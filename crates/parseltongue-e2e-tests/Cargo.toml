@@ -14,10 +14,6 @@ publish = false
 parseltongue-core = { path = "../parseltongue-core" }
 pt01-folder-to-cozodb-streamer = { path = "../pt01-folder-to-cozodb-streamer" }
 pt02-llm-cozodb-to-context-writer = { path = "../pt02-llm-cozodb-to-context-writer" }
-pt03-llm-to-cozodb-writer = { path = "../pt03-llm-to-cozodb-writer" }
-pt04-syntax-preflight-validator = { path = "../pt04-syntax-preflight-validator" }
-pt05-llm-cozodb-to-diff-writer = { path = "../pt05-llm-cozodb-to-diff-writer" }
-pt06-cozodb-make-future-code-current = { path = "../pt06-cozodb-make-future-code-current" }
 
 # Dependencies from workspace
 anyhow.workspace = true

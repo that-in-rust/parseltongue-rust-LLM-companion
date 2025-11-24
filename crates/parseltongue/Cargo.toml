@@ -17,13 +17,9 @@ console = { workspace = true }
 # Core library (provides storage, entities, traits)
 parseltongue-core = { path = "../parseltongue-core" }
 
-# Import all tool crates as libraries (workflow-ordered pt01-pt06)
+# Import all tool crates as libraries (workflow-ordered pt01-pt07)
 pt01-folder-to-cozodb-streamer = { path = "../pt01-folder-to-cozodb-streamer" }
 pt02-llm-cozodb-to-context-writer = { path = "../pt02-llm-cozodb-to-context-writer" }
-pt03-llm-to-cozodb-writer = { path = "../pt03-llm-to-cozodb-writer" }
-pt04-syntax-preflight-validator = { path = "../pt04-syntax-preflight-validator" }
-pt05-llm-cozodb-to-diff-writer = { path = "../pt05-llm-cozodb-to-diff-writer" }
-pt06-cozodb-make-future-code-current = { path = "../pt06-cozodb-make-future-code-current" }
 pt07-visual-analytics-terminal = { path = "../pt07-visual-analytics-terminal" }
 
 # Core dependencies
