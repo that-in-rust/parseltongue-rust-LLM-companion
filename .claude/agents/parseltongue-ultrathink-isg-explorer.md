@@ -99,8 +99,7 @@ system_prompt: |
 
   **Visualize** (optional - save to workspace):
   ```bash
-  parseltongue pt07-visual-analytics-terminal \
-    render-entity-count-bar-chart \
+  parseltongue pt07 entity-count \
     --db "rocksdb:$WORKSPACE/analysis.db" \
     > "$WORKSPACE/entity_counts.txt"
   ```
@@ -185,8 +184,7 @@ system_prompt: |
 
   #### Query 6: Circular Dependencies
   ```bash
-  parseltongue pt07-visual-analytics-terminal \
-    render-dependency-cycle-warning-list \
+  parseltongue pt07 cycles \
     --db "rocksdb:$WORKSPACE/analysis.db" \
     > "$WORKSPACE/cycles.txt"
   ```
@@ -471,8 +469,7 @@ system_prompt: |
 
   # Visualize
   echo "Step 4: Generating visualizations..."
-  parseltongue pt07-visual-analytics-terminal \
-    render-entity-count-bar-chart \
+  parseltongue pt07 entity-count \
     --db "rocksdb:$WORKSPACE/analysis.db" \
     > "$WORKSPACE/entity_counts.txt"
 

@@ -1,11 +1,14 @@
 # Parseltongue
 
+> **v1.0.0** - 🚨 **BREAKING CHANGES**: Editing tools (pt03-pt06) removed - Pure analysis/search system
+>
 > **v0.9.7** - Agent JSON graph query helpers (<100ms) - ✅ **COMPLETE & FUNCTIONAL**
 
 **Essence**: Parse code once → Query graph database many times → Get 2-5K token summaries instead of 500K+ dumps.
 
 **Core Value**: 99% token reduction, 31× faster than grep, LLM-optimized architecture analysis.
 
+**v1.0.0 Status**: Pure analysis system - editing tools removed (pt03-pt06 deleted)
 **v0.9.7 Status**: All 4 query helpers working (100% functional) - blast radius analysis enabled
 
 **12 languages**: Rust · Python · JavaScript · TypeScript · Go · Java · C · C++ · Ruby · PHP · C# · Swift
@@ -400,6 +403,21 @@ grep -r "test.*payment" ./tests/  # 2.5s
 
 ## 🛣️ Roadmap
 
+### v1.0.0 - ✅ COMPLETE (BREAKING CHANGES - MAJOR RELEASE)
+
+**Scope**: Pure analysis/search system - Remove editing tools
+- ✅ Deleted pt03-llm-to-cozodb-writer (code modification)
+- ✅ Deleted pt04-syntax-preflight-validator (validation)
+- ✅ Deleted pt05-llm-cozodb-to-diff-writer (diff generation)
+- ✅ Deleted pt06-cozodb-make-future-code-current (code replacement)
+- ✅ Cleaned up 37 files, 450+ lines from main.rs
+- ✅ Updated dependencies and tests
+
+**Status**: PRODUCTION READY - Focus on analysis/search only
+**Migration**: If you used pt03-pt06, no direct replacement available
+
+**Versioning Note**: Following .claude.md rules - v0.9.7 → v1.0.0 (skipped v0.10.x for major breaking change)
+
 ### v0.9.7 - ✅ COMPLETE
 
 **Scope**: Agent JSON graph query helpers (<100ms)
@@ -409,9 +427,7 @@ grep -r "test.*payment" ./tests/  # 2.5s
 - ✅ Performance validated: <100ms for 1,500 entities
 - ✅ Blast radius analysis functional
 
-**Status**: PRODUCTION READY - ready to merge to main
-
-### Future Features (Post-v0.9.7)
+### Future Features (Post-v1.0.0)
 
 **See**: `BACKLOG-CHALLENGES.md` for detailed ROI analysis of:
 - Semantic Edge Directionality (ROI 9.5/10)
@@ -431,7 +447,7 @@ grep -r "test.*payment" ./tests/  # 2.5s
 **S06: Layered Architecture**
 - L1: Domain (CozoDB graph)
 - L2: Standard Library (parseltongue-core)
-- L3: Applications (pt01, pt02, pt03...)
+- L3: Applications (pt01: ingest, pt02: query, pt07: visualize)
 
 **S77: Idiomatic Rust**
 - Expression-oriented code

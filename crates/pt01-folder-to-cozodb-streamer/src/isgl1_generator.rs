@@ -126,6 +126,7 @@ impl Isgl1KeyGeneratorImpl {
         init_parser!(Language::TypeScript, &tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into());
         init_parser!(Language::Go, &tree_sitter_go::LANGUAGE.into());
         init_parser!(Language::Java, &tree_sitter_java::LANGUAGE.into());
+        init_parser!(Language::C, &tree_sitter_c::LANGUAGE.into());  // v1.0.0: Add missing C parser
         init_parser!(Language::Cpp, &tree_sitter_cpp::LANGUAGE.into());
         init_parser!(Language::Ruby, &tree_sitter_ruby::LANGUAGE.into());
         init_parser!(Language::Php, &tree_sitter_php::LANGUAGE_PHP.into());

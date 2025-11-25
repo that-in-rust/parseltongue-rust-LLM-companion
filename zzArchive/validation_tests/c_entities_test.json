@@ -1,0 +1,10 @@
+{
+  "export_metadata": {
+    "level": 1,
+    "timestamp": "2025-11-25T02:59:48.056083+00:00",
+    "total_entities": 0,
+    "include_code": true,
+    "where_filter": "entity_class = 'TEST'"
+  },
+  "entities": []
+}
