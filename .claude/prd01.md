@@ -2,8 +2,8 @@
 
 **Author**: Product
 **Status**: Draft
-**Version**: 1.1.0
-**Last Updated**: 2025-11-26
+**Version**: 1.2.0
+**Last Updated**: 2025-11-27
 
 ---
 
@@ -153,8 +153,9 @@ Phase 2: Parsing (12 languages supported)
   ✓ Python:     45 files  →  123 entities
   ✓ TypeScript: 100 files →  234 entities
 
-Phase 3: Dependency Extraction
-  ✓ 2,341 edges (Calls: 1,890 | Uses: 345 | Implements: 106)
+Phase 3: Dependency Extraction (CPG-Inspired Edge Types)
+  ✓ 2,541 edges
+    Calls: 1,890 | Uses: 345 | Implements: 106 | Extends: 45 | Contains: 155
 
 Phase 4: Classification
   ✓ CODE entities: 591
@@ -188,6 +189,7 @@ Available endpoints:
   GET /blast/{name}       - Impact analysis
   GET /cycles             - Circular dependencies
   GET /hotspots           - Complexity ranking
+  GET /clusters           - Semantic module groupings (LPA)
   GET /search?q=pattern   - Search entities
   GET /help               - Full API reference
 
@@ -288,8 +290,24 @@ CodeGraph {
 DependencyEdges {
   from_key: String         → "rust:fn:process:..."
   to_key: String           → "rust:fn:validate:..."
-  edge_type: String        → "Calls", "Uses", "Implements"
+  edge_type: String        → "Calls", "Uses", "Implements", "Extends", "Contains"
+  direction: String        → "downward", "upward", "horizontal"
 }
+
+### Edge Types (CPG-Inspired)
+
+| Edge Type | Direction | Meaning | Example |
+|-----------|-----------|---------|---------|
+| `Calls` | downward | Function invocation | `main` → `process` |
+| `Uses` | downward | Type/constant reference | `handler` → `Config` |
+| `Implements` | upward | Trait implementation | `MyStruct` → `Trait` |
+| `Extends` | upward | Inheritance/extension | `Child` → `Parent` |
+| `Contains` | downward | Structural containment | `module` → `function` |
+
+**Direction Semantics**:
+- `"downward"` - Caller→Callee, User→Provider, Container→Contained
+- `"upward"` - Implementor→Trait, Child→Parent
+- `"horizontal"` - Peer relationships (rare)
 ```
 
 ### Port Management
@@ -339,6 +357,7 @@ Terminal 2: parseltongue serve-http-code-backend ./project-b  → localhost:3334
 | `GET /cycles` | `handle_cycles_detection_request()` | Circular dependencies |
 | `GET /hotspots` | `handle_hotspots_analysis_request()` | Complexity ranking |
 | `GET /search` | `handle_search_entities_request()` | Fuzzy search |
+| `GET /clusters` | `handle_clusters_query_request()` | Semantic module groupings |
 | `GET /help` | `handle_help_reference_request()` | API documentation |
 
 ### Core Endpoints
@@ -349,7 +368,7 @@ Terminal 2: parseltongue serve-http-code-backend ./project-b  → localhost:3334
 | `GET /entities` | All entities | `[{"key": "rust:fn:...", "name": "process", ...}]` |
 | `GET /entities?name=X` | Filter by name | Entities matching pattern |
 | `GET /entities?type=function` | Filter by type | Only functions |
-| `GET /edges` | All dependency edges | `[{"from": "...", "to": "...", "type": "Calls"}]` |
+| `GET /edges` | All dependency edges | `[{"from": "...", "to": "...", "type": "Calls", "direction": "downward"}]` |
 
 ### Graph Query Endpoints
 
@@ -360,6 +379,8 @@ Terminal 2: parseltongue serve-http-code-backend ./project-b  → localhost:3334
 | `GET /blast/{entity}?hops=N` | Transitive impact | "What breaks if I change this?" |
 | `GET /cycles` | Circular dependencies | "Are there architectural problems?" |
 | `GET /hotspots?top=N` | Complexity ranking | "Where is the complexity?" |
+| `GET /clusters` | Semantic module groupings | "What logical modules exist?" |
+| `GET /clusters?entity=X` | Cluster for entity | "What module does X belong to?" |
 | `GET /search?q=pattern` | Fuzzy search | "Find anything related to X" |
 
 ### Response Format
@@ -532,6 +553,7 @@ async fn test_blast_radius_bounded_by_hops() {
 - [ ] `/blast/{entity}` (`handle_blast_radius_request()`)
 - [ ] `/cycles` (`handle_cycles_detection_request()`)
 - [ ] `/hotspots` (`handle_hotspots_analysis_request()`)
+- [ ] `/clusters` (`handle_clusters_query_request()`) - wraps pt08 LPA clustering
 - [ ] `/search` (`handle_search_entities_request()`)
 
 ### Phase 3: Polish (Week 3)
@@ -681,8 +703,9 @@ curl http://localhost:3847/stats
   "success": true,
   "data": {
     "entities": 591,
-    "edges": 2341,
-    "by_type": {"function": 456, "struct": 78, "trait": 23},
+    "edges": 2541,
+    "by_entity_type": {"function": 456, "struct": 78, "trait": 23},
+    "by_edge_type": {"Calls": 1890, "Uses": 345, "Implements": 106, "Extends": 45, "Contains": 155},
     "by_language": {"rust": 456, "typescript": 234, "python": 123},
     "db_path": "parseltongue_20251126/analysis.db"
   },
@@ -702,10 +725,40 @@ curl http://localhost:3847/callers/process
   "entity": "process",
   "count": 2,
   "data": [
-    {"from": "rust:fn:main:src_main_rs:10", "edge_type": "Calls"},
-    {"from": "rust:fn:handle:src_api_rs:34", "edge_type": "Calls"}
+    {"from": "rust:fn:main:src_main_rs:10", "edge_type": "Calls", "direction": "downward"},
+    {"from": "rust:fn:handle:src_api_rs:34", "edge_type": "Calls", "direction": "downward"}
   ],
   "tokens": 120
+}
+```
+
+### GET /clusters
+
+```bash
+curl http://localhost:3847/clusters
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/clusters",
+  "count": 5,
+  "data": [
+    {
+      "cluster_id": 1,
+      "name": "core-processing",
+      "members": ["rust:fn:process", "rust:fn:validate", "rust:fn:transform"],
+      "cohesion_score": 0.87
+    },
+    {
+      "cluster_id": 2,
+      "name": "api-handlers",
+      "members": ["rust:fn:handle", "rust:fn:route", "rust:fn:respond"],
+      "cohesion_score": 0.72
+    }
+  ],
+  "algorithm": "LPA",
+  "tokens": 250
 }
 ```
 
@@ -766,4 +819,30 @@ curl "http://localhost:3847/hotspots?top=5"
 
 ---
 
-**End of PRD v1.1.0**
+## Changelog
+
+### v1.2.0 (2025-11-27) - CPG-Inspired Enhancements
+
+**New Edge Types** (Code Property Graph inspired):
+- `Extends` - Inheritance/trait extension (upward direction)
+- `Contains` - Structural containment (downward direction)
+
+**Direction Metadata**:
+- All edges now include `direction` field: `"downward"`, `"upward"`, `"horizontal"`
+- Enables semantic understanding of relationship flow
+
+**New Endpoint**:
+- `GET /clusters` - Semantic module groupings via LPA (Label Propagation Algorithm)
+- Wraps existing pt08 clustering capability
+- Returns cohesion scores for each cluster
+
+### v1.1.0 (2025-11-26) - Initial HTTP Server Architecture
+
+- HTTP server replaces CLI + JSON exports
+- 4-word command naming convention
+- 12 languages supported via tree-sitter
+- TDD-first implementation approach
+
+---
+
+**End of PRD v1.2.0**
