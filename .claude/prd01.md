@@ -2,7 +2,7 @@
 
 **Author**: Product
 **Status**: Draft
-**Version**: 1.2.0
+**Version**: 1.4.0
 **Last Updated**: 2025-11-27
 
 ---
@@ -112,6 +112,39 @@ parseltongue serve-http-code-backend . --daemon --timeout 60
 | **PHP** | `.php` | function, class, trait |
 | **C#** | `.cs` | class, struct, interface, method |
 | **Swift** | `.swift` | func, class, struct, protocol |
+
+---
+
+## ISGL Level Taxonomy (4-Word Hyphenated Names)
+
+**ISGL** = Information Semantic Graph Level. Each level provides progressively more detail about the codebase.
+
+| ISGL | 4-Word Name (Hyphenated) | What It Answers | Token Budget |
+|------|--------------------------|-----------------|--------------|
+| `ISGL0` | `Who-Calls-Who-Graph` | "What connects to what?" | ~3K tokens |
+| `ISGL0.5` | `Smart-Module-Grouping-Level` | "What logical groups exist?" | ~5K tokens |
+| `ISGL1` | `Function-Signature-Overview` | "What functions exist?" | ~30K tokens |
+| `ISGL2` | `Complete-Type-Detail-Level` | "What are all the types?" | ~60K tokens |
+| `ISGL3` | `Full-Source-Code-Level` | "What is the actual code?" | ~500K tokens |
+| `ISGL4` | `Folder-File-Organization` | "How is code organized?" | ~10K tokens |
+
+### Naming Convention by Context
+
+| Context | Convention | Example |
+|---------|------------|---------|
+| Documentation/ISGL names | Hyphenated | `Who-Calls-Who-Graph` |
+| HTTP URLs | Hyphenated | `/who-calls-who-graph` |
+| Rust files | snake_case | `who_calls_who_graph.rs` |
+| Rust modules | snake_case | `mod who_calls_who_graph;` |
+| DB tables | PascalCase | `CodeProductionEntityStore` |
+| Handler functions | snake_case | `handle_who_calls_who_graph()` |
+
+### Why Hyphenated Names
+
+1. **Readable** - `Who-Calls-Who-Graph` vs `WhoCallsWhoGraph`
+2. **Self-documenting** - Each word clearly separated
+3. **LLM-friendly** - Better tokenization with explicit boundaries
+4. **URL-compatible** - Already standard for REST endpoints
 
 ---
 
@@ -272,27 +305,237 @@ No re-indexing. Instant startup. Same port management.
 - Clear provenance (when was this indexed?)
 - No conflicts with project files
 
-### Database Schema (What Gets Ingested)
+### Database Schema (14 Tables - 4-Word Naming Convention)
 
+**Key Design Decision**: CODE and TEST entities are stored in **separate tables** for:
+- Cleaner queries (no `WHERE entity_class='CODE'` needed)
+- 75% token savings when excluding test entities
+- Separate edge graphs for CODE→CODE vs TEST→TEST vs TEST→CODE
+
+#### Table Summary
+
+| # | Table Name (4 words) | Purpose |
+|---|---------------------|---------|
+| 1 | `CodeProductionEntityStore` | Production code entities |
+| 2 | `TestImplementationEntityStore` | Test code entities |
+| 3 | `CodeDependencyEdgeGraph` | CODE→CODE dependencies |
+| 4 | `TestDependencyEdgeGraph` | TEST→TEST dependencies |
+| 5 | `TestToCodeEdgeBridge` | TEST→CODE coverage links |
+| 6 | `EntityComputedMetricsCache` | Pre-computed entity stats |
+| 7 | `GraphGlobalStatisticsStore` | Global codebase stats |
+| 8 | `SemanticClusterDefinitionStore` | ISGL0.5 cluster definitions |
+| 9 | `EntityClusterMembershipMap` | Entity→Cluster mapping |
+| 10 | `FileEntityMappingIndex` | Package graph (ISGL4) |
+| 11 | `ModuleCohesionMetricsCache` | Module quality metrics |
+| 12 | `OrphanDeadCodeCache` | Dead code detection cache |
+| 13 | `ControlFlowPathAnalysis` | Critical path analysis |
+| 14 | `TemporalCouplingEdgeStore` | Git-derived hidden dependencies |
+
+#### Core Entity Tables (1-2)
+
+```datalog
+:create CodeProductionEntityStore {
+    ISGL1_key: String =>           # "rust:fn:process:src_handler_rs:45-89"
+    entity_name: String,
+    entity_type: String,           # "function", "struct", "trait", "impl"
+    visibility: String,            # "public", "private", "crate"
+    file_path: String,
+    line_start: Int,
+    line_end: Int,
+    language: String,
+    module_path: String,           # "crate::module::submodule"
+    current_code: String?,
+    future_code: String?,
+    interface_signature: String,   # JSON
+    current_ind: Bool,
+    future_ind: Bool,
+    future_action: String?,
+    doc_comment: String?,
+    tdd_classification: String,
+    content_hash: String,
+    created_at: String,
+    modified_at: String
+}
+
+:create TestImplementationEntityStore {
+    ISGL1_key: String =>
+    entity_name: String,
+    entity_type: String,           # "test_function", "test_module"
+    test_kind: String,             # "unit", "integration", "benchmark"
+    file_path: String,
+    line_start: Int,
+    line_end: Int,
+    language: String,
+    module_path: String,
+    current_code: String?,
+    interface_signature: String,
+    current_ind: Bool,
+    future_ind: Bool,
+    future_action: String?,
+    test_attributes: String?,      # JSON: #[test], #[tokio::test]
+    tested_entity_key: String?,    # Link to CodeEntities
+    assertion_count: Int?,
+    content_hash: String,
+    created_at: String,
+    modified_at: String
+}
 ```
-CodeGraph {
-  ISGL1_key: String        → "rust:fn:process:src_handler_rs:45-89"
-  entity_name: String      → "process"
-  entity_type: String      → "function"
-  file_path: String        → "src/handler.rs"
-  line_number: Int         → 45
-  interface_signature: String → "pub async fn process(req: Request) -> Response"
-  entity_class: String     → "CODE" or "TEST"
-  current_ind: Bool        → true (exists now)
-  future_ind: Bool         → true (will exist)
+
+#### Edge Tables (3-5)
+
+```datalog
+:create CodeDependencyEdgeGraph {
+    from_key: String,
+    to_key: String,
+    edge_type: String              # "Calls", "Uses", "Implements", "Extends", "Contains"
+    =>
+    direction: String,             # "downward", "upward", "horizontal"
+    source_location: String?,
+    weight: Float?,
+    created_at: String
 }
 
-DependencyEdges {
-  from_key: String         → "rust:fn:process:..."
-  to_key: String           → "rust:fn:validate:..."
-  edge_type: String        → "Calls", "Uses", "Implements", "Extends", "Contains"
-  direction: String        → "downward", "upward", "horizontal"
+:create TestDependencyEdgeGraph {
+    from_key: String,
+    to_key: String,
+    edge_type: String
+    =>
+    source_location: String?,
+    created_at: String
 }
+
+:create TestToCodeEdgeBridge {
+    test_key: String,
+    code_key: String,
+    edge_type: String              # "Tests", "Calls", "Mocks"
+    =>
+    coverage_type: String?,        # "direct", "indirect"
+    source_location: String?,
+    created_at: String
+}
+```
+
+#### Metrics Tables (6-7)
+
+```datalog
+:create EntityComputedMetricsCache {
+    ISGL1_key: String =>
+    entity_class: String,          # "CODE" or "TEST"
+    outgoing_count: Int,
+    incoming_count: Int,
+    transitive_count: Int,
+    cyclomatic_complexity: Float?,
+    cognitive_complexity: Float?,
+    loc: Int?,
+    unwrap_count: Int?,
+    clone_count: Int?,
+    unsafe_count: Int?,
+    hotspot_score: Float,
+    computed_at: String
+}
+
+:create GraphGlobalStatisticsStore {
+    metric_name: String =>
+    metric_value: Float,
+    entity_class: String?,         # null = all, "CODE", "TEST"
+    computed_at: String
+}
+```
+
+#### Semantic Cluster Tables (8-9) - ISGL0.5
+
+```datalog
+:create SemanticClusterDefinitionStore {
+    cluster_id: String =>
+    cluster_name: String,          # "export_pipeline", "db_adapter"
+    purpose: String?,              # LLM-inferred purpose
+    entity_class: String,
+    size: Int,
+    cohesion_score: Float,         # Internal connectivity
+    coupling_score: Float,         # External dependencies
+    parent_cluster_id: String?,    # Hierarchy support
+    depth: Int,
+    algorithm: String,             # "louvain", "lpa"
+    created_at: String
+}
+
+:create EntityClusterMembershipMap {
+    ISGL1_key: String,
+    cluster_id: String
+    =>
+    membership_score: Float?,
+    is_bridge: Bool?,              # Connects multiple clusters
+    role: String?                  # "core", "boundary", "bridge"
+}
+```
+
+#### Analysis Tables (10-13)
+
+```datalog
+:create FileEntityMappingIndex {
+    file_path: String =>
+    entity_count: Int,
+    code_entity_count: Int,
+    test_entity_count: Int,
+    total_loc: Int?,
+    language: String,
+    module_path: String?,
+    last_modified: String
+}
+
+:create ModuleCohesionMetricsCache {
+    scope: String,                 # file_path or cluster_id
+    scope_type: String             # "file", "cluster", "module"
+    =>
+    internal_edges: Int,
+    external_edges: Int,
+    cohesion_ratio: Float,         # internal / (internal + external)
+    instability: Float?,           # external_out / (external_in + external_out)
+    computed_at: String
+}
+
+:create OrphanDeadCodeCache {
+    ISGL1_key: String =>
+    entity_type: String,
+    file_path: String,
+    reason: String,                # "no_callers", "unused_export", "dead_branch"
+    detected_at: String
+}
+
+:create ControlFlowPathAnalysis {
+    path_id: String =>
+    start_entity: String,
+    end_entity: String,
+    path_length: Int,
+    path_entities: String,         # JSON array of ISGL1 keys
+    path_type: String,             # "critical", "hot", "dead"
+    importance_score: Float?,
+    computed_at: String
+}
+```
+
+#### Temporal Coupling Table (14) - Git-Derived Hidden Dependencies
+
+```datalog
+:create TemporalCouplingEdgeStore {
+    entity_a: String,
+    entity_b: String =>
+    co_change_count: Int,           # Times changed together
+    coupling_score: Float,          # Normalized 0.0-1.0
+    time_window_days: Int,          # Analysis window (default: 180)
+    first_co_change: String,        # RFC3339
+    last_co_change: String,         # RFC3339
+    computed_at: String
+}
+```
+
+**Why Temporal Coupling Matters**: Static analysis sees code dependencies. Temporal coupling reveals **invisible architecture** - files that always change together but have ZERO code dependency.
+
+Example:
+```
+auth.rs ↔ config.yaml (changed together 47 times, ZERO code dependency)
+```
+This reveals missing abstractions, implicit contracts, and true change impact.
 
 ### Edge Types (CPG-Inspired)
 
@@ -308,7 +551,6 @@ DependencyEdges {
 - `"downward"` - Caller→Callee, User→Provider, Container→Contained
 - `"upward"` - Implementor→Trait, Child→Parent
 - `"horizontal"` - Peer relationships (rare)
-```
 
 ### Port Management
 
@@ -342,23 +584,199 @@ Terminal 2: parseltongue serve-http-code-backend ./project-b  → localhost:3334
 
 ## HTTP API Specification
 
-### Endpoint Handler Functions (4-Word Naming)
+### Endpoint Handler Functions (4-Word Hyphenated URLs)
+
+Per project rules: ALL endpoints use hyphenated 4-word URLs for LLM readability.
+
+#### Core Endpoints (Hyphenated URLs)
 
 | Endpoint | Handler Function | Description |
 |----------|-----------------|-------------|
-| `GET /health` | `handle_health_check_request()` | Server status |
-| `GET /stats` | `handle_stats_overview_request()` | Codebase statistics |
-| `GET /entities` | `handle_entities_list_request()` | All entities |
-| `GET /entities/{key}` | `handle_entity_detail_request()` | Single entity |
-| `GET /edges` | `handle_edges_list_request()` | All dependency edges |
-| `GET /callers/{entity}` | `handle_callers_query_request()` | Reverse dependencies |
-| `GET /callees/{entity}` | `handle_callees_query_request()` | Forward dependencies |
-| `GET /blast/{entity}` | `handle_blast_radius_request()` | Transitive impact |
-| `GET /cycles` | `handle_cycles_detection_request()` | Circular dependencies |
-| `GET /hotspots` | `handle_hotspots_analysis_request()` | Complexity ranking |
-| `GET /search` | `handle_search_entities_request()` | Fuzzy search |
-| `GET /clusters` | `handle_clusters_query_request()` | Semantic module groupings |
-| `GET /help` | `handle_help_reference_request()` | API documentation |
+| `GET /server-health-check-status` | `handle_server_health_check_status()` | Server status |
+| `GET /codebase-statistics-overview-summary` | `handle_codebase_statistics_overview_summary()` | Codebase statistics |
+| `GET /code-entities-list-all` | `handle_code_entities_list_all()` | All entities |
+| `GET /code-entity-detail-view/{key}` | `handle_code_entity_detail_view()` | Single entity |
+| `GET /dependency-edges-list-all` | `handle_dependency_edges_list_all()` | All dependency edges |
+| `GET /reverse-callers-query-graph/{entity}` | `handle_reverse_callers_query_graph()` | Reverse dependencies |
+| `GET /forward-callees-query-graph/{entity}` | `handle_forward_callees_query_graph()` | Forward dependencies |
+| `GET /blast-radius-impact-analysis/{entity}` | `handle_blast_radius_impact_analysis()` | Transitive impact |
+| `GET /circular-dependency-detection-scan` | `handle_circular_dependency_detection_scan()` | Circular dependencies |
+| `GET /complexity-hotspots-ranking-view` | `handle_complexity_hotspots_ranking_view()` | Complexity ranking |
+| `GET /fuzzy-entity-search-query` | `handle_fuzzy_entity_search_query()` | Fuzzy search |
+| `GET /semantic-cluster-grouping-list` | `handle_semantic_cluster_grouping_list()` | Semantic module groupings |
+| `GET /api-reference-documentation-help` | `handle_api_reference_documentation_help()` | API documentation |
+
+#### New Endpoints (v1.4.0 - High-ROI Features)
+
+| Endpoint | Handler Function | Description | Source Table |
+|----------|-----------------|-------------|--------------|
+| `GET /orphan-dead-code-detection` | `handle_orphan_dead_code_detection()` | Dead code detection | `OrphanDeadCodeCache` |
+| `GET /package-file-structure-graph` | `handle_package_file_structure_graph()` | Package graph (ISGL4) | `FileEntityMappingIndex` |
+| `GET /entity-complexity-metrics-cache` | `handle_entity_complexity_metrics_cache()` | Pre-computed metrics | `EntityComputedMetricsCache` |
+| `GET /module-cohesion-quality-score` | `handle_module_cohesion_quality_score()` | Module quality metrics | `ModuleCohesionMetricsCache` |
+| `GET /critical-control-flow-paths` | `handle_critical_control_flow_paths()` | Critical path analysis | `ControlFlowPathAnalysis` |
+| `GET /semantic-cluster-detail-view/{id}` | `handle_semantic_cluster_detail_view()` | Cluster with members | `SemanticClusterDefinitionStore` |
+
+#### Killer Feature Endpoints (v1.4.0)
+
+| Endpoint | Handler Function | Description | LOC |
+|----------|-----------------|-------------|-----|
+| `GET /temporal-coupling-hidden-deps/{entity}` | `handle_temporal_coupling_hidden_deps()` | Git-derived hidden dependencies | ~1200 |
+| `GET /smart-context-token-budget?focus=X&tokens=N` | `handle_smart_context_token_budget()` | Dynamic context selection | ~1500 |
+
+---
+
+## Killer Features (v1.4.0)
+
+### The Shreyas Frame
+
+> *"What's the job the customer is hiring you for?"*
+>
+> Not "parse my code." Not "build a graph." Not "detect clusters."
+>
+> **"Give my LLM exactly what it needs to reason about this code, and nothing else."**
+
+---
+
+### KILLER FEATURE #1: Temporal-Coupling-Detection (~1200 LOC)
+
+**What it reveals**: The INVISIBLE architecture.
+
+Static analysis sees:
+```
+auth.rs → session.rs (Calls edge)
+```
+
+Temporal coupling reveals:
+```
+auth.rs ↔ config.yaml (changed together 47 times, ZERO code dependency)
+auth.rs ↔ middleware.rs (changed together 31 times, indirect edge)
+```
+
+**This is information no amount of tree-sitter parsing will ever find.**
+
+#### Implementation (Git Log Parsing)
+
+```bash
+git log --name-only --pretty=format:"%H" --since="6 months ago" \
+  | parse commit boundaries \
+  | count co-occurrences \
+  | normalize to coupling_score
+```
+
+#### Endpoint: `/temporal-coupling-hidden-deps/{entity}`
+
+```json
+{
+  "success": true,
+  "entity": "auth.rs",
+  "hidden_dependencies": [
+    {"file": "config.yaml", "co_changes": 47, "score": 0.92, "code_edge": false},
+    {"file": "middleware.rs", "co_changes": 31, "score": 0.78, "code_edge": true}
+  ],
+  "insight": "config.yaml has NO code dependency but HIGH temporal coupling - missing abstraction?"
+}
+```
+
+#### Compounding Effect
+
+| What It Unlocks | Why It Matters |
+|-----------------|----------------|
+| **Better clusters** | Multi-signal affinity: 63% → 91% accuracy |
+| **True blast radius** | `/blast/auth` now includes `config.yaml` |
+| **Change prediction** | "If you touch X, you'll probably touch Y" |
+| **Hidden tech debt** | High temporal + zero code edge = missing abstraction |
+
+---
+
+### KILLER FEATURE #2: Dynamic-Context-Token-Budget (~1500 LOC)
+
+**The culmination of everything.**
+
+You now have:
+- Static edges (code dependencies)
+- Clusters (semantic groupings)
+- Temporal coupling (hidden dependencies)
+
+**But you're still making the LLM do the work.**
+
+Dynamic context selection flips the model:
+
+```
+Input:  focus=auth, budget=4000 tokens
+Output: Exactly the 4000 most relevant tokens for reasoning about auth
+```
+
+Not "here's everything related to auth" (50K tokens).
+Not "here's the auth function only" (200 tokens, missing context).
+**Exactly** what the LLM needs. Nothing more.
+
+#### The Algorithm (Greedy Knapsack)
+
+```python
+def select_context(focus_entity, token_budget):
+    # 1. Start with focus entity
+    context = [focus_entity]
+
+    # 2. Score all reachable entities by:
+    for entity in reachable_entities(focus_entity):
+        entity.score = (
+            dependency_distance_score(entity, focus_entity) * 0.3 +
+            temporal_coupling_score(entity, focus_entity) * 0.25 +
+            cluster_co_membership_score(entity, focus_entity) * 0.25 +
+            centrality_score(entity) * 0.2  # Is this a hub?
+        )
+
+    # 3. Greedily add highest-scored until budget exhausted
+    for entity in sorted_by_score(reachable_entities):
+        if current_tokens + entity.tokens <= token_budget:
+            context.append(entity)
+
+    # 4. Return ordered context with reasoning hints
+    return ContextResponse(
+        entities=context,
+        edges=relevant_edges(context),
+        cluster=primary_cluster(context),
+        reasoning_hints=generate_hints(context)
+    )
+```
+
+#### Endpoint: `/smart-context-token-budget?focus=X&tokens=N`
+
+```json
+{
+  "success": true,
+  "focus": "auth",
+  "token_budget": 4000,
+  "tokens_used": 3850,
+  "selection_strategy": "greedy_knapsack_multi_signal",
+  "context": {
+    "core_entities": [
+      {"key": "rust:fn:authenticate", "tokens": 450, "score": 0.95, "reason": "focus"},
+      {"key": "rust:fn:validate_token", "tokens": 380, "score": 0.89, "reason": "direct_caller"},
+      {"key": "rust:struct:Session", "tokens": 220, "score": 0.85, "reason": "cluster_co_member"}
+    ],
+    "supporting_edges": [...],
+    "cluster": "auth_flow",
+    "temporal_hints": [
+      "config.yaml changes with auth 47 times - check if config change needed"
+    ],
+    "blast_radius_summary": "14 entities affected by changes to auth"
+  }
+}
+```
+
+#### Why It's THE Feature
+
+| Without It | With It |
+|------------|---------|
+| Agent queries multiple endpoints, manually assembles | Agent queries one endpoint, gets perfect context |
+| Token budget guesswork | Token budget respected |
+| LLM reasons over noise | LLM reasons over signal |
+
+**Why it's the moat**: "I asked for auth context, I got exactly what an LLM needs to reason about auth, and nothing else."
+
+---
 
 ### Core Endpoints
 
@@ -819,7 +1237,408 @@ curl "http://localhost:3847/hotspots?top=5"
 
 ---
 
+## Appendix: New v1.3.0 Endpoint Examples
+
+### GET /orphans (Dead Code Detection)
+
+```bash
+curl http://localhost:3847/orphans
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/orphans",
+  "count": 12,
+  "data": [
+    {
+      "key": "rust:fn:legacy_export:src_old_rs:45",
+      "reason": "no_callers",
+      "type": "function",
+      "file": "src/old.rs"
+    },
+    {
+      "key": "rust:struct:OldConfig:src_config_rs:20",
+      "reason": "unused_export",
+      "type": "struct",
+      "file": "src/config.rs"
+    }
+  ],
+  "tokens": 200
+}
+```
+
+### GET /files (Package Graph - ISGL4)
+
+```bash
+curl http://localhost:3847/files
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/files",
+  "count": 45,
+  "data": [
+    {
+      "file_path": "src/handler.rs",
+      "entity_count": 12,
+      "code_entities": 10,
+      "test_entities": 2,
+      "loc": 450,
+      "language": "rust"
+    },
+    {
+      "file_path": "src/parser.rs",
+      "entity_count": 8,
+      "code_entities": 8,
+      "test_entities": 0,
+      "loc": 320,
+      "language": "rust"
+    }
+  ],
+  "tokens": 350
+}
+```
+
+### GET /complexity?top=N (Pre-computed Metrics)
+
+```bash
+curl "http://localhost:3847/complexity?top=5"
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/complexity",
+  "data": [
+    {
+      "key": "rust:fn:process:src_handler_rs:45",
+      "hotspot_score": 0.92,
+      "incoming_count": 15,
+      "outgoing_count": 8,
+      "cyclomatic_complexity": 12,
+      "risk_indicators": {
+        "unwrap_count": 3,
+        "clone_count": 2,
+        "unsafe_count": 0
+      }
+    },
+    {
+      "key": "rust:fn:parse:src_parser_rs:100",
+      "hotspot_score": 0.78,
+      "incoming_count": 10,
+      "outgoing_count": 6,
+      "cyclomatic_complexity": 8,
+      "risk_indicators": {
+        "unwrap_count": 5,
+        "clone_count": 0,
+        "unsafe_count": 0
+      }
+    }
+  ],
+  "tokens": 280
+}
+```
+
+### GET /cohesion?scope=file (Module Quality Metrics)
+
+```bash
+curl "http://localhost:3847/cohesion?scope=file"
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/cohesion",
+  "data": [
+    {
+      "scope": "src/handler.rs",
+      "scope_type": "file",
+      "internal_edges": 24,
+      "external_edges": 8,
+      "cohesion_ratio": 0.75,
+      "instability": 0.35,
+      "health": "good"
+    },
+    {
+      "scope": "src/utils.rs",
+      "scope_type": "file",
+      "internal_edges": 4,
+      "external_edges": 15,
+      "cohesion_ratio": 0.21,
+      "instability": 0.85,
+      "health": "poor"
+    }
+  ],
+  "tokens": 220
+}
+```
+
+### GET /paths (Critical Path Analysis)
+
+```bash
+curl http://localhost:3847/paths
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/paths",
+  "count": 3,
+  "data": [
+    {
+      "path_id": "critical_1",
+      "start_entity": "rust:fn:main:src_main_rs:1",
+      "end_entity": "rust:fn:write_output:src_io_rs:200",
+      "path_length": 5,
+      "path_entities": ["main", "process", "transform", "serialize", "write_output"],
+      "path_type": "critical",
+      "importance_score": 0.95
+    },
+    {
+      "path_id": "hot_1",
+      "start_entity": "rust:fn:handle:src_api_rs:50",
+      "end_entity": "rust:fn:db_query:src_db_rs:100",
+      "path_length": 3,
+      "path_entities": ["handle", "validate", "db_query"],
+      "path_type": "hot",
+      "importance_score": 0.78
+    }
+  ],
+  "tokens": 300
+}
+```
+
+### GET /clusters/{id} (Cluster Detail with Members)
+
+```bash
+curl http://localhost:3847/clusters/export_pipeline
+```
+
+```json
+{
+  "success": true,
+  "endpoint": "/clusters/export_pipeline",
+  "data": {
+    "cluster_id": "export_pipeline",
+    "cluster_name": "Export Pipeline",
+    "purpose": "Handles all code export operations including JSON and text output",
+    "entity_class": "CODE",
+    "size": 8,
+    "cohesion_score": 0.87,
+    "coupling_score": 0.15,
+    "algorithm": "louvain",
+    "members": [
+      {
+        "key": "rust:fn:export:src_export_rs:10",
+        "role": "core",
+        "membership_score": 0.95
+      },
+      {
+        "key": "rust:fn:write_json:src_export_rs:100",
+        "role": "core",
+        "membership_score": 0.92
+      },
+      {
+        "key": "rust:fn:format_output:src_format_rs:50",
+        "role": "boundary",
+        "membership_score": 0.78,
+        "is_bridge": true
+      }
+    ],
+    "parent_cluster_id": null,
+    "depth": 0
+  },
+  "tokens": 350
+}
+```
+
+---
+
+## File Renaming Tasks (4-Word Convention)
+
+**Decision**: Full rename of all 50 production .rs files to 4-word snake_case names.
+
+**Constraint**: `mod.rs`, `lib.rs`, `main.rs` CANNOT be renamed (Rust convention).
+
+### Task Checklist (Tree Structure)
+
+```
+crates/
+├── parseltongue/                    (Main CLI - 1 file)
+│   └── src/
+│       └── [ ] main.rs              → (keep - Rust convention)
+│
+├── parseltongue-core/               (Foundational Library - 12 files)
+│   └── src/
+│       ├── [ ] lib.rs               → (keep)
+│       ├── [ ] entities.rs          → core_entity_type_definitions.rs
+│       ├── [ ] error.rs             → structured_error_handling_types.rs
+│       ├── [ ] interfaces.rs        → trait_based_abstraction_contracts.rs
+│       ├── [ ] temporal.rs          → temporal_versioning_state_manager.rs
+│       ├── [ ] output_path_resolver.rs → timestamped_output_path_resolver.rs
+│       ├── [ ] query_extractor.rs   → tree_sitter_query_extractor.rs
+│       ├── [ ] query_json_graph_errors.rs → agent_graph_query_errors.rs
+│       ├── [ ] query_json_graph_helpers.rs → agent_graph_traversal_helpers.rs
+│       ├── [ ] entity_class_specifications.rs → code_test_classification_specs.rs
+│       ├── storage/
+│       │   └── [ ] cozo_client.rs   → cozo_database_client_wrapper.rs
+│       └── serializers/
+│           ├── [ ] json.rs          → json_token_serializer_format.rs
+│           └── [ ] toon.rs          → toon_compact_serializer_format.rs
+│
+├── pt01-folder-to-cozodb-streamer/  (Ingestion Tool - 8 files)
+│   └── src/
+│       ├── [ ] lib.rs               → (keep)
+│       ├── [ ] cli.rs               → command_line_argument_parser.rs
+│       ├── [ ] errors.rs            → streaming_tool_error_types.rs
+│       ├── [ ] streamer.rs          → file_streaming_processor_core.rs
+│       ├── [ ] isgl1_generator.rs   → semantic_key_generation_service.rs
+│       ├── [ ] lsp_client.rs        → rust_analyzer_lsp_client.rs
+│       ├── [ ] test_detector.rs     → test_code_detection_classifier.rs
+│       └── [ ] v090_specifications.rs → executable_specification_v090_tests.rs
+│
+├── pt02-llm-cozodb-to-context-writer/ (Export Tool - 11 files)
+│   └── src/
+│       ├── [ ] lib.rs               → (keep)
+│       ├── [ ] cli.rs               → export_command_argument_parser.rs
+│       ├── [ ] errors.rs            → export_tool_error_types.rs
+│       ├── [ ] models.rs            → export_data_model_definitions.rs
+│       ├── [ ] cozodb_adapter.rs    → cozo_repository_adapter_impl.rs
+│       ├── [ ] export_trait.rs      → level_exporter_trait_contract.rs
+│       ├── [ ] query_builder.rs     → datalog_query_composition_builder.rs
+│       ├── [ ] entity_class_integration_tests.rs → code_test_integration_spec_tests.rs
+│       └── exporters/
+│           ├── [ ] level0.rs        → edge_only_export_level.rs
+│           ├── [ ] level1.rs        → entity_signature_export_level.rs
+│           └── [ ] level2.rs        → type_system_export_level.rs
+│
+└── pt07-visual-analytics-terminal/  (Visualization Tool - 10 files)
+    └── src/
+        ├── [ ] lib.rs               → (keep)
+        ├── [ ] visualizations.rs    → terminal_visualization_renderer_core.rs
+        ├── core/
+        │   ├── [ ] cycle_detection.rs → circular_dependency_detection_algorithm.rs
+        │   ├── [ ] filter_implementation_edges_only.rs → code_edge_filter_implementation.rs
+        │   └── [ ] filter_implementation_entities_only.rs → code_entity_filter_implementation.rs
+        ├── database/
+        │   ├── [ ] adapter.rs       → pt07_database_adapter_bridge.rs
+        │   └── [ ] conversion.rs    → type_conversion_utility_helpers.rs
+        └── primitives/
+            ├── [ ] render_box_drawing_unicode.rs → unicode_box_drawing_renderer.rs
+            ├── [ ] render_color_emoji_terminal.rs → terminal_color_emoji_renderer.rs
+            └── [ ] render_progress_bar_horizontal.rs → horizontal_progress_bar_renderer.rs
+```
+
+### Rename Execution Steps
+
+1. **Phase 1: parseltongue-core** (highest import count)
+   - [ ] Rename physical files
+   - [ ] Update `mod.rs` declarations
+   - [ ] Update all internal imports
+   - [ ] Run `cargo check` to verify
+
+2. **Phase 2: pt01-folder-to-cozodb-streamer**
+   - [ ] Rename physical files
+   - [ ] Update `mod.rs` declarations
+   - [ ] Update imports from parseltongue-core
+   - [ ] Run `cargo check` to verify
+
+3. **Phase 3: pt02-llm-cozodb-to-context-writer**
+   - [ ] Rename physical files
+   - [ ] Update `mod.rs` declarations
+   - [ ] Update imports from parseltongue-core
+   - [ ] Run `cargo check` to verify
+
+4. **Phase 4: pt07-visual-analytics-terminal**
+   - [ ] Rename physical files
+   - [ ] Update `mod.rs` declarations
+   - [ ] Update imports from parseltongue-core
+   - [ ] Run `cargo check` to verify
+
+5. **Phase 5: Full verification**
+   - [ ] Run `cargo build --release`
+   - [ ] Run `cargo test`
+   - [ ] Verify all 50 files renamed
+   - [ ] Estimated ~200 import statement updates
+
+---
+
 ## Changelog
+
+### v1.4.0 (2025-11-27) - Hyphenated Naming + Killer Features
+
+**ISGL Level Taxonomy (4-Word Hyphenated Names)**:
+- `Who-Calls-Who-Graph` (ISGL0) - edges only, ~3K tokens
+- `Smart-Module-Grouping-Level` (ISGL0.5) - semantic clusters, ~5K tokens
+- `Function-Signature-Overview` (ISGL1) - signatures, ~30K tokens
+- `Complete-Type-Detail-Level` (ISGL2) - types, ~60K tokens
+- `Full-Source-Code-Level` (ISGL3) - full code, ~500K tokens
+- `Folder-File-Organization` (ISGL4) - package graph, ~10K tokens
+
+**New Table (14th)**:
+- `TemporalCouplingEdgeStore` - Git-derived hidden dependencies
+- Reveals invisible architecture: files that change together but have ZERO code dependency
+
+**2 Killer Features**:
+1. **Temporal Coupling Detection** (~1200 LOC)
+   - `/temporal-coupling-hidden-deps/{entity}` endpoint
+   - Git log parsing to find co-changed files
+   - Multi-signal affinity for 63%→91% cluster accuracy
+2. **Dynamic Context Selection** (~1500 LOC)
+   - `/smart-context-token-budget?focus=X&tokens=N` endpoint
+   - Greedy knapsack algorithm with multi-signal scoring
+   - Token-budget-aware context selection
+
+**Hyphenated Endpoint URLs**:
+- All endpoints now use 4-word hyphenated URLs for LLM readability
+- Example: `/server-health-check-status` instead of `/health`
+
+**File Renaming Task List**:
+- Complete checklist for renaming all 50 .rs files to 4-word names
+- Tree structure with checkboxes for tracking progress
+
+### v1.3.0 (2025-11-27) - Full Schema Redesign + High-ROI Features
+
+**Database Schema Redesign (13 Tables)**:
+- **CODE/TEST Separation**: Production code and test code now in separate tables
+  - `CodeProductionEntityStore` - Production entities only
+  - `TestImplementationEntityStore` - Test entities only
+  - `CodeDependencyEdgeGraph` - CODE→CODE edges
+  - `TestDependencyEdgeGraph` - TEST→TEST edges
+  - `TestToCodeEdgeBridge` - TEST→CODE coverage links
+- **All tables follow 4-word naming convention** for LLM tokenization optimization
+
+**Semantic Clustering (ISGL0.5)**:
+- `SemanticClusterDefinitionStore` - Logical boundaries beyond geographic file boundaries
+- `EntityClusterMembershipMap` - Entity→Cluster mapping with roles (core/boundary/bridge)
+- Supports hierarchical clusters with parent/child relationships
+
+**Pre-computed Metrics**:
+- `EntityComputedMetricsCache` - Hotspot scores, complexity, risk indicators (unwrap/clone/unsafe counts)
+- `GraphGlobalStatisticsStore` - Global codebase statistics
+- `ModuleCohesionMetricsCache` - Cohesion ratios, instability metrics
+
+**Analysis Tables**:
+- `FileEntityMappingIndex` - Package graph (ISGL4) with per-file stats
+- `OrphanDeadCodeCache` - Dead code detection cache
+- `ControlFlowPathAnalysis` - Critical path analysis
+
+**6 New HTTP Endpoints**:
+| Endpoint | Handler | Purpose |
+|----------|---------|---------|
+| `GET /orphans` | `handle_orphans_list_request()` | Dead code detection |
+| `GET /files` | `handle_files_mapping_request()` | Package graph |
+| `GET /complexity` | `handle_complexity_analysis_request()` | Pre-computed metrics |
+| `GET /cohesion` | `handle_cohesion_scoring_request()` | Module quality |
+| `GET /paths` | `handle_control_paths_request()` | Critical paths |
+| `GET /clusters/{id}` | `handle_cluster_detail_request()` | Cluster details |
+
+**Key User Insight Addressed**:
+> "what matters at a level different than APIs or files - which are all geographical boundaries"
+
+ISGL0.5 semantic clusters provide understanding at logical/functional boundaries, not just file boundaries.
 
 ### v1.2.0 (2025-11-27) - CPG-Inspired Enhancements
 
@@ -845,4 +1664,4 @@ curl "http://localhost:3847/hotspots?top=5"
 
 ---
 
-**End of PRD v1.2.0**
+**End of PRD v1.4.0**
