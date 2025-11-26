@@ -248,12 +248,29 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
     let verbose = matches.get_flag("verbose");
     let quiet = matches.get_flag("quiet");
 
+    // Create timestamped workspace directory
+    let timestamp = chrono::Local::now().format("%Y%m%d%H%M%S").to_string();
+    let workspace_dir = format!("parseltongue{}", timestamp);
+    std::fs::create_dir_all(&workspace_dir)?;
+
+    // Construct database path within workspace
+    let workspace_db_path = if db == "mem" {
+        "mem".to_string()
+    } else {
+        // Always use rocksdb with timestamped workspace
+        format!("rocksdb:{}/analysis.db", workspace_dir)
+    };
+
     println!("{}", style("Running Tool 1: folder-to-cozodb-streamer").cyan());
+    if !quiet {
+        println!("  Workspace: {}", style(&workspace_dir).yellow().bold());
+        println!("  Database: {}", &workspace_db_path);
+    }
 
     // Create config (S01 ultra-minimalist: let tree-sitter decide what to parse)
     let config = pt01_folder_to_cozodb_streamer::StreamerConfig {
         root_dir: std::path::PathBuf::from(directory),
-        db_path: db.clone(),
+        db_path: workspace_db_path.clone(),
         max_file_size: 100 * 1024 * 1024,  // 100MB - no artificial limits
         include_patterns: vec!["*".to_string()],  // ALL files - tree-sitter handles it
         exclude_patterns: vec![
@@ -278,6 +295,18 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
         println!("{}", style("✓ Indexing completed").green().bold());
         println!("  Files processed: {}", result.processed_files);
         println!("  Entities created: {}", result.entities_created);
+        println!();
+        println!("{}", style("📁 Workspace location:").green().bold());
+        println!("  {}", style(&workspace_dir).yellow().bold());
+        println!();
+        println!("{}", style("Next steps:").cyan());
+        println!("  Export edges:    parseltongue pt02-level00 --where-clause \"ALL\" \\");
+        println!("                     --output {}/edges.json \\", workspace_dir);
+        println!("                     --db \"{}\"", workspace_db_path);
+        println!();
+        println!("  Export entities: parseltongue pt02-level01 --include-code 0 --where-clause \"ALL\" \\");
+        println!("                     --output {}/entities.json \\", workspace_dir);
+        println!("                     --db \"{}\"", workspace_db_path);
         if verbose {
             println!("  Duration: {:?}", result.duration);
         }

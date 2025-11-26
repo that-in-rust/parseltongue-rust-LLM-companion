@@ -1522,7 +1522,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1766,7 +1766,7 @@ dependencies = [
 
 [[package]]
 name = "pt01-folder-to-cozodb-streamer"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "pt02-llm-cozodb-to-context-writer"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "async-trait",

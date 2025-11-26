@@ -160,51 +160,51 @@ impl QueryBasedExtractor {
         let mut dependency_queries = HashMap::new();
         dependency_queries.insert(
             Language::Rust,
-            include_str!("../../../entity_queries/rust.scm").to_string()
+            include_str!("../../../dependency_queries/rust.scm").to_string()
         );
         dependency_queries.insert(
             Language::Python,
-            include_str!("../../../entity_queries/python.scm").to_string()
+            include_str!("../../../dependency_queries/python.scm").to_string()
         );
         dependency_queries.insert(
             Language::JavaScript,
-            include_str!("../../../entity_queries/javascript.scm").to_string()
+            include_str!("../../../dependency_queries/javascript.scm").to_string()
         );
         dependency_queries.insert(
             Language::TypeScript,
-            include_str!("../../../entity_queries/typescript.scm").to_string()
+            include_str!("../../../dependency_queries/typescript.scm").to_string()
         );
         dependency_queries.insert(
             Language::Go,
-            include_str!("../../../entity_queries/go.scm").to_string()
+            include_str!("../../../dependency_queries/go.scm").to_string()
         );
         dependency_queries.insert(
             Language::Java,
-            include_str!("../../../entity_queries/java.scm").to_string()
+            include_str!("../../../dependency_queries/java.scm").to_string()
         );
         dependency_queries.insert(
             Language::C,
-            include_str!("../../../entity_queries/c.scm").to_string()
+            include_str!("../../../dependency_queries/c.scm").to_string()
         );
         dependency_queries.insert(
             Language::Cpp,
-            include_str!("../../../entity_queries/cpp.scm").to_string()
+            include_str!("../../../dependency_queries/cpp.scm").to_string()
         );
         dependency_queries.insert(
             Language::Ruby,
-            include_str!("../../../entity_queries/ruby.scm").to_string()
+            include_str!("../../../dependency_queries/ruby.scm").to_string()
         );
         dependency_queries.insert(
             Language::Php,
-            include_str!("../../../entity_queries/php.scm").to_string()
+            include_str!("../../../dependency_queries/php.scm").to_string()
         );
         dependency_queries.insert(
             Language::CSharp,
-            include_str!("../../../entity_queries/c_sharp.scm").to_string()
+            include_str!("../../../dependency_queries/c_sharp.scm").to_string()
         );
         dependency_queries.insert(
             Language::Swift,
-            include_str!("../../../entity_queries/swift.scm").to_string()
+            include_str!("../../../dependency_queries/swift.scm").to_string()
         );
 
         Ok(Self { queries, dependency_queries, parsers })
