@@ -2030,6 +2030,7 @@ dependencies = [
  "anyhow",
  "axum",
  "chrono",
+ "cozo",
  "parseltongue-core",
  "pt01-folder-to-cozodb-streamer",
  "pt02-llm-cozodb-to-context-writer",

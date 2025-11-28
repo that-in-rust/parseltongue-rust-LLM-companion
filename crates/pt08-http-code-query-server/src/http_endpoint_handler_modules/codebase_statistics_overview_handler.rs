@@ -49,13 +49,16 @@ pub async fn handle_codebase_statistics_overview_summary(
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
-    // Read statistics from state
+    // Query actual counts from database if connected
+    let (code_count, test_count, edges_count) = state.query_entity_counts_from_database().await;
+
+    // Read static metadata from state
     let stats = state.codebase_statistics_metadata_arc.read().await;
 
     let data = StatisticsOverviewDataPayload {
-        code_entities_total_count: stats.total_code_entities_count,
-        test_entities_total_count: stats.total_test_entities_count,
-        dependency_edges_total_count: stats.total_dependency_edges_count,
+        code_entities_total_count: code_count,
+        test_entities_total_count: test_count,
+        dependency_edges_total_count: edges_count,
         languages_detected_list: stats.languages_detected_list_vec.clone(),
         database_file_path: stats.database_file_path_string.clone(),
     };

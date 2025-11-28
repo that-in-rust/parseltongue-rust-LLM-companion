@@ -9,14 +9,15 @@ use tokio::sync::RwLock;
 
 use crate::command_line_argument_parser::{HttpServerStartupConfig, find_available_port_number};
 use crate::route_definition_builder_module::build_complete_router_instance;
+use parseltongue_core::storage::CozoDbStorage;
 
 /// Shared application state container
 ///
 /// # 4-Word Name: SharedApplicationStateContainer
 #[derive(Clone)]
 pub struct SharedApplicationStateContainer {
-    /// Database storage connection (placeholder for now)
-    pub database_storage_connection_arc: Arc<RwLock<Option<String>>>,
+    /// Database storage connection (optional CozoDbStorage)
+    pub database_storage_connection_arc: Arc<RwLock<Option<Arc<CozoDbStorage>>>>,
 
     /// Server start timestamp
     pub server_start_timestamp_utc: DateTime<Utc>,
@@ -66,12 +67,84 @@ impl SharedApplicationStateContainer {
         }
     }
 
+    /// Create state with database storage
+    ///
+    /// # 4-Word Name: create_with_database_storage
+    pub fn create_with_database_storage(storage: CozoDbStorage) -> Self {
+        let now = Utc::now();
+        Self {
+            database_storage_connection_arc: Arc::new(RwLock::new(Some(Arc::new(storage)))),
+            server_start_timestamp_utc: now,
+            last_request_timestamp_arc: Arc::new(RwLock::new(now)),
+            codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
+        }
+    }
+
     /// Update last request timestamp
     ///
     /// # 4-Word Name: update_last_request_timestamp
     pub async fn update_last_request_timestamp(&self) {
         let mut timestamp = self.last_request_timestamp_arc.write().await;
         *timestamp = Utc::now();
+    }
+
+    /// Query entity counts from database
+    ///
+    /// # 4-Word Name: query_entity_counts_from_database
+    pub async fn query_entity_counts_from_database(&self) -> (usize, usize, usize) {
+        let db_guard = self.database_storage_connection_arc.read().await;
+        if let Some(storage) = db_guard.as_ref() {
+            // Query CODE entities count
+            let code_count = storage.raw_query(
+                "?[count(ISGL1_key)] := *CodeGraph{ISGL1_key, entity_class}, entity_class == 'CODE'"
+            ).await.ok()
+            .and_then(|r| r.rows.first().cloned())
+            .and_then(|row| row.first().cloned())
+            .and_then(|v| match v {
+                cozo::DataValue::Num(n) => match n {
+                    cozo::Num::Int(i) => Some(i as usize),
+                    cozo::Num::Float(f) => Some(f as usize),
+                },
+                _ => None,
+            })
+            .unwrap_or(0);
+
+            // Query TEST entities count
+            let test_count = storage.raw_query(
+                "?[count(ISGL1_key)] := *CodeGraph{ISGL1_key, entity_class}, entity_class == 'TEST'"
+            ).await.ok()
+            .and_then(|r| r.rows.first().cloned())
+            .and_then(|row| row.first().cloned())
+            .and_then(|v| match v {
+                cozo::DataValue::Num(n) => match n {
+                    cozo::Num::Int(i) => Some(i as usize),
+                    cozo::Num::Float(f) => Some(f as usize),
+                },
+                _ => None,
+            })
+            .unwrap_or(0);
+
+            // Query edges count
+            let edges_count = storage.raw_query(
+                "?[count(from_key)] := *DependencyEdges{from_key}"
+            ).await.ok()
+            .and_then(|r| r.rows.first().cloned())
+            .and_then(|row| row.first().cloned())
+            .and_then(|v| match v {
+                cozo::DataValue::Num(n) => match n {
+                    cozo::Num::Int(i) => Some(i as usize),
+                    cozo::Num::Float(f) => Some(f as usize),
+                },
+                _ => None,
+            })
+            .unwrap_or(0);
+
+            (code_count, test_count, edges_count)
+        } else {
+            // No database connected, return metadata values
+            let stats = self.codebase_statistics_metadata_arc.read().await;
+            (stats.total_code_entities_count, stats.total_test_entities_count, stats.total_dependency_edges_count)
+        }
     }
 }
 
@@ -83,8 +156,24 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     let port = config.http_port_override_option
         .unwrap_or_else(|| find_available_port_number(3333).unwrap_or(3333));
 
-    // Create application state
-    let state = SharedApplicationStateContainer::create_new_application_state();
+    // Connect to database if path provided
+    let db_path = &config.database_connection_string_value;
+    let state = if !db_path.is_empty() && db_path != "mem" {
+        println!("Connecting to database: {}", db_path);
+        match CozoDbStorage::new(db_path).await {
+            Ok(storage) => {
+                println!("✓ Database connected successfully");
+                SharedApplicationStateContainer::create_with_database_storage(storage)
+            }
+            Err(e) => {
+                println!("⚠ Warning: Could not connect to database: {}", e);
+                println!("  Starting with empty state");
+                SharedApplicationStateContainer::create_new_application_state()
+            }
+        }
+    } else {
+        SharedApplicationStateContainer::create_new_application_state()
+    };
 
     // Update database path in stats
     {
