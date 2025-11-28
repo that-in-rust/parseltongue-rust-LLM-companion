@@ -2,17 +2,26 @@
 //!
 //! # 4-Word Naming: reverse_callers_query_graph_handler
 //!
-//! Endpoint: GET /reverse-callers-query-graph/{*entity}
+//! Endpoint: GET /reverse-callers-query-graph?entity={key}
 
 use axum::{
-    extract::{Path, State},
+    extract::{Query, State},
     http::StatusCode,
     Json,
     response::IntoResponse,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+
+/// Query parameters for reverse callers endpoint
+///
+/// # 4-Word Name: ReverseCallersQueryParams
+#[derive(Debug, Deserialize)]
+pub struct ReverseCallersQueryParams {
+    /// Entity key to find reverse dependencies for (required)
+    pub entity: String,
+}
 
 /// Caller edge data
 ///
@@ -63,41 +72,38 @@ pub struct ReverseCallersErrorResponse {
 /// # Contract
 /// - Precondition: Database connected with dependency edges
 /// - Postcondition: Returns list of entities that call the target
-/// - Performance: <100ms response time
+/// - Performance: <100ms response time (leverages existing pt01 optimization)
 /// - Error Handling: Returns 404 for non-existent entities
 ///
 /// # URL Pattern
-/// - Endpoint: GET /reverse-callers-query-graph/{*entity}
-/// - The {*entity} wildcard captures entity keys with colons (e.g., "rust:fn:process:src_process_rs:1-20")
-/// - Entity keys are URL-encoded in requests and decoded in handler
+/// - Endpoint: GET /reverse-callers-query-graph?entity={key}
+/// - Query parameter approach avoids AXUM colon routing limitations
+/// - Entity keys can contain colons without URL encoding issues
+/// - Example: /reverse-callers-query-graph?entity=rust:fn:process:src_process_rs:1-20
 pub async fn handle_reverse_callers_query_graph(
     State(state): State<SharedApplicationStateContainer>,
-    Path(encoded_entity_key): Path<String>,
+    Query(params): Query<ReverseCallersQueryParams>,
 ) -> impl IntoResponse {
-    // Debug: Log handler entry
-    println!("DEBUG: Reverse callers handler called with entity key: {}", encoded_entity_key);
-
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
-    // Decode URL-encoded entity key
-    let entity_key = match urlencoding::decode(&encoded_entity_key) {
-        Ok(key) => key.into_owned(),
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ReverseCallersErrorResponse {
-                    success: false,
-                    error: format!("Invalid entity key encoding: {}", encoded_entity_key),
-                    endpoint: "/reverse-callers-query-graph/{*entity}".to_string(),
-                    tokens: 45,
-                }),
-            ).into_response();
-        }
+    // Validate entity parameter
+    let entity_key = if params.entity.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ReverseCallersErrorResponse {
+                success: false,
+                error: "Entity parameter is required".to_string(),
+                endpoint: "/reverse-callers-query-graph".to_string(),
+                tokens: 35,
+            }),
+        ).into_response();
+    } else {
+        params.entity
     };
 
-    // Query for reverse callers (entities that call this entity)
-    let callers = query_reverse_callers_from_database(&state, &entity_key).await;
+    // Use existing production-ready dependency analysis from pt01
+    let callers = query_reverse_callers_using_pt01_methods(&state, &entity_key).await;
     let total_count = callers.len();
 
     // Estimate tokens (~50 per caller + entity key)
@@ -109,7 +115,7 @@ pub async fn handle_reverse_callers_query_graph(
             Json(ReverseCallersErrorResponse {
                 success: false,
                 error: format!("No callers found for entity: {}", entity_key),
-                endpoint: "/reverse-callers-query-graph/{*entity}".to_string(),
+                endpoint: "/reverse-callers-query-graph".to_string(),
                 tokens,
             }),
         ).into_response();
@@ -119,7 +125,7 @@ pub async fn handle_reverse_callers_query_graph(
         StatusCode::OK,
         Json(ReverseCallersResponsePayload {
             success: true,
-            endpoint: "/reverse-callers-query-graph/{*entity}".to_string(),
+            endpoint: "/reverse-callers-query-graph".to_string(),
             data: ReverseCallersDataPayload {
                 total_count,
                 callers,
@@ -129,55 +135,90 @@ pub async fn handle_reverse_callers_query_graph(
     ).into_response()
 }
 
-/// Query reverse callers from database by entity key
+/// Query reverse callers using existing pt01 production-ready methods
 ///
-/// # 4-Word Name: query_reverse_callers_from_database
-async fn query_reverse_callers_from_database(
+/// # 4-Word Name: query_reverse_callers_using_pt01_methods
+async fn query_reverse_callers_using_pt01_methods(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
 ) -> Vec<CallerEdgeDataPayload> {
     let db_guard = state.database_storage_connection_arc.read().await;
     if let Some(storage) = db_guard.as_ref() {
-        // Query for entities that call the target entity
-        // Properly escape the entity key for CozoDB query
-        let escaped_entity_key = entity_key
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"");
+        // Use existing production-ready get_reverse_dependencies() method from pt01
+        // This method is already optimized (<5ms per query) and battle-tested
+        match storage.get_reverse_dependencies(entity_key).await {
+            Ok(reverse_deps) => {
+                // For each reverse dependency, get the full edge details
+                let mut callers = Vec::new();
 
-        let query_result = storage
-            .raw_query(&format!(
-                r#"
-                ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-                    to_key == "{}"
-                "#,
-                escaped_entity_key
-            ))
-            .await
-            .ok();
-
-        if let Some(result) = query_result {
-            result
-                .rows
-                .into_iter()
-                .filter_map(|row| {
-                    if row.len() >= 4 {
-                        Some(CallerEdgeDataPayload {
-                            from_key: extract_string_value(&row[0])?,
-                            to_key: extract_string_value(&row[1])?,
-                            edge_type: extract_string_value(&row[2])?,
-                            source_location: extract_string_value(&row[3]).unwrap_or_else(|| "unknown".to_string()),
-                        })
-                    } else {
-                        None
+                for from_key in reverse_deps {
+                    // Query for the edge details including edge_type and source_location
+                    if let Some(edge_details) = get_edge_details_between_entities(storage, &from_key, entity_key).await {
+                        callers.push(CallerEdgeDataPayload {
+                            from_key,
+                            to_key: entity_key.to_string(),
+                            edge_type: edge_details.edge_type,
+                            source_location: edge_details.source_location,
+                        });
                     }
-                })
-                .collect()
-        } else {
-            Vec::new()
+                }
+
+                callers
+            }
+            Err(_) => Vec::new(),
         }
     } else {
         Vec::new()
     }
+}
+
+/// Edge details between two entities
+///
+/// # 4-Word Name: EdgeDetailsBetweenEntities
+#[derive(Debug)]
+struct EdgeDetailsBetweenEntities {
+    edge_type: String,
+    source_location: String,
+}
+
+/// Get edge details between two entities
+///
+/// # 4-Word Name: get_edge_details_between_entities
+async fn get_edge_details_between_entities(
+    storage: &parseltongue_core::storage::CozoDbStorage,
+    from_key: &str,
+    to_key: &str,
+) -> Option<EdgeDetailsBetweenEntities> {
+    // Escape keys for CozoDB query
+    let escaped_from_key = from_key
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+    let escaped_to_key = to_key
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+
+    let query_result = storage
+        .raw_query(&format!(
+            r#"
+            ?[edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type => source_location}},
+                from_key == "{}",
+                to_key == "{}"
+            "#,
+            escaped_from_key, escaped_to_key
+        ))
+        .await
+        .ok()?;
+
+    if let Some(row) = query_result.rows.first() {
+        if row.len() >= 2 {
+            return Some(EdgeDetailsBetweenEntities {
+                edge_type: extract_string_value(&row[0]).unwrap_or_else(|| "Unknown".to_string()),
+                source_location: extract_string_value(&row[1]).unwrap_or_else(|| "unknown".to_string()),
+            });
+        }
+    }
+
+    None
 }
 
 /// Extract string value from CozoDB DataValue

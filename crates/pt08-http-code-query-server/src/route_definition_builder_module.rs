@@ -69,9 +69,9 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/code-entities-search-fuzzy",
             get(code_entities_fuzzy_search_handler::handle_code_entities_fuzzy_search)
         )
-        // Graph query endpoints
+        // Graph query endpoints (using query parameters to avoid colon routing issues)
         .route(
-            "/reverse-callers-query-graph/{entity}",
+            "/reverse-callers-query-graph",
             get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
         )
         // Test route for debugging

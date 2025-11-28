@@ -643,14 +643,11 @@ async fn test_reverse_callers_returns_deps() {
         .unwrap();
     println!("DEBUG: Health check status: {}", health_response.status());
 
-    // WHEN: GET /reverse-callers-query-graph/process (URL-encode entity key)
-    let encoded_entity_key = urlencoding::encode("rust:fn:process:src_process_rs:1-20");
-    println!("DEBUG: Encoded entity key: {}", encoded_entity_key);
-
+    // WHEN: GET /reverse-callers-query-graph?entity=rust:fn:process:src_process_rs:1-20
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/reverse-callers-query-graph/{}", encoded_entity_key))
+                .uri("/reverse-callers-query-graph?entity=rust:fn:process:src_process_rs:1-20")
                 .body(Body::empty())
                 .unwrap()
         )
@@ -671,7 +668,7 @@ async fn test_reverse_callers_returns_deps() {
     let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
 
     assert_eq!(json["success"], true);
-    assert_eq!(json["endpoint"], "/reverse-callers-query-graph/{*entity}");
+    assert_eq!(json["endpoint"], "/reverse-callers-query-graph");
     assert_eq!(json["data"]["total_count"].as_u64().unwrap(), 1);
 
     let callers = json["data"]["callers"].as_array().unwrap();
