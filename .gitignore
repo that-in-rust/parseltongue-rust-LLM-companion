@@ -29,6 +29,7 @@ parseltongue-v*-macos-arm64
 /parseltongue
 
 # Workspace directories (timestamped analysis outputs)
+parseltongue*/
 parseltongue20*/
 parseltongue_*/
 
