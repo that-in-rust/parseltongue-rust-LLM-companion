@@ -262,8 +262,7 @@ fn build_cli() -> Command {
                     Arg::new("port")
                         .long("port")
                         .short('p')
-                        .help("Port to listen on")
-                        .default_value("3000"),
+                        .help("Port to listen on (auto-detects from 3333 if not specified)"),
                 )
                 .arg(
                     Arg::new("db")
@@ -587,13 +586,17 @@ async fn run_pt07(matches: &ArgMatches) -> Result<()> {
 ///
 /// # 4-Word Name: run_serve_http_code_backend
 async fn run_serve_http_code_backend(matches: &ArgMatches) -> Result<()> {
-    let port = matches.get_one::<String>("port").unwrap();
+    let port = matches.get_one::<String>("port");
     let db = matches.get_one::<String>("db").unwrap();
     let verbose = matches.get_flag("verbose");
 
     println!("{}", style("Running Tool 8: HTTP Code Query Server").cyan());
     if verbose {
-        println!("  Port: {}", port);
+        if let Some(p) = port {
+            println!("  Port: {}", p);
+        } else {
+            println!("  Port: auto-detect from 3333");
+        }
         println!("  Database: {}", db);
     }
 
@@ -601,7 +604,7 @@ async fn run_serve_http_code_backend(matches: &ArgMatches) -> Result<()> {
     let config = HttpServerStartupConfig {
         target_directory_path_value: std::path::PathBuf::from("."),
         database_connection_string_value: db.clone(),
-        http_port_override_option: port.parse().ok(),
+        http_port_override_option: port.and_then(|p| p.parse().ok()),
         force_reindex_enabled_flag: false,
         daemon_background_mode_flag: false,
         idle_timeout_minutes_option: None,

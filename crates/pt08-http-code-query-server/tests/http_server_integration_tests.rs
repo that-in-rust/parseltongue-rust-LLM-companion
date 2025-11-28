@@ -58,6 +58,22 @@ async fn test_health_endpoint_returns_ok() {
     assert_eq!(json["endpoint"], "/server-health-check-status");
 }
 
+/// Test 1.2: Port Auto-Detection Works
+///
+/// # 4-Word Name: test_port_auto_detection_works
+#[tokio::test]
+async fn test_port_auto_detection_works() {
+    // GIVEN: Port 3333 is occupied
+    let _blocker = std::net::TcpListener::bind("127.0.0.1:3333").unwrap();
+
+    // WHEN: find_available_port_number(3333)
+    use pt08_http_code_query_server::command_line_argument_parser::find_available_port_number;
+    let port = find_available_port_number(3333).unwrap();
+
+    // THEN: Returns port > 3333
+    assert!(port > 3333);
+}
+
 /// Test 1.6: Statistics endpoint returns counts
 ///
 /// # 4-Word Name: test_stats_returns_entity_counts
