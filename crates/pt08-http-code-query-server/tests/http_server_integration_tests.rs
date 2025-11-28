@@ -432,3 +432,73 @@ async fn test_filter_entities_by_type() {
         assert_eq!(entity["entity_type"], "function");
     }
 }
+
+/// Test 2.5: Fuzzy Search Entities
+///
+/// # 4-Word Name: test_fuzzy_search_entities
+#[tokio::test]
+async fn test_fuzzy_search_entities() {
+    // GIVEN: Database with searchable entities
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entities with searchable names
+    let test_entities = vec![
+        ("rust:fn:calculate_total:src_math_rs:1-10", "pub fn calculate_total(items: &[i32]) -> i32", "calculate_total", "src/math.rs", "function"),
+        ("rust:fn:process_data:src_main_rs:20-30", "fn process_data(input: &str) -> Result<Data, Error>", "process_data", "src/main.rs", "function"),
+        ("rust:struct:DataProcessor:src_models_rs:5-15", "struct DataProcessor { config: Config }", "DataProcessor", "src/models.rs", "struct"),
+        ("rust:fn:validate_input:src_utils_rs:50-60", "pub fn validate_input(value: &str) -> bool", "validate_input", "src/utils.rs", "function"),
+    ];
+
+    for (key, code, name, file_path, entity_type) in test_entities {
+        let query = format!(r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class] <- [
+                ["{}", "{}", null, "{{}}", "{{}}", null, true, true, null, "{}", "rust", "2024-01-01T00:00:00Z", "{}", "CODE"]
+            ]
+            :put CodeGraph {{
+                ISGL1_key =>
+                Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class
+            }}
+        "#, key, code, file_path, entity_type);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /code-entities-search-fuzzy?q=total
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/code-entities-search-fuzzy?q=total")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns entities matching "total"
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/code-entities-search-fuzzy");
+    assert!(json["data"]["total_count"].as_u64().unwrap() >= 1);
+    assert!(json["data"]["entities"].is_array());
+
+    let entities = json["data"]["entities"].as_array().unwrap();
+
+    // Should find calculate_total function
+    let found = entities.iter().any(|entity| {
+        entity["key"].as_str().unwrap().contains("calculate_total")
+    });
+    assert!(found, "Should find calculate_total function");
+}
