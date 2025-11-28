@@ -236,3 +236,97 @@ async fn test_stats_with_actual_database() {
     // 1 TEST entity
     assert_eq!(json["data"]["test_entities_total_count"], 1);
 }
+
+/// Test 2.3: Get entity detail by key
+///
+/// # 4-Word Name: test_get_entity_detail_by_key
+#[tokio::test]
+async fn test_get_entity_detail_by_key() {
+    // GIVEN: Server with in-memory database containing entities
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entity with known key
+    storage.execute_query(r#"
+        ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+          lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+          last_modified, entity_type, entity_class] <- [
+            ["rust:fn:my_func:src_lib_rs:1-20", "pub fn my_func() { println!(\"Hello\"); }", null, "{}", "{}", null, true, true, null, "src/lib.rs", "rust", "2024-01-01T00:00:00Z", "function", "CODE"]
+        ]
+        :put CodeGraph {
+            ISGL1_key =>
+            Current_Code, Future_Code, interface_signature, TDD_Classification,
+            lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+            last_modified, entity_type, entity_class
+        }
+    "#).await.unwrap();
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /code-entity-detail-view/{key} with URL-encoded key
+    let encoded_key = urlencoding::encode("rust:fn:my_func:src_lib_rs:1-20");
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/code-entity-detail-view/{}", encoded_key))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns entity details with code
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/code-entity-detail-view");
+
+    // Verify entity data
+    let data = &json["data"];
+    assert_eq!(data["key"], "rust:fn:my_func:src_lib_rs:1-20");
+    assert_eq!(data["file_path"], "src/lib.rs");
+    assert_eq!(data["entity_type"], "function");
+    assert_eq!(data["entity_class"], "CODE");
+    assert_eq!(data["language"], "rust");
+    assert!(data["code"].as_str().unwrap().contains("my_func"));
+}
+
+/// Test 2.4: Get entity detail returns 404 for missing key
+///
+/// # 4-Word Name: test_entity_detail_not_found
+#[tokio::test]
+async fn test_entity_detail_not_found() {
+    // GIVEN: Server with in-memory database (empty)
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /code-entity-detail-view/{key} with non-existent key
+    let encoded_key = urlencoding::encode("rust:fn:nonexistent:foo:1-10");
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/code-entity-detail-view/{}", encoded_key))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns 404 with error message
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["success"], false);
+    assert!(json["error"].is_string());
+}

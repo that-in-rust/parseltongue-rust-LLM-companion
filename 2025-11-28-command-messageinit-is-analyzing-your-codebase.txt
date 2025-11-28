@@ -1,0 +1,666 @@
+
+╭─── Claude Code v2.0.55 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│             Welcome back that in rust!             │ started                 │
+│                                                    │ Run /install-github-ap… │
+│                      ▗ ▗   ▖ ▖                     │ ✔ Run /init to create … │
+│                                                    │ ─────────────────────── │
+│                        ▘▘ ▝▝                       │ Recent activity         │
+│                                                    │ No recent activity      │
+│               Opus 4.5 · Claude Max                │                         │
+│ ~/Projects/parseltongue-dependency-graph-generator │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+══════════════════ Conversation compacted · ctrl+o for history ═════════════════
+  ⎿ Read crates/pt08-http-code-query-server/src/http_server_startup_runner.rs
+    (230 lines)
+  ⎿ Read crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/co
+    debase_statistics_overview_handler.rs (76 lines)
+  ⎿  Read crates/pt08-http-code-query-server/Cargo.toml (41 lines)
+  ⎿ Read 
+    crates/pt08-http-code-query-server/tests/http_server_integration_tests.rs
+    (175 lines)
+  ⎿  Read .gitignore (37 lines)
+  ⎿  Todo list read (4 items)
+
+⏺ Continuing with Phase 2: Entity Endpoints. I'm implementing Test 2.1: List
+   All Entities endpoint (/code-entities-list-all) following TDD.
+
+  Step 1: Write the test first (RED phase)
+
+  Let me add the test to the integration tests file:
+
+⏺ Update(crates/pt08-http-code-query-server/tests/http_server_integration_tests.
+        rs)
+  ⎿  Updated crates/pt08-http-code-query-server/tests/http_server_integrati
+     n_tests.rs with 65 additions and 1 removal
+       118    // Phase 2: Database Integration Tests
+       119    // ========================================================
+             =====================
+       120    
+       121 -  /// Test 2.1: Statistics with actual database
+       121 +  /// Test 2.1: List all entities endpoint
+       122    ///
+       123 +  /// # 4-Word Name: test_list_all_entities_endpoint
+       124 +  #[tokio::test]
+       125 +  async fn test_list_all_entities_endpoint() {
+       126 +      // GIVEN: Server with in-memory database containing 
+           + entities
+       127 +      let storage = CozoDbStorage::new("mem").await.unwrap();
+       128 +      storage.create_schema().await.unwrap();
+       129 +      
+           + storage.create_dependency_edges_schema().await.unwrap();
+       130 +  
+       131 +      // Insert test entities
+       132 +      storage.execute_query(r#"
+       133 +          ?[ISGL1_key, Current_Code, Future_Code, 
+           + interface_signature, TDD_Classification,
+       134 +            lsp_meta_data, current_ind, future_ind, 
+           + Future_Action, file_path, language,
+       135 +            last_modified, entity_type, entity_class] <- [
+       136 +              ["rust:fn:func1:main_rs:1-10", "fn func1() {}",
+           +  null, "{}", "{}", null, true, true, null, "src/main.rs", 
+           + "rust", "2024-01-01T00:00:00Z", "function", "CODE"],
+       137 +              ["rust:fn:func2:lib_rs:11-20", "fn func2() {}",
+           +  null, "{}", "{}", null, true, true, null, "src/lib.rs", 
+           + "rust", "2024-01-01T00:00:00Z", "function", "CODE"],
+       138 +              ["rust:fn:test1:test_rs:1-10", "#[test] fn 
+           + test1() {}", null, "{}", "{}", null, true, true, null, 
+           + "tests/test.rs", "rust", "2024-01-01T00:00:00Z", "function",
+           +  "TEST"]
+       139 +          ]
+       140 +          :put CodeGraph {
+       141 +              ISGL1_key =>
+       142 +              Current_Code, Future_Code, interface_signature,
+           +  TDD_Classification,
+       143 +              lsp_meta_data, current_ind, future_ind, 
+           + Future_Action, file_path, language,
+       144 +              last_modified, entity_type, entity_class
+       145 +          }
+       146 +      "#).await.unwrap();
+       147 +  
+       148 +      // Create state with database connection
+       149 +      let state = SharedApplicationStateContainer::create_wit
+           + h_database_storage(storage);
+       150 +      let app = build_complete_router_instance(state);
+       151 +  
+       152 +      // WHEN: GET /code-entities-list-all
+       153 +      let response = app
+       154 +          .oneshot(
+       155 +              Request::builder()
+       156 +                  .uri("/code-entities-list-all")
+       157 +                  .body(Body::empty())
+       158 +                  .unwrap()
+       159 +          )
+       160 +          .await
+       161 +          .unwrap();
+       162 +  
+       163 +      // THEN: Returns list of entities
+       164 +      assert_eq!(response.status(), StatusCode::OK);
+       165 +  
+       166 +      let body = axum::body::to_bytes(response.into_body(), 
+           + usize::MAX).await.unwrap();
+       167 +      let json: serde_json::Value = 
+           + serde_json::from_slice(&body).unwrap();
+       168 +  
+       169 +      assert_eq!(json["success"], true);
+       170 +      assert_eq!(json["endpoint"], 
+           + "/code-entities-list-all");
+       171 +      assert_eq!(json["data"]["total_count"], 3);
+       172 +      assert!(json["data"]["entities"].is_array());
+       173 +  
+       174 +      let entities = 
+           + json["data"]["entities"].as_array().unwrap();
+       175 +      assert_eq!(entities.len(), 3);
+       176 +  
+       177 +      // Verify entity structure
+       178 +      let first = &entities[0];
+       179 +      assert!(first["key"].is_string());
+       180 +      assert!(first["file_path"].is_string());
+       181 +      assert!(first["entity_type"].is_string());
+       182 +      assert!(first["entity_class"].is_string());
+       183 +  }
+       184 +  
+       185 +  /// Test 2.2: Statistics with actual database
+       186 +  ///
+       187    /// # 4-Word Name: test_stats_with_actual_database
+       188    #[tokio::test]
+       189    async fn test_stats_with_actual_database() {
+
+⏺ Test written. Let me run the tests to confirm RED phase (test should fail
+  because endpoint doesn't exist):
+
+⏺ Bash(/Users/amuldotexe/.cargo/bin/cargo test -p pt08-http-code-query-server
+      2>&1)
+  ⎿  Error: Exit code 101
+     warning: function `create_test_entity` is never used
+        --> crates/parseltongue-core/src/entity_class_specifications.rs:388:4
+         |
+     388 | fn create_test_entity(file_path: &str, code: &str, entity_class: 
+     EntityClass) -> CodeEntity {
+         |    ^^^^^^^^^^^^^^^^^^
+         |
+         = note: `#[warn(dead_code)]` on by default
+
+     warning: `parseltongue-core` (lib) generated 1 warning
+     … +41 lines (ctrl+o to see all)
+
+⏺ Syntax error - the #[test] in the string is being misinterpreted. Let me
+  fix it:
+
+⏺ Update(crates/pt08-http-code-query-server/tests/http_server_integration_tests.
+        rs)
+  ⎿  Updated crates/pt08-http-code-query-server/tests/http_server_integrati
+     n_tests.rs with 1 addition and 1 removal
+       135              last_modified, entity_type, entity_class] <- [
+       136                ["rust:fn:func1:main_rs:1-10", "fn func1() {}",
+              null, "{}", "{}", null, true, true, null, "src/main.rs", 
+             "rust", "2024-01-01T00:00:00Z", "function", "CODE"],
+       137                ["rust:fn:func2:lib_rs:11-20", "fn func2() {}",
+              null, "{}", "{}", null, true, true, null, "src/lib.rs", 
+             "rust", "2024-01-01T00:00:00Z", "function", "CODE"],
+       138 -              ["rust:fn:test1:test_rs:1-10", "#[test] 
+           -  fn test1() {}", null, "{}", "{}", null, true, true, null, 
+           -  "tests/test.rs", "rust", "2024-01-01T00:00:00Z", 
+           -  "function", "TEST"]
+       138 +              ["rust:fn:test1:test_rs:1-10", "
+           +  fn test1() {}", null, "{}", "{}", null, true, true, null, 
+           +  "tests/test.rs", "rust", "2024-01-01T00:00:00Z", 
+           +  "function", "TEST"]
+       139            ]
+       140            :put CodeGraph {
+       141                ISGL1_key =>
+
+⏺ Bash(/Users/amuldotexe/.cargo/bin/cargo test -p pt08-http-code-query-server
+      2>&1)
+  ⎿  Error: Exit code 101
+     warning: function `create_test_entity` is never used
+        --> crates/parseltongue-core/src/entity_class_specifications.rs:388:4
+         |
+     388 | fn create_test_entity(file_path: &str, code: &str, entity_class: 
+     EntityClass) -> CodeEntity {
+         |    ^^^^^^^^^^^^^^^^^^
+         |
+         = note: `#[warn(dead_code)]` on by default
+
+     warning: `parseltongue-core` (lib) generated 1 warning
+     … +60 lines (ctrl+o to see all)
+
+⏺ RED phase confirmed - test fails with 404 because endpoint doesn't exist.
+
+  Step 2: Implement the handler (GREEN phase)
+
+  Let me create the handler module following the 4-word naming convention:
+
+⏺ Search(pattern: "crates/pt08-http-code-query-server/src/http_endpoint_handler_
+        modules/*.rs")
+  ⎿  Found 3 files (ctrl+o to expand)
+
+⏺ Read(crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/mod.
+      rs)
+  ⎿  Read 16 lines
+
+⏺ Read(crates/pt08-http-code-query-server/src/route_definition_builder_module.rs
+      )
+  ⎿  Read 58 lines
+
+⏺ Now let me create the handler module:
+
+⏺ Write(crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/cod
+       e_entities_list_all_handler.rs)
+  ⎿  Wrote 133 lines to crates/pt08-http-code-query-server/src/http_endpoin
+     _handler_modules/code_entities_list_all_handler.rs
+     //! Code entities list all endpoint handler
+     //!
+     //! # 4-Word Naming: code_entities_list_all_handler
+     //!
+     //! Endpoint: GET /code-entities-list-all
+     use axum::{
+         extract::State,
+         Json,
+     };
+     … +123 lines (ctrl+o to expand)
+
+⏺ Now let me update mod.rs to export the new handler:
+
+⏺ Update(crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/mo
+        d.rs)
+  ⎿  Updated crates/pt08-http-code-query-server/src/http_endpoint_handler_m
+     dules/mod.rs with 1 addition and 1 removal
+        6    
+        7    pub mod server_health_check_handler;
+        8    pub mod codebase_statistics_overview_handler;
+        9 +  pub mod code_entities_list_all_handler;
+       10    // Future handlers:
+       11 -  // pub mod code_entities_list_handler;
+       11    // pub mod dependency_edges_list_handler;
+       12    // pub mod blast_radius_impact_handler;
+       13    // pub mod circular_dependency_detection_handler;
+
+⏺ Now add the route to the router:
+
+⏺ Update(crates/pt08-http-code-query-server/src/route_definition_builder_module.
+        rs)
+  ⎿  Updated crates/pt08-http-code-query-server/src/route_definition_builde
+     _module.rs with 1 addition
+       11    use crate::http_endpoint_handler_modules::{
+       12        server_health_check_handler,
+       13        codebase_statistics_overview_handler,
+       14 +      code_entities_list_all_handler,
+       15    };
+       16    
+       17    /// Build the complete router with all endpoints
+
+⏺ Update(crates/pt08-http-code-query-server/src/route_definition_builder_module.
+        rs)
+  ⎿  Updated crates/pt08-http-code-query-server/src/route_definition_builde
+     _module.rs with 5 additions
+       53                "/codebase-statistics-overview-summary",
+       54                get(codebase_statistics_overview_handler::handle
+            _codebase_statistics_overview_summary)
+       55            )
+       56 +          // Entity endpoints
+       57 +          .route(
+       58 +              "/code-entities-list-all",
+       59 +              get(code_entities_list_all_handler::handle_code_
+          + entities_list_all)
+       60 +          )
+       61            // More endpoints will be added in subsequent phases
+       62            .with_state(state)
+       63    }
+
+⏺ Now run the tests to confirm GREEN phase:
+
+⏺ Bash(/Users/amuldotexe/.cargo/bin/cargo test -p pt08-http-code-query-server
+      2>&1)
+  ⎿ warning: function `create_test_entity` is never used                   
+       --> crates/parseltongue-core/src/entity_class_specifications.rs:388:
+    4
+    … +77 lines (ctrl+o to expand)
+
+
+⏺ GREEN phase achieved - all 10 tests passing (5 unit + 5 integration)!
+
+  Step 3: Dogfood on parseltongue repo
+
+  Let me kill old background processes, build release, and test on our
+  indexed database:
+
+⏺ Bash(pkill -f "parseltongue serve-http" 2>/dev/null || true)
+  ⎿  (No content)
+
+⏺ Bash(/Users/amuldotexe/.cargo/bin/cargo build --release -p         timeout: 
+      parseltongue 2>&1 | tail -5)                                   5m 0s
+  ⎿ warning: `pt01-folder-to-cozodb-streamer` (lib) generated 3 warnings   
+       Compiling pt08-http-code-query-server v1.0.2 (/Users/amuldotexe/Proj
+    ects/parseltongue-dependency-graph-generator/crates/pt08-http-code-quer
+    … +4 lines (ctrl+o to expand)
+
+
+
+⏺ Bash(./target/release/parseltongue serve-http-code-backend --port   timeout: 
+      3458 --db "rocksdb:parseltongue20251128132411/analysis.db" &    30s
+      sleep 2…)
+  ⎿  Running in the background (down arrow to manage)
+
+⏺ BashOutput(Reading shell output)
+  ⎿  Running Tool 8: HTTP Code Query Server                                
+     Connecting to database: rocksdb:parseltongue20251128132411/analysis.db
+     ✓ Database connected successfully
+     … +11 lines (ctrl+o to expand)
+  ⎿ sleep: invalid time interval: curl
+    sleep: invalid time interval: -s
+    sleep: invalid time interval: http://localhost:3458/code-entities-list-
+    … +23 lines (ctrl+o to expand)
+
+
+⏺ Let me test the endpoint with a simple curl:
+
+⏺ Bash(curl -s http://localhost:3458/code-entities-list-all | head   timeout: 
+      -c 2000)                                                       10s
+  ⎿  {                                       
+       "success": true,
+       "endpoint": "/code-entities-list-all",
+     … +6 lines (ctrl+o to expand)
+
+⏺ The endpoint returns 0 entities! Let me check if the stats endpoint shows
+  entities:
+
+⏺ Bash(curl -s http://localhost:3458/codebase-statistics-overview-summary |
+      python3 -m json.tool)
+  ⎿  {                                                       
+         "success": true,
+         "endpoint": "/codebase-statistics-overview-summary",
+     … +10 lines (ctrl+o to expand)
+
+⏺ Stats also shows 0. The database might need re-indexing. Let me check if
+  the database directory exists and has data:
+
+⏺ Bash(ls -la parseltongue20251128132411/ 2>/dev/null || echo "Database
+      directory not found")
+  ⎿  total 0                                                       
+     drwxr-xr-x@  3 amuldotexe  staff   96 Nov 28 15:02 .
+     drwxr-xr-x  22 amuldotexe  staff  704 Nov 28 15:02 ..
+     drwxr-xr-x@  4 amuldotexe  staff  128 Nov 28 15:02 analysis.db
+
+⏺ The DB directory exists but may be empty. Let me re-index the codebase:
+
+⏺ Bash(pkill -f "parseltongue serve-http" 2>/dev/null || true
+      rm -rf parseltongue_dogfood_*.db parseltongue_dogfood_* 2>/dev/null ||
+      true…)
+  ⎿  Error: Exit code 2
+     (eval):2: no matches found: parseltongue_dogfood_*.db
+
+     error: unrecognized subcommand 'index'
+
+     Usage: parseltongue [COMMAND]
+
+     For more information, try '--help'.
+
+⏺ Bash(./target/release/parseltongue --help 2>&1)
+  ⎿  Ultra-minimalist CLI toolkit for code analysis
+
+     Usage: parseltongue [COMMAND]
+     … +20 lines (ctrl+o to expand)
+
+⏺ Bash(./target/release/parseltongue pt01-folder-to-cozodb-streamer .
+      "rocksdb:parseltongue_dogfood/analysis.db" 2>&1)
+  ⎿  Error: Exit code 2
+     error: unexpected argument 'rocksdb:parseltongue_dogfood/analysis.db' found
+
+     Usage: parseltongue pt01-folder-to-cozodb-streamer [OPTIONS] [directory]
+
+     For more information, try '--help'.
+
+⏺ Bash(./target/release/parseltongue pt01-folder-to-cozodb-streamer --help 2>&1)
+  ⎿ Examples:                                                              
+      parseltongue pt01-folder-to-cozodb-streamer .            # Index curr
+    ent directory
+    … +26 lines (ctrl+o to expand)
+
+
+⏺ Bash(./target/release/parseltongue pt01-folder-to-cozodb-streamer . --db
+      "rocksdb:parseltongue_dogfood/analysis.db" 2>&1)
+  ⎿  Running Tool 1: folder-to-cozodb-streamer                 
+       Workspace: parseltongue20251128151135
+       Database: rocksdb:parseltongue20251128151135/analysis.db
+     … +31 lines (ctrl+o to expand)
+
+⏺ Indexed 118 CODE entities. Now let me start the server with the new
+  database:
+
+⏺ Bash(pkill -f "parseltongue serve-http" 2>/dev/null || true timeout: 30s
+      sleep 1…)
+  ⎿  Error: Exit code 1
+     sleep: invalid time interval: echo
+     sleep: invalid time interval: === Stats ===
+     usage: sleep number[unit] [...]
+     Unit can be 's' (seconds, the default), m (minutes), h (hours), or d (days).
+
+
+⏺ Bash(pkill -f "parseltongue serve-http" 2>/dev/null; sleep 1)
+  ⎿  (No content)
+
+⏺ Kill Shell(Kill shell: 5ad74a)
+  ⎿  Error: Shell 5ad74a is not running, so cannot be killed (status: killed)
+
+⏺ Kill Shell(Kill shell: 32271c)
+  ⎿  Error: Shell 32271c is not running, so cannot be killed (status: killed)
+
+⏺ Kill Shell(Kill shell: de441f)
+  ⎿  Error: Shell de441f is not running, so cannot be killed (status: failed)
+
+⏺ Bash(./target/release/parseltongue serve-http-code-backend --port 3460 --db
+      "rocksdb:parseltongue20251128151135/analysis.db" 2>&1 &)
+  ⎿  Running in the background (down arrow to manage)
+
+⏺ Bash(sleep 2 && curl -s                                             timeout: 
+      http://localhost:3460/codebase-statistics-overview-summary |    15s
+      python3 -m json.tool)
+  ⎿  {                                                       
+         "success": true,
+         "endpoint": "/codebase-statistics-overview-summary",
+     … +10 lines (ctrl+o to expand)
+
+⏺ Stats shows 118 CODE entities and 3415 dependency edges. Now test the list
+   all endpoint:
+
+⏺ Bash(curl -s http://localhost:3460/code-entities-list-all | python3 timeout: 
+      -m json.tool 2>&1 | head -50)                                   15s
+
+  ⎿  {                                         
+         "success": true,
+         "endpoint": "/code-entities-list-all",
+     … +60 lines (ctrl+o to expand)
+
+⏺ Dogfooding successful! The /code-entities-list-all endpoint returns all
+  118 entities with:
+  - key: ISGL1 key
+  - file_path: file location
+  - entity_type: enum, function, struct, etc.
+  - entity_class: CODE
+  - language: rust
+
+  Let me update the .gitignore to exclude dogfood directories and mark task
+  complete:
+
+⏺ Read(.gitignore)
+  ⎿  Read 37 lines
+
+⏺ The .gitignore already has parseltongue20*/ pattern which covers dogfood
+  directories. Now let me update the todo and commit:
+
+⏺ Bash(git status --short 2>&1)
+  ⎿  M crates/pt08-http-code-query-server/src/http_endpoint_handler_modules
+    /mod.rs
+     M crates/pt08-http-code-query-server/src/route_definition_builder_modu
+    … +5 lines (ctrl+o to expand)
+
+
+
+⏺ Bash(git add crates/pt08-http-code-query-server/src/http_endpoint_handler_modu
+      les/code_entities_list_all_handler.rs
+      crates/pt08-http-code-query-server/src/http_endpo…)
+  ⎿  [main 251a4e11d] feat(pt08): Add code entities list all endpoint
+      Committer: amuldotexe <amuldotexe@amuldotexes-Mac-mini.local>
+     Your name and email address were configured automatically based
+     … +14 lines (ctrl+o to expand)
+
+⏺ Bash(git push origin main 2>&1) timeout: 1m 0s
+  ⎿ To https://github.com/that-in-rust/parseltongue-dependency-graph-genera
+    tor.git
+       da55958b1..251a4e11d  main -> main
+
+
+⏺ Pushed. Now continuing with Test 2.3: Get entity by key endpoint:
+
+⏺ Test 2.3: Get entity by key endpoint - Following TDD (RED → GREEN)
+
+  Step 1: Write the test first (RED phase)
+
+⏺ Read(crates/pt08-http-code-query-server/tests/http_server_integration_tests.rs
+      )
+  ⎿  Read 239 lines
+
+⏺ Now add the test for entity detail by key:
+
+⏺ Update(crates/pt08-http-code-query-server/tests/http_server_integration_tests.
+        rs)
+  ⎿  Updated crates/pt08-http-code-query-server/tests/http_server_integrati
+     n_tests.rs with 94 additions
+       236        // 1 TEST entity
+       237        assert_eq!(json["data"]["test_entities_total_count"], 
+             1);
+       238    }
+       239 +  
+       240 +  /// Test 2.3: Get entity detail by key
+       241 +  ///
+       242 +  /// # 4-Word Name: test_get_entity_detail_by_key
+       243 +  #[tokio::test]
+       244 +  async fn test_get_entity_detail_by_key() {
+       245 +      // GIVEN: Server with in-memory database containing 
+           + entities
+       246 +      let storage = CozoDbStorage::new("mem").await.unwrap();
+       247 +      storage.create_schema().await.unwrap();
+       248 +      
+           + storage.create_dependency_edges_schema().await.unwrap();
+       249 +  
+       250 +      // Insert test entity with known key
+       251 +      storage.execute_query(r#"
+       252 +          ?[ISGL1_key, Current_Code, Future_Code, 
+           + interface_signature, TDD_Classification,
+       253 +            lsp_meta_data, current_ind, future_ind, 
+           + Future_Action, file_path, language,
+       254 +            last_modified, entity_type, entity_class] <- [
+       255 +              ["rust:fn:my_func:src_lib_rs:1-20", "pub fn 
+           + my_func() {\n    println!(\"Hello\");\n}", null, "{\"name\":
+           +  \"my_func\"}", "{}", null, true, true, null, "src/lib.rs", 
+           + "rust", "2024-01-01T00:00:00Z", "function", "CODE"]
+       256 +          ]
+       257 +          :put CodeGraph {
+       258 +              ISGL1_key =>
+       259 +              Current_Code, Future_Code, interface_signature,
+           +  TDD_Classification,
+       260 +              lsp_meta_data, current_ind, future_ind, 
+           + Future_Action, file_path, language,
+       261 +              last_modified, entity_type, entity_class
+       262 +          }
+       263 +      "#).await.unwrap();
+       264 +  
+       265 +      // Create state with database connection
+       266 +      let state = SharedApplicationStateContainer::create_wit
+           + h_database_storage(storage);
+       267 +      let app = build_complete_router_instance(state);
+       268 +  
+       269 +      // WHEN: GET /code-entity-detail-view/{key} with 
+           + URL-encoded key
+       270 +      let encoded_key = 
+           + urlencoding::encode("rust:fn:my_func:src_lib_rs:1-20");
+       271 +      let response = app
+       272 +          .oneshot(
+       273 +              Request::builder()
+       274 +                  .uri(format!("/code-entity-detail-view/{}",
+           +  encoded_key))
+       275 +                  .body(Body::empty())
+       276 +                  .unwrap()
+       277 +          )
+       278 +          .await
+       279 +          .unwrap();
+       280 +  
+       281 +      // THEN: Returns entity details with code
+       282 +      assert_eq!(response.status(), StatusCode::OK);
+       283 +  
+       284 +      let body = axum::body::to_bytes(response.into_body(), 
+           + usize::MAX).await.unwrap();
+       285 +      let json: serde_json::Value = 
+           + serde_json::from_slice(&body).unwrap();
+       286 +  
+       287 +      assert_eq!(json["success"], true);
+       288 +      assert_eq!(json["endpoint"], 
+           + "/code-entity-detail-view");
+       289 +  
+       290 +      // Verify entity data
+       291 +      let data = &json["data"];
+       292 +      assert_eq!(data["key"], 
+           + "rust:fn:my_func:src_lib_rs:1-20");
+       293 +      assert_eq!(data["file_path"], "src/lib.rs");
+       294 +      assert_eq!(data["entity_type"], "function");
+       295 +      assert_eq!(data["entity_class"], "CODE");
+       296 +      assert_eq!(data["language"], "rust");
+       297 +      
+           + assert!(data["code"].as_str().unwrap().contains("my_func"));
+       298 +  }
+       299 +  
+       300 +  /// Test 2.4: Get entity detail returns 404 for missing key
+       301 +  ///
+       302 +  /// # 4-Word Name: test_entity_detail_not_found
+       303 +  #[tokio::test]
+       304 +  async fn test_entity_detail_not_found() {
+       305 +      // GIVEN: Server with in-memory database (empty)
+       306 +      let storage = CozoDbStorage::new("mem").await.unwrap();
+       307 +      storage.create_schema().await.unwrap();
+       308 +  
+       309 +      let state = SharedApplicationStateContainer::create_wit
+           + h_database_storage(storage);
+       310 +      let app = build_complete_router_instance(state);
+       311 +  
+       312 +      // WHEN: GET /code-entity-detail-view/{key} with 
+           + non-existent key
+       313 +      let encoded_key = 
+           + urlencoding::encode("rust:fn:nonexistent:foo:1-10");
+       314 +      let response = app
+       315 +          .oneshot(
+       316 +              Request::builder()
+       317 +                  .uri(format!("/code-entity-detail-view/{}",
+           +  encoded_key))
+       318 +                  .body(Body::empty())
+       319 +                  .unwrap()
+       320 +          )
+       321 +          .await
+       322 +          .unwrap();
+       323 +  
+       324 +      // THEN: Returns 404 with error message
+       325 +      assert_eq!(response.status(), StatusCode::NOT_FOUND);
+       326 +  
+       327 +      let body = axum::body::to_bytes(response.into_body(), 
+           + usize::MAX).await.unwrap();
+       328 +      let json: serde_json::Value = 
+           + serde_json::from_slice(&body).unwrap();
+       329 +  
+       330 +      assert_eq!(json["success"], false);
+       331 +      assert!(json["error"].is_string());
+       332 +  }
+
+⏺ Need to add urlencoding dependency for tests:
+
+⏺ Update(crates/pt08-http-code-query-server/Cargo.toml)
+  ⎿  Updated crates/pt08-http-code-query-server/Cargo.toml with 1 addition
+       38    tokio-test = { workspace = true }
+       39    tempfile = { workspace = true }
+       40    tower = { version = "0.5", features = ["util"] }
+       41 +  urlencoding = "2.1"
+
+⏺ Now run tests to confirm RED phase:
+
+⏺ Bash(/Users/amuldotexe/.cargo/bin/cargo test -p pt08-http-code-query-server
+      test_get_entity_detail_by_key 2>&1)
+  ⎿  Error: Exit code 101
+         Updating crates.io index
+          Locking 1 package to latest compatible version
+           Adding urlencoding v2.1.3
+     warning: function `create_test_entity` is never used
+        --> crates/parseltongue-core/src/entity_class_specifications.rs:388:4
+         |
+     388 | fn create_test_entity(file_path: &str, code: &str, entity_class: 
+     EntityClass) -> CodeEntity {
+         |    ^^^^^^^^^^^^^^^^^^
+         |
+     … +53 lines (ctrl+o to see all)
+
+⏺ There's a syntax error with newlines in the test data. Let me fix it:
+
+⏺ Update(crates/pt08-http-code-query-server/tests/http_server_integration_tests.
+        rs)
+  ⎿  Updated crates/pt08-http-code-query-server/tests/http_server_integrati
+     n_tests.rs with 1 addition and 1 removal
+       252            ?[ISGL1_key, Current_Code, Future_Code, 
+             interface_signature, TDD_Classification,
+       253              lsp_meta_data, current_ind, future_ind, 
+             Future_Action, file_path, language,
+       254              last_modified, entity_type, entity_class] <- [
+       255 -              ["rust:fn:my_func:src_lib_rs:1-20", "pub fn 
+           -  my_func() {\n    println!(\"Hello\");\n}", null, "{
+           -  \"name\": \"my_func\"
+           -  }", "{}", null, true, true, null, "src/lib.rs", "rust", 
+           -  "2024-01-01T00:00:00Z", "function", "CODE"]
+       255 +              ["rust:fn:my_func:src_lib_rs:1-20", "pub fn 
+           +  my_func() { println!(\"Hello\"); }", null, "{
+           +  }", "{}", null, true, true, null, "src/lib.rs", "rust", 
+           +  "2024-01-01T00:00:00Z", "function", "CODE"]
+       256            ]
+       257            :put CodeGraph {
+       258                ISGL1_key =>
+
+⏺ Your account does not have access to Claude Code. Please run /login.
+
+
+
