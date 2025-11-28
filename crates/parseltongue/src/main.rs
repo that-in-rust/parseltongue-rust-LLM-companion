@@ -3,6 +3,8 @@
 //! This binary provides subcommands that dispatch to the individual tools:
 //! - pt01-folder-to-cozodb-streamer (Tool 1: Ingest)
 //! - pt02-llm-cozodb-to-context-writer (Tool 2: Read)
+//! - pt07-visual-analytics-terminal (Tool 7: Visualize)
+//! - pt08-http-code-query-server (Tool 8: HTTP Server)
 
 use clap::{Arg, ArgMatches, Command};
 use console::style;
@@ -10,6 +12,9 @@ use anyhow::Result;
 
 // Import traits to enable trait methods
 use pt01_folder_to_cozodb_streamer::streamer::FileStreamer;
+
+// Import HTTP server types
+use pt08_http_code_query_server::{HttpServerStartupConfig, http_server_startup_runner};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,6 +36,9 @@ async fn main() -> Result<()> {
         Some(("pt07", sub_matches)) => {
             run_pt07(sub_matches).await
         }
+        Some(("serve-http-code-backend", sub_matches)) => {
+            run_serve_http_code_backend(sub_matches).await
+        }
         _ => {
             println!("{}", style("Parseltongue CLI Toolkit").blue().bold());
             println!("{}", style("Ultra-minimalist code analysis toolkit").blue());
@@ -46,6 +54,7 @@ async fn main() -> Result<()> {
             println!("    pt02-level02                       - + Type system (~60K tokens)");
             println!("");
             println!("  pt07                                 - Visual analytics (Tool 7: Visualize)");
+            println!("  serve-http-code-backend              - HTTP server for REST API (Tool 8: Server)");
             Ok(())
         }
     }
@@ -238,6 +247,36 @@ fn build_cli() -> Command {
                                 .help("Include test entities (default: implementation-only)")
                                 .action(clap::ArgAction::SetTrue),
                         ),
+                ),
+        )
+        .subcommand(
+            Command::new("serve-http-code-backend")
+                .about("Tool 8: HTTP server for code queries (REST API)")
+                .long_about(
+                    "Start an HTTP server exposing CozoDB queries via REST endpoints.\n\n\
+                    Examples:\n  \
+                    parseltongue serve-http-code-backend --port 3000\n  \
+                    parseltongue serve-http-code-backend --port 8080 --db rocksdb:analysis.db"
+                )
+                .arg(
+                    Arg::new("port")
+                        .long("port")
+                        .short('p')
+                        .help("Port to listen on")
+                        .default_value("3000"),
+                )
+                .arg(
+                    Arg::new("db")
+                        .long("db")
+                        .help("Database file path (rocksdb:path or mem)")
+                        .default_value("mem"),
+                )
+                .arg(
+                    Arg::new("verbose")
+                        .long("verbose")
+                        .short('v')
+                        .help("Enable verbose logging")
+                        .action(clap::ArgAction::SetTrue),
                 ),
         )
 }
@@ -544,6 +583,35 @@ async fn run_pt07(matches: &ArgMatches) -> Result<()> {
     }
 }
 
+/// Run the HTTP server for code queries
+///
+/// # 4-Word Name: run_serve_http_code_backend
+async fn run_serve_http_code_backend(matches: &ArgMatches) -> Result<()> {
+    let port = matches.get_one::<String>("port").unwrap();
+    let db = matches.get_one::<String>("db").unwrap();
+    let verbose = matches.get_flag("verbose");
+
+    println!("{}", style("Running Tool 8: HTTP Code Query Server").cyan());
+    if verbose {
+        println!("  Port: {}", port);
+        println!("  Database: {}", db);
+    }
+
+    // Build configuration
+    let config = HttpServerStartupConfig {
+        target_directory_path_value: std::path::PathBuf::from("."),
+        database_connection_string_value: db.clone(),
+        http_port_override_option: port.parse().ok(),
+        force_reindex_enabled_flag: false,
+        daemon_background_mode_flag: false,
+        idle_timeout_minutes_option: None,
+        verbose_logging_enabled_flag: verbose,
+    };
+
+    // Start the server (blocks until shutdown)
+    http_server_startup_runner::start_http_server_blocking_loop(config).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,5 +626,6 @@ mod tests {
         assert!(subcommands.contains(&"pt02-level01")); // Progressive disclosure
         assert!(subcommands.contains(&"pt02-level02")); // Progressive disclosure
         assert!(subcommands.contains(&"pt07")); // Visual analytics
+        assert!(subcommands.contains(&"serve-http-code-backend")); // HTTP server
     }
 }

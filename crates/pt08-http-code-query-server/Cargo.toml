@@ -1,30 +1,37 @@
 [package]
-name = "parseltongue"
+name = "pt08-http-code-query-server"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
-[[bin]]
-name = "parseltongue"
-path = "src/main.rs"
+[lib]
+name = "pt08_http_code_query_server"
+path = "src/lib.rs"
 
 [dependencies]
-# CLI framework
-clap = { workspace = true }
-console = { workspace = true }
+# HTTP server framework
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Core library (provides storage, entities, traits)
 parseltongue-core = { path = "../parseltongue-core" }
 
-# Import all tool crates as libraries (workflow-ordered pt01-pt08)
+# Ingestion tool (for startup indexing)
 pt01-folder-to-cozodb-streamer = { path = "../pt01-folder-to-cozodb-streamer" }
+
+# Export tool (for query logic reuse)
 pt02-llm-cozodb-to-context-writer = { path = "../pt02-llm-cozodb-to-context-writer" }
-pt07-visual-analytics-terminal = { path = "../pt07-visual-analytics-terminal" }
-pt08-http-code-query-server = { path = "../pt08-http-code-query-server" }
 
 # Core dependencies
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+tempfile = { workspace = true }
+tower = { version = "0.5", features = ["util"] }
