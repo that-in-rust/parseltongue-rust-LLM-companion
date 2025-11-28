@@ -5,12 +5,21 @@
 //! Endpoint: GET /code-entities-list-all
 
 use axum::{
-    extract::State,
+    extract::{Query, State},
     Json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+
+/// Query parameters for entities list endpoint
+///
+/// # 4-Word Name: EntitiesListQueryParams
+#[derive(Debug, Deserialize)]
+pub struct EntitiesListQueryParams {
+    /// Filter entities by type (e.g., "function", "struct", "class")
+    pub entity_type: Option<String>,
+}
 
 /// Entity summary for list response
 ///
@@ -50,16 +59,17 @@ pub struct EntitiesListResponsePayload {
 ///
 /// # Contract
 /// - Precondition: Database loaded
-/// - Postcondition: Returns all entities with summary info
+/// - Postcondition: Returns entities with optional type filtering
 /// - Performance: <100ms for up to 1000 entities
 pub async fn handle_code_entities_list_all(
     State(state): State<SharedApplicationStateContainer>,
+    Query(params): Query<EntitiesListQueryParams>,
 ) -> Json<EntitiesListResponsePayload> {
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
-    // Query entities from database
-    let entities = query_all_entities_from_database(&state).await;
+    // Query entities from database with optional filtering
+    let entities = query_entities_with_filter_from_database(&state, params.entity_type).await;
     let total_count = entities.len();
 
     // Estimate tokens (~20 per entity)
@@ -76,19 +86,26 @@ pub async fn handle_code_entities_list_all(
     })
 }
 
-/// Query all entities from database
+/// Query entities from database with optional filtering
 ///
-/// # 4-Word Name: query_all_entities_from_database
-async fn query_all_entities_from_database(
+/// # 4-Word Name: query_entities_with_filter_from_database
+async fn query_entities_with_filter_from_database(
     state: &SharedApplicationStateContainer,
+    entity_type_filter: Option<String>,
 ) -> Vec<EntitySummaryListItem> {
     let db_guard = state.database_storage_connection_arc.read().await;
 
     if let Some(storage) = db_guard.as_ref() {
-        // Query all entities with summary fields
-        let result = storage.raw_query(
-            "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}"
-        ).await;
+        // Build query based on whether we have a filter
+        let query = match entity_type_filter {
+            Some(filter) => format!(
+                "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language}}, entity_type == \"{}\"",
+                filter.replace('"', "\\\"")
+            ),
+            None => "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}".to_string(),
+        };
+
+        let result = storage.raw_query(&query).await;
 
         match result {
             Ok(named_rows) => {

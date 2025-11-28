@@ -346,3 +346,89 @@ async fn test_entity_detail_not_found() {
     assert_eq!(json["success"], false);
     assert!(json["error"].is_string());
 }
+
+/// Test 2.2: Filter Entities by Type
+///
+/// # 4-Word Name: test_filter_entities_by_type
+#[tokio::test]
+async fn test_filter_entities_by_type() {
+    // GIVEN: Database with 30 functions, 20 structs
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entities using multiple smaller queries to avoid syntax issues
+    // Insert 5 functions
+    for i in 1..=5 {
+        let start_line = (i-1)*10 + 1;
+        let end_line = i*10;
+        let query = format!(r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class] <- [
+                ["rust:fn:function{}:main_rs:{}-{}", "fn function{}() {{}}", null, "{{}}", "{{}}", null, true, true, null, "main.rs", "rust", "2024-01-01T00:00:00Z", "function", "CODE"]
+            ]
+            :put CodeGraph {{
+                ISGL1_key =>
+                Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class
+            }}
+        "#, i, start_line, end_line, i);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Insert 3 structs
+    for i in 1..=3 {
+        let start_line = (i-1)*5 + 1;
+        let end_line = i*5;
+        let query = format!(r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class] <- [
+                ["rust:struct:struct{}:lib_rs:{}-{}", "struct Struct{} {{}}", null, "{{}}", "{{}}", null, true, true, null, "lib.rs", "rust", "2024-01-01T00:00:00Z", "struct", "CODE"]
+            ]
+            :put CodeGraph {{
+                ISGL1_key =>
+                Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class
+            }}
+        "#, i, start_line, end_line, i);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /code-entities-list-all?entity_type=function
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/code-entities-list-all?entity_type=function")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns only functions
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/code-entities-list-all");
+    assert_eq!(json["data"]["total_count"], 5);
+    assert!(json["data"]["entities"].is_array());
+
+    let entities = json["data"]["entities"].as_array().unwrap();
+    assert_eq!(entities.len(), 5);
+
+    // Verify all returned entities are functions
+    for entity in entities {
+        assert_eq!(entity["entity_type"], "function");
+    }
+}

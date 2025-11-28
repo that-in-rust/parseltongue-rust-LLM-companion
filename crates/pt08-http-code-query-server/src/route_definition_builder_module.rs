@@ -12,6 +12,7 @@ use crate::http_endpoint_handler_modules::{
     server_health_check_handler,
     codebase_statistics_overview_handler,
     code_entities_list_all_handler,
+    code_entity_detail_view_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -57,6 +58,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/code-entities-list-all",
             get(code_entities_list_all_handler::handle_code_entities_list_all)
+        )
+        .route(
+            "/code-entity-detail-view/{key}",
+            get(code_entity_detail_view_handler::handle_code_entity_detail_view)
         )
         // More endpoints will be added in subsequent phases
         .with_state(state)

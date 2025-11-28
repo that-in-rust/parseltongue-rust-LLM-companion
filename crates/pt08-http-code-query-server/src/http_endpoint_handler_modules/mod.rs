@@ -7,6 +7,7 @@
 pub mod server_health_check_handler;
 pub mod codebase_statistics_overview_handler;
 pub mod code_entities_list_all_handler;
+pub mod code_entity_detail_view_handler;
 // Future handlers:
 // pub mod dependency_edges_list_handler;
 // pub mod blast_radius_impact_handler;

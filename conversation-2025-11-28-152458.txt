@@ -1,0 +1,15 @@
+
+╭─── Claude Code v2.0.55 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│             Welcome back that in rust!             │ started                 │
+│                                                    │ Run /install-github-ap… │
+│                      ▗ ▗   ▖ ▖                     │ ✔ Run /init to create … │
+│                                                    │ ─────────────────────── │
+│                        ▘▘ ▝▝                       │ Recent activity         │
+│                                                    │ No recent activity      │
+│               Opus 4.5 · Claude Max                │                         │
+│ ~/Projects/parseltongue-dependency-graph-generator │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+
