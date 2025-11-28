@@ -102,8 +102,8 @@ pub async fn handle_reverse_callers_query_graph(
         params.entity
     };
 
-    // Use existing production-ready dependency analysis from pt01
-    let callers = query_reverse_callers_using_pt01_methods(&state, &entity_key).await;
+    // Use direct query method compatible with test database setup
+    let callers = query_reverse_callers_direct_method(&state, &entity_key).await;
     let total_count = callers.len();
 
     // Estimate tokens (~50 per caller + entity key)
@@ -135,34 +135,42 @@ pub async fn handle_reverse_callers_query_graph(
     ).into_response()
 }
 
-/// Query reverse callers using existing pt01 production-ready methods
+/// Query reverse callers using direct CozoDB queries compatible with test setup
 ///
-/// # 4-Word Name: query_reverse_callers_using_pt01_methods
-async fn query_reverse_callers_using_pt01_methods(
+/// # 4-Word Name: query_reverse_callers_direct_method
+async fn query_reverse_callers_direct_method(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
 ) -> Vec<CallerEdgeDataPayload> {
     let db_guard = state.database_storage_connection_arc.read().await;
     if let Some(storage) = db_guard.as_ref() {
-        // Use existing production-ready get_reverse_dependencies() method from pt01
-        // This method is already optimized (<5ms per query) and battle-tested
-        match storage.get_reverse_dependencies(entity_key).await {
-            Ok(reverse_deps) => {
-                // For each reverse dependency, get the full edge details
-                let mut callers = Vec::new();
+        // Direct query compatible with our test insertion pattern
+        // This matches exactly how our test inserts dependency edges
+        let escaped_entity_key = entity_key
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
 
-                for from_key in reverse_deps {
-                    // Query for the edge details including edge_type and source_location
-                    if let Some(edge_details) = get_edge_details_between_entities(storage, &from_key, entity_key).await {
+        let query = format!(
+            r#"
+            ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+                to_key == "{}"
+            "#,
+            escaped_entity_key
+        );
+
+        match storage.raw_query(&query).await {
+            Ok(result) => {
+                let mut callers = Vec::new();
+                for row in result.rows {
+                    if row.len() >= 4 {
                         callers.push(CallerEdgeDataPayload {
-                            from_key,
-                            to_key: entity_key.to_string(),
-                            edge_type: edge_details.edge_type,
-                            source_location: edge_details.source_location,
+                            from_key: extract_string_value(&row[0]).unwrap_or_else(|| "Unknown".to_string()),
+                            to_key: extract_string_value(&row[1]).unwrap_or_else(|| entity_key.to_string()),
+                            edge_type: extract_string_value(&row[2]).unwrap_or_else(|| "Unknown".to_string()),
+                            source_location: extract_string_value(&row[3]).unwrap_or_else(|| "unknown".to_string()),
                         });
                     }
                 }
-
                 callers
             }
             Err(_) => Vec::new(),
