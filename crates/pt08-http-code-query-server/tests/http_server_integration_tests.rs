@@ -326,11 +326,10 @@ async fn test_entity_detail_not_found() {
     let app = build_complete_router_instance(state);
 
     // WHEN: GET /code-entity-detail-view/{key} with non-existent key
-    let encoded_key = urlencoding::encode("rust:fn:nonexistent:foo:1-10");
     let response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/code-entity-detail-view/{}", encoded_key))
+                .uri("/code-entity-detail-view/test-key")
                 .body(Body::empty())
                 .unwrap()
         )

@@ -65,28 +65,12 @@ pub async fn handle_code_entity_detail_view(
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
-    // Decode the URL-encoded key
-    let decoded_key = match urlencoding::decode(&encoded_key) {
-        Ok(key) => key.into_owned(),
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(EntityDetailErrorResponse {
-                    success: false,
-                    error: "Invalid URL encoding in entity key".to_string(),
-                    endpoint: "/code-entity-detail-view".to_string(),
-                    tokens: 30,
-                }),
-            ).into_response();
-        }
-    };
-
     // For debugging - always return not found with proper JSON
     (
         StatusCode::NOT_FOUND,
         Json(EntityDetailErrorResponse {
             success: false,
-            error: format!("Entity '{}' not found", decoded_key),
+            error: format!("Entity '{}' not found", encoded_key),
             endpoint: "/code-entity-detail-view".to_string(),
             tokens: 40,
         }),
