@@ -502,3 +502,55 @@ async fn test_fuzzy_search_entities() {
     });
     assert!(found, "Should find calculate_total function");
 }
+
+/// Test 2.6: Empty Search Returns Bad Request
+///
+/// # 4-Word Name: test_empty_search_returns_bad_request
+#[tokio::test]
+async fn test_empty_search_returns_bad_request() {
+    // GIVEN: Database with entities
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entity
+    let query = r#"
+        ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+          lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+          last_modified, entity_type, entity_class] <- [
+            ["rust:fn:test_func:src_main_rs:1-10", "pub fn test_func() {}", null, "{}", "{}", null, true, true, null, "src/main.rs", "rust", "2024-01-01T00:00:00Z", "function", "CODE"]
+        ]
+        :put CodeGraph {
+            ISGL1_key =>
+            Current_Code, Future_Code, interface_signature, TDD_Classification,
+            lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+            last_modified, entity_type, entity_class
+        }
+    "#;
+    storage.execute_query(query).await.unwrap();
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /code-entities-search-fuzzy?q= (empty search)
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/code-entities-search-fuzzy?q=")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns 400 Bad Request
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["success"], false);
+    assert_eq!(json["endpoint"], "/code-entities-search-fuzzy");
+    assert!(json["error"].as_str().unwrap().contains("empty"));
+}
