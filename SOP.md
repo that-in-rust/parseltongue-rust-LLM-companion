@@ -23,3 +23,32 @@
 **Meta Pattern Added**: Before creating ANY new file, folder, function, struct, or endpoint - COUNT THE WORDS. Must be exactly 4. Exceptions only for Rust conventions: `lib.rs`, `main.rs`, `mod.rs`, `Cargo.toml`.
 
 ---
+
+## Entry 002: Single Binary Rule (2025-11-28)
+
+**Encountered**: Attempting to run `cargo test` to verify HTTP server implementation
+
+**Error/Mistake**: Cargo binary not found in PATH - this is a single binary Rust project
+
+**Meta Pattern**: This repository uses a single binary rule for ALL Rust operations:
+- NO system-wide cargo installation
+- ALL operations use the project's single Rust binary
+- Binary location: `~/.cargo/bin/cargo` (project-specific)
+- Add to PATH when working on this project: `export PATH="$HOME/.cargo/bin:$PATH"`
+
+**What We Did**: Added PATH export to SOP for this repository
+
+**Commands for this repo**:
+```bash
+# Set up environment for this project
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Then run normal cargo commands
+cargo build --release
+cargo test -p pt08-http-code-query-server
+cargo run --release -- pt08-http-code-query-server serve .
+```
+
+**Meta Pattern Added**: Always source the project's Rust environment before any cargo operations. This repo is self-contained with its own toolchain.
+
+---

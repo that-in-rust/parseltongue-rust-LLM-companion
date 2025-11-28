@@ -19,6 +19,6 @@ pub mod http_endpoint_handler_modules;
 
 // Re-export main types for convenience
 pub use command_line_argument_parser::HttpServerStartupConfig;
-pub use http_server_startup_runner::SharedApplicationStateContainer;
+pub use http_server_startup_runner::{SharedApplicationStateContainer, start_http_server_blocking_loop};
 pub use route_definition_builder_module::build_complete_router_instance;
 pub use structured_error_handling_types::HttpServerErrorTypes;
