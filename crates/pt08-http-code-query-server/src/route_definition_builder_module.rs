@@ -14,6 +14,7 @@ use crate::http_endpoint_handler_modules::{
     code_entities_list_all_handler,
     code_entity_detail_view_handler,
     code_entities_fuzzy_search_handler,
+    reverse_callers_query_graph_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -27,13 +28,13 @@ use crate::http_endpoint_handler_modules::{
 ///
 /// ## Entity Endpoints
 /// - GET /code-entities-list-all
-/// - GET /code-entity-detail-view/{key}
+/// - GET /code-entity-detail-view/{*key}
 /// - GET /fuzzy-entity-search-query?q=pattern
 ///
 /// ## Edge Endpoints
 /// - GET /dependency-edges-list-all
-/// - GET /reverse-callers-query-graph/{entity}
-/// - GET /forward-callees-query-graph/{entity}
+/// - GET /reverse-callers-query-graph/{*entity}
+/// - GET /forward-callees-query-graph/{*entity}
 ///
 /// ## Analysis Endpoints
 /// - GET /blast-radius-impact-analysis/{entity}?hops=N
@@ -67,6 +68,16 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/code-entities-search-fuzzy",
             get(code_entities_fuzzy_search_handler::handle_code_entities_fuzzy_search)
+        )
+        // Graph query endpoints
+        .route(
+            "/reverse-callers-query-graph/{entity}",
+            get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
+        )
+        // Test route for debugging
+        .route(
+            "/test-simple/{param}",
+            get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
         )
         // More endpoints will be added in subsequent phases
         .with_state(state)

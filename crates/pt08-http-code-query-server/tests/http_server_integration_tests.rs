@@ -9,6 +9,7 @@ use axum::{
     http::{Request, StatusCode},
 };
 use tower::ServiceExt;
+use urlencoding;
 
 use pt08_http_code_query_server::{
     SharedApplicationStateContainer,
@@ -301,7 +302,7 @@ async fn test_get_entity_detail_by_key() {
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert_eq!(json["success"], true);
-    assert_eq!(json["endpoint"], "/code-entity-detail-view");
+    assert_eq!(json["endpoint"], "/code-entity-detail-view/{*key}");
 
     // Verify entity data
     let data = &json["data"];
@@ -552,4 +553,133 @@ async fn test_empty_search_returns_bad_request() {
     assert_eq!(json["success"], false);
     assert_eq!(json["endpoint"], "/code-entities-search-fuzzy");
     assert!(json["error"].as_str().unwrap().contains("empty"));
+}
+
+// ============================================================================
+// PHASE 3: GRAPH QUERY ENDPOINTS (8 Tests)
+// ============================================================================
+
+/// Test 3.1: Reverse Callers (Who Calls This?)
+///
+/// # 4-Word Name: test_reverse_callers_returns_deps
+///
+/// # Contract
+/// - Precondition: Database with dependency graph A → B → C
+/// - Postcondition: Query for B returns A as caller
+/// - Performance: <100ms response time
+/// - Error Handling: Returns 404 for non-existent entities
+#[tokio::test]
+async fn test_reverse_callers_returns_deps() {
+    // GIVEN: Database with dependency chain A → B → C (A calls B, B calls C)
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entities
+    let test_entities = vec![
+        ("rust:fn:main:src_main_rs:1-10", "pub fn main() { process(); }", "main", "src/main.rs", "function"),
+        ("rust:fn:process:src_process_rs:1-20", "pub fn process() { transform(); }", "process", "src/process.rs", "function"),
+        ("rust:fn:transform:src_transform_rs:1-15", "pub fn transform() { /* logic */ }", "transform", "src/transform.rs", "function"),
+    ];
+
+    for (key, code, name, file_path, entity_type) in test_entities {
+        let query = format!(r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class] <- [
+                ["{}", "{}", null, "{{}}", "{{}}", null, true, true, null, "{}", "rust", "2024-01-01T00:00:00Z", "{}", "CODE"]
+            ]
+            :put CodeGraph {{
+                ISGL1_key =>
+                Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class
+            }}
+        "#, key, code, file_path, entity_type);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Insert dependency edges: main → process, process → transform
+    let dependency_edges = vec![
+        ("rust:fn:main:src_main_rs:1-10", "rust:fn:process:src_process_rs:1-20", "Calls", "src/main.rs:5"),
+        ("rust:fn:process:src_process_rs:1-20", "rust:fn:transform:src_transform_rs:1-15", "Calls", "src/process.rs:10"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Debug: Verify edges were inserted
+    let debug_query = "?[from_key, to_key] := *DependencyEdges{from_key, to_key}";
+    let debug_result = storage.raw_query(debug_query).await.unwrap();
+    println!("DEBUG: Inserted edges count: {}", debug_result.rows.len());
+    for row in &debug_result.rows {
+        println!("DEBUG: Edge: {} -> {}", row[0], row[1]);
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // Test known working route first
+    println!("DEBUG: Testing known working route...");
+    let health_response = app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/server-health-check-status")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+    println!("DEBUG: Health check status: {}", health_response.status());
+
+    // WHEN: GET /reverse-callers-query-graph/process (URL-encode entity key)
+    let encoded_entity_key = urlencoding::encode("rust:fn:process:src_process_rs:1-20");
+    println!("DEBUG: Encoded entity key: {}", encoded_entity_key);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/reverse-callers-query-graph/{}", encoded_entity_key))
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns main as caller of process
+    // Debug: Print actual response
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG: Status: {}", status);
+    println!("DEBUG: Response body: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/reverse-callers-query-graph/{*entity}");
+    assert_eq!(json["data"]["total_count"].as_u64().unwrap(), 1);
+
+    let callers = json["data"]["callers"].as_array().unwrap();
+    assert_eq!(callers.len(), 1);
+
+    let caller = &callers[0];
+    assert_eq!(caller["from_key"], "rust:fn:main:src_main_rs:1-10");
+    assert_eq!(caller["to_key"], "rust:fn:process:src_process_rs:1-20");
+    assert_eq!(caller["edge_type"], "Calls");
+    assert_eq!(caller["source_location"], "src/main.rs:5");
 }

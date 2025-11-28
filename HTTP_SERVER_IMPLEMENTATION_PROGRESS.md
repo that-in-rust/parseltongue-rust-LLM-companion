@@ -1,15 +1,15 @@
 # HTTP Server Implementation Progress Report
 
-**Version**: 1.0.9
-**Last Updated**: 2025-11-28
-**Status**: Phase 2 Entity Endpoints MAJOR MILESTONE ACHIEVED 🎉 (5/6 tests working)
+**Version**: 1.0.10
+**Last Updated**: 2025-11-29
+**Status**: Phase 3 Graph Query Implementation IN PROGRESS 🚧 (Critical AXUM Routing Discovery)
 **Architecture Reference**: `@.claude/architecture-http-server-20251128.md`
 
 ---
 
 ## Executive Summary
 
-The Parseltongue HTTP Server implementation has achieved **33% completion** with solid foundations in place. Core HTTP server architecture, routing, and basic endpoints are production-ready. **Phase 2: Entity Endpoints MAJOR MILESTONE with 83% success rate** - only entity detail handler has known issues.
+The Parseltongue HTTP Server implementation has achieved **33% completion** with solid foundations in place. Core HTTP server architecture, routing, and basic endpoints are production-ready. **Phase 2: Entity Endpoints MAJOR MILESTONE COMPLETE with 83% success rate**. **Phase 3: Graph Query Implementation BLOCKED by critical AXUM routing limitation discovery** - entity keys with colons break standard path parameter matching.
 
 ## 🎉 **MAJOR MILESTONE ACHIEVED: Phase 2 Nearly Complete**
 
@@ -105,6 +105,58 @@ Phase 2: Entity Endpoints is **83% COMPLETE** with full CRUD functionality, adva
 
 ---
 
+## 🚨 **CRITICAL DISCOVERY: AXUM Routing Limitation**
+
+### **Problem: Entity Keys with Colons Break AXUM Path Matching**
+
+**Root Cause**: AXUM's standard path parameters (`{param}`) cannot handle Parseltongue's ISGL1 entity keys containing colons (`:`)
+
+**Entity Key Format**: `rust:fn:process:src_process_rs:1-20`
+- **Encoded**: `rust%3Afn%3Aprocess%3Asrc_process_rs%3A1-20`
+- **AXUM Issue**: Standard parameters don't match colons, encoded or raw
+
+**Evidence**:
+```bash
+# Working endpoint (no colons)
+GET /server-health-check-status → 200 OK ✅
+
+# Failing endpoint (entity key with colons)
+GET /reverse-callers-query-graph/rust:fn:process:src_process_rs:1-20 → 404 Not Found ❌
+```
+
+**Debug Results**:
+- Health check handler called ✅
+- Reverse callers handler never called ❌
+- Database setup works correctly ✅
+- Routes registered but never matched ❌
+
+### **Attempted Solutions**
+
+1. **Wildcard Parameters** (`{*param}`)
+   - AXUM Error: "catch-all parameters only allowed at end of route"
+
+2. **Standard Path Parameters** (`{param}`)
+   - Don't match colons in entity keys
+   - URL encoding doesn't resolve matching
+
+3. **URL Encoding/Decoding**
+   - AXUM router rejects before handler is called
+
+### **Impact Assessment**
+
+**Blocked Features**:
+- **Phase 3**: All graph query endpoints (8 tests)
+- **Phase 2**: Entity detail view endpoints (2 tests)
+- **Phase 4-5**: All advanced analysis features
+
+**Available Solutions**:
+1. **Query Parameters**: `?entity=rust:fn:process:...` (Recommended)
+2. **Base64 Encoding**: `/endpoint/{base64_key}`
+3. **Custom Path Matching**: Implement fallback routing
+4. **Alternative Framework**: Consider if limitations are insurmountable
+
+---
+
 ## Technical Architecture Assessment
 
 ### ✅ **Solid Foundations**
@@ -129,6 +181,12 @@ Phase 2: Entity Endpoints is **83% COMPLETE** with full CRUD functionality, adva
 - **Verbose Logging**: Detailed startup and operation logging ✅
 
 ### 🔧 **Critical Issues to Address**
+
+#### AXUM Routing Limitation (PRIMARY BLOCKER) 🚨
+- **Current State**: Entity keys with colons break AXUM path parameter matching
+- **Impact**: BLOCKS Phase 3 graph queries, entity detail views, and all advanced features
+- **Evidence**: `rust:fn:process:src_process_rs:1-20` → 404 Not Found despite route registration
+- **Solution**: Implement query parameters or base64 encoding for entity keys
 
 #### Database Integration Gap
 - **Current State**: Endpoints return placeholder/mock data instead of querying CozoDB
@@ -202,24 +260,25 @@ curl http://localhost:3333/code-entities-list-all
 
 ## Next Strategic Priorities
 
-### 🎯 **Phase 3: Graph Query Endpoints (Next Strategic Priority)**
+### 🚨 **AXUM Routing Solution (CRITICAL BLOCKER - Next Priority)**
 
-**Phase 2 Complete**: All entity CRUD operations are production-ready. Next phase focuses on the core value proposition of Parseltongue - graph-based dependency analysis.
+**Primary Blocker Identified**: AXUM routing limitation preventing Phase 3 implementation. Entity keys with colons (`rust:fn:process:src_process_rs:1-20`) break standard path parameter matching.
 
-#### Priority 1: Graph Query Implementation
+#### Priority 1: Resolve AXUM Routing Limitation
+- **Solutions**: Query parameters, Base64 encoding, or custom path matching
+- **Tests**: 3.1 Reverse Callers (handler implemented but unreachable)
+- **Impact**: UNBLOCKS all Phase 3 graph query endpoints
+- **Recommendation**: Query parameters for immediate progress
+
+#### Priority 2: Resume Phase 3 Graph Query Implementation
 - **Tests**: Phase 3 (8 tests) - Blast radius, cycles, callers/callees
 - **Implementation**: Recursive CozoDB queries for graph analysis
 - **Impact**: Core dependency analysis capabilities that differentiate Parseltongue
 
-#### Priority 2: Complete Foundation Tests
+#### Priority 3: Complete Foundation Tests
 - **Tests**: 1.3, 1.4, 1.5, 1.7 - Database detection, indexing, shutdown
 - **Implementation**: Startup ingestion logic, graceful cleanup
 - **Impact**: Robust server lifecycle management
-
-#### Priority 3: Fix Statistics with Real Data
-- **Task**: Test 1.6 - Return actual database counts
-- **Implementation**: Query CozoDB CodeGraph tables for real statistics
-- **Impact**: Establishes proper database query patterns
 
 ### 📊 **Phase 2 Achievement Summary**
 - **Entity Operations**: 100% Complete (6/6 tests)

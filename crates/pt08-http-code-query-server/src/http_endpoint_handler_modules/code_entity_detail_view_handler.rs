@@ -2,7 +2,7 @@
 //!
 //! # 4-Word Naming: code_entity_detail_view_handler
 //!
-//! Endpoint: GET /code-entity-detail-view/{key}
+//! Endpoint: GET /code-entity-detail-view/{*key}
 
 use axum::{
     extract::{Path, State},
@@ -65,21 +65,58 @@ pub async fn handle_code_entity_detail_view(
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
-    // For debugging - always return not found with proper JSON
-    (
-        StatusCode::NOT_FOUND,
-        Json(EntityDetailErrorResponse {
-            success: false,
-            error: format!("Entity '{}' not found", encoded_key),
-            endpoint: "/code-entity-detail-view".to_string(),
-            tokens: 40,
-        }),
-    ).into_response()
+    // Decode URL-encoded entity key
+    let entity_key = match urlencoding::decode(&encoded_key) {
+        Ok(key) => key.into_owned(),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(EntityDetailErrorResponse {
+                    success: false,
+                    error: format!("Invalid entity key encoding: {}", encoded_key),
+                    endpoint: "/code-entity-detail-view/{key}".to_string(),
+                    tokens: 45,
+                }),
+            ).into_response();
+        }
+    };
+
+    // Query for entity details
+    if let Some(entity_details) = fetch_entity_details_from_database(&state, &entity_key).await {
+        let tokens = 100 + entity_details.code.len();
+        (
+            StatusCode::OK,
+            Json(EntityDetailResponsePayload {
+                success: true,
+                endpoint: "/code-entity-detail-view/{key}".to_string(),
+                data: EntityDetailDataPayload {
+                    key: entity_details.key,
+                    file_path: entity_details.file_path,
+                    entity_type: entity_details.entity_type,
+                    entity_class: entity_details.entity_class,
+                    language: entity_details.language,
+                    code: entity_details.code,
+                },
+                tokens,
+            }),
+        ).into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(EntityDetailErrorResponse {
+                success: false,
+                error: format!("Entity '{}' not found", entity_key),
+                endpoint: "/code-entity-detail-view/{key}".to_string(),
+                tokens: 40,
+            }),
+        ).into_response()
+    }
 }
 
 /// Entity data from database query
 ///
 /// # 4-Word Name: EntityDatabaseQueryResult
+#[derive(Debug, Serialize)]
 struct EntityDatabaseQueryResult {
     key: String,
     file_path: String,
@@ -98,11 +135,16 @@ async fn fetch_entity_details_from_database(
 ) -> Option<EntityDatabaseQueryResult> {
     let db_guard = state.database_storage_connection_arc.read().await;
     if let Some(storage) = db_guard.as_ref() {
+        // Properly escape the entity key for CozoDB query
+        let escaped_entity_key = entity_key
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+
         // Query for entity by key
         let query_result = storage
             .raw_query(&format!(
                 "?[file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{{ISGL1_key, file_path, entity_type, entity_class, language, Current_Code}}, ISGL1_key == \"{}\"",
-                entity_key.replace('"', "\\\"")
+                escaped_entity_key
             ))
             .await
             .ok()?;
