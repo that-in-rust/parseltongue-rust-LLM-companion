@@ -118,7 +118,71 @@ async fn test_unknown_endpoint_returns_not_found() {
 // Phase 2: Database Integration Tests
 // =============================================================================
 
-/// Test 2.1: Statistics with actual database
+/// Test 2.1: List all entities endpoint
+///
+/// # 4-Word Name: test_list_all_entities_endpoint
+#[tokio::test]
+async fn test_list_all_entities_endpoint() {
+    // GIVEN: Server with in-memory database containing entities
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entities
+    storage.execute_query(r#"
+        ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+          lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+          last_modified, entity_type, entity_class] <- [
+            ["rust:fn:func1:main_rs:1-10", "fn func1() {}", null, "{}", "{}", null, true, true, null, "src/main.rs", "rust", "2024-01-01T00:00:00Z", "function", "CODE"],
+            ["rust:fn:func2:lib_rs:11-20", "fn func2() {}", null, "{}", "{}", null, true, true, null, "src/lib.rs", "rust", "2024-01-01T00:00:00Z", "function", "CODE"],
+            ["rust:fn:test1:test_rs:1-10", "fn test1() {}", null, "{}", "{}", null, true, true, null, "tests/test.rs", "rust", "2024-01-01T00:00:00Z", "function", "TEST"]
+        ]
+        :put CodeGraph {
+            ISGL1_key =>
+            Current_Code, Future_Code, interface_signature, TDD_Classification,
+            lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+            last_modified, entity_type, entity_class
+        }
+    "#).await.unwrap();
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /code-entities-list-all
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/code-entities-list-all")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns list of entities
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/code-entities-list-all");
+    assert_eq!(json["data"]["total_count"], 3);
+    assert!(json["data"]["entities"].is_array());
+
+    let entities = json["data"]["entities"].as_array().unwrap();
+    assert_eq!(entities.len(), 3);
+
+    // Verify entity structure
+    let first = &entities[0];
+    assert!(first["key"].is_string());
+    assert!(first["file_path"].is_string());
+    assert!(first["entity_type"].is_string());
+    assert!(first["entity_class"].is_string());
+}
+
+/// Test 2.2: Statistics with actual database
 ///
 /// # 4-Word Name: test_stats_with_actual_database
 #[tokio::test]
