@@ -22,6 +22,7 @@ use crate::http_endpoint_handler_modules::{
     complexity_hotspots_ranking_handler,
     semantic_cluster_grouping_handler,
     api_reference_documentation_handler,
+    smart_context_token_budget_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -108,6 +109,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/semantic-cluster-grouping-list",
             get(semantic_cluster_grouping_handler::handle_semantic_cluster_grouping_list)
+        )
+        .route(
+            "/smart-context-token-budget",
+            get(smart_context_token_budget_handler::handle_smart_context_token_budget)
         )
         // Test route for debugging
         .route(

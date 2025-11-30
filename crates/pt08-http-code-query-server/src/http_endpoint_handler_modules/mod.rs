@@ -17,3 +17,4 @@ pub mod circular_dependency_detection_handler;
 pub mod complexity_hotspots_ranking_handler;
 pub mod semantic_cluster_grouping_handler;
 pub mod api_reference_documentation_handler;
+pub mod smart_context_token_budget_handler;

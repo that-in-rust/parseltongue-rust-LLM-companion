@@ -1311,3 +1311,108 @@ async fn test_api_reference_documentation_help() {
         }
     }
 }
+
+// =============================================================================
+// Killer Features
+// =============================================================================
+
+/// Test smart context token budget endpoint
+///
+/// # 4-Word Name: test_smart_context_token_budget
+///
+/// # Contract
+/// - Precondition: Database with entities and edges
+/// - Postcondition: Returns optimal context within token budget
+/// - Performance: <100ms response time
+#[tokio::test]
+async fn test_smart_context_token_budget() {
+    // GIVEN: Database with focus entity and related entities (inferred from edges)
+    // main calls helper1, helper2
+    // helper1 calls util1
+    // helper2 calls util2
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert dependency edges - entities are inferred from edge endpoints
+    let dependency_edges = vec![
+        ("rust:fn:main:src_main:1-50", "rust:fn:helper1:src_helper1:1-30", "Calls", "src/main.rs:2"),
+        ("rust:fn:main:src_main:1-50", "rust:fn:helper2:src_helper2:1-40", "Calls", "src/main.rs:3"),
+        ("rust:fn:helper1:src_helper1:1-30", "rust:fn:util1:src_util1:1-20", "Calls", "src/helper1.rs:2"),
+        ("rust:fn:helper2:src_helper2:1-40", "rust:fn:util2:src_util2:1-25", "Calls", "src/helper2.rs:2"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /smart-context-token-budget?focus=main&tokens=1000
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/smart-context-token-budget?focus=rust:fn:main:src_main:1-50&tokens=1000")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns context entries prioritized by relevance
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Smart Context: Status: {}", status);
+    println!("DEBUG Smart Context: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/smart-context-token-budget");
+
+    // Should have focus entity
+    assert!(json["data"]["focus_entity"].as_str().is_some());
+
+    // Should have token budget info
+    assert!(json["data"]["token_budget"].as_u64().is_some());
+    assert!(json["data"]["tokens_used"].as_u64().is_some());
+
+    // Should not exceed budget
+    let budget = json["data"]["token_budget"].as_u64().unwrap();
+    let used = json["data"]["tokens_used"].as_u64().unwrap();
+    assert!(used <= budget);
+
+    // Should have context entries
+    let context = json["data"]["context"].as_array().unwrap();
+    assert!(!context.is_empty());
+
+    // Each context entry should have required fields
+    for entry in context {
+        assert!(entry["entity_key"].as_str().is_some());
+        assert!(entry["relevance_score"].as_f64().is_some());
+        assert!(entry["relevance_type"].as_str().is_some());
+        assert!(entry["estimated_tokens"].as_u64().is_some());
+    }
+
+    // Direct callees (helper1, helper2) should have higher relevance than utils
+    // Find a direct callee entry
+    let has_direct_callee = context.iter().any(|e| {
+        e["relevance_type"].as_str().unwrap_or("") == "direct_callee"
+    });
+    assert!(has_direct_callee, "Should include direct callees");
+}
