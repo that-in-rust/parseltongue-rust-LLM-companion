@@ -20,6 +20,7 @@ use crate::http_endpoint_handler_modules::{
     blast_radius_impact_handler,
     circular_dependency_detection_handler,
     complexity_hotspots_ranking_handler,
+    semantic_cluster_grouping_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -98,6 +99,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/complexity-hotspots-ranking-view",
             get(complexity_hotspots_ranking_handler::handle_complexity_hotspots_ranking_view)
+        )
+        .route(
+            "/semantic-cluster-grouping-list",
+            get(semantic_cluster_grouping_handler::handle_semantic_cluster_grouping_list)
         )
         // Test route for debugging
         .route(

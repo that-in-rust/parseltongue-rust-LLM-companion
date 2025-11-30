@@ -1152,3 +1152,94 @@ async fn test_complexity_hotspots_ranking_view() {
     assert_eq!(top_hotspot["outbound_count"].as_u64().unwrap(), 2); // B→D, B→E
     assert_eq!(top_hotspot["total_coupling"].as_u64().unwrap(), 4);
 }
+
+// =============================================================================
+// Phase 4: Advanced Analysis Endpoints
+// =============================================================================
+
+/// Test semantic cluster grouping endpoint
+///
+/// # 4-Word Name: test_semantic_cluster_grouping_list
+///
+/// # Contract
+/// - Precondition: Database with entities forming distinct clusters
+/// - Postcondition: Returns entities grouped by connectivity
+/// - Performance: <100ms response time
+#[tokio::test]
+async fn test_semantic_cluster_grouping_list() {
+    // GIVEN: Database with two distinct clusters of entities
+    // Cluster 1: A↔B↔C (tightly connected)
+    // Cluster 2: X↔Y (separate cluster)
+    // Bridge: B→X (weak connection between clusters)
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert dependency edges creating two clusters
+    let dependency_edges = vec![
+        // Cluster 1: A, B, C tightly connected
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:a:src_a:1-10", "Calls", "src/b.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
+        ("rust:fn:c:src_c:1-15", "rust:fn:b:src_b:1-20", "Calls", "src/c.rs:5"),
+        // Cluster 2: X, Y tightly connected
+        ("rust:fn:x:src_x:1-10", "rust:fn:y:src_y:1-20", "Calls", "src/x.rs:5"),
+        ("rust:fn:y:src_y:1-20", "rust:fn:x:src_x:1-10", "Calls", "src/y.rs:5"),
+        // Weak bridge between clusters
+        ("rust:fn:b:src_b:1-20", "rust:fn:x:src_x:1-10", "Calls", "src/b.rs:15"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /semantic-cluster-grouping-list
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/semantic-cluster-grouping-list")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns clusters with entities grouped by connectivity
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Semantic Clusters: Status: {}", status);
+    println!("DEBUG Semantic Clusters: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/semantic-cluster-grouping-list");
+    assert!(json["data"]["total_entities"].as_u64().unwrap() >= 5); // A, B, C, X, Y
+    assert!(json["data"]["cluster_count"].as_u64().unwrap() >= 1);
+
+    let clusters = json["data"]["clusters"].as_array().unwrap();
+    assert!(!clusters.is_empty());
+
+    // Each cluster should have entity_count > 0
+    for cluster in clusters {
+        assert!(cluster["entity_count"].as_u64().unwrap() > 0);
+        assert!(cluster["entities"].as_array().unwrap().len() > 0);
+    }
+}

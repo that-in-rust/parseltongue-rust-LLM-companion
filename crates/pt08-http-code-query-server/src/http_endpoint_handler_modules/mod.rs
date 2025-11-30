@@ -15,3 +15,4 @@ pub mod dependency_edges_list_handler;
 pub mod blast_radius_impact_handler;
 pub mod circular_dependency_detection_handler;
 pub mod complexity_hotspots_ranking_handler;
+pub mod semantic_cluster_grouping_handler;
