@@ -21,6 +21,7 @@ use crate::http_endpoint_handler_modules::{
     circular_dependency_detection_handler,
     complexity_hotspots_ranking_handler,
     semantic_cluster_grouping_handler,
+    api_reference_documentation_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -61,6 +62,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/codebase-statistics-overview-summary",
             get(codebase_statistics_overview_handler::handle_codebase_statistics_overview_summary)
+        )
+        .route(
+            "/api-reference-documentation-help",
+            get(api_reference_documentation_handler::handle_api_reference_documentation_help)
         )
         // Entity endpoints
         .route(

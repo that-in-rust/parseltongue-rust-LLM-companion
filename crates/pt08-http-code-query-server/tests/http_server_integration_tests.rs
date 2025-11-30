@@ -1243,3 +1243,71 @@ async fn test_semantic_cluster_grouping_list() {
         assert!(cluster["entities"].as_array().unwrap().len() > 0);
     }
 }
+
+/// Test API reference documentation help endpoint
+///
+/// # 4-Word Name: test_api_reference_documentation_help
+///
+/// # Contract
+/// - Precondition: Server running
+/// - Postcondition: Returns complete API documentation
+/// - Performance: <50ms response time
+#[tokio::test]
+async fn test_api_reference_documentation_help() {
+    // GIVEN: Running server with all endpoints registered
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /api-reference-documentation-help
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api-reference-documentation-help")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns API documentation with all endpoints
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG API Reference: Status: {}", status);
+    println!("DEBUG API Reference: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/api-reference-documentation-help");
+
+    // Should have API version
+    assert!(json["data"]["api_version"].as_str().is_some());
+
+    // Should have multiple endpoints documented
+    assert!(json["data"]["total_endpoints"].as_u64().unwrap() >= 10);
+
+    // Should have categorized endpoints
+    let categories = json["data"]["categories"].as_array().unwrap();
+    assert!(!categories.is_empty());
+
+    // Each category should have endpoints
+    for category in categories {
+        assert!(category["name"].as_str().is_some());
+        let endpoints = category["endpoints"].as_array().unwrap();
+        assert!(!endpoints.is_empty());
+
+        // Each endpoint should have path, method, description
+        for endpoint in endpoints {
+            assert!(endpoint["path"].as_str().is_some());
+            assert!(endpoint["method"].as_str().is_some());
+            assert!(endpoint["description"].as_str().is_some());
+        }
+    }
+}
