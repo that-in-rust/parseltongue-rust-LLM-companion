@@ -1068,3 +1068,87 @@ async fn test_circular_dependency_cycle_detected() {
     assert!(first_cycle["length"].as_u64().unwrap() >= 3);
     assert!(first_cycle["path"].is_array());
 }
+
+/// Test 3.7: Complexity Hotspots Ranking View
+///
+/// # 4-Word Name: test_complexity_hotspots_ranking_view
+///
+/// # Contract
+/// - Precondition: Database with entities having varying dependency counts
+/// - Postcondition: Returns entities ranked by total coupling (inbound + outbound)
+/// - Performance: <100ms response time
+#[tokio::test]
+async fn test_complexity_hotspots_ranking_view() {
+    // GIVEN: Database with entities having different coupling scores
+    // Entity B has highest coupling: 2 inbound (A→B, C→B) + 2 outbound (B→D, B→E) = 4
+    // Entity A has: 0 inbound + 1 outbound = 1
+    // Entity C has: 0 inbound + 1 outbound = 1
+    // Entity D has: 1 inbound + 0 outbound = 1
+    // Entity E has: 1 inbound + 0 outbound = 1
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert dependency edges creating a hub pattern around B
+    let dependency_edges = vec![
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),   // A → B
+        ("rust:fn:c:src_c:1-15", "rust:fn:b:src_b:1-20", "Calls", "src/c.rs:5"),   // C → B
+        ("rust:fn:b:src_b:1-20", "rust:fn:d:src_d:1-25", "Calls", "src/b.rs:10"),  // B → D
+        ("rust:fn:b:src_b:1-20", "rust:fn:e:src_e:1-30", "Calls", "src/b.rs:15"),  // B → E
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /complexity-hotspots-ranking-view?top=5
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/complexity-hotspots-ranking-view?top=5")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns entities ranked by coupling, B should be #1
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Complexity Hotspots: Status: {}", status);
+    println!("DEBUG Complexity Hotspots: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/complexity-hotspots-ranking-view");
+    assert!(json["data"]["total_entities_analyzed"].as_u64().unwrap() >= 1);
+
+    let hotspots = json["data"]["hotspots"].as_array().unwrap();
+    assert!(!hotspots.is_empty());
+
+    // First hotspot should be B with highest coupling
+    let top_hotspot = &hotspots[0];
+    assert_eq!(top_hotspot["rank"].as_u64().unwrap(), 1);
+    assert!(top_hotspot["entity_key"].as_str().unwrap().contains("rust:fn:b"));
+    assert_eq!(top_hotspot["inbound_count"].as_u64().unwrap(), 2);  // A→B, C→B
+    assert_eq!(top_hotspot["outbound_count"].as_u64().unwrap(), 2); // B→D, B→E
+    assert_eq!(top_hotspot["total_coupling"].as_u64().unwrap(), 4);
+}
