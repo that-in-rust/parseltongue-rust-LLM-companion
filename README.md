@@ -1,11 +1,16 @@
 # Parseltongue
 
-> **Parse once, query forever.** A local HTTP backend that makes any LLM agent understand your codebase.
+> **v1.0.9** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
 
 ```bash
-parseltongue serve-http-code-backend ./my-project
-# Server running at http://localhost:3847
-# curl http://localhost:3847/codebase-statistics-overview-summary
+# Index your codebase
+parseltongue pt01-folder-to-cozodb-streamer ./my-project --db "rocksdb:mycode.db"
+
+# Start the HTTP server
+parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
+
+# Query from your LLM agent
+curl http://localhost:8080/codebase-statistics-overview-summary
 ```
 
 **12 languages**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
@@ -61,45 +66,70 @@ graph LR
 
 ---
 
-## User Journey
+## Quick Start
 
-```mermaid
-flowchart TB
-    subgraph "First Time Setup"
-        A1[Developer runs<br/>parseltongue serve-http-code-backend .]
-        A2[Parseltongue scans<br/>& indexes codebase]
-        A3[HTTP server starts<br/>localhost:3847]
-        A1 --> A2 --> A3
-    end
+### Step 1: Index Your Codebase
 
-    subgraph "Agent Queries"
-        B1[LLM Agent needs<br/>codebase context]
-        B2[Agent calls HTTP endpoint<br/>e.g. /blast-radius-impact-analysis/auth]
-        B3[Server returns<br/>structured JSON ~3K tokens]
-        B4[Agent reasons with<br/>98% context free]
-        B1 --> B2 --> B3 --> B4
-    end
+```bash
+parseltongue pt01-folder-to-cozodb-streamer ./my-project --db "rocksdb:mycode.db"
+```
 
-    subgraph "Return Visit"
-        C1[Developer runs<br/>parseltongue again]
-        C2[Existing DB detected<br/>instant startup 0.3s]
-        C3[Same HTTP server<br/>ready to query]
-        C1 --> C2 --> C3
-    end
+**Output**:
+```
+Running Tool 1: folder-to-cozodb-streamer
+  Database: rocksdb:mycode.db
 
-    A3 --> B1
-    C3 --> B1
+Streaming Summary:
+Total files found: 108
+Files processed: 92
+Entities created: 216 (CODE only)
+  └─ CODE entities: 216
+  └─ TEST entities: 982 (excluded for optimal LLM context)
 
-    style A1 fill:#E6F3FF
-    style A2 fill:#E6F3FF
-    style A3 fill:#90EE90
-    style B1 fill:#FFF3E6
-    style B2 fill:#FFF3E6
-    style B3 fill:#FFF3E6
-    style B4 fill:#90EE90
-    style C1 fill:#F3E6FF
-    style C2 fill:#F3E6FF
-    style C3 fill:#90EE90
+✓ Indexing completed
+```
+
+### Step 2: Start the HTTP Server
+
+```bash
+parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
+```
+
+**Output**:
+```
+Parseltongue HTTP Server
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HTTP Server running at: http://localhost:8080
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Add to your LLM agent: PARSELTONGUE_URL=http://localhost:8080  │
+└─────────────────────────────────────────────────────────────────┘
+
+Quick test:
+  curl http://localhost:8080/server-health-check-status
+```
+
+### Step 3: Query from Your Agent
+
+```bash
+# Health check
+curl http://localhost:8080/server-health-check-status
+
+# Codebase overview
+curl http://localhost:8080/codebase-statistics-overview-summary
+
+# Search for functions
+curl "http://localhost:8080/code-entities-search-fuzzy?q=authenticate"
+
+# What calls this function?
+curl "http://localhost:8080/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:50-100"
+
+# What breaks if I change this?
+curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:new:src_storage_rs:10-30&hops=3"
+
+# Get optimal context for LLM (killer feature!)
+curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000"
 ```
 
 ---
@@ -108,131 +138,30 @@ flowchart TB
 
 | User Job | HTTP Endpoint | Token Cost |
 |----------|---------------|------------|
-| "I want to understand this codebase" | `GET /codebase-statistics-overview-summary` | ~100 |
-| "What calls this function?" | `GET /reverse-callers-query-graph/{entity}` | ~500 |
-| "What does this function call?" | `GET /forward-callees-query-graph/{entity}` | ~500 |
-| "What breaks if I change X?" | `GET /blast-radius-impact-analysis/{entity}?hops=3` | ~2K |
-| "Are there circular dependencies?" | `GET /circular-dependency-detection-scan` | ~1K |
+| "Is the server running?" | `GET /server-health-check-status` | ~35 |
+| "Give me codebase overview" | `GET /codebase-statistics-overview-summary` | ~100 |
+| "List all endpoints" | `GET /api-reference-documentation-help` | ~500 |
+| "List all entities" | `GET /code-entities-list-all` | ~2K |
+| "Find functions named X" | `GET /code-entities-search-fuzzy?q=X` | ~500 |
+| "Get entity details" | `GET /code-entity-detail-view/{key}` | ~200 |
+| "What calls this?" | `GET /reverse-callers-query-graph?entity=X` | ~500 |
+| "What does this call?" | `GET /forward-callees-query-graph?entity=X` | ~500 |
+| "List all edges" | `GET /dependency-edges-list-all` | ~3K |
+| "What breaks if I change X?" | `GET /blast-radius-impact-analysis?entity=X&hops=3` | ~2K |
+| "Any circular dependencies?" | `GET /circular-dependency-detection-scan` | ~1K |
 | "Where is the complexity?" | `GET /complexity-hotspots-ranking-view?top=10` | ~500 |
-| "What logical modules exist?" | `GET /semantic-cluster-grouping-list` | ~1K |
-| "Find functions related to payment" | `GET /fuzzy-entity-search-query?q=payment` | ~1K |
-| "What files change together?" | `GET /temporal-coupling-hidden-deps/{entity}` | ~1K |
-| "Give me optimal context for X" | `GET /smart-context-token-budget?focus=X&tokens=4000` | ~4K |
+| "What modules exist?" | `GET /semantic-cluster-grouping-list` | ~1K |
+| "Give me optimal context" | `GET /smart-context-token-budget?focus=X&tokens=4000` | ~4K |
 
 ---
 
-## Quick Start
-
-### 1. Start the Server
-
-```bash
-parseltongue serve-http-code-backend .
-```
-
-**Output**:
-```
-Parseltongue v1.1.0
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Ingesting: /Users/dev/code/my-project
-
-Phase 1: Scanning
-  ✓ 234 files found
-  ✗ 12 skipped (target/, node_modules/, .git/)
-
-Phase 2: Parsing (12 languages)
-  ✓ Rust:       89 files  →  456 entities
-  ✓ Python:     45 files  →  123 entities
-  ✓ TypeScript: 100 files →  234 entities
-
-Phase 3: Dependency Extraction
-  ✓ 2,541 edges (Calls, Uses, Implements, Extends, Contains)
-
-Phase 4: Classification
-  ✓ CODE entities: 591
-  ✓ TEST entities: 222 (excluded from default queries)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-HTTP Server running at: http://localhost:3847
-
-┌─────────────────────────────────────────────────────────────────┐
-│  Add to your LLM agent: PARSELTONGUE_URL=http://localhost:3847  │
-└─────────────────────────────────────────────────────────────────┘
-
-curl http://localhost:3847/codebase-statistics-overview-summary
-```
-
-### 2. Query from Your Agent
-
-```bash
-# Codebase overview
-curl http://localhost:3847/codebase-statistics-overview-summary
-
-# Who calls the auth function?
-curl http://localhost:3847/reverse-callers-query-graph/authenticate
-
-# What breaks if I change the config parser?
-curl "http://localhost:3847/blast-radius-impact-analysis/parse_config?hops=3"
-
-# Find all payment-related code
-curl "http://localhost:3847/fuzzy-entity-search-query?q=payment"
-```
-
-### 3. Return Later (Instant Startup)
-
-```bash
-parseltongue serve-http-code-backend .
-```
-
-```
-Found existing database:
-  ./parseltongue_20251126/analysis.db
-  Created: 2 hours ago | Entities: 591 | Edges: 2,541
-
-Loading... done (0.3s)
-HTTP Server running at: http://localhost:3847
-
-(Use --reindex to force fresh ingestion)
-```
-
----
-
-## Progressive Disclosure (ISGL Levels)
-
-```mermaid
-graph TB
-    subgraph "Token Budget Selection"
-        L0[ISGL0: Who-Calls-Who-Graph<br/>~3K tokens<br/>Edges only]
-        L05[ISGL0.5: Smart-Module-Grouping<br/>~5K tokens<br/>Semantic clusters]
-        L1[ISGL1: Function-Signature-Overview<br/>~30K tokens<br/>Signatures + deps]
-        L2[ISGL2: Complete-Type-Detail<br/>~60K tokens<br/>Full type system]
-        L4[ISGL4: Folder-File-Organization<br/>~10K tokens<br/>Package graph]
-    end
-
-    L0 --> L05
-    L05 --> L1
-    L1 --> L2
-    L0 -.->|Skip as needed| L2
-
-    style L0 fill:#90EE90
-    style L05 fill:#98FB98
-    style L1 fill:#FFE4B5
-    style L2 fill:#FFB6C1
-    style L4 fill:#E6E6FA
-```
-
-**Strategy**: Start with ISGL0 (edges only, ~3K tokens). Escalate only when needed.
-
----
-
-## HTTP API Reference
+## HTTP API Reference (14 Endpoints)
 
 ### Core Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /server-health-check-status` | Server status |
+| `GET /server-health-check-status` | Server health check |
 | `GET /codebase-statistics-overview-summary` | Entity/edge counts, languages |
 | `GET /api-reference-documentation-help` | Full API documentation |
 
@@ -240,101 +169,146 @@ graph TB
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /code-entities-list-all` | All entities (filterable) |
+| `GET /code-entities-list-all` | All entities |
 | `GET /code-entities-list-all?entity_type=function` | Filter by type |
-| `GET /code-entities-list-all?language=rust` | Filter by language |
-| `GET /code-entity-detail-view/{key}` | Single entity with deps |
-| `GET /fuzzy-entity-search-query?q=pattern` | Search by name/signature |
+| `GET /code-entity-detail-view/{key}` | Single entity details |
+| `GET /code-entities-search-fuzzy?q=pattern` | Fuzzy search by name |
 
 ### Graph Query Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /dependency-edges-list-all` | All edges |
-| `GET /reverse-callers-query-graph/{entity}` | Who calls this? |
-| `GET /forward-callees-query-graph/{entity}` | What does this call? |
-| `GET /blast-radius-impact-analysis/{entity}?hops=N` | Transitive impact |
-| `GET /circular-dependency-detection-scan` | Find cycles |
+| `GET /dependency-edges-list-all` | All dependency edges |
+| `GET /reverse-callers-query-graph?entity=X` | Who calls X? |
+| `GET /forward-callees-query-graph?entity=X` | What does X call? |
+| `GET /blast-radius-impact-analysis?entity=X&hops=N` | What breaks if X changes? |
 
 ### Analysis Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
+| `GET /circular-dependency-detection-scan` | Find circular dependencies |
 | `GET /complexity-hotspots-ranking-view?top=N` | Complexity ranking |
 | `GET /semantic-cluster-grouping-list` | Semantic module groups |
-| `GET /semantic-cluster-detail-view/{id}` | Cluster with members |
-| `GET /orphan-dead-code-detection` | Dead code detection |
-| `GET /package-file-structure-graph` | File-level statistics |
-| `GET /entity-complexity-metrics-cache` | Pre-computed metrics |
-| `GET /module-cohesion-quality-score` | Module quality |
-| `GET /critical-control-flow-paths` | Critical paths |
 
-### Killer Features
+### Killer Feature
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /temporal-coupling-hidden-deps/{entity}` | Git-derived hidden dependencies |
 | `GET /smart-context-token-budget?focus=X&tokens=N` | Optimal context selection |
 
 ---
 
-## Killer Feature #1: Temporal Coupling
+## Deeply Thought Example Queries
 
-**What it reveals**: The INVISIBLE architecture.
-
-Static analysis sees:
-```
-auth.rs → session.rs (code dependency)
-```
-
-Temporal coupling reveals:
-```
-auth.rs ↔ config.yaml (changed together 47 times, ZERO code dependency)
-```
+### Example 1: Understanding a New Codebase
 
 ```bash
-curl http://localhost:3847/temporal-coupling-hidden-deps/auth
+# 1. Get codebase overview
+curl http://localhost:8080/codebase-statistics-overview-summary | jq '.data'
+# Returns: entity counts, edge counts, languages detected
+
+# 2. Find complexity hotspots (most coupled code)
+curl "http://localhost:8080/complexity-hotspots-ranking-view?top=10" | jq '.data.hotspots'
+# Returns: Top 10 entities by coupling (inbound + outbound dependencies)
+
+# 3. Check for circular dependencies
+curl http://localhost:8080/circular-dependency-detection-scan | jq '.data'
+# Returns: has_cycles, cycle_count, cycle paths
 ```
 
+### Example 2: Impact Analysis Before Refactoring
+
+```bash
+# 1. Find who calls the function you want to change
+curl "http://localhost:8080/reverse-callers-query-graph?entity=rust:fn:process_request:src_handler_rs:20-80" | jq '.data'
+# Returns: All callers (direct dependencies)
+
+# 2. Get full blast radius (transitive impact)
+curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:process_request:src_handler_rs:20-80&hops=3" | jq '.data'
+# Returns: total_affected count, by_hop breakdown
+
+# 3. Get optimal context for the LLM to understand the refactoring
+curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:process_request:src_handler_rs:20-80&tokens=5000" | jq '.data'
+# Returns: Focus entity + highest-relevance related entities within 5000 tokens
+```
+
+### Example 3: Finding and Exploring Code
+
+```bash
+# 1. Search for authentication-related code
+curl "http://localhost:8080/code-entities-search-fuzzy?q=auth" | jq '.data.entities[].key'
+# Returns: All entities with "auth" in their name
+
+# 2. Get details of a specific entity
+curl "http://localhost:8080/code-entity-detail-view/rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
+# Returns: Full entity details including source code
+
+# 3. See what the auth function depends on
+curl "http://localhost:8080/forward-callees-query-graph?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
+# Returns: All functions/types that authenticate() calls
+```
+
+### Example 4: Module Architecture Understanding
+
+```bash
+# 1. Get semantic clusters (modules that work together)
+curl http://localhost:8080/semantic-cluster-grouping-list | jq '.data.clusters'
+# Returns: Entities grouped by connectivity (Label Propagation Algorithm)
+
+# 2. Get all edges to understand the dependency graph
+curl http://localhost:8080/dependency-edges-list-all | jq '.data.total_count'
+# Returns: Total edge count and edge details
+```
+
+### Example 5: Smart Context for LLM Agents
+
+```bash
+# The killer feature: Get optimal context within token budget
+curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000" | jq '.data'
+```
+
+**Response**:
 ```json
 {
-  "entity": "auth.rs",
-  "hidden_dependencies": [
-    {"file": "config.yaml", "co_changes": 47, "score": 0.92, "code_edge": false},
-    {"file": "middleware.rs", "co_changes": 31, "score": 0.78, "code_edge": true}
-  ],
-  "insight": "config.yaml has ZERO code dependency but HIGH temporal coupling"
+  "focus_entity": "rust:fn:main:src_main_rs:1-50",
+  "token_budget": 4000,
+  "tokens_used": 3850,
+  "entities_included": 15,
+  "context": [
+    {"entity_key": "rust:fn:init:src_lib_rs:10-30", "relevance_score": 1.0, "relevance_type": "direct_caller"},
+    {"entity_key": "rust:fn:run:src_app_rs:5-25", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:config:src_config_rs:1-20", "relevance_score": 0.6, "relevance_type": "transitive_depth_2"}
+  ]
 }
 ```
+
+**Algorithm**:
+- Direct callers: score 1.0
+- Direct callees: score 0.95
+- Transitive deps: score 0.7 - (0.1 × depth)
+- Greedy knapsack selection until budget exhausted
 
 ---
 
-## Killer Feature #2: Smart Context Selection
+## Entity Key Format
 
-**The problem**: You have a token budget. What context should the LLM see?
+Entity keys follow this pattern:
+```
+language:entity_type:entity_name:file_path:line_range
+```
 
+**Example**: `rust:fn:authenticate:src_auth_rs:10-50`
+- Language: `rust`
+- Type: `fn` (function)
+- Name: `authenticate`
+- File: `src/auth.rs` (slashes become underscores)
+- Lines: `10-50`
+
+**Tip**: When using entity keys in URLs with query parameters, colons work fine:
 ```bash
-curl "http://localhost:3847/smart-context-token-budget?focus=authenticate&tokens=4000"
+curl "http://localhost:8080/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:1-20"
 ```
-
-```json
-{
-  "focus": "authenticate",
-  "token_budget": 4000,
-  "tokens_used": 3850,
-  "context": {
-    "core_entities": [
-      {"key": "authenticate", "tokens": 450, "score": 0.95, "reason": "focus"},
-      {"key": "validate_token", "tokens": 380, "score": 0.89, "reason": "direct_caller"},
-      {"key": "Session", "tokens": 220, "score": 0.85, "reason": "cluster_co_member"}
-    ],
-    "temporal_hints": ["config.yaml changes with auth 47 times"],
-    "blast_radius_summary": "14 entities affected by changes"
-  }
-}
-```
-
-**Algorithm**: Multi-signal scoring (dependency distance, temporal coupling, cluster membership, centrality) + greedy knapsack selection.
 
 ---
 
@@ -345,11 +319,13 @@ All endpoints return consistent JSON:
 ```json
 {
   "success": true,
-  "endpoint": "/blast-radius-impact-analysis/process",
-  "count": 14,
-  "data": [...],
-  "tokens": 234,
-  "query_time_ms": 12
+  "endpoint": "/blast-radius-impact-analysis",
+  "data": {
+    "source_entity": "rust:fn:process:src_lib_rs:1-20",
+    "total_affected": 14,
+    "by_hop": [{"hop": 1, "count": 5, "entities": [...]}]
+  },
+  "tokens": 234
 }
 ```
 
@@ -357,90 +333,22 @@ The `tokens` field helps LLMs understand context budget impact.
 
 ---
 
-## Database Schema (14 Tables)
-
-**Design principle**: Amortize expensive operations. Parse once, pre-compute metrics, query cheap.
-
-```mermaid
-graph TB
-    subgraph "Entity Storage"
-        T1[CodeProductionEntityStore<br/>Production code]
-        T2[TestImplementationEntityStore<br/>Test code]
-    end
-
-    subgraph "Edge Storage"
-        T3[CodeDependencyEdgeGraph<br/>CODE→CODE]
-        T4[TestDependencyEdgeGraph<br/>TEST→TEST]
-        T5[TestToCodeEdgeBridge<br/>TEST→CODE]
-    end
-
-    subgraph "Pre-computed Metrics"
-        T6[EntityComputedMetricsCache]
-        T7[GraphGlobalStatisticsStore]
-        T11[ModuleCohesionMetricsCache]
-    end
-
-    subgraph "Semantic Analysis"
-        T8[SemanticClusterDefinitionStore]
-        T9[EntityClusterMembershipMap]
-        T10[FileEntityMappingIndex]
-    end
-
-    subgraph "Advanced Analysis"
-        T12[OrphanDeadCodeCache]
-        T13[ControlFlowPathAnalysis]
-        T14[TemporalCouplingEdgeStore]
-    end
-
-    T1 --> T3
-    T2 --> T4
-    T2 --> T5
-    T5 --> T1
-    T3 --> T6
-    T1 --> T8
-    T8 --> T9
-
-    style T1 fill:#90EE90
-    style T2 fill:#E6F3FF
-    style T3 fill:#FFE4B5
-    style T14 fill:#DDA0DD
-```
-
-**Why separate tables?**
-- **No WHERE clauses** needed for CODE vs TEST
-- **75% token savings** when excluding tests
-- **Pre-computed** = instant queries
-
----
-
 ## CLI Options
 
 ```bash
-parseltongue serve-http-code-backend <DIRECTORY> [OPTIONS]
+parseltongue serve-http-code-backend [OPTIONS]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--port <PORT>` | HTTP port (default: auto-detect from 3333) |
-| `--reindex` | Force fresh ingestion |
-| `--daemon` | Run in background |
-| `--timeout <MIN>` | Auto-shutdown after idle |
-| `--verbose` | Show query logs |
-| `--quiet` | Minimal output |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--port <PORT>` | HTTP port | Auto-detect from 3333 |
+| `--db <PATH>` | Database path | `mem` (in-memory) |
+| `--verbose` | Enable verbose logging | false |
 
-**Examples**:
+**Database format**: Always use `rocksdb:` prefix for persistent databases:
 ```bash
-# Basic
-parseltongue serve-http-code-backend .
-
-# Custom port
-parseltongue serve-http-code-backend . --port 8080
-
-# Force re-ingestion
-parseltongue serve-http-code-backend . --reindex
-
-# Background with auto-shutdown
-parseltongue serve-http-code-backend . --daemon --timeout 60
+--db "rocksdb:mycode.db"     # Correct
+--db "mycode.db"              # Wrong
 ```
 
 ---
@@ -464,7 +372,7 @@ parseltongue serve-http-code-backend . --daemon --timeout 60
 
 ---
 
-## Edge Types (CPG-Inspired)
+## Edge Types
 
 | Edge Type | Direction | Meaning |
 |-----------|-----------|---------|
@@ -476,71 +384,47 @@ parseltongue serve-http-code-backend . --daemon --timeout 60
 
 ---
 
-## Comparison: Parseltongue vs Grep
+## Performance
 
 | Metric | Grep | Parseltongue | Improvement |
 |--------|------|--------------|-------------|
 | Query time | 7.5s | 50ms | **150× faster** |
 | Tokens | 500K | 2.3K | **99.5% reduction** |
 | Context free | 0% | 98.9% | **Optimal reasoning** |
-| Structure | Raw text | Graph + metrics | **Semantic understanding** |
+| Structure | Raw text | Graph | **Semantic understanding** |
 
 ---
 
-## Research Foundation
+## Architecture
 
-**Liu et al. (TACL 2023)** "Lost in the Middle: How Language Models Use Long Contexts"
-- Finding: 30 documents in context → 25% performance drop
-- Application: Parseltongue gives graphs (2.3K tokens), not documents (250K tokens)
-
-**Token Arithmetic** (1,500 entity codebase):
-- Full code: 525K tokens
-- Signatures only: 37.5K tokens
-- Filtered query: 2.3K tokens
-- **Reduction**: 228×
-
----
-
-## Architecture Principles
-
-**4-Word Naming Convention**: All functions, endpoints, tables use exactly 4 words for LLM tokenization optimization.
-
+**4-Word Naming Convention**: All functions and endpoints use exactly 4 words for LLM tokenization optimization:
 ```
-serve-http-code-backend          ✓ 4 words
-blast-radius-impact-analysis     ✓ 4 words
-CodeProductionEntityStore        ✓ 4 words
+serve-http-code-backend          # 4 words
+blast-radius-impact-analysis     # 4 words
+code-entities-search-fuzzy       # 4 words
 ```
 
-**TDD-First**: STUB → RED → GREEN → REFACTOR
-
-**Layered Architecture**:
-- L1: Core (no_std compatible)
-- L2: Standard library
-- L3: External (tokio, serde, cozo)
+**Single Binary**: ~50MB, zero runtime dependencies.
 
 ---
 
-## Documentation
+## Installation
 
-| Document | Location |
-|----------|----------|
-| PRD | `.claude/prd01.md` |
-| Architecture | `.claude/architecture-http-server-20251128.md` |
-| CLI Reference | `COMMANDS.md` |
-| Development Guide | `CLAUDE.md` |
+```bash
+# Download from GitHub releases
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.0.9/parseltongue -o parseltongue
+chmod +x parseltongue
+
+# Verify
+./parseltongue --version
+# parseltongue 1.0.9
+```
 
 ---
 
 ## License
 
 MIT License - See LICENSE file
-
----
-
-## Links
-
-- **GitHub**: [that-in-rust/parseltongue](https://github.com/that-in-rust/parseltongue)
-- **Issues**: [Report bugs](https://github.com/that-in-rust/parseltongue/issues)
 
 ---
 
