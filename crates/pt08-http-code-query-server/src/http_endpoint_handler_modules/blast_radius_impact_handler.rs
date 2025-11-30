@@ -5,7 +5,8 @@
 //! Endpoint: GET /blast-radius-impact-analysis?entity={key}&hops=N
 //!
 //! Returns all entities that would be affected if the source entity changes.
-//! This is a transitive closure of forward dependencies up to N hops.
+//! This is a transitive closure of REVERSE dependencies (callers) up to N hops.
+//! Blast radius = "If I change X, what breaks?" = entities that DEPEND ON X.
 
 use axum::{
     extract::{Query, State},
@@ -151,8 +152,9 @@ pub async fn handle_blast_radius_impact_analysis(
 ///
 /// # 4-Word Name: compute_blast_radius_by_hops
 ///
-/// Uses breadth-first search to find all entities reachable
-/// from the source within the specified number of hops.
+/// Uses breadth-first search to find all entities that DEPEND ON
+/// the source entity (callers) within the specified number of hops.
+/// This answers: "If I change X, what else might break?"
 async fn compute_blast_radius_by_hops(
     state: &SharedApplicationStateContainer,
     source_entity: &str,
@@ -178,26 +180,27 @@ async fn compute_blast_radius_by_hops(
 
         // Process all entities in current frontier
         while let Some(entity) = current_frontier.pop_front() {
-            // Query forward dependencies (what this entity calls)
+            // Query REVERSE dependencies (what CALLS this entity)
+            // Blast radius = entities that depend on source
             let escaped_entity = entity
                 .replace('\\', "\\\\")
                 .replace('"', "\\\"");
 
             let query = format!(
                 r#"
-                ?[to_key] := *DependencyEdges{{from_key, to_key}},
-                    from_key == "{}"
+                ?[from_key] := *DependencyEdges{{from_key, to_key}},
+                    to_key == "{}"
                 "#,
                 escaped_entity
             );
 
             if let Ok(result) = storage.raw_query(&query).await {
                 for row in result.rows {
-                    if let Some(to_key) = extract_string_value(&row[0]) {
-                        if !visited.contains(&to_key) {
-                            visited.insert(to_key.clone());
-                            hop_entities.push(to_key.clone());
-                            next_frontier.push_back(to_key);
+                    if let Some(caller_key) = extract_string_value(&row[0]) {
+                        if !visited.contains(&caller_key) {
+                            visited.insert(caller_key.clone());
+                            hop_entities.push(caller_key.clone());
+                            next_frontier.push_back(caller_key);
                         }
                     }
                 }

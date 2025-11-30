@@ -766,9 +766,13 @@ async fn test_dependency_edges_list_all() {
 ///
 /// # Contract
 /// - Precondition: Database with dependency graph A → B → C → D
-/// - Postcondition: Query for A with hops=1 returns only B
+/// - Postcondition: Query for D with hops=1 returns only C (caller of D)
 /// - Performance: <100ms response time
 /// - Error Handling: Returns 404 for non-existent entities
+///
+/// # Semantics
+/// Blast radius = "If I change X, what breaks?" = entities that DEPEND ON X
+/// With edges A→B→C→D, blast radius of D includes C (C calls D).
 #[tokio::test]
 async fn test_blast_radius_single_hop() {
     // GIVEN: Database with dependency chain A → B → C → D
@@ -777,6 +781,7 @@ async fn test_blast_radius_single_hop() {
     storage.create_dependency_edges_schema().await.unwrap();
 
     // Insert dependency edges: A → B → C → D (linear chain)
+    // This means: A calls B, B calls C, C calls D
     let dependency_edges = vec![
         ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
         ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
@@ -800,18 +805,19 @@ async fn test_blast_radius_single_hop() {
     let state = SharedApplicationStateContainer::create_with_database_storage(storage);
     let app = build_complete_router_instance(state);
 
-    // WHEN: GET /blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=1
+    // WHEN: GET /blast-radius-impact-analysis?entity=rust:fn:d:src_d:1-25&hops=1
+    // Query blast radius of D - who depends on D?
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=1")
+                .uri("/blast-radius-impact-analysis?entity=rust:fn:d:src_d:1-25&hops=1")
                 .body(Body::empty())
                 .unwrap()
         )
         .await
         .unwrap();
 
-    // THEN: Returns only B (1 hop away)
+    // THEN: Returns only C (C calls D, so C depends on D)
     let status = response.status();
     let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8(body.to_vec()).unwrap();
@@ -825,18 +831,18 @@ async fn test_blast_radius_single_hop() {
 
     assert_eq!(json["success"], true);
     assert_eq!(json["endpoint"], "/blast-radius-impact-analysis");
-    assert_eq!(json["data"]["source_entity"], "rust:fn:a:src_a:1-10");
+    assert_eq!(json["data"]["source_entity"], "rust:fn:d:src_d:1-25");
     assert_eq!(json["data"]["hops_requested"].as_u64().unwrap(), 1);
     assert_eq!(json["data"]["total_affected"].as_u64().unwrap(), 1);
 
-    // Verify hop 1 contains only B
+    // Verify hop 1 contains only C (the caller of D)
     let by_hop = json["data"]["by_hop"].as_array().unwrap();
     assert_eq!(by_hop.len(), 1);
     assert_eq!(by_hop[0]["hop"].as_u64().unwrap(), 1);
     assert_eq!(by_hop[0]["count"].as_u64().unwrap(), 1);
 
     let hop1_entities = by_hop[0]["entities"].as_array().unwrap();
-    assert!(hop1_entities.iter().any(|e| e.as_str().unwrap().contains("rust:fn:b")));
+    assert!(hop1_entities.iter().any(|e| e.as_str().unwrap().contains("rust:fn:c")));
 }
 
 /// Test 3.4: Blast Radius Multi Hop
@@ -845,9 +851,13 @@ async fn test_blast_radius_single_hop() {
 ///
 /// # Contract
 /// - Precondition: Database with dependency graph A → B → C → D
-/// - Postcondition: Query for A with hops=3 returns B, C, D
+/// - Postcondition: Query for D with hops=3 returns C, B, A (callers)
 /// - Performance: <100ms response time
 /// - Error Handling: Stops at max hops even if more exist
+///
+/// # Semantics
+/// Blast radius = "If I change X, what breaks?" = entities that DEPEND ON X
+/// With edges A→B→C→D, blast radius of D = {C, B, A} transitively.
 #[tokio::test]
 async fn test_blast_radius_multi_hop() {
     // GIVEN: Database with dependency chain A → B → C → D
@@ -856,6 +866,7 @@ async fn test_blast_radius_multi_hop() {
     storage.create_dependency_edges_schema().await.unwrap();
 
     // Insert dependency edges: A → B → C → D (linear chain)
+    // This means: A calls B, B calls C, C calls D
     let dependency_edges = vec![
         ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
         ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
@@ -879,18 +890,19 @@ async fn test_blast_radius_multi_hop() {
     let state = SharedApplicationStateContainer::create_with_database_storage(storage);
     let app = build_complete_router_instance(state);
 
-    // WHEN: GET /blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=3
+    // WHEN: GET /blast-radius-impact-analysis?entity=rust:fn:d:src_d:1-25&hops=3
+    // Query blast radius of D - who transitively depends on D?
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=3")
+                .uri("/blast-radius-impact-analysis?entity=rust:fn:d:src_d:1-25&hops=3")
                 .body(Body::empty())
                 .unwrap()
         )
         .await
         .unwrap();
 
-    // THEN: Returns B (hop 1), C (hop 2), D (hop 3)
+    // THEN: Returns C (hop 1), B (hop 2), A (hop 3) - all callers up the chain
     let status = response.status();
     let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8(body.to_vec()).unwrap();
@@ -904,7 +916,7 @@ async fn test_blast_radius_multi_hop() {
 
     assert_eq!(json["success"], true);
     assert_eq!(json["endpoint"], "/blast-radius-impact-analysis");
-    assert_eq!(json["data"]["source_entity"], "rust:fn:a:src_a:1-10");
+    assert_eq!(json["data"]["source_entity"], "rust:fn:d:src_d:1-25");
     assert_eq!(json["data"]["hops_requested"].as_u64().unwrap(), 3);
     assert_eq!(json["data"]["total_affected"].as_u64().unwrap(), 3);
 
@@ -912,15 +924,15 @@ async fn test_blast_radius_multi_hop() {
     let by_hop = json["data"]["by_hop"].as_array().unwrap();
     assert_eq!(by_hop.len(), 3);
 
-    // Hop 1: B
+    // Hop 1: C (direct caller of D)
     assert_eq!(by_hop[0]["hop"].as_u64().unwrap(), 1);
     assert_eq!(by_hop[0]["count"].as_u64().unwrap(), 1);
 
-    // Hop 2: C
+    // Hop 2: B (calls C which calls D)
     assert_eq!(by_hop[1]["hop"].as_u64().unwrap(), 2);
     assert_eq!(by_hop[1]["count"].as_u64().unwrap(), 1);
 
-    // Hop 3: D
+    // Hop 3: A (calls B which calls C which calls D)
     assert_eq!(by_hop[2]["hop"].as_u64().unwrap(), 3);
     assert_eq!(by_hop[2]["count"].as_u64().unwrap(), 1);
 }

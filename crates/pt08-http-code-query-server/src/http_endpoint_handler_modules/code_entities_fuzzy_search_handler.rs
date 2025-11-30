@@ -125,8 +125,8 @@ async fn search_entities_by_query_from_database(
     let db_guard = state.database_storage_connection_arc.read().await;
 
     if let Some(storage) = db_guard.as_ref() {
-        // Start with a simple query to get all entities, then filter in memory
-        let query = "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language, Current_Code}";
+        // Query all entities from CodeGraph - don't require Current_Code to exist
+        let query = "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}";
 
         let result = storage.raw_query(query).await;
 
