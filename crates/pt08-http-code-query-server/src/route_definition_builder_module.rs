@@ -18,6 +18,7 @@ use crate::http_endpoint_handler_modules::{
     forward_callees_query_graph_handler,
     dependency_edges_list_handler,
     blast_radius_impact_handler,
+    circular_dependency_detection_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -88,6 +89,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/blast-radius-impact-analysis",
             get(blast_radius_impact_handler::handle_blast_radius_impact_analysis)
+        )
+        .route(
+            "/circular-dependency-detection-scan",
+            get(circular_dependency_detection_handler::handle_circular_dependency_detection_scan)
         )
         // Test route for debugging
         .route(

@@ -924,3 +924,147 @@ async fn test_blast_radius_multi_hop() {
     assert_eq!(by_hop[2]["hop"].as_u64().unwrap(), 3);
     assert_eq!(by_hop[2]["count"].as_u64().unwrap(), 1);
 }
+
+/// Test 3.5: Circular Dependency None Found
+///
+/// # 4-Word Name: test_circular_dependency_none_found
+///
+/// # Contract
+/// - Precondition: Database with acyclic dependency graph A → B → C
+/// - Postcondition: Returns has_cycles=false, cycle_count=0
+/// - Performance: <100ms response time
+#[tokio::test]
+async fn test_circular_dependency_none_found() {
+    // GIVEN: Database with acyclic dependency chain A → B → C (no cycles)
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert acyclic dependency edges
+    let dependency_edges = vec![
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /circular-dependency-detection-scan
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/circular-dependency-detection-scan")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns no cycles
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Cycle Detection (none): Status: {}", status);
+    println!("DEBUG Cycle Detection (none): Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/circular-dependency-detection-scan");
+    assert_eq!(json["data"]["has_cycles"], false);
+    assert_eq!(json["data"]["cycle_count"].as_u64().unwrap(), 0);
+}
+
+/// Test 3.6: Circular Dependency Cycle Detected
+///
+/// # 4-Word Name: test_circular_dependency_cycle_detected
+///
+/// # Contract
+/// - Precondition: Database with cyclic dependency graph A → B → C → A
+/// - Postcondition: Returns has_cycles=true with cycle details
+/// - Performance: <100ms response time
+#[tokio::test]
+async fn test_circular_dependency_cycle_detected() {
+    // GIVEN: Database with cycle A → B → C → A
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert cyclic dependency edges: A → B → C → A
+    let dependency_edges = vec![
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
+        ("rust:fn:c:src_c:1-15", "rust:fn:a:src_a:1-10", "Calls", "src/c.rs:15"), // Cycle!
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /circular-dependency-detection-scan
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/circular-dependency-detection-scan")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns cycle detected
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Cycle Detection (found): Status: {}", status);
+    println!("DEBUG Cycle Detection (found): Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/circular-dependency-detection-scan");
+    assert_eq!(json["data"]["has_cycles"], true);
+    assert!(json["data"]["cycle_count"].as_u64().unwrap() >= 1);
+
+    // Verify cycle details
+    let cycles = json["data"]["cycles"].as_array().unwrap();
+    assert!(!cycles.is_empty());
+
+    // First cycle should have length 3 (A → B → C → A)
+    let first_cycle = &cycles[0];
+    assert!(first_cycle["length"].as_u64().unwrap() >= 3);
+    assert!(first_cycle["path"].is_array());
+}
