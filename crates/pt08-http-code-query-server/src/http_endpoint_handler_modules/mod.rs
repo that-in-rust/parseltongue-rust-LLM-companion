@@ -12,8 +12,8 @@ pub mod code_entities_fuzzy_search_handler;
 pub mod reverse_callers_query_graph_handler;
 pub mod forward_callees_query_graph_handler;
 pub mod dependency_edges_list_handler;
+pub mod blast_radius_impact_handler;
 // Future handlers:
-// pub mod blast_radius_impact_analysis_handler;
 // pub mod circular_dependency_detection_scan_handler;
 // pub mod complexity_hotspots_ranking_view;
 // pub mod temporal_coupling_hidden_deps;

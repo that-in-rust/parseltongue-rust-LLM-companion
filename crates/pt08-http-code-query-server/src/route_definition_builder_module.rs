@@ -17,6 +17,7 @@ use crate::http_endpoint_handler_modules::{
     reverse_callers_query_graph_handler,
     forward_callees_query_graph_handler,
     dependency_edges_list_handler,
+    blast_radius_impact_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -83,6 +84,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/dependency-edges-list-all",
             get(dependency_edges_list_handler::handle_dependency_edges_list_all)
+        )
+        .route(
+            "/blast-radius-impact-analysis",
+            get(blast_radius_impact_handler::handle_blast_radius_impact_analysis)
         )
         // Test route for debugging
         .route(

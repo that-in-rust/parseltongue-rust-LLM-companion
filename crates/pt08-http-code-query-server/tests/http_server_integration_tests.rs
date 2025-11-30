@@ -759,3 +759,168 @@ async fn test_dependency_edges_list_all() {
     let edges = json["data"]["edges"].as_array().unwrap();
     assert_eq!(edges.len(), 3);
 }
+
+/// Test 3.3: Blast Radius Single Hop
+///
+/// # 4-Word Name: test_blast_radius_single_hop
+///
+/// # Contract
+/// - Precondition: Database with dependency graph A → B → C → D
+/// - Postcondition: Query for A with hops=1 returns only B
+/// - Performance: <100ms response time
+/// - Error Handling: Returns 404 for non-existent entities
+#[tokio::test]
+async fn test_blast_radius_single_hop() {
+    // GIVEN: Database with dependency chain A → B → C → D
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert dependency edges: A → B → C → D (linear chain)
+    let dependency_edges = vec![
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
+        ("rust:fn:c:src_c:1-15", "rust:fn:d:src_d:1-25", "Calls", "src/c.rs:15"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=1
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=1")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns only B (1 hop away)
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Blast Radius 1-hop: Status: {}", status);
+    println!("DEBUG Blast Radius 1-hop: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/blast-radius-impact-analysis");
+    assert_eq!(json["data"]["source_entity"], "rust:fn:a:src_a:1-10");
+    assert_eq!(json["data"]["hops_requested"].as_u64().unwrap(), 1);
+    assert_eq!(json["data"]["total_affected"].as_u64().unwrap(), 1);
+
+    // Verify hop 1 contains only B
+    let by_hop = json["data"]["by_hop"].as_array().unwrap();
+    assert_eq!(by_hop.len(), 1);
+    assert_eq!(by_hop[0]["hop"].as_u64().unwrap(), 1);
+    assert_eq!(by_hop[0]["count"].as_u64().unwrap(), 1);
+
+    let hop1_entities = by_hop[0]["entities"].as_array().unwrap();
+    assert!(hop1_entities.iter().any(|e| e.as_str().unwrap().contains("rust:fn:b")));
+}
+
+/// Test 3.4: Blast Radius Multi Hop
+///
+/// # 4-Word Name: test_blast_radius_multi_hop
+///
+/// # Contract
+/// - Precondition: Database with dependency graph A → B → C → D
+/// - Postcondition: Query for A with hops=3 returns B, C, D
+/// - Performance: <100ms response time
+/// - Error Handling: Stops at max hops even if more exist
+#[tokio::test]
+async fn test_blast_radius_multi_hop() {
+    // GIVEN: Database with dependency chain A → B → C → D
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert dependency edges: A → B → C → D (linear chain)
+    let dependency_edges = vec![
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
+        ("rust:fn:c:src_c:1-15", "rust:fn:d:src_d:1-25", "Calls", "src/c.rs:15"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=3
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/blast-radius-impact-analysis?entity=rust:fn:a:src_a:1-10&hops=3")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns B (hop 1), C (hop 2), D (hop 3)
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Blast Radius 3-hop: Status: {}", status);
+    println!("DEBUG Blast Radius 3-hop: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/blast-radius-impact-analysis");
+    assert_eq!(json["data"]["source_entity"], "rust:fn:a:src_a:1-10");
+    assert_eq!(json["data"]["hops_requested"].as_u64().unwrap(), 3);
+    assert_eq!(json["data"]["total_affected"].as_u64().unwrap(), 3);
+
+    // Verify all 3 hops
+    let by_hop = json["data"]["by_hop"].as_array().unwrap();
+    assert_eq!(by_hop.len(), 3);
+
+    // Hop 1: B
+    assert_eq!(by_hop[0]["hop"].as_u64().unwrap(), 1);
+    assert_eq!(by_hop[0]["count"].as_u64().unwrap(), 1);
+
+    // Hop 2: C
+    assert_eq!(by_hop[1]["hop"].as_u64().unwrap(), 2);
+    assert_eq!(by_hop[1]["count"].as_u64().unwrap(), 1);
+
+    // Hop 3: D
+    assert_eq!(by_hop[2]["hop"].as_u64().unwrap(), 3);
+    assert_eq!(by_hop[2]["count"].as_u64().unwrap(), 1);
+}
