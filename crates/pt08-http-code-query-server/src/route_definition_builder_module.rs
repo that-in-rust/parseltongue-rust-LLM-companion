@@ -15,6 +15,8 @@ use crate::http_endpoint_handler_modules::{
     code_entity_detail_view_handler,
     code_entities_fuzzy_search_handler,
     reverse_callers_query_graph_handler,
+    forward_callees_query_graph_handler,
+    dependency_edges_list_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -73,6 +75,14 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/reverse-callers-query-graph",
             get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
+        )
+        .route(
+            "/forward-callees-query-graph",
+            get(forward_callees_query_graph_handler::handle_forward_callees_query_graph)
+        )
+        .route(
+            "/dependency-edges-list-all",
+            get(dependency_edges_list_handler::handle_dependency_edges_list_all)
         )
         // Test route for debugging
         .route(

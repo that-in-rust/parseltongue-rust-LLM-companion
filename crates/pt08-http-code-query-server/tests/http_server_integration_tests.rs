@@ -680,3 +680,176 @@ async fn test_reverse_callers_returns_deps() {
     assert_eq!(caller["edge_type"], "Calls");
     assert_eq!(caller["source_location"], "src/main.rs:5");
 }
+
+/// Test 3.2: Forward Callees (What Does This Call?)
+///
+/// # 4-Word Name: test_forward_callees_returns_deps
+///
+/// # Contract
+/// - Precondition: Database with dependency graph A → B → C
+/// - Postcondition: Query for B returns C as callee
+/// - Performance: <100ms response time
+/// - Error Handling: Returns 404 for entities with no callees
+#[tokio::test]
+async fn test_forward_callees_returns_deps() {
+    // GIVEN: Database with dependency chain A → B → C (A calls B, B calls C)
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entities
+    let test_entities = vec![
+        ("rust:fn:main:src_main_rs:1-10", "pub fn main() { process(); }", "_main", "src/main.rs", "function"),
+        ("rust:fn:process:src_process_rs:1-20", "pub fn process() { transform(); }", "_process", "src/process.rs", "function"),
+        ("rust:fn:transform:src_transform_rs:1-15", "pub fn transform() { /* logic */ }", "_transform", "src/transform.rs", "function"),
+    ];
+
+    for (key, code, _name, file_path, entity_type) in test_entities {
+        let query = format!(r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class] <- [
+                ["{}", "{}", null, "{{}}", "{{}}", null, true, true, null, "{}", "rust", "2024-01-01T00:00:00Z", "{}", "CODE"]
+            ]
+            :put CodeGraph {{
+                ISGL1_key =>
+                Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class
+            }}
+        "#, key, code, file_path, entity_type);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Insert dependency edges: main → process, process → transform
+    let dependency_edges = vec![
+        ("rust:fn:main:src_main_rs:1-10", "rust:fn:process:src_process_rs:1-20", "Calls", "src/main.rs:5"),
+        ("rust:fn:process:src_process_rs:1-20", "rust:fn:transform:src_transform_rs:1-15", "Calls", "src/process.rs:10"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /forward-callees-query-graph?entity=rust:fn:process:src_process_rs:1-20
+    // (What does process() call?)
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/forward-callees-query-graph?entity=rust:fn:process:src_process_rs:1-20")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns transform as callee (process calls transform)
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Forward Callees: Status: {}", status);
+    println!("DEBUG Forward Callees: Response body: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/forward-callees-query-graph");
+    assert_eq!(json["data"]["total_count"].as_u64().unwrap(), 1);
+
+    let callees = json["data"]["callees"].as_array().unwrap();
+    assert_eq!(callees.len(), 1);
+
+    let callee = &callees[0];
+    assert_eq!(callee["from_key"], "rust:fn:process:src_process_rs:1-20");
+    assert_eq!(callee["to_key"], "rust:fn:transform:src_transform_rs:1-15");
+    assert_eq!(callee["edge_type"], "Calls");
+    assert_eq!(callee["source_location"], "src/process.rs:10");
+}
+
+/// Test 3.8: Dependency Edges List All
+///
+/// # 4-Word Name: test_dependency_edges_list_all
+///
+/// # Contract
+/// - Precondition: Database with dependency edges
+/// - Postcondition: Returns paginated list of all edges
+/// - Performance: <100ms response time
+/// - Error Handling: Returns empty list if no edges
+#[tokio::test]
+async fn test_dependency_edges_list_all() {
+    // GIVEN: Database with dependency edges
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test edges
+    let dependency_edges = vec![
+        ("rust:fn:a:src_a:1-10", "rust:fn:b:src_b:1-20", "Calls", "src/a.rs:5"),
+        ("rust:fn:b:src_b:1-20", "rust:fn:c:src_c:1-15", "Calls", "src/b.rs:10"),
+        ("rust:fn:c:src_c:1-15", "rust:fn:d:src_d:1-25", "Uses", "src/c.rs:15"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /dependency-edges-list-all
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/dependency-edges-list-all")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns all edges
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Edges List: Status: {}", status);
+    println!("DEBUG Edges List: Response body: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/dependency-edges-list-all");
+    assert_eq!(json["data"]["total_count"].as_u64().unwrap(), 3);
+    assert_eq!(json["data"]["returned_count"].as_u64().unwrap(), 3);
+
+    let edges = json["data"]["edges"].as_array().unwrap();
+    assert_eq!(edges.len(), 3);
+}
