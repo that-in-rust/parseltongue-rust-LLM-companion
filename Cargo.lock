@@ -1712,8 +1712,6 @@ dependencies = [
  "console",
  "parseltongue-core",
  "pt01-folder-to-cozodb-streamer",
- "pt02-llm-cozodb-to-context-writer",
- "pt07-visual-analytics-terminal",
  "pt08-http-code-query-server",
  "serde_json",
  "tokio",
@@ -1991,39 +1989,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pt02-llm-cozodb-to-context-writer"
-version = "1.0.9"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "console",
- "cozo",
- "parseltongue-core",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-test",
-]
-
-[[package]]
-name = "pt07-visual-analytics-terminal"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "console",
- "parseltongue-core",
- "pt02-llm-cozodb-to-context-writer",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "pt08-http-code-query-server"
 version = "1.0.9"
 dependencies = [
@@ -2033,7 +1998,6 @@ dependencies = [
  "cozo",
  "parseltongue-core",
  "pt01-folder-to-cozodb-streamer",
- "pt02-llm-cozodb-to-context-writer",
  "serde",
  "serde_json",
  "tempfile",

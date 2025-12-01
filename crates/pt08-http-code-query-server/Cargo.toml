@@ -20,9 +20,6 @@ parseltongue-core = { path = "../parseltongue-core" }
 # Ingestion tool (for startup indexing)
 pt01-folder-to-cozodb-streamer = { path = "../pt01-folder-to-cozodb-streamer" }
 
-# Export tool (for query logic reuse)
-pt02-llm-cozodb-to-context-writer = { path = "../pt02-llm-cozodb-to-context-writer" }
-
 # Core dependencies
 anyhow = { workspace = true }
 thiserror = { workspace = true }

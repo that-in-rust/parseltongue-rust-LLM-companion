@@ -550,7 +550,7 @@ impl FileStreamer for FileStreamerImpl {
         }
 
         // ALWAYS create DependencyEdges schema, even if no dependencies
-        // This ensures pt02-level00 can query the table (returns empty array if no edges)
+        // This ensures HTTP server can query the table (returns empty array if no edges)
         // Bug fix: Previously only created schema if dependencies.is_empty() == false
         if let Err(e) = self.db.create_dependency_edges_schema().await {
             // Schema might already exist - that's ok

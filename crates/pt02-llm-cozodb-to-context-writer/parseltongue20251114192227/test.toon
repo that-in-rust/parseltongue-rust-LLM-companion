@@ -1,2 +1,0 @@
-entities[1\t]{edge_type,from_key,to_key}:
-  depends_on	"rust:fn:foo:src_lib_rs:10"	"rust:fn:bar:src_lib_rs:20"

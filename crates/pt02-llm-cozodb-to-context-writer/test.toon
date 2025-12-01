@@ -1,2 +1,0 @@
-entities[1\t]{current_ind,doc_comment,entity_name,entity_type,file_path,future_ind,generic_constraints,interface_signature,is_async,is_public,is_unsafe,isgl1_key,line_number,param_names,param_types,return_type,trait_impls}:
-  1	Test function	test_function	fn	src/lib.rs	0	["T: Clone"]	pub fn test_function() -> Result<()>	false	true	false	"rust:fn:test:src_lib_rs:10"	42	[name,count]	[&str,i32]	Result<()>	[Debug,Clone]

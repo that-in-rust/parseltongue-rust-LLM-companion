@@ -1,2 +1,0 @@
-entities[1\t]{current_ind,doc_comment,entity_class,entity_name,entity_type,file_path,forward_deps,future_ind,interface_signature,isgl1_key,line_number}:
-  1	Test function	CODE	test	fn	src/lib.rs	["rust:fn:helper:src_lib_rs:20"]	0	pub fn test()	"rust:fn:test:src_lib_rs:10"	10
