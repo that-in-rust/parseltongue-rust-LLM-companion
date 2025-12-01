@@ -23,6 +23,7 @@ use crate::http_endpoint_handler_modules::{
     semantic_cluster_grouping_handler,
     api_reference_documentation_handler,
     smart_context_token_budget_handler,
+    temporal_coupling_hidden_deps_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -113,6 +114,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/smart-context-token-budget",
             get(smart_context_token_budget_handler::handle_smart_context_token_budget)
+        )
+        .route(
+            "/temporal-coupling-hidden-deps",
+            get(temporal_coupling_hidden_deps_handler::handle_temporal_coupling_hidden_deps)
         )
         // Test route for debugging
         .route(

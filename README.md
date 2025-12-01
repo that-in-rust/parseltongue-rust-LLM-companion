@@ -152,10 +152,11 @@ curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_ma
 | "Where is the complexity?" | `GET /complexity-hotspots-ranking-view?top=10` | ~500 |
 | "What modules exist?" | `GET /semantic-cluster-grouping-list` | ~1K |
 | "Give me optimal context" | `GET /smart-context-token-budget?focus=X&tokens=4000` | ~4K |
+| "Hidden dependencies?" | `GET /temporal-coupling-hidden-deps?entity=X` | ~200 |
 
 ---
 
-## HTTP API Reference (14 Endpoints)
+## HTTP API Reference (15 Endpoints)
 
 ### Core Endpoints
 
@@ -191,11 +192,12 @@ curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_ma
 | `GET /complexity-hotspots-ranking-view?top=N` | Complexity ranking |
 | `GET /semantic-cluster-grouping-list` | Semantic module groups |
 
-### Killer Feature
+### Killer Features
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /smart-context-token-budget?focus=X&tokens=N` | Optimal context selection |
+| `GET /temporal-coupling-hidden-deps?entity=X` | Hidden temporal dependencies |
 
 ---
 
@@ -261,7 +263,34 @@ curl http://localhost:8080/dependency-edges-list-all | jq '.data.total_count'
 # Returns: Total edge count and edge details
 ```
 
-### Example 5: Smart Context for LLM Agents
+### Example 5: Discover Hidden Dependencies
+
+```bash
+# Reveal the INVISIBLE architecture - files that change together with ZERO code edge
+curl "http://localhost:8080/temporal-coupling-hidden-deps?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
+```
+
+**Response**:
+```json
+{
+  "source_entity": "rust:fn:authenticate:src_auth_rs:10-50",
+  "hidden_dependencies": [
+    {
+      "coupled_entity": "rust:config:app_config:src_config:1-50",
+      "co_change_count": 47,
+      "coupling_score": 0.92,
+      "has_code_edge": false,
+      "insight": "HIGH temporal coupling with ZERO code dependency - missing abstraction?"
+    }
+  ],
+  "analysis_window_days": 180,
+  "insight": "Found 1 hidden temporal dependency with NO code edge!"
+}
+```
+
+**This is the INVISIBLE architecture** - Static analysis can't see this relationship!
+
+### Example 6: Smart Context for LLM Agents
 
 ```bash
 # The killer feature: Get optimal context within token budget

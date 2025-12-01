@@ -1428,3 +1428,92 @@ async fn test_smart_context_token_budget() {
     });
     assert!(has_direct_callee, "Should include direct callees");
 }
+
+/// Test 5.1: Temporal Coupling Hidden Dependencies
+///
+/// # 4-Word Name: test_temporal_coupling_hidden_deps
+///
+/// # Contract
+/// - Precondition: Database with entities and edges
+/// - Postcondition: Returns temporal coupling analysis (simulated in test environment)
+/// - Performance: <100ms response time
+/// - Error Handling: Returns 422 when git unavailable, or simulated data for tests
+///
+/// # Semantics
+/// Temporal coupling = files that change together but may have ZERO code dependency.
+/// This reveals the INVISIBLE architecture.
+#[tokio::test]
+async fn test_temporal_coupling_hidden_deps() {
+    // GIVEN: Database with entities and edges
+    let storage = CozoDbStorage::new("mem").await.unwrap();
+    storage.create_schema().await.unwrap();
+    storage.create_dependency_edges_schema().await.unwrap();
+
+    // Insert test entities and edges
+    let dependency_edges = vec![
+        ("rust:fn:auth:src_auth:1-50", "rust:fn:session:src_session:1-30", "Calls", "src/auth.rs:25"),
+        ("rust:fn:auth:src_auth:1-50", "rust:fn:validate:src_validate:1-20", "Calls", "src/auth.rs:40"),
+    ];
+
+    for (from_key, to_key, edge_type, source_location) in &dependency_edges {
+        let query = format!(r#"
+            ?[from_key, to_key, edge_type, source_location] <-
+            [["{}", "{}", "{}", "{}"]]
+
+            :put DependencyEdges {{
+                from_key, to_key, edge_type =>
+                source_location
+            }}
+        "#, from_key, to_key, edge_type, source_location);
+        storage.execute_query(&query).await.unwrap();
+    }
+
+    // Create state with database connection
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage);
+    let app = build_complete_router_instance(state);
+
+    // WHEN: GET /temporal-coupling-hidden-deps?entity=rust:fn:auth:src_auth:1-50
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/temporal-coupling-hidden-deps?entity=rust:fn:auth:src_auth:1-50")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .unwrap();
+
+    // THEN: Returns temporal coupling data (simulated in test environment)
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+
+    println!("DEBUG Temporal Coupling: Status: {}", status);
+    println!("DEBUG Temporal Coupling: Response: {}", body_str);
+
+    assert_eq!(status, StatusCode::OK);
+
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["endpoint"], "/temporal-coupling-hidden-deps");
+
+    // Should have source entity
+    assert!(json["data"]["source_entity"].as_str().is_some());
+
+    // Should have hidden_dependencies array
+    let hidden_deps = json["data"]["hidden_dependencies"].as_array().unwrap();
+
+    // Each hidden dependency should have required fields
+    for dep in hidden_deps {
+        assert!(dep["coupled_entity"].as_str().is_some());
+        assert!(dep["coupling_score"].as_f64().is_some());
+        assert!(dep["has_code_edge"].is_boolean());
+    }
+
+    // Should have analysis_window_days
+    assert!(json["data"]["analysis_window_days"].as_u64().is_some());
+
+    // Should have insight text
+    assert!(json["data"]["insight"].as_str().is_some());
+}
