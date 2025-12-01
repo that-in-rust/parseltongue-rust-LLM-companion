@@ -33,11 +33,14 @@ cargo clean
 ## CLI Usage (HTTP-Only Workflow)
 
 ```bash
-# Step 1: Ingest codebase into database
-parseltongue pt01-folder-to-cozodb-streamer . --db "rocksdb:mycode.db"
+# Step 1: Ingest codebase (auto-creates parseltongueTIMESTAMP/analysis.db)
+parseltongue pt01-folder-to-cozodb-streamer .
+# Output shows: Workspace: parseltongue20251201125000
+#               Database: rocksdb:parseltongue20251201125000/analysis.db
 
-# Step 2: Start HTTP server (15 endpoints)
-parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
+# Step 2: Start HTTP server using the printed path
+parseltongue serve-http-code-backend \
+  --db "rocksdb:parseltongue20251201125000/analysis.db" --port 8080
 
 # Step 3: Query via REST API
 curl http://localhost:8080/server-health-check-status
@@ -46,6 +49,8 @@ curl http://localhost:8080/code-entities-list-all
 curl "http://localhost:8080/code-entities-search-fuzzy?q=handle"
 curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:main&hops=2"
 ```
+
+**Note**: pt01 always creates a timestamped workspace folder - no `--db` flag needed.
 
 ## HTTP Server Endpoints (15 Total)
 
@@ -123,8 +128,10 @@ Follow STUB -> RED -> GREEN -> REFACTOR cycle:
 
 ## Database Format
 
-Always use RocksDB prefix:
+For `serve-http-code-backend`, always use RocksDB prefix:
 ```bash
---db "rocksdb:mycode.db"    # Good
---db "mycode.db"            # Bad
+--db "rocksdb:parseltongue20251201/analysis.db"    # Good
+--db "parseltongue20251201/analysis.db"            # Bad - missing prefix
 ```
+
+Note: `pt01-folder-to-cozodb-streamer` auto-creates the database - just copy the path it prints.
