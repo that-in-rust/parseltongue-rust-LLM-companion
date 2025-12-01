@@ -3,6 +3,10 @@
 //! # 4-Word Naming: reverse_callers_query_graph_handler
 //!
 //! Endpoint: GET /reverse-callers-query-graph?entity={key}
+//!
+//! v1.0.4 FIX: Added fuzzy key matching for stdlib function calls.
+//! Edge targets may use simplified keys like `rust:fn:new:unknown:0-0`
+//! but we query with full entity keys like `rust:method:new:__path:38-54`.
 
 use axum::{
     extract::{Query, State},
@@ -13,6 +17,25 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+
+/// Extract function name from ISGL1 key for fuzzy matching
+///
+/// # 4-Word Name: extract_function_name_key
+///
+/// # Examples
+/// - "rust:fn:main:path:1-50" -> Some("main")
+/// - "rust:method:new:path:38-54" -> Some("new")
+/// - "invalid" -> None
+fn extract_function_name_key(key: &str) -> Option<&str> {
+    // ISGL1 key format: language:type:name:path:lines
+    // Example: rust:fn:main:__crates_parseltongue_src_main_rs:18-40
+    let parts: Vec<&str> = key.split(':').collect();
+    if parts.len() >= 3 {
+        Some(parts[2])
+    } else {
+        None
+    }
+}
 
 /// Query parameters for reverse callers endpoint
 ///
@@ -135,28 +158,52 @@ pub async fn handle_reverse_callers_query_graph(
     ).into_response()
 }
 
-/// Query reverse callers using direct CozoDB queries compatible with test setup
+/// Query reverse callers using direct CozoDB queries with fuzzy matching
 ///
 /// # 4-Word Name: query_reverse_callers_direct_method
+///
+/// # v1.0.4 Fix
+/// Added fuzzy key matching: Edge targets may use simplified keys like
+/// `rust:fn:new:unknown:0-0` but we query with full entity keys.
+/// Now matches on function name when exact key match fails.
 async fn query_reverse_callers_direct_method(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
 ) -> Vec<CallerEdgeDataPayload> {
     let db_guard = state.database_storage_connection_arc.read().await;
     if let Some(storage) = db_guard.as_ref() {
-        // Direct query compatible with our test insertion pattern
-        // This matches exactly how our test inserts dependency edges
         let escaped_entity_key = entity_key
             .replace('\\', "\\\\")
             .replace('"', "\\\"");
 
-        let query = format!(
-            r#"
-            ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-                to_key == "{}"
-            "#,
-            escaped_entity_key
-        );
+        // v1.0.4: Build fuzzy matching query based on function name
+        let query = match extract_function_name_key(entity_key) {
+            Some(func_name) => {
+                let escaped_func_name = func_name
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"");
+                // Fuzzy match: exact key OR keys ending with function name pattern
+                format!(
+                    r#"
+                    ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+                        (to_key == "{}" or
+                         starts_with(to_key, "rust:fn:{}:") or
+                         starts_with(to_key, "rust:method:{}:"))
+                    "#,
+                    escaped_entity_key, escaped_func_name, escaped_func_name
+                )
+            }
+            None => {
+                // Fallback to exact match only
+                format!(
+                    r#"
+                    ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+                        to_key == "{}"
+                    "#,
+                    escaped_entity_key
+                )
+            }
+        };
 
         match storage.raw_query(&query).await {
             Ok(result) => {

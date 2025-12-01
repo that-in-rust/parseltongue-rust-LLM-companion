@@ -1123,7 +1123,187 @@ async fn test_smart_context_invalid_budget_error() {
 
 ---
 
-**End of Architecture Document v1.0.1**
+**End of Architecture Document v1.0.2**
 
 **Changelog**:
+- v1.0.2 (2025-12-01): Added Bug Fix Implementation Details for v1.0.4
 - v1.0.1 (2025-11-28): Removed Phase 6 Performance Tests - existing storage layer already validates performance contracts
+
+---
+
+## Appendix: v1.0.4 Bug Fix Implementation Details
+
+### Bug #1: Entity Detail View - Path to Query Parameter
+
+**Problem**: Axum path parameter `{key}` conflicts with colons in ISGL1 entity keys.
+
+**Implementation Change**:
+
+```rust
+// BEFORE (route_definition_builder_module.rs)
+.route("/code-entity-detail-view/:key", get(handle_code_entity_detail_view))
+
+// AFTER
+.route("/code-entity-detail-view", get(handle_code_entity_detail_view))
+```
+
+```rust
+// BEFORE (code_entity_detail_view_handler.rs)
+pub async fn handle_code_entity_detail_view(
+    State(state): State<SharedApplicationStateContainer>,
+    Path(encoded_key): Path<String>,
+) -> impl IntoResponse
+
+// AFTER
+#[derive(Deserialize)]
+pub struct EntityDetailQueryParams {
+    key: String,
+}
+
+pub async fn handle_code_entity_detail_view(
+    State(state): State<SharedApplicationStateContainer>,
+    Query(params): Query<EntityDetailQueryParams>,
+) -> impl IntoResponse
+```
+
+### Bug #2: Reverse Callers - Fuzzy Key Matching
+
+**Problem**: Edge targets use simplified keys (`rust:fn:new:unknown:0-0`) but queries use full entity keys.
+
+**Implementation Change** (reverse_callers_query_graph_handler.rs):
+
+```rust
+// BEFORE: Exact match query
+let query = format!(
+    "?[from_key, edge_type] := *DependencyEdges{{from_key, to_key, edge_type}}, to_key == '{}'",
+    entity_key
+);
+
+// AFTER: Fuzzy match with function name extraction
+fn extract_function_name_from_key(key: &str) -> Option<&str> {
+    // "rust:fn:main:path:1-50" -> "main"
+    // "rust:method:new:path:1-50" -> "new"
+    key.split(':').nth(2)
+}
+
+let func_name = extract_function_name_from_key(&entity_key);
+let query = match func_name {
+    Some(name) => format!(
+        "?[from_key, edge_type] := *DependencyEdges{{from_key, to_key, edge_type}}, \
+         (to_key == '{}' or (starts_with(to_key, 'rust:fn:{}:') or starts_with(to_key, 'rust:method:{}:')))",
+        entity_key, name, name
+    ),
+    None => format!(
+        "?[from_key, edge_type] := *DependencyEdges{{from_key, to_key, edge_type}}, to_key == '{}'",
+        entity_key
+    ),
+};
+```
+
+### Bug #3: Blast Radius - Correct Direction + Fuzzy Matching
+
+**Problem**: Blast radius needs REVERSE dependencies (who calls me) and fuzzy matching.
+
+**Implementation Change** (blast_radius_impact_handler.rs):
+
+```rust
+// Key insight: "If I change X, what breaks?" = Who DEPENDS ON me = REVERSE dependencies
+
+fn compute_blast_radius_by_hops(
+    storage: &CozoDbStorage,
+    entity_key: &str,
+    max_hops: u32,
+) -> Vec<BlastRadiusHopDataItem> {
+    let func_name = extract_function_name_from_key(entity_key);
+
+    // Use REVERSE direction: Find all entities that CALL the target
+    // from_key is the caller, to_key is what's being called
+    let base_query = match func_name {
+        Some(name) => format!(
+            "?[caller, depth] := *DependencyEdges{{from_key: caller, to_key}}, \
+             (to_key == '{}' or starts_with(to_key, 'rust:fn:{}:') or starts_with(to_key, 'rust:method:{}:')), \
+             depth = 1",
+            entity_key, name, name
+        ),
+        None => format!(
+            "?[caller, depth] := *DependencyEdges{{from_key: caller, to_key}}, \
+             to_key == '{}', depth = 1",
+            entity_key
+        ),
+    };
+
+    // Recursive hop traversal using CozoDB's recursive queries
+    // ...
+}
+```
+
+### Languages Detection Fix
+
+**Implementation Change** (http_server_startup_runner.rs):
+
+```rust
+impl SharedApplicationStateContainer {
+    /// # 4-Word Name: populate_languages_from_database
+    pub async fn populate_languages_from_database(&self) {
+        let db_guard = self.database_storage_connection_arc.read().await;
+        if let Some(storage) = db_guard.as_ref() {
+            // Query distinct languages from CodeGraph
+            let result = storage.raw_query(
+                "?[language] := *CodeGraph{language}, language != ''"
+            ).await;
+
+            if let Ok(result) = result {
+                let mut stats = self.codebase_statistics_metadata_arc.write().await;
+                stats.languages_detected_list_vec = result.rows
+                    .iter()
+                    .filter_map(|row| row.first())
+                    .filter_map(|v| match v {
+                        cozo::DataValue::Str(s) => Some(s.to_string()),
+                        _ => None,
+                    })
+                    .collect();
+            }
+        }
+    }
+}
+```
+
+### TDD Tests for Bug Fixes
+
+```rust
+// Test for Bug #1 Fix
+#[tokio::test]
+async fn test_entity_detail_view_with_colons_in_key() {
+    let server = create_test_server_with_data().await;
+    let key = "rust:fn:main:__crates_parseltongue_src_main_rs:18-40";
+
+    // Query parameter should work
+    let response = server.get(&format!("/code-entity-detail-view?key={}", key)).await;
+    assert_eq!(response.status(), 200);
+    assert!(response.json()["data"]["entity_name"].is_string());
+}
+
+// Test for Bug #2 Fix
+#[tokio::test]
+async fn test_reverse_callers_fuzzy_matching() {
+    let server = create_test_server_with_stdlib_calls().await;
+
+    // Query for method that's called via stdlib pattern
+    let response = server.get("/reverse-callers-query-graph?entity=rust:method:new:__path:38-54").await;
+    assert_eq!(response.status(), 200);
+    assert!(response.json()["total_count"].as_u64().unwrap() > 0);
+}
+
+// Test for Bug #3 Fix
+#[tokio::test]
+async fn test_blast_radius_uses_reverse_deps() {
+    let server = create_test_server_with_callers().await;
+
+    // Entity that IS CALLED BY 5 other entities
+    let response = server.get("/blast-radius-impact-analysis?entity=X&hops=1").await;
+    assert_eq!(response.status(), 200);
+
+    // Should return the 5 callers (reverse deps), not forward deps
+    assert_eq!(response.json()["data"]["hop_1"]["count"], 5);
+}
+```

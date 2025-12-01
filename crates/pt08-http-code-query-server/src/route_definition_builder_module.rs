@@ -75,7 +75,7 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             get(code_entities_list_all_handler::handle_code_entities_list_all)
         )
         .route(
-            "/code-entity-detail-view/{key}",
+            "/code-entity-detail-view",
             get(code_entity_detail_view_handler::handle_code_entity_detail_view)
         )
         .route(

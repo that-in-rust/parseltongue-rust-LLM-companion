@@ -2,18 +2,29 @@
 //!
 //! # 4-Word Naming: code_entity_detail_view_handler
 //!
-//! Endpoint: GET /code-entity-detail-view/{*key}
+//! Endpoint: GET /code-entity-detail-view?key={entity_key}
+//!
+//! v1.0.4 FIX: Changed from path parameter to query parameter
+//! because ISGL1 entity keys contain colons which conflict with Axum routing.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Query, State},
     http::StatusCode,
     Json,
     response::IntoResponse,
 };
-use serde::Serialize;
-use urlencoding;
+use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+
+/// Query parameters for entity detail endpoint
+///
+/// # 4-Word Name: EntityDetailQueryParams
+#[derive(Debug, Deserialize)]
+pub struct EntityDetailQueryParams {
+    /// Entity key (required)
+    pub key: String,
+}
 
 /// Entity detail response data
 ///
@@ -58,27 +69,30 @@ pub struct EntityDetailErrorResponse {
 /// - Precondition: Database connected
 /// - Postcondition: Returns entity details or 404 error
 /// - Performance: <100ms
+///
+/// # v1.0.4 Fix
+/// Changed from Path parameter to Query parameter because ISGL1 entity keys
+/// contain colons (e.g., rust:fn:main:path:1-50) which conflict with Axum routing.
 pub async fn handle_code_entity_detail_view(
     State(state): State<SharedApplicationStateContainer>,
-    Path(encoded_key): Path<String>,
+    Query(params): Query<EntityDetailQueryParams>,
 ) -> impl IntoResponse {
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
-    // Decode URL-encoded entity key
-    let entity_key = match urlencoding::decode(&encoded_key) {
-        Ok(key) => key.into_owned(),
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(EntityDetailErrorResponse {
-                    success: false,
-                    error: format!("Invalid entity key encoding: {}", encoded_key),
-                    endpoint: "/code-entity-detail-view/{key}".to_string(),
-                    tokens: 45,
-                }),
-            ).into_response();
-        }
+    // Validate entity key parameter
+    let entity_key = if params.key.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(EntityDetailErrorResponse {
+                success: false,
+                error: "Entity key parameter is required".to_string(),
+                endpoint: "/code-entity-detail-view".to_string(),
+                tokens: 45,
+            }),
+        ).into_response();
+    } else {
+        params.key
     };
 
     // Query for entity details
@@ -88,7 +102,7 @@ pub async fn handle_code_entity_detail_view(
             StatusCode::OK,
             Json(EntityDetailResponsePayload {
                 success: true,
-                endpoint: "/code-entity-detail-view/{key}".to_string(),
+                endpoint: "/code-entity-detail-view".to_string(),
                 data: EntityDetailDataPayload {
                     key: entity_details.key,
                     file_path: entity_details.file_path,
@@ -106,7 +120,7 @@ pub async fn handle_code_entity_detail_view(
             Json(EntityDetailErrorResponse {
                 success: false,
                 error: format!("Entity '{}' not found", entity_key),
-                endpoint: "/code-entity-detail-view/{key}".to_string(),
+                endpoint: "/code-entity-detail-view".to_string(),
                 tokens: 40,
             }),
         ).into_response()

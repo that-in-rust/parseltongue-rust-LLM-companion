@@ -146,6 +146,42 @@ impl SharedApplicationStateContainer {
             (stats.total_code_entities_count, stats.total_test_entities_count, stats.total_dependency_edges_count)
         }
     }
+
+    /// Populate languages detected from database
+    ///
+    /// # 4-Word Name: populate_languages_from_database
+    ///
+    /// # v1.0.4 Fix
+    /// Languages detection was not populated. Now queries distinct
+    /// languages from CodeGraph table during server startup.
+    pub async fn populate_languages_from_database(&self) {
+        let db_guard = self.database_storage_connection_arc.read().await;
+        if let Some(storage) = db_guard.as_ref() {
+            // Query distinct languages from CodeGraph
+            let result = storage.raw_query(
+                "?[language] := *CodeGraph{language}, language != ''"
+            ).await;
+
+            if let Ok(result) = result {
+                let mut languages: Vec<String> = result.rows
+                    .iter()
+                    .filter_map(|row| row.first())
+                    .filter_map(|v| match v {
+                        cozo::DataValue::Str(s) => Some(s.to_string()),
+                        _ => None,
+                    })
+                    .collect();
+
+                // Deduplicate
+                languages.sort();
+                languages.dedup();
+
+                // Update metadata
+                let mut stats = self.codebase_statistics_metadata_arc.write().await;
+                stats.languages_detected_list_vec = languages;
+            }
+        }
+    }
 }
 
 /// Start the HTTP server in blocking loop
@@ -180,6 +216,9 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
         let mut stats = state.codebase_statistics_metadata_arc.write().await;
         stats.database_file_path_string = config.database_connection_string_value.clone();
     }
+
+    // v1.0.4: Populate languages from database
+    state.populate_languages_from_database().await;
 
     // Build router
     let router = build_complete_router_instance(state);

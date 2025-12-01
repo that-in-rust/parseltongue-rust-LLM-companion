@@ -7,6 +7,10 @@
 //! Returns all entities that would be affected if the source entity changes.
 //! This is a transitive closure of REVERSE dependencies (callers) up to N hops.
 //! Blast radius = "If I change X, what breaks?" = entities that DEPEND ON X.
+//!
+//! v1.0.4 FIX: Added fuzzy key matching for stdlib function calls.
+//! Edge targets may use simplified keys like `rust:fn:new:unknown:0-0`
+//! but we query with full entity keys like `rust:method:new:__path:38-54`.
 
 use axum::{
     extract::{Query, State},
@@ -18,6 +22,24 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+
+/// Extract function name from ISGL1 key for fuzzy matching
+///
+/// # 4-Word Name: extract_function_name_key
+///
+/// # Examples
+/// - "rust:fn:main:path:1-50" -> Some("main")
+/// - "rust:method:new:path:38-54" -> Some("new")
+/// - "invalid" -> None
+fn extract_function_name_key(key: &str) -> Option<&str> {
+    // ISGL1 key format: language:type:name:path:lines
+    let parts: Vec<&str> = key.split(':').collect();
+    if parts.len() >= 3 {
+        Some(parts[2])
+    } else {
+        None
+    }
+}
 
 /// Query parameters for blast radius endpoint
 ///
@@ -148,13 +170,18 @@ pub async fn handle_blast_radius_impact_analysis(
     ).into_response()
 }
 
-/// Compute blast radius using BFS traversal
+/// Compute blast radius using BFS traversal with fuzzy key matching
 ///
 /// # 4-Word Name: compute_blast_radius_by_hops
 ///
 /// Uses breadth-first search to find all entities that DEPEND ON
 /// the source entity (callers) within the specified number of hops.
 /// This answers: "If I change X, what else might break?"
+///
+/// # v1.0.4 Fix
+/// Added fuzzy key matching: Edge targets may use simplified keys like
+/// `rust:fn:new:unknown:0-0` but we query with full entity keys.
+/// Now matches on function name pattern when exact key match fails.
 async fn compute_blast_radius_by_hops(
     state: &SharedApplicationStateContainer,
     source_entity: &str,
@@ -186,16 +213,37 @@ async fn compute_blast_radius_by_hops(
                 .replace('\\', "\\\\")
                 .replace('"', "\\\"");
 
-            let query = format!(
-                r#"
-                ?[from_key] := *DependencyEdges{{from_key, to_key}},
-                    to_key == "{}"
-                "#,
-                escaped_entity
-            );
+            // v1.0.4: Build fuzzy matching query based on function name
+            let query = match extract_function_name_key(&entity) {
+                Some(func_name) => {
+                    let escaped_func_name = func_name
+                        .replace('\\', "\\\\")
+                        .replace('"', "\\\"");
+                    // Fuzzy match: exact key OR keys with matching function name
+                    format!(
+                        r#"
+                        ?[from_key] := *DependencyEdges{{from_key, to_key}},
+                            (to_key == "{}" or
+                             starts_with(to_key, "rust:fn:{}:") or
+                             starts_with(to_key, "rust:method:{}:"))
+                        "#,
+                        escaped_entity, escaped_func_name, escaped_func_name
+                    )
+                }
+                None => {
+                    // Fallback to exact match only
+                    format!(
+                        r#"
+                        ?[from_key] := *DependencyEdges{{from_key, to_key}},
+                            to_key == "{}"
+                        "#,
+                        escaped_entity
+                    )
+                }
+            };
 
-            if let Ok(result) = storage.raw_query(&query).await {
-                for row in result.rows {
+            if let Ok(query_result) = storage.raw_query(&query).await {
+                for row in query_result.rows {
                     if let Some(caller_key) = extract_string_value(&row[0]) {
                         if !visited.contains(&caller_key) {
                             visited.insert(caller_key.clone());

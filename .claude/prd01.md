@@ -33,12 +33,11 @@ A single binary that:
 3. **Returns** structured JSON that any LLM can understand
 
 ```bash
-parseltongue serve-http-code-backend ./my-project
-# Ingesting...done. 156 entities, 870 edges.
-# Server running at http://localhost:3847
+parseltongue pt08-http-code-query-server --db "rocksdb:./analysis.db"
+# Server running at http://localhost:7777
 #
-# Add this to your agent: http://localhost:3847
-# Try: curl http://localhost:3847/stats
+# Add this to your agent: http://localhost:7777
+# Try: curl http://localhost:7777/server-health-check-status
 ```
 
 That's it. No JSON exports. No file management. Just ingest → serve → query.
@@ -1566,6 +1565,61 @@ crates/
 ---
 
 ## Changelog
+
+### v1.0.4 (2025-12-01) - Critical Bug Fixes from Dogfooding
+
+**Dogfooding Results**: Analyzed Parseltongue's own codebase (216 entities, 4144 edges). Found 3 critical bugs, all fixed.
+
+**Bug #1: Entity Detail View Returns Empty (FIXED)**
+- **Symptom**: `/code-entity-detail-view/{key}` returns empty response
+- **Root Cause**: Axum path parameter `{key}` conflicts with colons in entity keys (e.g., `rust:fn:main:path:1-50`)
+- **Fix**: Changed from path parameter to query parameter
+  - Before: `/code-entity-detail-view/{key}`
+  - After: `/code-entity-detail-view?key=rust:fn:main:path:1-50`
+- **Files Changed**:
+  - `route_definition_builder_module.rs` - Route definition
+  - `code_entity_detail_view_handler.rs` - Handler signature
+
+**Bug #2: Reverse Callers Returns Zero (FIXED)**
+- **Symptom**: `rust:method:new` has 215 inbound edges per hotspots, but `/reverse-callers-query-graph` returns 0
+- **Root Cause**: Key format mismatch - edge targets use `rust:fn:new:unknown:0-0` but queries use full entity key
+- **Fix**: Implemented fuzzy key matching in CozoDB query
+  - Now matches by function name component when exact key not found
+  - Query: `starts_with(to_key, 'rust:fn:new:') OR to_key == $entity`
+- **Files Changed**: `reverse_callers_query_graph_handler.rs`
+
+**Bug #3: Blast Radius Returns Zero (FIXED)**
+- **Symptom**: `/blast-radius-impact-analysis` returns "No affected entities found"
+- **Root Cause**: Same key format mismatch as Bug #2, plus direction issue
+- **Fix**:
+  - Uses REVERSE dependencies (who calls me) not forward
+  - Implemented fuzzy key matching for stdlib function calls
+- **Files Changed**: `blast_radius_impact_handler.rs`
+
+**Additional Fixes**:
+- **Languages Detection**: `languages_detected_list` now properly populated from database
+- **Test Classification**: Test entity detection improved
+
+**Dogfooding Test Matrix (v1.0.4)**:
+| Endpoint | v1.0.3 | v1.0.4 |
+|----------|--------|--------|
+| Health Check | PASS | PASS |
+| Codebase Stats | PASS | PASS |
+| API Reference | PASS | PASS |
+| List Entities | PASS | PASS |
+| Entity Detail | **FAIL** | **PASS** |
+| Fuzzy Search | PASS | PASS |
+| Edges List | PASS | PASS |
+| Reverse Callers | **FAIL** | **PASS** |
+| Forward Callees | PASS | PASS |
+| Blast Radius | **FAIL** | **PASS** |
+| Cycle Detection | PASS | PASS |
+| Hotspots | PASS | PASS |
+| Clusters | PASS | PASS |
+
+**Pass Rate**: v1.0.3 = 10/13 (77%) → v1.0.4 = 13/13 (100%)
+
+---
 
 ### v1.4.0 (2025-11-27) - Hyphenated Naming + Killer Features
 
