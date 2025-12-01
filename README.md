@@ -1,16 +1,16 @@
 # Parseltongue
 
-> **v1.0.9** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
+> **v1.1.0** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
 
 ```bash
 # Index your codebase
 parseltongue pt01-folder-to-cozodb-streamer ./my-project --db "rocksdb:mycode.db"
 
-# Start the HTTP server
-parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
+# Start the HTTP server (default port: 7777)
+parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 
 # Query from your LLM agent
-curl http://localhost:8080/codebase-statistics-overview-summary
+curl http://localhost:7777/codebase-statistics-overview-summary
 ```
 
 **12 languages**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
@@ -92,7 +92,7 @@ Entities created: 216 (CODE only)
 ### Step 2: Start the HTTP Server
 
 ```bash
-parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
+parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 ```
 
 **Output**:
@@ -100,36 +100,36 @@ parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
 Parseltongue HTTP Server
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-HTTP Server running at: http://localhost:8080
+HTTP Server running at: http://localhost:7777
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Add to your LLM agent: PARSELTONGUE_URL=http://localhost:8080  │
+│  Add to your LLM agent: PARSELTONGUE_URL=http://localhost:7777  │
 └─────────────────────────────────────────────────────────────────┘
 
 Quick test:
-  curl http://localhost:8080/server-health-check-status
+  curl http://localhost:7777/server-health-check-status
 ```
 
 ### Step 3: Query from Your Agent
 
 ```bash
 # Health check
-curl http://localhost:8080/server-health-check-status
+curl http://localhost:7777/server-health-check-status
 
 # Codebase overview
-curl http://localhost:8080/codebase-statistics-overview-summary
+curl http://localhost:7777/codebase-statistics-overview-summary
 
 # Search for functions
-curl "http://localhost:8080/code-entities-search-fuzzy?q=authenticate"
+curl "http://localhost:7777/code-entities-search-fuzzy?q=authenticate"
 
 # What calls this function?
-curl "http://localhost:8080/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:50-100"
+curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:50-100"
 
 # What breaks if I change this?
-curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:new:src_storage_rs:10-30&hops=3"
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:new:src_storage_rs:10-30&hops=3"
 
 # Get optimal context for LLM (killer feature!)
-curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000"
+curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000"
 ```
 
 ---
@@ -143,7 +143,7 @@ curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_ma
 | "List all endpoints" | `GET /api-reference-documentation-help` | ~500 |
 | "List all entities" | `GET /code-entities-list-all` | ~2K |
 | "Find functions named X" | `GET /code-entities-search-fuzzy?q=X` | ~500 |
-| "Get entity details" | `GET /code-entity-detail-view/{key}` | ~200 |
+| "Get entity details" | `GET /code-entity-detail-view?key=X` | ~200 |
 | "What calls this?" | `GET /reverse-callers-query-graph?entity=X` | ~500 |
 | "What does this call?" | `GET /forward-callees-query-graph?entity=X` | ~500 |
 | "List all edges" | `GET /dependency-edges-list-all` | ~3K |
@@ -172,7 +172,7 @@ curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_ma
 |----------|-------------|
 | `GET /code-entities-list-all` | All entities |
 | `GET /code-entities-list-all?entity_type=function` | Filter by type |
-| `GET /code-entity-detail-view/{key}` | Single entity details |
+| `GET /code-entity-detail-view?key=X` | Single entity details |
 | `GET /code-entities-search-fuzzy?q=pattern` | Fuzzy search by name |
 
 ### Graph Query Endpoints
@@ -207,15 +207,15 @@ curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_ma
 
 ```bash
 # 1. Get codebase overview
-curl http://localhost:8080/codebase-statistics-overview-summary | jq '.data'
+curl http://localhost:7777/codebase-statistics-overview-summary | jq '.data'
 # Returns: entity counts, edge counts, languages detected
 
 # 2. Find complexity hotspots (most coupled code)
-curl "http://localhost:8080/complexity-hotspots-ranking-view?top=10" | jq '.data.hotspots'
+curl "http://localhost:7777/complexity-hotspots-ranking-view?top=10" | jq '.data.hotspots'
 # Returns: Top 10 entities by coupling (inbound + outbound dependencies)
 
 # 3. Check for circular dependencies
-curl http://localhost:8080/circular-dependency-detection-scan | jq '.data'
+curl http://localhost:7777/circular-dependency-detection-scan | jq '.data'
 # Returns: has_cycles, cycle_count, cycle paths
 ```
 
@@ -223,15 +223,15 @@ curl http://localhost:8080/circular-dependency-detection-scan | jq '.data'
 
 ```bash
 # 1. Find who calls the function you want to change
-curl "http://localhost:8080/reverse-callers-query-graph?entity=rust:fn:process_request:src_handler_rs:20-80" | jq '.data'
+curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:process_request:src_handler_rs:20-80" | jq '.data'
 # Returns: All callers (direct dependencies)
 
 # 2. Get full blast radius (transitive impact)
-curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:process_request:src_handler_rs:20-80&hops=3" | jq '.data'
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:process_request:src_handler_rs:20-80&hops=3" | jq '.data'
 # Returns: total_affected count, by_hop breakdown
 
 # 3. Get optimal context for the LLM to understand the refactoring
-curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:process_request:src_handler_rs:20-80&tokens=5000" | jq '.data'
+curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:process_request:src_handler_rs:20-80&tokens=5000" | jq '.data'
 # Returns: Focus entity + highest-relevance related entities within 5000 tokens
 ```
 
@@ -239,15 +239,15 @@ curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:process_req
 
 ```bash
 # 1. Search for authentication-related code
-curl "http://localhost:8080/code-entities-search-fuzzy?q=auth" | jq '.data.entities[].key'
+curl "http://localhost:7777/code-entities-search-fuzzy?q=auth" | jq '.data.entities[].key'
 # Returns: All entities with "auth" in their name
 
 # 2. Get details of a specific entity
-curl "http://localhost:8080/code-entity-detail-view/rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
+curl "http://localhost:7777/code-entity-detail-view/rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
 # Returns: Full entity details including source code
 
 # 3. See what the auth function depends on
-curl "http://localhost:8080/forward-callees-query-graph?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
+curl "http://localhost:7777/forward-callees-query-graph?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
 # Returns: All functions/types that authenticate() calls
 ```
 
@@ -255,11 +255,11 @@ curl "http://localhost:8080/forward-callees-query-graph?entity=rust:fn:authentic
 
 ```bash
 # 1. Get semantic clusters (modules that work together)
-curl http://localhost:8080/semantic-cluster-grouping-list | jq '.data.clusters'
+curl http://localhost:7777/semantic-cluster-grouping-list | jq '.data.clusters'
 # Returns: Entities grouped by connectivity (Label Propagation Algorithm)
 
 # 2. Get all edges to understand the dependency graph
-curl http://localhost:8080/dependency-edges-list-all | jq '.data.total_count'
+curl http://localhost:7777/dependency-edges-list-all | jq '.data.total_count'
 # Returns: Total edge count and edge details
 ```
 
@@ -267,7 +267,7 @@ curl http://localhost:8080/dependency-edges-list-all | jq '.data.total_count'
 
 ```bash
 # Reveal the INVISIBLE architecture - files that change together with ZERO code edge
-curl "http://localhost:8080/temporal-coupling-hidden-deps?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
+curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
 ```
 
 **Response**:
@@ -294,7 +294,7 @@ curl "http://localhost:8080/temporal-coupling-hidden-deps?entity=rust:fn:authent
 
 ```bash
 # The killer feature: Get optimal context within token budget
-curl "http://localhost:8080/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000" | jq '.data'
+curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000" | jq '.data'
 ```
 
 **Response**:
@@ -336,7 +336,7 @@ language:entity_type:entity_name:file_path:line_range
 
 **Tip**: When using entity keys in URLs with query parameters, colons work fine:
 ```bash
-curl "http://localhost:8080/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:1-20"
+curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:1-20"
 ```
 
 ---
@@ -365,12 +365,12 @@ The `tokens` field helps LLMs understand context budget impact.
 ## CLI Options
 
 ```bash
-parseltongue serve-http-code-backend [OPTIONS]
+parseltongue pt08-http-code-query-server [OPTIONS]
 ```
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--port <PORT>` | HTTP port | Auto-detect from 3333 |
+| `--port <PORT>` | HTTP port | 7777 |
 | `--db <PATH>` | Database path | `mem` (in-memory) |
 | `--verbose` | Enable verbose logging | false |
 
@@ -413,6 +413,52 @@ parseltongue serve-http-code-backend [OPTIONS]
 
 ---
 
+## Data Granularity
+
+Parseltongue stores two types of data with different granularity levels:
+
+### Entities (Fine-Grained)
+
+Entities are parsed at **function/method/struct level** with full source locations:
+
+| Entity Type | Count Example | Description |
+|-------------|---------------|-------------|
+| `struct` | 66 | Struct definitions |
+| `function` | 53 | Free functions |
+| `method` | 46 | Methods on impl blocks |
+| `module` | 40 | Module declarations |
+| `impl` | 8 | Implementation blocks |
+| `enum` | 4 | Enum definitions |
+
+**Entity Key Format**: `language:type:name:file_path:start_line-end_line`
+```
+rust:method:new:__crates_core_src_storage_rs:38-54
+```
+
+### Dependency Edges (File-to-Symbol)
+
+Edges track **file-level** outgoing dependencies to **symbol-level** targets:
+
+```
+from_key: rust:file:__crates_core_src_entities_rs:1-1   (file level)
+to_key:   rust:fn:new:unknown:0-0                        (symbol level)
+```
+
+### External/Stdlib References (`unknown:0-0`)
+
+When code calls external functions (stdlib, crate dependencies), the target has `unknown:0-0` as its source location because parseltongue cannot locate the source:
+
+| Pattern | Meaning | Example |
+|---------|---------|---------|
+| `rust:fn:new:unknown:0-0` | Stdlib `new()` calls | `HashMap::new()`, `Vec::new()` |
+| `rust:fn:unwrap:unknown:0-0` | Stdlib `unwrap()` calls | `result.unwrap()` |
+| `rust:fn:Ok:unknown:0-0` | Result enum variant | `Ok(value)` |
+| `rust:module:SomeType:0-0` | External type reference | Type from another crate |
+
+**Why this matters**: The complexity hotspots endpoint shows `rust:fn:new:unknown:0-0` with 215 callers - this means 215 places in your codebase call `new()` on various types.
+
+---
+
 ## Performance
 
 | Metric | Grep | Parseltongue | Improvement |
@@ -441,12 +487,12 @@ code-entities-search-fuzzy       # 4 words
 
 ```bash
 # Download from GitHub releases
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.0.9/parseltongue -o parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.1.0/parseltongue -o parseltongue
 chmod +x parseltongue
 
 # Verify
 ./parseltongue --version
-# parseltongue 1.0.9
+# parseltongue 1.1.0
 ```
 
 ---
