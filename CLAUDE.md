@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Parseltongue is a code analysis toolkit that parses codebases into a graph database (CozoDB) for efficient LLM-optimized querying. Core value: 99% token reduction (2-5K tokens vs 500K raw dumps), 31× faster than grep.
+Parseltongue is a code analysis toolkit that parses codebases into a graph database (CozoDB) for efficient LLM-optimized querying. Core value: 99% token reduction (2-5K tokens vs 500K raw dumps), 31x faster than grep.
 
-**Version**: 1.0.2 (pure analysis system - editing tools removed in v1.0.0)
+**Version**: 1.0.3 (HTTP-only architecture)
 **Languages Supported**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ## Build and Test Commands
@@ -21,6 +21,7 @@ cargo test --all
 # Run tests for specific crate
 cargo test -p parseltongue-core
 cargo test -p pt01-folder-to-cozodb-streamer
+cargo test -p pt08-http-code-query-server
 
 # Check for TODOs/stubs (must be clean before commit)
 grep -r "TODO\|STUB\|PLACEHOLDER" --include="*.rs" crates/
@@ -29,21 +30,42 @@ grep -r "TODO\|STUB\|PLACEHOLDER" --include="*.rs" crates/
 cargo clean
 ```
 
-## CLI Usage
+## CLI Usage (HTTP-Only Workflow)
 
 ```bash
-# Ingest codebase into database
+# Step 1: Ingest codebase into database
 parseltongue pt01-folder-to-cozodb-streamer . --db "rocksdb:mycode.db"
 
-# Export dependency graph (progressive disclosure levels)
-parseltongue pt02-level00 --where-clause "ALL" --output edges.json --db "rocksdb:mycode.db"  # ~3K tokens
-parseltongue pt02-level01 --where-clause "ALL" --output entities.json --db "rocksdb:mycode.db"  # ~30K tokens
-parseltongue pt02-level02 --where-clause "ALL" --output typed.json --db "rocksdb:mycode.db"  # ~60K tokens
+# Step 2: Start HTTP server (15 endpoints)
+parseltongue serve-http-code-backend --db "rocksdb:mycode.db" --port 8080
 
-# Visualize
-parseltongue pt07 entity-count --db "rocksdb:mycode.db"
-parseltongue pt07 cycles --db "rocksdb:mycode.db"
+# Step 3: Query via REST API
+curl http://localhost:8080/server-health-check-status
+curl http://localhost:8080/codebase-statistics-overview-summary
+curl http://localhost:8080/code-entities-list-all
+curl "http://localhost:8080/code-entities-search-fuzzy?q=handle"
+curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:main&hops=2"
 ```
+
+## HTTP Server Endpoints (15 Total)
+
+| Category | Endpoint | Description |
+|----------|----------|-------------|
+| Core | `/server-health-check-status` | Health check |
+| Core | `/codebase-statistics-overview-summary` | Stats summary |
+| Core | `/api-reference-documentation-help` | API docs |
+| Entity | `/code-entities-list-all` | All entities |
+| Entity | `/code-entity-detail-view/{key}` | Entity detail |
+| Entity | `/code-entities-search-fuzzy?q=pattern` | Fuzzy search |
+| Graph | `/dependency-edges-list-all` | All edges |
+| Graph | `/reverse-callers-query-graph?entity=X` | Who calls X? |
+| Graph | `/forward-callees-query-graph?entity=X` | What does X call? |
+| Analysis | `/blast-radius-impact-analysis?entity=X&hops=N` | Impact analysis |
+| Analysis | `/circular-dependency-detection-scan` | Cycle detection |
+| Analysis | `/complexity-hotspots-ranking-view?top=N` | Coupling hotspots |
+| Analysis | `/semantic-cluster-grouping-list` | Module clusters |
+| Advanced | `/smart-context-token-budget?focus=X&tokens=N` | LLM context |
+| Advanced | `/temporal-coupling-hidden-deps` | Hidden dependencies |
 
 ## Workspace Architecture
 
@@ -51,12 +73,11 @@ parseltongue pt07 cycles --db "rocksdb:mycode.db"
 crates/
 ├── parseltongue/                        # CLI binary - dispatches to tools
 ├── parseltongue-core/                   # Shared types, traits, storage, tree-sitter parsing
-├── pt01-folder-to-cozodb-streamer/      # Tool 1: Ingest codebase → CozoDB
-├── pt02-llm-cozodb-to-context-writer/   # Tool 2: Query CozoDB → JSON exports
-└── pt07-visual-analytics-terminal/      # Tool 7: Terminal visualizations
+├── pt01-folder-to-cozodb-streamer/      # Tool 1: Ingest codebase -> CozoDB
+└── pt08-http-code-query-server/         # Tool 8: HTTP REST API server
 ```
 
-**Dependency Flow**: `parseltongue` (binary) → `pt01`/`pt02`/`pt07` (tools) → `parseltongue-core` (shared)
+**Dependency Flow**: `parseltongue` (binary) -> `pt01`/`pt08` (tools) -> `parseltongue-core` (shared)
 
 ## Naming Conventions (Critical)
 
@@ -64,20 +85,20 @@ crates/
 
 ```rust
 // Functions: underscore-separated
-filter_implementation_entities_only()    // ✅
-render_box_with_title_unicode()          // ✅
-filter_entities()                        // ❌ Too short
+filter_implementation_entities_only()    // Good
+render_box_with_title_unicode()          // Good
+filter_entities()                        // Bad - Too short
 
 // Crates: hyphen-separated
-pt01-folder-to-cozodb-streamer           // ✅
-pt07-visual-analytics-terminal           // ✅
+pt01-folder-to-cozodb-streamer           // Good
+pt08-http-code-query-server              // Good
 ```
 
 **Pattern**: `verb_constraint_target_qualifier()`
 
 ## TDD Workflow
 
-Follow STUB → RED → GREEN → REFACTOR cycle:
+Follow STUB -> RED -> GREEN -> REFACTOR cycle:
 1. Write failing test first
 2. Run test, verify failure
 3. Minimal implementation to pass
@@ -92,11 +113,10 @@ Follow STUB → RED → GREEN → REFACTOR cycle:
 
 - **L1 Core**: Ownership, traits, Result/Option, RAII (no_std compatible)
 - **L2 Standard**: Collections, iterators, Arc/Rc, Send/Sync
-- **L3 External**: Async/await (Tokio), Serde, CozoDB
+- **L3 External**: Async/await (Tokio), Serde, CozoDB, Axum
 
 ## Version Increment Rules
 
-- v0.9.4 → v0.9.5 → ... → v0.9.9 → v1.0.0 (no v0.10.x)
 - Each version = ONE complete feature, end-to-end working
 - Zero TODOs/stubs in commits
 - All tests passing before commit
@@ -105,14 +125,6 @@ Follow STUB → RED → GREEN → REFACTOR cycle:
 
 Always use RocksDB prefix:
 ```bash
---db "rocksdb:mycode.db"    # ✅
---db "mycode.db"            # ❌
+--db "rocksdb:mycode.db"    # Good
+--db "mycode.db"            # Bad
 ```
-
-## Query Helpers (v0.9.7+)
-
-After exporting JSON, traverse programmatically:
-- `find_reverse_dependencies_by_key()` - Blast radius analysis
-- `build_call_chain_from_root()` - Execution paths
-- `filter_edges_by_type_only()` - Edge filtering
-- `collect_entities_in_file_path()` - File search
