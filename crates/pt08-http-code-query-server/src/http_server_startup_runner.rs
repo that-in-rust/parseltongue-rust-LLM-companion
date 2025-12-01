@@ -152,9 +152,9 @@ impl SharedApplicationStateContainer {
 ///
 /// # 4-Word Name: start_http_server_blocking_loop
 pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) -> Result<()> {
-    // Determine port
+    // Determine port (default: 7777)
     let port = config.http_port_override_option
-        .unwrap_or_else(|| find_available_port_number(3333).unwrap_or(3333));
+        .unwrap_or_else(|| find_available_port_number(7777).unwrap_or(7777));
 
     // Connect to database if path provided
     let db_path = &config.database_connection_string_value;

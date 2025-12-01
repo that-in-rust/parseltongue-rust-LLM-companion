@@ -87,14 +87,14 @@ fn build_cli() -> Command {
                 .long_about(
                     "Start an HTTP server exposing CozoDB queries via REST endpoints.\n\n\
                     Examples:\n  \
-                    parseltongue pt08-http-code-query-server --port 3000\n  \
-                    parseltongue pt08-http-code-query-server --port 8080 --db rocksdb:analysis.db"
+                    parseltongue pt08-http-code-query-server --db rocksdb:analysis.db\n  \
+                    parseltongue pt08-http-code-query-server --port 7777 --db rocksdb:analysis.db"
                 )
                 .arg(
                     Arg::new("port")
                         .long("port")
                         .short('p')
-                        .help("Port to listen on (auto-detects from 3333 if not specified)"),
+                        .help("Port to listen on [default: 7777]"),
                 )
                 .arg(
                     Arg::new("db")
@@ -171,11 +171,11 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
         println!();
         println!("{}", style("Next step:").cyan());
         println!("  parseltongue pt08-http-code-query-server \\");
-        println!("    --db \"{}\" --port 8080", workspace_db_path);
+        println!("    --db \"{}\"", workspace_db_path);
         println!();
         println!("{}", style("Quick test:").cyan());
-        println!("  curl http://localhost:8080/server-health-check-status");
-        println!("  curl http://localhost:8080/codebase-statistics-overview-summary");
+        println!("  curl http://localhost:7777/server-health-check-status");
+        println!("  curl http://localhost:7777/codebase-statistics-overview-summary");
         if verbose {
             println!("  Duration: {:?}", result.duration);
         }
@@ -197,7 +197,7 @@ async fn run_http_code_query_server(matches: &ArgMatches) -> Result<()> {
         if let Some(p) = port {
             println!("  Port: {}", p);
         } else {
-            println!("  Port: auto-detect from 3333");
+            println!("  Port: 7777 (default)");
         }
         println!("  Database: {}", db);
     }

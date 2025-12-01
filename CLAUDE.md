@@ -40,14 +40,14 @@ parseltongue pt01-folder-to-cozodb-streamer .
 
 # Step 2: Start HTTP server using the printed path
 parseltongue pt08-http-code-query-server \
-  --db "rocksdb:parseltongue20251201125000/analysis.db" --port 8080
+  --db "rocksdb:parseltongue20251201125000/analysis.db"
 
-# Step 3: Query via REST API
-curl http://localhost:8080/server-health-check-status
-curl http://localhost:8080/codebase-statistics-overview-summary
-curl http://localhost:8080/code-entities-list-all
-curl "http://localhost:8080/code-entities-search-fuzzy?q=handle"
-curl "http://localhost:8080/blast-radius-impact-analysis?entity=rust:fn:main&hops=2"
+# Step 3: Query via REST API (default port: 7777)
+curl http://localhost:7777/server-health-check-status
+curl http://localhost:7777/codebase-statistics-overview-summary
+curl http://localhost:7777/code-entities-list-all
+curl "http://localhost:7777/code-entities-search-fuzzy?q=handle"
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hops=2"
 ```
 
 **Note**: pt01 always creates a timestamped workspace folder - no `--db` flag needed.

@@ -16,7 +16,7 @@ pub struct HttpServerStartupConfig {
     /// Database connection string (e.g., "rocksdb:./analysis.db")
     pub database_connection_string_value: String,
 
-    /// HTTP port override (None = auto-detect from 3333)
+    /// HTTP port override (None = default 7777)
     pub http_port_override_option: Option<u16>,
 
     /// Force fresh ingestion even if DB exists
@@ -152,16 +152,16 @@ mod tests {
             "pt08".to_string(),
             ".".to_string(),
             "--port".to_string(),
-            "8080".to_string(),
+            "7777".to_string(),
         ];
         let config = HttpServerStartupConfig::parse_from_argument_vector(&args).unwrap();
 
-        assert_eq!(config.http_port_override_option, Some(8080));
+        assert_eq!(config.http_port_override_option, Some(7777));
     }
 
     #[test]
     fn test_find_available_port_number() {
-        let port = find_available_port_number(33333).unwrap();
-        assert!(port >= 33333);
+        let port = find_available_port_number(7777).unwrap();
+        assert!(port >= 7777);
     }
 }
