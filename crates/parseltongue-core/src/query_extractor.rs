@@ -65,6 +65,14 @@ pub struct QueryBasedExtractor {
     parsers: HashMap<Language, Parser>,
 }
 
+/// Sanitize file path for key format
+///
+/// Ensures edge keys match entity keys by normalizing path separators.
+/// Entity keys use underscores, so edges must too.
+fn sanitize_path_for_key_format(path: &str) -> String {
+    path.replace(['/', '\\', '.'], "_")
+}
+
 impl QueryBasedExtractor {
     /// Create new extractor with embedded query files
     ///
@@ -485,7 +493,7 @@ impl QueryBasedExtractor {
         if let (Some(edge_type), Some(to)) = (dependency_type, to_name) {
             // For Uses edges (imports, use declarations), create simplified keys
             if edge_type == EdgeType::Uses {
-                let from_key = format!("{}:file:{}:1-1", language, file_path.display());
+                let from_key = format!("{}:file:{}:1-1", language, sanitize_path_for_key_format(&file_path.display().to_string()));
                 let to_key = format!("{}:module:{}:0-0", language, to);
 
                 return DependencyEdge::builder()
@@ -504,7 +512,7 @@ impl QueryBasedExtractor {
                     language,
                     self.entity_type_to_key_component(&from.entity_type),
                     from.name,
-                    from.file_path,
+                    sanitize_path_for_key_format(&from.file_path),
                     from.line_range.0,
                     from.line_range.1
                 );
