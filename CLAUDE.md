@@ -39,7 +39,7 @@ parseltongue pt01-folder-to-cozodb-streamer .
 #               Database: rocksdb:parseltongue20251201125000/analysis.db
 
 # Step 2: Start HTTP server using the printed path
-parseltongue serve-http-code-backend \
+parseltongue pt08-http-code-query-server \
   --db "rocksdb:parseltongue20251201125000/analysis.db" --port 8080
 
 # Step 3: Query via REST API
@@ -128,7 +128,7 @@ Follow STUB -> RED -> GREEN -> REFACTOR cycle:
 
 ## Database Format
 
-For `serve-http-code-backend`, always use RocksDB prefix:
+For `pt08-http-code-query-server`, always use RocksDB prefix:
 ```bash
 --db "rocksdb:parseltongue20251201/analysis.db"    # Good
 --db "parseltongue20251201/analysis.db"            # Bad - missing prefix

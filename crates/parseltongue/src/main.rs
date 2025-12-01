@@ -22,8 +22,8 @@ async fn main() -> Result<()> {
         Some(("pt01-folder-to-cozodb-streamer", sub_matches)) => {
             run_folder_to_cozodb_streamer(sub_matches).await
         }
-        Some(("serve-http-code-backend", sub_matches)) => {
-            run_serve_http_code_backend(sub_matches).await
+        Some(("pt08-http-code-query-server", sub_matches)) => {
+            run_http_code_query_server(sub_matches).await
         }
         _ => {
             println!("{}", style("Parseltongue CLI Toolkit").blue().bold());
@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
             println!();
             println!("Available commands:");
             println!("  pt01-folder-to-cozodb-streamer       - Index codebase into CozoDB");
-            println!("  serve-http-code-backend              - HTTP server for REST API (15 endpoints)");
+            println!("  pt08-http-code-query-server              - HTTP server for REST API (15 endpoints)");
             Ok(())
         }
     }
@@ -82,13 +82,13 @@ fn build_cli() -> Command {
                 ),
         )
         .subcommand(
-            Command::new("serve-http-code-backend")
+            Command::new("pt08-http-code-query-server")
                 .about("Tool 8: HTTP server for code queries (REST API)")
                 .long_about(
                     "Start an HTTP server exposing CozoDB queries via REST endpoints.\n\n\
                     Examples:\n  \
-                    parseltongue serve-http-code-backend --port 3000\n  \
-                    parseltongue serve-http-code-backend --port 8080 --db rocksdb:analysis.db"
+                    parseltongue pt08-http-code-query-server --port 3000\n  \
+                    parseltongue pt08-http-code-query-server --port 8080 --db rocksdb:analysis.db"
                 )
                 .arg(
                     Arg::new("port")
@@ -170,7 +170,7 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
         println!("  {}", style(&workspace_dir).yellow().bold());
         println!();
         println!("{}", style("Next step:").cyan());
-        println!("  parseltongue serve-http-code-backend \\");
+        println!("  parseltongue pt08-http-code-query-server \\");
         println!("    --db \"{}\" --port 8080", workspace_db_path);
         println!();
         println!("{}", style("Quick test:").cyan());
@@ -186,8 +186,8 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
 
 /// Run the HTTP server for code queries
 ///
-/// # 4-Word Name: run_serve_http_code_backend
-async fn run_serve_http_code_backend(matches: &ArgMatches) -> Result<()> {
+/// # 4-Word Name: run_http_code_query_server
+async fn run_http_code_query_server(matches: &ArgMatches) -> Result<()> {
     let port = matches.get_one::<String>("port");
     let db = matches.get_one::<String>("db").unwrap();
     let verbose = matches.get_flag("verbose");
@@ -227,7 +227,7 @@ mod tests {
         // Verify all subcommands are present (v1.0.3: HTTP-only architecture)
         let subcommands: Vec<&str> = cli.get_subcommands().map(|cmd| cmd.get_name()).collect();
         assert!(subcommands.contains(&"pt01-folder-to-cozodb-streamer")); // Ingest
-        assert!(subcommands.contains(&"serve-http-code-backend")); // HTTP server (primary)
+        assert!(subcommands.contains(&"pt08-http-code-query-server")); // HTTP server (primary)
         // Note: pt02 (JSON export) and pt07 (terminal viz) removed in v1.0.3
         // All visualization available via HTTP endpoints
     }
