@@ -521,15 +521,42 @@ code-entities-search-fuzzy       # 4 words
 
 ## Installation
 
+### Quick Install (Recommended)
+
 ```bash
-# Download from GitHub releases
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.1.0/parseltongue -o parseltongue
+# Download latest release (v1.2.0)
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.2.0/parseltongue -o parseltongue
 chmod +x parseltongue
 
-# Verify
+# Verify installation
 ./parseltongue --version
-# parseltongue 1.1.0
+# parseltongue 1.2.0
+
+# Move to PATH (optional)
+sudo mv parseltongue /usr/local/bin/
 ```
+
+### Build from Source
+
+```bash
+# Clone repository
+git clone https://github.com/that-in-rust/parseltongue-dependency-graph-generator.git
+cd parseltongue-dependency-graph-generator
+
+# Build release binary
+cargo build --release
+
+# Binary is at target/release/parseltongue
+./target/release/parseltongue --version
+```
+
+### GitHub Releases
+
+All releases available at: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases
+
+| Version | Platform | Size |
+|---------|----------|------|
+| v1.2.0 (latest) | macOS ARM64 | 50MB |
 
 ---
 
