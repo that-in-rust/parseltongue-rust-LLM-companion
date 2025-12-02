@@ -1,68 +1,48 @@
 # Parseltongue
 
-> **v1.2.0** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
+> **v1.2.0** - The question grep can't answer: *"If I change this function, what breaks?"*
 
+```mermaid
+flowchart TB
+    subgraph Question["The Question Every Developer Asks"]
+        Q[If I change authenticate, what breaks?]
+    end
+
+    subgraph Grep["grep -r 'authenticate'"]
+        G1[auth.rs:45 - function definition]
+        G2[login.rs:12 - string match]
+        G3[README.md:89 - documentation]
+        G4[test_auth.rs:5 - test file]
+        G5[... 47 more matches]
+        G1 --> R1[500K tokens]
+        R1 --> R2[No dependency info]
+        R2 --> R3[Manual analysis needed]
+    end
+
+    subgraph Parseltongue["curl /blast-radius-impact-analysis?entity=authenticate&hops=2"]
+        P1[302 affected entities]
+        P2[Direct callers: 14]
+        P3[Transitive impact: 288]
+        P1 --> P4[2K tokens]
+        P4 --> P5[Graph-aware]
+        P5 --> P6[Instant answer]
+    end
+
+    Q --> Grep
+    Q --> Parseltongue
+
+    style Question fill:#f5f5f5,stroke:#333
+    style Grep fill:#ffcccc,stroke:#cc0000
+    style Parseltongue fill:#ccffcc,stroke:#00cc00
+```
+
+**One command. Real answer.**
 ```bash
-# Index your codebase
-parseltongue pt01-folder-to-cozodb-streamer ./my-project --db "rocksdb:mycode.db"
-
-# Start the HTTP server (default port: 7777)
-parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
-
-# Query from your LLM agent
-curl http://localhost:7777/codebase-statistics-overview-summary
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:authenticate:src_auth_rs:10-50&hops=2"
 ```
-
-**12 languages**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
-
----
-
-## The Problem
-
-```mermaid
-graph LR
-    subgraph "Without Parseltongue"
-        A[LLM Agent] -->|grep/read files| B[500K tokens]
-        B --> C[Context overflow]
-        C --> D[Poor reasoning]
-    end
-
-    style A fill:#FFB6C1
-    style B fill:#FFB6C1
-    style C fill:#FFB6C1
-    style D fill:#FFB6C1
+```json
+{"total_affected": 302, "by_hop": [{"hop": 1, "count": 14}, {"hop": 2, "count": 288}]}
 ```
-
-**Developers and LLM agents cannot easily understand codebases.** They resort to grep, which:
-- Returns raw text (no semantic understanding)
-- Uses 100× more tokens than needed
-- Misses relationships between code entities
-- Requires re-parsing on every query
-
----
-
-## The Solution
-
-```mermaid
-graph LR
-    subgraph "With Parseltongue"
-        A[LLM Agent] -->|HTTP query| B[3K tokens]
-        B --> C[98% context free]
-        C --> D[Optimal reasoning]
-    end
-
-    style A fill:#90EE90
-    style B fill:#90EE90
-    style C fill:#90EE90
-    style D fill:#90EE90
-```
-
-**Code is a graph, not text.** Parseltongue:
-1. **Parses** your codebase once (tree-sitter, 12 languages)
-2. **Stores** entities + dependencies in a graph database (CozoDB)
-3. **Serves** an HTTP API that any LLM agent can query
-
-**Result**: 99% token reduction. 31× faster than grep. Structured graph data.
 
 ---
 
