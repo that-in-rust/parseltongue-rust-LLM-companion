@@ -201,118 +201,154 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 
 ---
 
-## Deeply Thought Example Queries
+## Real-World Example Queries (Dogfooded on Parseltongue)
+
+These examples were run against Parseltongue's own codebase (217 entities, 3027 dependency edges).
 
 ### Example 1: Understanding a New Codebase
 
 ```bash
 # 1. Get codebase overview
 curl http://localhost:7777/codebase-statistics-overview-summary | jq '.data'
-# Returns: entity counts, edge counts, languages detected
+```
+**Actual Response**:
+```json
+{
+  "code_entities_total_count": 217,
+  "test_entities_total_count": 0,
+  "dependency_edges_total_count": 3027,
+  "languages_detected_list": ["rust"],
+  "database_file_path": "rocksdb:parseltongue.db"
+}
+```
 
-# 2. Find complexity hotspots (most coupled code)
-curl "http://localhost:7777/complexity-hotspots-ranking-view?top=10" | jq '.data.hotspots'
-# Returns: Top 10 entities by coupling (inbound + outbound dependencies)
+```bash
+# 2. Find complexity hotspots (most called functions)
+curl "http://localhost:7777/complexity-hotspots-ranking-view?top=5" | jq '.data.hotspots'
+```
+**Actual Response**:
+```json
+[
+  {"rank": 1, "entity_key": "rust:fn:new:unknown:0-0", "inbound_count": 215, "total_coupling": 215},
+  {"rank": 2, "entity_key": "rust:fn:unwrap:unknown:0-0", "inbound_count": 163, "total_coupling": 163},
+  {"rank": 3, "entity_key": "rust:fn:to_string:unknown:0-0", "inbound_count": 139, "total_coupling": 139},
+  {"rank": 4, "entity_key": "rust:fn:Ok:unknown:0-0", "inbound_count": 101, "total_coupling": 101},
+  {"rank": 5, "entity_key": "rust:fn:Some:unknown:0-0", "inbound_count": 62, "total_coupling": 62}
+]
+```
+> Note: `unknown:0-0` indicates stdlib/external calls (HashMap::new, unwrap, etc.)
 
+```bash
 # 3. Check for circular dependencies
 curl http://localhost:7777/circular-dependency-detection-scan | jq '.data'
-# Returns: has_cycles, cycle_count, cycle paths
+```
+**Actual Response**:
+```json
+{"has_cycles": false, "cycle_count": 0, "cycles": []}
 ```
 
 ### Example 2: Impact Analysis Before Refactoring
 
 ```bash
-# 1. Find who calls the function you want to change
-curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:process_request:src_handler_rs:20-80" | jq '.data'
-# Returns: All callers (direct dependencies)
-
-# 2. Get full blast radius (transitive impact)
-curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:process_request:src_handler_rs:20-80&hops=3" | jq '.data'
-# Returns: total_affected count, by_hop breakdown
-
-# 3. Get optimal context for the LLM to understand the refactoring
-curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:process_request:src_handler_rs:20-80&tokens=5000" | jq '.data'
-# Returns: Focus entity + highest-relevance related entities within 5000 tokens
+# 1. Find who calls CozoDbStorage::new() (reverse dependencies)
+curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54" | jq '.data.total_count'
 ```
+**Actual Response**: `215` callers!
+
+```bash
+# 2. Get full blast radius (2-hop transitive impact)
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54&hops=2" | jq '.data'
+```
+**Actual Response**:
+```json
+{
+  "source_entity": "rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54",
+  "hops_requested": 2,
+  "total_affected": 302,
+  "by_hop": [
+    {"hop": 1, "count": 214, "entities": ["rust:fn:build_cli:...", "rust:fn:start_http_server_blocking_loop:...", "..."]},
+    {"hop": 2, "count": 88, "entities": ["rust:fn:main:...", "rust:fn:handle_blast_radius_impact_analysis:...", "..."]}
+  ]
+}
+```
+> **Insight**: Changing `CozoDbStorage::new()` affects 302 entities transitively!
 
 ### Example 3: Finding and Exploring Code
 
 ```bash
-# 1. Search for authentication-related code
-curl "http://localhost:7777/code-entities-search-fuzzy?q=auth" | jq '.data.entities[].key'
-# Returns: All entities with "auth" in their name
-
-# 2. Get details of a specific entity
-curl "http://localhost:7777/code-entity-detail-view/rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
-# Returns: Full entity details including source code
-
-# 3. See what the auth function depends on
-curl "http://localhost:7777/forward-callees-query-graph?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
-# Returns: All functions/types that authenticate() calls
+# 1. Search for storage-related entities
+curl "http://localhost:7777/code-entities-search-fuzzy?q=storage" | jq '.data.total_count'
 ```
-
-### Example 4: Module Architecture Understanding
+**Actual Response**: `36` matching entities (struct, impl, methods)
 
 ```bash
-# 1. Get semantic clusters (modules that work together)
-curl http://localhost:7777/semantic-cluster-grouping-list | jq '.data.clusters'
-# Returns: Entities grouped by connectivity (Label Propagation Algorithm)
-
-# 2. Get all edges to understand the dependency graph
-curl http://localhost:7777/dependency-edges-list-all | jq '.data.total_count'
-# Returns: Total edge count and edge details
+# 2. Get full source code of CozoDbStorage::new()
+curl "http://localhost:7777/code-entity-detail-view?key=rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54" | jq '.data'
 ```
-
-### Example 5: Discover Hidden Dependencies
-
-```bash
-# Reveal the INVISIBLE architecture - files that change together with ZERO code edge
-curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=rust:fn:authenticate:src_auth_rs:10-50" | jq '.data'
-```
-
-**Response**:
+**Actual Response**:
 ```json
 {
-  "source_entity": "rust:fn:authenticate:src_auth_rs:10-50",
-  "hidden_dependencies": [
-    {
-      "coupled_entity": "rust:config:app_config:src_config:1-50",
-      "co_change_count": 47,
-      "coupling_score": 0.92,
-      "has_code_edge": false,
-      "insight": "HIGH temporal coupling with ZERO code dependency - missing abstraction?"
-    }
-  ],
-  "analysis_window_days": 180,
-  "insight": "Found 1 hidden temporal dependency with NO code edge!"
+  "key": "rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54",
+  "file_path": "./crates/parseltongue-core/src/storage/cozo_client.rs",
+  "entity_type": "method",
+  "language": "rust",
+  "code": "    pub async fn new(engine_spec: &str) -> Result<Self> {\n        let (engine, path) = if engine_spec.contains(':') {\n            let parts: Vec<&str> = engine_spec.splitn(2, ':').collect();\n            (parts[0], parts[1])\n        } else {\n            (engine_spec, \"\")\n        };\n        let db = DbInstance::new(engine, path, Default::default())\n            .map_err(|e| ParseltongError::DatabaseError {...})?;\n        Ok(Self { db })\n    }"
 }
 ```
 
-**This is the INVISIBLE architecture** - Static analysis can't see this relationship!
-
-### Example 6: Smart Context for LLM Agents
-
 ```bash
-# The killer feature: Get optimal context within token budget
-curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000" | jq '.data'
+# 3. See what CozoDbStorage::new() calls (forward dependencies)
+curl "http://localhost:7777/forward-callees-query-graph?entity=rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54" | jq '.data.callees'
+```
+**Actual Response**:
+```json
+[
+  {"to_key": "rust:fn:Ok:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:collect:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:contains:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:default:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:map_err:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:new:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:splitn:unknown:0-0", "edge_type": "Calls"},
+  {"to_key": "rust:fn:to_string:unknown:0-0", "edge_type": "Calls"}
+]
 ```
 
-**Response**:
+### Example 4: Find HTTP Handlers
+
+```bash
+# Search for all handler functions
+curl "http://localhost:7777/code-entities-search-fuzzy?q=handler" | jq '.data.total_count'
+```
+**Actual Response**: `124` handler-related entities (functions, modules, structs)
+
+### Example 5: Smart Context for LLM Agents
+
+```bash
+# Get optimal context within 2000 token budget
+curl "http://localhost:7777/smart-context-token-budget?focus=rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54&tokens=2000" | jq '.data'
+```
+**Actual Response**:
 ```json
 {
-  "focus_entity": "rust:fn:main:src_main_rs:1-50",
-  "token_budget": 4000,
-  "tokens_used": 3850,
-  "entities_included": 15,
+  "focus_entity": "rust:method:new:__crates_parseltongue-core_src_storage_cozo_client_rs:38-54",
+  "token_budget": 2000,
+  "tokens_used": 816,
+  "entities_included": 8,
   "context": [
-    {"entity_key": "rust:fn:init:src_lib_rs:10-30", "relevance_score": 1.0, "relevance_type": "direct_caller"},
-    {"entity_key": "rust:fn:run:src_app_rs:5-25", "relevance_score": 0.95, "relevance_type": "direct_callee"},
-    {"entity_key": "rust:fn:config:src_config_rs:1-20", "relevance_score": 0.6, "relevance_type": "transitive_depth_2"}
+    {"entity_key": "rust:fn:Ok:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:collect:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:contains:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:default:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:map_err:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:new:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:splitn:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"},
+    {"entity_key": "rust:fn:to_string:unknown:0-0", "relevance_score": 0.95, "relevance_type": "direct_callee"}
   ]
 }
 ```
 
-**Algorithm**:
+**Smart Context Algorithm**:
 - Direct callers: score 1.0
 - Direct callees: score 0.95
 - Transitive deps: score 0.7 - (0.1 × depth)
