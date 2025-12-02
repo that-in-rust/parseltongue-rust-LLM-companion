@@ -35,7 +35,7 @@ graph LR
 
 **Developers and LLM agents cannot easily understand codebases.** They resort to grep, which:
 - Returns raw text (no semantic understanding)
-- Uses 100× more tokens than needed
+- Consumes excessive tokens
 - Misses relationships between code entities
 - Requires re-parsing on every query
 
@@ -47,8 +47,8 @@ graph LR
 graph LR
     subgraph "With Parseltongue"
         A[LLM Agent] -->|HTTP query| B[3K tokens]
-        B --> C[98% context free]
-        C --> D[Optimal reasoning]
+        B --> C[Focused context]
+        C --> D[Better reasoning]
     end
 
     style A fill:#90EE90
@@ -62,11 +62,9 @@ graph LR
 2. **Stores** entities + dependencies in a graph database (CozoDB)
 3. **Serves** an HTTP API that any LLM agent can query
 
-**Result**: 99% token reduction. 31× faster than grep. Structured graph data.
-
 ---
 
-## The Killer Question
+## Impact Analysis
 
 > *"If I change this function, what breaks?"*
 
@@ -76,7 +74,7 @@ flowchart LR
     A[grep -r 'authenticate'] --> B[51 matches]
     B --> C[500K tokens]
     C --> D[No dependency info]
-    D --> E[Manual analysis]
+    D --> E[Manual work]
     style E fill:#ffcccc,stroke:#cc0000
 ```
 
@@ -86,11 +84,11 @@ flowchart LR
     A[blast-radius API] --> B[302 entities]
     B --> C[2K tokens]
     C --> D[14 direct + 288 transitive]
-    D --> E[Instant answer]
+    D --> E[Graph answer]
     style E fill:#ccffcc,stroke:#00cc00
 ```
 
-**One command. Real answer.**
+**One query:**
 ```bash
 curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:authenticate:src/auth.rs:10-50&hops=2"
 ```
@@ -162,7 +160,7 @@ curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:process:s
 # What breaks if I change this?
 curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:new:src_storage_rs:10-30&hops=3"
 
-# Get optimal context for LLM (killer feature!)
+# Get optimal context for LLM
 curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_main_rs:1-50&tokens=4000"
 ```
 
@@ -226,12 +224,12 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 | `GET /complexity-hotspots-ranking-view?top=N` | Complexity ranking |
 | `GET /semantic-cluster-grouping-list` | Semantic module groups |
 
-### Killer Features
+### Context Optimization
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /smart-context-token-budget?focus=X&tokens=N` | Optimal context selection |
-| `GET /temporal-coupling-hidden-deps?entity=X` | Hidden temporal dependencies |
+| `GET /smart-context-token-budget?focus=X&tokens=N` | Context selection within token budget |
+| `GET /temporal-coupling-hidden-deps?entity=X` | Temporal dependency detection |
 
 ---
 
@@ -529,20 +527,9 @@ When code calls external functions (stdlib, crate dependencies), the target has 
 
 ---
 
-## Performance
-
-| Metric | Grep | Parseltongue | Improvement |
-|--------|------|--------------|-------------|
-| Query time | 7.5s | 50ms | **150× faster** |
-| Tokens | 500K | 2.3K | **99.5% reduction** |
-| Context free | 0% | 98.9% | **Optimal reasoning** |
-| Structure | Raw text | Graph | **Semantic understanding** |
-
----
-
 ## Architecture
 
-**4-Word Naming Convention**: All functions and endpoints use exactly 4 words for LLM tokenization optimization:
+**4-Word Naming Convention**: All functions and endpoints use exactly 4 words:
 ```
 serve-http-code-backend          # 4 words
 blast-radius-impact-analysis     # 4 words
