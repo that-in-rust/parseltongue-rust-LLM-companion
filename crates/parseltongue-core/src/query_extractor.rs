@@ -600,3 +600,94 @@ impl QueryBasedExtractor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tree_sitter::{Query, Parser};
+
+    #[test]
+    fn test_cpp_ast_dump() {
+        let mut parser = Parser::new();
+        parser.set_language(&tree_sitter_cpp::LANGUAGE.into()).unwrap();
+
+        let source = r#"
+namespace MyNamespace {
+    class MyClass {};
+}
+
+using namespace std;
+using std::cout;
+
+void myFunction() {}
+"#;
+        let tree = parser.parse(source, None).unwrap();
+
+        fn print_tree(node: tree_sitter::Node, source: &str, indent: usize) {
+            let indent_str = "  ".repeat(indent);
+            let text = if node.child_count() == 0 {
+                format!(" = {:?}", &source[node.start_byte()..node.end_byte()])
+            } else {
+                String::new()
+            };
+
+            let field_info = if let Some(parent) = node.parent() {
+                let mut field_name = None;
+                for i in 0..parent.child_count() {
+                    if let Some(child) = parent.child(i) {
+                        if child.id() == node.id() {
+                            field_name = parent.field_name_for_child(i as u32);
+                            break;
+                        }
+                    }
+                }
+                if let Some(name) = field_name {
+                    format!("{}: ", name)
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+
+            println!("{}{}{}{}", indent_str, field_info, node.kind(), text);
+
+            for i in 0..node.child_count() {
+                if let Some(child) = node.child(i) {
+                    print_tree(child, source, indent + 1);
+                }
+            }
+        }
+
+        println!("\n=== C++ AST ===");
+        print_tree(tree.root_node(), source, 0);
+        println!("=== END ===\n");
+    }
+
+    #[test]
+    fn test_cpp_entity_query_valid() {
+        let query_source = include_str!("../../../entity_queries/cpp.scm");
+        let ts_lang = tree_sitter_cpp::LANGUAGE.into();
+        match Query::new(&ts_lang, query_source) {
+            Ok(q) => {
+                println!("✓ C++ entity query valid! {} patterns", q.pattern_count());
+            }
+            Err(e) => {
+                panic!("✗ C++ entity query FAILED:\n  Error: {:?}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_cpp_dependency_query_valid() {
+        let query_source = include_str!("../../../dependency_queries/cpp.scm");
+        let ts_lang = tree_sitter_cpp::LANGUAGE.into();
+        match Query::new(&ts_lang, query_source) {
+            Ok(q) => {
+                println!("✓ C++ dependency query valid! {} patterns", q.pattern_count());
+            }
+            Err(e) => {
+                panic!("✗ C++ dependency query FAILED:\n  Error: {:?}", e);
+            }
+        }
+    }
+}

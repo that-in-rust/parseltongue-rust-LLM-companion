@@ -1,0 +1,377 @@
+; C++ Dependency Queries - IMPROVED VERSION
+; Target: 99-100% dependency coverage for real-world C++ codebases
+; Date: 2025-11-08
+
+; ============================================================================
+; BASIC DEPENDENCIES (from original implementation)
+; ============================================================================
+
+; Simple function call
+(call_expression
+  function: (identifier) @reference.call) @dependency.call
+
+; Method call
+(call_expression
+  function: (field_expression
+    field: (field_identifier) @reference.method_call)) @dependency.method_call
+
+; Local include
+(preproc_include
+  path: (string_literal) @reference.include) @dependency.include
+
+; System include
+(preproc_include
+  path: (system_lib_string) @reference.include_system) @dependency.include_system
+
+; NOTE: Class inheritance moved to standalone base_class_clause pattern at line 100
+; The nested pattern was invalid tree-sitter syntax (base_class_clause has no field name)
+
+
+; ============================================================================
+; QUALIFIED NAMES & SCOPE RESOLUTION
+; ============================================================================
+
+; Qualified function call (std::cout)
+(call_expression
+  function: (qualified_identifier
+    scope: (namespace_identifier) @namespace
+    name: (identifier) @reference.qualified_call)) @dependency.qualified_call
+
+; Qualified member access (obj::member)
+(field_expression
+  argument: (qualified_identifier
+    scope: (namespace_identifier) @scope
+    name: (identifier) @reference)) @dependency.qualified_member
+
+; Scoped type reference (std::string)
+(qualified_type_identifier
+  scope: (namespace_identifier) @namespace
+  name: (type_identifier) @reference.type) @dependency.qualified_type
+
+
+; ============================================================================
+; TEMPLATE DEPENDENCIES (Critical!)
+; ============================================================================
+
+; Template instantiation (std::vector<int>)
+(template_type
+  name: (type_identifier) @reference.template_name
+  arguments: (template_argument_list)) @dependency.template_instantiation
+
+; Template function call
+(call_expression
+  function: (template_function
+    name: (identifier) @reference.template_function)) @dependency.template_function_call
+
+; Template argument type reference
+(template_argument_list
+  (type_descriptor
+    type: (type_identifier) @reference.template_arg)) @dependency.template_argument
+
+; Dependent type
+(dependent_type
+  (type_identifier) @reference.dependent_type) @dependency.dependent_type_usage
+
+
+; ============================================================================
+; TYPE DEPENDENCIES
+; ============================================================================
+
+; Variable type dependency
+(declaration
+  type: (type_identifier) @reference.type_dependency) @dependency.variable_type
+
+; Parameter type dependency
+(parameter_declaration
+  type: (type_identifier) @reference.parameter_type) @dependency.parameter_type
+
+; Return type dependency
+(function_definition
+  type: (type_identifier) @reference.return_type) @dependency.return_type
+
+; Field type dependency
+(field_declaration
+  type: (type_identifier) @reference.field_type) @dependency.field_type
+
+; Base class type dependency
+(base_class_clause
+  (type_identifier) @reference.base_type) @dependency.base_type
+
+; Cast type dependency
+(cast_expression
+  type: (type_identifier) @reference.cast_type) @dependency.cast_type
+
+
+; ============================================================================
+; CONSTRUCTOR & OBJECT CREATION
+; ============================================================================
+
+; New expression (heap allocation)
+(new_expression
+  type: (type_identifier) @reference.constructor) @dependency.constructor_call
+
+; Direct constructor call
+(call_expression
+  function: (type_identifier) @reference.explicit_constructor) @dependency.explicit_constructor
+
+; Member initializer list
+(field_initializer_list
+  (field_initializer
+    (field_identifier) @reference.field)) @dependency.member_initializer
+
+; Constructor delegation
+(constructor_or_destructor_definition
+  (field_initializer_list
+    (field_initializer
+      (identifier) @reference.delegated_constructor))) @dependency.constructor_delegation
+
+
+; ============================================================================
+; DESTRUCTOR DEPENDENCIES
+; ============================================================================
+
+; Delete expression
+(delete_expression
+  (identifier) @reference.deleted_object) @dependency.destructor_call
+
+
+; ============================================================================
+; USING DECLARATIONS & DIRECTIVES
+; ============================================================================
+
+; using namespace std;
+(using_directive
+  (namespace_identifier) @reference.using_namespace) @dependency.using_namespace
+
+; using std::cout;
+(using_declaration
+  (qualified_identifier
+    scope: (namespace_identifier) @namespace
+    name: (identifier) @reference.using_symbol)) @dependency.using_symbol
+
+
+; ============================================================================
+; OPERATOR DEPENDENCIES
+; ============================================================================
+
+; Operator call (overloaded operators)
+(call_expression
+  function: (field_expression
+    field: (operator_name) @reference.operator)) @dependency.operator_call
+
+; Binary operator
+(binary_expression
+  operator: _ @reference.binary_op) @dependency.binary_operator
+
+; Unary operator
+(unary_expression
+  operator: _ @reference.unary_op) @dependency.unary_operator
+
+
+; ============================================================================
+; LAMBDA CAPTURES
+; ============================================================================
+
+; Lambda capture by reference (simplified - captures all lambda captures)
+(lambda_capture_specifier
+  (lambda_capture
+    (identifier) @reference.lambda_capture)) @dependency.lambda_capture
+
+; Lambda default capture
+(lambda_default_capture) @dependency.lambda_default_capture
+
+
+; ============================================================================
+; FRIEND RELATIONSHIPS
+; ============================================================================
+
+; Friend class declaration
+(friend_declaration
+  (class_specifier
+    name: (type_identifier) @reference.friend_class)) @dependency.friend_class
+
+; Friend function declaration
+(friend_declaration
+  (function_definition
+    declarator: (function_declarator
+      declarator: (identifier) @reference.friend_function))) @dependency.friend_function
+
+
+; ============================================================================
+; TYPE ALIASES
+; ============================================================================
+
+; Using type alias reference
+(alias_declaration
+  type: (type_identifier) @reference.aliased_type) @dependency.type_alias
+
+; Typedef reference
+(type_definition
+  type: (type_identifier) @reference.typedef_type) @dependency.typedef
+
+
+; ============================================================================
+; MACRO USAGE
+; ============================================================================
+
+; Preprocessor macro invocation
+(preproc_function_def
+  name: (identifier) @reference.macro_def) @dependency.macro_definition
+
+; Macro call (heuristic: all-caps identifier)
+(call_expression
+  function: (identifier) @reference.macro_call
+  (#match? @reference.macro_call "^[A-Z_][A-Z0-9_]+$")) @dependency.macro_call
+
+
+; ============================================================================
+; NAMESPACE ALIASES
+; ============================================================================
+
+; namespace alias = original;
+(namespace_alias_definition
+  (namespace_identifier) @reference.namespace_original) @dependency.namespace_alias
+
+
+; ============================================================================
+; STATIC MEMBER ACCESS
+; ============================================================================
+
+; Class::static_member
+(qualified_identifier
+  scope: (namespace_identifier) @class
+  name: (identifier) @reference.static_member) @dependency.static_member_access
+
+
+; ============================================================================
+; ENUM USAGE
+; ============================================================================
+
+; Enum constant usage
+(qualified_identifier
+  scope: (namespace_identifier) @enum_name
+  name: (identifier) @reference.enum_constant) @dependency.enum_constant_usage
+
+
+; ============================================================================
+; VIRTUAL FUNCTION OVERRIDES
+; ============================================================================
+
+; Virtual method declaration (simplified - removed invalid predicate)
+(field_declaration
+  declarator: (function_declarator
+    declarator: (field_identifier) @reference.virtual_method)) @dependency.virtual_method
+
+
+; ============================================================================
+; CONCEPTS (C++20)
+; ============================================================================
+
+; Concept constraint usage
+(type_constraint
+  (type_identifier) @reference.concept) @dependency.concept_constraint
+
+; Requires clause
+(requires_clause
+  (call_expression
+    function: (identifier) @reference.concept_requirement)) @dependency.requires_clause
+
+
+; ============================================================================
+; AUTO & DECLTYPE
+; ============================================================================
+
+; decltype(expr) - creates dependency on expr's type
+(decltype
+  (identifier) @reference.decltype_dependency) @dependency.decltype_usage
+
+
+; ============================================================================
+; THROW & EXCEPTION SPECS
+; ============================================================================
+
+; Throw expression
+(throw_expression
+  (identifier) @reference.exception_type) @dependency.exception_throw
+
+; Dynamic exception specification (deprecated but still used)
+(dynamic_exception_specification
+  (type_identifier) @reference.exception_spec) @dependency.exception_spec
+
+
+; ============================================================================
+; SIZEOF & ALIGNOF
+; ============================================================================
+
+; sizeof(Type)
+(sizeof_expression
+  (type_identifier) @reference.sizeof_type) @dependency.sizeof_usage
+
+; alignof(Type)
+(alignof_expression
+  (type_identifier) @reference.alignof_type) @dependency.alignof_usage
+
+
+; ============================================================================
+; POINTER & REFERENCE TYPES
+; ============================================================================
+
+; Pointer dereference
+(pointer_expression
+  (identifier) @reference.dereferenced) @dependency.pointer_deref
+
+; Reference declaration
+(reference_declarator
+  (identifier) @reference.referenced) @dependency.reference_type
+
+
+; ============================================================================
+; ARRAY ACCESS
+; ============================================================================
+
+; Array subscript
+(subscript_expression
+  argument: (identifier) @reference.array_base) @dependency.array_access
+
+
+; ============================================================================
+; MEMBER ACCESS (Enhanced)
+; ============================================================================
+
+; Direct member access (obj.member)
+(field_expression
+  argument: (identifier) @object
+  field: (field_identifier) @reference.member) @dependency.member_access
+
+; Pointer member access (obj->member)
+(field_expression
+  operator: "->"
+  argument: (identifier) @object
+  field: (field_identifier) @reference.member) @dependency.pointer_member_access
+
+
+; ============================================================================
+; INITIALIZER LISTS
+; ============================================================================
+
+; Initializer list (uniform initialization)
+(initializer_list
+  (identifier) @reference.initializer) @dependency.initializer_list
+
+
+; ============================================================================
+; RANGE-BASED FOR LOOPS
+; ============================================================================
+
+; Range-based for (for (auto x : container))
+(for_range_loop
+  right: (identifier) @reference.range_container) @dependency.range_for
+
+
+; ============================================================================
+; STRUCTURED BINDINGS (C++17)
+; ============================================================================
+
+; auto [a, b] = pair;
+(structured_binding_declarator
+  (identifier) @reference.structured_binding) @dependency.structured_binding
