@@ -1,4 +1,4 @@
-# FAQs to Parseltongue v1.1.0
+# FAQs to Parseltongue v1.2.0
 
 > A comprehensive guide to questions you can ask Parseltongue's HTTP API about your codebase.
 
@@ -337,4 +337,4 @@ curl "http://localhost:7777/smart-context-token-budget?focus=FILE_ENTITY&tokens=
 
 ---
 
-*Generated from Parseltongue v1.1.0 HTTP API*
+*Generated from Parseltongue v1.2.0 HTTP API*
