@@ -70,38 +70,24 @@ graph LR
 
 > *"If I change this function, what breaks?"*
 
+**With grep:**
 ```mermaid
-flowchart TB
-    subgraph Question["The Question Every Developer Asks"]
-        Q[If I change authenticate, what breaks?]
-    end
+flowchart LR
+    A[grep -r 'authenticate'] --> B[51 matches]
+    B --> C[500K tokens]
+    C --> D[No dependency info]
+    D --> E[Manual analysis]
+    style E fill:#ffcccc,stroke:#cc0000
+```
 
-    subgraph Grep["grep -r 'authenticate'"]
-        G1[auth.rs:45 - function definition]
-        G2[login.rs:12 - string match]
-        G3[README.md:89 - documentation]
-        G4[test_auth.rs:5 - test file]
-        G5[... 47 more matches]
-        G1 --> R1[500K tokens]
-        R1 --> R2[No dependency info]
-        R2 --> R3[Manual analysis needed]
-    end
-
-    subgraph Parseltongue["curl /blast-radius-impact-analysis?entity=authenticate&hops=2"]
-        P1[302 affected entities]
-        P2[Direct callers: 14]
-        P3[Transitive impact: 288]
-        P1 --> P4[2K tokens]
-        P4 --> P5[Graph-aware]
-        P5 --> P6[Instant answer]
-    end
-
-    Q --> Grep
-    Q --> Parseltongue
-
-    style Question fill:#f5f5f5,stroke:#333
-    style Grep fill:#ffcccc,stroke:#cc0000
-    style Parseltongue fill:#ccffcc,stroke:#00cc00
+**With Parseltongue:**
+```mermaid
+flowchart LR
+    A[blast-radius API] --> B[302 entities]
+    B --> C[2K tokens]
+    C --> D[14 direct + 288 transitive]
+    D --> E[Instant answer]
+    style E fill:#ccffcc,stroke:#00cc00
 ```
 
 **One command. Real answer.**
@@ -109,7 +95,7 @@ flowchart TB
 curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:authenticate:src/auth.rs:10-50&hops=2"
 ```
 ```json
-{"total_affected": 302, "by_hop": [{"hop": 1, "count": 14}, {"hop": 2, "count": 288}]}
+{"total_affected": 302, "direct_callers": 14, "transitive": 288}
 ```
 
 ---
