@@ -184,7 +184,6 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 | "Where is the complexity?" | `GET /complexity-hotspots-ranking-view?top=10` | ~500 |
 | "What modules exist?" | `GET /semantic-cluster-grouping-list` | ~1K |
 | "Give me optimal context" | `GET /smart-context-token-budget?focus=X&tokens=4000` | ~4K |
-| "Hidden dependencies?" | `GET /temporal-coupling-hidden-deps?entity=X` | ~200 |
 
 ---
 
