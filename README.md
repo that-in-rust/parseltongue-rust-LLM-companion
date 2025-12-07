@@ -228,7 +228,6 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 | Endpoint | Description |
 |----------|-------------|
 | `GET /smart-context-token-budget?focus=X&tokens=N` | Context selection within token budget |
-| `GET /temporal-coupling-hidden-deps?entity=X` | Temporal dependency detection |
 
 ---
 
@@ -596,7 +595,6 @@ Parseltongue transforms code from **unstructured text** into a **queryable graph
 │                     INTELLIGENCE                                │
 │                     ────────────                                │
 │                     • smart-context-token-budget                │
-│                     • temporal-coupling-hidden-deps             │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -1004,13 +1002,6 @@ Goal: {refactoring_goal}
 Module: {cluster_name}
 Cycle involvement: {yes/no, list if yes}
 
-## CRITICAL: Hidden Dependencies
-{for dep in temporal where not has_code_edge}
-⚠️ {dep.coupled_entity} MUST change with this code
-   Historical co-changes: {dep.co_change_count}
-   But NO direct code connection exists
-{endfor}
-
 ## Code Context
 {smart_context}
 
@@ -1040,7 +1031,6 @@ Create a step-by-step refactoring plan that:
 | "What's most complex?" | `/complexity-hotspots-ranking-view` | `/blast-radius-impact-analysis` |
 | "What are the modules?" | `/semantic-cluster-grouping-list` | - |
 | "Give me context for LLM" | `/smart-context-token-budget` | All others as input |
-| "What's secretly connected?" | `/temporal-coupling-hidden-deps` | - |
 
 ### Hop Depth Guidelines for Blast Radius
 
@@ -1091,15 +1081,7 @@ hotspots = curl "http://localhost:7777/complexity-hotspots-ranking-view?top=20"
 your_hotspots = [h for h in hotspots if 'unknown:0-0' not in h.entity_key]
 ```
 
-### ❌ Anti-Pattern 3: Over-trusting Temporal Coupling
 
-**Current Implementation Note** (from source code):
-```rust
-// In MVP: Return simulated temporal coupling data
-// Future: Parse actual git log for co-change analysis
-```
-
-**Reality**: The temporal coupling endpoint currently returns **simulated** data based on code edges and file paths, NOT actual git history. Use it for conceptual understanding, but verify with real git analysis for production decisions.
 
 ### ❌ Anti-Pattern 4: Ignoring Token Counts
 
