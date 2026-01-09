@@ -26,8 +26,7 @@ graph LR
         B --> C[Context overflow]
         C --> D[Poor reasoning]
     end
-
-    style A fill:#FFB6C1
+    
     style B fill:#FFB6C1
     style C fill:#FFB6C1
     style D fill:#FFB6C1
@@ -50,8 +49,7 @@ graph LR
         B --> C[Focused context]
         C --> D[Better reasoning]
     end
-
-    style A fill:#90EE90
+    
     style B fill:#90EE90
     style C fill:#90EE90
     style D fill:#90EE90
@@ -75,7 +73,7 @@ flowchart LR
     B --> C[500K tokens]
     C --> D[No dependency info]
     D --> E[Manual work]
-    style E fill:#ffcccc,stroke:#cc0000
+    
 ```
 
 **With Parseltongue:**
@@ -85,7 +83,7 @@ flowchart LR
     B --> C[2K tokens]
     C --> D[14 direct + 288 transitive]
     D --> E[Graph answer]
-    style E fill:#ccffcc,stroke:#00cc00
+    
 ```
 
 **One query:**
