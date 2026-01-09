@@ -27,9 +27,7 @@ graph LR
         C --> D[Poor reasoning]
     end
     
-    style B fill:#FFB6C1
-    style C fill:#FFB6C1
-    style D fill:#FFB6C1
+    
 ```
 
 **Developers and LLM agents cannot easily understand codebases.** They resort to grep, which:
@@ -50,9 +48,7 @@ graph LR
         C --> D[Better reasoning]
     end
     
-    style B fill:#90EE90
-    style C fill:#90EE90
-    style D fill:#90EE90
+    
 ```
 
 **Code is a graph, not text.** Parseltongue:
