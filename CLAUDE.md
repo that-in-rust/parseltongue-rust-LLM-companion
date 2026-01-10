@@ -38,11 +38,16 @@ parseltongue pt01-folder-to-cozodb-streamer .
 # Output shows: Workspace: parseltongue20251201125000
 #               Database: rocksdb:parseltongue20251201125000/analysis.db
 
-# Step 2: Start HTTP server using the printed path
+# Step 2: Start HTTP server using the printed path (default port: 7777)
 parseltongue pt08-http-code-query-server \
   --db "rocksdb:parseltongue20251201125000/analysis.db"
 
-# Step 3: Query via REST API (default port: 7777)
+# Or with custom port:
+parseltongue pt08-http-code-query-server \
+  --db "rocksdb:parseltongue20251201125000/analysis.db" \
+  --port 8080
+
+# Step 3: Query via REST API
 curl http://localhost:7777/server-health-check-status
 curl http://localhost:7777/codebase-statistics-overview-summary
 curl http://localhost:7777/code-entities-list-all

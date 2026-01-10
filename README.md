@@ -118,7 +118,11 @@ Entities created: 216 (CODE only)
 ### Step 2: Start the HTTP Server
 
 ```bash
+# Default port (7777)
 parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
+
+# Custom port (use --port flag)
+parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db" --port 8080
 ```
 
 **Output**:
