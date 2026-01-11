@@ -12,8 +12,8 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0a0f;
-      color: #e4e4e7;
+      background: #0f0f1a;
+      color: #e0e0e0;
       overflow: hidden;
     }
     #app {
@@ -25,43 +25,53 @@
     #canvas-container {
       flex: 1;
       position: relative;
+      cursor: grab;
+    }
+    #canvas-container:active {
+      cursor: grabbing;
     }
     canvas {
       display: block;
       width: 100%;
       height: 100%;
     }
+
+    /* Status Bar */
     #status-bar {
       padding: 8px 16px;
-      background: #18181b;
-      border-top: 1px solid #27272a;
+      background: #0f0f1a;
+      border-top: 1px solid #2d3748;
       font-size: 12px;
       display: flex;
       gap: 20px;
+      user-select: none;
     }
     .status-item {
       display: flex;
       gap: 8px;
     }
     .status-label {
-      color: #71717a;
+      color: #718096;
     }
     .status-value {
-      color: #a1a1aa;
+      color: #e0e0e0;
       font-family: monospace;
     }
+
+    /* Loading Screen */
     #loading {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
+      color: #e0e0e0;
     }
     .spinner {
       width: 40px;
       height: 40px;
-      border: 3px solid #27272a;
-      border-top-color: #3b82f6;
+      border: 3px solid #2d3748;
+      border-top-color: #60a5fa;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin: 0 auto 16px;
@@ -69,16 +79,238 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* Tooltip */
+    .codecity-tooltip {
+      position: fixed;
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid #60a5fa;
+      border-radius: 8px;
+      padding: 8px 12px;
+      pointer-events: none;
+      z-index: 1000;
+      max-width: 300px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    .tooltip-title {
+      font-weight: 600;
+      color: #e0e0e0;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+    .tooltip-detail {
+      font-size: 12px;
+      color: #a0aec0;
+    }
+
+    /* Details Panel */
+    #details-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 320px;
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 0;
+      display: none;
+      flex-direction: column;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    #details-panel.active {
+      display: flex;
+    }
+    .details-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid #2d3748;
+    }
+    #details-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e0e0e0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #close-details {
+      background: none;
+      border: none;
+      color: #718096;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    #close-details:hover {
+      background: #2d3748;
+      color: #e0e0e0;
+    }
+    .details-content {
+      padding: 16px;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .detail-row:last-child {
+      margin-bottom: 0;
+    }
+    .detail-label {
+      color: #a0aec0;
+      font-weight: 500;
+    }
+    .detail-value {
+      color: #e0e0e0;
+      text-align: right;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .detail-file {
+      font-family: monospace;
+      font-size: 11px;
+    }
+    .detail-key {
+      font-family: monospace;
+      font-size: 10px;
+      color: #718096;
+    }
+
+    /* Help hint */
+    .help-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(26, 26, 46, 0.85);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #a0aec0;
+      pointer-events: none;
+      border: 1px solid #2d3748;
+    }
+    .help-hint kbd {
+      background: #2d3748;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      margin: 0 2px;
+      color: #e0e0e0;
+    }
+
+    /* Entity Type Legend */
+    .legend {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(26, 26, 46, 0.9);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #e0e0e0;
+      pointer-events: none;
+      border: 1px solid #2d3748;
+    }
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    .legend-label {
+      color: #a0aec0;
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <div id="canvas-container">
+      <!-- Loading Screen -->
       <div id="loading">
         <div class="spinner"></div>
         <div id="loading-text">Connecting to Parseltongue server...</div>
       </div>
+
+      <!-- Details Panel -->
+      <div id="details-panel">
+        <div class="details-header">
+          <h3 id="details-title">Entity Details</h3>
+          <button id="close-details" aria-label="Close details">×</button>
+        </div>
+        <div class="details-content" id="details-content">
+          <!-- Populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Help Hint -->
+      <div class="help-hint">
+        <kbd>Click</kbd> to select • <kbd>Drag</kbd> to rotate • <kbd>Scroll</kbd> to zoom • <kbd>Right-drag</kbd> to pan
+      </div>
+
+      <!-- Legend - Entity Types & Relationships -->
+      <div class="legend">
+        <div class="legend-title">🏗️ Entity Types</div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #00fff5; box-shadow: 0 0 8px #00fff5;"></div>
+          <span class="legend-label">Function</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #39ff14; box-shadow: 0 0 8px #39ff14;"></div>
+          <span class="legend-label">Struct / Class</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #bf00ff; box-shadow: 0 0 8px #bf00ff;"></div>
+          <span class="legend-label">Trait / Interface</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ff6b00; box-shadow: 0 0 8px #ff6b00;"></div>
+          <span class="legend-label">Enum</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ff00aa; box-shadow: 0 0 8px #ff00aa;"></div>
+          <span class="legend-label">Module</span>
+        </div>
+
+        <div class="legend-title" style="margin-top: 16px;">🔗 Relationship Types</div>
+        <div class="legend-item">
+          <div class="legend-color arc-color" style="background: #00d4ff; box-shadow: 0 0 10px #00d4ff; height: 3px; width: 20px; border-radius: 2px;"></div>
+          <span class="legend-label">Calls (invokes)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color arc-color" style="background: #bf00ff; box-shadow: 0 0 10px #bf00ff; height: 3px; width: 20px; border-radius: 2px;"></div>
+          <span class="legend-label">Implements (inherits)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color arc-color" style="background: #39ff14; box-shadow: 0 0 10px #39ff14; height: 3px; width: 20px; border-radius: 2px;"></div>
+          <span class="legend-label">Imports (depends)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color arc-color" style="background: #ff6b00; box-shadow: 0 0 10px #ff6b00; height: 3px; width: 20px; border-radius: 2px;"></div>
+          <span class="legend-label">References</span>
+        </div>
+      </div>
     </div>
+
+    <!-- Status Bar -->
     <div id="status-bar">
       <div class="status-item">
         <span class="status-label">Server:</span>
@@ -87,6 +319,10 @@
       <div class="status-item">
         <span class="status-label">Entities:</span>
         <span class="status-value" id="entity-count">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Districts:</span>
+        <span class="status-value" id="district-count">-</span>
       </div>
       <div class="status-item">
         <span class="status-label">FPS:</span>
@@ -98,6 +334,7 @@
       </div>
     </div>
   </div>
+
   <script type="module" src="/src/parseltongue_poc_main.ts"></script>
 </body>
 </html>
