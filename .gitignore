@@ -38,3 +38,8 @@ artifacts/
 
 # Archive folder (for cleanup - can be deleted later)
 zzArchive/
+
+# Web UI POC (node_modules and build artifacts)
+web-ui-poc/node_modules/
+web-ui-poc/dist/
+web-ui-poc/.vite/

@@ -142,7 +142,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                 EndpointDocumentationEntryPayload {
                     path: "/code-entities-list-all".to_string(),
                     method: "GET".to_string(),
-                    description: "Lists all code entities in the database".to_string(),
+                    description: "Lists all code entities with lines_of_code".to_string(),
                     parameters: vec![
                         EndpointParameterDocPayload {
                             name: "entity_type".to_string(),

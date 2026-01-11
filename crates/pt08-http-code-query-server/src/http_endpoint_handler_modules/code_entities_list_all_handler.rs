@@ -31,6 +31,9 @@ pub struct EntitySummaryListItem {
     pub entity_type: String,
     pub entity_class: String,
     pub language: String,
+    /// Lines of code (counted from stored source code)
+    /// None if code is not available in database
+    pub lines_of_code: Option<usize>,
 }
 
 /// Entities list data payload
@@ -97,12 +100,13 @@ async fn query_entities_with_filter_from_database(
 
     if let Some(storage) = db_guard.as_ref() {
         // Build query based on whether we have a filter
+        // Include Current_Code to calculate lines_of_code
         let query = match entity_type_filter {
             Some(filter) => format!(
-                "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language}}, entity_type == \"{}\"",
+                "?[key, file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language, Current_Code}}, entity_type == \"{}\"",
                 filter.replace('"', "\\\"")
             ),
-            None => "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}".to_string(),
+            None => "?[key, file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language, Current_Code}".to_string(),
         };
 
         let result = storage.raw_query(&query).await;
@@ -132,12 +136,24 @@ async fn query_entities_with_filter_from_database(
                         _ => None,
                     })?;
 
+                    // Extract Current_Code and count lines (index 5)
+                    let lines_of_code = row.get(5).and_then(|v| match v {
+                        cozo::DataValue::Str(code) => {
+                            // Count non-empty lines
+                            let count = code.lines().filter(|line| !line.trim().is_empty()).count();
+                            Some(count)
+                        },
+                        cozo::DataValue::Null => None,
+                        _ => None,
+                    });
+
                     Some(EntitySummaryListItem {
                         key,
                         file_path,
                         entity_type,
                         entity_class,
                         language,
+                        lines_of_code,
                     })
                 }).collect()
             }

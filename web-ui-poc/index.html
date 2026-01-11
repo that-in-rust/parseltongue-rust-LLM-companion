@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parseltongue 3D CodeCity - Proof of Concept</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e4e4e7;
+      overflow: hidden;
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    #canvas-container {
+      flex: 1;
+      position: relative;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #status-bar {
+      padding: 8px 16px;
+      background: #18181b;
+      border-top: 1px solid #27272a;
+      font-size: 12px;
+      display: flex;
+      gap: 20px;
+    }
+    .status-item {
+      display: flex;
+      gap: 8px;
+    }
+    .status-label {
+      color: #71717a;
+    }
+    .status-value {
+      color: #a1a1aa;
+      font-family: monospace;
+    }
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #27272a;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="canvas-container">
+      <div id="loading">
+        <div class="spinner"></div>
+        <div id="loading-text">Connecting to Parseltongue server...</div>
+      </div>
+    </div>
+    <div id="status-bar">
+      <div class="status-item">
+        <span class="status-label">Server:</span>
+        <span class="status-value" id="server-status">Connecting...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Entities:</span>
+        <span class="status-value" id="entity-count">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">FPS:</span>
+        <span class="status-value" id="fps-counter">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Buildings:</span>
+        <span class="status-value" id="building-count">-</span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

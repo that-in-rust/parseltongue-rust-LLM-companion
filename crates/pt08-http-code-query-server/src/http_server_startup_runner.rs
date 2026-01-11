@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use tokio::sync::RwLock;
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::command_line_argument_parser::{HttpServerStartupConfig, find_available_port_number};
 use crate::route_definition_builder_module::build_complete_router_instance;
@@ -223,11 +224,20 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     // Build router
     let router = build_complete_router_instance(state);
 
+    // Add CORS layer for browser-based applications
+    // Allows localhost development servers and cross-origin requests
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+    let router = router.layer(cors);
+
     // Print startup message
     println!("Parseltongue HTTP Server");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!();
     println!("HTTP Server running at: http://localhost:{}", port);
+    println!("CORS: Enabled (allows browser-based applications)");
     println!();
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│  Add to your LLM agent: PARSELTONGUE_URL=http://localhost:{}  │", port);
