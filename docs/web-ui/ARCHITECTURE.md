@@ -3,78 +3,134 @@
 **Document**: Architecture specification for Parseltongue 3D CodeCity Web UI
 
 **Created**: 2025-01-11 09:40 America/Los_Angeles
+**Last Updated**: 2025-01-11 12:00 America/Los_Angeles
 
 ---
 
 ## Overview
 
-The `web-ui/` directory provides a 3D CodeCity visualization for Parseltongue. This is a **purely additive** architecture — **zero changes** to existing Rust code.
+The `web-ui-poc/` directory provides a 3D CodeCity visualization for Parseltongue. After the rubber duck analysis, **minimal Rust changes were made** to enable the visualization:
 
+1. Added `lines_of_code: Option<usize>` to entities list response
+2. Added CORS support to pt08 server
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "Rust Backend"
+        PT01[pt01-folder-to-cozodb-streamer]
+        COZO[(CozoDB + RocksDB)]
+        PT08[pt08-http-code-query-server<br/>port 7777<br/>CORS: ✅ LOC: ✅]
+
+        PT01 --> COZO
+        COZO --> PT08
+    end
+
+    subgraph "TypeScript Frontend"
+        VITE[Vite Dev Server<br/>port 3000]
+        API[parseltongue_api_client]
+        STATE[State Manager]
+        LAYOUT[Layout Engine]
+        SCENE[code_city_scene_manager]
+
+        VITE --> API
+        API --> STATE
+        STATE --> LAYOUT
+        LAYOUT --> SCENE
+    end
+
+    PT08 -->|HTTP/REST<br/>with CORS| VITE
+
+    style PT08 fill:#b7410e
+    style SCENE fill:#3b82f6
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Existing Rust                             │
-│                    (Zero Changes Required)                       │
-│                                                                  │
-│  ┌─────────────────┐    ┌─────────────────┐                     │
-│  │   pt01: Ingest  │───▶│  CozoDB + Rocks │                     │
-│  └─────────────────┘    └─────────────────┘                     │
-│                                │                                 │
-│                                ▼                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │            pt08: HTTP Query Server (port 7777)            │   │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐         │   │
-│  │  │ Health  │ │Entities │ │ Blast   │ │ Clusters│  ...   │   │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘         │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ HTTP/REST
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         New Web UI                               │
-│                        (TypeScript)                              │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    Vite Dev Server                       │    │
-│  │                      (port 3000)                         │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                │                                 │
-│  ┌─────────────────────────────┼─────────────────────────────┐  │
-│  │                             ▼                             │  │
-│  │  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐│  │
-│  │  │  API    │───▶│  State  │───▶│ Layout  │───▶│ ThreeJS ││  │
-│  │  │ Client  │    │ Manager │    │ Engine  │    │ Scene   ││  │
-│  │  └─────────┘    └─────────┘    └─────────┘    └─────────┘│  │
-│  │                                                       │     │  │
-│  │  ┌─────────┐    ┌─────────┐    ┌─────────┐          │     │  │
-│  │  │ Filter  │    │ Control │    │  Info   │          │     │  │
-│  │  │ Panel   │    │ Panel   │    │ Panel   │          │     │  │
-│  │  └─────────┘    └─────────┘    └─────────┘          │     │  │
-│  │                                                       │     │  │
-│  │  ┌─────────────────────────────────────────────────┐ │     │  │
-│  │  │          Snapshot Comparison Engine              │ │     │  │
-│  │  │    (Dual-server connection, browser-side diff)   │ │     │  │
-│  │  └─────────────────────────────────────────────────┘ │     │  │
-│  └─────────────────────────────────────────────────────┘     │  │
-└─────────────────────────────────────────────────────────────────┘
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Main as parseltongue_poc_main
+    participant API as parseltongue_api_client
+    participant PT08 as pt08 Server
+    participant Scene as code_city_scene_manager
+
+    User->>Main: Load page
+    Main->>API: getHealthCheck()
+    API->>PT08: GET /server-health-check-status
+    PT08-->>API: { success: true, status: "ok" }
+    API-->>Main: OK
+
+    Main->>API: getEntitiesList()
+    API->>PT08: GET /code-entities-list-all
+    Note over PT08: Returns lines_of_code field
+    PT08-->>API: { data: { entities: [...] } }
+    API-->>Main: Entities with LOC
+
+    Main->>Scene: initialize(entities)
+    Scene->>Scene: Create building for each entity
+    Note over Scene: Building height = LOC<br/>Building color = language
+
+    Main->>Main: requestAnimationFrame(renderLoop)
+    loop Every frame
+        Main->>Scene: render(deltaTime)
+        Scene-->>Main: 3D scene updated
+    end
+```
+
+### TDD Cycle
+
+```mermaid
+graph LR
+    STUB[STUB<br/>Write test] --> RED[RED<br/>Run test<br/>Verify failure]
+    RED --> GREEN[GREEN<br/>Minimal impl<br/>Make test pass]
+    GREEN --> REFACTOR[REFACTOR<br/>Improve code<br/>Keep tests green]
+    REFACTOR --> STUB
+
+    style STUB fill:#ef4444
+    style RED fill:#f97316
+    style GREEN fill:#22c55e
+    style REFACTOR fill:#3b82f6
 ```
 
 ---
 
-## Separation Boundaries
+## API Changes (Post-Rubber-Duck)
+
+The following changes were made to pt08 after the rubber duck analysis:
+
+| Change | File | Description |
+|--------|------|-------------|
+| LOC field | `code_entities_list_all_handler.rs` | Added `lines_of_code: Option<usize>` |
+| CORS layer | `http_server_startup_runner.rs` | Added `CorsLayer` for browser access |
+| API docs | `api_reference_documentation_handler.rs` | Updated endpoint description |
+
+See `API_CHANGES_2025-01-11.md` for details.
+
+---
+
+## Original Overview (Pre-POC)
+
+> **Note**: The following sections describe the originally planned structure. The actual POC (`web-ui-poc/`) is a minimal implementation.
+
+---
+
+## Separation Boundaries (Post-Implementation)
 
 | Layer | Location | Language | Touches Rust? |
 |-------|----------|----------|---------------|
-| Backend API | `crates/pt08-*` | Rust | **NO** |
-| Web UI | `web-ui/` | TypeScript | **NO** |
-| Build | `web-ui/package.json` | npm | **NO** |
+| Backend API | `crates/pt08-*` | Rust | **YES** (minimal: LOC + CORS) |
+| Web UI POC | `web-ui-poc/` | TypeScript | **NO** |
+| Build | `web-ui-poc/package.json` | npm | **NO** |
 
 ---
 
-## Directory Structure
+## Directory Structure (Planned vs Actual)
 
-```
-web-ui/
+### Original Plan (`web-ui/`)
+
+The following structure was planned but not yet implemented:
 ├── docs/                           # This documentation
 │   ├── THREE_JS_BEST_PRACTICES.md
 │   ├── TDD_TEST_PLAN.md

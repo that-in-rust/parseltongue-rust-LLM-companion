@@ -3,8 +3,8 @@
  * Main entry point
  */
 
-import { ParseltongueApiClient } from './api/client';
-import { CodeCityScene } from './scene/scene';
+import { ParseltongueApiClient } from './api/parseltongue_api_client';
+import { CodeCitySceneManager } from './scene/code_city_scene_manager';
 
 // Configuration
 const API_BASE = 'http://localhost:7777';
@@ -18,7 +18,7 @@ const fpsCounterEl = document.getElementById('fps-counter')!;
 const buildingCountEl = document.getElementById('building-count')!;
 
 // State
-let scene: CodeCityScene | null = null;
+let scene: CodeCitySceneManager | null = null;
 let lastFrameTime = performance.now();
 let frameCount = 0;
 let fpsUpdateTime = 0;
@@ -50,7 +50,7 @@ async function init() {
 
     // Step 5: Initialize Three.js scene
     loadingTextEl.textContent = 'Building 3D scene...';
-    scene = new CodeCityScene(document.getElementById('canvas-container')!);
+    scene = new CodeCitySceneManager(document.getElementById('canvas-container')!);
     await scene.initialize(entities);
 
     buildingCountEl.textContent = entities.length.toString();

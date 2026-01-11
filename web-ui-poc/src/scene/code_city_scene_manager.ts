@@ -5,9 +5,9 @@
  */
 
 import * as THREE from 'three';
-import type { EntitySummaryListItem } from '../types/api';
+import type { EntitySummaryListItem } from '../types/parseltongue_api_types';
 
-export class CodeCityScene {
+export class CodeCitySceneManager {
   private container: HTMLElement;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
