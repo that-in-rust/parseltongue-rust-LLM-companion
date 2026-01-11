@@ -7,7 +7,6 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { ParseltongueApiClient } from './parseltongue_api_client';
-import type { HealthCheckResponsePayload } from '../types/parseltongue_api_types';
 
 describe('ParseltongueApiClient', () => {
   const API_BASE = 'http://localhost:7777';
