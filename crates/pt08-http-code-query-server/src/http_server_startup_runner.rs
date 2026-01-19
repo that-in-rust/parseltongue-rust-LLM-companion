@@ -7,7 +7,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use tokio::sync::RwLock;
 
-use crate::command_line_argument_parser::{HttpServerStartupConfig, find_available_port_number};
+use crate::command_line_argument_parser::HttpServerStartupConfig;
+use crate::port_selection::{find_and_bind_port_available, PortSelectionError};
 use crate::route_definition_builder_module::build_complete_router_instance;
 use parseltongue_core::storage::CozoDbStorage;
 
@@ -187,10 +188,54 @@ impl SharedApplicationStateContainer {
 /// Start the HTTP server in blocking loop
 ///
 /// # 4-Word Name: start_http_server_blocking_loop
+///
+/// # Smart Port Selection Behavior (REQ-PORT-001 through REQ-PORT-005)
+///
+/// Whether `--port` is specified or not, this function uses intelligent
+/// port selection with retry logic:
+///
+/// - **Without --port**: Tries 7777, 7778, 7779... until one is available
+/// - **With --port 7777**: Treats 7777 as preference, tries 7777, 7778, 7779...
+/// - **With --port 8000**: Treats 8000 as preference, tries 8000, 8001, 8002...
+///
+/// Progress is logged to stderr for each attempt.
+///
+/// # Error Conditions
+/// - Returns error if all ports in range are occupied
+/// - Returns error if binding fails due to permissions
 pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) -> Result<()> {
-    // Determine port (default: 7777)
-    let port = config.http_port_override_option
-        .unwrap_or_else(|| find_available_port_number(7777).unwrap_or(7777));
+    // REQ-PORT-001.0 & REQ-PORT-002.0: Smart port selection with retry
+    // This handles both --port specified and not specified cases uniformly
+    let listener = match find_and_bind_port_available(
+        config.http_port_override_option,
+        100, // max_attempts: try up to 100 ports
+    ).await {
+        Ok(l) => l,
+        Err(PortSelectionError::RangeExhausted { start, end }) => {
+            anyhow::bail!(
+                "No available port in range {}-{}. \
+                 Try closing some Parseltongue instances or specify a different starting port.",
+                start, end
+            );
+        }
+        Err(PortSelectionError::PermissionDenied { port, cause }) => {
+            anyhow::bail!(
+                "Permission denied for port {}: {}. \
+                 Try using a port >= 1024.",
+                port, cause
+            );
+        }
+        Err(PortSelectionError::SystemError { port, cause }) => {
+            anyhow::bail!(
+                "System error binding to port {}: {}. \
+                 Check if the port is available.",
+                port, cause
+            );
+        }
+    };
+
+    // Get the actual bound port (may differ from preference)
+    let port = listener.local_addr()?.port();
 
     // Connect to database if path provided
     let db_path = &config.database_connection_string_value;
@@ -223,7 +268,7 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     // Build router
     let router = build_complete_router_instance(state);
 
-    // Print startup message
+    // Print startup message with actual bound port
     println!("Parseltongue HTTP Server");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!();
@@ -237,8 +282,8 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     println!("  curl http://localhost:{}/server-health-check-status", port);
     println!();
 
-    // Start server
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
+    // Start server with the already-bound listener
+    // REQ-PORT-003.0: No race condition - listener is already bound
     axum::serve(listener, router).await?;
 
     Ok(())
