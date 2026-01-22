@@ -55,28 +55,39 @@ Entity keys can change between base and current state:
 
 ### Database Schema (Single Table Per Workspace)
 
+**Note**: This is the conceptual schema. The actual Parseltongue API returns slightly different field names (see ARCHITECTURE_API_GROUNDED doc for exact structures).
+
 ```sql
 -- entities table (same schema for base.db and live.db)
 CREATE TABLE entities (
-  key TEXT PRIMARY KEY,        -- rust:fn:handle_auth
-  kind TEXT,                   -- fn, struct, trait, etc.
-  name TEXT,                   -- handle_auth
-  file_path TEXT,              -- src/auth.rs
-  line_start INT,
-  line_end INT,
+  key TEXT PRIMARY KEY,        -- rust:fn:handle_auth:__path_hash:10-50
+  entity_type TEXT,            -- fn, struct, trait, enum (NOT "kind")
+  entity_class TEXT,           -- CODE or TEST
+  language TEXT,               -- rust, python, etc.
+  file_path TEXT,              -- ./crates/path/to/file.rs
+  -- Note: line numbers are encoded in the key, not separate fields
   signature_hash TEXT,         -- SHA256 of function signature
-  body_hash TEXT,              -- SHA256 of function body
-  fan_in INT,                  -- how many call this
-  fan_out INT                  -- how many this calls
+  body_hash TEXT               -- SHA256 of function body
 );
 
 -- edges table
 CREATE TABLE edges (
   from_key TEXT,
   to_key TEXT,
-  edge_type TEXT,              -- calls, imports, implements
+  edge_type TEXT,              -- Uses, Calls, Implements, Contains
+  source_location TEXT,        -- ./path/file.rs:123
   PRIMARY KEY (from_key, to_key, edge_type)
 );
+```
+
+**API Response Envelope**: All Parseltongue API endpoints return:
+```json
+{
+  "success": true,
+  "endpoint": "/code-entities-list-all",
+  "data": { ... },
+  "tokens": 50
+}
 ```
 
 ### Diff Algorithm
@@ -348,16 +359,48 @@ The diff engine produces data for Three.js visualization:
     "blast_radius": 7
   },
   "nodes": [
-    {"key": "rust:fn:auth", "status": "added", "file": "src/auth.rs", "line": 42},
-    {"key": "rust:fn:old", "status": "removed"},
-    {"key": "rust:fn:handler", "status": "modified", "change": "body"}
+    {
+      "key": "rust:fn:new_auth:__crates_path_src_auth_rs:10-50",
+      "status": "added",
+      "file_path": "./crates/path/src/auth.rs",
+      "entity_type": "fn",
+      "entity_class": "CODE",
+      "is_external": false
+    },
+    {
+      "key": "rust:fn:old_handler:__crates_path_src_lib_rs:20-30",
+      "status": "removed"
+    },
+    {
+      "key": "rust:fn:handler:__crates_path_src_lib_rs:42-60",
+      "status": "modified",
+      "change": "body"
+    },
+    {
+      "key": "rust:fn:map:unknown:0-0",
+      "status": "ambient",
+      "is_external": true
+    }
   ],
   "edges": [
-    {"from": "handler", "to": "auth", "status": "added"},
-    {"from": "handler", "to": "old", "status": "removed"}
+    {
+      "from_key": "rust:fn:handler:__path:42-60",
+      "to_key": "rust:fn:new_auth:__path:10-50",
+      "edge_type": "Calls",
+      "status": "added",
+      "source_location": "./crates/path/src/lib.rs:45"
+    },
+    {
+      "from_key": "rust:fn:handler:__path:42-60",
+      "to_key": "rust:fn:old_handler:__path:20-30",
+      "edge_type": "Calls",
+      "status": "removed"
+    }
   ]
 }
 ```
+
+**Note on External Entities**: Entities with `unknown:0-0` suffix are external references (stdlib, external crates). They should be rendered differently (e.g., smaller, grayed out, no source link).
 
 ---
 

@@ -52,15 +52,22 @@
 ### Entity Type Colors
 
 ```typescript
-const ENTITY_TYPE_COLORS = {
-  function: "#4a9eff",   // Blue
+// Maps API entity_type values to display colors
+// Note: API returns "fn" not "function", "struct" not "class", etc.
+const ENTITY_TYPE_COLORS: Record<string, string> = {
+  fn:       "#4a9eff",   // Blue (functions)
   struct:   "#ff6b6b",   // Coral red
   enum:     "#ffa94d",   // Orange
   impl:     "#69db7c",   // Green
   method:   "#748ffc",   // Indigo
-  module:   "#f783ac",   // Pink
-  file:     "#868e96"    // Gray
+  mod:      "#f783ac",   // Pink (modules)
+  file:     "#868e96",   // Gray
+  trait:    "#da77f2",   // Purple
+  type:     "#20c997",   // Teal
 };
+
+// For external references (key contains "unknown:0-0")
+const EXTERNAL_ENTITY_COLOR = "#4a4a4a";  // Dark gray
 ```
 
 ---

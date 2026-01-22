@@ -14,7 +14,7 @@ The following endpoints were tested against a live Parseltongue server running o
 | `/code-entities-list-all` | Full entity list with keys, types, locations | Graph nodes |
 | `/dependency-edges-list-all` | All edges with from_key, to_key, edge_type | Graph edges |
 | `/blast-radius-impact-analysis?entity=X&hops=N` | Affected entities within N hops | Impact visualization |
-| `/semantic-cluster-grouping-list` | 35 clusters by module/namespace | Spatial grouping |
+| `/semantic-cluster-grouping-list` | 46 clusters by module/namespace | Spatial grouping |
 | `/reverse-callers-query-graph?entity=X` | Who calls X | Incoming edges |
 | `/forward-callees-query-graph?entity=X` | What does X call | Outgoing edges |
 
@@ -24,40 +24,73 @@ The following endpoints were tested against a live Parseltongue server running o
 
 ### Entity Format (from `/code-entities-list-all`)
 
+**Response Envelope** (all endpoints use this pattern):
 ```json
 {
-  "entity_key": "rust:fn:handle_blast_radius_impact_analysis:__crates_pt08_http_code_query_server_src_routes_rs:116-171",
-  "kind": "fn",
-  "name": "handle_blast_radius_impact_analysis",
-  "file_path": "crates/pt08-http-code-query-server/src/routes.rs",
-  "line_start": 116,
-  "line_end": 171
+  "success": true,
+  "endpoint": "/code-entities-list-all",
+  "data": { ... },
+  "tokens": 50
 }
 ```
 
-**Key Pattern**: `{lang}:{kind}:{name}:{path_hash}:{lines}`
+**Entity Structure** (inside `data.entities[]`):
+```json
+{
+  "key": "rust:fn:handle_blast_radius_impact_analysis:__crates_pt08-http-code-query-server_src_http_endpoint_handler_modules_blast_radius_impact_handler_rs:116-171",
+  "file_path": "./crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/blast_radius_impact_handler.rs",
+  "entity_type": "fn",
+  "entity_class": "CODE",
+  "language": "rust"
+}
+```
+
+**Key Pattern**: `{lang}:{entity_type}:{name}:{path_hash}:{start_line}-{end_line}`
+
+**Note**: Path hash uses `__` prefix and replaces `/` with `_`, `-` preserved.
 
 ### Edge Format (from `/dependency-edges-list-all`)
 
+**Edge Structure** (inside `data.edges[]`):
 ```json
 {
-  "from_key": "rust:fn:main:__crates_parseltongue_src_main_rs:15-42",
-  "to_key": "rust:fn:run_server:__crates_pt08_src_lib_rs:10-30",
-  "edge_type": "Uses"
+  "from_key": "rust:file:__crates_parseltongue-core_src_entities_rs:1-1",
+  "to_key": "rust:module:AccessModifier:0-0",
+  "edge_type": "Uses",
+  "source_location": "./crates/parseltongue-core/src/entities.rs:400"
 }
 ```
 
 **Edge Types Observed**: Uses, Calls, Implements, Contains
 
+**Pagination Support**: This endpoint supports `limit` and `offset` query params.
+Response includes: `total_count`, `returned_count`, `limit`, `offset`.
+
 ### Cluster Format (from `/semantic-cluster-grouping-list`)
 
+**Cluster Structure** (inside `data.clusters[]`):
 ```json
 {
-  "cluster_name": "pt08-http-code-query-server",
-  "member_count": 23,
-  "members": ["rust:fn:...", "rust:fn:...", ...]
+  "cluster_id": 1,
+  "entity_count": 336,
+  "entities": ["rust:fn:filter_map:unknown:0-0", "rust:method:insert_edge:...", ...],
+  "internal_edges": 942,
+  "external_edges": 538
 }
 ```
+
+**Note**: Clusters use numeric IDs, not semantic names. Derive display names from entity patterns within each cluster.
+
+### External References ("Unknown" Entities)
+
+Many edges point to entities with `unknown:0-0` suffix:
+```
+rust:fn:is_empty:unknown:0-0
+rust:fn:iter:unknown:0-0
+rust:fn:map:unknown:0-0
+```
+
+These represent standard library functions, external crate functions, or functions not found in indexed source. The 790 "external references" in statistics are these entities. They should be rendered as "external" nodes without source locations.
 
 ---
 
@@ -68,10 +101,10 @@ From the actual Parseltongue codebase analysis:
 | Metric | Value | Implication |
 |--------|-------|-------------|
 | **Total Entities** | 215 | Manageable for 3D rendering |
-| **External References** | 790 | Could optionally show/hide |
+| **External References** | 790 | Could optionally show/hide (unknown:0-0 entities) |
 | **Total Edges** | 2,880 | ~13 edges per entity average |
-| **Semantic Clusters** | 35 | Natural spatial grouping |
-| **Largest Cluster** | ~25 entities | Cluster-based layout feasible |
+| **Semantic Clusters** | 46 | Natural spatial grouping |
+| **Largest Cluster** | 336 entities | Contains stdlib/external refs, internal has 942 edges |
 
 **Note**: A larger codebase (3000+ entities) would benefit from LOD and GPU instancing.
 
@@ -152,8 +185,8 @@ Step 1: Load Both Graphs
   live_edges = GET /dependency-edges-list-all (from live.db)
 
 Step 2: Entity Diff (by key)
-  base_keys = set(base_entities.map(e => e.entity_key))
-  live_keys = set(live_entities.map(e => e.entity_key))
+  base_keys = set(base_entities.data.entities.map(e => e.key))
+  live_keys = set(live_entities.data.entities.map(e => e.key))
 
   added = live_keys - base_keys
   removed = base_keys - live_keys
@@ -231,14 +264,32 @@ Step 5: Return Diff
 ### Node Classification Logic
 
 ```typescript
+// Matches actual API response structure
+interface ApiEntity {
+  key: string;           // NOT entity_key
+  file_path: string;
+  entity_type: string;   // NOT kind
+  entity_class: string;  // "CODE" | "TEST"
+  language: string;
+}
+
+interface ApiCluster {
+  cluster_id: number;    // NOT cluster_name (it's an integer)
+  entity_count: number;  // NOT member_count
+  entities: string[];
+  internal_edges: number;
+  external_edges: number;
+}
+
 interface Node {
   key: string;
   status: 'added' | 'removed' | 'modified' | 'neighbor' | 'ambient';
   position: { x: number; y: number; z: number };
-  cluster: string;
+  clusterId: number;
+  isExternal: boolean;  // true if key contains "unknown:0-0"
 }
 
-function classifyNodes(diff: Diff, allEntities: Entity[]): Node[] {
+function classifyNodes(diff: Diff, allEntities: ApiEntity[]): Node[] {
   const focal = new Set([
     ...diff.entities.added,
     ...diff.entities.removed,
@@ -248,14 +299,15 @@ function classifyNodes(diff: Diff, allEntities: Entity[]): Node[] {
   const neighbors = new Set(diff.affected);
 
   return allEntities.map(entity => ({
-    key: entity.entity_key,
-    status: focal.has(entity.entity_key)
+    key: entity.key,
+    status: focal.has(entity.key)
       ? getChangeStatus(entity, diff)
-      : neighbors.has(entity.entity_key)
+      : neighbors.has(entity.key)
         ? 'neighbor'
         : 'ambient',
     position: computePosition(entity, clusters),
-    cluster: entity.cluster
+    clusterId: findClusterForEntity(entity.key, clusters),
+    isExternal: entity.key.includes('unknown:0-0')
   }));
 }
 ```
@@ -271,8 +323,8 @@ LAYOUT ALGORITHM
 ────────────────
 
 1. Position clusters in 3D space (spherical arrangement)
-   - 35 clusters → arrange on sphere surface
-   - Radius based on member count
+   - 46 clusters → arrange on sphere surface
+   - Radius based on entity_count (not member_count)
 
 2. Position nodes within cluster
    - Force-directed within cluster bounds
@@ -395,4 +447,5 @@ This approach maximizes code reuse and leverages the battle-tested Parseltongue 
 
 ---
 
-*Architecture validated against live API queries on 2026-01-22*
+*Architecture validated and corrected against live API queries on 2026-01-22*
+*Field corrections applied from rubber duck debugging session*
