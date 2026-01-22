@@ -13,6 +13,7 @@
 
 pub mod command_line_argument_parser;
 pub mod http_server_startup_runner;
+pub mod port_selection;
 pub mod route_definition_builder_module;
 pub mod structured_error_handling_types;
 pub mod http_endpoint_handler_modules;
@@ -20,5 +21,6 @@ pub mod http_endpoint_handler_modules;
 // Re-export main types for convenience
 pub use command_line_argument_parser::HttpServerStartupConfig;
 pub use http_server_startup_runner::{SharedApplicationStateContainer, start_http_server_blocking_loop};
+pub use port_selection::{find_and_bind_port_available, PortSelectionError, ValidatedPortNumber};
 pub use route_definition_builder_module::build_complete_router_instance;
 pub use structured_error_handling_types::HttpServerErrorTypes;
