@@ -38,3 +38,6 @@ artifacts/
 
 # Archive folder (for cleanup - can be deleted later)
 zzArchive/
+
+# Frontend build artifacts
+frontend/node_modules/

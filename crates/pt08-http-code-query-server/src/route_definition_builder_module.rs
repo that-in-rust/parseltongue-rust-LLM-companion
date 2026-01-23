@@ -4,7 +4,8 @@
 
 use axum::{
     Router,
-    routing::{get, post},
+    routing::get,
+    routing::post,
 };
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
@@ -25,6 +26,17 @@ use crate::http_endpoint_handler_modules::{
     smart_context_token_budget_handler,
     temporal_coupling_hidden_deps_handler,
     diff_analysis_compare_handler,
+    // Phase 2.1: Workspace Management Handlers
+    workspace_create_handler,
+    workspace_list_handler,
+    workspace_watch_handler,
+};
+use crate::websocket_streaming_module::handler::handle_websocket_diff_stream_upgrade;
+// Phase 2.6: Static file embedding handlers
+use crate::static_file_embed_module::{
+    serve_root_index_handler,
+    serve_static_asset_handler,
+    serve_spa_fallback_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -130,6 +142,30 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/diff-analysis-compare-snapshots",
             post(diff_analysis_compare_handler::handle_diff_analysis_compare_snapshots)
         )
-        // More endpoints will be added in subsequent phases
+        // Phase 2.1: Workspace Management Endpoints
+        .route(
+            "/workspace-create-from-path",
+            post(workspace_create_handler::handle_workspace_create_from_path)
+        )
+        .route(
+            "/workspace-list-all",
+            get(workspace_list_handler::handle_workspace_list_all_entries)
+        )
+        .route(
+            "/workspace-watch-toggle",
+            post(workspace_watch_handler::handle_workspace_watch_toggle_state)
+        )
+        // Phase 2.3: WebSocket Diff Streaming
+        .route(
+            "/websocket-diff-stream",
+            get(handle_websocket_diff_stream_upgrade)
+        )
+        // Phase 2.6: Static file embedding routes
+        // Static asset routes (priority 2 - after API routes)
+        .route("/assets/*path", get(serve_static_asset_handler))
+        // Root path (priority 3)
+        .route("/", get(serve_root_index_handler))
+        // SPA fallback (priority 4 - catch-all for client-side routing)
+        .fallback(get(serve_spa_fallback_handler))
         .with_state(state)
 }

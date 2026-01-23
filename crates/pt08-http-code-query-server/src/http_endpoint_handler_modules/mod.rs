@@ -20,3 +20,8 @@ pub mod api_reference_documentation_handler;
 pub mod smart_context_token_budget_handler;
 pub mod temporal_coupling_hidden_deps_handler;
 pub mod diff_analysis_compare_handler;
+
+// Phase 2.1: Workspace Management Handlers
+pub mod workspace_create_handler;
+pub mod workspace_list_handler;
+pub mod workspace_watch_handler;
