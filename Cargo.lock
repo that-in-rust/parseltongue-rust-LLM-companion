@@ -1704,7 +1704,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1713,13 +1713,14 @@ dependencies = [
  "parseltongue-core",
  "pt01-folder-to-cozodb-streamer",
  "pt08-http-code-query-server",
+ "serde",
  "serde_json",
  "tokio",
 ]
 
 [[package]]
 name = "parseltongue-core"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1953,7 +1954,7 @@ dependencies = [
 
 [[package]]
 name = "pt01-folder-to-cozodb-streamer"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1990,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "pt08-http-code-query-server"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "axum",

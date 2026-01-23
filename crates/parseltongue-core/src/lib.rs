@@ -8,6 +8,7 @@
 #![warn(rust_2018_idioms)]
 #![allow(missing_docs)]
 
+pub mod diff; // v1.1.0: Diff visualization system
 pub mod entities;
 pub mod entity_class_specifications;
 pub mod error;

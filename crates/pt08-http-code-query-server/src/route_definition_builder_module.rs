@@ -4,7 +4,7 @@
 
 use axum::{
     Router,
-    routing::get,
+    routing::{get, post},
 };
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
@@ -24,6 +24,7 @@ use crate::http_endpoint_handler_modules::{
     api_reference_documentation_handler,
     smart_context_token_budget_handler,
     temporal_coupling_hidden_deps_handler,
+    diff_analysis_compare_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -123,6 +124,11 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/test-simple/{param}",
             get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
+        )
+        // Diff analysis endpoints
+        .route(
+            "/diff-analysis-compare-snapshots",
+            post(diff_analysis_compare_handler::handle_diff_analysis_compare_snapshots)
         )
         // More endpoints will be added in subsequent phases
         .with_state(state)

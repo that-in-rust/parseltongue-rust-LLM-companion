@@ -19,3 +19,4 @@ pub mod semantic_cluster_grouping_handler;
 pub mod api_reference_documentation_handler;
 pub mod smart_context_token_budget_handler;
 pub mod temporal_coupling_hidden_deps_handler;
+pub mod diff_analysis_compare_handler;
