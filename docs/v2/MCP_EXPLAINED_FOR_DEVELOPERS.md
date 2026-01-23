@@ -1,0 +1,567 @@
+# How MCP Actually Works: An ELI15 Guide for Developers
+
+> For developers who want to understand MCP (Model Context Protocol) in practice, specifically with Claude Code. No marketing fluff.
+
+**Last Updated**: 2026-01-23
+
+---
+
+## Table of Contents
+
+1. [What is MCP Really?](#what-is-mcp-really)
+2. [How Does Claude Code Call MCP Tools?](#how-does-claude-code-call-mcp-tools)
+3. [Do I Need an Agent or Skill to Use MCP?](#do-i-need-an-agent-or-skill-to-use-mcp)
+4. [Can MCP Do Live Codebase Watching?](#can-mcp-do-live-codebase-watching)
+5. [Converting Parseltongue to MCP: Will It Solve the Integration Problem?](#converting-parseltongue-to-mcp-will-it-solve-the-integration-problem)
+6. [Step-by-Step: Using Parseltongue as MCP with Claude Code](#step-by-step-using-parseltongue-as-mcp-with-claude-code)
+7. [The Bottom Line](#the-bottom-line)
+
+---
+
+## What is MCP Really?
+
+### The No-BS Definition
+
+MCP (Model Context Protocol) is a **standardized API protocol** that lets AI applications like Claude Code talk to external services. Think of it like REST APIs, but specifically designed for AI tools.
+
+**The USB-C analogy everyone uses**: Just like USB-C is a standard port that works with any USB-C device, MCP is a standard protocol that works with any MCP-compatible AI application.
+
+### Technical Reality
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MCP ARCHITECTURE                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  HOST (Claude Code)                                         │
+│    └── MCP CLIENT (1 per server)                           │
+│          └── communicates via JSON-RPC 2.0 ───────────┐    │
+│                                                        │    │
+│                                                        ▼    │
+│  MCP SERVER (Your tool: Parseltongue, GitHub, etc.)        │
+│    └── Exposes: Resources, Tools, Prompts                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**MCP is built on:**
+- **Protocol**: JSON-RPC 2.0 (request/response messages)
+- **Transport**: STDIO (local) or HTTP+SSE (remote)
+- **Primitives**:
+  - **Resources**: Read-only data (files, database records)
+  - **Tools**: Actions with side effects (API calls, calculations)
+  - **Prompts**: Reusable templates for AI interactions
+
+**Key Insight**: MCP servers don't "do AI" - they just expose capabilities that Claude can call.
+
+---
+
+## How Does Claude Code Call MCP Tools?
+
+### The Actual Mechanism
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              HOW CLAUDE CODE INVOKES MCP TOOLS              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. STARTUP: Claude Code discovers tools                    │
+│     - Reads config: ~/.claude.json or claude_desktop_config │
+│     - Creates MCP client for each server                    │
+│     - Sends "initialize" handshake                          │
+│     - Server responds with list of available tools          │
+│                                                             │
+│  2. TOOL DISCOVERY: Loading into context                    │
+│     ┌─ Small setup (<50 tools): All tool descriptions      │
+│     │  loaded into Claude's context                        │
+│     │                                                       │
+│     └─ Large setup (>50 tools): Tool Search Tool enabled   │
+│        - Only tool names loaded initially                  │
+│        - Claude searches for relevant tools on-demand      │
+│        - Reduces token usage by 85%                        │
+│                                                             │
+│  3. DECISION: Claude decides when to call                   │
+│     - YOU ask: "What breaks if I change authenticate()?"   │
+│     - Claude sees tool: "blast-radius-impact-analysis"     │
+│     - Claude decides: "This tool can help"                 │
+│     - Claude generates parameters: {entity: "...", hops: 3}│
+│                                                             │
+│  4. INVOCATION: Client calls server                         │
+│     - Client sends JSON-RPC request to server              │
+│     - Server executes tool (e.g., queries database)        │
+│     - Server returns JSON result                           │
+│                                                             │
+│  5. RESPONSE: Claude uses result                            │
+│     - Result added to context                              │
+│     - Claude generates final answer using result           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Important Facts
+
+**AUTOMATIC INVOCATION**:
+- Claude Code automatically calls MCP tools when it thinks they're relevant
+- YOU don't manually call tools - you ask questions and Claude decides
+- Tool descriptions are critical - they tell Claude when to use each tool
+
+**TOKEN-AWARE LOADING**:
+- If your tools consume >10% of context window, Tool Search activates
+- Example: 58 tools from 5 servers = 55K tokens before you even start
+- Tool Search reduces this by only loading tools when needed
+
+**PERMISSION MODEL**:
+- Some tools require user approval before execution
+- Claude asks: "Claude needs your permission to use Bash"
+- You can configure auto-approval for trusted tools (use carefully)
+
+---
+
+## Do I Need an Agent or Skill to Use MCP?
+
+### The Short Answer: NO (mostly)
+
+**MCP tools are called DIRECTLY by Claude Code**. You don't need to write a skill or agent to use MCP.
+
+### The Relationship Between MCP, Skills, and Agents
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           MCP vs SKILLS vs AGENTS                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  MCP TOOLS                                                  │
+│  └─ External services (GitHub, Jira, Parseltongue)         │
+│  └─ Provide DATA and ACTIONS                               │
+│  └─ Example: "Get issue ENG-4521 from Jira"               │
+│                                                             │
+│  SKILLS                                                     │
+│  └─ Reusable knowledge frameworks                          │
+│  └─ Teach Claude HOW TO REASON                             │
+│  └─ Example: "When analyzing impact, use this framework"   │
+│  └─ Auto-invoked based on description matching             │
+│                                                             │
+│  CUSTOM AGENTS                                              │
+│  └─ Specialized sub-agents for specific tasks              │
+│  └─ Combine tools, skills, and custom logic                │
+│  └─ Example: "Code review agent that uses GitHub MCP"      │
+│                                                             │
+│  THEY'RE COMPLEMENTARY:                                     │
+│  MCP provides access to systems                            │
+│  Skills provide methodologies                              │
+│  Agents coordinate complex workflows                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### When You MIGHT Want a Skill
+
+You might create a skill that references MCP tools if you want:
+
+1. **Domain-specific workflows**: "When refactoring, always check blast radius first"
+2. **Custom reasoning patterns**: "Use this framework when analyzing Parseltongue results"
+3. **Multi-step procedures**: "Follow these 5 steps for safe refactoring"
+
+**But this is OPTIONAL**. Claude Code will use MCP tools automatically based on their descriptions.
+
+### Example: Skills That Use MCP
+
+```markdown
+# SKILL.md example
+---
+name: safe-refactoring-workflow
+description: Framework for safe code refactoring using dependency analysis
+---
+
+When the user asks to refactor code:
+
+1. SEARCH: Use code-entities-search-fuzzy to find the entity
+2. IMPACT: Use blast-radius-impact-analysis with hops=3
+3. ASSESS: If total_affected > 50, mark as HIGH RISK
+4. CALLERS: Use reverse-callers-query-graph to see who depends on it
+5. CONTEXT: Use smart-context-token-budget to gather full context
+6. PLAN: Create step-by-step refactoring plan with test requirements
+```
+
+This skill TEACHES Claude Code how to use the MCP tools effectively. But the tools themselves work without the skill.
+
+---
+
+## Can MCP Do Live Codebase Watching?
+
+### Short Answer: KIND OF (with limitations)
+
+MCP supports **notifications** and **streaming**, but NOT in the way you might expect.
+
+### What MCP Can Do
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           MCP NOTIFICATIONS & STREAMING                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  SERVER-SENT EVENTS (SSE):                                  │
+│  └─ Server can push updates to client                      │
+│  └─ Real-time notifications when data changes              │
+│  └─ Example: "Tool list updated" notification              │
+│                                                             │
+│  RESOURCE SUBSCRIPTIONS:                                    │
+│  └─ Client subscribes to specific resources                │
+│  └─ Server sends "updated" notification when changed       │
+│  └─ Client re-fetches resource to get new data             │
+│                                                             │
+│  STREAMING RESPONSES:                                       │
+│  └─ Server streams progress updates during long operations │
+│  └─ Example: "Analyzing file 1/100... 2/100..."           │
+│  └─ Final result still sent as single response             │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### What MCP CANNOT Do
+
+**MCP is NOT a pub/sub system**. Here's the critical distinction:
+
+```
+❌ WHAT YOU MIGHT EXPECT (NOT HOW MCP WORKS):
+   File changes → MCP server detects → Pushes to Claude Code
+   Claude Code constantly receives updates in background
+   Claude proactively says "Hey, code changed!"
+
+✅ HOW MCP ACTUALLY WORKS:
+   Client asks → Server responds
+   Server can notify "data changed" → Client must re-request
+   Claude only sees updates when it queries the server
+```
+
+### File Watching Architectures
+
+**Option 1: MCP Server with Internal Watcher**
+
+```rust
+// Your MCP server internally watches files
+impl MCPServer for ParseltongueServer {
+    // When file changes, update internal state
+    fn on_file_changed(&self, path: PathBuf) {
+        self.reindex(path);
+        // Send "tools_list_changed" notification
+        self.notify_clients(Notification::ToolsChanged);
+    }
+
+    // Client calls this after getting notification
+    fn get_blast_radius(&self, entity: String) -> Result {
+        // Returns fresh data from updated index
+    }
+}
+```
+
+**Pros**: Claude gets fresh data when it queries
+**Cons**: Claude doesn't know data changed unless it asks
+
+**Option 2: Hybrid (MCP + WebSocket)**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         PARSELTONGUE HYBRID ARCHITECTURE                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  HTTP API (localhost:7777)                                  │
+│  └─ /blast-radius-impact-analysis                          │
+│  └─ /code-entities-search-fuzzy                            │
+│                                                             │
+│  MCP SERVER (wraps HTTP API)                                │
+│  └─ Exposes HTTP endpoints as MCP tools                    │
+│  └─ Claude Code calls MCP → MCP calls HTTP                 │
+│                                                             │
+│  FILE WATCHER (separate service)                            │
+│  └─ Watches codebase                                       │
+│  └─ Re-indexes on changes                                  │
+│  └─ Broadcasts via WebSocket: "Reindex complete"          │
+│                                                             │
+│  Note: WebSocket is for HUMANS (VS Code extension, etc.)   │
+│        MCP is for CLAUDE CODE (pull model)                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**This is what Parseltongue already does!** (It has file watching built-in)
+
+---
+
+## Converting Parseltongue to MCP: Will It Solve the Integration Problem?
+
+### The Integration Problem
+
+**Current State**: Parseltongue has HTTP API at localhost:7777
+- Claude Code doesn't automatically know about it
+- You must manually tell Claude Code to curl the endpoints
+- Claude Code doesn't see the API in its tool list
+
+**Desired State**: Claude Code automatically uses Parseltongue
+- When you ask "What breaks if I change X?", Claude calls blast-radius
+- No manual curl commands needed
+- Seamless integration
+
+### Will MCP Solve This?
+
+**YES - MCP will solve the integration problem**. Here's why:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│         BEFORE MCP (Current Parseltongue)                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  YOU: "What breaks if I change authenticate()?"            │
+│  CLAUDE: "I can help! Let me search the codebase..."       │
+│           [uses grep, reads files, consumes 50K tokens]    │
+│  YOU: "No! Use Parseltongue at localhost:7777"            │
+│  CLAUDE: "Ah, let me curl that endpoint..."                │
+│           [finally uses the right tool]                    │
+│                                                             │
+│  PROBLEM: Claude doesn't know Parseltongue exists          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│         AFTER MCP (Parseltongue as MCP)                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  YOU: "What breaks if I change authenticate()?"            │
+│  CLAUDE: "I see tool: blast-radius-impact-analysis"        │
+│           [automatically calls MCP tool]                   │
+│           [gets answer in 2K tokens instead of 50K]        │
+│  RESULT: [shows you the blast radius immediately]          │
+│                                                             │
+│  BENEFIT: Claude knows Parseltongue exists and uses it     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### What MCP Gives You
+
+1. **Automatic Discovery**: Claude Code sees Parseltongue tools at startup
+2. **Better Descriptions**: Each endpoint becomes a tool with description
+3. **Typed Parameters**: Tool parameters are structured (not just URL query strings)
+4. **Token Efficiency**: Claude uses Parseltongue first instead of grep
+5. **Context Awareness**: Claude knows when to use which Parseltongue endpoint
+
+### What MCP Doesn't Change
+
+1. **File Watching**: Parseltongue still needs to watch files internally
+2. **Indexing**: Still needs to parse and index the codebase
+3. **Database**: Still needs CozoDB for graph storage
+4. **Core Logic**: All the blast-radius, caller analysis stays the same
+
+**MCP is just the interface layer** - it makes Claude Code aware of Parseltongue's capabilities.
+
+---
+
+## Step-by-Step: Using Parseltongue as MCP with Claude Code
+
+### Phase 1: Current State (HTTP API)
+
+```bash
+# 1. Index codebase
+parseltongue pt01-folder-to-cozodb-streamer ./my-project --db "rocksdb:mycode.db"
+
+# 2. Start HTTP server
+parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
+
+# 3. Use with Claude Code (manual)
+YOU: "Check blast radius for authenticate function"
+CLAUDE: [You must explicitly tell it to curl localhost:7777]
+```
+
+### Phase 2: Add MCP Wrapper (Recommended Approach)
+
+**Option A: Wrap HTTP API as MCP Server**
+
+Create a simple MCP server that forwards to Parseltongue HTTP API:
+
+```rust
+// pseudo-code for MCP wrapper
+use rmcp::{ServerHandler, tool, tool_box};
+
+#[tool_box]
+impl ParseltongueMCPServer {
+    #[tool(description = "Analyze blast radius of code changes. Returns entities affected by changing the target entity within N hops of the dependency graph.")]
+    async fn blast_radius_impact_analysis(
+        &self,
+        entity: String,  // Entity key (e.g., "rust:fn:authenticate:src_auth_rs:10-50")
+        hops: u32,       // Number of hops (1-4)
+    ) -> Result<BlastRadiusResult> {
+        // Forward to HTTP API
+        let url = format!(
+            "http://localhost:7777/blast-radius-impact-analysis?entity={}&hops={}",
+            entity, hops
+        );
+        let response = reqwest::get(&url).await?;
+        Ok(response.json().await?)
+    }
+
+    #[tool(description = "Search for code entities by name using fuzzy matching. Returns matching functions, structs, methods, etc.")]
+    async fn code_entities_search_fuzzy(
+        &self,
+        q: String,  // Search query
+    ) -> Result<SearchResult> {
+        let url = format!("http://localhost:7777/code-entities-search-fuzzy?q={}", q);
+        let response = reqwest::get(&url).await?;
+        Ok(response.json().await?)
+    }
+
+    // ... 13 more tools for other endpoints
+}
+
+#[tokio::main]
+async fn main() {
+    let server = ParseltongueMCPServer::new();
+    rmcp::serve_stdio(server).await;
+}
+```
+
+**Install the MCP server:**
+
+```bash
+# Add to Claude Code config
+claude mcp add parseltongue -- /path/to/parseltongue-mcp-server
+
+# Or edit ~/.claude.json
+{
+  "mcpServers": {
+    "parseltongue": {
+      "type": "stdio",
+      "command": "/usr/local/bin/parseltongue-mcp-server"
+    }
+  }
+}
+```
+
+**Option B: Native MCP in Parseltongue**
+
+Add MCP transport directly to Parseltongue:
+
+```rust
+// Add to pt08-http-code-query-server
+use rmcp::{ServerHandler, tool_box};
+
+// Keep HTTP server running
+// Add MCP server alongside
+async fn serve_mcp_and_http(db: CozoDbStorage) {
+    // Spawn HTTP server
+    tokio::spawn(start_http_server(db.clone()));
+
+    // Serve MCP via STDIO
+    let mcp_handler = ParseltongueMCPHandler::new(db);
+    rmcp::serve_stdio(mcp_handler).await;
+}
+```
+
+### Phase 3: Configure Claude Code
+
+```bash
+# List configured MCP servers
+claude mcp list
+
+# Add Parseltongue
+claude mcp add parseltongue --scope user -- parseltongue-mcp-server
+
+# Verify it's working
+# Claude Code will now show Parseltongue tools in context
+```
+
+### Phase 4: Use It
+
+```
+YOU: "I want to refactor the authenticate function. What will break?"
+
+CLAUDE: [Automatically uses parseltongue MCP tool]
+        Calling blast-radius-impact-analysis(
+          entity="rust:fn:authenticate:src_auth_rs:10-50",
+          hops=3
+        )
+
+        Result: 302 entities affected
+        - 14 direct callers
+        - 88 second-hop dependencies
+        - 200 third-hop dependencies
+
+        HIGH RISK refactor. Here's what will break:
+        [detailed analysis]
+```
+
+**That's the magic**: Claude Code now knows about Parseltongue and uses it automatically.
+
+---
+
+## The Bottom Line
+
+### Key Takeaways
+
+1. **MCP is a standardized protocol** for AI tools to talk to external services
+   - Built on JSON-RPC 2.0
+   - Uses STDIO (local) or HTTP+SSE (remote) transport
+   - Exposes Resources, Tools, and Prompts
+
+2. **Claude Code calls MCP tools automatically** based on their descriptions
+   - You don't need to write a skill or agent (but you can)
+   - Tool descriptions are critical - they tell Claude when to use each tool
+   - Large tool sets use "Tool Search" to load on-demand
+
+3. **MCP supports notifications** but it's NOT a real-time push system
+   - Server can notify "data changed" but client must re-request
+   - For live updates, combine MCP (for queries) with file watching (internal to server)
+
+4. **Converting Parseltongue to MCP WILL solve the integration problem**
+   - Claude Code will automatically see Parseltongue's capabilities
+   - No more manual curl commands needed
+   - Token-efficient: uses Parseltongue instead of grep
+
+5. **Recommended Architecture**:
+   ```
+   Parseltongue Core (indexer + CozoDB)
+   └─ HTTP API (localhost:7777) - for testing, VS Code extensions
+   └─ MCP Server (wraps HTTP API) - for Claude Code
+   └─ File Watcher (internal) - keeps index fresh
+   ```
+
+### What This Means for Parseltongue
+
+**Before MCP**:
+- Great tool, but Claude Code doesn't know it exists
+- Manual integration required ("please curl this endpoint")
+- Competes with built-in grep/read file tools
+
+**After MCP**:
+- Claude Code treats Parseltongue as first-class tooling
+- Automatic usage when you ask dependency questions
+- Token-efficient: 2K tokens vs 50K tokens for grep
+- Natural language interface: "What breaks?" instead of curl
+
+**Converting to MCP is worth it** - it's the difference between a tool Claude can use and a tool Claude automatically reaches for.
+
+---
+
+## Resources
+
+### Official Documentation
+
+- [Claude Code MCP Docs](https://code.claude.com/docs/en/mcp)
+- [MCP Architecture Overview](https://modelcontextprotocol.io/docs/learn/architecture)
+- [Building MCP Servers in Rust](https://mcpcat.io/guides/building-mcp-server-rust/)
+- [Anthropic MCP Announcement](https://www.anthropic.com/news/model-context-protocol)
+
+### Parseltongue Resources
+
+- README.md - Core documentation
+- `/blast-radius-impact-analysis` endpoint - Already perfect for MCP
+- File watcher implementation - See `watcher_service.rs`
+
+### Implementation Examples
+
+- [GitHub MCP Server](https://github.com/github/github-mcp-server) - Official GitHub implementation
+- [Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk) - Official Rust SDK
+- [Build MCP in Rust Tutorial](https://www.shuttle.dev/blog/2025/07/18/how-to-build-a-stdio-mcp-server-in-rust)
+
+---
+
+**Questions?** The MCP protocol is well-documented, and the Rust SDK makes it straightforward to wrap existing HTTP APIs.

@@ -1,0 +1,440 @@
+# Parseltongue User Journeys
+
+> "When code changes, what else might break and why?"
+
+## User Segments Overview
+
+```mermaid
+graph TD
+    subgraph "User Segments"
+        A[AI-First Developer] --> |MCP + Tauri| P[Parseltongue]
+        B[AI Tool Builder] --> |HTTP API| P
+        C[Platform Engineer] --> |CLI| P
+        D[Tech Lead] --> |Tauri| P
+        E[OSS Maintainer] --> |CLI + Tauri| P
+    end
+
+    P --> |Real-time| G[Dependency Graph]
+    P --> |JSON| R[Blast Radius]
+    P --> |Stream| W[WebSocket Updates]
+```
+
+## Segment Matrix
+
+| Segment | Persona | Primary Interface | Job-to-be-Done | Frequency |
+|---------|---------|-------------------|----------------|-----------|
+| AI-First Developer | Maya | MCP + Tauri | See what AI is doing to my code | Daily |
+| AI Tool Builder | Raj | HTTP API | Give my AI code awareness | Per deploy |
+| Platform Engineer | Sarah | CLI | Gate PRs by blast radius | Per PR |
+| Tech Lead | David | Tauri | Audit AI-generated changes | Weekly |
+| OSS Maintainer | Lisa | CLI + Tauri | Evaluate contributor PRs | Daily |
+
+---
+
+## Journey 1: Maya - AI-First Solo Developer
+
+**Who:** Senior dev using Claude Code / Cursor all day
+**Fear:** "AI just refactored something and I have no idea what it touched"
+**JTBD:** Know blast radius BEFORE AI commits, intervene if too risky
+
+### Flow Diagram
+
+```mermaid
+graph TD
+    subgraph "Setup - Once"
+        S1[Install parseltongue] --> S2[Configure MCP in Claude Code]
+        S2 --> S3[Open Tauri Dashboard]
+        S3 --> S4[Point at project]
+    end
+
+    subgraph "Daily Flow"
+        A[Maya asks Claude:<br>'Refactor auth to use JWT'] --> B[Claude Code]
+        B --> C{MCP Server}
+        C --> |check_blast_radius| D[Parseltongue Core]
+        D --> |blast: 23, risk: HIGH| C
+        C --> B
+        B --> E[Claude pauses:<br>'This affects 23 entities.<br>Should I proceed?']
+
+        E --> |Yes, add tests first| F[Claude edits files]
+        F --> G[File watcher detects]
+        G --> H[WebSocket stream]
+        H --> I[Tauri Dashboard]
+        I --> J[Maya sees real-time:<br>- auth.rs modified<br>- 3 new functions<br>- 5 tests added]
+    end
+
+    style E fill:#ff6b6b,color:#fff
+    style J fill:#51cf66,color:#fff
+```
+
+### Touchpoints
+
+| Step | Interface | What Happens |
+|------|-----------|--------------|
+| 1 | MCP Server | Claude checks blast radius before edit |
+| 2 | MCP Response | Returns risk level + affected entities |
+| 3 | Claude Code | Pauses and asks for confirmation |
+| 4 | Tauri Dashboard | Real-time graph updates as edits happen |
+
+### Outcome
+Maya saw exactly what Claude touched, approved incrementally. No surprises at PR time.
+
+---
+
+## Journey 2: Raj - AI Tool Builder
+
+**Who:** Building custom AI coding agent using OpenAI
+**Fear:** "My agent keeps breaking production code"
+**JTBD:** Give my AI agent awareness of code dependencies
+
+### Flow Diagram
+
+```mermaid
+graph TD
+    subgraph "Setup - Integration"
+        S1[Start parseltongue server<br>parseltongue serve --port 7777] --> S2[Add tool definition to OpenAI config]
+        S2 --> S3[Agent has check_code_impact tool]
+    end
+
+    subgraph "Runtime"
+        A[User: 'Fix payment bug'] --> B[Raj's Custom Agent]
+        B --> C{Decision Point}
+        C --> |Before editing| D[POST /blast-radius]
+        D --> E[HTTP API :7777]
+        E --> F[Parseltongue Core]
+        F --> |JSON response| E
+        E --> |blast: 8, risk: medium<br>affected: checkout, order, test| D
+        D --> B
+        B --> G{Risk Check}
+        G --> |Medium risk| H[Make minimal change]
+        H --> I[Update payment.test too]
+        I --> J[User: 'Fixed with<br>minimal impact']
+    end
+
+    style G fill:#ffd43b,color:#000
+    style J fill:#51cf66,color:#fff
+```
+
+### API Integration Example
+
+```python
+# Tool definition for OpenAI function calling
+tools = [{
+    "name": "check_code_impact",
+    "description": "Before editing code, check what would be affected",
+    "parameters": {
+        "entity_key": "Code entity (e.g., ts:fn:processPayment)",
+        "max_hops": "How deep to trace (default 3)"
+    }
+}]
+
+# In agent loop
+if agent_wants_to_edit(file):
+    impact = requests.post(
+        "http://localhost:7777/blast-radius",
+        json={"entity_key": f"ts:fn:{function_name}"}
+    )
+    if impact["risk"] == "high":
+        agent.context.append(f"WARNING: {impact['blast_radius']} entities affected")
+```
+
+### Outcome
+Raj's agent makes safer edits. Customer complaints down 70%.
+
+---
+
+## Journey 3: Sarah - Platform Engineer
+
+**Who:** Manages CI/CD for 50-person engineering team
+**Fear:** "Someone's AI-generated PR broke staging"
+**JTBD:** Automatically flag high-impact PRs before merge
+
+### Flow Diagram
+
+```mermaid
+graph TD
+    subgraph "Setup - Per Repo"
+        S1[Add parseltongue to Dockerfile] --> S2[Create nightly baseline job]
+        S2 --> S3[Add blast-check workflow]
+    end
+
+    subgraph "PR Flow"
+        A[Developer opens PR<br>with AI-generated changes] --> B[GitHub Actions triggered]
+        B --> C[Download main.db baseline]
+        C --> D[parseltongue index --output pr.db]
+        D --> E[parseltongue diff --json]
+        E --> F{Blast Radius?}
+        F --> |> 20| G[FAIL: High risk]
+        F --> |10-20| H[WARN: Medium risk]
+        F --> |< 10| I[PASS: Low risk]
+
+        G --> J[PR Comment:<br>Blast Radius: 47<br>Risk: HIGH]
+        J --> K[Check blocks merge]
+        K --> L[Developer splits PR]
+        L --> A
+
+        I --> M[PR Comment:<br>Blast Radius: 8<br>Risk: LOW]
+        M --> N[Merge allowed]
+    end
+
+    style G fill:#ff6b6b,color:#fff
+    style I fill:#51cf66,color:#fff
+    style H fill:#ffd43b,color:#000
+```
+
+### GitHub Actions Workflow
+
+```yaml
+name: Blast Radius Check
+on: pull_request
+
+jobs:
+  blast-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install parseltongue
+        run: cargo install parseltongue
+
+      - name: Download baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: main-index
+          path: main.db
+
+      - name: Index PR branch
+        run: parseltongue index --path . --output pr.db
+
+      - name: Calculate blast radius
+        id: blast
+        run: |
+          parseltongue diff --base main.db --live pr.db --json > diff.json
+          BLAST=$(jq '.summary.blast_radius' diff.json)
+          RISK=$(jq -r '.summary.risk_level' diff.json)
+          echo "blast=$BLAST" >> $GITHUB_OUTPUT
+          echo "risk=$RISK" >> $GITHUB_OUTPUT
+
+      - name: Fail if high risk
+        if: steps.blast.outputs.risk == 'high'
+        run: exit 1
+```
+
+### Outcome
+High-impact PRs flagged automatically. Staging breakages down 80%.
+
+---
+
+## Journey 4: David - Tech Lead
+
+**Who:** Leads 8-person team, does weekly code review
+**Fear:** "I can't keep up reviewing all AI-generated code"
+**JTBD:** Quickly understand blast radius of a week's changes
+
+### Flow Diagram
+
+```mermaid
+graph TD
+    subgraph "Setup - Once"
+        S1[Install Parseltongue Desktop] --> S2[Point at team monorepo]
+        S2 --> S3[Create Monday baseline]
+    end
+
+    subgraph "Friday Review Ritual"
+        A[Open Tauri app<br>Friday 4pm] --> B[Select workspace]
+        B --> C[Compare: Mon 9am vs Now]
+        C --> D[Weekly Diff View]
+
+        D --> E[Heat Map Shows:<br>auth/ high churn<br>api/ moderate<br>utils/ low]
+
+        D --> F[Summary:<br>+47 entities<br>-12 removed<br>~23 modified]
+
+        F --> G{High Risk Changes?}
+        G --> |3 found| H[Click auth/jwt.rs]
+        H --> I[Entity Details:<br>- 15 dependents<br>- Signature changed<br>- Modified by Maya]
+
+        I --> J{Review needed?}
+        J --> |Yes| K[Open in editor]
+        J --> |No| L[Mark as reviewed]
+    end
+
+    style G fill:#ff6b6b,color:#fff
+    style L fill:#51cf66,color:#fff
+```
+
+### Dashboard View
+
+```
++------------------------------------------------------------------+
+|  PARSELTONGUE - Weekly Review                        [_][o][x]   |
++------------------------------------------------------------------+
+|  WORKSPACES    |  WEEKLY DIFF VIEW                               |
+|                |                                                  |
+|  * acme-app    |  Heat Map:                                      |
+|    Mon -> Fri  |    auth/  ============  (high churn)            |
+|                |    api/   ====          (moderate)              |
+|  Compare:      |    utils/ ==            (low)                   |
+|  [Mon 9am]     |    tests/ ======        (good coverage)         |
+|      |         |                                                  |
+|  [Now]         +--------------------------------------------------+
+|                |  SUMMARY                                         |
++----------------+  +47 entities | -12 removed | ~23 modified       |
+|                |                                                  |
+|                |  HIGH RISK (3):                                  |
+|                |  - auth/jwt.rs (15 dependents) - Maya, Tue       |
+|                |  - api/handlers.rs (12 deps) - Alex, Thu         |
+|                |  - db/migrations.rs (8 deps) - Sam, Wed          |
++------------------------------------------------------------------+
+```
+
+### Outcome
+David reviews 3 high-risk changes in 20 mins instead of reading every PR.
+
+---
+
+## Journey 5: Lisa - Open Source Maintainer
+
+**Who:** Maintains popular OSS project with 200+ contributors
+**Fear:** "I can't review every PR properly, some use AI for large changes"
+**JTBD:** Quickly triage contributor PRs by actual code impact
+
+### Flow Diagram
+
+```mermaid
+graph TD
+    subgraph "Triage Flow - CLI"
+        A[Morning: Run triage script] --> B[Loop through open PRs]
+        B --> C[gh pr checkout]
+        C --> D[parseltongue index]
+        D --> E[parseltongue diff --json]
+        E --> F{Blast Radius?}
+
+        F --> |< 10| G[Quick review]
+        F --> |10-30| H[Standard review]
+        F --> |> 30| I[Deep review needed]
+    end
+
+    subgraph "Deep Review - Tauri"
+        I --> J[gh pr checkout 1237]
+        J --> K[parseltongue app --compare main]
+        K --> L[Visual Diff:<br>Before vs After graphs]
+
+        L --> M{Structural issues?}
+        M --> |Circular dep| N[Request changes]
+        M --> |Clean| O[Approve]
+    end
+
+    style G fill:#51cf66,color:#fff
+    style H fill:#ffd43b,color:#000
+    style I fill:#ff6b6b,color:#fff
+```
+
+### Triage Script
+
+```bash
+#!/bin/bash
+# triage-prs.sh
+
+for pr in $(gh pr list --json number -q '.[].number'); do
+  gh pr checkout $pr
+  parseltongue index --path . --output pr-$pr.db
+  BLAST=$(parseltongue diff --base main.db --live pr-$pr.db --json \
+          | jq '.summary.blast_radius')
+
+  if [ "$BLAST" -gt 30 ]; then
+    echo "PR #$pr: BLAST=$BLAST - needs deep review"
+  elif [ "$BLAST" -gt 10 ]; then
+    echo "PR #$pr: BLAST=$BLAST - standard review"
+  else
+    echo "PR #$pr: BLAST=$BLAST - quick review"
+  fi
+done
+```
+
+### Output Example
+
+```
+PR #1234: BLAST=3 - quick review
+PR #1235: BLAST=5 - quick review
+PR #1236: BLAST=18 - standard review
+PR #1237: BLAST=47 - needs deep review
+PR #1238: BLAST=2 - quick review
+```
+
+### Outcome
+Lisa reviews 20 PRs in 1 hour. Catches architectural issues before merge.
+
+---
+
+## Jobs-to-be-Done Summary
+
+```mermaid
+graph LR
+    subgraph "Jobs"
+        J1[Check impact BEFORE editing]
+        J2[Gate PRs by blast radius]
+        J3[Visualize week's changes]
+        J4[Deep-dive risky PR]
+        J5[Real-time monitoring]
+        J6[Batch analyze PRs]
+    end
+
+    subgraph "Interfaces"
+        MCP[MCP Server]
+        HTTP[HTTP API]
+        CLI[CLI]
+        TAURI[Tauri Desktop]
+    end
+
+    J1 --> MCP
+    J1 --> HTTP
+    J2 --> CLI
+    J3 --> TAURI
+    J4 --> TAURI
+    J5 --> TAURI
+    J6 --> CLI
+```
+
+| Job-to-be-Done | Personas | Interface | Core API |
+|----------------|----------|-----------|----------|
+| Check impact BEFORE editing | Maya, Raj | MCP, HTTP | `check_blast_radius` |
+| Gate PRs by blast radius | Sarah, Lisa | CLI | `parseltongue diff` |
+| Visualize week's changes | David | Tauri | WebSocket stream |
+| Deep-dive on risky PR | David, Lisa | Tauri | Entity details |
+| Real-time change monitoring | Maya | Tauri | WebSocket stream |
+| Batch analyze multiple PRs | Lisa | CLI | `parseltongue diff` loop |
+
+---
+
+## Interface Architecture
+
+```mermaid
+graph TB
+    subgraph "Parseltongue Core"
+        CORE[Shared Rust Library]
+        CORE --> DIFF[Diff Engine]
+        CORE --> BLAST[Blast Radius Calculator]
+        CORE --> DB[RocksDB Storage]
+        CORE --> WATCH[File Watcher]
+    end
+
+    subgraph "Interfaces"
+        CLI[CLI + JSON<br>parseltongue diff --json]
+        HTTP[HTTP API<br>:7777]
+        MCP[MCP Server<br>parseltongue mcp]
+        TAURI[Tauri Desktop<br>parseltongue app]
+    end
+
+    CORE --> CLI
+    CORE --> HTTP
+    CORE --> MCP
+    HTTP --> TAURI
+
+    subgraph "Users"
+        SCRIPTS[Scripts/CI] --> CLI
+        LLMS[LLMs/Agents] --> HTTP
+        CLAUDE[Claude Code] --> MCP
+        HUMANS[Developers] --> TAURI
+    end
+```
