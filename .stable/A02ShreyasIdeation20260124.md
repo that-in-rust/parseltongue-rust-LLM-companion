@@ -62,6 +62,9 @@ Parseltongue provides
     - Agent TDD
         - ISG Diff impact
     - Agent Rubbber Duck Debugging of ISG
+- Modes
+    - no-std mode
+    - std mode (default)
 
 
 ## Why Vision 02
