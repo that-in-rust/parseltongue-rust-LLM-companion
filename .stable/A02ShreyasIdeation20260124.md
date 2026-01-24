@@ -62,6 +62,8 @@ Parseltongue provides
     - Agent TDD
         - ISG Diff impact
     - Agent Rubbber Duck Debugging of ISG
+    - Agents to visualize changes in ISG in HTML format
+        - trigger LLM driven narrative based on that
 - Modes
     - no-std mode
     - std mode (default)
