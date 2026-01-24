@@ -92,6 +92,12 @@ Parseltongue provides
     - different abstraction than modules
     - more like clusters of high-data or high-control flow units
 
+# Nation wants to know
+
+- How to write highest predictability LLM driven code, what will be the characteristics of that code?
+    - Functional Programming which can have mathematical correction proved by Lean etc.
+    - Code needs to be predictable as in a simulation can be run on it
+
 
 
 
