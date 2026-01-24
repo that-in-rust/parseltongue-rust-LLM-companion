@@ -51,6 +51,22 @@ Parseltongue provides
 - Everything in Vision 01
 - Will be based NOT on tree-sitter but on rust-analyzer
 - Will be working specifically for needs of users who want to constantly reason their codebase via dependency-graph
+- We want to create visuals and control for experienced OSS Rust devs
+    - they can allow agents to do the job
+    - they can slow it down to check their work
+- Dependency Graph as first citizen of thinking itself
+    - PRD
+    - Archi
+    - TDD
+    
+
+## Why Vision 02
+
+Because we cannot force users to use dependency-graphs and associated search tools
+
+
+
+
 
 ## Vision 03 New IDE Interface-Signature-Graphs for Functional Programming in Rust
 
