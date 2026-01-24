@@ -58,8 +58,9 @@ Parseltongue provides
         - Interface Signatures which are Primary Keys
         - These Primary keys will be small txt files
         - Edit these primary keys
-            - Change the code or Signature
+            - Change the code or Signature while being super-explicit e.g. serde :: Serialize
             - Changes the forward and backward dependencies
+                - in the above example an external library serde will become a calling node
 
 - What if what you wrote then gets deposited in txt files so that it is relevantly compiled by compilers 
     - Rust has 3 layers
