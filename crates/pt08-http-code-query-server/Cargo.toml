@@ -11,7 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # HTTP server framework
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Core library (provides storage, entities, traits)
@@ -28,12 +28,27 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 urlencoding = "2.1"
+uuid = { version = "1.8", features = ["v4"] }
+
+# WebSocket/Async utilities
+futures = "0.3"
+
+# File watching
+notify = "6.1"
+glob = "0.3"
 
 # Database
 cozo = { workspace = true }
+
+# Static file embedding (Phase 2.6: rust-embed integration)
+rust-embed = "8.5"
+mime_guess = "2.0"
 
 [dev-dependencies]
 tokio-test = { workspace = true }
 tempfile = { workspace = true }
 tower = { version = "0.5", features = ["util"] }
 urlencoding = "2.1"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+http-body-util = "0.1"

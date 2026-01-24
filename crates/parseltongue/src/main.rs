@@ -3,10 +3,15 @@
 //! This binary provides subcommands that dispatch to the individual tools:
 //! - pt01-folder-to-cozodb-streamer (Tool 1: Ingest)
 //! - pt08-http-code-query-server (Tool 8: HTTP Server - primary interface)
+//! - diff (Phase 6: Diff visualization between database snapshots)
 
 use clap::{Arg, ArgMatches, Command};
 use console::style;
 use anyhow::Result;
+
+// Commands module for organized subcommand implementations
+mod commands;
+use commands::{DiffCommandArgsPayload, execute_diff_analysis_command};
 
 // Import traits to enable trait methods
 use pt01_folder_to_cozodb_streamer::streamer::FileStreamer;
@@ -25,6 +30,9 @@ async fn main() -> Result<()> {
         Some(("pt08-http-code-query-server", sub_matches)) => {
             run_http_code_query_server(sub_matches).await
         }
+        Some(("diff", sub_matches)) => {
+            run_diff_visualization_command(sub_matches).await
+        }
         _ => {
             println!("{}", style("Parseltongue CLI Toolkit").blue().bold());
             println!("{}", style("Ultra-minimalist code analysis toolkit").blue());
@@ -32,8 +40,9 @@ async fn main() -> Result<()> {
             println!("Use --help for more information");
             println!();
             println!("Available commands:");
-            println!("  pt01-folder-to-cozodb-streamer       - Index codebase into CozoDB");
-            println!("  pt08-http-code-query-server              - HTTP server for REST API (15 endpoints)");
+            println!("  pt01-folder-to-cozodb-streamer  - Index codebase into CozoDB");
+            println!("  pt08-http-code-query-server     - HTTP server for REST API (15 endpoints)");
+            println!("  diff                            - Compare two database snapshots");
             Ok(())
         }
     }
@@ -108,6 +117,44 @@ fn build_cli() -> Command {
                         .short('v')
                         .help("Enable verbose logging")
                         .action(clap::ArgAction::SetTrue),
+                ),
+        )
+        .subcommand(
+            Command::new("diff")
+                .about("Compare two database snapshots and visualize changes")
+                .long_about(
+                    "Compare two CozoDB snapshots (e.g., before/after code changes) and produce\n\
+                    a visualization of differences and their blast radius.\n\n\
+                    Examples:\n  \
+                    parseltongue diff --base rocksdb:before.db --live rocksdb:after.db\n  \
+                    parseltongue diff --base rocksdb:v1.db --live rocksdb:v2.db --json\n  \
+                    parseltongue diff --base rocksdb:old.db --live rocksdb:new.db --max-hops 3"
+                )
+                .arg(
+                    Arg::new("base")
+                        .long("base")
+                        .short('b')
+                        .help("Path to base/before database (e.g., rocksdb:path/to/base.db)")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("live")
+                        .long("live")
+                        .short('l')
+                        .help("Path to live/after database (e.g., rocksdb:path/to/live.db)")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("json")
+                        .long("json")
+                        .help("Output results as JSON")
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("max-hops")
+                        .long("max-hops")
+                        .help("Maximum hops for blast radius calculation [default: 2]")
+                        .value_parser(clap::value_parser!(u32)),
                 ),
         )
 }
@@ -217,6 +264,34 @@ async fn run_http_code_query_server(matches: &ArgMatches) -> Result<()> {
     http_server_startup_runner::start_http_server_blocking_loop(config).await
 }
 
+/// Run the diff visualization command
+///
+/// # 4-Word Name: run_diff_visualization_command
+async fn run_diff_visualization_command(matches: &ArgMatches) -> Result<()> {
+    let base_db = matches.get_one::<String>("base").unwrap();
+    let live_db = matches.get_one::<String>("live").unwrap();
+    let json_output = matches.get_flag("json");
+    let max_hops = matches.get_one::<u32>("max-hops").copied().unwrap_or(2);
+
+    println!("{}", style("Running Diff Visualization Analysis").cyan());
+    println!("  Base database: {}", base_db);
+    println!("  Live database: {}", live_db);
+    println!("  Max hops: {}", max_hops);
+    if json_output {
+        println!("  Output format: JSON");
+    }
+    println!();
+
+    let args = DiffCommandArgsPayload {
+        base_database_path_value: base_db.clone(),
+        live_database_path_value: live_db.clone(),
+        json_output_format_flag: json_output,
+        max_hops_depth_limit: max_hops,
+    };
+
+    execute_diff_analysis_command(args).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,11 +299,10 @@ mod tests {
     #[test]
     fn test_cli_builds() {
         let cli = build_cli();
-        // Verify all subcommands are present (v1.0.3: HTTP-only architecture)
+        // Verify all subcommands are present
         let subcommands: Vec<&str> = cli.get_subcommands().map(|cmd| cmd.get_name()).collect();
         assert!(subcommands.contains(&"pt01-folder-to-cozodb-streamer")); // Ingest
         assert!(subcommands.contains(&"pt08-http-code-query-server")); // HTTP server (primary)
-        // Note: pt02 (JSON export) and pt07 (terminal viz) removed in v1.0.3
-        // All visualization available via HTTP endpoints
+        assert!(subcommands.contains(&"diff")); // Phase 6: Diff visualization
     }
 }

@@ -2,15 +2,38 @@
 //!
 //! # 4-Word Naming: http_server_startup_runner
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 
 use crate::command_line_argument_parser::HttpServerStartupConfig;
+use crate::file_watcher_service_module::FileWatcherServiceStruct;
 use crate::port_selection::{find_and_bind_port_available, PortSelectionError};
 use crate::route_definition_builder_module::build_complete_router_instance;
+use crate::websocket_streaming_module::message_types::WebSocketServerOutboundMessageType;
 use parseltongue_core::storage::CozoDbStorage;
+use parseltongue_core::workspace::WorkspaceUniqueIdentifierType;
+
+/// Type alias for WebSocket sender channel
+///
+/// # 4-Word Name: WebSocketSenderChannelType
+pub type WebSocketSenderChannelType = mpsc::Sender<WebSocketServerOutboundMessageType>;
+
+/// Type alias for WebSocket connections map
+///
+/// # 4-Word Name: WebSocketConnectionsMapType
+///
+/// Maps workspace_id to list of sender channels for broadcasting.
+pub type WebSocketConnectionsMapType = HashMap<String, Vec<WebSocketSenderChannelType>>;
+
+/// Type alias for file watchers registry
+///
+/// # 4-Word Name: FileWatchersRegistryMapType
+///
+/// Maps workspace_id to file watcher service instances.
+pub type FileWatchersRegistryMapType = HashMap<WorkspaceUniqueIdentifierType, FileWatcherServiceStruct>;
 
 /// Shared application state container
 ///
@@ -28,6 +51,22 @@ pub struct SharedApplicationStateContainer {
 
     /// Codebase statistics metadata
     pub codebase_statistics_metadata_arc: Arc<RwLock<CodebaseStatisticsMetadata>>,
+
+    /// WebSocket connections map for broadcasting diff events
+    ///
+    /// # 4-Word Name: websocket_connections_map_arc
+    ///
+    /// Maps workspace_id -> list of sender channels.
+    /// Used by file watcher to broadcast diff events to subscribed clients.
+    pub websocket_connections_map_arc: Arc<RwLock<WebSocketConnectionsMapType>>,
+
+    /// File watchers registry for managing workspace watchers
+    ///
+    /// # 4-Word Name: file_watchers_registry_arc
+    ///
+    /// Maps workspace_id -> FileWatcherServiceStruct.
+    /// Used by file watcher service to manage active watchers.
+    pub file_watchers_registry_arc: Arc<RwLock<FileWatchersRegistryMapType>>,
 }
 
 /// Codebase statistics metadata
@@ -65,6 +104,8 @@ impl SharedApplicationStateContainer {
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
+            websocket_connections_map_arc: Arc::new(RwLock::new(HashMap::new())),
+            file_watchers_registry_arc: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -78,6 +119,8 @@ impl SharedApplicationStateContainer {
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
+            websocket_connections_map_arc: Arc::new(RwLock::new(HashMap::new())),
+            file_watchers_registry_arc: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 

@@ -1,0 +1,453 @@
+Running Diff Visualization Analysis
+  Base database: rocksdb:/Users/amuldotexe/Desktop/OSS202601/parseltongue-dependency-graph-generator/tests/e2e_fixtures/before/parseltongue20260123103209/analysis.db
+  Live database: rocksdb:/Users/amuldotexe/Desktop/OSS202601/parseltongue-dependency-graph-generator/tests/e2e_fixtures/after/parseltongue20260123103209/analysis.db
+  Max hops: 2
+  Output format: JSON
+
+{
+  "diff": {
+    "summary": {
+      "total_before_count": 0,
+      "total_after_count": 9,
+      "added_entity_count": 9,
+      "removed_entity_count": 0,
+      "modified_entity_count": 0,
+      "unchanged_entity_count": 0,
+      "relocated_entity_count": 0
+    },
+    "entity_changes": [
+      {
+        "stable_identity": "rust:struct:Config:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:struct:Config:__src_lib_rs:10-13",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Struct",
+          "line_range": {
+            "start": 10,
+            "end": 13
+          },
+          "content_hash": "bbe25b7b87bda7fa"
+        }
+      },
+      {
+        "stable_identity": "rust:fn:use_config:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:fn:use_config:__src_lib_rs:52-54",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Function",
+          "line_range": {
+            "start": 52,
+            "end": 54
+          },
+          "content_hash": "f6a6474462e3b044"
+        }
+      },
+      {
+        "stable_identity": "rust:impl:Config:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:impl:Config:__src_lib_rs:15-28",
+          "file_path": "./src/lib.rs",
+          "entity_type": "ImplBlock { trait_name: None, struct_name: \"Unknown\" }",
+          "line_range": {
+            "start": 15,
+            "end": 28
+          },
+          "content_hash": "9998f99d7969aee5"
+        }
+      },
+      {
+        "stable_identity": "rust:method:display:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:method:display:__src_lib_rs:25-27",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Method",
+          "line_range": {
+            "start": 25,
+            "end": 27
+          },
+          "content_hash": "bbb35d009cb8c21"
+        }
+      },
+      {
+        "stable_identity": "rust:fn:caller_function:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:fn:caller_function:__src_lib_rs:47-49",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Function",
+          "line_range": {
+            "start": 47,
+            "end": 49
+          },
+          "content_hash": "4b86cffbc44fa34f"
+        }
+      },
+      {
+        "stable_identity": "rust:fn:function_to_modify:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:fn:function_to_modify:__src_lib_rs:33-38",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Function",
+          "line_range": {
+            "start": 33,
+            "end": 38
+          },
+          "content_hash": "5d7db90b9134bf67"
+        }
+      },
+      {
+        "stable_identity": "rust:fn:new_function:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:fn:new_function:__src_lib_rs:41-43",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Function",
+          "line_range": {
+            "start": 41,
+            "end": 43
+          },
+          "content_hash": "24722ac7af151bde"
+        }
+      },
+      {
+        "stable_identity": "rust:fn:main_api_function:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:fn:main_api_function:__src_lib_rs:57-60",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Function",
+          "line_range": {
+            "start": 57,
+            "end": 60
+          },
+          "content_hash": "e9662312cf30a1b6"
+        }
+      },
+      {
+        "stable_identity": "rust:method:new:__src_lib_rs",
+        "change_type": "AddedToCodebase",
+        "before_entity": null,
+        "after_entity": {
+          "key": "rust:method:new:__src_lib_rs:17-22",
+          "file_path": "./src/lib.rs",
+          "entity_type": "Method",
+          "line_range": {
+            "start": 17,
+            "end": 22
+          },
+          "content_hash": "14b8b448ac41268"
+        }
+      }
+    ],
+    "edge_changes": [
+      {
+        "from_stable_identity": "rust:fn:caller_function:__src_lib_rs",
+        "to_stable_identity": "rust:fn:helper_to_remove:unknown",
+        "change_type": "RemovedFromGraph",
+        "before_edge": {
+          "from_key": "rust:fn:caller_function:__src_lib_rs:36-38",
+          "to_key": "rust:fn:helper_to_remove:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:37"
+        },
+        "after_edge": null
+      },
+      {
+        "from_stable_identity": "rust:fn:function_to_modify:__src_lib_rs",
+        "to_stable_identity": "rust:fn:to_uppercase:unknown",
+        "change_type": "AddedToGraph",
+        "before_edge": null,
+        "after_edge": {
+          "from_key": "rust:fn:function_to_modify:__src_lib_rs:33-38",
+          "to_key": "rust:fn:to_uppercase:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:36"
+        }
+      },
+      {
+        "from_stable_identity": "rust:fn:caller_function:__src_lib_rs",
+        "to_stable_identity": "rust:fn:new_function:unknown",
+        "change_type": "AddedToGraph",
+        "before_edge": null,
+        "after_edge": {
+          "from_key": "rust:fn:caller_function:__src_lib_rs:47-49",
+          "to_key": "rust:fn:new_function:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:48"
+        }
+      },
+      {
+        "from_stable_identity": "rust:fn:use_config:__src_lib_rs",
+        "to_stable_identity": "rust:fn:display:unknown",
+        "change_type": "UnchangedInGraph",
+        "before_edge": {
+          "from_key": "rust:fn:use_config:__src_lib_rs:41-43",
+          "to_key": "rust:fn:display:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:42"
+        },
+        "after_edge": {
+          "from_key": "rust:fn:use_config:__src_lib_rs:52-54",
+          "to_key": "rust:fn:display:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:53"
+        }
+      },
+      {
+        "from_stable_identity": "rust:file:__src_lib_rs:1-1",
+        "to_stable_identity": "rust:module:Self:0-0",
+        "change_type": "UnchangedInGraph",
+        "before_edge": {
+          "from_key": "rust:file:__src_lib_rs:1-1",
+          "to_key": "rust:module:Self:0-0",
+          "edge_type": "Uses",
+          "source_location": "./src/lib.rs:12"
+        },
+        "after_edge": {
+          "from_key": "rust:file:__src_lib_rs:1-1",
+          "to_key": "rust:module:Self:0-0",
+          "edge_type": "Uses",
+          "source_location": "./src/lib.rs:17"
+        }
+      },
+      {
+        "from_stable_identity": "rust:file:__src_lib_rs:1-1",
+        "to_stable_identity": "rust:module:String:0-0",
+        "change_type": "UnchangedInGraph",
+        "before_edge": {
+          "from_key": "rust:file:__src_lib_rs:1-1",
+          "to_key": "rust:module:String:0-0",
+          "edge_type": "Uses",
+          "source_location": "./src/lib.rs:6"
+        },
+        "after_edge": {
+          "from_key": "rust:file:__src_lib_rs:1-1",
+          "to_key": "rust:module:String:0-0",
+          "edge_type": "Uses",
+          "source_location": "./src/lib.rs:57"
+        }
+      },
+      {
+        "from_stable_identity": "rust:fn:main_api_function:__src_lib_rs",
+        "to_stable_identity": "rust:fn:new:unknown",
+        "change_type": "UnchangedInGraph",
+        "before_edge": {
+          "from_key": "rust:fn:main_api_function:__src_lib_rs:46-49",
+          "to_key": "rust:fn:new:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:47"
+        },
+        "after_edge": {
+          "from_key": "rust:fn:main_api_function:__src_lib_rs:57-60",
+          "to_key": "rust:fn:new:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:58"
+        }
+      },
+      {
+        "from_stable_identity": "rust:method:new:__src_lib_rs",
+        "to_stable_identity": "rust:fn:to_string:unknown",
+        "change_type": "UnchangedInGraph",
+        "before_edge": {
+          "from_key": "rust:method:new:__src_lib_rs:12-17",
+          "to_key": "rust:fn:to_string:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:14"
+        },
+        "after_edge": {
+          "from_key": "rust:method:new:__src_lib_rs:17-22",
+          "to_key": "rust:fn:to_string:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:19"
+        }
+      },
+      {
+        "from_stable_identity": "rust:fn:main_api_function:__src_lib_rs",
+        "to_stable_identity": "rust:fn:use_config:unknown",
+        "change_type": "UnchangedInGraph",
+        "before_edge": {
+          "from_key": "rust:fn:main_api_function:__src_lib_rs:46-49",
+          "to_key": "rust:fn:use_config:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:48"
+        },
+        "after_edge": {
+          "from_key": "rust:fn:main_api_function:__src_lib_rs:57-60",
+          "to_key": "rust:fn:use_config:unknown:0-0",
+          "edge_type": "Calls",
+          "source_location": "./src/lib.rs:59"
+        }
+      }
+    ]
+  },
+  "blast_radius": {
+    "origin_entity": "rust:struct:Config:__src_lib_rs,rust:fn:use_config:__src_lib_rs,rust:impl:Config:__src_lib_rs,rust:method:display:__src_lib_rs,rust:fn:caller_function:__src_lib_rs,rust:fn:function_to_modify:__src_lib_rs,rust:fn:new_function:__src_lib_rs,rust:fn:main_api_function:__src_lib_rs,rust:method:new:__src_lib_rs",
+    "affected_by_distance": {},
+    "total_affected_count": 0,
+    "max_depth_reached": 0
+  },
+  "visualization": {
+    "nodes": [
+      {
+        "id": "rust:struct:Config:__src_lib_rs",
+        "label": "Config",
+        "status": "AddedNode",
+        "entity_type": "Struct",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:fn:use_config:__src_lib_rs",
+        "label": "use_config",
+        "status": "AddedNode",
+        "entity_type": "Function",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:impl:Config:__src_lib_rs",
+        "label": "Config",
+        "status": "AddedNode",
+        "entity_type": "ImplBlock { trait_name: None, struct_name: \"Unknown\" }",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:method:display:__src_lib_rs",
+        "label": "display",
+        "status": "AddedNode",
+        "entity_type": "Method",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:fn:caller_function:__src_lib_rs",
+        "label": "caller_function",
+        "status": "AddedNode",
+        "entity_type": "Function",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:fn:function_to_modify:__src_lib_rs",
+        "label": "function_to_modify",
+        "status": "AddedNode",
+        "entity_type": "Function",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:fn:new_function:__src_lib_rs",
+        "label": "new_function",
+        "status": "AddedNode",
+        "entity_type": "Function",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:fn:main_api_function:__src_lib_rs",
+        "label": "main_api_function",
+        "status": "AddedNode",
+        "entity_type": "Function",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      },
+      {
+        "id": "rust:method:new:__src_lib_rs",
+        "label": "new",
+        "status": "AddedNode",
+        "entity_type": "Method",
+        "file_path": "./src/lib.rs",
+        "blast_radius_distance": 0,
+        "metadata": {}
+      }
+    ],
+    "edges": [
+      {
+        "from_id": "rust:fn:caller_function:__src_lib_rs",
+        "to_id": "rust:fn:helper_to_remove:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": true
+      },
+      {
+        "from_id": "rust:fn:function_to_modify:__src_lib_rs",
+        "to_id": "rust:fn:to_uppercase:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": true
+      },
+      {
+        "from_id": "rust:fn:caller_function:__src_lib_rs",
+        "to_id": "rust:fn:new_function:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": true
+      },
+      {
+        "from_id": "rust:fn:use_config:__src_lib_rs",
+        "to_id": "rust:fn:display:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": false
+      },
+      {
+        "from_id": "rust:file:__src_lib_rs:1-1",
+        "to_id": "rust:module:Self:0-0",
+        "edge_type": "Uses",
+        "is_changed_edge": false
+      },
+      {
+        "from_id": "rust:file:__src_lib_rs:1-1",
+        "to_id": "rust:module:String:0-0",
+        "edge_type": "Uses",
+        "is_changed_edge": false
+      },
+      {
+        "from_id": "rust:fn:main_api_function:__src_lib_rs",
+        "to_id": "rust:fn:new:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": false
+      },
+      {
+        "from_id": "rust:method:new:__src_lib_rs",
+        "to_id": "rust:fn:to_string:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": false
+      },
+      {
+        "from_id": "rust:fn:main_api_function:__src_lib_rs",
+        "to_id": "rust:fn:use_config:unknown",
+        "edge_type": "Calls",
+        "is_changed_edge": false
+      }
+    ],
+    "diff_summary": {
+      "total_before_count": 0,
+      "total_after_count": 9,
+      "added_entity_count": 9,
+      "removed_entity_count": 0,
+      "modified_entity_count": 0,
+      "unchanged_entity_count": 0,
+      "relocated_entity_count": 0
+    },
+    "max_blast_radius_depth": 0
+  }
+}

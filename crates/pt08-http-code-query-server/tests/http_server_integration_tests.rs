@@ -107,12 +107,15 @@ async fn test_stats_returns_entity_counts() {
     assert!(json["tokens"].is_number());
 }
 
-/// Test: Unknown endpoint returns 404
+/// Test: Unknown endpoint returns index.html (SPA fallback)
 ///
-/// # 4-Word Name: test_unknown_endpoint_returns_not_found
+/// # 4-Word Name: test_unknown_endpoint_returns_spa_fallback
+///
+/// With rust-embed SPA integration, unknown routes return index.html
+/// for client-side routing instead of 404.
 #[tokio::test]
-async fn test_unknown_endpoint_returns_not_found() {
-    // GIVEN: Server running
+async fn test_unknown_endpoint_returns_spa_fallback() {
+    // GIVEN: Server running with SPA fallback
     let app = create_test_server_instance();
 
     // WHEN: GET /nonexistent-endpoint
@@ -126,8 +129,16 @@ async fn test_unknown_endpoint_returns_not_found() {
         .await
         .unwrap();
 
-    // THEN: Returns 404
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    // THEN: Returns 200 with index.html (SPA fallback)
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get("content-type").unwrap(),
+        "text/html; charset=utf-8"
+    );
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8(body.to_vec()).unwrap();
+    assert!(body_str.contains("<!DOCTYPE html>"));
 }
 
 // =============================================================================
