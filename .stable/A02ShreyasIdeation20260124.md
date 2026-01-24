@@ -46,12 +46,24 @@ Parseltongue provides
         - live.db
     - constant diff visualization
 
-## Vision 02 Open-Code-Fork for Rust
+## Vision 02 Open-Code-Fork for Rust OSS workflow indexed on the power of DEPENDENCY GRAPHs & Functional Programming
 
 - Will be based NOT on tree-sitter but on rust-analyzer
 - Will be working specifically for needs of users who want to constantly reason their codebase via dependency-graph
 
+## Vision 03 New IDE Interface-Signature-Graphs only for Rust
 
+- What if you could write Dependency-Graph in an IDE which treats Interfaces as a first-class citizen?
+    - Interface Signature Graph is a collection of
+        - Interface Signatures which are Primary Keys
+        - These Primary keys will be small txt files
+        - Edit these primary keys
+            - Change the code or Signature
+            - Changes the forward and backward dependencies
+
+
+This will fail where
+- Implict relationships are established based on folder and file structure e.g. Springboot and Rails
 
 ## Remarks
 
@@ -85,6 +97,14 @@ Parseltongue provides
     - IDEs trained for specific outcome
     - Models trained for specific outcome
 - We can compete on a niche which will not be easily attacked with taste x ease-of-use
+    - and it should be something which is NOT a huge opportunity in terms of $
+        - platform companies make money from business application layer, not from library layer
+        - platform companies are the libray layer
+        - platform companies do not invest in tooling for library layer
+            - Golang google
+            - React FB
+        - Platform companies do not invest in tooling for library layer
+            - So we can fulfil that need
 - Number of LOCs will 10x or 20x - so reading the code will be a new bottle-neck
     - So again a dependency graph will be a thing
 - Code-blocks
