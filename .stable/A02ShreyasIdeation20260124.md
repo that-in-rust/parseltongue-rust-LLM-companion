@@ -48,6 +48,7 @@ Parseltongue provides
 
 ## Vision 02 Open-Code-Fork for Rust OSS workflow indexed on the power of DEPENDENCY GRAPHs & Functional Programming
 
+- Everything in Vision 01
 - Will be based NOT on tree-sitter but on rust-analyzer
 - Will be working specifically for needs of users who want to constantly reason their codebase via dependency-graph
 
