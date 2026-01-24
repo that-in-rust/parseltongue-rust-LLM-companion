@@ -55,10 +55,14 @@ Parseltongue provides
     - they can allow agents to do the job
     - they can slow it down to check their work
 - Dependency Graph as first citizen of thinking itself
-    - PRD
-    - Archi
-    - TDD
-    
+    - Agent PRD
+        - ISG Diff impact
+    - Agent Architecture
+        - ISG Diff estimations
+    - Agent TDD
+        - ISG Diff impact
+    - Agent Rubbber Duck Debugging of ISG
+
 
 ## Why Vision 02
 
