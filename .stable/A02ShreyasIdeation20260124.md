@@ -51,6 +51,8 @@ Parseltongue provides
 - Will be based NOT on tree-sitter but on rust-analyzer
 - Will be working specifically for needs of users who want to constantly reason their codebase via dependency-graph
 
+
+
 ## Remarks
 
 - Parseltongue failed because of
@@ -76,6 +78,19 @@ Parseltongue provides
                     - migration
                     - deployment
                     - cut-over of some sort or changes to data
+    - Workflow 02 : OSS level contribution to Rust tools or libraries or embedded systems
+        - Code needs to be audited
+        - Code needs to be reasoned at the level dependency graphs which is NOT native to models which are still optimized for Full Stack use cases
+- We cannot compete with
+    - IDEs trained for specific outcome
+    - Models trained for specific outcome
+- We can compete on a niche which will not be easily attacked with taste x ease-of-use
+- Number of LOCs will 10x or 20x - so reading the code will be a new bottle-neck
+    - So again a dependency graph will be a thing
+- Code-blocks
+    - higher abstraction than interfaces
+    - different abstraction than modules
+    - more like clusters of high-data or high-control flow units
 
 
 
