@@ -51,7 +51,7 @@ Parseltongue provides
 - Will be based NOT on tree-sitter but on rust-analyzer
 - Will be working specifically for needs of users who want to constantly reason their codebase via dependency-graph
 
-## Vision 03 New IDE Interface-Signature-Graphs only for Rust
+## Vision 03 New IDE Interface-Signature-Graphs for Functional Programming in Rust
 
 - What if you could write Dependency-Graph in an IDE which treats Interfaces as a first-class citizen?
     - Interface Signature Graph is a collection of
@@ -61,9 +61,21 @@ Parseltongue provides
             - Change the code or Signature
             - Changes the forward and backward dependencies
 
+- What if what you wrote then gets deposited in txt files so that it is relevantly compiled by compilers 
+    - Rust has 3 layers
+        - Creates
+            - Folders
+                - Files
+                    - Code
+                    - Tests
+                    - Comments or Txt MD
+    - You write in a graphical interface where main function is root node
+        - will edit the interfaces themselves
+        - the interfaces will be then combined and collected into a rs file
+            - the rs files will be put into a codebase the way compiler expects it to be
+            - the rs files will be compiled by the compiler
 
-This will fail where
-- Implict relationships are established based on folder and file structure e.g. Springboot and Rails
+
 
 ## Remarks
 
