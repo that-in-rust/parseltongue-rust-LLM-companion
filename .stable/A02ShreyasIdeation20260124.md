@@ -49,7 +49,7 @@ Parseltongue provides
 ## Vision 02 Open-Code-Fork for Rust
 
 - Will be based NOT on tree-sitter but on rust-analyzer
-
+- Will be working specifically for needs of users who want to constantly reason their codebase via dependency-graph
 
 ## Remarks
 
@@ -60,6 +60,22 @@ Parseltongue provides
 - Rust is almost a functional langauge, which most Full Stack languages are NOT
 - Highest paid jobs are in Rust
 - Optimizing for Rust means optimizing for high scrutiny codebases
+- Workflows that we can think of
+    - Workflow 01 : Full Stack devs of Springboot Java, React, Go, Nodejs, Python
+        - Frotend IDE
+            - Antigravity
+            - Lovable etc.
+        - Backend IDE
+            - Claude Code, Open-code
+        - Do they look at code after generating it?
+            - Frontend yes because you need to have an eye
+                - Playwright is used but not perfect
+            - Backend no because as long as end to end tests are working & Postman
+                - Backend code is templatized, because there are only so many architectures
+                - Bigger issue is
+                    - migration
+                    - deployment
+                    - cut-over of some sort or changes to data
 
 
 
