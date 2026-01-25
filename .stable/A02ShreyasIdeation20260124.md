@@ -69,42 +69,11 @@ Parseltongue provides
     - std mode (default)
 
 
-## Why Vision 02
+### Why Vision 02
 
-Because we cannot force users to use dependency-graphs and associated search tools
+Because we cannot force users to use dependency-graphs and associated search tools - for that we need more control
 
-
-
-
-
-## Vision 03 New IDE Interface-Signature-Graphs for Functional Programming in Rust
-
-- What if you could write Dependency-Graph in an IDE which treats Interfaces as a first-class citizen?
-    - Interface Signature Graph is a collection of
-        - Interface Signatures which are Primary Keys
-        - These Primary keys will be small txt files
-        - Edit these primary keys
-            - Change the code or Signature while being super-explicit e.g. serde :: Serialize
-            - Changes the forward and backward dependencies
-                - in the above example an external library serde will become a calling node
-
-- What if what you wrote then gets deposited in txt files so that it is relevantly compiled by compilers 
-    - Rust has 3 layers
-        - Creates
-            - Folders
-                - Files
-                    - Code
-                    - Tests
-                    - Comments or Txt MD
-    - You write in a graphical interface where main function is root node
-        - will edit the interfaces themselves
-        - the interfaces will be then combined and collected into a rs file
-            - the rs files will be put into a codebase the way compiler expects it to be
-            - the rs files will be compiled by the compiler
-
-
-
-## Remarks
+### Remarks
 
 - Parseltongue failed because of
     - lack of a good interface to use it
@@ -151,11 +120,42 @@ Because we cannot force users to use dependency-graphs and associated search too
     - different abstraction than modules
     - more like clusters of high-data or high-control flow units
 
-# Nation wants to know
+### Nation wants to know
 
 - How to write highest predictability LLM driven code, what will be the characteristics of that code?
     - Functional Programming which can have mathematical correction proved by Lean etc.
     - Code needs to be predictable as in a simulation can be run on it
+
+
+
+
+
+## Vision 03 New IDE Interface-Signature-Graphs for Functional Programming in Rust
+
+- What if you could write Dependency-Graph in an IDE which treats Interfaces as a first-class citizen?
+    - Interface Signature Graph is a collection of
+        - Interface Signatures which are Primary Keys
+        - These Primary keys will be small txt files
+        - Edit these primary keys
+            - Change the code or Signature while being super-explicit e.g. serde :: Serialize
+            - Changes the forward and backward dependencies
+                - in the above example an external library serde will become a calling node
+
+- What if what you wrote then gets deposited in txt files so that it is relevantly compiled by compilers 
+    - Rust has 3 layers
+        - Creates
+            - Folders
+                - Files
+                    - Code
+                    - Tests
+                    - Comments or Txt MD
+    - You write in a graphical interface where main function is root node
+        - will edit the interfaces themselves
+        - the interfaces will be then combined and collected into a rs file
+            - the rs files will be put into a codebase the way compiler expects it to be
+            - the rs files will be compiled by the compiler
+
+
 
 
 
