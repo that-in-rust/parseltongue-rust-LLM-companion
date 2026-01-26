@@ -22,10 +22,13 @@ This document provides a comprehensive architectural analysis of Parseltongue's 
 3. [Control Flow Analysis](#control-flow-analysis)
 4. [The Critical Gap](#the-critical-gap)
 5. [Data Flow Diagrams](#data-flow-diagrams)
-6. [Implementation Status Matrix](#implementation-status-matrix)
-7. [Three Alternative Approaches](#three-alternative-approaches)
-8. [Recommendation](#recommendation)
-9. [Critical Files Reference](#critical-files-reference)
+6. [ISGL1 v2: Stable Entity Identity](#isgl1-v2-stable-entity-identity)
+7. [Entity Matching Algorithm](#entity-matching-algorithm)
+8. [Simulation Scenarios](#simulation-scenarios)
+9. [Implementation Status Matrix](#implementation-status-matrix)
+10. [Three Alternative Approaches](#three-alternative-approaches)
+11. [Recommendation](#recommendation)
+12. [Critical Files Reference](#critical-files-reference)
 
 ---
 
@@ -564,6 +567,333 @@ flowchart TD
 
 ---
 
+## ISGL1 v2: Stable Entity Identity
+
+### The Problem with Line-Number Based Keys
+
+The current ISGL1 key format includes line numbers:
+
+```
+rust:fn:handle_auth:__src_auth_rs:42-67
+                                   ↑↑↑↑↑
+                               LINE RANGE
+```
+
+**Critical Issue**: When you add lines to one function, ALL subsequent functions shift:
+
+```mermaid
+flowchart LR
+    subgraph Before["BEFORE: Add 5 lines to handle_auth"]
+        B1["fn handle_auth()<br/>lines 10-20<br/>KEY: ...rs:10-20"]
+        B2["fn validate_token()<br/>lines 22-40<br/>KEY: ...rs:22-40"]
+        B3["fn refresh_token()<br/>lines 42-60<br/>KEY: ...rs:42-60"]
+    end
+
+    subgraph After["AFTER: Lines shifted!"]
+        A1["fn handle_auth()<br/>lines 10-25<br/>KEY: ...rs:10-25 ✗"]
+        A2["fn validate_token()<br/>lines 27-45<br/>KEY: ...rs:27-45 ✗"]
+        A3["fn refresh_token()<br/>lines 47-65<br/>KEY: ...rs:47-65 ✗"]
+    end
+
+    Before --> After
+
+    style A1 fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style A2 fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style A3 fill:#ff6b6b,stroke:#c92a2a,color:#fff
+```
+
+**Consequences**:
+1. All 3 ISGL1 keys change, even though only `handle_auth` was modified
+2. All incoming edges break (they reference non-existent keys)
+3. Diff shows phantom changes (3 "modified" when only 1 actually changed)
+
+### The Solution: Birth Timestamp as Permanent Identity
+
+**Primary Key = `semantic_path` × `birth_timestamp`**
+
+```
+rust:fn:process:Foo:__src_rs:T1_001
+└──────────────┬───────────┘ └──┬──┘
+          semantic_path      birth_ts
+```
+
+**Key Properties**:
+1. **Unique**: semantic_path + timestamp is always unique
+2. **Stable**: Once assigned, NEVER changes (even if content/lines change)
+3. **Human-readable**: Still has the function name
+4. **Ordered**: T1_001 came before T1_002
+
+### ISGL1 v2 Key Format
+
+```mermaid
+flowchart LR
+    subgraph Input["Parsed Entity"]
+        LANG["language: rust"]
+        TYPE["entity_type: fn"]
+        NAME["name: handle_auth"]
+        PARENT["parent: Foo"]
+        FILE["file: src/auth.rs"]
+        BIRTH["birth_ts: T1_001"]
+    end
+
+    subgraph Generator["ISGL1 v2 Generator"]
+        BUILD["Build semantic path"]
+        LOOKUP["Lookup or assign birth_ts"]
+        CONCAT["Concatenate"]
+    end
+
+    subgraph Output["ISGL1 v2 Key"]
+        KEY["rust:fn:handle_auth:Foo:__src_auth_rs:T1_001"]
+    end
+
+    LANG --> BUILD
+    TYPE --> BUILD
+    NAME --> BUILD
+    PARENT --> BUILD
+    FILE --> BUILD
+    BUILD --> LOOKUP
+    BIRTH --> LOOKUP
+    LOOKUP --> CONCAT
+    CONCAT --> KEY
+
+    style KEY fill:#69db7c,stroke:#37b24d
+```
+
+### Entity Schema (v2)
+
+```
+Entity {
+    // PRIMARY KEY (immutable after creation)
+    key: "rust:fn:process:Foo:__src_rs:T1_001",
+
+    // Semantic identity (for matching)
+    semantic_path: "rust:fn:process:Foo:__src_rs",
+
+    // Mutable metadata (can change without changing key)
+    content_hash: "sha256_abc123",
+    line_start: 42,
+    line_end: 67,
+    last_modified: "2026-01-26T09:30:00Z",
+    birth_timestamp: "T1_001",
+}
+```
+
+---
+
+## Entity Matching Algorithm
+
+### The Challenge: Matching Entities Across Re-Index
+
+When a file is re-parsed, we must match newly parsed entities to existing ones in the database:
+
+```mermaid
+flowchart TD
+    subgraph NewParse["Newly Parsed Entities"]
+        N1["fn process() { A }"]
+        N2["fn process() { B }"]
+        N3["fn validate() { C }"]
+    end
+
+    subgraph Existing["Existing Entities in DB"]
+        E1["T1_001: fn process() { A }"]
+        E2["T1_002: fn process() { A }"]
+        E3["T1_003: fn validate() { C }"]
+    end
+
+    subgraph Matching["Matching Algorithm"]
+        M1["1. Match by content_hash"]
+        M2["2. Match by position"]
+        M3["3. Assign new timestamp"]
+    end
+
+    NewParse --> Matching
+    Existing --> Matching
+
+    style M1 fill:#69db7c,stroke:#37b24d
+    style M2 fill:#ffd43b,stroke:#fab005
+    style M3 fill:#4dabf7,stroke:#228be6
+```
+
+### Matching Priority
+
+```
+FOR each entity in newly parsed file:
+    1. Find candidates by semantic_path (name + parent + file)
+
+    2. IF candidate with matching content_hash exists:
+       → MATCH (same entity, key unchanged)
+
+    3. ELSE IF candidates exist but no hash match:
+       → Match by closest line position
+       → Mark as MODIFIED (content changed)
+
+    4. ELSE (no candidates):
+       → NEW entity, assign new birth timestamp
+
+    5. Any old entity with no match → DELETED
+```
+
+---
+
+## Simulation Scenarios
+
+### Simulation 1: New Function Inserted BEFORE Duplicates
+
+```
+BEFORE:                              AFTER:
+Line 10: fn process() { return 1 }   Line 5:  fn new_func() { ... }     ← NEW
+         T1_001, hash=H1             Line 15: fn process() { return 1 } ← shifted
+Line 20: fn process() { return 2 }            T1_001, hash=H1 ✓
+         T1_002, hash=H2             Line 25: fn process() { return 2 } ← shifted
+                                              T1_002, hash=H2 ✓
+```
+
+**Result**: Content hashes H1 and H2 are unique → **Easy match, keys stable**
+
+---
+
+### Simulation 2: Identical Duplicates, New Function Inserted
+
+```
+BEFORE:                              AFTER:
+Line 10: fn process() { return 1 }   Line 5:  fn new_func() { ... }     ← NEW (T2_001)
+         T1_001, hash=H1             Line 15: fn process() { return 1 } ← T1_001 or T1_002?
+Line 20: fn process() { return 1 }            hash=H1
+         T1_002, hash=H1 (SAME!)     Line 25: fn process() { return 1 } ← T1_001 or T1_002?
+                                              hash=H1
+```
+
+**Challenge**: Both have same hash H1 → **Order-based matching**
+- First `process` → T1_001
+- Second `process` → T1_002
+
+---
+
+### Simulation 3: Identical Duplicates SWAPPED
+
+```
+BEFORE:                              AFTER (user swapped them):
+Line 10: fn process() { A }  T1_001  Line 10: fn process() { A }  ← was T1_002?
+Line 20: fn process() { A }  T1_002  Line 20: fn process() { A }  ← was T1_001?
+```
+
+**Reality**: **Undetectable**. But semantically, if they're byte-for-byte identical, does it matter which timestamp they have? They're functionally interchangeable.
+
+---
+
+### Simulation 4: One Duplicate Modified
+
+```
+BEFORE:                              AFTER:
+Line 10: fn process() { A }  T1_001  Line 10: fn process() { A }  ← hash H1 → T1_001 ✓
+         hash=H1                     Line 20: fn process() { B }  ← hash H2 (changed!)
+Line 20: fn process() { A }  T1_002           T1_002 (matched by position)
+         hash=H1                              marked as MODIFIED
+```
+
+**Result**: First matches by hash. Second has no hash match → **Position-based, mark MODIFIED**
+
+---
+
+### Simulation 5: New Duplicate Inserted BETWEEN
+
+```
+BEFORE:                              AFTER:
+Line 10: fn process() { A }  T1_001  Line 10: fn process() { A }  ← hash → T1_001
+         hash=H1                     Line 20: fn process() { C }  ← NEW (T2_001)
+Line 30: fn process() { B }  T1_002           hash=H3 (no match)
+         hash=H2                     Line 30: fn process() { B }  ← hash → T1_002
+```
+
+**Result**: Hash matching works perfectly. New entity gets new timestamp.
+
+---
+
+### Simulation 6: Middle Entity Deleted
+
+```
+BEFORE:                              AFTER:
+Line 10: fn process() { A }  T1_001  Line 10: fn process() { A }  ← T1_001 ✓
+         hash=H1                     Line 20: fn process() { C }  ← T1_003 ✓
+Line 20: fn process() { B }  T1_002
+         hash=H2                     T1_002 has no match → DELETED
+Line 30: fn process() { C }  T1_003
+         hash=H3
+```
+
+---
+
+## Simulation Summary Matrix
+
+```mermaid
+flowchart TD
+    subgraph Scenarios["Matching Scenarios"]
+        S1["Different content hashes"]
+        S2["Same hash, shifted"]
+        S3["Same hash, swapped"]
+        S4["Content modified"]
+        S5["New entity"]
+        S6["Entity deleted"]
+    end
+
+    subgraph Solutions["Resolution Strategy"]
+        R1["Hash match ✓"]
+        R2["Order-based match"]
+        R3["Undetectable<br/>(semantically equivalent)"]
+        R4["Position match + MODIFIED"]
+        R5["New timestamp"]
+        R6["Mark DELETED"]
+    end
+
+    S1 --> R1
+    S2 --> R2
+    S3 --> R3
+    S4 --> R4
+    S5 --> R5
+    S6 --> R6
+
+    style R1 fill:#69db7c,stroke:#37b24d
+    style R2 fill:#ffd43b,stroke:#fab005
+    style R3 fill:#868e96,stroke:#495057
+    style R4 fill:#ffd43b,stroke:#fab005
+    style R5 fill:#4dabf7,stroke:#228be6
+    style R6 fill:#ff6b6b,stroke:#c92a2a
+```
+
+| Scenario | Content Hash | Solution | Key Stable? |
+|----------|--------------|----------|-------------|
+| Different content | Unique hashes | Match by hash | ✅ Yes |
+| Same content, shifted | Same hash | Order-based match | ✅ Yes |
+| Same content, swapped | Same hash | **Undetectable** (but equivalent) | ⚠️ N/A |
+| Content modified | Hash changed | Position-based, mark MODIFIED | ✅ Yes |
+| New entity | No hash match | New timestamp | ✅ Yes (new) |
+| Deleted entity | No new match | Mark DELETED | ✅ Yes (gone) |
+
+---
+
+## Philosophical Acceptance
+
+**The Identical Duplicate Limitation**:
+
+If two functions are byte-for-byte identical:
+- Same name
+- Same content
+- Same hash
+
+...then their individual identity is **philosophically meaningless**. Swapping them changes nothing about the program's behavior. We accept this limitation.
+
+**The Mental Model**:
+
+```
+OLD: "Track the same entity across changes"
+     (impossible for identical duplicates)
+
+NEW: "Track entities by semantic path, detect when content changed"
+     (handles all practical cases)
+```
+
+---
+
 ## Implementation Status Matrix
 
 | Component | Location | Status | Notes |
@@ -974,3 +1304,4 @@ pub async fn trigger_incremental_reindex_update(
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-26 | Claude Code Analysis | Initial comprehensive document |
+| 1.1 | 2026-01-26 | Claude Code Analysis | Added ISGL1 v2 design with birth timestamp identity, entity matching algorithm, 6 simulation scenarios, philosophical acceptance of identical duplicate limitation |
