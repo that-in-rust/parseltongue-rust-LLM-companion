@@ -20,14 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Interface inheritance (`extends`)
   - Interface implementation (`implements`)
 
-## [1.3.0] - 2025-01-26
+- **TypeScript grammar patterns**: Fixed tree-sitter query patterns for TypeScript class declarations:
+  - Use `type_identifier` instead of `identifier` for class names (TypeScript AST difference)
+  - Handle `member_expression` in extends clause for patterns like `React.Component`
+
+## [1.3.0] - 2026-01-26
 
 ### Added
 
 - D09-D12 Parseltongue architecture and design documents
 - D08 Principal Rust Engineer Interview documentation
 
-## [1.2.0] - 2025-01-23
+## [1.2.0] - 2026-01-23
 
 ### Added
 
@@ -40,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Query extractor now returns `(Vec<ParsedEntity>, Vec<DependencyEdge>)` tuple
 
-## [1.1.0] - 2025-01-20
+## [1.1.0] - 2026-01-20
 
 ### Added
 
@@ -55,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - <20ms per 1K LOC parsing (release mode)
 - 67% code reduction vs imperative extractors
 
-## [1.0.0] - 2025-01-15
+## [1.0.0] - 2026-01-15
 
 ### Added
 
@@ -65,8 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File streaming and indexing (pt01)
 - Basic entity extraction for Rust and Python
 
-[Unreleased]: https://github.com/that-in-rust/parseltongue/compare/v1.3.0...HEAD
-[1.3.0]: https://github.com/that-in-rust/parseltongue/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/that-in-rust/parseltongue/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/that-in-rust/parseltongue/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/that-in-rust/parseltongue/releases/tag/v1.0.0
+[Unreleased]: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/tag/v1.0.0
