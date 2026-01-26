@@ -46,12 +46,19 @@
   function: (identifier) @_require (#eq? @_require "require")
   arguments: (arguments (string) @reference.require)) @dependency.require
 
-; Class inheritance (extends)
+; Class inheritance (extends) - simple identifier
 (class_declaration
-  name: (identifier) @definition.class
+  name: (type_identifier) @definition.class
   (class_heritage
     (extends_clause
-      value: (identifier) @reference.extends))) @dependency.extends
+      (identifier) @reference.extends))) @dependency.extends
+
+; Class inheritance (extends) - member expression (e.g., React.Component)
+(class_declaration
+  name: (type_identifier) @definition.class
+  (class_heritage
+    (extends_clause
+      (member_expression) @reference.extends))) @dependency.extends_member
 
 ; Interface inheritance (extends)
 (interface_declaration
@@ -61,7 +68,7 @@
 
 ; Class implements interface
 (class_declaration
-  name: (identifier) @definition.class
+  name: (type_identifier) @definition.class
   (class_heritage
     (implements_clause
       (type_identifier) @reference.implements))) @dependency.implements
