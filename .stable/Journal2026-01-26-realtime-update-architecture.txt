@@ -1,0 +1,536 @@
+
+╭─── Claude Code v2.0.55 ──────────────────────────────────────────────────────╮
+│                                                 │ Tips for getting started   │
+│            Welcome back that in rust!           │ Run /init to create a CLA… │
+│                                                 │ ────────────────────────── │
+│                    ▗ ▗   ▖ ▖                    │ Recent activity            │
+│                                                 │ No recent activity         │
+│                      ▘▘ ▝▝                      │                            │
+│                                                 │                            │
+│             Sonnet 4.5 · Claude Max             │                            │
+│   ~/…/parseltongue-dependency-graph-generator   │                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+══════════════════ Conversation compacted · ctrl+o for history ═════════════════
+  ⎿  Read docs/v2/UserJourneys01.md (441 lines)
+  ⎿ Read 
+    crates/pt08-http-code-query-server/src/route_definition_builder_module.rs
+    (172 lines)
+  ⎿ Referenced file crates/pt08-http-code-query-server/src/http_endpoint_handler
+    _modules/workspace_watch_handler.rs
+  ⎿ Referenced file crates/pt08-http-code-query-server/src/file_watcher_service_
+    module/watcher_service.rs
+  ⎿  Read .gitignore (42 lines)
+
+⏺ Continuing the architectural analysis. Let me query parseltongue to
+  understand the full indexing pipeline and then provide the comprehensive
+  assessment.
+
+⏺ Bash(curl -s
+      "http://localhost:7777/code-entities-search-fuzzy?q=stream_directory"
+      2>/dev/null | jq '.')
+  ⎿  {                                           
+       "success": true,
+       "endpoint": "/code-entities-search-fuzzy",
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=parse"
+      2>/dev/null | jq '.entities[:15]')
+  ⎿  null
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=Streamer"
+      2>/dev/null | jq '.')
+  ⎿  {                                           
+       "success": true,
+       "endpoint": "/code-entities-search-fuzzy",
+     … +151 lines (ctrl+o to expand)
+
+⏺ Let me continue the analysis by examining the streamer module and
+  understanding the full indexing pipeline:
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=isgl1"
+      2>/dev/null | jq '.entities[:10]')
+  ⎿  null
+
+⏺ Bash(curl -s "http://localhost:7777/forward-callees-query-graph?entity=rust:me
+      thod:create_streamer:__crates_pt01-folder-to-cozodb-streamer_src_lib_rs:81
+      -86&hops=3" 2…)
+  ⎿  {                                            
+       "success": true,
+       "endpoint": "/forward-callees-query-graph",
+     … +23 lines (ctrl+o to expand)
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=incremental"
+      2>/dev/null | jq '.')
+  ⎿  {                                           
+       "success": true,
+       "endpoint": "/code-entities-search-fuzzy",
+     … +6 lines (ctrl+o to expand)
+
+⏺ Let me read the existing plan file and gather more information about the
+  indexing pipeline:
+
+⏺ Reading Plan(~/.claude/plans/ticklish-yawning-wirth.md)
+  ⎿  Read 976 lines
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=extract"
+      2>/dev/null | jq '.entities[:12]')
+  ⎿  null
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=cozo"
+      2>/dev/null | jq '.entities[:15]')
+  ⎿  null
+
+⏺ The HTTP API queries are returning null for some searches. Let me query
+  with different terms and then compile my architectural analysis:
+
+⏺ Bash(curl -s "http://localhost:7777/codebase-statistics-overview-summary"
+      2>/dev/null | jq '.')
+  ⎿  {                                                     
+       "success": true,
+       "endpoint": "/codebase-statistics-overview-summary",
+     … +12 lines (ctrl+o to expand)
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=trigger"
+      2>/dev/null | jq '.entities')
+  ⎿  null
+
+⏺ Bash(curl -s "http://localhost:7777/code-entities-search-fuzzy?q=reindex"
+      2>/dev/null | jq '.')
+  ⎿  {                                           
+       "success": true,
+       "endpoint": "/code-entities-search-fuzzy",
+     … +6 lines (ctrl+o to expand)
+
+⏺ The server is running with parseltongue's own codebase (291 entities).
+  Based on my extensive analysis from the previous session, I have enough
+  information to write the comprehensive architectural analysis. Let me
+  update the plan file:
+
+⏺ Updated plan
+  ⎿  /plan to preview · ~/.claude/plans/ticklish-yawning-wirth.md
+
+⏺ I've written a comprehensive architectural analysis to the plan file.
+  Here's the summary of my findings:
+
+  Architectural Analysis Summary
+
+  The current architecture is fundamentally CORRECT. There's no need for
+  re-architecture.
+
+  What's Working (✅)
+
+  - File watcher (notify v6.1)
+  - Debouncing (500ms window)
+  - Path filtering (ignores target/, .git/, etc.)
+  - WebSocket broadcasting
+  - Database CRUD operations
+  - Diff engine
+
+  The ONE Critical Gap (❌)
+
+  trigger_incremental_reindex_update() at watcher_service.rs:292-313 is a
+  STUB that returns Ok() without doing anything.
+
+  Control Flow
+
+  File Change → Watcher → Debouncer → Path Filter
+      → trigger_incremental_reindex_update() ← STUB HERE
+      → (never reaches) WebSocket broadcast
+
+  Implementation Strategy (4 Phases)
+
+  1. Phase 1: Basic implementation - full file re-parse
+  2. Phase 2: Delta computation - only update changed entities
+  3. Phase 3: Tree-sitter incremental parsing for sub-100ms
+  4. Phase 4: File content caching for no-op save detection
+
+⏺ User declined to answer questions
+
+> I want you to write down the details of this architecture in a new MD file
+ in @parseltongue-dependency-graph-generator/.stable/ - draw Mermaid 
+diagrams which are github compliant - cover each adn every aspect of 
+incremental diff updates - and also suggest 3 better ways of doing it using 
+research from @agent-general-purpose 
+
+⏺ Task(Research incremental indexing approaches)
+  ⎿  Done (16 tool uses · 69.0k tokens · 4m 50s)                           
+
+⏺ Bash(ls -la /Users/amuldotexe/Desktop/OSS202601/parseltongue-dependency-graph-
+      generator/.stable/ 2>/dev/null || echo "Directory does not exist, will
+      create")
+  ⎿  total 312                                              
+     drwxr-xr-x@  9 amuldotexe  staff    288 Jan 25 22:15 .
+     drwxr-xr-x@ 22 amuldotexe  staff    704 Jan 26 09:07 ..
+     … +12 lines (ctrl+o to expand)
+
+⏺ Excellent! The research agent returned comprehensive findings. Now let me
+  create the detailed architecture document with GitHub-compliant Mermaid
+  diagrams:
+
+⏺ Write(.stable/D04_Incremental_Indexing_Architecture.md)
+  ⎿  Wrote 977 lines to .stable/D04_Incremental_Indexing_Architecture.md
+     # Incremental Indexing Architecture
+     > **Document ID**: D04
+     > **Status**: Design Complete
+     > **Last Updated**: 2026-01-26
+     > **Author**: Claude Code Analysis
+     ---
+     ## Executive Summary
+     … +967 lines (ctrl+o to expand)
+
+⏺ Bash(ls -la /Users/amuldotexe/Desktop/OSS202601/parseltongue-dependency-graph-
+      generator/.stable/D04_Incremental_Indexing_Architecture.md)
+  ⎿ -rw-------  1 amuldotexe  staff  25871 Jan 26 09:29 /Users/amuldotexe/D
+    esktop/OSS202601/parseltongue-dependency-graph-generator/.stable/D04_In
+    cremental_Indexing_Architecture.md
+
+
+
+⏺ Created comprehensive architecture document at
+  .stable/D04_Incremental_Indexing_Architecture.md (25KB).
+
+  Document Summary
+
+  File: .stable/D04_Incremental_Indexing_Architecture.md
+
+  Contents
+
+  1. Current Architecture Overview
+    - High-level system architecture diagram
+    - Database architecture (base.db vs live.db)
+  2. Component Deep Dive (5 components with Mermaid diagrams)
+    - File Watcher Service
+    - Debouncer Module
+    - Path Filter Module
+    - WebSocket Streaming Module
+    - CozoDbStorage (Database Layer)
+  3. Control Flow Analysis
+    - Current state (with gap identified)
+    - Expected state (after implementation)
+  4. The Critical Gap
+    - Exact location: watcher_service.rs:292-313
+    - What the stub should do
+  5. Data Flow Diagrams
+    - Entity lifecycle state diagram
+    - ISGL1 key generation flow
+    - Dependency edge types
+  6. Implementation Status Matrix
+    - All components with status (✅ or ❌)
+  7. Three Alternative Approaches (from research)
+
+  | Approach               | Latency  | Complexity | Time to Implement |
+  |------------------------|----------|------------|-------------------|
+  | 1. Simple But Reliable | 20-100ms | Low        | 2-3 days          |
+  | 2. Salsa + Tree-sitter | 10-40ms  | High       | 2-3 weeks         |
+  | 3. Reactive + CRDTs    | 3-15ms   | Very High  | 1-2 months        |
+
+  8. Comparison Matrix (quadrant chart)
+  9. Recommendation: Start with Approach 1, migrate to Approach 2
+  10. Critical Files Reference + Pseudocode for implementation
+
+  All Mermaid diagrams are GitHub-compliant and will render correctly.
+
+
+
+# AGENTS.md
+
+This file provides guidance to WARP (warp.dev) when working with code in this repository.
+
+## Build and Test Commands
+
+### Rust Backend
+
+```bash
+# Build the entire workspace
+cargo build --release
+
+# Run all tests across all crates
+cargo test --all
+
+# Run tests for specific crate
+cargo test -p parseltongue-core
+cargo test -p pt01-folder-to-cozodb-streamer
+cargo test -p pt08-http-code-query-server
+
+# Run a single test by name
+cargo test test_name --package parseltongue-core
+
+# Check code without building
+cargo check --all
+
+# Clean build artifacts (useful when switching branches)
+cargo clean
+
+# Verify no TODOs/stubs remain (required before commits)
+grep -r "TODO\|STUB\|PLACEHOLDER" --include="*.rs" crates/
+```
+
+### Frontend (React + TypeScript)
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server (proxies to backend on :7777)
+npm run dev
+
+# Build production bundle
+npm run build
+
+# Run unit tests
+npm run test
+
+# Run end-to-end tests with Playwright
+npm run test:e2e
+
+# Preview production build
+npm run preview
+```
+
+### Running the Application
+
+```bash
+# Step 1: Index a codebase (creates timestamped workspace in parseltongueYYYYMMDDHHMMSS/)
+cargo run --release -- pt01-folder-to-cozodb-streamer ./target-directory
+
+# Step 2: Start HTTP server (default port 7777)
+cargo run --release -- pt08-http-code-query-server --db "rocksdb:parseltongue20250124120500/analysis.db"
+
+# Step 3: In another terminal, start frontend dev server
+cd frontend && npm run dev
+
+# Access frontend at http://localhost:5173
+# Access API directly at http://localhost:7777
+```
+
+## High-Level Architecture
+
+### The Core Concept
+Parseltongue transforms codebases into queryable graph databases. Instead of grep returning raw text, LLMs query structured entities and dependencies via HTTP API, reducing token usage by 99% (2-5K vs 500K).
+
+### Workspace Architecture (Cargo Workspace)
+
+```
+parseltongue/
+├── crates/
+│   ├── parseltongue/              # CLI binary - dispatches to tools
+│   ├── parseltongue-core/         # Shared library (types, traits, storage, parsing)
+│   ├── pt01-folder-to-cozodb-streamer/  # Tool 1: Ingest codebase → CozoDB
+│   └── pt08-http-code-query-server/    # Tool 8: HTTP REST API + WebSocket server
+├── frontend/                      # React/TypeScript UI for live diff visualization
+├── entity_queries/                # Tree-sitter queries for entity extraction (.scm files)
+├── dependency_queries/            # Tree-sitter queries for dependency extraction
+└── tests/                        # Integration tests
+```
+
+**Dependency Flow**: `parseltongue` (binary) → `pt01`/`pt08` (tools) → `parseltongue-core` (shared)
+
+### parseltongue-core: The Shared Foundation
+
+**Key Modules:**
+- `entities.rs` - Core types: `CodeEntity`, `DependencyEdge`, `EdgeType`, ISGL1 key format
+- `storage/` - CozoDB client implementation with schema management
+- `interfaces.rs` - Trait definitions for storage, parsing, serialization
+- `error.rs` - Structured error types using `thiserror`
+- `diff/` - Diff analysis: entity differ, blast radius calculator, visualization transformer
+- `workspace/` - Workspace management types and manager
+- `temporal.rs` - Temporal versioning support (current_ind, future_ind, future_action)
+- `query_json_graph_helpers.rs` - JSON graph traversal utilities for HTTP endpoints
+- `serializers/` - Serialization traits (JSON, TOON format)
+
+**Entity Key Format (ISGL1):**
+```
+language:entity_type:entity_name:file_path:line_range
+
+Example: rust:fn:main:src_main_rs:1-50
+```
+
+File paths use underscores instead of slashes. This format is the primary key for all entities and dependencies.
+
+### pt01-folder-to-cozodb-streamer: The Ingestion Engine
+
+**Purpose:** Parse source code using tree-sitter, extract entities and dependencies, store in CozoDB.
+
+**Key Files:**
+- `streamer.rs` - Main file streaming logic with `FileStreamer` trait
+- `isgl1_generator.rs` - Generates ISGL1 keys from tree-sitter nodes
+- `test_detector.rs` - Classifies entities as CODE or TEST (filters test entities for LLM context optimization)
+- `lsp_client.rs` - LSP integration for enhanced semantic analysis
+- `cli.rs` - CLI argument parsing for pt01
+
+**Tree-sitter Queries:**
+- `entity_queries/*.scm` - Extracts function/class/struct definitions (12 languages)
+- `dependency_queries/*.scm` - Extracts function calls, imports, type usage
+
+**Languages Supported:** Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
+
+### pt08-http-code-query-server: The HTTP API Server
+
+**Purpose:** Expose CozoDB queries via 15 REST endpoints + WebSocket streaming for live diff visualization.
+
+**Key Modules:**
+- `http_server_startup_runner.rs` - Main server initialization and axum setup
+- `http_endpoint_handler_modules/` - 15 endpoint handlers (blast-radius, reverse-callers, etc.)
+- `websocket_streaming_module/` - WebSocket connection management for real-time diff events
+- `file_watcher_service_module/` - File system watcher with debouncing for auto-indexing
+- `static_file_embed_module.rs` - Embeds frontend build using rust-embed
+- `command_line_argument_parser.rs` - CLI parsing for pt08
+
+**HTTP Endpoints (15 Total):**
+1. `/server-health-check-status` - Health check
+2. `/codebase-statistics-overview-summary` - Entity/edge counts, languages
+3. `/api-reference-documentation-help` - Full API docs
+4. `/code-entities-list-all` - All entities (optionally filtered by type)
+5. `/code-entity-detail-view?key=X` - Single entity with source code
+6. `/code-entities-search-fuzzy?q=pattern` - Fuzzy search by name
+7. `/dependency-edges-list-all` - All dependency edges
+8. `/reverse-callers-query-graph?entity=X` - Who calls X? (fan-in)
+9. `/forward-callees-query-graph?entity=X` - What does X call? (fan-out)
+10. `/blast-radius-impact-analysis?entity=X&hops=N` - Transitive impact analysis
+11. `/circular-dependency-detection-scan` - Find dependency cycles
+12. `/complexity-hotspots-ranking-view?top=N` - Entities with highest coupling
+13. `/semantic-cluster-grouping-list` - Module groups via label propagation
+14. `/smart-context-token-budget?focus=X&tokens=N` - Optimal context selection for LLMs
+15. `/temporal-coupling-hidden-deps?entity=X` - Files that change together without code edges
+
+**WebSocket Streaming:**
+- `/websocket/diff-stream?workspace_id=X` - Streams real-time diff events (entity_added, entity_modified, edge_removed, etc.)
+- Used by frontend for live visualization
+
+### Frontend: React Live Diff Visualization
+
+**Purpose:** 3D force-directed graph visualization of code changes and blast radius in real-time.
+
+**Tech Stack:**
+- React 18 + TypeScript
+- Vite (build tool)
+- react-force-graph-3d (Three.js wrapper)
+- Zustand (state management)
+- TanStack Query (data fetching)
+- Playwright (E2E tests)
+
+**Key Components:**
+- `App.tsx` - Root component, orchestrates layout and WebSocket lifecycle
+- `DiffGraphCanvasView.tsx` - 3D graph visualization
+- `WorkspaceListSidebar.tsx` - Workspace management UI
+- `EntityDetailPanel.tsx` - Shows entity source code on selection
+- `stores/diffVisualizationStore.ts` - Graph data state
+- `stores/workspaceStore.ts` - Workspace list state
+- `hooks/useWebsocketDiffStream.ts` - WebSocket connection management
+
+**Proxy Configuration:** Vite dev server proxies `/workspace` and `/websocket` to `http://localhost:7777`
+
+## Critical Naming Convention: FOUR-WORD NAMING
+
+All function names, crate names, and command names MUST follow exactly 4 words:
+
+```rust
+// Functions: underscore-separated
+filter_implementation_entities_only()    // ✓ Good - 4 words
+render_box_with_title_unicode()          // ✓ Good - 4 words
+filter_entities()                        // ✗ Bad - Too short
+
+// Crates: hyphen-separated
+pt01-folder-to-cozodb-streamer           // ✓ Good - 4 words
+pt08-http-code-query-server              // ✓ Good - 4 words
+```
+
+**Pattern:** `verb_constraint_target_qualifier()`
+
+This is a hard architectural constraint enforced throughout the codebase.
+
+## TDD-First Development Process
+
+This project follows **Design101** principles with executable specifications:
+
+1. **Write tests FIRST** - Follow STUB → RED → GREEN → REFACTOR cycle
+2. **Tests are specifications** - With preconditions, postconditions, error conditions
+3. **Zero placeholders** - No TODOs/stubs in commits
+4. **Validate performance claims** - Every performance assertion backed by tests
+
+**Test Organization:**
+- Unit tests: `#[cfg(test)]` modules in same file
+- Integration tests: `tests/` directory
+- Frontend tests: `*.test.tsx` and `e2e/` directory
+
+## Layered Rust Architecture
+
+Follow L1→L2→L3 dependency model:
+
+- **L1 Core:** Ownership, traits, Result/Option, RAII (no_std compatible)
+- **L2 Standard:** Collections, iterators, Arc/Rc, Send/Sync
+- **L3 External:** Async/await (Tokio), Serde, CozoDB, Axum
+
+## Error Handling
+
+- **Libraries** (`parseltongue-core`): Use `thiserror` for structured errors
+- **Applications** (CLI/tools): Use `anyhow` for context chaining
+- **HTTP Endpoints:** Return JSON with `{success: bool, endpoint: string, data: {...}, tokens: number}`
+
+## CozoDB Database Schema
+
+**CodeGraph Table:**
+- Primary key: `ISGL1_key` (String)
+- Fields: Current_Code, Future_Code, interface_signature, TDD_Classification, lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language, last_modified, entity_type, entity_class
+
+**DependencyEdges Table:**
+- Composite key: (from_key, to_key, edge_type)
+- Fields: source_location (optional line/column info)
+
+**Engine Formats:**
+- In-memory: `mem`
+- Persistent: `rocksdb:path/to/db` (recommended)
+- Alternative: `sqlite:path/to/db.sqlite`
+
+## Workspace Management (v2.0+)
+
+Workspaces are timestamped directories created by pt01:
+```
+parseltongue20250124120500/
+├── analysis.db/         # RocksDB database
+├── metadata.json        # Workspace metadata
+└── snapshots/          # Optional snapshots for diff
+```
+
+The HTTP server can manage multiple workspaces and watch for file changes to auto-reindex.
+
+## Test Entity Filtering
+
+By default, pt01 excludes entities classified as TEST from the database to optimize LLM context. This reduces entity count by ~80% for typical test-heavy codebases.
+
+**Classification heuristics:**
+- File path contains `test`, `spec`, `__tests__`, `e2e`
+- Function name starts with `test_`, `Test`, `should_`
+- Decorator/annotation: `@Test`, `#[test]`, `#[cfg(test)]`
+
+Override with pt01 flags if needed.
+
+## Version Increment Rules
+
+- Each version = ONE complete feature, end-to-end working
+- Zero TODOs/stubs in commits
+- All tests passing before commit
+- Performance tests validate claimed improvements
+
+## Common Pitfalls
+
+1. **Don't forget rocksdb: prefix** - `--db "rocksdb:analysis.db"`, NOT `--db "analysis.db"`
+2. **Copy exact workspace path from pt01 output** - The timestamped directory name is printed after indexing
+3. **Frontend needs backend running** - Start pt08 server before `npm run dev`
+4. **unknown:0-0 entities are stdlib/external** - Filter these when analyzing YOUR code complexity
+5. **Entity keys are case-sensitive** - Use exact ISGL1 format from search results
+
+## Diagram Guidelines (from Design101 Rule)
+
+ALL DIAGRAMS MUST USE MERMAID SYNTAX for GitHub compatibility. Never use other diagram formats.
+
+## Additional Context from README
+
+The README.md contains extensive usage examples and a "Recipe Book" for LLM agents. Key workflows:
+- **Pattern 1.1: Orientation Sequence** - First contact with unfamiliar codebase
+- **Pattern 1.2: Surgical Investigation** - Bug hunting with reverse trace
+- **Pattern 1.3: Safe Refactor Protocol** - Quantify risk before changes
+
+Refer to README.md "Section 02 Recipe Book" for detailed API workflow patterns.
