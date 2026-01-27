@@ -3,6 +3,7 @@
 //! Following S01 TDD principles: STUB → RED → GREEN → REFACTOR
 //! These specifications define the contract for mandatory EntityClass field
 
+#[cfg(test)]
 use crate::entities::{CodeEntity, EntityClass, EntityType, InterfaceSignature};
 
 /// Contract: All CodeEntity instances MUST have EntityClass
@@ -384,7 +385,7 @@ mod pt03_preservation_tests {
     }
 }
 
-/// Helper function to create test entities
+#[cfg(test)]
 fn create_test_entity(file_path: &str, code: &str, entity_class: EntityClass) -> CodeEntity {
     let signature = InterfaceSignature {
         entity_type: if entity_class == EntityClass::TestImplementation {

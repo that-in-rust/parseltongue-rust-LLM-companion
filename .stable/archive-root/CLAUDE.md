@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Parseltongue is a code analysis toolkit that parses codebases into a graph database (CozoDB) for efficient LLM-optimized querying. Core value: 99% token reduction (2-5K tokens vs 500K raw dumps), 31x faster than grep.
 
-**Version**: 1.4.0 (HTTP-only architecture with smart port selection)
+**Version**: 1.0.3 (HTTP-only architecture)
 **Languages Supported**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ## Build and Test Commands
@@ -57,7 +57,7 @@ curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hop
 
 **Note**: pt01 always creates a timestamped workspace folder - no `--db` flag needed.
 
-## HTTP Server Endpoints (14 Total)
+## HTTP Server Endpoints (15 Total)
 
 | Category | Endpoint | Description |
 |----------|----------|-------------|
@@ -75,6 +75,7 @@ curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hop
 | Analysis | `/complexity-hotspots-ranking-view?top=N` | Coupling hotspots |
 | Analysis | `/semantic-cluster-grouping-list` | Module clusters |
 | Advanced | `/smart-context-token-budget?focus=X&tokens=N` | LLM context |
+| Advanced | `/temporal-coupling-hidden-deps` | Hidden dependencies |
 
 ## Workspace Architecture
 

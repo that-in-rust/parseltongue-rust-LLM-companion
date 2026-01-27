@@ -227,55 +227,6 @@ async fn query_reverse_callers_direct_method(
     }
 }
 
-/// Edge details between two entities
-///
-/// # 4-Word Name: EdgeDetailsBetweenEntities
-#[derive(Debug)]
-struct EdgeDetailsBetweenEntities {
-    edge_type: String,
-    source_location: String,
-}
-
-/// Get edge details between two entities
-///
-/// # 4-Word Name: get_edge_details_between_entities
-async fn get_edge_details_between_entities(
-    storage: &parseltongue_core::storage::CozoDbStorage,
-    from_key: &str,
-    to_key: &str,
-) -> Option<EdgeDetailsBetweenEntities> {
-    // Escape keys for CozoDB query
-    let escaped_from_key = from_key
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"");
-    let escaped_to_key = to_key
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"");
-
-    let query_result = storage
-        .raw_query(&format!(
-            r#"
-            ?[edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type => source_location}},
-                from_key == "{}",
-                to_key == "{}"
-            "#,
-            escaped_from_key, escaped_to_key
-        ))
-        .await
-        .ok()?;
-
-    if let Some(row) = query_result.rows.first() {
-        if row.len() >= 2 {
-            return Some(EdgeDetailsBetweenEntities {
-                edge_type: extract_string_value(&row[0]).unwrap_or_else(|| "Unknown".to_string()),
-                source_location: extract_string_value(&row[1]).unwrap_or_else(|| "unknown".to_string()),
-            });
-        }
-    }
-
-    None
-}
-
 /// Extract string value from CozoDB DataValue
 ///
 /// # 4-Word Name: extract_string_value

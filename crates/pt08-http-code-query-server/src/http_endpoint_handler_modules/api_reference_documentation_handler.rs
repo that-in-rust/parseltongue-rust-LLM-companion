@@ -99,7 +99,7 @@ pub async fn handle_api_reference_documentation_help(
             success: true,
             endpoint: "/api-reference-documentation-help".to_string(),
             data: ApiReferenceDataPayload {
-                api_version: "1.0.2".to_string(),
+                api_version: "1.4.0".to_string(),
                 total_endpoints,
                 categories,
             },
@@ -263,6 +263,25 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                     method: "GET".to_string(),
                     description: "Groups entities into semantic clusters by connectivity".to_string(),
                     parameters: vec![],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/smart-context-token-budget".to_string(),
+                    method: "GET".to_string(),
+                    description: "Returns optimal context for LLM within token budget".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "focus".to_string(),
+                            param_type: "query".to_string(),
+                            required: true,
+                            description: "Entity key to focus context around".to_string(),
+                        },
+                        EndpointParameterDocPayload {
+                            name: "tokens".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Maximum token budget (default: 4000)".to_string(),
+                        },
+                    ],
                 },
             ],
         },

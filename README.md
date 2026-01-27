@@ -1,6 +1,6 @@
 # Parseltongue
 
-> **v1.2.0** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
+> **v1.4.0** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
 
 ```bash
 # Index your codebase
@@ -185,7 +185,7 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 
 ---
 
-## HTTP API Reference (15 Endpoints)
+## HTTP API Reference (14 Endpoints)
 
 ### Core Endpoints
 
@@ -540,11 +540,11 @@ code-entities-search-fuzzy       # 4 words
 
 ```bash
 # Download (one command)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.2.0/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.0/parseltongue -o parseltongue && chmod +x parseltongue
 
 # Verify
 ./parseltongue --version
-# parseltongue 1.2.0
+# parseltongue 1.4.0
 ```
 
 **Optional**: Add to PATH for global access:

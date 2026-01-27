@@ -286,10 +286,8 @@ mod test_detection_tests {
     }
 }
 
-// STUB IMPLEMENTATIONS (Phase 2: STUB)
-// These will be fleshed out in RED/GREEN/REFACTOR phases
-
-/// Stub: Check if path should be excluded based on patterns
+// Test helper functions (only compiled for tests)
+#[cfg(test)]
 fn should_exclude_path(path: &std::path::Path, patterns: &[String]) -> bool {
     let path_str = path.to_string_lossy();
     
@@ -303,7 +301,7 @@ fn should_exclude_path(path: &std::path::Path, patterns: &[String]) -> bool {
     false
 }
 
-/// Stub: Check if path is under a git subdirectory (not project root)
+#[cfg(test)]
 fn is_under_git_subdirectory(path: &std::path::Path, project_root: &std::path::Path) -> bool {
     let mut current = path;
     
@@ -330,7 +328,7 @@ fn is_under_git_subdirectory(path: &std::path::Path, project_root: &std::path::P
     false
 }
 
-/// Stub: Detect if file contains test code based on language and patterns
+#[cfg(test)]
 fn detect_test_from_content(path: &std::path::Path, content: &str) -> bool {
     use crate::test_detector::{TestDetector, DefaultTestDetector, EntityClass};
     
