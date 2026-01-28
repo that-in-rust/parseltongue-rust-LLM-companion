@@ -426,6 +426,90 @@ The `tokens` field helps LLMs understand context budget impact.
 
 ---
 
+## jq Query Patterns & Anti-Patterns
+
+When querying the API with jq, use the correct field names to avoid errors.
+
+### API Field Reference
+
+| Endpoint | Field Names |
+|----------|-------------|
+| `/dependency-edges-list-all` | `from_key`, `to_key`, `edge_type`, `source_location` |
+| `/code-entities-list-all` | `key`, `name`, `entity_type`, `language`, `file_path` |
+| `/reverse-callers-query-graph` | `from_key`, `to_key`, `edge_type` |
+| `/forward-callees-query-graph` | `from_key`, `to_key`, `edge_type` |
+
+### Common Patterns (Do This)
+
+```bash
+# Filter edges by target entity
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '[.data.edges[] | select(.to_key | contains("Auth"))]'
+
+# Filter edges by source file
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '[.data.edges[] | select(.from_key | contains("controller"))]'
+
+# Count edges by type
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '.data.edges | group_by(.edge_type) | map({type: .[0].edge_type, count: length})'
+
+# Get unique edge types
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '[.data.edges[].edge_type] | unique'
+
+# Filter entities by language
+curl -s http://localhost:7777/code-entities-list-all | \
+  jq '[.data.entities[] | select(.language == "javascript")]'
+```
+
+### Anti-Patterns (Don't Do This)
+
+```bash
+# WRONG: Using .to instead of .to_key
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '.data.edges | map(select(.to | contains("Auth")))'
+# Error: null (null) and string ("Auth") cannot have their containment checked
+
+# WRONG: Using .from instead of .from_key
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '[.data.edges[] | select(.from | contains("main"))]'
+# Error: null and string cannot have containment checked
+
+# WRONG: Using .type instead of .edge_type
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '[.data.edges[] | select(.type == "Calls")]'
+# Returns empty (field doesn't exist)
+```
+
+### Why These Errors Happen
+
+When jq accesses a non-existent field, it returns `null`. Functions like `contains()` cannot operate on `null`:
+
+```bash
+# This returns null (field doesn't exist)
+echo '{"to_key": "foo"}' | jq '.to'
+# Output: null
+
+# This causes an error
+echo '{"to_key": "foo"}' | jq '.to | contains("f")'
+# Error: null and string cannot have containment checked
+```
+
+### Defensive jq Patterns
+
+```bash
+# Safe filtering with null check
+curl -s http://localhost:7777/dependency-edges-list-all | \
+  jq '[.data.edges[] | select(.to_key != null and (.to_key | contains("Auth")))]'
+
+# Inspect response structure first
+curl -s http://localhost:7777/dependency-edges-list-all | jq '.data.edges[0] | keys'
+# Output: ["edge_type", "from_key", "source_location", "to_key"]
+```
+
+---
+
 ## CLI Options
 
 ```bash
