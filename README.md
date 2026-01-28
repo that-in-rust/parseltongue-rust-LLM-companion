@@ -576,7 +576,7 @@ MIT License - See LICENSE file
 
 ### The Fundamental Insight
 
-Parseltongue transforms code from **unstructured text** into a **queryable graph**. The 15 endpoints are not random—they form a coherent system:
+Parseltongue transforms code from **unstructured text** into a **queryable graph**. The 14 endpoints form a coherent system:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -664,12 +664,7 @@ curl "http://localhost:7777/reverse-callers-query-graph?entity=ENTITY_KEY"
 # → Source code reveals: Uses fuzzy matching on function name
 # → Even if key doesn't match exactly, it finds related calls
 
-# STEP 4: Check temporal coupling (hidden relationships)
-curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=ENTITY_KEY"
-# → KILLER INSIGHT: Shows files that change together WITHOUT code edges
-# → If a config file shows high coupling but no code edge → likely cause
-
-# STEP 5: Assess investigation scope
+# STEP 4: Assess investigation scope
 curl "http://localhost:7777/blast-radius-impact-analysis?entity=SUSPECT_ENTITY&hops=2"
 # → Algorithm: BFS traversal with fuzzy key matching
 # → hops=1: Direct callers only
@@ -716,12 +711,7 @@ curl http://localhost:7777/circular-dependency-detection-scan
 # → Algorithm: DFS with three-color marking (WHITE/GRAY/BLACK)
 # → If your entity is IN a cycle, refactoring is HIGH RISK
 
-# STEP 5: Hidden coupling check
-curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=ENTITY_KEY"
-# → If files show high co-change with NO code edge:
-#   These files MUST be updated together even if code doesn't require it
-
-# STEP 6: Generate comprehensive context for AI assistance
+# STEP 5: Generate comprehensive context for AI assistance
 curl "http://localhost:7777/smart-context-token-budget?focus=ENTITY_KEY&tokens=6000"
 # → Algorithm from source:
 #   • Direct callers: score 1.0
@@ -843,14 +833,6 @@ for changed_entity in CHANGES:
     if changed_entity in hotspots.top_20:
         TOTAL_RISK += 10  # Hotspot penalty
     
-    # Get temporal coupling
-    temporal = curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=${changed_entity}"
-    for coupling in temporal.hidden_dependencies:
-        if not coupling.has_code_edge:
-            if coupling.coupled_entity not in CHANGES:
-                REQUIRED_TESTS.append(coupling.coupled_entity)
-                TOTAL_RISK += 5  # Missing coupled change
-
 # Check for new cycles
 cycles = curl http://localhost:7777/circular-dependency-detection-scan
 if cycles.has_cycles:
@@ -924,13 +906,10 @@ error_entity = curl "http://localhost:7777/code-entities-search-fuzzy?q=ERROR_LO
 # STEP 2: Get backward trace (potential causes)
 callers = curl "http://localhost:7777/reverse-callers-query-graph?entity=ERROR_ENTITY"
 
-# STEP 3: Check for hidden dependencies
-temporal = curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=ERROR_ENTITY"
-
-# STEP 4: Get complexity context
+# STEP 3: Get complexity context
 hotspots = curl "http://localhost:7777/complexity-hotspots-ranking-view?top=20"
 
-# STEP 5: Generate rich context
+# STEP 4: Generate rich context
 context = curl "http://localhost:7777/smart-context-token-budget?focus=ERROR_ENTITY&tokens=6000"
 ```
 
@@ -944,12 +923,6 @@ I'm debugging: {symptom_description}
 ## Upstream Code (Potential Causes)
 {for caller in callers.top_5}
 - {caller.from_key}: calls this via {caller.edge_type}
-{endfor}
-
-## Hidden Dependencies (Files that change together)
-{for dep in temporal.hidden_dependencies if not dep.has_code_edge}
-⚠️ {dep.coupled_entity} - changes together but NO code connection
-   Insight: {dep.insight}
 {endfor}
 
 ## Complexity Note
@@ -978,10 +951,7 @@ blast = curl "http://localhost:7777/blast-radius-impact-analysis?entity=TARGET&h
 clusters = curl http://localhost:7777/semantic-cluster-grouping-list
 cycles = curl http://localhost:7777/circular-dependency-detection-scan
 
-# STEP 3: Hidden coupling (what ELSE needs to change)
-temporal = curl "http://localhost:7777/temporal-coupling-hidden-deps?entity=TARGET"
-
-# STEP 4: Maximum context
+# STEP 3: Maximum context
 context = curl "http://localhost:7777/smart-context-token-budget?focus=TARGET&tokens=8000"
 ```
 
@@ -1007,8 +977,7 @@ Create a step-by-step refactoring plan that:
 1. Maintains backward compatibility for {blast.by_hop[0].count} direct callers
 2. Respects module boundary of {cluster_name}
 3. Does NOT introduce new cycles
-4. Includes changes to hidden dependencies: {temporal.hidden_deps_list}
-5. Specifies test coverage requirements
+4. Specifies test coverage requirements
 ```
 
 ---
