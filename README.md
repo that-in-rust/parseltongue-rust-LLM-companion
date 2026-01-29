@@ -293,7 +293,31 @@ curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:my_new_he
 
 > **IMPORTANT FOR AI AGENTS**: Use `curl` via the Bash tool, NOT WebFetch/Fetch!
 
-### Why WebFetch/Fetch Fails
+### Step 1: Discover Available Endpoints First
+
+```bash
+# ALWAYS start here - get the full API reference with correct endpoint names
+curl -s "http://localhost:7777/api-reference-documentation-help" | jq '.data.categories[].endpoints[].path'
+```
+
+**Common endpoint mistakes**:
+```
+❌ WRONG endpoint names (these don't exist):
+/code-entity-get-by-key       → Use: /code-entity-detail-view
+/get-entity                   → Use: /code-entity-detail-view
+/search                       → Use: /code-entities-search-fuzzy
+/callers                      → Use: /reverse-callers-query-graph
+
+✅ CORRECT endpoint names (4-word naming convention):
+/code-entity-detail-view?key=X
+/code-entities-search-fuzzy?q=X
+/code-entities-list-all
+/reverse-callers-query-graph?entity=X
+/forward-callees-query-graph?entity=X
+/blast-radius-impact-analysis?entity=X&hops=N
+```
+
+### Step 2: Why WebFetch/Fetch Fails
 
 ```
 ❌ WRONG - WebFetch is for HTML pages, not JSON APIs:
