@@ -289,6 +289,75 @@ curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:my_new_he
 
 ---
 
+## Critical: How LLM Agents Should Query Parseltongue
+
+> **IMPORTANT FOR AI AGENTS**: Use `curl` via the Bash tool, NOT WebFetch/Fetch!
+
+### Why WebFetch/Fetch Fails
+
+```
+❌ WRONG - WebFetch is for HTML pages, not JSON APIs:
+Fetch(http://localhost:7777/code-entity-detail-view?key=java:class:MyClass:...)
+→ Error: Invalid URL  (or returns garbled HTML-to-markdown conversion)
+
+✅ CORRECT - Use curl via Bash for JSON APIs:
+curl -s "http://localhost:7777/code-entity-detail-view?key=java:class:MyClass:..." | jq '.'
+→ Returns clean JSON response
+```
+
+### Correct Query Patterns for LLM Agents
+
+```bash
+# Search for entities
+curl -s "http://localhost:7777/code-entities-search-fuzzy?q=EvictableCache" | jq '.data.total_count'
+
+# Get entity details by key
+curl -s "http://localhost:7777/code-entity-detail-view?key=java:class:CacheManager:__src_main_java:50-100" | jq '.data'
+
+# Find what calls an entity
+curl -s "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:process:src_lib_rs:10-50" | jq '.data.callers'
+
+# Get codebase statistics
+curl -s "http://localhost:7777/codebase-statistics-overview-summary" | jq '.'
+
+# Blast radius analysis
+curl -s "http://localhost:7777/blast-radius-impact-analysis?entity=java:method:save:UserService_java:100-150&hops=2" | jq '.data'
+```
+
+### Filter Results with jq
+
+```bash
+# Get only class entities from search
+curl -s "http://localhost:7777/code-entities-search-fuzzy?q=Cache" | \
+  jq -r '.data.entities[] | select(.entity_type == "class") | .key'
+
+# Get first 5 entities
+curl -s "http://localhost:7777/code-entities-list-all" | \
+  jq '.data.entities[:5]'
+
+# Count entities by type
+curl -s "http://localhost:7777/code-entities-list-all" | \
+  jq '.data.entities | group_by(.entity_type) | map({type: .[0].entity_type, count: length})'
+```
+
+### Multi-Port Environments
+
+When multiple Parseltongue instances are running (different codebases), specify the port:
+
+```bash
+# Codebase A on port 7777
+curl -s "http://localhost:7777/codebase-statistics-overview-summary" | jq '.data'
+
+# Codebase B on port 7785
+curl -s "http://localhost:7785/codebase-statistics-overview-summary" | jq '.data'
+
+# Compare entity counts between codebases
+echo "Codebase A entities: $(curl -s http://localhost:7777/codebase-statistics-overview-summary | jq '.data.code_entities_total_count')"
+echo "Codebase B entities: $(curl -s http://localhost:7785/codebase-statistics-overview-summary | jq '.data.code_entities_total_count')"
+```
+
+---
+
 ## Jobs To Be Done
 
 | User Job | HTTP Endpoint | Token Cost |
