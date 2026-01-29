@@ -123,6 +123,9 @@ parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 
 # Custom port (use --port flag)
 parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db" --port 8080
+
+# With file watching for automatic reindex (v1.4.1+)
+parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db" --watch --watch-dir ./src
 ```
 
 **Output**:
@@ -182,10 +185,12 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 | "Where is the complexity?" | `GET /complexity-hotspots-ranking-view?top=10` | ~500 |
 | "What modules exist?" | `GET /semantic-cluster-grouping-list` | ~1K |
 | "Give me optimal context" | `GET /smart-context-token-budget?focus=X&tokens=4000` | ~4K |
+| "Is file watching on?" | `GET /file-watcher-status-check` | ~50 |
+| "Reindex this file" | `POST /incremental-reindex-file-update?path=X` | ~100 |
 
 ---
 
-## HTTP API Reference (14 Endpoints)
+## HTTP API Reference (16 Endpoints)
 
 ### Core Endpoints
 
@@ -226,6 +231,13 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 | Endpoint | Description |
 |----------|-------------|
 | `GET /smart-context-token-budget?focus=X&tokens=N` | Context selection within token budget |
+
+### File Watcher Endpoints (v1.4.1+)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /file-watcher-status-check` | Check if file watching is enabled and running |
+| `POST /incremental-reindex-file-update?path=X` | Trigger reindex for a specific file |
 
 ---
 
@@ -520,7 +532,11 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 |--------|-------------|---------|
 | `--port <PORT>` | HTTP port | 7777 |
 | `--db <PATH>` | Database path | `mem` (in-memory) |
+| `--watch`, `-w` | Enable file watching for automatic reindex | false |
+| `--watch-dir <PATH>` | Directory to watch (requires `--watch`) | current directory |
 | `--verbose` | Enable verbose logging | false |
+
+**File Watching** (v1.4.1+): When `--watch` is enabled, the server monitors file changes in the specified directory and automatically reindexes modified files. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`, `.rb`, `.php`, `.c`, `.cpp`, `.cs`, `.swift`
 
 **Database format**: Always use `rocksdb:` prefix for persistent databases:
 ```bash
@@ -624,11 +640,11 @@ code-entities-search-fuzzy       # 4 words
 
 ```bash
 # Download (one command)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.0/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.1/parseltongue -o parseltongue && chmod +x parseltongue
 
 # Verify
 ./parseltongue --version
-# parseltongue 1.4.0
+# parseltongue 1.4.1
 ```
 
 **Optional**: Add to PATH for global access:
