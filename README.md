@@ -167,6 +167,128 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 
 ---
 
+## What's New in v1.4.2: Always-On File Watching
+
+### Breaking Change: `--watch` Flags Removed
+
+**v1.4.2 simplifies the workflow**: File watching is now always enabled. The `--watch` and `--watch-dir` CLI flags have been removed.
+
+#### Migration from v1.4.1
+
+```bash
+# ❌ OLD (v1.4.1) - These flags no longer work
+parseltongue pt08-http-code-query-server --db rocksdb:mydb --watch
+parseltongue pt08-http-code-query-server --db rocksdb:mydb --watch --watch-dir ./src
+
+# ✅ NEW (v1.4.2) - File watching happens automatically
+parseltongue pt08-http-code-query-server --db rocksdb:mydb
+# That's it! The server automatically watches the current directory.
+```
+
+### Why Always-On File Watching?
+
+**Before v1.4.2**: Users had to remember to add `--watch` flags. Many forgot, leading to stale code graphs.
+
+**With v1.4.2**: Your code graph stays in sync automatically. Zero configuration required.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    THE NEW WORKFLOW                               │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  1. Index codebase (once)                                        │
+│     parseltongue pt01-folder-to-cozodb-streamer ./my-project     │
+│                                                                   │
+│  2. Start server (file watching is automatic)                    │
+│     parseltongue pt08-http-code-query-server --db rocksdb:mydb   │
+│                                                                   │
+│  3. Write code... save file... graph updates automatically       │
+│     └─ No manual reindex needed                                  │
+│     └─ LLM agents always get fresh data                          │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### File Watching in Action
+
+When the server starts, you'll see:
+```
+✓ File watcher started: /path/to/your/project
+  Monitoring: .rs, .py, .js, .ts, .go, .java files
+```
+
+**Monitored extensions**: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`
+
+**What happens when you save a file**:
+1. File watcher detects the change
+2. Server automatically reindexes the modified file
+3. Code graph is updated in <100ms
+4. Next HTTP query reflects the changes
+
+### Verifying File Watcher Status
+
+```bash
+# Check if file watching is running
+curl http://localhost:7777/file-watcher-status-check
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "file_watching_enabled_flag": true,
+    "watcher_running_status_flag": true,
+    "watch_directory_path": "/path/to/your/project",
+    "watched_extensions_list": [".rs", ".py", ".js", ".ts", ".go", ".java"],
+    "events_processed_count": 42
+  }
+}
+```
+
+### Manual Reindex (Optional)
+
+For edge cases, you can still trigger a manual reindex:
+
+```bash
+# Reindex a specific file
+curl -X POST "http://localhost:7777/incremental-reindex-file-update?path=/absolute/path/to/file.rs"
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "file_path": "/absolute/path/to/file.rs",
+    "entities_added": 5,
+    "entities_updated": 2,
+    "entities_removed": 1,
+    "reindex_duration_ms": 45
+  }
+}
+```
+
+### LLM Agent Integration with File Watching
+
+When using Parseltongue with LLM agents, the always-on file watching ensures:
+
+1. **Fresh Context**: Every query returns the latest code state
+2. **No Stale Data**: Agents never work with outdated dependency graphs
+3. **Seamless Development**: Edit code, ask questions, get accurate answers
+
+**Example workflow**:
+```bash
+# Agent asks: "What calls the new helper function I just added?"
+# 1. You save the new file
+# 2. File watcher auto-reindexes (happens in background)
+# 3. Agent queries reverse-callers
+curl "http://localhost:7777/reverse-callers-query-graph?entity=rust:fn:my_new_helper:src_utils_rs:10-25"
+# 4. Response includes all current callers (including any you just wrote)
+```
+
+---
+
 ## Jobs To Be Done
 
 | User Job | HTTP Endpoint | Token Cost |
