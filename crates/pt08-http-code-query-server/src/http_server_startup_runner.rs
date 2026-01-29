@@ -335,11 +335,9 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     // v1.0.4: Populate languages from database
     state.populate_languages_from_database().await;
 
-    // PRD-2026-01-28: Start file watcher if enabled
-    if config.file_watching_enabled_flag {
-        let watch_dir = config.watch_directory_path_option
-            .clone()
-            .unwrap_or_else(|| config.target_directory_path_value.clone());
+    // v1.4.2: File watching always enabled - watches current directory
+    {
+        let watch_dir = config.target_directory_path_value.clone();
 
         let extensions = vec![
             "rs".to_string(),

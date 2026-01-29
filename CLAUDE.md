@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Parseltongue is a code analysis toolkit that parses codebases into a graph database (CozoDB) for efficient LLM-optimized querying. Core value: 99% token reduction (2-5K tokens vs 500K raw dumps), 31x faster than grep.
 
-**Version**: 1.4.1 (HTTP-only architecture with smart port selection, --watch CLI support)
+**Version**: 1.4.2 (HTTP-only architecture with always-on file watching)
 **Languages Supported**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ## Build and Test Commands

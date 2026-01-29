@@ -30,12 +30,6 @@ pub struct HttpServerStartupConfig {
 
     /// Show verbose query logs
     pub verbose_logging_enabled_flag: bool,
-
-    /// Enable file watching for incremental reindex (PRD-2026-01-28)
-    pub file_watching_enabled_flag: bool,
-
-    /// Directory to watch (defaults to target directory)
-    pub watch_directory_path_option: Option<PathBuf>,
 }
 
 impl Default for HttpServerStartupConfig {
@@ -48,8 +42,6 @@ impl Default for HttpServerStartupConfig {
             daemon_background_mode_flag: false,
             idle_timeout_minutes_option: None,
             verbose_logging_enabled_flag: false,
-            file_watching_enabled_flag: false,
-            watch_directory_path_option: None,
         }
     }
 }
@@ -98,20 +90,6 @@ impl HttpServerStartupConfig {
                 }
                 "--verbose" => {
                     config.verbose_logging_enabled_flag = true;
-                }
-                "--watch" => {
-                    config.file_watching_enabled_flag = true;
-                }
-                "--watch-dir" => {
-                    i += 1;
-                    config.watch_directory_path_option = Some(
-                        PathBuf::from(
-                            args.get(i)
-                                .context("--watch-dir requires a path")?
-                        )
-                    );
-                    // Implicitly enable watching when watch-dir is specified
-                    config.file_watching_enabled_flag = true;
                 }
                 arg if !arg.starts_with('-') => {
                     // Positional argument = target directory
@@ -187,33 +165,4 @@ mod tests {
         assert!(port >= 7777);
     }
 
-    #[test]
-    fn test_parse_with_watch_flag() {
-        let args = vec![
-            "pt08".to_string(),
-            ".".to_string(),
-            "--watch".to_string(),
-        ];
-        let config = HttpServerStartupConfig::parse_from_argument_vector(&args).unwrap();
-
-        assert!(config.file_watching_enabled_flag);
-        assert!(config.watch_directory_path_option.is_none());
-    }
-
-    #[test]
-    fn test_parse_with_watch_dir_flag() {
-        let args = vec![
-            "pt08".to_string(),
-            ".".to_string(),
-            "--watch-dir".to_string(),
-            "/tmp/watch".to_string(),
-        ];
-        let config = HttpServerStartupConfig::parse_from_argument_vector(&args).unwrap();
-
-        assert!(config.file_watching_enabled_flag);
-        assert_eq!(
-            config.watch_directory_path_option,
-            Some(PathBuf::from("/tmp/watch"))
-        );
-    }
 }

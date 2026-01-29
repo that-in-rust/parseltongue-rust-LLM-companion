@@ -1,6 +1,6 @@
 # Parseltongue
 
-> **v1.4.1** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
+> **v1.4.2** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
 
 ```bash
 # Index your codebase
@@ -124,8 +124,8 @@ parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 # Custom port (use --port flag)
 parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db" --port 8080
 
-# With file watching for automatic reindex (v1.4.1+)
-parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db" --watch --watch-dir ./src
+# File watching is always enabled (v1.4.2+) - code graph stays in sync automatically
+parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 ```
 
 **Output**:
@@ -232,7 +232,7 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 |----------|-------------|
 | `GET /smart-context-token-budget?focus=X&tokens=N` | Context selection within token budget |
 
-### File Watcher Endpoints (v1.4.1+)
+### File Watcher Endpoints (Always On)
 
 | Endpoint | Description |
 |----------|-------------|
@@ -532,11 +532,9 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 |--------|-------------|---------|
 | `--port <PORT>` | HTTP port | 7777 |
 | `--db <PATH>` | Database path | `mem` (in-memory) |
-| `--watch`, `-w` | Enable file watching for automatic reindex | false |
-| `--watch-dir <PATH>` | Directory to watch (requires `--watch`) | current directory |
 | `--verbose` | Enable verbose logging | false |
 
-**File Watching** (v1.4.1+): When `--watch` is enabled, the server monitors file changes in the specified directory and automatically reindexes modified files. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`, `.rb`, `.php`, `.c`, `.cpp`, `.cs`, `.swift`
+**File Watching** (v1.4.2+): Always enabled. The server automatically monitors the current directory for code changes and reindexes modified files. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`
 
 **Database format**: Always use `rocksdb:` prefix for persistent databases:
 ```bash
@@ -640,11 +638,11 @@ code-entities-search-fuzzy       # 4 words
 
 ```bash
 # Download (one command)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.1/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.2/parseltongue -o parseltongue && chmod +x parseltongue
 
 # Verify
 ./parseltongue --version
-# parseltongue 1.4.1
+# parseltongue 1.4.2
 ```
 
 **Optional**: Add to PATH for global access:
