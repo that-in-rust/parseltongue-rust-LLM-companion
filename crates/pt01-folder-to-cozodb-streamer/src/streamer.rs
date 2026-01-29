@@ -153,7 +153,7 @@ impl FileStreamerImpl {
             visibility: Visibility::Public, // Default to public for now
             file_path: PathBuf::from(&parsed.file_path),
             line_range: LineRange::new(parsed.line_range.0 as u32, parsed.line_range.1 as u32)?,
-            module_path: vec![], // TODO: Extract from file path
+            module_path: self.derive_file_module_path(file_path),
             documentation: None,
             language_specific: self.create_language_signature(&parsed.language),
         };
@@ -284,6 +284,60 @@ impl FileStreamerImpl {
             .map(|(_, line)| line)
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// Extract module path from file path relative to crate root
+    ///
+    /// # 4-Word Name: derive_file_module_path
+    ///
+    /// # Examples (Rust conventions)
+    /// - `src/lib.rs` → `[]` (crate root)
+    /// - `src/main.rs` → `[]` (binary root)
+    /// - `src/calculator.rs` → `["calculator"]`
+    /// - `src/utils/mod.rs` → `["utils"]`
+    /// - `src/utils/helpers.rs` → `["utils", "helpers"]`
+    fn derive_file_module_path(&self, file_path: &Path) -> Vec<String> {
+        // Make path relative to root_dir
+        let relative_path = file_path
+            .strip_prefix(&self.config.root_dir)
+            .unwrap_or(file_path);
+
+        let path_str = relative_path.to_string_lossy();
+        let parts: Vec<&str> = path_str.split(['/', '\\']).collect();
+
+        // Find "src" directory index and start after it
+        let start_idx = parts.iter().position(|&s| s == "src").map(|i| i + 1).unwrap_or(0);
+
+        let mut module_path: Vec<String> = parts[start_idx..]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                // Remove file extension for Rust files
+                s.strip_suffix(".rs")
+                    .or_else(|| s.strip_suffix(".py"))
+                    .or_else(|| s.strip_suffix(".js"))
+                    .or_else(|| s.strip_suffix(".ts"))
+                    .unwrap_or(s)
+                    .to_string()
+            })
+            .collect();
+
+        // Handle special Rust files
+        if let Some(last) = module_path.last() {
+            match last.as_str() {
+                // lib.rs and main.rs are crate roots - remove from path
+                "lib" | "main" => {
+                    module_path.pop();
+                }
+                // mod.rs represents parent module - remove from path
+                "mod" => {
+                    module_path.pop();
+                }
+                _ => {}
+            }
+        }
+
+        module_path
     }
 
     /// Check if file should be processed based on patterns
@@ -642,3 +696,7 @@ impl FileStreamerImpl {
 #[cfg(test)]
 #[path = "streamer_lsp_tests.rs"]
 mod streamer_lsp_tests;
+
+#[cfg(test)]
+#[path = "streamer_module_path_tests.rs"]
+mod streamer_module_path_tests;

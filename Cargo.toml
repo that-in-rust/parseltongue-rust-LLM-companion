@@ -5,7 +5,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 authors = ["Parseltongue Team"]
 license = "MIT OR Apache-2.0"
@@ -51,6 +51,9 @@ cozo = { version = "0.7.6", default-features = false, features = ["storage-rocks
 
 # Export dependencies
 wasm-bindgen = "0.2"
+
+# File watching dependencies
+notify = "6.1"
 
 # Development dependencies
 criterion = "0.5"

@@ -28,12 +28,19 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 urlencoding = "2.1"
+async-trait = { workspace = true }
 
 # Database
 cozo = { workspace = true }
+
+# Hashing (PRD-2026-01-28: incremental reindex)
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 tokio-test = { workspace = true }
 tempfile = { workspace = true }
 tower = { version = "0.5", features = ["util"] }
 urlencoding = "2.1"
+sha2 = "0.10"
+hex = "0.4"

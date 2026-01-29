@@ -129,6 +129,18 @@ pub enum ParseltongError {
         from_key: String,
         to_key: String,
     },
+
+    /// Unsupported language/file extension
+    #[error("Unsupported language for file: {path}")]
+    UnsupportedLanguage {
+        path: String,
+    },
+
+    /// Parser initialization or parsing error
+    #[error("Parser error: {message}")]
+    ParserError {
+        message: String,
+    },
 }
 
 /// Result type alias for convenience

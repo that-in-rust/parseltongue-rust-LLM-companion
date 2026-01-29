@@ -44,6 +44,9 @@ indicatif.workspace = true
 walkdir = "2.0"
 async-trait.workspace = true
 
+# File watching dependencies
+notify = { workspace = true }
+
 [dev-dependencies]
 criterion.workspace = true
 proptest.workspace = true

@@ -4,7 +4,7 @@
 
 use axum::{
     Router,
-    routing::get,
+    routing::{get, post},
 };
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
@@ -23,6 +23,8 @@ use crate::http_endpoint_handler_modules::{
     semantic_cluster_grouping_handler,
     api_reference_documentation_handler,
     smart_context_token_budget_handler,
+    incremental_reindex_file_handler,
+    file_watcher_status_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -112,6 +114,16 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/smart-context-token-budget",
             get(smart_context_token_budget_handler::handle_smart_context_token_budget)
+        )
+        // Incremental reindex endpoint (PRD-2026-01-28)
+        .route(
+            "/incremental-reindex-file-update",
+            post(incremental_reindex_file_handler::handle_incremental_reindex_file_request)
+        )
+        // File watcher status endpoint (PRD-2026-01-29)
+        .route(
+            "/file-watcher-status-check",
+            get(file_watcher_status_handler::handle_file_watcher_status_check)
         )
         // Test route for debugging
         .route(

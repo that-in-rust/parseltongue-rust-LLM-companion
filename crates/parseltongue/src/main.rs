@@ -88,7 +88,9 @@ fn build_cli() -> Command {
                     "Start an HTTP server exposing CozoDB queries via REST endpoints.\n\n\
                     Examples:\n  \
                     parseltongue pt08-http-code-query-server --db rocksdb:analysis.db\n  \
-                    parseltongue pt08-http-code-query-server --port 7777 --db rocksdb:analysis.db"
+                    parseltongue pt08-http-code-query-server --port 7777 --db rocksdb:analysis.db\n  \
+                    parseltongue pt08-http-code-query-server --db rocksdb:analysis.db --watch\n  \
+                    parseltongue pt08-http-code-query-server --db rocksdb:analysis.db --watch --watch-dir ./src"
                 )
                 .arg(
                     Arg::new("port")
@@ -108,6 +110,20 @@ fn build_cli() -> Command {
                         .short('v')
                         .help("Enable verbose logging")
                         .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("watch")
+                        .long("watch")
+                        .short('w')
+                        .help("Enable file watching for automatic reindex on changes")
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("watch-dir")
+                        .long("watch-dir")
+                        .value_name("PATH")
+                        .help("Directory to watch (defaults to current directory)")
+                        .requires("watch"),
                 ),
         )
 }
@@ -191,6 +207,8 @@ async fn run_http_code_query_server(matches: &ArgMatches) -> Result<()> {
     let port = matches.get_one::<String>("port");
     let db = matches.get_one::<String>("db").unwrap();
     let verbose = matches.get_flag("verbose");
+    let watch = matches.get_flag("watch");
+    let watch_dir = matches.get_one::<String>("watch-dir");
 
     println!("{}", style("Running Tool 8: HTTP Code Query Server").cyan());
     if verbose {
@@ -200,6 +218,13 @@ async fn run_http_code_query_server(matches: &ArgMatches) -> Result<()> {
             println!("  Port: 7777 (default)");
         }
         println!("  Database: {}", db);
+        if watch {
+            if let Some(dir) = watch_dir {
+                println!("  File watching: enabled ({})", dir);
+            } else {
+                println!("  File watching: enabled (current directory)");
+            }
+        }
     }
 
     // Build configuration
@@ -211,6 +236,8 @@ async fn run_http_code_query_server(matches: &ArgMatches) -> Result<()> {
         daemon_background_mode_flag: false,
         idle_timeout_minutes_option: None,
         verbose_logging_enabled_flag: verbose,
+        file_watching_enabled_flag: watch,
+        watch_directory_path_option: watch_dir.map(|p| std::path::PathBuf::from(p)),
     };
 
     // Start the server (blocks until shutdown)
@@ -230,5 +257,43 @@ mod tests {
         assert!(subcommands.contains(&"pt08-http-code-query-server")); // HTTP server (primary)
         // Note: pt02 (JSON export) and pt07 (terminal viz) removed in v1.0.3
         // All visualization available via HTTP endpoints
+    }
+
+    #[test]
+    fn test_cli_watch_argument_parsing() {
+        let cli = build_cli();
+
+        // Test --watch flag is recognized
+        let matches = cli.clone().try_get_matches_from([
+            "parseltongue",
+            "pt08-http-code-query-server",
+            "--db", "rocksdb:test.db",
+            "--watch",
+        ]).expect("CLI should accept --watch flag");
+
+        let sub_matches = matches.subcommand_matches("pt08-http-code-query-server").unwrap();
+        assert!(sub_matches.get_flag("watch"));
+
+        // Test --watch-dir requires --watch
+        let result = cli.clone().try_get_matches_from([
+            "parseltongue",
+            "pt08-http-code-query-server",
+            "--db", "rocksdb:test.db",
+            "--watch-dir", "./src",
+        ]);
+        assert!(result.is_err(), "--watch-dir should require --watch");
+
+        // Test --watch with --watch-dir works
+        let matches = cli.clone().try_get_matches_from([
+            "parseltongue",
+            "pt08-http-code-query-server",
+            "--db", "rocksdb:test.db",
+            "--watch",
+            "--watch-dir", "./src",
+        ]).expect("CLI should accept --watch --watch-dir combination");
+
+        let sub_matches = matches.subcommand_matches("pt08-http-code-query-server").unwrap();
+        assert!(sub_matches.get_flag("watch"));
+        assert_eq!(sub_matches.get_one::<String>("watch-dir").unwrap(), "./src");
     }
 }

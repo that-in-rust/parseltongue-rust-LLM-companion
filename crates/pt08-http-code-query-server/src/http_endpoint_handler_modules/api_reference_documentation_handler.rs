@@ -99,7 +99,7 @@ pub async fn handle_api_reference_documentation_help(
             success: true,
             endpoint: "/api-reference-documentation-help".to_string(),
             data: ApiReferenceDataPayload {
-                api_version: "1.4.0".to_string(),
+                api_version: "1.4.1".to_string(),
                 total_endpoints,
                 categories,
             },

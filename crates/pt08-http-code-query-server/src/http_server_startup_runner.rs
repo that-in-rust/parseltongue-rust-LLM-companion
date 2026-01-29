@@ -2,14 +2,20 @@
 //!
 //! # 4-Word Naming: http_server_startup_runner
 
+use std::path::PathBuf;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use tokio::sync::RwLock;
 
 use crate::command_line_argument_parser::HttpServerStartupConfig;
+use crate::file_watcher_integration_service::{
+    create_production_watcher_service, FileWatcherIntegrationConfig,
+};
 use crate::port_selection::{find_and_bind_port_available, PortSelectionError};
 use crate::route_definition_builder_module::build_complete_router_instance;
+use parseltongue_core::file_parser::FileParser;
 use parseltongue_core::storage::CozoDbStorage;
 
 /// Shared application state container
@@ -28,6 +34,17 @@ pub struct SharedApplicationStateContainer {
 
     /// Codebase statistics metadata
     pub codebase_statistics_metadata_arc: Arc<RwLock<CodebaseStatisticsMetadata>>,
+
+    /// File parser instance for incremental reindexing (PRD-2026-01-28)
+    ///
+    /// Thread-safe parser that can parse files into entities and dependencies.
+    /// Used by the incremental-reindex-file-update endpoint.
+    pub file_parser_instance_arc: Arc<FileParser>,
+
+    /// File watcher status metadata (PRD-2026-01-29)
+    ///
+    /// Tracks file watcher state for status endpoint.
+    pub file_watcher_status_metadata_arc: Arc<RwLock<FileWatcherStatusMetadata>>,
 }
 
 /// Codebase statistics metadata
@@ -54,30 +71,83 @@ pub struct CodebaseStatisticsMetadata {
     pub ingestion_timestamp_utc_option: Option<DateTime<Utc>>,
 }
 
+/// File watcher status metadata
+///
+/// # 4-Word Name: FileWatcherStatusMetadata
+///
+/// Tracks file watcher state for the status endpoint.
+/// Uses atomic counter for thread-safe event tracking.
+#[derive(Debug, Clone)]
+pub struct FileWatcherStatusMetadata {
+    /// Whether file watching is enabled
+    pub watcher_enabled_status_flag: bool,
+
+    /// Whether watcher started successfully
+    pub watcher_running_status_flag: bool,
+
+    /// Directory being watched (if any)
+    pub watch_directory_path_option: Option<PathBuf>,
+
+    /// File extensions being monitored
+    pub watched_extensions_list_vec: Vec<String>,
+
+    /// Count of file events processed (atomic)
+    pub events_processed_count_arc: Arc<AtomicUsize>,
+
+    /// Error message if watcher failed to start
+    pub watcher_error_message_option: Option<String>,
+}
+
+impl Default for FileWatcherStatusMetadata {
+    fn default() -> Self {
+        Self {
+            watcher_enabled_status_flag: false,
+            watcher_running_status_flag: false,
+            watch_directory_path_option: None,
+            watched_extensions_list_vec: Vec::new(),
+            events_processed_count_arc: Arc::new(AtomicUsize::new(0)),
+            watcher_error_message_option: None,
+        }
+    }
+}
+
 impl SharedApplicationStateContainer {
     /// Create new application state
     ///
     /// # 4-Word Name: create_new_application_state
+    ///
+    /// Initializes state with a thread-safe FileParser instance for incremental reindexing.
+    /// The parser is created once and shared across all handler invocations.
     pub fn create_new_application_state() -> Self {
         let now = Utc::now();
+        let parser = FileParser::create_new_parser_instance()
+            .expect("Failed to initialize FileParser - tree-sitter grammars missing");
         Self {
             database_storage_connection_arc: Arc::new(RwLock::new(None)),
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
+            file_parser_instance_arc: Arc::new(parser),
+            file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
         }
     }
 
     /// Create state with database storage
     ///
     /// # 4-Word Name: create_with_database_storage
+    ///
+    /// Initializes state with database and thread-safe FileParser for incremental reindexing.
     pub fn create_with_database_storage(storage: CozoDbStorage) -> Self {
         let now = Utc::now();
+        let parser = FileParser::create_new_parser_instance()
+            .expect("Failed to initialize FileParser - tree-sitter grammars missing");
         Self {
             database_storage_connection_arc: Arc::new(RwLock::new(Some(Arc::new(storage)))),
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
+            file_parser_instance_arc: Arc::new(parser),
+            file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
         }
     }
 
@@ -264,6 +334,62 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
 
     // v1.0.4: Populate languages from database
     state.populate_languages_from_database().await;
+
+    // PRD-2026-01-28: Start file watcher if enabled
+    if config.file_watching_enabled_flag {
+        let watch_dir = config.watch_directory_path_option
+            .clone()
+            .unwrap_or_else(|| config.target_directory_path_value.clone());
+
+        let extensions = vec![
+            "rs".to_string(),
+            "py".to_string(),
+            "js".to_string(),
+            "ts".to_string(),
+            "go".to_string(),
+            "java".to_string(),
+        ];
+
+        let watcher_config = FileWatcherIntegrationConfig {
+            watch_directory_path_value: watch_dir.clone(),
+            debounce_duration_milliseconds_value: 100,
+            watched_extensions_list_vec: extensions.clone(),
+            file_watching_enabled_flag: true,
+        };
+
+        let watcher_service = create_production_watcher_service(state.clone(), watcher_config);
+
+        match watcher_service.start_file_watcher_service().await {
+            Ok(()) => {
+                println!("✓ File watcher started: {}", watch_dir.display());
+                println!("  Monitoring: .rs, .py, .js, .ts, .go, .java files");
+
+                // Update file watcher status metadata
+                {
+                    let mut status = state.file_watcher_status_metadata_arc.write().await;
+                    status.watcher_enabled_status_flag = true;
+                    status.watcher_running_status_flag = true;
+                    status.watch_directory_path_option = Some(watch_dir.clone());
+                    status.watched_extensions_list_vec = extensions;
+                    status.watcher_error_message_option = None;
+                }
+            }
+            Err(e) => {
+                println!("⚠ Warning: File watcher failed to start: {}", e);
+                println!("  Continuing without file watching (graceful degradation)");
+
+                // Update file watcher status metadata with error
+                {
+                    let mut status = state.file_watcher_status_metadata_arc.write().await;
+                    status.watcher_enabled_status_flag = true;
+                    status.watcher_running_status_flag = false;
+                    status.watch_directory_path_option = Some(watch_dir.clone());
+                    status.watched_extensions_list_vec = extensions;
+                    status.watcher_error_message_option = Some(e.to_string());
+                }
+            }
+        }
+    }
 
     // Build router
     let router = build_complete_router_instance(state);

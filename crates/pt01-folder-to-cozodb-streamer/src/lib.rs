@@ -27,6 +27,7 @@ use std::sync::Arc;
 
 pub mod cli;
 pub mod errors;
+pub mod file_watcher;
 pub mod isgl1_generator;
 pub mod lsp_client;
 pub mod streamer;
@@ -35,6 +36,7 @@ pub mod v090_specifications;
 
 // Re-export commonly used types
 pub use errors::*;
+pub use file_watcher::*;
 pub use isgl1_generator::*;
 pub use lsp_client::*;
 pub use streamer::{FileStreamerImpl, *};

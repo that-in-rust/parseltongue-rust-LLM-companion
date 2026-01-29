@@ -1269,6 +1269,330 @@ impl CozoDbStorage {
 
         Ok(entity)
     }
+
+    // ============================================================================
+    // INCREMENTAL REINDEX METHODS (PRD-2026-01-28)
+    // ============================================================================
+
+    /// Create FileHashCache schema for storing file content hashes
+    ///
+    /// # 4-Word Name: create_file_hash_cache_schema
+    ///
+    /// # Performance Contract
+    /// - Schema creation: <50ms
+    pub async fn create_file_hash_cache_schema(&self) -> Result<()> {
+        let schema = r#"
+            :create FileHashCache {
+                file_path: String =>
+                content_hash: String,
+                last_updated: String
+            }
+        "#;
+
+        self.db
+            .run_script(schema, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "create_file_hash_cache_schema".to_string(),
+                details: format!("Failed to create FileHashCache schema: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Get all entities from a specific file
+    ///
+    /// # 4-Word Name: get_entities_by_file_path
+    ///
+    /// # Arguments
+    /// * `file_path` - The file path to query entities for
+    ///
+    /// # Returns
+    /// Vector of all entities in the specified file
+    ///
+    /// # Performance Contract
+    /// - Query: <10ms for typical file with <100 entities
+    pub async fn get_entities_by_file_path(&self, file_path: &str) -> Result<Vec<CodeEntity>> {
+        let query = r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class] :=
+            *CodeGraph{
+                ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class
+            },
+            file_path == $target_path
+        "#;
+
+        let mut params = BTreeMap::new();
+        params.insert("target_path".to_string(), DataValue::Str(file_path.into()));
+
+        let result = self
+            .db
+            .run_script(query, params, ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "get_entities_by_file_path".to_string(),
+                details: format!("Failed to query entities by file path: {}", e),
+            })?;
+
+        let mut entities = Vec::new();
+        for row in result.rows {
+            entities.push(self.row_to_entity(&row)?);
+        }
+
+        Ok(entities)
+    }
+
+    /// Delete multiple entities by their ISGL1 keys
+    ///
+    /// # 4-Word Name: delete_entities_batch_by_keys
+    ///
+    /// # Arguments
+    /// * `keys` - Slice of ISGL1 keys to delete
+    ///
+    /// # Returns
+    /// Number of entities deleted
+    ///
+    /// # Performance Contract
+    /// - Batch delete 100 entities: <50ms
+    pub async fn delete_entities_batch_by_keys(&self, keys: &[String]) -> Result<usize> {
+        if keys.is_empty() {
+            return Ok(0);
+        }
+
+        let count = keys.len();
+
+        // Build query with inline data for batch delete
+        let escaped_keys: Vec<String> = keys
+            .iter()
+            .map(|k| format!("['{}']", k.replace('\'', "\\'")))
+            .collect();
+
+        let query = format!(
+            r#"
+            ?[ISGL1_key] <- [{}]
+            :rm CodeGraph {{ ISGL1_key }}
+            "#,
+            escaped_keys.join(", ")
+        );
+
+        self.db
+            .run_script(&query, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "delete_entities_batch_by_keys".to_string(),
+                details: format!("Failed to batch delete {} entities: {}", count, e),
+            })?;
+
+        Ok(count)
+    }
+
+    /// Delete edges where from_key is in the provided list
+    ///
+    /// # 4-Word Name: delete_edges_by_from_keys
+    ///
+    /// # Arguments
+    /// * `from_keys` - Slice of ISGL1 keys whose outgoing edges should be deleted
+    ///
+    /// # Returns
+    /// Number of edges deleted
+    ///
+    /// # Performance Contract
+    /// - Delete edges for 100 keys: <100ms
+    pub async fn delete_edges_by_from_keys(&self, from_keys: &[String]) -> Result<usize> {
+        if from_keys.is_empty() {
+            return Ok(0);
+        }
+
+        // First count existing edges for these from_keys
+        let escaped_keys: Vec<String> = from_keys
+            .iter()
+            .map(|k| format!("'{}'", k.replace('\'', "\\'")))
+            .collect();
+
+        let count_query = format!(
+            r#"
+            ?[count(from_key)] := *DependencyEdges{{from_key, to_key, edge_type}},
+                                  from_key in [{}]
+            "#,
+            escaped_keys.join(", ")
+        );
+
+        let count_result = self
+            .db
+            .run_script(&count_query, Default::default(), ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DependencyError {
+                operation: "delete_edges_by_from_keys".to_string(),
+                reason: format!("Failed to count edges before deletion: {}", e),
+            })?;
+
+        let mut deleted_count = 0usize;
+        if let Some(row) = count_result.rows.first() {
+            if let Some(DataValue::Num(n)) = row.first() {
+                deleted_count = match n {
+                    cozo::Num::Int(i) => *i as usize,
+                    cozo::Num::Float(f) => *f as usize,
+                };
+            }
+        }
+
+        if deleted_count == 0 {
+            return Ok(0);
+        }
+
+        // Build delete query - need to select all matching edges first, then delete
+        let delete_query = format!(
+            r#"
+            to_delete[from_key, to_key, edge_type] := *DependencyEdges{{from_key, to_key, edge_type}},
+                                                       from_key in [{}]
+            ?[from_key, to_key, edge_type] := to_delete[from_key, to_key, edge_type]
+            :rm DependencyEdges {{ from_key, to_key, edge_type }}
+            "#,
+            escaped_keys.join(", ")
+        );
+
+        self.db
+            .run_script(&delete_query, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DependencyError {
+                operation: "delete_edges_by_from_keys".to_string(),
+                reason: format!("Failed to delete edges by from_keys: {}", e),
+            })?;
+
+        Ok(deleted_count)
+    }
+
+    /// Get cached file hash value
+    ///
+    /// # 4-Word Name: get_cached_file_hash_value
+    ///
+    /// # Arguments
+    /// * `file_path` - The file path to query hash for
+    ///
+    /// # Returns
+    /// Some(hash) if cached, None if not found
+    ///
+    /// # Performance Contract
+    /// - Query: <5ms
+    pub async fn get_cached_file_hash_value(&self, file_path: &str) -> Result<Option<String>> {
+        let query = r#"
+            ?[content_hash] := *FileHashCache{file_path, content_hash},
+                               file_path == $path
+        "#;
+
+        let mut params = BTreeMap::new();
+        params.insert("path".to_string(), DataValue::Str(file_path.into()));
+
+        let result = self
+            .db
+            .run_script(query, params, ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "get_cached_file_hash_value".to_string(),
+                details: format!("Failed to query file hash cache: {}", e),
+            })?;
+
+        if let Some(row) = result.rows.first() {
+            if let Some(DataValue::Str(hash)) = row.first() {
+                return Ok(Some(hash.to_string()));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Set cached file hash value
+    ///
+    /// # 4-Word Name: set_cached_file_hash_value
+    ///
+    /// # Arguments
+    /// * `file_path` - The file path to cache hash for
+    /// * `hash` - The SHA-256 hash of the file content
+    ///
+    /// # Performance Contract
+    /// - Insert/Update: <5ms
+    pub async fn set_cached_file_hash_value(&self, file_path: &str, hash: &str) -> Result<()> {
+        let query = r#"
+            ?[file_path, content_hash, last_updated] <- [[$path, $hash, $timestamp]]
+            :put FileHashCache {
+                file_path =>
+                content_hash,
+                last_updated
+            }
+        "#;
+
+        let mut params = BTreeMap::new();
+        params.insert("path".to_string(), DataValue::Str(file_path.into()));
+        params.insert("hash".to_string(), DataValue::Str(hash.into()));
+        params.insert(
+            "timestamp".to_string(),
+            DataValue::Str(chrono::Utc::now().to_rfc3339().into()),
+        );
+
+        self.db
+            .run_script(query, params, ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "set_cached_file_hash_value".to_string(),
+                details: format!("Failed to set file hash cache: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Count total entities in database
+    ///
+    /// # 4-Word Name: count_all_entities_total
+    ///
+    /// # Returns
+    /// Total count of entities
+    pub async fn count_all_entities_total(&self) -> Result<usize> {
+        let query = "?[count(k)] := *CodeGraph{ISGL1_key: k}";
+
+        let result = self
+            .db
+            .run_script(query, Default::default(), ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "count_all_entities_total".to_string(),
+                details: format!("Failed to count entities: {}", e),
+            })?;
+
+        if let Some(row) = result.rows.first() {
+            if let Some(DataValue::Num(n)) = row.first() {
+                return Ok(match n {
+                    cozo::Num::Int(i) => *i as usize,
+                    cozo::Num::Float(f) => *f as usize,
+                });
+            }
+        }
+
+        Ok(0)
+    }
+
+    /// Count total edges in database
+    ///
+    /// # 4-Word Name: count_all_edges_total
+    ///
+    /// # Returns
+    /// Total count of edges
+    pub async fn count_all_edges_total(&self) -> Result<usize> {
+        let query = "?[count(e)] := *DependencyEdges{from_key: e}";
+
+        let result = self
+            .db
+            .run_script(query, Default::default(), ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DependencyError {
+                operation: "count_all_edges_total".to_string(),
+                reason: format!("Failed to count edges: {}", e),
+            })?;
+
+        if let Some(row) = result.rows.first() {
+            if let Some(DataValue::Num(n)) = row.first() {
+                return Ok(match n {
+                    cozo::Num::Int(i) => *i as usize,
+                    cozo::Num::Float(f) => *f as usize,
+                });
+            }
+        }
+
+        Ok(0)
+    }
 }
 
 // Implement CodeGraphRepository trait
