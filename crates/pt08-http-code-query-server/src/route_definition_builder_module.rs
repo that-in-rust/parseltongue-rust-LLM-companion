@@ -25,6 +25,10 @@ use crate::http_endpoint_handler_modules::{
     smart_context_token_budget_handler,
     incremental_reindex_file_handler,
     file_watcher_status_handler,
+    scc_analysis_handler,
+    pagerank_ranking_handler,
+    coupling_metrics_handler,
+    instability_index_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -49,8 +53,12 @@ use crate::http_endpoint_handler_modules::{
 /// ## Analysis Endpoints
 /// - GET /blast-radius-impact-analysis/{entity}?hops=N
 /// - GET /circular-dependency-detection-scan
+/// - GET /strongly-connected-components-analysis?min_size=N&include_singletons=BOOL
 /// - GET /complexity-hotspots-ranking-view?top=N
+/// - GET /pagerank-importance-ranking-view?iterations=N&damping=D&limit=L
 /// - GET /semantic-cluster-grouping-list
+/// - GET /coupling-metrics-afferent-efferent?entity=X&sort_by=Y&limit=N
+/// - GET /instability-index-calculation-view?threshold=X&filter=Y&limit=N
 ///
 /// ## Context Optimization
 /// - GET /smart-context-token-budget?focus=X&tokens=N
@@ -104,12 +112,28 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             get(circular_dependency_detection_handler::handle_circular_dependency_detection_scan)
         )
         .route(
+            "/strongly-connected-components-analysis",
+            get(scc_analysis_handler::handle_scc_analysis_request)
+        )
+        .route(
             "/complexity-hotspots-ranking-view",
             get(complexity_hotspots_ranking_handler::handle_complexity_hotspots_ranking_view)
         )
         .route(
+            "/pagerank-importance-ranking-view",
+            get(pagerank_ranking_handler::handle_pagerank_importance_ranking_view)
+        )
+        .route(
             "/semantic-cluster-grouping-list",
             get(semantic_cluster_grouping_handler::handle_semantic_cluster_grouping_list)
+        )
+        .route(
+            "/coupling-metrics-afferent-efferent",
+            get(coupling_metrics_handler::handle_coupling_metrics_afferent_efferent)
+        )
+        .route(
+            "/instability-index-calculation-view",
+            get(instability_index_handler::handle_instability_index_calculation_view)
         )
         .route(
             "/smart-context-token-budget",

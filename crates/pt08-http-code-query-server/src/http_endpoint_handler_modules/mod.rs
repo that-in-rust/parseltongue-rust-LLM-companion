@@ -20,3 +20,7 @@ pub mod api_reference_documentation_handler;
 pub mod smart_context_token_budget_handler;
 pub mod incremental_reindex_file_handler;
 pub mod file_watcher_status_handler;
+pub mod coupling_metrics_handler;
+pub mod instability_index_handler;
+pub mod scc_analysis_handler;
+pub mod pagerank_ranking_handler;
