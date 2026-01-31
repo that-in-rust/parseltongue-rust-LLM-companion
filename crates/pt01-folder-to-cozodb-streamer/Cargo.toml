@@ -48,6 +48,9 @@ async-trait.workspace = true
 notify = { workspace = true }
 notify-debouncer-full = "0.3"
 
+# Logging dependencies
+tracing = "0.1"
+
 [dev-dependencies]
 criterion.workspace = true
 proptest.workspace = true

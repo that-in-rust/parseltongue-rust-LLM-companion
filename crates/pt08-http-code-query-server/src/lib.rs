@@ -14,7 +14,8 @@
 pub mod command_line_argument_parser;
 pub mod file_watcher_integration_service;
 pub mod http_server_startup_runner;
-pub mod incremental_reindex_core_logic;
+// TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion in parseltongue-core
+// pub mod incremental_reindex_core_logic;
 pub mod port_selection;
 pub mod route_definition_builder_module;
 pub mod structured_error_handling_types;

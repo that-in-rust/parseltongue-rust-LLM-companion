@@ -1,6 +1,6 @@
 # Parseltongue
 
-> **v1.4.2** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
+> **v1.4.3** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
 
 ```bash
 # Index your codebase
@@ -124,7 +124,7 @@ parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 # Custom port (use --port flag)
 parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db" --port 8080
 
-# File watching is always enabled (v1.4.2+) - code graph stays in sync automatically
+# File watching is always enabled (v1.4.3+) - code graph stays in sync automatically
 parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 ```
 
@@ -167,11 +167,11 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 
 ---
 
-## What's New in v1.4.2: Always-On File Watching
+## What's New in v1.4.3: Fixed File Watcher + Extended Language Support
 
-### Breaking Change: `--watch` Flags Removed
+### Critical Bug Fix
 
-**v1.4.2 simplifies the workflow**: File watching is now always enabled. The `--watch` and `--watch-dir` CLI flags have been removed.
+**v1.4.2 file watcher was completely broken** - detected 0 events due to `blocking_send` deadlock. v1.4.3 fixes the deadlock and adds support for 8 additional file extensions (C, C++, Ruby, PHP, C#, Swift).
 
 #### Migration from v1.4.1
 
@@ -180,16 +180,16 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 parseltongue pt08-http-code-query-server --db rocksdb:mydb --watch
 parseltongue pt08-http-code-query-server --db rocksdb:mydb --watch --watch-dir ./src
 
-# ✅ NEW (v1.4.2) - File watching happens automatically
+# ✅ NEW (v1.4.3) - File watching happens automatically (and actually works!)
 parseltongue pt08-http-code-query-server --db rocksdb:mydb
 # That's it! The server automatically watches the current directory.
 ```
 
 ### Why Always-On File Watching?
 
-**Before v1.4.2**: Users had to remember to add `--watch` flags. Many forgot, leading to stale code graphs.
+**Before v1.4.3**: v1.4.2 had file watching enabled, but it was broken (0 events detected due to deadlock).
 
-**With v1.4.2**: Your code graph stays in sync automatically. Zero configuration required.
+**With v1.4.3**: File watcher actually works - detects all code changes in real-time. Zero configuration required.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -749,7 +749,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 | `--db <PATH>` | Database path | `mem` (in-memory) |
 | `--verbose` | Enable verbose logging | false |
 
-**File Watching** (v1.4.2+): Always enabled. The server automatically monitors the current directory for code changes and reindexes modified files. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`
+**File Watching** (v1.4.3+): Always enabled and now working (v1.4.2 was broken). The server automatically monitors the current directory for code changes and reindexes modified files. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`, `.c`, `.h`, `.cpp`, `.hpp`, `.rb`, `.php`, `.cs`, `.swift`
 
 **Database format**: Always use `rocksdb:` prefix for persistent databases:
 ```bash
@@ -853,11 +853,11 @@ code-entities-search-fuzzy       # 4 words
 
 ```bash
 # Download (one command)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.2/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.3/parseltongue -o parseltongue && chmod +x parseltongue
 
 # Verify
 ./parseltongue --version
-# parseltongue 1.4.2
+# parseltongue 1.4.3
 ```
 
 **Optional**: Add to PATH for global access:

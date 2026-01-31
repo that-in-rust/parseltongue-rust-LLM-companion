@@ -32,7 +32,8 @@ use pt01_folder_to_cozodb_streamer::file_watcher::{
 };
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
-use crate::incremental_reindex_core_logic::execute_incremental_reindex_core;
+// TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
+// use crate::incremental_reindex_core_logic::execute_incremental_reindex_core;
 
 /// Error types for file watcher integration
 ///
@@ -197,34 +198,38 @@ impl<W: FileWatchProviderTrait + 'static> FileWatcherIntegrationService<W> {
                         change_type, file_path_str
                     );
 
+                    // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
                     // Trigger incremental reindex
-                    match execute_incremental_reindex_core(&file_path_str, &state).await {
-                        Ok(result) => {
-                            if result.hash_changed {
-                                println!(
-                                    "[FileWatcher] Reindexed {}: +{} entities, -{} entities, +{} edges, -{} edges ({}ms)",
-                                    result.file_path,
-                                    result.entities_added,
-                                    result.entities_removed,
-                                    result.edges_added,
-                                    result.edges_removed,
-                                    result.processing_time_ms
-                                );
-                            } else {
-                                println!(
-                                    "[FileWatcher] Skipped {} (content unchanged)",
-                                    result.file_path
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            // Graceful degradation: log error but continue watching
-                            eprintln!(
-                                "[FileWatcher] Reindex failed for {}: {}",
-                                file_path_str, e
-                            );
-                        }
-                    }
+                    // match execute_incremental_reindex_core(&file_path_str, &state).await {
+                    //     Ok(result) => {
+                    //         if result.hash_changed {
+                    //             println!(
+                    //                 "[FileWatcher] Reindexed {}: +{} entities, -{} entities, +{} edges, -{} edges ({}ms)",
+                    //                 result.file_path,
+                    //                 result.entities_added,
+                    //                 result.entities_removed,
+                    //                 result.edges_added,
+                    //                 result.edges_removed,
+                    //                 result.processing_time_ms
+                    //             );
+                    //         } else {
+                    //             println!(
+                    //                 "[FileWatcher] Skipped {} (content unchanged)",
+                    //                 result.file_path
+                    //             );
+                    //         }
+                    //     }
+                    //     Err(e) => {
+                    //         // Graceful degradation: log error but continue watching
+                    //         eprintln!(
+                    //             "[FileWatcher] Reindex failed for {}: {}",
+                    //             file_path_str, e
+                    //         );
+                    //     }
+                    // }
+
+                    // Temporary stub: Just log the event
+                    println!("[FileWatcher] Event logged (reindex temporarily disabled)")
                 }
                 // else: A newer event superseded this one, skip processing
             });

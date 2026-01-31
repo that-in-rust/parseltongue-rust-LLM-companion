@@ -15,7 +15,8 @@ use crate::file_watcher_integration_service::{
 };
 use crate::port_selection::{find_and_bind_port_available, PortSelectionError};
 use crate::route_definition_builder_module::build_complete_router_instance;
-use parseltongue_core::file_parser::FileParser;
+// TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
+// use parseltongue_core::file_parser::FileParser;
 use parseltongue_core::storage::CozoDbStorage;
 
 /// Shared application state container
@@ -35,11 +36,12 @@ pub struct SharedApplicationStateContainer {
     /// Codebase statistics metadata
     pub codebase_statistics_metadata_arc: Arc<RwLock<CodebaseStatisticsMetadata>>,
 
-    /// File parser instance for incremental reindexing (PRD-2026-01-28)
-    ///
-    /// Thread-safe parser that can parse files into entities and dependencies.
-    /// Used by the incremental-reindex-file-update endpoint.
-    pub file_parser_instance_arc: Arc<FileParser>,
+    // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
+    // /// File parser instance for incremental reindexing (PRD-2026-01-28)
+    // ///
+    // /// Thread-safe parser that can parse files into entities and dependencies.
+    // /// Used by the incremental-reindex-file-update endpoint.
+    // pub file_parser_instance_arc: Arc<FileParser>,
 
     /// File watcher status metadata (PRD-2026-01-29)
     ///
@@ -120,14 +122,15 @@ impl SharedApplicationStateContainer {
     /// The parser is created once and shared across all handler invocations.
     pub fn create_new_application_state() -> Self {
         let now = Utc::now();
-        let parser = FileParser::create_new_parser_instance()
-            .expect("Failed to initialize FileParser - tree-sitter grammars missing");
+        // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
+        // let parser = FileParser::create_new_parser_instance()
+        //     .expect("Failed to initialize FileParser - tree-sitter grammars missing");
         Self {
             database_storage_connection_arc: Arc::new(RwLock::new(None)),
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
-            file_parser_instance_arc: Arc::new(parser),
+            // file_parser_instance_arc: Arc::new(parser),
             file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
         }
     }
@@ -139,14 +142,15 @@ impl SharedApplicationStateContainer {
     /// Initializes state with database and thread-safe FileParser for incremental reindexing.
     pub fn create_with_database_storage(storage: CozoDbStorage) -> Self {
         let now = Utc::now();
-        let parser = FileParser::create_new_parser_instance()
-            .expect("Failed to initialize FileParser - tree-sitter grammars missing");
+        // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
+        // let parser = FileParser::create_new_parser_instance()
+        //     .expect("Failed to initialize FileParser - tree-sitter grammars missing");
         Self {
             database_storage_connection_arc: Arc::new(RwLock::new(Some(Arc::new(storage)))),
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
-            file_parser_instance_arc: Arc::new(parser),
+            // file_parser_instance_arc: Arc::new(parser),
             file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
         }
     }
@@ -339,6 +343,11 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     {
         let watch_dir = config.target_directory_path_value.clone();
 
+        // v1.4.3: Monitor all 12 supported languages (14 extensions)
+        // - Rust (.rs), Python (.py), JavaScript/TypeScript (.js, .ts)
+        // - Go (.go), Java (.java)
+        // - C (.c, .h), C++ (.cpp, .hpp)
+        // - Ruby (.rb), PHP (.php), C# (.cs), Swift (.swift)
         let extensions = vec![
             "rs".to_string(),
             "py".to_string(),
@@ -346,6 +355,14 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
             "ts".to_string(),
             "go".to_string(),
             "java".to_string(),
+            "c".to_string(),
+            "h".to_string(),
+            "cpp".to_string(),
+            "hpp".to_string(),
+            "rb".to_string(),
+            "php".to_string(),
+            "cs".to_string(),
+            "swift".to_string(),
         ];
 
         let watcher_config = FileWatcherIntegrationConfig {

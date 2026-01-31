@@ -18,5 +18,6 @@ pub mod complexity_hotspots_ranking_handler;
 pub mod semantic_cluster_grouping_handler;
 pub mod api_reference_documentation_handler;
 pub mod smart_context_token_budget_handler;
-pub mod incremental_reindex_file_handler;
+// TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion in parseltongue-core
+// pub mod incremental_reindex_file_handler;
 pub mod file_watcher_status_handler;
