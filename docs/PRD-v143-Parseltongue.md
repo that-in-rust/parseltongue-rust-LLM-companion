@@ -1,484 +1,389 @@
-# PRD: Parseltongue v1.4.3 - Fix File Watching
+# PRD: Parseltongue v1.4.3 - Three Core Requirements
 
 **Version**: 1.4.3
 **Status**: Draft
 **Created**: 2026-01-31
-**Target Release**: 2026-02-01
-**Companion Document**: [THESIS-PRD-v143-File-Watching.md](./THESIS-PRD-v143-File-Watching.md)
+**Target Release**: 2026-02-02
 
 ---
 
 ## Executive Summary
 
-**Problem**: Parseltongue v1.4.2 reports file watcher as "running" but **never detects file changes** (0 events processed despite multiple edits).
+Parseltongue v1.4.3 has **exactly three requirements**:
 
-**Root Cause**: The file watcher uses `blocking_send` in notify's callback thread, which deadlocks when the tokio event loop is slow. Manual incremental reindex works perfectly, proving the issue is isolated to the watcher.
+1. **Live watching at super high speed** - File changes detected and reindexed in <100ms
+2. **Cross-platform release builds** - macOS (Apple Silicon + Intel) and Linux (x86_64)
+3. **All existing APIs working** - 14 endpoints from README must work correctly
 
-**Solution**: Replace the broken implementation with `notify-debouncer-full` crate (battle-tested, correct event loop handling, built-in debouncing).
-
-**Impact**: Users currently believe file watching works when it's silently broken. This fix enables the promised "always-on" file watching.
-
----
-
-## Goals
-
-### Primary Goal
-Enable **automatic file change detection** that triggers incremental reindexing without user intervention.
-
-### Success Metrics
-1. **Event Detection**: `events_processed_total_count` increments when files change
-2. **Reindex Trigger**: Logs show `[FileWatcher] Reindexed <file>: +X entities, -Y entities`
-3. **Latency**: P99 < 500ms from file save to reindex complete
-4. **Reliability**: 0 silent failures (all errors logged)
-
-### Non-Goals
-- Live WebSocket streaming (deferred to v1.5.0)
-- Diff computation between base/live databases (apwbd feature, deferred)
-- Workspace management (apwbd feature, deferred)
-- Temporal coupling analysis (apwbd feature, deferred)
+**No scope creep.** No new features. Just fix what's broken and ship it.
 
 ---
 
-## Current State Analysis
+## 1. Live Watching at Super High Speed
 
-### What Works ✅
-1. **Manual Incremental Reindex** (POST `/incremental-reindex-file-update`)
-   - SHA-256 file hashing
-   - Entity diff computation (+added, -removed)
-   - Edge updates (delete old, insert new)
-   - Performance: 9-14ms for typical files
+### Current State: BROKEN ❌
+- File watcher reports "running" but detects **0 events**
+- Users believe auto-watch works when it doesn't
+- Root cause: `blocking_send` deadlock in notify callback
 
-2. **Status Endpoint** (GET `/file-watcher-status-check`)
-   - Returns watcher metadata
-   - Shows enabled/running flags
-   - Reports monitored extensions
+### Target State: WORKING ✅
+- **P50 latency**: < 50ms (file save → reindex start)
+- **P99 latency**: < 100ms (match VS Code responsiveness)
+- **Event detection**: 100% of file changes captured
+- **Debouncing**: 10 rapid edits → 1 reindex (coalescing works)
 
-3. **Startup Flow**
-   - Creates `NotifyFileWatcherProvider`
-   - Calls `start_file_watcher_service()`
-   - Prints "✓ File watcher started: ."
+### Implementation: notify-debouncer-full
+Based on research (see PLAN-v143-High-Speed-File-Watching.md):
+- Replace broken manual event loop with `notify-debouncer-full` crate
+- Battle-tested by watchexec, rust-analyzer, 30M+ repositories
+- Correct async event handling (no deadlocks)
+- Built-in debouncing (100ms default)
 
-### What's Broken ❌
-1. **Auto File Detection**
-   - Symptom: 0 events processed after multiple file edits
-   - Root Cause: `blocking_send` in notify callback (line 131 of file_watcher.rs)
-   - Impact: Users believe auto-watch works when it doesn't
-
-2. **Event Loop**
-   - `tokio::spawn` task never receives events from channel
-   - Race condition between notify thread and tokio runtime
-   - No error handling when `blocking_send` fails
-
-### Test Results (v1.4.2)
-
+### Acceptance Test
 ```bash
-# Create test file
-echo "pub fn test() {}" > test_live_update.rs
-
-# Trigger manual reindex (WORKS)
-curl -X POST "http://localhost:7777/incremental-reindex-file-update?path=./test_live_update.rs"
-# Response: {"success": true, "data": {"entities_added": 1, "processing_time_ms": 9}}
-
-# Modify file and check status (BROKEN)
-echo "pub fn test2() {}" >> test_live_update.rs
-sleep 2
-curl "http://localhost:7777/file-watcher-status-check" | jq '.data.events_processed_total_count'
-# Result: 0 (SHOULD be 1 or higher)
-```
-
----
-
-## Requirements
-
-### Functional Requirements
-
-#### REQ-FW-001: Automatic File Change Detection
-**WHEN** a user saves a file with extension `.rs`, `.py`, `.js`, `.ts`, `.go`, or `.java`
-**THEN** the system SHALL:
-1. Detect the change within 500ms
-2. Trigger incremental reindex automatically
-3. Increment `events_processed_total_count`
-4. Log: `[FileWatcher] Processing Modified: <path>`
-
-**Acceptance Test**:
-```bash
-# Edit file
-echo "// change" >> src/main.rs
-
-# Wait 1 second
-sleep 1
-
-# Check events
+# Test 1: Basic detection
+echo "fn test() {}" > test.rs
+sleep 0.2
 curl http://localhost:7777/file-watcher-status-check | jq '.data.events_processed_total_count'
 # MUST return: >= 1
-```
 
-#### REQ-FW-002: Debouncing
-**WHEN** a file is saved multiple times within 100ms
-**THEN** the system SHALL:
-1. Coalesce events (trigger reindex only once)
-2. Log: `[FileWatcher] Debouncing: waiting 100ms for more changes`
+# Test 2: Performance
+time echo "// change" >> test.rs
+# MUST complete reindex in < 100ms (P99)
 
-**Acceptance Test**:
-```bash
-# Rapid edits
-for i in {1..10}; do echo "// $i" >> src/main.rs; done
-
-# Wait 1 second
-sleep 1
-
-# Check events (should be 1-2, not 10)
+# Test 3: Debouncing
+for i in {1..10}; do echo "// $i" >> test.rs; sleep 0.02; done
+sleep 0.2
 curl http://localhost:7777/file-watcher-status-check | jq '.data.events_processed_total_count'
-# MUST return: <= 2
+# MUST return: <= 2 (coalescing worked)
 ```
 
-#### REQ-FW-003: Extension Filtering
-**WHEN** a non-code file is saved (e.g., `.md`, `.txt`, `.pdf`)
-**THEN** the system SHALL:
-1. Increment `events_processed_total_count` (event detected)
-2. Skip reindex (log: `[FileWatcher] Skipping non-code file: README.md`)
+### Files to Change
+1. `crates/pt01-folder-to-cozodb-streamer/Cargo.toml` - Add `notify-debouncer-full = "0.3"`
+2. `crates/pt01-folder-to-cozodb-streamer/src/file_watcher.rs` - Replace `RecommendedWatcher` with `Debouncer`
+3. `crates/pt08-http-code-query-server/src/file_watcher_integration_service.rs` - Add comprehensive logging
 
-#### REQ-FW-004: Graceful Degradation
-**WHEN** file watcher fails to start (permissions, unsupported filesystem)
-**THEN** the system SHALL:
-1. Log: `⚠ Warning: File watcher failed to start: <error>`
-2. Continue serving HTTP endpoints
-3. Set `watcher_running_status_flag: false`
-4. Manual reindex endpoint MUST still work
-
-### Non-Functional Requirements
-
-#### REQ-NFR-001: Performance
-- **Latency**: P50 < 100ms, P99 < 500ms (file save to reindex start)
-- **Memory**: < 10MB overhead for watcher service
-- **CPU**: < 5% idle, < 20% during reindex
-
-#### REQ-NFR-002: Observability
-**MUST** log:
-- Watcher start: `[FileWatcher] Started: watching . for [rs, py, js, ts, go, java]`
-- Events: `[FileWatcher] Event detected: Modified src/main.rs`
-- Debouncing: `[FileWatcher] Debouncing: waiting 100ms`
-- Reindex: `[FileWatcher] Reindexed src/main.rs: +2 entities, -1 entities (45ms)`
-- Errors: `[FileWatcher] Error: Failed to reindex: <error>`
-
-#### REQ-NFR-003: Backwards Compatibility
-**MUST** maintain:
-- All existing HTTP endpoints (no breaking changes)
-- Database format (no schema changes)
-- CLI interface (no new required flags)
-
-**MUST NOT**:
-- Reintroduce `--watch` flag (removed in v1.4.2)
-- Change endpoint URLs or response formats
+### Success Criteria
+- [ ] Events > 0 when files change
+- [ ] P99 latency < 100ms
+- [ ] Debouncing works (10 edits = 1-2 callbacks)
+- [ ] Logs show all watcher activity
+- [ ] E2E tests pass
 
 ---
 
-## Implementation Plan
+## 2. Cross-Platform Release Builds
 
-### Phase 1: Update Dependencies
-**File**: `crates/pt01-folder-to-cozodb-streamer/Cargo.toml`
+### Current State: Manual Downloads Only
+- Users must download from GitHub releases
+- Only macOS universal binary available
+- No Linux builds
+- No automated CI/CD
 
-```toml
-[dependencies]
-notify = "6.1"
-notify-debouncer-full = "0.3"  # ADD THIS LINE
-async-trait = "0.1"
-thiserror = "2.0"
-tokio = { version = "1.43", features = ["sync", "time"] }
+### Target State: Automated Releases
+Build matrix:
+- **macOS**:
+  - Apple Silicon (aarch64-apple-darwin)
+  - Intel (x86_64-apple-darwin)
+  - Universal binary (both architectures)
+- **Linux**:
+  - x86_64 (x86_64-unknown-linux-gnu)
+  - musl (x86_64-unknown-linux-musl) - static binary
+
+### Implementation: GitHub Actions
+Create `.github/workflows/release.yml`:
+
+```yaml
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-14
+            name: parseltongue-macos-arm64
+          - target: x86_64-apple-darwin
+            os: macos-13
+            name: parseltongue-macos-x64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: parseltongue-linux-x64
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: parseltongue-linux-x64-musl
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create artifact
+        run: |
+          cp target/${{ matrix.target }}/release/parseltongue ${{ matrix.name }}
+          chmod +x ${{ matrix.name }}
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.name }}
 ```
 
-**Verification**:
+### Acceptance Test
 ```bash
-cargo build -p pt01-folder-to-cozodb-streamer
+# macOS (Apple Silicon)
+curl -L https://github.com/.../parseltongue-macos-arm64 -o parseltongue
+chmod +x parseltongue
+./parseltongue --version
+# MUST show: parseltongue 1.4.3
+
+# macOS (Intel)
+curl -L https://github.com/.../parseltongue-macos-x64 -o parseltongue
+# Same test
+
+# Linux
+curl -L https://github.com/.../parseltongue-linux-x64 -o parseltongue
+# Same test
 ```
 
-### Phase 2: Rewrite NotifyFileWatcherProvider
-**File**: `crates/pt01-folder-to-cozodb-streamer/src/file_watcher.rs`
-
-**Key Changes**:
-1. Replace `RecommendedWatcher` with `notify_debouncer_full::Debouncer`
-2. Remove manual `mpsc::channel` and `tokio::spawn`
-3. Store debouncer in struct (keep it alive)
-4. Use debouncer's built-in event handler
-
-**Implementation** (see THESIS document for full code):
-
-```rust
-use notify_debouncer_full::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
-
-pub struct NotifyFileWatcherProvider {
-    debouncer: Arc<Mutex<Option<Debouncer<RecommendedWatcher, FileIdMap>>>>,
-    is_running: Arc<AtomicBool>,
-    debounce_duration_ms: u64,
-}
-
-impl FileWatchProviderTrait for NotifyFileWatcherProvider {
-    async fn start_watching_directory_recursively(
-        &self,
-        path: &Path,
-        callback: FileChangeCallback,
-    ) -> WatcherResult<()> {
-        let debounce_duration = Duration::from_millis(self.debounce_duration_ms);
-
-        let mut debouncer = new_debouncer(
-            debounce_duration,
-            None,
-            move |result: DebounceEventResult| {
-                match result {
-                    Ok(events) => {
-                        for event in events {
-                            if let Some(payload) = convert_notify_event_payload(&event.event) {
-                                callback(payload);
-                            }
-                        }
-                    }
-                    Err(errors) => {
-                        eprintln!("[FileWatcher] Error: {:?}", errors);
-                    }
-                }
-            },
-        )?;
-
-        debouncer.watcher().watch(path, RecursiveMode::Recursive)?;
-
-        *self.debouncer.lock().await = Some(debouncer);
-        self.is_running.store(true, Ordering::SeqCst);
-
-        Ok(())
-    }
-}
-```
-
-### Phase 3: Enhance Logging
-**File**: `crates/pt08-http-code-query-server/src/file_watcher_integration_service.rs`
-
-**Add logging at**:
-- Line 144-150: Event detection
-- Line 164-230: Debounce logic
-- Line 195-227: Reindex trigger
-
-**Example**:
-```rust
-println!("[FileWatcher] Event detected: {:?} {}", event.change_type, file_path.display());
-println!("[FileWatcher] Debouncing: waiting {}ms for more changes", debounce_ms);
-println!("[FileWatcher] Processing {:?}: {}", change_type, file_path_str);
-println!(
-    "[FileWatcher] Reindexed {}: +{} entities, -{} entities, +{} edges, -{} edges ({}ms)",
-    result.file_path,
-    result.entities_added,
-    result.entities_removed,
-    result.edges_added,
-    result.edges_removed,
-    result.processing_time_ms
-);
-```
-
-### Phase 4: Add E2E Tests
-**File**: `crates/pt08-http-code-query-server/tests/integration_file_watcher_test.rs` (NEW)
-
-```rust
-#[tokio::test]
-async fn test_file_watcher_detects_changes() {
-    // 1. Start server with test database
-    let temp_dir = tempfile::tempdir().unwrap();
-    let db_path = temp_dir.path().join("analysis.db");
-
-    // 2. Create test file
-    let test_file = temp_dir.path().join("test.rs");
-    std::fs::write(&test_file, "pub fn initial() {}").unwrap();
-
-    // 3. Start server (file watcher auto-starts)
-    let server = start_test_server(&db_path).await;
-
-    // 4. Initial reindex
-    server.post_incremental_reindex(&test_file).await;
-
-    // 5. Modify file
-    std::fs::write(&test_file, "pub fn modified() {}").unwrap();
-
-    // 6. Wait for auto-detection
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    // 7. Verify event count increased
-    let status = server.get_file_watcher_status().await;
-    assert!(status.events_processed_total_count >= 1);
-
-    // 8. Verify entity updated
-    let entities = server.search_entities("modified").await;
-    assert_eq!(entities.len(), 1);
-}
-```
-
-### Phase 5: Performance Tests
-**File**: `crates/pt01-folder-to-cozodb-streamer/benches/file_watcher_bench.rs` (NEW)
-
-```rust
-#[bench]
-fn bench_file_watcher_latency(b: &mut Bencher) {
-    // Measure: Time from file save to callback trigger
-    // Target: P99 < 500ms
-}
-
-#[bench]
-fn bench_debounce_coalescing(b: &mut Bencher) {
-    // Measure: 10 rapid edits should trigger 1-2 callbacks
-}
-```
-
-### Phase 6: Update Documentation
-**Files to update**:
-1. `README.md`: Add "Always-on File Watching" section
-2. `CLAUDE.md`: Update file watching behavior
-3. `docs/04-api-guide.md`: Document `/file-watcher-status-check` endpoint
+### Success Criteria
+- [ ] GitHub Actions workflow exists
+- [ ] Builds triggered on tag push (v1.4.3)
+- [ ] 4 binaries uploaded to release
+- [ ] All binaries executable and show correct version
 
 ---
 
-## Testing Strategy
+## 3. All Existing APIs Working
 
-### Unit Tests (pt01 crate)
-- `test_notify_provider_starts_watcher`: Verify debouncer created
-- `test_notify_provider_stops_watcher`: Verify cleanup
-- `test_debouncer_fires_callback`: Verify events reach callback
-- `test_extension_filtering`: Verify only code files trigger callback
+### Current State: Mixed ✅❌
+From README.md, these 14 endpoints MUST work:
 
-### Integration Tests (pt08 crate)
-- `test_watcher_integration_service_starts`: Verify integration layer
-- `test_watcher_detects_file_modification`: E2E file modification
-- `test_watcher_detects_file_creation`: E2E file creation
-- `test_watcher_detects_file_deletion`: E2E file deletion
-- `test_watcher_debounces_rapid_changes`: Verify debounce behavior
-- `test_watcher_graceful_degradation`: Verify error handling
+| Endpoint | Status | Issue |
+|----------|--------|-------|
+| `/server-health-check-status` | ✅ Working | None |
+| `/codebase-statistics-overview-summary` | ❌ BROKEN | Returns null counts |
+| `/code-entities-search-fuzzy` | ⚠️ Inconsistent | Works for "handle", fails for "main" |
+| `/reverse-callers-query-graph` | ✅ Working | None |
+| `/blast-radius-impact-analysis` | ✅ Working | None |
+| `/smart-context-token-budget` | ❌ BROKEN | Returns 0 entities always |
+| `/code-entities-list-all` | ✅ Working | None |
+| `/code-entity-detail-view` | ✅ Working | None |
+| `/forward-callees-query-graph` | ✅ Working | None |
+| `/dependency-edges-list-all` | ✅ Working | None |
+| `/circular-dependency-detection-scan` | ✅ Working | None |
+| `/complexity-hotspots-ranking-view` | ⚠️ Returns externals | Shows "unknown:0-0" |
+| `/semantic-cluster-grouping-list` | ✅ Working | None |
+| `/api-reference-documentation-help` | ✅ Working | None |
 
-### E2E Tests (Manual + Automated)
+**Additional endpoints** (not in README, but exposed):
+- `/incremental-reindex-file-update` (POST) - ✅ Working perfectly
+- `/file-watcher-status-check` (GET) - ✅ Working
+
+### Target State: 100% Working
+All 14 README endpoints MUST return valid data:
+- No null values in critical fields
+- No "unknown:0-0" entities
+- Consistent search results
+- Smart context returns entities
+
+### Fixes Required
+
+#### Fix 1: Codebase Statistics (NULL counts)
+**File**: `crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/codebase_statistics_overview_handler.rs`
+
+**Issue**: Returns `null` for entity/edge counts
+
+**Fix**: Ensure counts are populated from database
+```rust
+// Query total entities
+let total_entities = storage.raw_query(
+    "?[count(key)] := *CodeGraph{key}"
+).await?;
+
+// Extract count value correctly
+let count = total_entities.rows[0][0].as_i64().unwrap_or(0);
+```
+
+#### Fix 2: Smart Context (0 entities)
+**File**: `crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/smart_context_token_budget_handler.rs`
+
+**Issue**: Returns 0 entities always
+
+**Root cause**: Query logic broken or entity filtering too aggressive
+
+**Fix**: Debug query, verify entities returned
+
+#### Fix 3: Fuzzy Search (Inconsistent)
+**File**: `crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/code_entities_fuzzy_search_handler.rs`
+
+**Issue**: Works for "handle", fails for "main"
+
+**Fix**: Check query logic, ensure case-insensitive matching
+
+### Acceptance Test
+Run full endpoint test suite:
+
 ```bash
-# Test 1: Basic file change detection
-echo "pub fn test() {}" > test.rs
-sleep 1
-curl http://localhost:7777/file-watcher-status-check | jq '.data.events_processed_total_count'
-# Expected: >= 1
+# Test 1: Health check
+curl http://localhost:7777/server-health-check-status
+# Expected: {"success": true, "data": {...}}
 
-# Test 2: Debouncing
-for i in {1..10}; do echo "// $i" >> test.rs; done
-sleep 1
-curl http://localhost:7777/file-watcher-status-check | jq '.data.events_processed_total_count'
-# Expected: <= 2
+# Test 2: Statistics (MUST NOT BE NULL)
+curl http://localhost:7777/codebase-statistics-overview-summary | jq '.data.total_entity_count'
+# Expected: > 0 (not null)
 
-# Test 3: Non-code files ignored for reindex
-echo "test" >> README.md
-sleep 1
-# Expect: Event count increments, but no reindex log
+# Test 3: Fuzzy search
+curl "http://localhost:7777/code-entities-search-fuzzy?q=main"
+# Expected: At least 1 result
+
+# Test 4: Smart context (MUST RETURN ENTITIES)
+curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main&tokens=2000"
+# Expected: entities_included > 0 (not 0)
+
+# Test 5: Blast radius
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hops=2"
+# Expected: total_affected > 0
+
+# Test 6-14: Run remaining endpoints
+# All MUST return valid JSON with success: true
 ```
 
-### Performance Tests
-```bash
-# Measure latency (P50, P99)
-cargo bench --bench file_watcher_bench
-
-# Measure memory
-/usr/bin/time -l parseltongue pt08-http-code-query-server --db "rocksdb:test/analysis.db"
-
-# Measure CPU
-top -pid $(pgrep parseltongue)
-```
+### Success Criteria
+- [ ] All 14 README endpoints return valid data
+- [ ] No null values in critical fields
+- [ ] No "unknown:0-0" entities in results
+- [ ] Smart context returns > 0 entities
+- [ ] Fuzzy search works for common terms
 
 ---
 
-## Edge Cases & Risk Mitigation
+## Implementation Timeline
 
-### Edge Case 1: Symlinks
-**Issue**: Watcher may follow symlinks recursively
-**Mitigation**: Configure `RecursiveMode::NonRecursive` for symlinks
-**Test**: Create symlink to `/`, verify watcher doesn't explode
+### Day 1 (Feb 1): Fix File Watching
+**Duration**: 6-8 hours
 
-### Edge Case 2: Large Files (>100MB)
-**Issue**: Reindexing 100MB file may timeout
-**Mitigation**: Add file size check, skip files > 10MB
-**Test**: Create 50MB file, verify skip log
+1. Add `notify-debouncer-full` dependency (5 min)
+2. Rewrite `NotifyFileWatcherProvider` (2 hours)
+3. Add comprehensive logging (30 min)
+4. Write E2E tests (2 hours)
+5. Run performance benchmarks (1 hour)
+6. Verify P99 < 100ms (30 min)
 
-### Edge Case 3: Network Filesystems (NFS, SMB)
-**Issue**: `notify` may not work on network mounts
-**Mitigation**: Detect unsupported filesystem, fall back to polling
-**Test**: Start server in NFS mount, verify graceful degradation
+**Go/No-Go**: If tests pass and P99 < 100ms, proceed. Otherwise, debug.
 
-### Edge Case 4: Permission Denied
-**Issue**: Watcher can't read directory
-**Mitigation**: Log error, set `watcher_running_status_flag: false`
-**Test**: `chmod -r .`, verify error logged
+### Day 2 (Feb 2): Fix Broken APIs
+**Duration**: 4-6 hours
 
-### Edge Case 5: Rapid Server Restarts
-**Issue**: Old watcher threads may leak
-**Mitigation**: Ensure `Drop` trait cleans up debouncer
-**Test**: Restart server 100x, verify no thread leak
+1. Fix codebase statistics (1 hour)
+2. Fix smart context (2 hours)
+3. Fix fuzzy search (1 hour)
+4. Test all 14 endpoints (1 hour)
+5. Document any remaining issues (30 min)
 
----
+**Go/No-Go**: If all 14 endpoints return valid data, proceed. Otherwise, iterate.
 
-## Rollout Plan
+### Day 2 (Feb 2): Setup CI/CD
+**Duration**: 2-4 hours
 
-### Development (Feb 1)
-1. Implement Phase 1-2 (notify-debouncer-full integration)
-2. Manual testing with test files
-3. Verify event count increments
+1. Create `.github/workflows/release.yml` (1 hour)
+2. Test workflow on feature branch (1 hour)
+3. Tag v1.4.3 and trigger release (10 min)
+4. Verify all 4 binaries uploaded (30 min)
+5. Test downloads on macOS/Linux (1 hour)
 
-### Testing (Feb 1-2)
-1. Add Phase 4 E2E tests
-2. Add Phase 5 performance benchmarks
-3. Run full test suite
-
-### Release (Feb 2)
-1. Update docs (Phase 6)
-2. Tag v1.4.3
-3. Build release binary
-4. Publish to GitHub releases
+**Go/No-Go**: If all binaries download and run, ship. Otherwise, fix workflow.
 
 ---
 
-## Success Criteria
+## Out of Scope (Deferred to v1.5.0)
+
+**NOT in v1.4.3**:
+- WebSocket streaming (apwbd feature)
+- Diff analysis endpoint (apwbd feature)
+- Workspace management (apwbd feature)
+- Temporal coupling (apwbd feature)
+- Embedded React frontend (apwbd feature)
+- Incremental tree-sitter parsing (optimization)
+- GraphQL endpoint
+- Authentication/authorization
+- Batch operations
+
+**Why defer?** v1.4.3 is a **bug fix release**. Focus on fixing what's broken, not adding features.
+
+---
+
+## Success Criteria Summary
 
 ### Must Have (v1.4.3)
-- [ ] File watcher detects changes automatically (events > 0)
-- [ ] Incremental reindex triggered on file save
-- [ ] Debouncing works (10 rapid edits = 1-2 callbacks)
-- [ ] Graceful degradation on watcher failure
-- [ ] Logs show all watcher activity
-- [ ] E2E tests pass (create, modify, delete)
-- [ ] Performance: P99 < 500ms
-- [ ] Zero breaking changes
+- [ ] **Req 1**: File watcher detects changes (events > 0, P99 < 100ms)
+- [ ] **Req 2**: Release builds for macOS (arm64 + x64) and Linux (x64 + musl)
+- [ ] **Req 3**: All 14 README endpoints return valid data (no nulls, no 0 entities)
 
-### Nice to Have (Deferred to v1.5.0)
-- WebSocket streaming of diffs (apwbd feature)
-- Workspace management (apwbd feature)
-- Diff analysis endpoint (apwbd feature)
-- Temporal coupling analysis (apwbd feature)
-
----
-
-## Open Questions
-
-1. **Q**: Should we port the entire apwbd file_watcher_service_module (3,400 lines)?
-   **A**: No. Use `notify-debouncer-full` crate instead (simpler, battle-tested).
-
-2. **Q**: Should we support `--watch` flag for backwards compatibility?
-   **A**: No. v1.4.2 removed it, users expect always-on behavior.
-
-3. **Q**: What if `notify-debouncer-full` also fails?
-   **A**: Graceful degradation - log error, manual reindex still works.
-
-4. **Q**: Should we add WebSocket streaming?
-   **A**: Defer to v1.5.0 (out of scope for this fix).
+### Nice to Have (Deferred)
+- Incremental parsing (v1.5.0)
+- WebSocket streaming (v1.5.0)
+- Workspace management (v1.5.0)
 
 ---
 
 ## References
 
-- **Thesis Document**: [THESIS-PRD-v143-File-Watching.md](./THESIS-PRD-v143-File-Watching.md)
-- **Git History**: [GIT-HISTORY-ANALYSIS.md](./GIT-HISTORY-ANALYSIS.md)
-- **v1.4.2 PRD**: [PRD-v142-Parseltongue.md](./PRD-v142-Parseltongue.md)
-- **notify-debouncer-full**: https://docs.rs/notify-debouncer-full/0.3/
-- **Commit 979ffcb7c**: v1.4.2 release (always-on file watching)
-- **Commit b21ed137**: v1.4.1 release (added --watch flag)
-- **Commit 4329e8f6d**: apwbd branch (complete file watcher with debouncer)
+- **Thesis Document**: [THESIS-PRD-v143-File-Watching.md](./THESIS-PRD-v143-File-Watching.md) - 61KB root cause analysis
+- **Research Plan**: [PLAN-v143-High-Speed-File-Watching.md](./PLAN-v143-High-Speed-File-Watching.md) - Best-in-class architectures
+- **README**: [../README.md](../README.md) - All 14 API endpoints
+- **v1.4.2 Commit**: `979ffcb7c` - Always-on file watching (broken)
+
+---
+
+## Testing Checklist
+
+### File Watching Tests
+- [ ] Basic detection (edit file → events > 0)
+- [ ] Performance (P99 < 100ms)
+- [ ] Debouncing (10 edits → 1-2 callbacks)
+- [ ] Extension filtering (.rs .py .js .ts .go .java only)
+- [ ] Graceful degradation (watcher failure → log error)
+
+### API Tests (All 14 Endpoints)
+- [ ] `/server-health-check-status`
+- [ ] `/codebase-statistics-overview-summary` (fix null counts)
+- [ ] `/code-entities-search-fuzzy` (fix inconsistent results)
+- [ ] `/reverse-callers-query-graph`
+- [ ] `/blast-radius-impact-analysis`
+- [ ] `/smart-context-token-budget` (fix 0 entities)
+- [ ] `/code-entities-list-all`
+- [ ] `/code-entity-detail-view`
+- [ ] `/forward-callees-query-graph`
+- [ ] `/dependency-edges-list-all`
+- [ ] `/circular-dependency-detection-scan`
+- [ ] `/complexity-hotspots-ranking-view`
+- [ ] `/semantic-cluster-grouping-list`
+- [ ] `/api-reference-documentation-help`
+
+### Build Tests
+- [ ] macOS arm64 build works
+- [ ] macOS x64 build works
+- [ ] Linux x64 build works
+- [ ] Linux musl build works
+- [ ] All binaries show correct version
 
 ---
 
 **Status**: Ready for Implementation
-**Next Step**: Add `notify-debouncer-full` dependency and rewrite `NotifyFileWatcherProvider`
+**Next Step**: Add `notify-debouncer-full` dependency and fix file watcher
+**Target Release**: February 2, 2026
