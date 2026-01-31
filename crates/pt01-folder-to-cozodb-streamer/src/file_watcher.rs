@@ -106,7 +106,7 @@ pub trait FileWatchProviderTrait: Send + Sync {
     fn check_watcher_running_status(&self) -> bool;
 }
 
-/// Production implementation using notify crate
+/// Production implementation using notify crate with debouncer
 ///
 /// # 4-Word Name: NotifyFileWatcherProvider
 pub struct NotifyFileWatcherProvider {
@@ -116,6 +116,18 @@ pub struct NotifyFileWatcherProvider {
     debounce_duration_ms: u64,
     /// Sender to stop the watcher
     stop_sender: tokio::sync::Mutex<Option<mpsc::Sender<()>>>,
+    /// Handle to the debouncer (stored to keep it alive)
+    debouncer_handle_storage: Arc<
+        tokio::sync::Mutex<
+            Option<notify_debouncer_full::Debouncer<RecommendedWatcher, notify_debouncer_full::FileIdMap>>,
+        >,
+    >,
+    /// Total events processed (for metrics)
+    events_processed_total_count: Arc<std::sync::atomic::AtomicU64>,
+    /// Total events coalesced (for metrics)
+    events_coalesced_total_count: Arc<std::sync::atomic::AtomicU64>,
+    /// Timestamp of last event (milliseconds)
+    last_event_timestamp_millis: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl NotifyFileWatcherProvider {
@@ -127,6 +139,10 @@ impl NotifyFileWatcherProvider {
             is_running: Arc::new(AtomicBool::new(false)),
             debounce_duration_ms: 100,
             stop_sender: tokio::sync::Mutex::new(None),
+            debouncer_handle_storage: Arc::new(tokio::sync::Mutex::new(None)),
+            events_processed_total_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            events_coalesced_total_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            last_event_timestamp_millis: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -138,7 +154,35 @@ impl NotifyFileWatcherProvider {
             is_running: Arc::new(AtomicBool::new(false)),
             debounce_duration_ms: debounce_ms,
             stop_sender: tokio::sync::Mutex::new(None),
+            debouncer_handle_storage: Arc::new(tokio::sync::Mutex::new(None)),
+            events_processed_total_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            events_coalesced_total_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            last_event_timestamp_millis: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
+    }
+
+    /// Get metrics: total events processed
+    ///
+    /// # 4-Word Name: get_events_processed_count
+    pub fn get_events_processed_count(&self) -> u64 {
+        self.events_processed_total_count
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Get metrics: total events coalesced
+    ///
+    /// # 4-Word Name: get_events_coalesced_count
+    pub fn get_events_coalesced_count(&self) -> u64 {
+        self.events_coalesced_total_count
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Get metrics: last event timestamp
+    ///
+    /// # 4-Word Name: get_last_event_timestamp
+    pub fn get_last_event_timestamp(&self) -> u64 {
+        self.last_event_timestamp_millis
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -149,6 +193,8 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
         path: &Path,
         callback: FileChangeCallback,
     ) -> WatcherResult<()> {
+        use notify_debouncer_full::{new_debouncer, DebounceEventResult, FileIdMap};
+
         // Check if already running
         if self.is_running.load(Ordering::SeqCst) {
             return Err(FileWatcherOperationError::WatcherAlreadyRunning);
@@ -158,6 +204,11 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
         let is_running = self.is_running.clone();
         let debounce_ms = self.debounce_duration_ms;
 
+        // Clone metrics for use in event handler
+        let events_processed = self.events_processed_total_count.clone();
+        let events_coalesced = self.events_coalesced_total_count.clone();
+        let last_timestamp = self.last_event_timestamp_millis.clone();
+
         // Create stop channel
         let (stop_tx, mut stop_rx) = mpsc::channel::<()>(1);
         {
@@ -165,24 +216,33 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
             *sender_lock = Some(stop_tx);
         }
 
-        // Create event channel for notify
-        let (event_tx, mut event_rx) = mpsc::channel::<notify::Result<Event>>(100);
+        // Create event channel for debounced events
+        let (event_tx, mut event_rx) = mpsc::channel::<DebounceEventResult>(100);
 
-        // Create watcher
-        let mut watcher = RecommendedWatcher::new(
-            move |res| {
-                let _ = event_tx.blocking_send(res);
+        // Create debouncer with event handler
+        let mut debouncer = new_debouncer(
+            Duration::from_millis(debounce_ms),
+            None, // No extra timeout
+            move |result: DebounceEventResult| {
+                // Send debounced events through channel (non-blocking)
+                let _ = event_tx.try_send(result);
             },
-            Config::default().with_poll_interval(Duration::from_millis(debounce_ms)),
         )
         .map_err(|e| FileWatcherOperationError::WatcherCreationFailed(e.to_string()))?;
 
-        // Start watching
-        watcher
+        // Start watching the path
+        debouncer
+            .watcher()
             .watch(&path_buf, RecursiveMode::Recursive)
             .map_err(|_| FileWatcherOperationError::WatchPathFailed {
                 path: path_buf.clone(),
             })?;
+
+        // Store debouncer handle to keep it alive
+        {
+            let mut handle_lock = self.debouncer_handle_storage.lock().await;
+            *handle_lock = Some(debouncer);
+        }
 
         is_running.store(true, Ordering::SeqCst);
 
@@ -191,9 +251,6 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
         let callback = Arc::new(callback);
 
         tokio::spawn(async move {
-            // Keep watcher alive in this task
-            let _watcher = watcher;
-
             loop {
                 tokio::select! {
                     // Handle stop signal
@@ -201,12 +258,37 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
                         is_running_clone.store(false, Ordering::SeqCst);
                         break;
                     }
-                    // Handle file events
+                    // Handle debounced file events
                     Some(result) = event_rx.recv() => {
-                        if let Ok(event) = result {
-                            // Convert notify event to our event type
-                            if let Some(payload) = convert_notify_event_payload(&event) {
-                                callback(payload);
+                        match result {
+                            Ok(events) => {
+                                // Update timestamp
+                                let now = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_millis() as u64;
+                                last_timestamp.store(now, Ordering::SeqCst);
+
+                                // Track coalescing: if multiple events, count them
+                                let event_count = events.len() as u64;
+                                if event_count > 1 {
+                                    events_coalesced.fetch_add(event_count - 1, Ordering::SeqCst);
+                                }
+
+                                // Process each debounced event
+                                for event in events {
+                                    if let Some(payload) = convert_debounced_event_to_payload(event) {
+                                        // Increment processed counter
+                                        events_processed.fetch_add(1, Ordering::SeqCst);
+
+                                        // Invoke callback
+                                        callback(payload);
+                                    }
+                                }
+                            }
+                            Err(errors) => {
+                                // Log errors but continue watching
+                                eprintln!("File watcher errors: {:?}", errors);
                             }
                         }
                     }
