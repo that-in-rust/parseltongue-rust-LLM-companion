@@ -908,6 +908,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "file-id"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1fc6a637b6dc58414714eddd9170ff187ecb0933d4c7024d1abbd23a3cc26e9"
+dependencies = [
+ "windows-sys 0.60.2",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1710,6 +1719,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "notify-debouncer-full"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb7fd166739789c9ff169e654dc1501373db9d80a4c3f972817c8a4d7cf8f34e"
+dependencies = [
+ "crossbeam-channel",
+ "file-id",
+ "log",
+ "notify",
+ "parking_lot",
+ "walkdir",
+]
+
+[[package]]
 name = "num-complex"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2077,6 +2100,7 @@ dependencies = [
  "criterion",
  "indicatif",
  "notify",
+ "notify-debouncer-full",
  "parseltongue-core",
  "proptest",
  "serde",

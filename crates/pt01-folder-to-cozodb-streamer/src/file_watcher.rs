@@ -257,6 +257,39 @@ fn convert_notify_event_payload(event: &Event) -> Option<FileChangeEventPayload>
     })
 }
 
+/// Convert debounced event to our event payload
+///
+/// # 4-Word Name: convert_debounced_event_to_payload
+///
+/// Converts `notify-debouncer-full::DebouncedEvent` to our internal event type.
+/// This is the adapter between the debouncer's event format and our domain model.
+///
+/// # Arguments
+/// * `event` - Debounced event from notify-debouncer-full
+///
+/// # Returns
+/// * `Some(FileChangeEventPayload)` - If event is relevant (Create/Modify/Remove)
+/// * `None` - If event should be ignored (Access, Other, or empty paths)
+fn convert_debounced_event_to_payload(
+    event: notify_debouncer_full::DebouncedEvent,
+) -> Option<FileChangeEventPayload> {
+    // Extract first path (events can have multiple paths, we take the first)
+    let path = event.event.paths.first()?.clone();
+
+    // Convert event kind to our change type
+    let change_type = match event.event.kind {
+        EventKind::Create(_) => FileChangeType::Created,
+        EventKind::Modify(_) => FileChangeType::Modified,
+        EventKind::Remove(_) => FileChangeType::Deleted,
+        _ => return None, // Ignore Access, Other, etc.
+    };
+
+    Some(FileChangeEventPayload {
+        file_path: path,
+        change_type,
+    })
+}
+
 /// Mock implementation for testing
 ///
 /// # 4-Word Name: MockFileWatcherProvider

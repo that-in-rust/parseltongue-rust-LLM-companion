@@ -307,4 +307,153 @@ mod tests {
         assert_eq!(cloned.file_path, event.file_path);
         assert_eq!(cloned.change_type, event.change_type);
     }
+
+    // =========================================================================
+    // PHASE 1: DEBOUNCED EVENT CONVERSION TESTS
+    // =========================================================================
+
+    /// Test 1.1: Convert debounced Create event to FileChangeEventPayload
+    ///
+    /// # 4-Word Test Name: test_convert_create_event_correctly
+    #[test]
+    fn test_convert_create_event_correctly() {
+        use notify_debouncer_full::DebouncedEvent;
+
+        // GIVEN: A mock debounced event with Create kind
+        let test_path = std::path::PathBuf::from("/test/file.rs");
+        let notify_event = notify::Event {
+            kind: notify::EventKind::Create(notify::event::CreateKind::File),
+            paths: vec![test_path.clone()],
+            attrs: Default::default(),
+        };
+
+        let debounced_event = DebouncedEvent {
+            event: notify_event,
+            time: std::time::Instant::now(),
+        };
+
+        // WHEN: Convert using the new function (doesn't exist yet - RED phase)
+        let result = convert_debounced_event_to_payload(debounced_event);
+
+        // THEN: Should convert to Created event
+        assert!(result.is_some(), "Should convert Create event");
+        let payload = result.unwrap();
+        assert_eq!(payload.file_path, test_path);
+        assert_eq!(payload.change_type, FileChangeType::Created);
+    }
+
+    /// Test 1.2: Convert debounced Modify event to FileChangeEventPayload
+    ///
+    /// # 4-Word Test Name: test_convert_modify_event_correctly
+    #[test]
+    fn test_convert_modify_event_correctly() {
+        use notify_debouncer_full::DebouncedEvent;
+
+        // GIVEN: A mock debounced event with Modify kind
+        let test_path = std::path::PathBuf::from("/test/file.rs");
+        let notify_event = notify::Event {
+            kind: notify::EventKind::Modify(notify::event::ModifyKind::Data(
+                notify::event::DataChange::Content,
+            )),
+            paths: vec![test_path.clone()],
+            attrs: Default::default(),
+        };
+
+        let debounced_event = DebouncedEvent {
+            event: notify_event,
+            time: std::time::Instant::now(),
+        };
+
+        // WHEN: Convert using the new function
+        let result = convert_debounced_event_to_payload(debounced_event);
+
+        // THEN: Should convert to Modified event
+        assert!(result.is_some(), "Should convert Modify event");
+        let payload = result.unwrap();
+        assert_eq!(payload.file_path, test_path);
+        assert_eq!(payload.change_type, FileChangeType::Modified);
+    }
+
+    /// Test 1.3: Convert debounced Remove event to FileChangeEventPayload
+    ///
+    /// # 4-Word Test Name: test_convert_remove_event_correctly
+    #[test]
+    fn test_convert_remove_event_correctly() {
+        use notify_debouncer_full::DebouncedEvent;
+
+        // GIVEN: A mock debounced event with Remove kind
+        let test_path = std::path::PathBuf::from("/test/file.rs");
+        let notify_event = notify::Event {
+            kind: notify::EventKind::Remove(notify::event::RemoveKind::File),
+            paths: vec![test_path.clone()],
+            attrs: Default::default(),
+        };
+
+        let debounced_event = DebouncedEvent {
+            event: notify_event,
+            time: std::time::Instant::now(),
+        };
+
+        // WHEN: Convert using the new function
+        let result = convert_debounced_event_to_payload(debounced_event);
+
+        // THEN: Should convert to Deleted event
+        assert!(result.is_some(), "Should convert Remove event");
+        let payload = result.unwrap();
+        assert_eq!(payload.file_path, test_path);
+        assert_eq!(payload.change_type, FileChangeType::Deleted);
+    }
+
+    /// Test 1.4: Return None for irrelevant event types (Access, Other)
+    ///
+    /// # 4-Word Test Name: test_filter_irrelevant_events_out
+    #[test]
+    fn test_filter_irrelevant_events_out() {
+        use notify_debouncer_full::DebouncedEvent;
+
+        // GIVEN: A mock debounced event with Access kind (should be ignored)
+        let test_path = std::path::PathBuf::from("/test/file.rs");
+        let notify_event = notify::Event {
+            kind: notify::EventKind::Access(notify::event::AccessKind::Read),
+            paths: vec![test_path.clone()],
+            attrs: Default::default(),
+        };
+
+        let debounced_event = DebouncedEvent {
+            event: notify_event,
+            time: std::time::Instant::now(),
+        };
+
+        // WHEN: Convert using the new function
+        let result = convert_debounced_event_to_payload(debounced_event);
+
+        // THEN: Should return None for irrelevant events
+        assert!(result.is_none(), "Should filter out Access events");
+    }
+
+    /// Test 1.5: Handle events with no paths gracefully
+    ///
+    /// # 4-Word Test Name: test_handle_empty_paths_gracefully
+    #[test]
+    fn test_handle_empty_paths_gracefully() {
+        use notify_debouncer_full::DebouncedEvent;
+
+        // GIVEN: A mock debounced event with empty paths
+        let notify_event = notify::Event {
+            kind: notify::EventKind::Create(notify::event::CreateKind::File),
+            paths: vec![], // Empty paths
+            attrs: Default::default(),
+        };
+
+        let debounced_event = DebouncedEvent {
+            event: notify_event,
+            time: std::time::Instant::now(),
+        };
+
+        // WHEN: Convert using the new function
+        let result = convert_debounced_event_to_payload(debounced_event);
+
+        // THEN: Should return None when no paths
+        assert!(result.is_none(), "Should handle empty paths gracefully");
+    }
 }

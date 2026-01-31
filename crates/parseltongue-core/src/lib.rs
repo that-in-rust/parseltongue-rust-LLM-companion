@@ -10,9 +10,9 @@
 
 pub mod entities;
 pub mod entity_class_specifications;
-pub mod entity_conversion; // P5: Entity conversion utilities
+// pub mod entity_conversion; // P5: Entity conversion utilities (TODO: implement)
 pub mod error;
-pub mod file_parser; // P1: Thread-safe file parser facade
+// pub mod file_parser; // P1: Thread-safe file parser facade (TODO: implement)
 pub mod interfaces;
 pub mod output_path_resolver; // v0.9.7: Timestamped folder creation
 pub mod query_extractor;
