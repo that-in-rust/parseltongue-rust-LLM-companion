@@ -61,12 +61,42 @@ curl http://localhost:7777/file-watcher-status-check | jq '.data.events_processe
 ### Files to Change
 1. `crates/pt01-folder-to-cozodb-streamer/Cargo.toml` - Add `notify-debouncer-full = "0.3"`
 2. `crates/pt01-folder-to-cozodb-streamer/src/file_watcher.rs` - Replace `RecommendedWatcher` with `Debouncer`
-3. `crates/pt08-http-code-query-server/src/file_watcher_integration_service.rs` - Add comprehensive logging
+3. `crates/pt08-http-code-query-server/src/http_server_startup_runner.rs` - **Add missing 6 languages** (C, C++, Ruby, PHP, C#, Swift)
+4. `crates/pt08-http-code-query-server/src/file_watcher_integration_service.rs` - Add comprehensive logging
+
+### Critical Fix: All 12 Languages
+**Current bug**: File watcher only monitors 6/12 languages!
+
+**Fix**: Update `http_server_startup_runner.rs` line 342-349:
+```rust
+let extensions = vec![
+    // Currently monitored (6 languages)
+    "rs".to_string(),      // Rust
+    "py".to_string(),      // Python
+    "js".to_string(),      // JavaScript
+    "ts".to_string(),      // TypeScript
+    "go".to_string(),      // Go
+    "java".to_string(),    // Java
+
+    // MISSING - Add these (6 languages)
+    "c".to_string(),       // C
+    "h".to_string(),       // C header
+    "cpp".to_string(),     // C++
+    "cc".to_string(),      // C++ alternate
+    "cxx".to_string(),     // C++ alternate
+    "hpp".to_string(),     // C++ header
+    "rb".to_string(),      // Ruby
+    "php".to_string(),     // PHP
+    "cs".to_string(),      // C#
+    "swift".to_string(),   // Swift
+];
+```
 
 ### Success Criteria
 - [ ] Events > 0 when files change
 - [ ] P99 latency < 100ms
 - [ ] Debouncing works (10 edits = 1-2 callbacks)
+- [ ] **All 12 languages monitored** (.rs .py .js .ts .go .java .c .h .cpp .hpp .rb .php .cs .swift)
 - [ ] Logs show all watcher activity
 - [ ] E2E tests pass
 
@@ -356,7 +386,8 @@ curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hop
 - [ ] Basic detection (edit file → events > 0)
 - [ ] Performance (P99 < 100ms)
 - [ ] Debouncing (10 edits → 1-2 callbacks)
-- [ ] Extension filtering (.rs .py .js .ts .go .java only)
+- [ ] **Extension filtering (all 12 languages: .rs .py .js .ts .go .java .c .h .cpp .hpp .rb .php .cs .swift)**
+- [ ] Test each language: Create .c file → verify event detected
 - [ ] Graceful degradation (watcher failure → log error)
 
 ### API Tests (All 14 Endpoints)
