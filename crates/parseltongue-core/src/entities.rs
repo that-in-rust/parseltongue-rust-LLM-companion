@@ -735,6 +735,64 @@ impl CodeEntity {
         Ok(())
     }
 
+    /// Extract language component from ISGL1 key (v1.4.5 Bug Fix)
+    ///
+    /// **Purpose**: Fix Bug #3a (Language Field Corruption) by extracting language
+    /// from the correctly-generated ISGL1 key prefix instead of hardcoding.
+    ///
+    /// **Key Format**: `language:type:name:file:lines`
+    /// - Example: `javascript:fn:greetUser:__tests_e2e_workspace_src_test_v141_js:4-6`
+    /// - Returns: `"javascript"`
+    ///
+    /// **Edge Cases**:
+    /// - Empty key → `"unknown"`
+    /// - No delimiters → return entire key
+    /// - Single component → return that component
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use parseltongue_core::entities::{CodeEntity, InterfaceSignature, EntityType,
+    ///                                    Visibility, LineRange, LanguageSpecificSignature,
+    ///                                    RustSignature, EntityClass};
+    /// use std::path::PathBuf;
+    ///
+    /// let entity = CodeEntity::new(
+    ///     "rust:fn:main:src_main_rs:1-10".to_string(),
+    ///     InterfaceSignature {
+    ///         entity_type: EntityType::Function,
+    ///         name: "main".to_string(),
+    ///         visibility: Visibility::Public,
+    ///         file_path: PathBuf::from("src/main.rs"),
+    ///         line_range: LineRange::new(1, 10).unwrap(),
+    ///         module_path: vec![],
+    ///         documentation: None,
+    ///         language_specific: LanguageSpecificSignature::Rust(RustSignature {
+    ///             generics: vec![],
+    ///             lifetimes: vec![],
+    ///             where_clauses: vec![],
+    ///             attributes: vec![],
+    ///             trait_impl: None,
+    ///         }),
+    ///     },
+    ///     EntityClass::CodeImplementation,
+    /// ).unwrap();
+    ///
+    /// assert_eq!(entity.extract_language_from_key_validated(), "rust");
+    /// ```
+    pub fn extract_language_from_key_validated(&self) -> String {
+        // Handle empty key edge case
+        if self.isgl1_key.is_empty() {
+            return "unknown".to_string();
+        }
+
+        // Split by ':' delimiter and take first component
+        match self.isgl1_key.split(':').next() {
+            Some(language) if !language.is_empty() => language.to_string(),
+            _ => "unknown".to_string(),
+        }
+    }
+
     /// Generate hash-based ISGL1 key for new entities
     ///
     /// Creates stable identity keys for entities that don't exist yet in the codebase.

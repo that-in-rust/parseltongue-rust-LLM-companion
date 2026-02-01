@@ -1046,16 +1046,7 @@ impl CozoDbStorage {
 
         params.insert(
             "language".to_string(),
-            DataValue::Str(
-                match &entity.interface_signature.language_specific {
-                    LanguageSpecificSignature::Rust(_) => "rust",
-                    LanguageSpecificSignature::JavaScript(_) => "javascript",
-                    LanguageSpecificSignature::TypeScript(_) => "typescript",
-                    LanguageSpecificSignature::Python(_) => "python",
-                    LanguageSpecificSignature::Java(_) => "java",
-                }
-                .into(),
-            ),
+            DataValue::Str(entity.extract_language_from_key_validated().into()),
         );
 
         params.insert(
