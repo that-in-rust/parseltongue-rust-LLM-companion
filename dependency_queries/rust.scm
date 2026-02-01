@@ -33,6 +33,12 @@
 ; DEPENDENCY TYPE 2: Use Declarations (A uses B)
 ; ============================================================================
 
+; EXTERNAL DEPENDENCY DETECTION: Capture full use path for external crate detection
+; Example: use clap::Parser; → captures "clap::Parser" (full text)
+; This enables extracting crate name (clap) and item name (Parser)
+(use_declaration
+  argument: (scoped_identifier) @reference.use_full_path) @dependency.use_external
+
 ; Simple use: use std::collections::HashMap;
 (use_declaration
   argument: (scoped_identifier

@@ -34,6 +34,10 @@ pub mod streamer;
 pub mod test_detector;
 pub mod v090_specifications;
 
+// Bug #4: External dependency placeholder tests
+#[cfg(test)]
+mod external_dependency_tests;
+
 // Re-export commonly used types
 pub use errors::*;
 pub use file_watcher::*;

@@ -9,8 +9,8 @@
 
 ## PMF Rating Guide
 
-- **90-100 (Must-Have)**: Solves critical workflow blocker, 10× improvement, daily use
-- **70-89 (Performance)**: 3-5× improvement, high frequency + impact
+- **90-100 (Must-Have)**: Solves critical workflow blocker, 10ï¿½ improvement, daily use
+- **70-89 (Performance)**: 3-5ï¿½ improvement, high frequency + impact
 - **50-69 (Power)**: Enables new capabilities, low frequency but very high impact
 - **30-49 (Delight)**: Nice to have, makes users smile
 - **10-29 (Polish)**: Quality improvement, no new capability
@@ -46,7 +46,7 @@ Critical for AST-based features (cyclomatic complexity, clone detection, entropy
 
 ### 6. Query Token Budget Estimator
 **PMF: 90** | **Version: v1.7** | **Effort: 1w**
-Add pre-query token estimation with /query-token-budget-estimate and ?dry_run mode (±15% accuracy).
+Add pre-query token estimation with /query-token-budget-estimate and ?dry_run mode (ï¿½15% accuracy).
 Self-correction warnings before execution - prevents context overflow, enables agents to backtrack before wasting tokens.
 
 ### 7. Technical Debt Quantification Scoring
@@ -60,7 +60,7 @@ Enables business justification for refactoring - tracks growth rate, prevents de
 
 ### 8. Layered Architecture Compliance Verification
 **PMF: 89** | **Version: v2.1** | **Effort: 2w**
-Implement DSM partitioning with layer constraint checking (no UI’Data shortcuts), automated CI enforcement.
+Implement DSM partitioning with layer constraint checking (no UIï¿½Data shortcuts), automated CI enforcement.
 Prevents architecture erosion via automated CI enforcement - 99.8% compliance rate, catches violations in PR.
 
 ### 9. Incremental Query Streaming API
@@ -81,12 +81,12 @@ Auto-generates layer/component/connector diagrams - detects architectural violat
 ### 12. Hierarchical Module Boundary Detection
 **PMF: 86** | **Version: v2.0** | **Effort: 3w**
 Implement Leiden algorithm for automatic module boundary detection via modularity optimization (0.73 score).
-Discovers true module boundaries vs. folder structure - 90% time saved on architecture analysis (2 days ’ 2 hours).
+Discovers true module boundaries vs. folder structure - 90% time saved on architecture analysis (2 days ï¿½ 2 hours).
 
 ### 13. Unix Piping Output Format
 **PMF: 85** | **Version: v1.6** | **Effort: 1w**
 Add --format flag supporting json/ndjson/tsv/csv output for Unix-style composability (grep | awk | sort).
-Enables grep | awk | sort workflows - 3-5× improvement over manual JSON parsing, agent-friendly piping.
+Enables grep | awk | sort workflows - 3-5ï¿½ improvement over manual JSON parsing, agent-friendly piping.
 
 ### 14. Stateful Query Pagination Bookmarks
 **PMF: 85** | **Version: v1.7** | **Effort: 2w**
@@ -110,7 +110,7 @@ Ranks entity importance - prioritizes documentation/testing/refactoring work, id
 
 ### 18. Label Propagation Enhanced Clustering
 **PMF: 82** | **Version: v2.0** | **Effort: 2w**
-Replace current label propagation with GVE-LPA (vector-based) for 3-5× faster convergence.
+Replace current label propagation with GVE-LPA (vector-based) for 3-5ï¿½ faster convergence.
 15 iterations vs. 100 - deterministic clusters align with developer intuition 85% of time, faster module detection.
 
 ### 19. Workspace Context Multiplexing
@@ -131,11 +131,11 @@ Supports v1.8 query pipeline composition compilation - performance improvements 
 ### 22. Session Hot Path Cache
 **PMF: 78** | **Version: v1.8** | **Effort: 1.5w**
 Implement in-memory LRU cache for frequently queried entities/edges per session (>70% hit rate).
-10-50× speedup on repeated queries - file-watcher invalidation, massive performance gain for agents.
+10-50ï¿½ speedup on repeated queries - file-watcher invalidation, massive performance gain for agents.
 
 ### 23. Token Estimation Accuracy Improvement
 **PMF: 75** | **Version: v1.7** | **Effort: included**
-Improve token estimation from ±30% (heuristic) to ±15% (entity metadata-based calculation).
+Improve token estimation from ï¿½30% (heuristic) to ï¿½15% (entity metadata-based calculation).
 Critical for v1.7 budget estimator accuracy - prevents over/under-estimation, enables reliable planning.
 
 ### 24. Spectral Graph Partition Decomposition
@@ -257,7 +257,7 @@ Foundation for v1.6 MCP server implementation - critical path external dependenc
 
 ### SigHashLookup CozoDB Table
 **Type: Database Schema** | **Version: v1.7** | **Effort: included**
-Add CozoDB relation for BLAKE3 signature hash ’ entity key mapping (supports preview/pointer).
+Add CozoDB relation for BLAKE3 signature hash ï¿½ entity key mapping (supports preview/pointer).
 Supports v1.7 preview/pointer system - enables pointer-based full entity retrieval.
 
 ### QueryCursorState CozoDB Table
@@ -277,7 +277,7 @@ Core to v1.7 token budget estimator - safe way to check costs before execution.
 
 ### Query Parameter: ?session=<id>
 **Type: API Enhancement** | **Version: v1.8** | **Effort: included**
-Add session parameter to all endpoints for hot path caching (10-50× speedup on hits).
+Add session parameter to all endpoints for hot path caching (10-50ï¿½ speedup on hits).
 Core to v1.8 session cache feature - enables per-agent caching strategies.
 
 ### Query Parameter: ?token_budget=<N>
@@ -296,7 +296,7 @@ Already resolved in v1.4.2 - mentioned in git history as completed.
 
 ### Token Estimation Accuracy Improvement
 **Status: Included in v1.7** | **PMF: 75 (Performance)**
-Improve token estimation from ±30% to ±15% accuracy using entity metadata.
+Improve token estimation from ï¿½30% to ï¿½15% accuracy using entity metadata.
 Included in v1.7 budget estimator feature - critical for reliable planning.
 
 ---
@@ -310,7 +310,7 @@ Enables focused analysis - test prioritization, change impact analysis, surgical
 
 ### Feature #19: Triangle Counting Cohesion Metrics
 **PMF: 68** | **Version: v2.2** | **Effort: 1.5w**
-Implement fast triangle counting (O(m·dmax)) for clustering coefficient computation.
+Implement fast triangle counting (O(mï¿½dmax)) for clustering coefficient computation.
 Quantifies local cohesion - complements global modularity metrics, identifies tight clusters.
 
 ### Feature #20: UMAP 2D Code Layout Projection
@@ -340,13 +340,13 @@ Architecture evolution tracking - trend analysis, drift detection, historical co
 
 ### Feature #25: Incremental Graph Update Performance
 **PMF: 88** | **Version: v2.0** | **Effort: 2w**
-Optimize incremental ISG updates (file watcher ’ entity/edge delta ’ <100ms update).
+Optimize incremental ISG updates (file watcher ï¿½ entity/edge delta ï¿½ <100ms update).
 Real-time analysis - sub-100ms updates on file changes, enables live architectural monitoring.
 
 ### Feature #26: Parallel Graph Algorithm Execution
 **PMF: 86** | **Version: v2.0** | **Effort: 2.5w**
 Implement parallel execution for graph algorithms on multicore CPUs (96-core benchmarks).
-Enterprise-scale performance - 315× speedup over sequential on 96-core, handles massive codebases.
+Enterprise-scale performance - 315ï¿½ speedup over sequential on 96-core, handles massive codebases.
 
 ### Feature #27: Graph Compression Sparse Storage
 **PMF: 82** | **Version: v2.0** | **Effort: 1.5w**
@@ -356,7 +356,7 @@ Memory efficiency - 50K entities in <6GB RAM, enables laptop-based analysis of l
 ### Feature #28: Approximate Algorithms Massive Graphs
 **PMF: 75** | **Version: v2.0** | **Effort: 2w**
 Implement approximate algorithms with provable guarantees for 100K+ entity graphs.
-Massive codebase support - <5% error with 10× speedup, enables enterprise-scale analysis.
+Massive codebase support - <5% error with 10ï¿½ speedup, enables enterprise-scale analysis.
 
 ---
 
@@ -506,7 +506,7 @@ Massive codebase support - <5% error with 10× speedup, enables enterprise-scale 
 ### Q3 2026 Focus (v1.8-v1.9)
 - Performance optimization (cache, parallel, compression)
 - Intelligent auto-optimization (budget planner)
-- Goal: 10-50× speedup, context-aware planning
+- Goal: 10-50ï¿½ speedup, context-aware planning
 
 ### Q4 2026 Focus (v2.0)
 - Research-backed analysis features (entropy, debt, SARIF)
@@ -532,7 +532,7 @@ Massive codebase support - <5% error with 10× speedup, enables enterprise-scale 
 - **Quality**: Technical debt growth <10 hours/quarter
 - **Architecture**: Modularity score >0.7, compliance >99%
 - **Scale**: 100K entity codebases analyzed in <20 seconds
-- **Insight**: 50% faster architecture planning (days ’ hours)
+- **Insight**: 50% faster architecture planning (days ï¿½ hours)
 
 ---
 
