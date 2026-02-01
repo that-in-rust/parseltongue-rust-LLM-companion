@@ -389,10 +389,10 @@ quadrantChart
     title Feature Priority: Impact vs. Effort
     x-axis Low Effort --> High Effort
     y-axis Low Impact --> High Impact
-    quadrant-1 High Impact, High Effort (Strategic)
-    quadrant-2 High Impact, Low Effort (Quick Wins)
-    quadrant-3 Low Impact, Low Effort (Fill-ins)
-    quadrant-4 Low Impact, High Effort (Avoid)
+    quadrant-1 High Impact High Effort Strategic
+    quadrant-2 High Impact Low Effort Quick Wins
+    quadrant-3 Low Impact Low Effort Fill-ins
+    quadrant-4 Low Impact High Effort Avoid
 
     Feature 6 (Tech Debt): [0.3, 0.95]
     Feature 11 (Centrality): [0.25, 0.9]
@@ -433,11 +433,11 @@ quadrantChart
 
 ```mermaid
 graph LR
-    subgraph "Complexity Classes (CPU-Friendly)"
-        Linear["O(V + E)<br/><br/>Features 13, 19, 25"]
-        LogLinear["O(E log V)<br/><br/>Features 1, 2, 3"]
-        Quadratic["O(V²)<br/><br/>Features 11, 17, 21"]
-        Cubic["O(V³)<br/><br/>Feature 18"]
+    subgraph "Complexity Classes CPU-Friendly"
+        Linear["O-V-plus-E<br/><br/>Features 13 19 25"]
+        LogLinear["O-E-log-V<br/><br/>Features 1 2 3"]
+        Quadratic["O-V²<br/><br/>Features 11 17 21"]
+        Cubic["O-V³<br/><br/>Feature 18"]
     end
 
     Linear -->|Fast| Suitable1[Real-time CI/CD]
@@ -469,10 +469,10 @@ flowchart TD
     CozoDB --> Query3[/centrality-measures-entity-importance/]
     CozoDB --> Query4[/blast-radius-impact-analysis/]
 
-    Query1 --> Algo1[Leiden Algorithm<br/>O(E log V)]
-    Query2 --> Algo2[SQALE Method<br/>O(V)]
-    Query3 --> Algo3[PageRank<br/>O(V²)]
-    Query4 --> Algo4[Random Walk<br/>O(V²)]
+    Query1 --> Algo1["Leiden Algorithm<br/>O-E-log-V"]
+    Query2 --> Algo2["SQALE Method<br/>O-V"]
+    Query3 --> Algo3["PageRank<br/>O-V²"]
+    Query4 --> Algo4["Random Walk<br/>O-V²"]
 
     Algo1 --> JSON1[JSON Response]
     Algo2 --> JSON2[JSON Response]
