@@ -303,6 +303,25 @@ impl LineRange {
         Ok(Self { start, end })
     }
 
+    /// Create external dependency marker line range (0-0)
+    ///
+    /// External dependencies (imports from external crates/packages) use
+    /// line range 0-0 as a special marker since they don't exist in the
+    /// local codebase files.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use parseltongue_core::entities::LineRange;
+    ///
+    /// let external_range = LineRange::external();
+    /// assert_eq!(external_range.start, 0);
+    /// assert_eq!(external_range.end, 0);
+    /// ```
+    pub fn external() -> Self {
+        Self { start: 0, end: 0 }
+    }
+
     /// Get the span (number of lines)
     pub fn span(&self) -> u32 {
         self.end - self.start + 1
@@ -714,6 +733,15 @@ impl CodeEntity {
     }
 
     fn validate_code_consistency(&self) -> Result<()> {
+        // Check if this is an external dependency (line range 0-0)
+        let is_external = self.interface_signature.line_range.start == 0
+            && self.interface_signature.line_range.end == 0;
+
+        // External dependencies don't have code content - skip validation
+        if is_external {
+            return Ok(());
+        }
+
         // If entity exists in current state, it should have current code
         if self.temporal_state.current_ind && self.current_code.is_none() {
             return Err(ParseltongError::ValidationError {

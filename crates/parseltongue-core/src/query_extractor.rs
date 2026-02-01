@@ -73,6 +73,73 @@ fn sanitize_path_for_key_format(path: &str) -> String {
     path.replace(['/', '\\', '.'], "_")
 }
 
+/// Parse external dependency from full use path
+///
+/// **Four-Word Naming**: parse_external_dependency_from_path
+/// - parse: verb (extract structured data)
+/// - external: constraint (not local/stdlib)
+/// - dependency: target (what we're identifying)
+/// - from_path: qualifier (source of data)
+///
+/// **Design**: Detects external crates by analyzing use path structure
+///
+/// # Examples
+///
+/// ```ignore
+/// parse_external_dependency_from_path("clap::Parser")
+///   → Some(("clap", "Parser"))
+///   → Creates key: rust:module:Parser:external-dependency-clap:0-0
+///
+/// parse_external_dependency_from_path("std::collections::HashMap")
+///   → None (stdlib crate)
+///
+/// parse_external_dependency_from_path("crate::module::Type")
+///   → None (local crate keyword)
+/// ```
+///
+/// **Preconditions**:
+/// - path contains valid Rust module path syntax
+/// - path may contain "::" separators
+///
+/// **Postconditions**:
+/// - Returns Some((crate_name, item_name)) if external
+/// - Returns None if stdlib or local keyword
+/// - External keys use format: external-dependency-{crate} (2-word prefix)
+///
+/// **Error Conditions**:
+/// - Empty path → None
+/// - Single identifier → None (ambiguous)
+fn parse_external_dependency_from_path(path: &str) -> Option<(String, String)> {
+    // Split path by "::"
+    let segments: Vec<&str> = path.split("::").collect();
+
+    // Need at least 2 segments (crate::item)
+    if segments.len() < 2 {
+        return None;
+    }
+
+    let crate_name = segments[0];
+    let item_name = segments.last().unwrap();
+
+    // Check if it's a local keyword
+    if matches!(crate_name, "crate" | "self" | "super") {
+        return None;
+    }
+
+    // Check if it's a stdlib crate
+    let stdlib_crates = [
+        "std", "core", "alloc", "proc_macro",
+        "test", // Rust stdlib crates
+    ];
+
+    if stdlib_crates.contains(&crate_name) {
+        return None;
+    }
+
+    // It's external!
+    Some((crate_name.to_string(), item_name.to_string()))
+}
+
 impl QueryBasedExtractor {
     /// Create new extractor with embedded query files
     ///
@@ -452,6 +519,7 @@ impl QueryBasedExtractor {
         let mut dependency_type = None;
         let mut from_entity = None;
         let mut to_name = None;
+        let mut use_full_path = None; // Bug #4: Capture full use path for external detection
         let mut location = None;
 
         // Parse captures to identify relationship type and participants
@@ -475,6 +543,11 @@ impl QueryBasedExtractor {
                 }
             }
 
+            // Bug #4: Capture full use path (e.g., "clap::Parser") for external detection
+            if *capture_name == "reference.use_full_path" {
+                use_full_path = Some(node_text.to_string());
+            }
+
             // Extract reference name (what is being called/used/implemented)
             if capture_name.starts_with("reference.") {
                 to_name = Some(node_text.to_string());
@@ -494,7 +567,21 @@ impl QueryBasedExtractor {
             // For Uses edges (imports, use declarations), create simplified keys
             if edge_type == EdgeType::Uses {
                 let from_key = format!("{}:file:{}:1-1", language, sanitize_path_for_key_format(&file_path.display().to_string()));
-                let to_key = format!("{}:module:{}:0-0", language, to);
+
+                // Bug #4: Detect external dependencies from full use path
+                let to_key = if let Some(full_path) = use_full_path {
+                    // Try to parse as external dependency
+                    if let Some((crate_name, item_name)) = parse_external_dependency_from_path(&full_path) {
+                        // External dependency: rust:module:Parser:external-dependency-clap:0-0
+                        format!("{}:module:{}:external-dependency-{}:0-0", language, item_name, crate_name)
+                    } else {
+                        // Stdlib or local: rust:module:HashMap:0-0
+                        format!("{}:module:{}:0-0", language, to)
+                    }
+                } else {
+                    // Fallback: rust:module:Parser:0-0
+                    format!("{}:module:{}:0-0", language, to)
+                };
 
                 return DependencyEdge::builder()
                     .from_key(from_key)

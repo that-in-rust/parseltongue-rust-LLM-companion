@@ -12,6 +12,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use parseltongue_core::entities::*;
 use parseltongue_core::storage::CozoDbStorage;
 use crate::errors::*;
+use crate::external_dependency_handler::extract_placeholders_from_edges_deduplicated;
 use crate::isgl1_generator::*;
 use crate::lsp_client::*;
 use crate::test_detector::{TestDetector, EntityClass};
@@ -558,6 +559,30 @@ impl FileStreamer for FileStreamerImpl {
         let mut code_count = 0;  // v0.9.3: Track CODE entities
         let mut test_count = 0;  // v0.9.3: Track TEST entities
         let mut errors: Vec<String> = Vec::new();
+
+        // Bug #4 Fix: Extract external dependency placeholders from edges
+        // These are dependencies to external crates (e.g., clap::Parser, tokio::Runtime)
+        // that don't exist in the local codebase. We create placeholder CodeEntity nodes
+        // so that dependency edges have valid targets and blast radius queries work.
+        let external_placeholders = extract_placeholders_from_edges_deduplicated(&dependencies);
+
+        // Store external dependency placeholders first (before processing regular entities)
+        for placeholder in external_placeholders {
+            match self.db.insert_entity(&placeholder).await {
+                Ok(_) => {
+                    entities_created += 1;
+                    code_count += 1; // External dependencies count as CODE entities
+                }
+                Err(e) => {
+                    // Graceful degradation: don't fail entire file if one placeholder fails
+                    let error_msg = format!(
+                        "Failed to insert external dependency placeholder {}: {}",
+                        placeholder.isgl1_key, e
+                    );
+                    errors.push(error_msg);
+                }
+            }
+        }
 
         // Process each parsed entity
         for parsed_entity in parsed_entities {

@@ -1,8 +1,6 @@
 
 # PRD-v146: Bidirectional LLM-CPU Enhancement Suite
 
-**Version**: 1.46 (planned)
-**Current Base**: v1.4.2
 **Date**: 2026-02-02
 **Status**: Implementation Specification
 

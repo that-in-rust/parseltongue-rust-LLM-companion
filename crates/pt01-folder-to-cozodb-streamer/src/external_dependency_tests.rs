@@ -12,7 +12,7 @@
 //! Instead of skipping external dependencies, CREATE placeholder CodeEntity nodes:
 //! 1. Detect external dependency references (imports, uses, function calls to external code)
 //! 2. Create placeholder CodeEntity for each external dependency
-//! 3. Store with ISGL1 key like: `rust:fn:build_cli:external_crate:0-0`
+//! 3. Store with ISGL1 key like: `rust:fn:build_cli:external-dependency-crate:0-0`
 //! 4. Mark with EntityClass::ExternalDependency (new enum variant needed)
 //! 5. Connect via dependency edges to entities that reference them
 //!
@@ -25,9 +25,9 @@
 #[cfg(test)]
 mod external_dependency_placeholder_tests {
     use std::path::PathBuf;
-    use std::sync::Arc;
-    use parseltongue_core::entities::{DependencyEdge, EdgeType, EntityClass, Language};
+    use parseltongue_core::entities::Language;
     use crate::isgl1_generator::{Isgl1KeyGeneratorImpl, Isgl1KeyGenerator};
+    use crate::external_dependency_handler::create_external_dependency_placeholder_entity_validated;
 
     /// RED TEST 1: Parse Rust `use` statement and detect external crate
     ///
@@ -60,7 +60,7 @@ mod external_dependency_placeholder_tests {
         let generator = Isgl1KeyGeneratorImpl::new();
 
         // Act: Parse source and extract dependencies
-        let (entities, dependencies) = generator
+        let (_entities, dependencies) = generator
             .parse_source(source, &file_path)
             .expect("Failed to parse source");
 
@@ -82,10 +82,10 @@ mod external_dependency_placeholder_tests {
             .find(|dep| dep.to_key.as_str().contains("clap"))
             .expect("Should have clap dependency");
 
-        // External dependency key should have format: rust:type:name:external_crate:0-0
+        // External dependency key should have format: rust:type:name:external-dependency-crate:0-0
         assert!(
-            external_dep.to_key.as_str().contains(":external_"),
-            "External dependency key should contain ':external_' marker: {}",
+            external_dep.to_key.as_str().contains(":external-dependency-"),
+            "External dependency key should contain ':external-dependency-' marker: {}",
             external_dep.to_key.as_str()
         );
 
@@ -103,7 +103,7 @@ mod external_dependency_placeholder_tests {
     /// - Need to create CodeEntity placeholder
     ///
     /// **Expected Behavior**:
-    /// - Create CodeEntity with ISGL1 key: `rust:struct:Runtime:external_tokio:0-0`
+    /// - Create CodeEntity with ISGL1 key: `rust:struct:Runtime:external-dependency-tokio:0-0`
     /// - EntityClass = ExternalDependency (new variant)
     /// - Language extracted from importing file context
     /// - Line range = 0-0 (indicates external)
@@ -141,7 +141,7 @@ mod external_dependency_placeholder_tests {
         let entity = result.unwrap();
 
         // Verify ISGL1 key format
-        let expected_key_pattern = format!("rust:{}:{}:external_{}", item_type, item_name, crate_name);
+        let expected_key_pattern = format!("rust:{}:{}:external-dependency-{}", item_type, item_name, crate_name);
         assert!(
             entity.isgl1_key.contains(&expected_key_pattern),
             "Key should match pattern '{}', got: {}",
@@ -228,48 +228,104 @@ mod external_dependency_placeholder_tests {
         todo!("Implement blast radius integration test with external dependencies");
     }
 
-    // ========================================================================
-    // Helper Functions (STUB - will implement during GREEN phase)
-    // ========================================================================
-
-    /// STUB: Create external dependency placeholder entity
+    /// RED TEST 5: Detect both :external-dependency- and :unknown:0-0 patterns
     ///
-    /// **Four-Word Naming**: create_external_dependency_placeholder_entity_validated
-    /// - create: verb (action)
-    /// - external: constraint (not local)
-    /// - dependency: target (what we're creating)
-    /// - placeholder: qualifier (temporary/external nature)
-    /// - entity: target refinement
-    /// - validated: qualifier (ensures correctness)
-    ///
-    /// **Design Decisions**:
-    /// - Line range 0-0 indicates external (not in local codebase)
-    /// - ISGL1 key format: `{language}:{type}:{name}:external_{crate}:0-0`
-    /// - EntityClass: Will need new ExternalDependency variant
-    /// - Temporal state: initial() (exists in current codebase's imports)
+    /// **Phase 1 TDD Test**: Extend extract_placeholders_from_edges_deduplicated()
     ///
     /// **Preconditions**:
-    /// - crate_name is non-empty external crate identifier
-    /// - item_name is non-empty entity identifier
-    /// - item_type matches EntityType variants
-    /// - language is supported Language variant
+    /// - Edges contain both external-dependency and unknown patterns
+    ///
+    /// **Expected Behavior**:
+    /// - Both pattern types detected and placeholders created
+    /// - Deduplication works across both patterns
     ///
     /// **Postconditions**:
-    /// - Returns Ok(CodeEntity) with valid external dependency placeholder
-    /// - Entity passes validate() checks (except line range = 0-0 special case)
-    /// - ISGL1 key uniquely identifies external dependency
+    /// - All unknown:0-0 references have placeholder entities
     ///
-    /// **Error Conditions**:
-    /// - Empty crate_name or item_name → ValidationError
-    /// - Invalid item_type → ValidationError
-    /// - Line range validation should allow 0-0 for external deps
-    fn create_external_dependency_placeholder_entity_validated(
-        _crate_name: &str,
-        _item_name: &str,
-        _item_type: &str,
-        _language: Language,
-    ) -> Result<parseltongue_core::entities::CodeEntity, Box<dyn std::error::Error>> {
-        // RED: This function doesn't exist yet - test will fail
-        Err("Not implemented: External dependency placeholder creation".into())
+    /// **Current Status**: RED (will fail - only detects :external-dependency-)
+    #[test]
+    fn test_extract_placeholders_unknown_pattern_detected() {
+        use parseltongue_core::entities::{DependencyEdge, EdgeType, Isgl1Key};
+        use crate::external_dependency_handler::extract_placeholders_from_edges_deduplicated;
+
+        // Arrange: Mix of external-dependency and unknown patterns
+        let edges = vec![
+            // Known external dependency
+            DependencyEdge {
+                from_key: Isgl1Key::new("rust:fn:main:src/main.rs:10-15").unwrap(),
+                to_key: Isgl1Key::new("rust:module:Parser:external-dependency-clap:0-0").unwrap(),
+                edge_type: EdgeType::Uses,
+                source_location: None,
+            },
+            // Unknown pattern (unresolved reference)
+            DependencyEdge {
+                from_key: Isgl1Key::new("rust:fn:main:src/main.rs:20-25").unwrap(),
+                to_key: Isgl1Key::new("rust:fn:build_cli:unknown:0-0").unwrap(),
+                edge_type: EdgeType::Calls,
+                source_location: None,
+            },
+            // Another unknown pattern
+            DependencyEdge {
+                from_key: Isgl1Key::new("rust:fn:handler:src/api.rs:30-35").unwrap(),
+                to_key: Isgl1Key::new("rust:struct:Config:unknown:0-0").unwrap(),
+                edge_type: EdgeType::Uses,
+                source_location: None,
+            },
+        ];
+
+        // Act
+        let placeholders = extract_placeholders_from_edges_deduplicated(&edges);
+
+        // Assert: Should create placeholders for BOTH patterns
+        assert_eq!(
+            placeholders.len(),
+            3,
+            "Should create 3 placeholders (1 external-dependency + 2 unknown), got: {:?}",
+            placeholders.iter().map(|p| &p.isgl1_key).collect::<Vec<_>>()
+        );
+
+        // Verify external-dependency pattern still works
+        let external_placeholder = placeholders.iter()
+            .find(|p| p.isgl1_key.contains("external-dependency-clap"))
+            .expect("Should have external-dependency placeholder");
+
+        assert_eq!(
+            external_placeholder.isgl1_key,
+            "rust:module:Parser:external-dependency-clap:0-0"
+        );
+
+        // Verify unknown pattern creates placeholders
+        let unknown_placeholders: Vec<_> = placeholders.iter()
+            .filter(|p| p.isgl1_key.contains(":unknown:0-0"))
+            .collect();
+
+        assert_eq!(
+            unknown_placeholders.len(),
+            2,
+            "Should have 2 unknown placeholders"
+        );
+
+        // Verify unknown placeholder keys exist
+        let keys: Vec<&str> = unknown_placeholders.iter()
+            .map(|p| p.isgl1_key.as_str())
+            .collect();
+
+        assert!(
+            keys.contains(&"rust:fn:build_cli:unknown:0-0"),
+            "Should have build_cli placeholder, got: {:?}",
+            keys
+        );
+        assert!(
+            keys.contains(&"rust:struct:Config:unknown:0-0"),
+            "Should have Config placeholder, got: {:?}",
+            keys
+        );
     }
+
+    // ========================================================================
+    // Helper Functions
+    // ========================================================================
+    //
+    // Note: Helper function moved to production module:
+    // crate::external_dependency_handler::create_external_dependency_placeholder_entity_validated
 }

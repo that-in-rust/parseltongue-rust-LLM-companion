@@ -549,9 +549,6 @@ sequenceDiagram
 
     LLM->>User: 5 cycles found<br/>2 Critical 1 High 2 Medium<br/>Recommended break points identified
 
-    style CPU fill:#fff9c4
-    style LLM fill:#e1f5ff
-    style User fill:#c8e6c9
 ```
 
 ---
@@ -778,9 +775,6 @@ sequenceDiagram
 
     Pipeline->>User: Top 10 results in 0.3s<br/>Naive order: 1.5s<br/>5x speedup achieved
 
-    style CPU fill:#fff9c4
-    style LLM fill:#e1f5ff
-    style User fill:#c8e6c9
 ```
 
 ---
@@ -972,9 +966,6 @@ sequenceDiagram
 
     LLM->>User: 78 percent structurally similar<br/>Same architecture different languages<br/>Patterns will transfer
 
-    style CPU fill:#fff9c4
-    style LLM fill:#e1f5ff
-    style User fill:#c8e6c9
 ```
 
 ---

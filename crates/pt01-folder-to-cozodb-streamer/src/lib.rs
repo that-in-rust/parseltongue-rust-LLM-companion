@@ -27,6 +27,7 @@ use std::sync::Arc;
 
 pub mod cli;
 pub mod errors;
+pub mod external_dependency_handler;
 pub mod file_watcher;
 pub mod isgl1_generator;
 pub mod lsp_client;
