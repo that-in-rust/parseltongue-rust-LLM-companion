@@ -445,6 +445,44 @@ struct TestStruct {
     }
 
     #[test]
+    fn test_parse_main_function_exists() {
+        // Bug #2: Verify main() function is parsed correctly
+        let generator = Isgl1KeyGeneratorImpl::new();
+        let source = r#"
+use clap::{Arg, ArgMatches, Command};
+use console::style;
+use anyhow::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let matches = build_cli().get_matches();
+    Ok(())
+}
+
+fn build_cli() -> Command {
+    Command::new("parseltongue").version("1.0.0")
+}
+"#;
+
+        let file_path = Path::new("src/main.rs");
+        let (entities, _dependencies) = generator.parse_source(source, file_path).unwrap();
+
+        // Debug: print all entities
+        println!("\nExtracted {} entities from main.rs:", entities.len());
+        for (i, entity) in entities.iter().enumerate() {
+            println!("  {}. {} (type: {:?})", i, entity.name, entity.entity_type);
+        }
+
+        // ASSERT: main function must be found
+        let main_functions: Vec<_> = entities.iter()
+            .filter(|e| e.name == "main")
+            .collect();
+
+        assert!(!main_functions.is_empty(), "main() function not found in entities!");
+        assert_eq!(main_functions[0].entity_type, EntityType::Function);
+    }
+
+    #[test]
     fn test_function_detection() {
         // v0.8.9: QueryBasedExtractor doesn't parse Rust attributes (#[test])
         // This is an acceptable trade-off to get all 11 languages working

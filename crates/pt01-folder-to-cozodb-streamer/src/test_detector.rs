@@ -70,31 +70,40 @@ impl TestDetector for DefaultTestDetector {
 
 impl DefaultTestDetector {
     /// REQ-V090-003.1: Rust test detection
-    /// 
+    ///
     /// Detects tests via:
     /// - `#[test]`, `#[tokio::test]`, `#[cfg(test)]` attributes
     /// - `tests/` directory
     /// - `_test.rs` filename pattern
+    ///
+    /// Special cases:
+    /// - main.rs and lib.rs are ALWAYS Code (even if they contain #[cfg(test)] modules)
     fn detect_rust_test(&self, file_path: &Path, content: &str) -> EntityClass {
         let path_str = file_path.to_string_lossy();
-        
+
+        // Priority: main.rs and lib.rs are ALWAYS production code
+        // They may contain #[cfg(test)] modules, but the file itself is Code
+        if path_str.ends_with("main.rs") || path_str.ends_with("lib.rs") {
+            return EntityClass::Code;
+        }
+
         // Check directory pattern: tests/ directory
         if path_str.contains("tests/") {
             return EntityClass::Test;
         }
-        
+
         // Check filename pattern: _test.rs
         if path_str.ends_with("_test.rs") {
             return EntityClass::Test;
         }
-        
+
         // Check content for test attributes
-        if content.contains("#[test]") || 
-           content.contains("#[tokio::test]") || 
+        if content.contains("#[test]") ||
+           content.contains("#[tokio::test]") ||
            content.contains("#[cfg(test)]") {
             return EntityClass::Test;
         }
-        
+
         EntityClass::Code
     }
     
@@ -285,13 +294,46 @@ mod tests {
     #[test]
     fn test_unknown_file_extensions_contract() {
         let detector = DefaultTestDetector::new();
-        
+
         let result = detector.detect_test_from_path_and_name(
-            Path::new("unknown.xyz"), 
+            Path::new("unknown.xyz"),
             "some content"
         );
-        
+
         // Unknown extensions should be treated as non-test files
         assert_eq!(result, EntityClass::Code);
+    }
+
+    /// RED Test: main.rs with test module should still be classified as CODE
+    ///
+    /// Bug: Files containing #[cfg(test)] anywhere are classified as TEST,
+    /// even if they contain production code like main()
+    #[test]
+    fn test_main_with_test_module_is_code() {
+        let detector = DefaultTestDetector::new();
+
+        // Realistic content: main.rs with both main() and test module
+        let content = r#"
+fn main() {
+    println!("Hello, world!");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_something() {
+        assert!(true);
+    }
+}
+"#;
+
+        let result = detector.detect_test_from_path_and_name(
+            Path::new("src/main.rs"),
+            content
+        );
+
+        // main.rs should ALWAYS be classified as CODE, even with test module
+        assert_eq!(result, EntityClass::Code,
+            "main.rs should be CODE even when it contains #[cfg(test)] module");
     }
 }
