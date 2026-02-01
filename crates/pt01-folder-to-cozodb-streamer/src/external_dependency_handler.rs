@@ -45,21 +45,29 @@ use crate::errors::*;
 ///
 /// ## Algorithm
 ///
-/// 1. Scan all edges for `to_key` containing `:external-dependency-`
-/// 2. Parse each external key to extract: language, type, name, crate
-/// 3. Create placeholder entity for each unique external dependency
-/// 4. Deduplicate using HashSet (same external dependency may be imported by multiple files)
+/// 1. Scan all edges for `to_key` containing `:external-dependency-` OR `:unknown:0-0`
+/// 2. Parse each external/unknown key to extract: language, type, name, crate
+/// 3. Create placeholder entity for each unique external dependency or unresolved reference
+/// 4. Deduplicate using HashSet (same dependency may be referenced by multiple files)
+///
+/// ## Supported Patterns
+///
+/// - **External Dependencies**: `{lang}:{type}:{name}:external-dependency-{crate}:0-0`
+///   - Created for imported items from external crates (e.g., `use clap::Parser`)
+/// - **Unresolved References**: `{lang}:{type}:{name}:unknown:0-0`
+///   - Created for calls/references where target location is unknown
+///   - Covers 6 scenarios: external deps, local functions, trait implementations, macros, generics, dynamic dispatch
 ///
 /// ## Preconditions
 ///
 /// - `edges` contains dependency edges from ISGL1 generator
-/// - External dependency keys follow format: `{lang}:{type}:{name}:external-dependency-{crate}:0-0`
+/// - Keys follow ISGL1 format with 5 colon-separated parts
 ///
 /// ## Postconditions
 ///
 /// - Returns Vec<CodeEntity> with placeholder entities
 /// - Each placeholder has unique ISGL1 key
-/// - Line range = 0-0 for all external dependencies
+/// - Line range = 0-0 for all placeholders (marker for external/unresolved)
 /// - No duplicate placeholders (deduplication applied)
 ///
 /// ## Error Handling
@@ -73,19 +81,18 @@ use crate::errors::*;
 /// let edges = vec![
 ///     DependencyEdge {
 ///         from_key: "rust:fn:main:src/main.rs:10-15".into(),
-///         to_key: "rust:module:Parser:external-dependency-clap:0-0".into(),
+///         to_key: "rust:module:Parser:external-dependency-clap:0-0".into(),  // Known external
 ///         edge_type: EdgeType::Uses,
 ///     },
 ///     DependencyEdge {
 ///         from_key: "rust:fn:build_cli:src/cli.rs:5-10".into(),
-///         to_key: "rust:module:Parser:external-dependency-clap:0-0".into(), // Same external dep
-///         edge_type: EdgeType::Uses,
+///         to_key: "rust:fn:helper:unknown:0-0".into(),  // Unresolved reference
+///         edge_type: EdgeType::Calls,
 ///     },
 /// ];
 ///
 /// let placeholders = extract_placeholders_from_edges_deduplicated(&edges);
-/// assert_eq!(placeholders.len(), 1); // Deduplicated
-/// assert_eq!(placeholders[0].isgl1_key, "rust:module:Parser:external-dependency-clap:0-0");
+/// assert_eq!(placeholders.len(), 2); // Both patterns detected
 /// ```
 pub fn extract_placeholders_from_edges_deduplicated(
     edges: &[DependencyEdge],
@@ -94,9 +101,9 @@ pub fn extract_placeholders_from_edges_deduplicated(
     let mut placeholders = Vec::new();
 
     for edge in edges {
-        // Check if target is an external dependency
+        // Check if target is an external dependency OR unknown reference
         let to_key_str: &str = edge.to_key.as_ref();
-        if to_key_str.contains(":external-dependency-") {
+        if to_key_str.contains(":external-dependency-") || to_key_str.contains(":unknown:0-0") {
             // Deduplicate: only process first occurrence of each key
             if seen_keys.insert(edge.to_key.clone()) {
                 // Parse external dependency key
@@ -144,41 +151,55 @@ pub fn extract_placeholders_from_edges_deduplicated(
 /// - parts: qualifier (breaking into components)
 /// - validated: ensures correctness
 ///
-/// ## Key Format
+/// ## Key Formats
 ///
-/// External dependency keys follow this pattern:
+/// Supports two patterns:
+///
+/// **1. External Dependencies (Known Crates)**:
 /// ```text
 /// rust:module:Parser:external-dependency-clap:0-0
 /// └─┬─┘└──┬──┘└──┬──┘└──────────┬────────────┘└┬┘
 ///  lang  type  name      file_marker         lines
 /// ```
 ///
+/// **2. Unresolved References (Unknown Location)**:
+/// ```text
+/// rust:fn:build_cli:unknown:0-0
+/// └─┬─┘└┬┘└───┬───┘└──┬──┘└┬┘
+///  lang type name  marker lines
+/// ```
+///
 /// ## Preconditions
 ///
 /// - `key` is a valid ISGL1 key string
-/// - Key contains `:external-dependency-` marker
+/// - Key contains `:external-dependency-{crate}` OR `:unknown:0-0`
 /// - Key has 5 colon-separated parts
 ///
 /// ## Postconditions
 ///
 /// - Returns Ok((Language, entity_type, name, crate_name)) on success
+/// - For unknown pattern: crate_name = "unresolved-reference"
+/// - For external pattern: crate_name = actual crate name
 /// - Returns Err for invalid formats
 ///
 /// ## Error Conditions
 ///
 /// - Wrong number of parts (not 5)
-/// - Missing `:external-dependency-` marker
+/// - Missing both `:external-dependency-` and `:unknown` markers
 /// - Invalid language prefix
 ///
-/// ## Example
+/// ## Examples
 ///
 /// ```ignore
+/// // External dependency
 /// let key = "rust:module:Parser:external-dependency-clap:0-0";
 /// let (lang, typ, name, crate_name) = parse_external_key_parts_validated(key)?;
-/// assert_eq!(lang, Language::Rust);
-/// assert_eq!(typ, "module");
-/// assert_eq!(name, "Parser");
 /// assert_eq!(crate_name, "clap");
+///
+/// // Unresolved reference
+/// let key = "rust:fn:build_cli:unknown:0-0";
+/// let (lang, typ, name, crate_name) = parse_external_key_parts_validated(key)?;
+/// assert_eq!(crate_name, "unresolved-reference");
 /// ```
 pub fn parse_external_key_parts_validated(
     key: &str,
@@ -202,17 +223,26 @@ pub fn parse_external_key_parts_validated(
     let item_name = parts[2].to_string();
     let file_path = parts[3];
 
-    // Extract crate name from "external-dependency-{crate}"
-    let crate_name = file_path
-        .strip_prefix("external-dependency-")
-        .ok_or_else(|| StreamerError::ParsingError {
+    // Extract crate name from pattern
+    // Supports two patterns:
+    // 1. "external-dependency-{crate}" - Known external crate from USE statements
+    // 2. "unknown" - Unresolved reference (6 scenarios: external deps, local functions, traits, macros, generics, dynamic dispatch)
+    let crate_name = if file_path == "unknown" {
+        // Unknown pattern: map to special "unresolved-reference" crate
+        "unresolved-reference".to_string()
+    } else if let Some(crate_name) = file_path.strip_prefix("external-dependency-") {
+        // Known external dependency pattern
+        crate_name.to_string()
+    } else {
+        // Invalid format - neither pattern matched
+        return Err(StreamerError::ParsingError {
             file: "external_dependency".to_string(),
             reason: format!(
-                "Key does not contain 'external-dependency-' prefix: {}",
+                "Invalid file_path format (expected 'external-dependency-{{crate}}' or 'unknown'): {}",
                 key
             ),
-        })?
-        .to_string();
+        });
+    };
 
     // Map language string to Language enum
     let language = match language_str {
@@ -344,13 +374,26 @@ pub fn create_external_dependency_placeholder_entity_validated(
         Language::Scala => "scala",
     };
 
-    let isgl1_key = format!(
-        "{}:{}:{}:external-dependency-{}:0-0",
-        language_prefix, item_type, item_name, crate_name
-    );
-
-    // Create file path marker for external dependency
-    let file_path = PathBuf::from(format!("external-dependency-{}", crate_name));
+    // Create ISGL1 key based on crate_name type
+    // - Known external dependencies: rust:struct:Runtime:external-dependency-tokio:0-0
+    // - Unresolved references: rust:fn:build_cli:unknown:0-0
+    let (isgl1_key, file_path) = if crate_name == "unresolved-reference" {
+        // Unknown pattern: use "unknown" in key
+        let key = format!(
+            "{}:{}:{}:unknown:0-0",
+            language_prefix, item_type, item_name
+        );
+        let path = PathBuf::from("unknown");
+        (key, path)
+    } else {
+        // External dependency pattern: use "external-dependency-{crate}" in key
+        let key = format!(
+            "{}:{}:{}:external-dependency-{}:0-0",
+            language_prefix, item_type, item_name, crate_name
+        );
+        let path = PathBuf::from(format!("external-dependency-{}", crate_name));
+        (key, path)
+    };
 
     // Create language-specific signature (minimal for external dependencies)
     let language_specific = match language {
@@ -399,6 +442,23 @@ pub fn create_external_dependency_placeholder_entity_validated(
         }
     };
 
+    // Create documentation based on placeholder type
+    let documentation = if crate_name == "unresolved-reference" {
+        // Unresolved reference: Explain the 6 scenarios this covers
+        Some(
+            "Unresolved reference - target location unknown. May be external dependency, \
+            local function, trait implementation, macro expansion, generic instantiation, \
+            or dynamic dispatch target."
+                .to_string(),
+        )
+    } else {
+        // Known external dependency: Mention the crate
+        Some(format!(
+            "External dependency from crate '{}'. Imported via USE statement.",
+            crate_name
+        ))
+    };
+
     // Create minimal InterfaceSignature
     let interface_signature = InterfaceSignature {
         entity_type,
@@ -407,7 +467,7 @@ pub fn create_external_dependency_placeholder_entity_validated(
         file_path,
         line_range: LineRange::external(), // Use external() helper for 0-0 range
         module_path: vec![crate_name.to_string()],
-        documentation: Some(format!("External dependency from crate '{}'", crate_name)),
+        documentation,
         language_specific,
     };
 
@@ -550,5 +610,125 @@ mod tests {
         // Assert: Should only extract external dependencies
         assert_eq!(placeholders.len(), 1, "Should only extract external dependencies");
         assert!(placeholders[0].isgl1_key.contains("external-dependency"));
+    }
+
+    /// RED TEST: Parse unknown pattern key
+    ///
+    /// **Phase 2 TDD Test**: Update parse_external_key_parts_validated()
+    ///
+    /// **Preconditions**:
+    /// - Key contains `:unknown:0-0` instead of `:external-dependency-{crate}:0-0`
+    ///
+    /// **Expected Behavior**:
+    /// - Successfully parse unknown pattern
+    /// - Return crate_name = "unresolved-reference"
+    ///
+    /// **Postconditions**:
+    /// - Parser handles both patterns uniformly
+    ///
+    /// **Current Status**: GREEN (passes after Phase 2 implementation)
+    #[test]
+    fn test_parse_unknown_pattern_key_validated() {
+        // Arrange
+        let key = "rust:fn:build_cli:unknown:0-0";
+
+        // Act
+        let result = parse_external_key_parts_validated(key);
+
+        // Assert
+        assert!(
+            result.is_ok(),
+            "Should parse unknown pattern key, got: {:?}",
+            result.err()
+        );
+
+        let (language, entity_type, item_name, crate_name) = result.unwrap();
+
+        assert_eq!(language, Language::Rust);
+        assert_eq!(entity_type, "fn");
+        assert_eq!(item_name, "build_cli");
+        assert_eq!(
+            crate_name, "unresolved-reference",
+            "Unknown pattern should map to 'unresolved-reference' crate name"
+        );
+    }
+
+    /// RED TEST: Differentiated documentation for unresolved references
+    ///
+    /// **Phase 3 TDD Test**: Update create_external_dependency_placeholder_entity_validated()
+    ///
+    /// **Preconditions**:
+    /// - Creating placeholder for unresolved reference (crate_name="unresolved-reference")
+    /// - Creating placeholder for known external dependency (crate_name="tokio")
+    ///
+    /// **Expected Behavior**:
+    /// - Unresolved: "Unresolved reference - target location unknown..."
+    /// - External: "External dependency from crate 'tokio'..."
+    ///
+    /// **Postconditions**:
+    /// - Documentation clearly distinguishes the two cases
+    ///
+    /// **Current Status**: RED (will fail - same documentation for both)
+    #[test]
+    fn test_differentiated_documentation_unresolved_vs_external() {
+        // Arrange & Act: Create unresolved reference placeholder
+        let unresolved = create_external_dependency_placeholder_entity_validated(
+            "unresolved-reference",
+            "build_cli",
+            "fn",
+            Language::Rust,
+        )
+        .expect("Should create unresolved placeholder");
+
+        // Arrange & Act: Create external dependency placeholder
+        let external = create_external_dependency_placeholder_entity_validated(
+            "tokio",
+            "Runtime",
+            "struct",
+            Language::Rust,
+        )
+        .expect("Should create external placeholder");
+
+        // Assert: Unresolved has specific documentation
+        let unresolved_doc = unresolved
+            .interface_signature
+            .documentation
+            .as_ref()
+            .expect("Should have documentation");
+
+        assert!(
+            unresolved_doc.contains("Unresolved reference"),
+            "Unresolved documentation should mention 'Unresolved reference', got: {}",
+            unresolved_doc
+        );
+        assert!(
+            unresolved_doc.contains("target location unknown"),
+            "Should explain unknown location, got: {}",
+            unresolved_doc
+        );
+
+        // Assert: External has crate-specific documentation
+        let external_doc = external
+            .interface_signature
+            .documentation
+            .as_ref()
+            .expect("Should have documentation");
+
+        assert!(
+            external_doc.contains("External dependency"),
+            "External documentation should mention 'External dependency', got: {}",
+            external_doc
+        );
+        assert!(
+            external_doc.contains("tokio"),
+            "Should mention crate name 'tokio', got: {}",
+            external_doc
+        );
+
+        // Assert: Different documentation for different cases
+        assert_ne!(
+            unresolved_doc, external_doc,
+            "Documentation should differ between unresolved and external"
+        );
     }
 }
