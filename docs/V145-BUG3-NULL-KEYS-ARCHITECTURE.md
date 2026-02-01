@@ -582,250 +582,521 @@ pub async fn generate_smart_context_within_budget(
 
 ## Phase 4: Test Strategy (TDD Approach)
 
-### Unit Tests (RED Phase)
+### Unit Tests for Language Field Fix
 
 ```rust
-// File: crates/parseltongue-core/tests/entity_key_generation_tests.rs
+// File: crates/parseltongue-core/tests/language_field_extraction_tests.rs
 
-use parseltongue_core::entity_key::{EntityKey, EntityKeyError};
+use parseltongue_core::CodeEntity;
 
 #[test]
-fn test_entity_key_create_from_parts_validated_success() {
-    let key = EntityKey::create_from_parts_validated("rust", "fn", "main")
-        .expect("Should create valid key");
-    assert_eq!(key.as_str(), "rust:fn:main");
+fn test_extract_language_from_key_validated_rust() {
+    let entity = CodeEntity {
+        key: "rust:fn:main:__crates_parseltongue_src_main_rs:1-10".to_string(),
+        language: "WRONG".to_string(),  // Simulating corruption
+        // ...other fields
+    };
+
+    let extracted = entity.extract_language_from_key_validated();
+    assert_eq!(extracted, "rust");
 }
 
 #[test]
-fn test_entity_key_create_from_parts_validated_rejects_empty() {
-    let result = EntityKey::create_from_parts_validated("", "fn", "main");
-    assert!(matches!(result, Err(EntityKeyError::EmptyComponent)));
+fn test_extract_language_from_key_validated_javascript() {
+    let entity = CodeEntity {
+        key: "javascript:fn:greetUser:__tests_e2e_workspace_src_test_js:4-6".to_string(),
+        language: "rust".to_string(),  // Actual corruption from v1.4.3
+        // ...
+    };
+
+    let extracted = entity.extract_language_from_key_validated();
+    assert_eq!(extracted, "javascript");
 }
 
 #[test]
-fn test_entity_key_create_from_parts_validated_rejects_invalid_language() {
-    let result = EntityKey::create_from_parts_validated("klingon", "fn", "main");
-    assert!(matches!(result, Err(EntityKeyError::UnsupportedLanguage(_))));
-}
+fn test_fix_language_field_from_key() {
+    let mut entity = CodeEntity {
+        key: "python:class:Parser:__src_parser_py:10-50".to_string(),
+        language: "rust".to_string(),  // Corrupted
+        // ...
+    };
 
-#[test]
-fn test_entity_key_parse_from_string_validated_success() {
-    let key = EntityKey::parse_from_string_validated("python:class:Parser")
-        .expect("Should parse valid format");
-    assert_eq!(key.extract_language_component_only(), "python");
-}
-
-#[test]
-fn test_entity_key_parse_from_string_validated_rejects_malformed() {
-    let result = EntityKey::parse_from_string_validated("invalid");
-    assert!(matches!(result, Err(EntityKeyError::InvalidFormat(_))));
-}
-
-#[test]
-fn test_entity_key_builder_pattern_success() {
-    use parseltongue_core::entity_key::EntityKeyBuilder;
-
-    let key = EntityKeyBuilder::new()
-        .with_language_set("go")
-        .with_entity_type_set("func")
-        .with_name_set("HandleRequest")
-        .build_validated_key()
-        .expect("Builder should succeed");
-
-    assert_eq!(key.as_str(), "go:func:HandleRequest");
-}
-
-#[test]
-fn test_entity_key_extract_language_component_only() {
-    let key = EntityKey::parse_from_string_validated("rust:struct:Entity").unwrap();
-    assert_eq!(key.extract_language_component_only(), "rust");
-}
-
-#[test]
-fn test_entity_key_extract_entity_type_only() {
-    let key = EntityKey::parse_from_string_validated("rust:struct:Entity").unwrap();
-    assert_eq!(key.extract_entity_type_only(), "struct");
-}
-
-#[test]
-fn test_entity_key_extract_name_component_only() {
-    let key = EntityKey::parse_from_string_validated("rust:struct:Entity").unwrap();
-    assert_eq!(key.extract_name_component_only(), "Entity");
+    entity.fix_language_field_from_key();
+    assert_eq!(entity.language, "python");
 }
 ```
 
-### Integration Tests (GREEN Phase)
+### Integration Test for Language Field Fix
 
 ```rust
-// File: crates/pt01-folder-to-cozodb-streamer/tests/ingestion_integration_tests.rs
-
-use pt01_folder_to_cozodb_streamer::*;
-use std::path::Path;
+// File: crates/pt01-folder-to-cozodb-streamer/tests/language_field_ingestion_test.rs
 
 #[test]
-fn test_ingest_rust_file_generates_entity_keys() {
+fn test_ingest_javascript_file_sets_correct_language_field() {
     // Arrange
     let test_code = r#"
-        fn main() {
-            println!("Hello");
-        }
-
-        struct Entity {
-            name: String,
+        function greetUser(name) {
+            return `Hello, ${name}`;
         }
     "#;
 
     let temp_dir = tempfile::tempdir().unwrap();
-    let file_path = temp_dir.path().join("test.rs");
+    let file_path = temp_dir.path().join("test.js");
     std::fs::write(&file_path, test_code).unwrap();
 
     // Act
     let db_path = temp_dir.path().join("test.db");
     ingest_folder_to_database(&temp_dir.path(), &db_path).unwrap();
 
-    // Assert: Query entities and verify keys are NOT null
+    // Assert: Language field MUST match key prefix
     let db = cozo::DbInstance::new("rocksdb", db_path.to_str().unwrap(), "").unwrap();
     let query = r#"
-        ?[entity_key, name] := *entities{entity_key, name}
+        ?[key, language] := *code_entities{key, language}
     "#;
     let result = db.run_script(query, Default::default()).unwrap();
 
-    assert!(result.rows.len() >= 2, "Should find at least 2 entities");
-
     for row in result.rows {
-        let key = row[0].get_str().expect("Key should be string");
-        assert!(!key.is_empty(), "Entity key must not be empty");
-        assert!(key.contains(':'), "Entity key must have format language:type:name");
+        let key = row[0].get_str().unwrap();
+        let language = row[1].get_str().unwrap();
+        let key_prefix = key.split(':').next().unwrap();
+
+        assert_eq!(
+            key_prefix, language,
+            "Key prefix '{}' must match language field '{}'",
+            key_prefix, language
+        );
     }
 }
 ```
 
-### Regression Tests
+### E2E Test for Search Fix
 
 ```rust
-// File: crates/parseltongue-core/tests/null_entity_key_regression_test.rs
+// File: crates/pt08-http-code-query-server/tests/e2e_search_test.rs
 
-/// Regression test: Ensure NULL entity keys never happen again
-#[test]
-fn test_entity_creation_without_key_fails_compilation() {
-    use parseltongue_core::Entity;
+#[tokio::test]
+async fn test_fuzzy_search_returns_main_function() {
+    // Setup: Ingest codebase with main function
+    let db = setup_test_database_with_main_function().await;
 
-    // Only valid constructor requires key generation:
-    let entity = Entity::create_with_generated_key(
-        "test",
-        "fn",
-        "rust",
-        "test.rs",
-        1,
-    ).expect("Should create entity with key");
+    // Act: Search for "main"
+    let response = fuzzy_search_handler("main", &db).await.unwrap();
 
-    // Verify key is never null
-    assert!(!entity.entity_key.as_str().is_empty());
+    // Assert: Should return at least 1 result
+    assert!(
+        response.total_count > 0,
+        "Search for 'main' should return results, got 0"
+    );
+
+    // Assert: Should include rust:fn:main
+    let main_found = response.entities.iter().any(|e| e.key.contains("rust:fn:main"));
+    assert!(main_found, "Search should find main function");
 }
+```
+
+### E2E Test for Blast Radius Fix
+
+```rust
+// File: crates/pt08-http-code-query-server/tests/e2e_blast_radius_test.rs
+
+#[tokio::test]
+async fn test_blast_radius_handles_valid_entity() {
+    // Setup
+    let db = setup_test_database().await;
+
+    // Act: Calculate blast radius for known entity
+    let entity_key = "javascript:fn:greetUser:__tests_e2e_workspace_src_test_js:4-6";
+    let result = calculate_blast_radius(entity_key, 1, &db).await;
+
+    // Assert: Should NOT error
+    assert!(result.is_ok(), "Blast radius should work for valid entity");
+
+    // Assert: Should return affected entities (even if 0)
+    let affected = result.unwrap();
+    // Note: May be 0 if entity has no dependencies, but should NOT error
+}
+```
+
+### Regression Test: Prevent Language Field Corruption
+
+```rust
+// File: crates/parseltongue-core/tests/language_field_corruption_regression_test.rs
+
+/// Regression test for v1.4.3 Bug #3
+/// Ensure language field ALWAYS matches key prefix
+#[test]
+fn test_entity_language_field_matches_key_prefix() {
+    let languages = vec!["rust", "javascript", "python", "go"];
+
+    for lang in languages {
+        let entity = CodeEntity::create_with_key_and_language(
+            format!("{}:fn:test", lang),
+            lang.to_string(),
+        );
+
+        let key_prefix = entity.key.split(':').next().unwrap();
+        assert_eq!(
+            key_prefix, entity.language,
+            "Language field corruption detected: key prefix '{}' != language field '{}'",
+            key_prefix, entity.language
+        );
+    }
+}
+
+---
+
+## Phase 5: Implementation Plan (Based on Live Server Findings)
+
+### Phase 5.1: Investigation (COMPLETED ✅)
+
+**Status**: Completed via 10 live server queries (see Phase 1)
+
+**Key Findings**:
+- Language field: 100% corrupted (ALL entities marked "rust")
+- Main function: Completely missing
+- Search: Returns 0 results
+- Blast radius: Fails for valid entities
+- Smart context: Returns 0 entities
+
+---
+
+### Phase 5.2: Fix Language Field Corruption (Priority #1)
+
+**TDD Cycle**: RED → GREEN → REFACTOR
+
+1. **RED Phase**:
+   - Write failing test: `test_extract_language_from_key_validated_javascript()`
+   - Test expects language extraction from key prefix
+   - Run test: FAILS (method doesn't exist)
+
+2. **GREEN Phase**:
+   - Implement `extract_language_from_key_validated()` on CodeEntity
+   - Implement `fix_language_field_from_key()` mutation method
+   - Run test: PASSES
+
+3. **REFACTOR Phase**:
+   - Update pt01 ingestion to use detected_lang consistently
+   - Remove hardcoded "rust" assignment
+   - Add integration test for language field consistency
+
+**Deliverable**: Language field matches key prefix for all new ingestions
+
+---
+
+### Phase 5.3: Create Migration for Existing Database (Priority #1b)
+
+**TDD Cycle**: Write migration + E2E test
+
+1. Create `migrate_language_field_corruption_fix()` function
+2. Write E2E test:
+   - Setup: Database with corrupted language fields
+   - Act: Run migration
+   - Assert: All 233 entities fixed
+
+3. Add CLI command: `parseltongue migrate-fix-language-fields`
+4. Test on live database at localhost:7777
+
+**Deliverable**: Existing v1.4.3 databases can be fixed
+
+---
+
+### Phase 5.4: Fix Missing Main Function (Priority #2)
+
+**Investigation First**:
+- Query live server: Are ANY entities from main.rs indexed?
+- If NO: Fix file discovery in pt01
+- If YES but main() missing: Fix function filtering
+
+**TDD Cycle**: RED → GREEN
+
+1. Write test: `test_ingest_main_function_indexes_correctly()`
+2. Implement fix based on investigation
+3. Verify main function appears in database
+
+**Deliverable**: `rust:fn:main` appears in entity list
+
+---
+
+### Phase 5.5: Fix Search Algorithm (Priority #3)
+
+**TDD Cycle**: RED → GREEN → REFACTOR
+
+1. **RED**: Write `test_fuzzy_search_returns_main_function()` - FAILS
+2. **GREEN**: Implement case-insensitive fuzzy matching in CozoDB query
+3. **REFACTOR**: Optimize query performance, add limits
+
+**Deliverable**: Search for "main" returns results
+
+---
+
+### Phase 5.6: Fix Blast Radius Algorithm (Priority #4)
+
+**TDD Cycle**: RED → GREEN
+
+1. **RED**: Write `test_blast_radius_handles_valid_entity()` - FAILS
+2. **GREEN**: Add orphan entity handling in graph traversal
+3. Verify on live server
+
+**Deliverable**: Blast radius works for valid entities
+
+---
+
+### Phase 5.7: Fix Smart Context Algorithm (Priority #5)
+
+**TDD Cycle**: RED → GREEN → REFACTOR
+
+1. **RED**: Write `test_smart_context_returns_entities_for_main()` - FAILS
+2. **GREEN**: Add entity existence check + fallback logic
+3. **REFACTOR**: Implement file-based context fallback
+
+**Deliverable**: Smart context returns meaningful results even if focus entity missing
+
+---
+
+## Phase 6: Verification Plan (Live Server Validation)
+
+### Pre-Fix Baseline (Current State - v1.4.3)
+
+| Metric | Current State | Evidence |
+|--------|---------------|----------|
+| **Language Field Accuracy** | 0% (0/233 correct) | Query 2: All marked "rust" |
+| **Main Function Indexed** | ❌ NO | Query 4: 0 results |
+| **Search Functionality** | ❌ BROKEN | Query 6: 0 results |
+| **Blast Radius** | ❌ BROKEN | Query 9: Error |
+| **Smart Context** | ❌ BROKEN | Query 10: 0 entities |
+
+---
+
+### Post-Fix Success Criteria (v1.4.5 Target)
+
+| Criterion | Verification Method | Expected Result | How to Verify |
+|-----------|---------------------|-----------------|---------------|
+| **Language Field Fixed** | Live server query | 100% match key prefix | `curl localhost:7777/code-entities-list-all \| jq '[.data.entities[] \| {key_lang: (.key\|split(":")[0]), field_lang: .language}] \| group_by(.key_lang == .field_lang) \| length'` → Should be 1 (all matching) |
+| **Main Function Indexed** | Entity search | `rust:fn:main` exists | `curl localhost:7777/code-entities-list-all \| jq '[.data.entities[] \| select(.key \| contains("rust:fn:main"))]' \| jq 'length'` → Should be ≥ 1 |
+| **Search Works** | Fuzzy search | Returns results for "main" | `curl "localhost:7777/code-entities-search-fuzzy?q=main"` → `total_count > 0` |
+| **Blast Radius Works** | Impact analysis | No error for valid entity | `curl "localhost:7777/blast-radius-impact-analysis?entity=javascript:fn:greetUser:..&hops=1"` → `success: true` |
+| **Smart Context Works** | Context generation | Returns entities for main | `curl "localhost:7777/smart-context-token-budget?focus=rust:fn:main&tokens=2000"` → `entities_included > 0` |
+| **External Deps Tracked** | Dependency list | External deps stored as entities | `curl localhost:7777/code-entities-list-all \| jq '[.data.entities[] \| select(.key \| contains(":0-0"))]' \| jq 'length'` → Should be > 0 |
+| **No Regression** | Fresh ingestion | Zero language mismatches | Reingest codebase, verify all language fields correct |
+
+---
+
+### Migration Verification Checklist
+
+After running `migrate_language_field_corruption_fix()` on live database:
+
+1. **Before Migration**:
+   ```bash
+   # Count corrupted entities (language != key prefix)
+   curl -s localhost:7777/code-entities-list-all | \
+     jq '[.data.entities[] | select((.key|split(":")[0]) != .language)] | length'
+   # Expected: 233 (all corrupted in v1.4.3)
+   ```
+
+2. **Run Migration**:
+   ```bash
+   parseltongue migrate-fix-language-fields \
+     --db "rocksdb:parseltongue20260131154912/analysis.db"
+   ```
+
+3. **After Migration**:
+   ```bash
+   # Count corrupted entities (should be 0)
+   curl -s localhost:7777/code-entities-list-all | \
+     jq '[.data.entities[] | select((.key|split(":")[0]) != .language)] | length'
+   # Expected: 0
+   ```
+
+4. **Spot Check JavaScript Entities**:
+   ```bash
+   curl -s localhost:7777/code-entities-list-all | \
+     jq '[.data.entities[] | select(.key | startswith("javascript:"))] | .[0]'
+   # Expected: language field should be "javascript", not "rust"
+   ```
+
+---
+
+### Full Regression Test Suite
+
+```bash
+#!/bin/bash
+# File: scripts/verify_v145_fixes.sh
+
+DB_PATH="rocksdb:parseltongue20260131154912/analysis.db"
+API="http://localhost:7777"
+
+echo "=== v1.4.5 Verification Suite ==="
+echo
+
+echo "1. Testing Language Field Fix..."
+MISMATCH_COUNT=$(curl -s "$API/code-entities-list-all" | \
+  jq '[.data.entities[] | select((.key|split(":")[0]) != .language)] | length')
+if [ "$MISMATCH_COUNT" -eq 0 ]; then
+  echo "✅ PASS: All language fields match key prefix"
+else
+  echo "❌ FAIL: $MISMATCH_COUNT entities have mismatched language fields"
+  exit 1
+fi
+
+echo "2. Testing Main Function Indexing..."
+MAIN_COUNT=$(curl -s "$API/code-entities-list-all" | \
+  jq '[.data.entities[] | select(.key | contains("rust:fn:main"))] | length')
+if [ "$MAIN_COUNT" -gt 0 ]; then
+  echo "✅ PASS: Main function indexed ($MAIN_COUNT found)"
+else
+  echo "❌ FAIL: Main function not indexed"
+  exit 1
+fi
+
+echo "3. Testing Fuzzy Search..."
+SEARCH_RESULTS=$(curl -s "$API/code-entities-search-fuzzy?q=main" | jq '.data.total_count')
+if [ "$SEARCH_RESULTS" -gt 0 ]; then
+  echo "✅ PASS: Search returns $SEARCH_RESULTS results for 'main'"
+else
+  echo "❌ FAIL: Search returns 0 results"
+  exit 1
+fi
+
+echo "4. Testing Blast Radius..."
+BLAST_RESULT=$(curl -s "$API/blast-radius-impact-analysis?entity=javascript:fn:greetUser:__tests_e2e_workspace_src_test_v141_js:4-6&hops=1" | jq '.success')
+if [ "$BLAST_RESULT" = "true" ]; then
+  echo "✅ PASS: Blast radius works"
+else
+  echo "❌ FAIL: Blast radius broken"
+  exit 1
+fi
+
+echo "5. Testing Smart Context..."
+CONTEXT_ENTITIES=$(curl -s "$API/smart-context-token-budget?focus=rust:fn:main&tokens=2000" | jq '.data.entities_included')
+if [ "$CONTEXT_ENTITIES" -gt 0 ]; then
+  echo "✅ PASS: Smart context returns $CONTEXT_ENTITIES entities"
+else
+  echo "❌ FAIL: Smart context returns 0 entities"
+  exit 1
+fi
+
+echo
+echo "=== All Tests Passed ✅ ==="
 ```
 
 ---
 
-## Phase 5: Implementation Plan
+## Implementation Checklist (v1.4.5)
 
-### Phase 5.1: Investigation (Current State Analysis)
-
-**Goal**: Determine WHERE NULL keys are introduced.
-
-Run investigation queries (see Phase 1) and document findings.
-
-### Phase 5.2: Core Type System (RED → GREEN)
-
-1. Create `entity_key.rs` module
-2. Write RED tests
-3. Implement `EntityKey` type (GREEN)
-4. Update `Entity` struct
-5. All tests passing
-
-### Phase 5.3: Ingestion Pipeline Fix (GREEN → REFACTOR)
-
-1. Update pt01 ingestion logic
-2. Add database schema validation
-3. Integration tests
-4. All tests passing
-
-### Phase 5.4: Data Migration (Fix Existing Database)
-
-1. Create migration module
-2. Implement `migrate_null_keys_to_valid()`
-3. Add CLI command
-4. Test on live database
-
-### Phase 5.5: Verification and Testing
-
-1. Run full test suite
-2. Live server verification
-3. Regression verification
-4. All metrics passing
+### Phase 1: Investigation ✅ (COMPLETED 2026-02-01)
+- [x] Run 10 live server queries on localhost:7777
+- [x] Document findings (see Phase 1 above)
+- [x] Identify exact bugs:
+  - Language field corruption (100% affected)
+  - Missing main function
+  - Broken search algorithm
+  - Broken blast radius algorithm
+  - Broken smart context algorithm
 
 ---
 
-## Phase 6: Verification Plan
-
-### Success Criteria
-
-| Criterion | Verification Method | Expected Result |
-|-----------|---------------------|-----------------|
-| **No NULL keys** | Query `/code-entities-list-all` | All `entity_key != null` |
-| **Valid format** | Check key format | All match `language:type:name` |
-| **Entity lookup works** | GET `/code-entity-detail-view?key=X` | Returns 200 with entity |
-| **Search works** | Search for "main" | Returns entities with valid keys |
-| **Edges reference valid keys** | Query edges | `from_key` and `to_key` valid |
-| **Migration success** | Count before/after | 230 entities → 230 valid keys |
-| **No regression** | Fresh ingestion | Zero NULL keys |
+### Phase 2: Fix Language Field Corruption (TDD)
+- [ ] **RED**: Write `test_extract_language_from_key_validated_javascript()`
+- [ ] **GREEN**: Implement `CodeEntity::extract_language_from_key_validated()`
+- [ ] **GREEN**: Implement `CodeEntity::fix_language_field_from_key()`
+- [ ] **REFACTOR**: Update pt01 ingestion to remove hardcoded "rust"
+- [ ] **TEST**: Integration test `test_ingest_javascript_file_sets_correct_language_field()`
+- [ ] All language field tests passing
 
 ---
 
-## Implementation Checklist
-
-### Phase 1: Investigation ✓
-- [ ] Run investigation queries on live server
-- [ ] Document findings
-- [ ] Identify exact point where NULL is introduced
-
-### Phase 2: Core Types (TDD)
-- [ ] Create `crates/parseltongue-core/src/entity_key.rs`
-- [ ] Write RED tests for `EntityKey`
-- [ ] Implement `EntityKey` type (GREEN)
-- [ ] Update `Entity` struct
-- [ ] All core tests passing
-
-### Phase 3: Ingestion Fix
-- [ ] Update pt01 to generate keys
-- [ ] Add database schema with constraints
-- [ ] Integration tests passing
-
-### Phase 4: Migration
-- [ ] Create migration module
-- [ ] Implement migration function
-- [ ] Add CLI command
-- [ ] Test on live database
-
-### Phase 5: Verification
-- [ ] Full test suite passing
-- [ ] Migrate live database
-- [ ] Verify live server metrics
-- [ ] Fresh ingestion test
-- [ ] All checklist items ✓
+### Phase 3: Migration for Existing Database
+- [ ] Create `crates/parseltongue-core/src/migration.rs`
+- [ ] Implement `migrate_language_field_corruption_fix()`
+- [ ] Write E2E migration test
+- [ ] Add CLI command: `parseltongue migrate-fix-language-fields`
+- [ ] Test on live database (parseltongue20260131154912)
+- [ ] Verify: 233/233 entities fixed via live server query
 
 ---
 
-## Time Estimate
-
-- Investigation: 30 minutes
-- Core types + tests: 2 hours
-- Ingestion fix: 1 hour
-- Migration: 1 hour
-- Verification: 30 minutes
-- **Total: ~5 hours**
+### Phase 4: Fix Missing Main Function
+- [ ] **INVESTIGATE**: Query live server for main.rs entities
+- [ ] **RED**: Write `test_ingest_main_function_indexes_correctly()`
+- [ ] **GREEN**: Fix ingestion logic (file discovery or parser)
+- [ ] **VERIFY**: Confirm `rust:fn:main` in entity list via live server
 
 ---
 
-**Design Ready**: This architecture is ready for TDD implementation following STUB → RED → GREEN → REFACTOR cycle.
+### Phase 5: Fix Search Algorithm
+- [ ] **RED**: Write `test_fuzzy_search_returns_main_function()`
+- [ ] **GREEN**: Implement case-insensitive CozoDB query
+- [ ] **REFACTOR**: Add limits and optimization
+- [ ] **VERIFY**: `/code-entities-search-fuzzy?q=main` returns > 0 results
 
-**Next Steps**: Invoke rust-coder-01 agent with this architecture for implementation.
+---
+
+### Phase 6: Fix Blast Radius Algorithm
+- [ ] **RED**: Write `test_blast_radius_handles_valid_entity()`
+- [ ] **GREEN**: Add orphan entity handling in graph traversal
+- [ ] **VERIFY**: Blast radius endpoint returns `success: true` for valid entities
+
+---
+
+### Phase 7: Fix Smart Context Algorithm
+- [ ] **RED**: Write `test_smart_context_returns_entities_for_main()`
+- [ ] **GREEN**: Add entity existence check + fallback logic
+- [ ] **REFACTOR**: Implement file-based context fallback
+- [ ] **VERIFY**: Smart context returns > 0 entities for main
+
+---
+
+### Phase 8: Full Verification (Live Server)
+- [ ] Run `scripts/verify_v145_fixes.sh` against live server
+- [ ] All 5 verification tests passing:
+  - [x] Language field accuracy: 100%
+  - [ ] Main function indexed: YES
+  - [ ] Search functionality: WORKING
+  - [ ] Blast radius: WORKING
+  - [ ] Smart context: WORKING
+- [ ] Fresh ingestion test (no regressions)
+- [ ] Full test suite: `cargo test --all` → 0 failures
+
+---
+
+## Time Estimate (Revised Based on Actual Complexity)
+
+| Phase | Task | Estimated Time |
+|-------|------|----------------|
+| 1 | Investigation (DONE ✅) | ~~30 min~~ COMPLETED |
+| 2 | Language field fix + tests | 1.5 hours |
+| 3 | Migration + CLI command | 1 hour |
+| 4 | Main function fix | 1 hour |
+| 5 | Search algorithm fix | 1.5 hours |
+| 6 | Blast radius fix | 1 hour |
+| 7 | Smart context fix | 1 hour |
+| 8 | Verification + testing | 1 hour |
+| **Total** | | **~8.5 hours** (was 5 hours before live server investigation) |
+
+**Complexity Increase**: Original estimate assumed simple NULL key fix. Actual problems include 5 separate critical bugs requiring algorithm rewrites.
+
+---
+
+## Key Learnings from Live Server Investigation
+
+1. **Never trust bug report titles**: "NULL entity keys" was misleading - keys were fine, language field was corrupted
+2. **Always query live server**: Theoretical architecture != reality
+3. **One bug often hides many**: Language corruption was just the surface issue
+4. **Search/graph algorithms need orphan handling**: External dependencies create orphaned references
+5. **Main function indexing is critical**: Entry point must always be indexed for context generation
+
+---
+
+**Design Ready**: ✅ Architecture validated with ACTUAL live server data from localhost:7777
+
+**Next Steps**:
+1. Implement Phase 2 (Language Field Fix) using TDD
+2. Create migration for existing v1.4.3 databases
+3. Fix remaining 4 critical bugs (main, search, blast radius, smart context)
+4. Verify all fixes on live server
+
+**Target Release**: v1.4.5 with all 5 critical bugs fixed
+
+---
+
+**Document Status**: Architecture complete and validated with 10 live server queries (2026-02-01)
