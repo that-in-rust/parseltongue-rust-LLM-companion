@@ -83,38 +83,7 @@ Step 6: LLM synthesizes: "Root cause: auth.verify() failing due to null session"
 
 ---
 
-### 2. Budget-Aware Code Review Context (PMF 96)
-
-**User Journey**: "PR review with 500 files changed → Review only relevant code in 8K token budget"
-
-**Workflow**:
-```
-Step 1: LLM analyzes git diff → extracts changed entity keys
-Step 2: Parseltongue smart context (focus=entity, tokens=8000) → greedy selection
-Step 3: CPU scores entities: callers=1.0, callees=0.95, transitive=0.7-depth
-Step 4: CPU sorts by relevance → fits within token budget
-Step 5: LLM reviews curated context → identifies issues
-Step 6: Parseltongue blast radius → "This change breaks 12 tests"
-```
-
-**Evidence from Codebase**:
-- `handle_smart_context_token_budget` (lines 85-119) - Steps 2-4
-- `build_smart_context_selection` (lines 128-248) - Greedy algorithm
-- `estimate_entity_tokens` (lines 256-266) - Budget calculation
-- Relevance scoring: `1.0 (direct_caller)`, `0.95 (direct_callee)`, `0.7 - (0.1 * depth)` (lines 172-220)
-
-**Why Must-Have**:
-- **Pain Point**: LLM context limits (8K-128K) force reviewing partial code
-- **Alternative**: Manually select files → miss hidden dependencies → bugs escape to prod
-- **Parseltongue + LLM**: Automatic relevance ranking + budget optimization
-- **Value**: 90% token savings, 0 missed dependencies
-- **Shreyas Test**: Code reviewers would be "extremely disappointed" without this - **PASS**
-
-**LOC Estimate**: 800 (already 70% implemented in smart_context_token_budget_handler.rs)
-
----
-
-### 3. Semantic Module Boundary Detection (PMF 94)
+### 2. Semantic Module Boundary Detection (PMF 94)
 
 **User Journey**: "Messy 50K LOC codebase → Discover real architecture in 5 min"
 
@@ -149,7 +118,7 @@ Step 6: LLM validates coherence → 0.91 (excellent)
 
 ---
 
-### 4. Intelligent Refactoring Roadmap Generation (PMF 92)
+### 3. Intelligent Refactoring Roadmap Generation (PMF 92)
 
 **User Journey**: "High coupling detected → Get actionable refactoring plan with pseudo-code"
 
@@ -184,7 +153,7 @@ Step 6: LLM ranks by business value × technical debt × blast radius
 
 ---
 
-### 5. Context-Aware Technical Debt Prioritization (PMF 90)
+### 4. Context-Aware Technical Debt Prioritization (PMF 90)
 
 **User Journey**: "100 files with tech debt → Prioritize by business impact, not just complexity"
 
@@ -836,18 +805,18 @@ Step 4: LLM formats results in natural language
 ## SUMMARY STATISTICS
 
 ### Workflow Distribution
-- **Must-Have (90-100)**: 5 workflows
+- **Must-Have (90-100)**: 4 workflows (was 5, moved Budget-Aware Code Review to backlog)
 - **Performance (70-89)**: 9 workflows
 - **Power (50-69)**: 6 workflows
 - **Delight (30-49)**: 4 workflows
-- **Total**: 24 end-to-end workflows
+- **Total**: 23 end-to-end workflows (was 24)
 
-### Average PMF: 73.2 (Performance tier overall)
+### Average PMF: 72.8 (Performance tier overall)
 
-### Total Estimated LOC: ~14,650
-- Must-Have: 5,000 LOC (34%)
-- Performance: 6,450 LOC (44%)
-- Power: 2,200 LOC (15%)
+### Total Estimated LOC: ~13,850
+- Must-Have: 4,200 LOC (30%)
+- Performance: 6,450 LOC (47%)
+- Power: 2,200 LOC (16%)
 - Delight: 1,000 LOC (7%)
 
 ### Token Efficiency Impact
@@ -918,21 +887,23 @@ IDE integration, live previews score PMF 50-65 - nice for power users, not criti
 
 ### Recommended v1.6 Scope (Based on PMF)
 
-**Phase 1: Must-Have Workflows (Weeks 1-6)**
+**Phase 1: Must-Have Workflows (Weeks 1-4)**
 1. Progressive Root Cause Diagnosis (PMF 98)
-2. Budget-Aware Code Review Context (PMF 96)
-3. Semantic Module Boundary Detection (PMF 94)
+2. Semantic Module Boundary Detection (PMF 94)
+3. Intelligent Refactoring Roadmap (PMF 92)
+4. Context-Aware Tech Debt Prioritization (PMF 90)
 
-**Phase 2: High-Performance Workflows (Weeks 7-12)**
-4. Intelligent Refactoring Roadmap (PMF 92)
-5. Context-Aware Tech Debt Prioritization (PMF 90)
-6. Iterative Circular Dependency Classification (PMF 88)
+**Phase 2: High-Performance Workflows (Weeks 5-10)**
+5. Iterative Circular Dependency Classification (PMF 88)
+6. Test Impact Prediction (PMF 86)
+7. Progressive Codebase Onboarding (PMF 84)
 
 **Deferred to v1.7+**:
+- Budget-Aware Code Review Context (PMF 96) - moved to backlog
 - Power workflows (PMF 50-69): Nice-to-have features
 - Delight workflows (PMF 30-49): Low priority
 
-**Total Scope**: 6 workflows, ~8,200 LOC, 12 weeks
+**Total Scope**: 7 workflows, ~7,400 LOC, 10 weeks
 
 ---
 

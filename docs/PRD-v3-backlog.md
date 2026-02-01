@@ -150,6 +150,88 @@ Feature deferred to allow focus on core functionality and higher-priority v1.4-v
 
 ---
 
+## Budget-Aware Code Review Context (PMF 96, 800 LOC, v1.7)
+
+**Feature Description**: PR review with 500 files changed → Review only relevant code in 8K token budget. Automatic relevance ranking + budget optimization for LLM-powered code reviews.
+
+### User Journey
+
+Developer reviews large PR (500 files changed, 50K LOC modified). LLM context limits (8K-128K tokens) force reviewing partial code. Manual file selection misses hidden dependencies → bugs escape to production.
+
+**Parseltongue + LLM workflow**: Automatically extracts changed entities, scores by relevance (callers=1.0, callees=0.95, transitive=0.7-depth), greedily fits within token budget.
+
+### Workflow
+
+```
+Step 1: LLM analyzes git diff → extracts changed entity keys
+Step 2: Parseltongue smart context (focus=entity, tokens=8000) → greedy selection
+Step 3: CPU scores entities: callers=1.0, callees=0.95, transitive=0.7-depth
+Step 4: CPU sorts by relevance → fits within token budget
+Step 5: LLM reviews curated context → identifies issues
+Step 6: Parseltongue blast radius → "This change breaks 12 tests"
+```
+
+### Evidence from Codebase (Parseltongue Analysis)
+
+**Existing Implementation (70% complete)**:
+- `handle_smart_context_token_budget` (lines 85-119) - Steps 2-4 already implemented
+- `build_smart_context_selection` (lines 128-248) - Greedy algorithm with relevance scoring
+- `estimate_entity_tokens` (lines 256-266) - Token budget calculation
+- Relevance scoring formula: `1.0 (direct_caller)`, `0.95 (direct_callee)`, `0.7 - (0.1 * depth)` (lines 172-220)
+
+**What's Missing (30% remaining work)**:
+- Git diff integration → entity key extraction
+- Multi-entity focus (currently single entity)
+- Blast radius integration for impact analysis
+- LLM review feedback loop
+
+### Architecture
+
+**New Components (~240 LOC)**:
+1. **Git Diff Parser** (~80 LOC): Extract changed files → map to entity keys
+2. **Multi-Focus Context Builder** (~100 LOC): Extend smart_context_selection to handle multiple focus entities
+3. **Review Workflow Orchestrator** (~60 LOC): Chain git diff → context selection → LLM review → blast radius
+
+**Leverage Existing (~560 LOC)**:
+- Smart context selection algorithm (already 70% implemented)
+- Token estimation infrastructure
+- Greedy relevance-based selection
+
+### Value Proposition
+
+- **Pain Point**: LLM context limits force reviewing partial code
+- **Alternative**: Manually select files → 30-60 min, miss 30-40% dependencies
+- **Parseltongue + LLM**: 2-5 minutes, 90% token savings, 0 missed dependencies
+- **Shreyas Test**: Code reviewers would be "extremely disappointed" without this - **MUST-HAVE tier**
+
+### Why Moved to Backlog
+
+**Original PMF**: 96 (Must-Have tier)
+
+**Reasons for Deferral**:
+1. **70% Already Implemented**: Core smart context selection exists, only git integration needed
+2. **Scope Focus**: Prioritize v1.6 workflows with 0% existing implementation first
+3. **Use Existing Workaround**: Reviewers can manually call `/smart-context-token-budget?focus=entity&tokens=8000` per entity
+4. **Integration Complexity**: Git diff parsing + multi-repo support adds external dependencies
+5. **LLM Cost**: Code review workflow may incur high LLM costs (need cost analysis)
+
+**Promotion Criteria**:
+- User demand: 5+ feature requests for automated code review context
+- Cost validation: LLM cost per review <$0.50 (acceptable for teams)
+- Git integration ready: File watcher + incremental reindex stable (v1.5+)
+- Multi-entity focus: Core smart context extended to handle list of entities
+
+### Implementation Estimate
+
+**Total LOC**: 800 (240 new + 560 existing refactored)
+**Effort**: 1.5 weeks (git integration 3 days, multi-focus 4 days, testing 1 day)
+**Risk**: Medium (git diff parsing edge cases, multi-repo complexity)
+**Confidence**: 85% (HIGH) - core algorithm proven, only integration work remains
+
+**Recommended Timeline**: v1.7 (after smart context v1.6 validation with single-entity use cases)
+
+---
+
 ## Backlog Management Notes
 
 **Last Updated**: 2026-02-01
