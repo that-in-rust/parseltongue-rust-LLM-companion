@@ -390,16 +390,19 @@ gh release view v{VERSION} --json assets --jq '.assets[] | {name, size}'
 **Platform Build Matrix** (v1.4.3 Standard):
 | Platform | Architecture | Method | Binary Name |
 |----------|--------------|--------|-------------|
-| macOS | ARM64 (M1/M2/M3) | Native | `parseltongue-macos-arm64` |
-| macOS | x86_64 (Intel) | Cross-compile | `parseltongue-macos-x86_64` |
-| Linux | x86_64 | GitHub Actions/Docker | `parseltongue-linux-x86_64` |
+| macOS | ARM64 (M1/M2/M3) | GitHub Actions | `parseltongue-macos-arm64` |
+| macOS | x86_64 (Intel) | GitHub Actions | `parseltongue-macos-x86_64` |
+| Linux | x86_64 | GitHub Actions | `parseltongue-linux-x86_64` |
 | Windows | x86_64 | GitHub Actions | `parseltongue-windows-x86_64.exe` |
 
-**Future Improvement** (v1.5.0+):
-- Set up GitHub Actions workflow for automated multi-platform builds
-- Trigger on git tag push
-- Auto-upload all 4 platform binaries
-- Eliminate manual cross-compilation steps
+**✅ IMPLEMENTED (2026-02-01)**:
+- GitHub Actions workflows created: `.github/workflows/release.yml`, `.github/workflows/test.yml`
+- Automated multi-platform builds on git tag push
+- All 4 platform binaries auto-uploaded to release
+- Cross-platform CI tests on every commit to main
+- File watcher tests validated on Linux, macOS, Windows
+- **Usage**: `git tag -a v1.5.0 -m "Release v1.5.0" && git push origin v1.5.0`
+- **Eliminates manual cross-compilation** - workflow handles everything
 
 ### Future Versions (Template)
 - {NEW_FEATURE_VERIFICATION}
