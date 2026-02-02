@@ -32,6 +32,7 @@ use pt01_folder_to_cozodb_streamer::file_watcher::{
 };
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::incremental_reindex_core_logic::execute_incremental_reindex_core;
 
 /// Error types for file watcher integration
 ///
@@ -53,91 +54,6 @@ pub enum FileWatcherIntegrationError {
 
 /// Result type for file watcher integration
 pub type IntegrationResult<T> = Result<T, FileWatcherIntegrationError>;
-
-/// Result of stub incremental reindex operation
-///
-/// # 4-Word Name: StubReindexResultData
-#[derive(Debug, Clone)]
-struct StubReindexResultData {
-    file_path: String,
-    hash_changed: bool,
-    entities_added: usize,
-    entities_removed: usize,
-    processing_time_ms: u64,
-}
-
-/// Execute stub incremental reindex operation
-///
-/// # 4-Word Name: execute_stub_reindex_operation
-///
-/// This is a temporary stub that implements hash-change detection
-/// but doesn't actually reparse files or update entities.
-/// It will be replaced with full implementation in v1.4.6.
-async fn execute_stub_reindex_operation(
-    file_path: &str,
-    state: &SharedApplicationStateContainer,
-) -> Result<StubReindexResultData, String> {
-    use sha2::{Digest, Sha256};
-    use std::time::Instant;
-
-    let start_time = Instant::now();
-
-    // Read file content
-    let file_content = std::fs::read(file_path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
-
-    // Compute hash
-    let mut hasher = Sha256::new();
-    hasher.update(&file_content);
-    let current_hash = hex::encode(hasher.finalize());
-
-    // Get database connection
-    let db_guard = state.database_storage_connection_arc.read().await;
-    let storage = db_guard
-        .as_ref()
-        .ok_or_else(|| "Database not connected".to_string())?;
-
-    // Ensure FileHashCache schema exists
-    let _ = storage.create_file_hash_cache_schema().await;
-
-    // Check cached hash
-    let cached_hash = storage
-        .get_cached_file_hash_value(file_path)
-        .await
-        .ok()
-        .flatten();
-
-    // If hash unchanged, return early
-    if cached_hash.as_ref() == Some(&current_hash) {
-        let processing_time_ms = start_time.elapsed().as_millis() as u64;
-        return Ok(StubReindexResultData {
-            file_path: file_path.to_string(),
-            hash_changed: false,
-            entities_added: 0,
-            entities_removed: 0,
-            processing_time_ms,
-        });
-    }
-
-    // Update hash cache (but don't actually reindex yet - that requires Bug #3/#4 fixes)
-    if let Err(e) = storage
-        .set_cached_file_hash_value(file_path, &current_hash)
-        .await
-    {
-        eprintln!("[StubReindex] Warning: Failed to update hash cache: {}", e);
-    }
-
-    let processing_time_ms = start_time.elapsed().as_millis() as u64;
-
-    // STUB: Report that hash changed but no entities updated
-    Ok(StubReindexResultData {
-        file_path: file_path.to_string(),
-        hash_changed: true,
-        entities_added: 0,
-        entities_removed: 0,
-        processing_time_ms,
-    })
-}
 
 
 /// Configuration for file watcher integration
@@ -241,7 +157,7 @@ impl<W: FileWatchProviderTrait + 'static> FileWatcherIntegrationService<W> {
 
             // Clone Arcs for the async task
             let pending_changes = pending_changes.clone();
-            let _state = state.clone();
+            let state = state.clone();
             let file_path = event.file_path.clone();
             let change_type = event.change_type;
 
@@ -282,14 +198,12 @@ impl<W: FileWatchProviderTrait + 'static> FileWatcherIntegrationService<W> {
                         change_type, file_path_str
                     );
 
-                    // Trigger incremental reindex (v1.4.5 - stub implementation)
-                    // TODO v1.4.6: Replace with full implementation once Bug #3 and Bug #4 are fixed
-                    // See: incremental_reindex_core_logic.rs for complete logic
-                    match execute_stub_reindex_operation(&file_path_str, &_state).await {
+                    // Trigger incremental reindex (v1.4.6 - full implementation)
+                    match execute_incremental_reindex_core(&file_path_str, &state).await {
                         Ok(result) => {
                             if result.hash_changed {
                                 println!(
-                                    "[FileWatcher] Reindexed {}: +{} entities, -{} entities ({}ms) [STUB]",
+                                    "[FileWatcher] Reindexed {}: +{} entities, -{} entities ({}ms)",
                                     result.file_path,
                                     result.entities_added,
                                     result.entities_removed,
