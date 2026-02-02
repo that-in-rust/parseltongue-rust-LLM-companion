@@ -166,25 +166,11 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:src_ma
 
 ---
 
-## What's New in v1.4.7: ISGL1 v2 Stable Entity Identity
+## What's New in v1.4.3: Fixed File Watcher + Extended Language Support
 
-### Major Enhancement: Timestamp-Based Entity Keys
+### Critical Bug Fix
 
-**v1.4.7 introduces ISGL1 v2** - a revolutionary approach to entity identity that eliminates key churn when code changes.
-
-**Old (v1.4.6 and earlier)**: `rust:fn:handle_auth:__src_auth_rs:10-50` (line-based, breaks on edits)
-**New (v1.4.7)**: `rust:fn:handle_auth:__src_auth_rs:T1706284800` (timestamp-based, stable)
-
-### Benefits
-
-- **0% key churn**: Entity keys remain stable when you add/remove lines above them
-- **Incremental indexing**: File watcher only reprocesses changed entities (SHA-256 content hashing)
-- **Real-time updates**: ~7ms average reindex time (70x faster than 500ms target)
-- **Production-ready**: Tested on 755 entities, 4,055 edges (Parseltongue analyzing itself)
-
-### v1.4.3 File Watcher Fix
-
-v1.4.2 file watcher was completely broken (0 events detected due to `blocking_send` deadlock). v1.4.3+ fixes the deadlock and v1.4.7 adds ISGL1 v2 stable keys.
+**v1.4.2 file watcher was completely broken** - detected 0 events due to `blocking_send` deadlock. v1.4.3 fixes the deadlock and adds support for 8 additional file extensions (C, C++, Ruby, PHP, C#, Swift).
 
 #### Migration from v1.4.1
 
@@ -762,9 +748,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 | `--db <PATH>` | Database path | `mem` (in-memory) |
 | `--verbose` | Enable verbose logging | false |
 
-**File Watching** (v1.4.7): Always enabled with ISGL1 v2 stable keys. The server automatically monitors the current directory for code changes and reindexes modified files with 0% key churn. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`, `.c`, `.h`, `.cpp`, `.hpp`, `.rb`, `.php`, `.cs`, `.swift`
-
-**Performance**: ~7ms average reindex time (tested on 755 entities, 70x faster than 500ms target)
+**File Watching** (v1.4.3+): Always enabled and now working (v1.4.2 was broken). The server automatically monitors the current directory for code changes and reindexes modified files. Supported extensions: `.rs`, `.py`, `.js`, `.ts`, `.go`, `.java`, `.c`, `.h`, `.cpp`, `.hpp`, `.rb`, `.php`, `.cs`, `.swift`
 
 **Database format**: Always use `rocksdb:` prefix for persistent databases:
 ```bash
@@ -868,26 +852,11 @@ code-entities-search-fuzzy       # 4 words
 
 ```bash
 # Download (one command)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.7/parseltongue-macos-arm64 -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.3/parseltongue -o parseltongue && chmod +x parseltongue
 
 # Verify
 ./parseltongue --version
-# parseltongue 1.4.7
-```
-
-**Platform-specific downloads**:
-```bash
-# macOS ARM64 (Apple Silicon)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.7/parseltongue-macos-arm64 -o parseltongue && chmod +x parseltongue
-
-# macOS x86_64 (Intel)
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.7/parseltongue-macos-x86_64 -o parseltongue && chmod +x parseltongue
-
-# Linux x86_64
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.7/parseltongue-linux-x86_64 -o parseltongue && chmod +x parseltongue
-
-# Windows x86_64
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.7/parseltongue-windows-x86_64.exe -o parseltongue.exe
+# parseltongue 1.4.3
 ```
 
 **Optional**: Add to PATH for global access:
@@ -896,8 +865,6 @@ sudo mv parseltongue /usr/local/bin/
 ```
 
 **Releases**: https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases
-
-**Documentation**: See [docs/UserJourney20260202v1.md](docs/UserJourney20260202v1.md) for comprehensive API testing examples
 
 ---
 
