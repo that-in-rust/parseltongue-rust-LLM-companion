@@ -143,7 +143,7 @@ impl ToonEncoder {
         // Convert to JSON values for schema extraction
         let json_values: Vec<Value> = data
             .iter()
-            .map(|item| serde_json::to_value(item))
+            .map(serde_json::to_value)
             .collect::<Result<_, _>>()
             .context("Failed to serialize items to JSON")?;
 

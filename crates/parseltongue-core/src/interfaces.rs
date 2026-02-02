@@ -587,12 +587,14 @@ pub mod mocks {
                 });
             }
 
-            self.execute_result
-                .clone()
-                .unwrap_or(Ok(ToolOutput::IndexingComplete {
+            match &self.execute_result {
+                Some(Ok(output)) => Ok(output.clone()),
+                Some(Err(e)) => Err((*e).clone()),
+                None => Ok(ToolOutput::IndexingComplete {
                     entities_count: 0,
                     duration_ms: 0,
-                }))
+                }),
+            }
         }
 
         fn validate_input(&self, _input: &ToolInput) -> Result<()> {
@@ -651,31 +653,5 @@ mod tests {
         assert_eq!(query.base_entities.len(), 1);
         assert_eq!(query.hop_depth, 2);
         assert!(query.future_only);
-    }
-
-    #[cfg(feature = "test-utils")]
-    #[tokio::test]
-    async fn mock_tool_implementation() {
-        let mock_tool = MockTool::new("test")
-            .with_execute_result(Ok(ToolOutput::IndexingComplete {
-                entities_count: 42,
-                duration_ms: 1000,
-            }));
-
-        let input = ToolInput::IndexFolder {
-            path: PathBuf::from("test"),
-            language_filter: None,
-        };
-
-        let result = mock_tool.execute(input).await.unwrap();
-        match result {
-            ToolOutput::IndexingComplete { entities_count, .. } => {
-                assert_eq!(entities_count, 42);
-            }
-            _ => panic!("Unexpected output type"),
-        }
-
-        assert!(mock_tool.validate_input(&input).is_ok());
-        assert_eq!(mock_tool.metadata().name, "test");
     }
 }

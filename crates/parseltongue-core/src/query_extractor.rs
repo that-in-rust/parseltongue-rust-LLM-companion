@@ -498,7 +498,7 @@ impl QueryBasedExtractor {
 
         while let Some(m) = matches.next() {
             // Process each match to extract dependency relationship
-            if let Some(edge) = self.process_dependency_match(&m, &query, source, file_path, language, entities) {
+            if let Some(edge) = self.process_dependency_match(m, &query, source, file_path, language, entities) {
                 dependencies.push(edge);
             }
         }
@@ -557,7 +557,7 @@ impl QueryBasedExtractor {
             if capture_name.starts_with("definition.impl") {
                 from_entity = entities.iter().find(|e| {
                     e.name == node_text && e.line_range.0 <= node.start_position().row + 1
-                        && e.line_range.1 >= node.end_position().row + 1
+                        && e.line_range.1 > node.end_position().row
                 });
             }
         }
@@ -605,7 +605,7 @@ impl QueryBasedExtractor {
                 );
 
                 let to_key = format!(
-                    "{}:fn:{}:unknown:0-0",
+                    "{}:fn:{}:unresolved-reference:0-0",
                     language,
                     to
                 );

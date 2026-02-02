@@ -106,8 +106,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
     // Verify initial state: All entities (1,0,None)
     for key in &[&key1, &key2, &key3] {
         let e = storage.get_entity(key).await.unwrap();
-        assert_eq!(e.temporal_state.current_ind, true, "Should exist in current");
-        assert_eq!(e.temporal_state.future_ind, false, "Future unknown initially");
+        assert!(e.temporal_state.current_ind, "Should exist in current");
+        assert!(!e.temporal_state.future_ind, "Future unknown initially");
         assert_eq!(e.temporal_state.future_action, None);
     }
     println!("✓ All entities start with state (current_ind=1, future_ind=0, future_action=None)");
@@ -131,8 +131,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
     storage.update_entity(edited).await.unwrap();
 
     let e1 = storage.get_entity(&key1).await.unwrap();
-    assert_eq!(e1.temporal_state.current_ind, true);
-    assert_eq!(e1.temporal_state.future_ind, true);
+    assert!(e1.temporal_state.current_ind);
+    assert!(e1.temporal_state.future_ind);
     assert_eq!(e1.temporal_state.future_action, Some(TemporalAction::Edit));
     println!("✓ State: (current_ind=1, future_ind=1, future_action=Edit)");
     println!("✓ future_code populated");
@@ -145,8 +145,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
         .unwrap();
 
     let e3 = storage.get_entity(&key3).await.unwrap();
-    assert_eq!(e3.temporal_state.current_ind, true);
-    assert_eq!(e3.temporal_state.future_ind, false);
+    assert!(e3.temporal_state.current_ind);
+    assert!(!e3.temporal_state.future_ind);
     assert_eq!(e3.temporal_state.future_action, Some(TemporalAction::Delete));
     println!("✓ State: (current_ind=1, future_ind=0, future_action=Delete)");
 
@@ -185,8 +185,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
     storage.insert_entity(&new_entity).await.unwrap();
 
     let e_new = storage.get_entity(&new_key).await.unwrap();
-    assert_eq!(e_new.temporal_state.current_ind, false);
-    assert_eq!(e_new.temporal_state.future_ind, true);
+    assert!(!e_new.temporal_state.current_ind);
+    assert!(e_new.temporal_state.future_ind);
     assert_eq!(e_new.temporal_state.future_action, Some(TemporalAction::Create));
     println!("✓ Hash-based ISGL1 key: {}", new_key);
     println!("✓ State: (current_ind=0, future_ind=1, future_action=Create)");
@@ -284,8 +284,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
              e1_final.temporal_state.current_ind,
              e1_final.temporal_state.future_ind,
              e1_final.temporal_state.future_action);
-    assert_eq!(e1_final.temporal_state.current_ind, true);
-    assert_eq!(e1_final.temporal_state.future_ind, true);
+    assert!(e1_final.temporal_state.current_ind);
+    assert!(e1_final.temporal_state.future_ind);
     assert_eq!(e1_final.temporal_state.future_action, Some(TemporalAction::Edit));
 
     let e2_final = storage.get_entity(&key2).await.unwrap();
@@ -294,8 +294,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
              e2_final.temporal_state.current_ind,
              e2_final.temporal_state.future_ind,
              e2_final.temporal_state.future_action);
-    assert_eq!(e2_final.temporal_state.current_ind, true);
-    assert_eq!(e2_final.temporal_state.future_ind, false);
+    assert!(e2_final.temporal_state.current_ind);
+    assert!(!e2_final.temporal_state.future_ind);
     assert_eq!(e2_final.temporal_state.future_action, None);
 
     let e3_final = storage.get_entity(&key3).await.unwrap();
@@ -304,8 +304,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
              e3_final.temporal_state.current_ind,
              e3_final.temporal_state.future_ind,
              e3_final.temporal_state.future_action);
-    assert_eq!(e3_final.temporal_state.current_ind, true);
-    assert_eq!(e3_final.temporal_state.future_ind, false);
+    assert!(e3_final.temporal_state.current_ind);
+    assert!(!e3_final.temporal_state.future_ind);
     assert_eq!(e3_final.temporal_state.future_action, Some(TemporalAction::Delete));
 
     let e_new_final = storage.get_entity(&new_key).await.unwrap();
@@ -314,8 +314,8 @@ async fn test_end_to_end_tool1_tool2_tool3_pipeline() {
              e_new_final.temporal_state.current_ind,
              e_new_final.temporal_state.future_ind,
              e_new_final.temporal_state.future_action);
-    assert_eq!(e_new_final.temporal_state.current_ind, false);
-    assert_eq!(e_new_final.temporal_state.future_ind, true);
+    assert!(!e_new_final.temporal_state.current_ind);
+    assert!(e_new_final.temporal_state.future_ind);
     assert_eq!(e_new_final.temporal_state.future_action, Some(TemporalAction::Create));
 
     // ═══════════════════════════════════════════════════════════════
@@ -359,7 +359,7 @@ fn create_indexed_entity(
     let isgl1_key = format!(
         "rust:fn:{}:{}:{}-{}",
         name,
-        file.replace('/', "_").replace('.', "_"),
+        file.replace(['/', '.'], "_"),
         lines.0,
         lines.1
     );

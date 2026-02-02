@@ -14,6 +14,7 @@ pub mod entity_class_specifications;
 pub mod error;
 // pub mod file_parser; // P1: Thread-safe file parser facade (TODO: implement)
 pub mod interfaces;
+pub mod isgl1_v2; // v1.4.5: ISGL1 v2 stable entity identity with birth timestamps
 pub mod output_path_resolver; // v0.9.7: Timestamped folder creation
 pub mod query_extractor;
 pub mod query_json_graph_errors; // v0.9.7: Agent query error types

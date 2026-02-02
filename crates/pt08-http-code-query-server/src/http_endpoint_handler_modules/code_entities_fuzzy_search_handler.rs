@@ -135,7 +135,7 @@ async fn search_entities_by_query_from_database(
                 let search_lower = search_query.to_lowercase();
                 named_rows.rows.iter().filter_map(|row| {
                     // Extract fields from row
-                    let key = row.get(0).and_then(|v| match v {
+                    let key = row.first().and_then(|v| match v {
                         cozo::DataValue::Str(s) => Some(s.to_string()),
                         _ => None,
                     })?;

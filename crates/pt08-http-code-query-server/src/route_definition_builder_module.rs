@@ -23,8 +23,8 @@ use crate::http_endpoint_handler_modules::{
     semantic_cluster_grouping_handler,
     api_reference_documentation_handler,
     smart_context_token_budget_handler,
-    // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
-    // incremental_reindex_file_handler,
+    // v1.5.0: ISGL1 v2 integration complete - re-enabled
+    incremental_reindex_file_handler,
     file_watcher_status_handler,
 };
 
@@ -116,12 +116,12 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/smart-context-token-budget",
             get(smart_context_token_budget_handler::handle_smart_context_token_budget)
         )
-        // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
+        // v1.5.0: ISGL1 v2 integration complete - re-enabled
         // Incremental reindex endpoint (PRD-2026-01-28)
-        // .route(
-        //     "/incremental-reindex-file-update",
-        //     post(incremental_reindex_file_handler::handle_incremental_reindex_file_request)
-        // )
+        .route(
+            "/incremental-reindex-file-update",
+            post(incremental_reindex_file_handler::handle_incremental_reindex_file_request)
+        )
         // File watcher status endpoint (PRD-2026-01-29)
         .route(
             "/file-watcher-status-check",

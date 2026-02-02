@@ -101,9 +101,9 @@ pub fn extract_placeholders_from_edges_deduplicated(
     let mut placeholders = Vec::new();
 
     for edge in edges {
-        // Check if target is an external dependency OR unknown reference
+        // Check if target is an external dependency OR unresolved reference
         let to_key_str: &str = edge.to_key.as_ref();
-        if to_key_str.contains(":external-dependency-") || to_key_str.contains(":unknown:0-0") {
+        if to_key_str.contains(":external-dependency-") || to_key_str.contains(":unresolved-reference:0-0") {
             // Deduplicate: only process first occurrence of each key
             if seen_keys.insert(edge.to_key.clone()) {
                 // Parse external dependency key
@@ -226,9 +226,9 @@ pub fn parse_external_key_parts_validated(
     // Extract crate name from pattern
     // Supports two patterns:
     // 1. "external-dependency-{crate}" - Known external crate from USE statements
-    // 2. "unknown" - Unresolved reference (6 scenarios: external deps, local functions, traits, macros, generics, dynamic dispatch)
-    let crate_name = if file_path == "unknown" {
-        // Unknown pattern: map to special "unresolved-reference" crate
+    // 2. "unresolved-reference" - Unresolved reference (6 scenarios: external deps, local functions, traits, macros, generics, dynamic dispatch)
+    let crate_name = if file_path == "unresolved-reference" {
+        // Unresolved reference pattern
         "unresolved-reference".to_string()
     } else if let Some(crate_name) = file_path.strip_prefix("external-dependency-") {
         // Known external dependency pattern
@@ -238,7 +238,7 @@ pub fn parse_external_key_parts_validated(
         return Err(StreamerError::ParsingError {
             file: "external_dependency".to_string(),
             reason: format!(
-                "Invalid file_path format (expected 'external-dependency-{{crate}}' or 'unknown'): {}",
+                "Invalid file_path format (expected 'external-dependency-{{crate}}' or 'unresolved-reference'): {}",
                 key
             ),
         });
@@ -376,14 +376,14 @@ pub fn create_external_dependency_placeholder_entity_validated(
 
     // Create ISGL1 key based on crate_name type
     // - Known external dependencies: rust:struct:Runtime:external-dependency-tokio:0-0
-    // - Unresolved references: rust:fn:build_cli:unknown:0-0
+    // - Unresolved references: rust:fn:build_cli:unresolved-reference:0-0
     let (isgl1_key, file_path) = if crate_name == "unresolved-reference" {
-        // Unknown pattern: use "unknown" in key
+        // Unresolved reference pattern: use "unresolved-reference" in key
         let key = format!(
-            "{}:{}:{}:unknown:0-0",
+            "{}:{}:{}:unresolved-reference:0-0",
             language_prefix, item_type, item_name
         );
-        let path = PathBuf::from("unknown");
+        let path = PathBuf::from("unresolved-reference");
         (key, path)
     } else {
         // External dependency pattern: use "external-dependency-{crate}" in key
@@ -630,7 +630,7 @@ mod tests {
     #[test]
     fn test_parse_unknown_pattern_key_validated() {
         // Arrange
-        let key = "rust:fn:build_cli:unknown:0-0";
+        let key = "rust:fn:build_cli:unresolved-reference:0-0";
 
         // Act
         let result = parse_external_key_parts_validated(key);

@@ -27,10 +27,17 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
+use std::collections::HashSet;
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
-use parseltongue_core::entity_conversion::convert_parsed_to_code_entity;
 use parseltongue_core::storage::CozoDbStorage;
+use parseltongue_core::isgl1_v2::{
+    EntityCandidate, OldEntity, EntityMatchResult, match_entity_with_old_index,
+    compute_birth_timestamp, compute_content_hash, extract_semantic_path, format_key_v2,
+};
+use parseltongue_core::entities::{CodeEntity, InterfaceSignature, LineRange, Visibility, EntityClass as CoreEntityClass, Language, LanguageSpecificSignature, EntityType as CoreEntityType, RustSignature};
+use pt01_folder_to_cozodb_streamer::isgl1_generator::Isgl1KeyGeneratorFactory;
+use std::path::PathBuf;
 
 /// Error types for incremental reindex operations
 ///
@@ -58,6 +65,11 @@ pub enum IncrementalReindexOperationError {
 
 /// Result type for incremental reindex operations
 pub type ReindexResult<T> = Result<T, IncrementalReindexOperationError>;
+
+/// Convert Language enum to lowercase string for ISGL1 key
+fn language_to_string_format(lang: &Language) -> String {
+    format!("{:?}", lang).to_lowercase()
+}
 
 /// Result data from incremental reindex operation
 ///
@@ -190,10 +202,15 @@ async fn execute_reindex_with_storage_arc(
     file_content: &[u8],
     current_hash: &str,
     storage: &Arc<CozoDbStorage>,
-    state: &SharedApplicationStateContainer,
+    _state: &SharedApplicationStateContainer,
     start_time: Instant,
 ) -> ReindexResult<IncrementalReindexResultData> {
     let file_path = Path::new(file_path_string);
+
+    // Convert to UTF-8 for parsing (do this early for matching)
+    let file_content_str = String::from_utf8(file_content.to_vec()).map_err(|e| {
+        IncrementalReindexOperationError::InvalidUtf8Error(e.to_string())
+    })?;
 
     // Get existing entities for this file
     let existing_entities = storage
@@ -205,53 +222,34 @@ async fn execute_reindex_with_storage_arc(
 
     let entities_before = existing_entities.len();
 
-    // Collect entity keys for deletion
-    let entity_keys: Vec<String> = existing_entities
-        .iter()
-        .map(|e| e.isgl1_key.clone())
-        .collect();
-
-    // Delete existing edges from these entities
-    let edges_removed = if !entity_keys.is_empty() {
-        storage
-            .delete_edges_by_from_keys(&entity_keys)
-            .await
-            .map_err(|e| {
-                IncrementalReindexOperationError::DatabaseOperationFailed(e.to_string())
-            })?
-    } else {
-        0
-    };
-
-    // Delete existing entities
-    let entities_removed = if !entity_keys.is_empty() {
-        storage
-            .delete_entities_batch_by_keys(&entity_keys)
-            .await
-            .map_err(|e| {
-                IncrementalReindexOperationError::DatabaseOperationFailed(e.to_string())
-            })?
-    } else {
-        0
-    };
-
-    // Convert to UTF-8 for parsing
-    let file_content_str = String::from_utf8(file_content.to_vec()).map_err(|e| {
-        IncrementalReindexOperationError::InvalidUtf8Error(e.to_string())
-    })?;
-
-    // Parse file using FileParser from state
-    let (parsed_entities, dependencies) = match state
-        .file_parser_instance_arc
-        .parse_file_to_entities(file_path, &file_content_str)
-    {
+    // Parse file using pt01's Isgl1KeyGenerator
+    let key_generator = Isgl1KeyGeneratorFactory::new();
+    let (parsed_entities, dependencies) = match key_generator.parse_source(&file_content_str, file_path) {
         Ok(result) => result,
         Err(e) => {
-            // If parsing fails, return deletion-only stats
+            // If parsing fails, delete all old entities and return
             eprintln!(
                 "[ReindexCore] Warning: Failed to parse {}: {}",
                 file_path_string, e
             );
+
+            let entity_keys: Vec<String> = existing_entities
+                .iter()
+                .map(|e| e.isgl1_key.clone())
+                .collect();
+
+            let edges_removed = if !entity_keys.is_empty() {
+                storage.delete_edges_by_from_keys(&entity_keys).await.unwrap_or(0)
+            } else {
+                0
+            };
+
+            let entities_removed = if !entity_keys.is_empty() {
+                storage.delete_entities_batch_by_keys(&entity_keys).await.unwrap_or(0)
+            } else {
+                0
+            };
+
             let processing_time_ms = start_time.elapsed().as_millis() as u64;
             return Ok(IncrementalReindexResultData {
                 file_path: file_path_string.to_string(),
@@ -267,26 +265,142 @@ async fn execute_reindex_with_storage_arc(
         }
     };
 
-    // Convert ParsedEntity to CodeEntity and insert
-    let mut entities_added = 0usize;
+    // ISGL1 v2: Convert existing entities to OldEntity format for matching
+    let old_entities: Vec<OldEntity> = existing_entities
+        .iter()
+        .filter_map(|e| {
+            Some(OldEntity {
+                key: e.isgl1_key.clone(),
+                name: e.interface_signature.name.clone(),
+                file_path: e.interface_signature.file_path.to_string_lossy().to_string(),
+                line_range: (
+                    e.interface_signature.line_range.start as usize,
+                    e.interface_signature.line_range.end as usize,
+                ),
+                content_hash: e.content_hash.clone()?,
+            })
+        })
+        .collect();
+
+    // ISGL1 v2: Match new entities against old index
+    let mut matched_keys = HashSet::new();
+    let mut new_entity_keys = HashSet::new();  // Track NEW entities separately
+    let mut entities_to_upsert = Vec::new();
+
     for parsed in &parsed_entities {
-        match convert_parsed_to_code_entity(parsed, &file_content_str) {
-            Ok(code_entity) => {
-                if let Err(e) = storage.insert_entity(&code_entity).await {
-                    eprintln!(
-                        "[ReindexCore] Warning: Failed to insert entity '{}': {}",
-                        parsed.name, e
-                    );
-                } else {
-                    entities_added += 1;
-                }
+        // Extract code snippet for this entity
+        let code_snippet = file_content_str
+            .lines()
+            .skip(parsed.line_range.0.saturating_sub(1))
+            .take(parsed.line_range.1 - parsed.line_range.0 + 1)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // Create candidate (MVP: simplified to Function entity type)
+        let candidate = EntityCandidate {
+            name: parsed.name.clone(),
+            entity_type: CoreEntityType::Function,  // Simplified for MVP
+            file_path: file_path_string.to_string(),
+            line_range: parsed.line_range,
+            content_hash: compute_content_hash(&code_snippet),
+            code: code_snippet.clone(),
+        };
+
+        // Match against old entities
+        let match_result = match_entity_with_old_index(&candidate, &old_entities);
+
+        // Determine ISGL1 key based on match result
+        let isgl1_key = match match_result {
+            EntityMatchResult::ContentMatch { old_key } | EntityMatchResult::PositionMatch { old_key } => {
+                matched_keys.insert(old_key.clone());
+                old_key
             }
-            Err(e) => {
-                eprintln!(
-                    "[ReindexCore] Warning: Entity conversion failed for '{}': {}",
-                    parsed.name, e
+            EntityMatchResult::NewEntity => {
+                // Assign new birth timestamp and create ISGL1 v2 key
+                let birth_timestamp = compute_birth_timestamp(file_path_string, &parsed.name);
+                let semantic_path = extract_semantic_path(file_path_string);
+                let language_str = language_to_string_format(&parsed.language);
+                let new_key = format_key_v2(
+                    CoreEntityType::Function,  // Simplified for MVP
+                    &parsed.name,
+                    &language_str,
+                    &semantic_path,
+                    birth_timestamp,
                 );
+                new_entity_keys.insert(new_key.clone());  // Track as NEW
+                new_key
             }
+        };
+
+        // Convert to CodeEntity using the determined key
+        // Create InterfaceSignature with simplified LanguageSpecificSignature (MVP: use empty RustSignature)
+        let interface_signature = InterfaceSignature {
+            entity_type: parseltongue_core::entities::EntityType::Function, // Simplified - real impl would map entity_type
+            name: parsed.name.clone(),
+            visibility: Visibility::Public,
+            file_path: PathBuf::from(&parsed.file_path),
+            line_range: LineRange::new(parsed.line_range.0 as u32, parsed.line_range.1 as u32)
+                .unwrap_or_else(|_| LineRange { start: 0, end: 0 }),
+            module_path: vec![],  // Simplified for incremental reindex
+            documentation: None,
+            language_specific: LanguageSpecificSignature::Rust(RustSignature {
+                generics: vec![],
+                lifetimes: vec![],
+                where_clauses: vec![],
+                attributes: vec![],
+                trait_impl: None,
+            }),  // Simplified for MVP - TODO: map parsed.language properly
+        };
+
+        // Create CodeEntity
+        let mut code_entity = CodeEntity::new(
+            isgl1_key,
+            interface_signature,
+            CoreEntityClass::CodeImplementation, // Simplified - real impl would detect tests
+        ).unwrap();
+
+        // Populate ISGL1 v2 fields
+        code_entity.birth_timestamp = Some(compute_birth_timestamp(file_path_string, &parsed.name));
+        code_entity.content_hash = Some(compute_content_hash(&code_snippet));
+        code_entity.semantic_path = Some(extract_semantic_path(file_path_string));
+        code_entity.current_code = Some(code_snippet.clone());
+        code_entity.future_code = Some(code_snippet);
+
+        entities_to_upsert.push(code_entity);
+    }
+
+    // Delete unmatched old entities (those that no longer exist in file)
+    let unmatched_keys: Vec<String> = existing_entities
+        .iter()
+        .filter(|e| !matched_keys.contains(&e.isgl1_key))
+        .map(|e| e.isgl1_key.clone())
+        .collect();
+
+    let edges_removed = if !unmatched_keys.is_empty() {
+        storage
+            .delete_edges_by_from_keys(&unmatched_keys)
+            .await
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let entities_removed = if !unmatched_keys.is_empty() {
+        storage
+            .delete_entities_batch_by_keys(&unmatched_keys)
+            .await
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    // Insert/update all entities (CozoDB :put handles upsert)
+    for code_entity in &entities_to_upsert {
+        if let Err(e) = storage.insert_entity(code_entity).await {
+            eprintln!(
+                "[ReindexCore] Warning: Failed to upsert entity '{}': {}",
+                code_entity.interface_signature.name, e
+            );
         }
     }
 
@@ -303,7 +417,9 @@ async fn execute_reindex_with_storage_arc(
         0
     };
 
-    let entities_after = entities_added;
+    // Calculate statistics
+    let entities_added = new_entity_keys.len();
+    let entities_after = entities_before - entities_removed + entities_added;
 
     // Update hash cache
     if let Err(e) = storage

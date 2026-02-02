@@ -62,7 +62,7 @@ end
 
     // RED: This assertion will FAIL - currently returns 0 entities
     assert!(
-        entities.len() > 0,
+        !entities.is_empty(),
         "FAILURE: Ruby extraction produced 0 entities from valid code. \
          Expected: class + methods. \
          This indicates walk_node() falls through to `_ => {{}}` for Ruby."

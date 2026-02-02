@@ -15,12 +15,10 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
 use std::path::Path;
-use std::time::Instant;
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
-use parseltongue_core::entity_conversion::convert_parsed_to_code_entity;
+use crate::incremental_reindex_core_logic::{execute_incremental_reindex_core, IncrementalReindexOperationError};
 
 /// Query parameters for incremental reindex endpoint
 ///
@@ -68,16 +66,6 @@ pub struct IncrementalReindexErrorResponse {
     pub endpoint: String,
 }
 
-/// Compute SHA-256 hash of file content
-///
-/// # 4-Word Name: compute_file_content_hash
-fn compute_file_content_hash(content: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content);
-    let result = hasher.finalize();
-    hex::encode(result)
-}
-
 /// Handle incremental reindex file update request
 ///
 /// # 4-Word Name: handle_incremental_reindex_file_request
@@ -88,16 +76,19 @@ fn compute_file_content_hash(content: &[u8]) -> String {
 /// - Postcondition: Returns diff statistics of what changed
 /// - Performance: <500ms for typical file with <100 entities
 ///
-/// # Algorithm
-/// 1. Read file content, compute SHA-256 hash
-/// 2. Compare hash against cached value (if exists)
-/// 3. If unchanged, return early with hash_changed: false
-/// 4. Query existing entities WHERE file_path == requested_path
-/// 5. Delete those entities and their outgoing edges
-/// 6. Re-parse file (not implemented in this MVP - placeholder)
-/// 7. Insert new entities and edges (not implemented in this MVP)
-/// 8. Update hash cache
-/// 9. Return diff statistics
+/// # Algorithm (ISGL1 v2 with Entity Matching)
+/// 1. Validate path parameter and file existence
+/// 2. Delegate to execute_incremental_reindex_core() which:
+///    - Reads file content, computes SHA-256 hash
+///    - Compares hash against cached value (early return if unchanged)
+///    - Re-parses file using FileParser
+///    - Matches new entities against old entities (ISGL1 v2)
+///    - Preserves keys for matched entities (ContentMatch/PositionMatch)
+///    - Assigns new keys only for truly new entities
+///    - Deletes only unmatched entities and their edges
+///    - Upserts matched/new entities
+///    - Updates hash cache
+/// 3. Map result to HTTP response with diff statistics
 ///
 /// # URL Pattern
 /// - Endpoint: POST /incremental-reindex-file-update?path=/path/to/file.rs
@@ -105,8 +96,6 @@ pub async fn handle_incremental_reindex_file_request(
     State(state): State<SharedApplicationStateContainer>,
     Query(params): Query<IncrementalReindexQueryParams>,
 ) -> impl IntoResponse {
-    let start_time = Instant::now();
-
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
@@ -150,243 +139,46 @@ pub async fn handle_incremental_reindex_file_request(
         ).into_response();
     }
 
-    // Read file content
-    let file_content = match std::fs::read(&params.path) {
-        Ok(content) => content,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(IncrementalReindexErrorResponse {
-                    success: false,
-                    error: format!("Failed to read file: {}", e),
-                    endpoint,
-                }),
-            ).into_response();
-        }
-    };
-
-    // Compute hash
-    let current_hash = compute_file_content_hash(&file_content);
-
-    // Get database connection
-    let db_guard = state.database_storage_connection_arc.read().await;
-    let storage = match db_guard.as_ref() {
-        Some(s) => s,
-        None => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(IncrementalReindexErrorResponse {
-                    success: false,
-                    error: "Database not connected".to_string(),
-                    endpoint,
-                }),
-            ).into_response();
-        }
-    };
-
-    // Ensure FileHashCache schema exists (lazy creation, ignore if already exists)
-    let _ = storage.create_file_hash_cache_schema().await;
-
-    // Check cached hash
-    let cached_hash = storage.get_cached_file_hash_value(&params.path).await.ok().flatten();
-
-    // If hash unchanged, return early
-    if cached_hash.as_ref() == Some(&current_hash) {
-        let processing_time_ms = start_time.elapsed().as_millis() as u64;
-        return (
-            StatusCode::OK,
-            Json(IncrementalReindexSuccessResponse {
-                success: true,
-                endpoint,
-                data: IncrementalReindexDataPayload {
-                    file_path: params.path,
-                    entities_before: 0,
-                    entities_after: 0,
-                    entities_added: 0,
-                    entities_removed: 0,
-                    entities_modified: 0,
-                    edges_added: 0,
-                    edges_removed: 0,
-                    hash_changed: false,
-                    processing_time_ms,
-                },
-            }),
-        ).into_response();
-    }
-
-    // Get existing entities for this file
-    let existing_entities = match storage.get_entities_by_file_path(&params.path).await {
-        Ok(entities) => entities,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(IncrementalReindexErrorResponse {
-                    success: false,
-                    error: format!("Failed to query existing entities: {}", e),
-                    endpoint,
-                }),
-            ).into_response();
-        }
-    };
-
-    let entities_before = existing_entities.len();
-
-    // Collect entity keys for deletion
-    let entity_keys: Vec<String> = existing_entities
-        .iter()
-        .map(|e| e.isgl1_key.clone())
-        .collect();
-
-    // Delete existing edges from these entities
-    let edges_removed = if !entity_keys.is_empty() {
-        match storage.delete_edges_by_from_keys(&entity_keys).await {
-            Ok(count) => count,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(IncrementalReindexErrorResponse {
-                        success: false,
-                        error: format!("Failed to delete edges: {}", e),
-                        endpoint,
-                    }),
-                ).into_response();
-            }
-        }
-    } else {
-        0
-    };
-
-    // Delete existing entities
-    let entities_removed = if !entity_keys.is_empty() {
-        match storage.delete_entities_batch_by_keys(&entity_keys).await {
-            Ok(count) => count,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(IncrementalReindexErrorResponse {
-                        success: false,
-                        error: format!("Failed to delete entities: {}", e),
-                        endpoint,
-                    }),
-                ).into_response();
-            }
-        }
-    } else {
-        0
-    };
-
-    // PRD-2026-01-28: Re-parse file and insert new entities
-    // Uses FileParser from state and entity_conversion module
-    let file_content_str = match String::from_utf8(file_content.clone()) {
-        Ok(s) => s,
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(IncrementalReindexErrorResponse {
-                    success: false,
-                    error: format!("File is not valid UTF-8: {}", e),
-                    endpoint,
-                }),
-            ).into_response();
-        }
-    };
-
-    // Parse file using FileParser from state
-    let (parsed_entities, dependencies) = match state
-        .file_parser_instance_arc
-        .parse_file_to_entities(file_path, &file_content_str)
-    {
-        Ok(result) => result,
-        Err(e) => {
-            // If parsing fails (unsupported language, etc.), just report deletion stats
-            eprintln!("Warning: Failed to re-parse {}: {}", params.path, e);
-            // Return with deletion-only stats
-            let processing_time_ms = start_time.elapsed().as_millis() as u64;
-            return (
+    // Execute core incremental reindex logic
+    match execute_incremental_reindex_core(&params.path, &state).await {
+        Ok(result) => {
+            (
                 StatusCode::OK,
                 Json(IncrementalReindexSuccessResponse {
                     success: true,
                     endpoint,
                     data: IncrementalReindexDataPayload {
-                        file_path: params.path,
-                        entities_before,
-                        entities_after: 0,
-                        entities_added: 0,
-                        entities_removed,
-                        entities_modified: 0,
-                        edges_added: 0,
-                        edges_removed,
-                        hash_changed: true,
-                        processing_time_ms,
+                        file_path: result.file_path,
+                        entities_before: result.entities_before,
+                        entities_after: result.entities_after,
+                        entities_added: result.entities_added,
+                        entities_removed: result.entities_removed,
+                        entities_modified: 0, // Not tracked - would need entity matching to detect
+                        edges_added: result.edges_added,
+                        edges_removed: result.edges_removed,
+                        hash_changed: result.hash_changed,
+                        processing_time_ms: result.processing_time_ms,
                     },
                 }),
-            ).into_response();
+            ).into_response()
         }
-    };
-
-    // Convert ParsedEntity to CodeEntity and insert
-    let mut entities_added = 0usize;
-    for parsed in &parsed_entities {
-        match convert_parsed_to_code_entity(parsed, &file_content_str) {
-            Ok(code_entity) => {
-                if let Err(e) = storage.insert_entity(&code_entity).await {
-                    eprintln!(
-                        "Warning: Failed to insert entity '{}': {}",
-                        parsed.name, e
-                    );
-                } else {
-                    entities_added += 1;
-                }
-            }
-            Err(e) => {
-                eprintln!(
-                    "Warning: Entity conversion failed for '{}': {}",
-                    parsed.name, e
-                );
-            }
+        Err(e) => {
+            let (status_code, error_message) = match e {
+                IncrementalReindexOperationError::FileNotFound(msg) => (StatusCode::NOT_FOUND, msg),
+                IncrementalReindexOperationError::NotAFile(msg) => (StatusCode::BAD_REQUEST, msg),
+                IncrementalReindexOperationError::FileReadError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to read file: {}", msg)),
+                IncrementalReindexOperationError::InvalidUtf8Error(msg) => (StatusCode::BAD_REQUEST, format!("File is not valid UTF-8: {}", msg)),
+                IncrementalReindexOperationError::DatabaseNotConnected => (StatusCode::INTERNAL_SERVER_ERROR, "Database not connected".to_string()),
+                IncrementalReindexOperationError::DatabaseOperationFailed(msg) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Database operation failed: {}", msg)),
+            };
+            (
+                status_code,
+                Json(IncrementalReindexErrorResponse {
+                    success: false,
+                    error: error_message,
+                    endpoint,
+                }),
+            ).into_response()
         }
     }
-
-    // Insert new edges
-    let edges_added = if !dependencies.is_empty() {
-        match storage.insert_edges_batch(&dependencies).await {
-            Ok(()) => dependencies.len(),
-            Err(e) => {
-                eprintln!("Warning: Failed to insert edges: {}", e);
-                0
-            }
-        }
-    } else {
-        0
-    };
-
-    let entities_after = entities_added;
-
-    // Update hash cache
-    if let Err(e) = storage.set_cached_file_hash_value(&params.path, &current_hash).await {
-        // Log error but don't fail the request
-        eprintln!("Warning: Failed to update hash cache: {}", e);
-    }
-
-    let processing_time_ms = start_time.elapsed().as_millis() as u64;
-
-    (
-        StatusCode::OK,
-        Json(IncrementalReindexSuccessResponse {
-            success: true,
-            endpoint,
-            data: IncrementalReindexDataPayload {
-                file_path: params.path,
-                entities_before,
-                entities_after,
-                entities_added,
-                entities_removed,
-                entities_modified: 0, // Not tracked in MVP
-                edges_added,
-                edges_removed,
-                hash_changed: true,
-                processing_time_ms,
-            },
-        }),
-    ).into_response()
 }

@@ -497,6 +497,14 @@ pub struct CodeEntity {
 
     /// Entity classification (v0.9.0: mandatory field)
     pub entity_class: EntityClass,
+
+    // ISGL1 v2: Stable entity identity fields
+    /// Birth timestamp (Unix epoch seconds) - assigned once, never changes
+    pub birth_timestamp: Option<i64>,
+    /// Content hash (SHA-256 hex, 64 chars) for change detection
+    pub content_hash: Option<String>,
+    /// Semantic path (sanitized file path without extension)
+    pub semantic_path: Option<String>,
 }
 
 /// Entity classification for TDD workflow
@@ -648,8 +656,31 @@ impl CodeEntity {
             metadata: EntityMetadata::new()?,
             isgl1_key,
             entity_class, // v0.9.0: mandatory classification
+            // ISGL1 v2 fields (None for backward compatibility)
+            birth_timestamp: None,
+            content_hash: None,
+            semantic_path: None,
         };
 
+        Ok(entity)
+    }
+
+    /// Create entity with ISGL1 v2 fields populated
+    ///
+    /// Use this for new entities in incremental indexing.
+    /// Falls back to v1 constructor if v2 data not available.
+    pub fn new_with_v2_fields(
+        isgl1_key: String,
+        interface_signature: InterfaceSignature,
+        entity_class: EntityClass,
+        birth_timestamp: i64,
+        content_hash: String,
+        semantic_path: String,
+    ) -> Result<Self> {
+        let mut entity = Self::new(isgl1_key, interface_signature, entity_class)?;
+        entity.birth_timestamp = Some(birth_timestamp);
+        entity.content_hash = Some(content_hash);
+        entity.semantic_path = Some(semantic_path);
         Ok(entity)
     }
 
@@ -1411,8 +1442,8 @@ mod tests {
         assert_ne!(key1, key2, "Different timestamps should produce different keys");
 
         // Extract hash parts to verify they're different
-        let hash1 = key1.split('-').last().unwrap();
-        let hash2 = key2.split('-').last().unwrap();
+        let hash1 = key1.split('-').next_back().unwrap();
+        let hash2 = key2.split('-').next_back().unwrap();
         assert_ne!(hash1, hash2, "Hash parts should be different");
     }
 

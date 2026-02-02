@@ -111,7 +111,7 @@ async fn query_entities_with_filter_from_database(
             Ok(named_rows) => {
                 named_rows.rows.iter().filter_map(|row| {
                     // Extract fields from row
-                    let key = row.get(0).and_then(|v| match v {
+                    let key = row.first().and_then(|v| match v {
                         cozo::DataValue::Str(s) => Some(s.to_string()),
                         _ => None,
                     })?;

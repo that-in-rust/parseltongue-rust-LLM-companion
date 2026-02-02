@@ -146,8 +146,21 @@ impl Isgl1KeyGeneratorImpl {
         }
     }
 
-    /// Generate ISGL1 key format: {language}:{type}:{name}:{location}
+    /// Generate ISGL1 v2 key format: {language}:{type}:{name}:{semantic_path}:T{timestamp}
+    ///
+    /// Uses birth timestamp instead of line numbers for stable entity identity.
+    /// This solves the incremental indexing false positive problem where line shifts
+    /// would cause all keys to change.
+    ///
+    /// # ISGL1 v2 Format
+    /// - Old: rust:fn:main:src_main_rs:10-50 (line-based, unstable)
+    /// - New: rust:fn:main:__src_main:T1706284800 (timestamp-based, stable)
     fn format_key(&self, entity: &ParsedEntity) -> String {
+        use parseltongue_core::isgl1_v2::{
+            compute_birth_timestamp,
+            extract_semantic_path,
+        };
+
         let type_str = match entity.entity_type {
             EntityType::Function => "fn",
             EntityType::Class => "class",
@@ -162,18 +175,24 @@ impl Isgl1KeyGeneratorImpl {
             EntityType::Variable => "var",
         };
 
+        // ISGL1 v2: Use semantic path and birth timestamp
+        let semantic_path = extract_semantic_path(&entity.file_path);
+        let birth_timestamp = compute_birth_timestamp(&entity.file_path, &entity.name);
+
         format!(
-            "{}:{}:{}:{}:{}-{}",
+            "{}:{}:{}:{}:T{}",
             entity.language,
             type_str,
             entity.name,
-            self.sanitize_path(&entity.file_path),
-            entity.line_range.0,
-            entity.line_range.1
+            semantic_path,
+            birth_timestamp
         )
     }
 
-    /// Sanitize file path for ISGL1 key
+    /// Sanitize file path for ISGL1 key (DEPRECATED in v2 - use extract_semantic_path)
+    ///
+    /// Kept for backward compatibility but not used in v2 key generation.
+    #[allow(dead_code)]
     fn sanitize_path(&self, path: &str) -> String {
         path.replace(['/', '\\', '.'], "_")
     }
@@ -398,10 +417,11 @@ impl Isgl1KeyGeneratorFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parseltongue_core::entities::EdgeType;
+    
 
     #[test]
     fn test_isgl1_key_format() {
+        // Updated for ISGL1 v2: Keys now use birth timestamps instead of line numbers
         let generator = Isgl1KeyGeneratorImpl::new();
         let entity = ParsedEntity {
             entity_type: EntityType::Function,
@@ -414,7 +434,16 @@ mod tests {
 
         let key = generator.generate_key(&entity).unwrap();
         assert!(key.contains("rust:fn:test_function"));
-        assert!(key.contains("10-15"));
+
+        // v2: Key should have timestamp format (:T followed by number)
+        assert!(key.contains(":T"), "Key should have :T timestamp prefix");
+        assert!(!key.contains("-"), "Key should not contain line range hyphen");
+
+        // Verify full structure: language:type:name:semantic_path:Ttimestamp
+        let parts: Vec<&str> = key.split(':').collect();
+        assert_eq!(parts.len(), 5, "Key should have 5 parts");
+        assert!(parts[3].starts_with("__"), "Semantic path should start with __");
+        assert!(parts[4].starts_with("T"), "Last part should be timestamp");
     }
 
     #[test]

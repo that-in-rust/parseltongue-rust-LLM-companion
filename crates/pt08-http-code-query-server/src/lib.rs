@@ -14,8 +14,9 @@
 pub mod command_line_argument_parser;
 pub mod file_watcher_integration_service;
 pub mod http_server_startup_runner;
-// TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion in parseltongue-core
-// pub mod incremental_reindex_core_logic;
+pub mod initial_scan;
+// v1.5.0: ISGL1 v2 integration complete - re-enabled
+pub mod incremental_reindex_core_logic;
 pub mod port_selection;
 pub mod route_definition_builder_module;
 pub mod structured_error_handling_types;
@@ -24,6 +25,7 @@ pub mod http_endpoint_handler_modules;
 // Re-export main types for convenience
 pub use command_line_argument_parser::HttpServerStartupConfig;
 pub use http_server_startup_runner::{SharedApplicationStateContainer, start_http_server_blocking_loop};
+pub use initial_scan::{execute_initial_codebase_scan, InitialScanStatistics};
 pub use port_selection::{find_and_bind_port_available, PortSelectionError, ValidatedPortNumber};
 pub use route_definition_builder_module::build_complete_router_instance;
 pub use structured_error_handling_types::HttpServerErrorTypes;

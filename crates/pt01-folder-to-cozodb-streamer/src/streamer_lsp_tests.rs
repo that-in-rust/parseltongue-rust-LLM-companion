@@ -5,7 +5,7 @@ mod tests {
     use super::super::*;
     use crate::lsp_client::{HoverResponse, MockRustAnalyzerClient};
     use crate::isgl1_generator::Isgl1KeyGeneratorFactory;
-    use std::path::Path;
+    
     use tempfile::TempDir;
 
     #[tokio::test]

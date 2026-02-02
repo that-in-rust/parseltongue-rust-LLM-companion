@@ -268,11 +268,9 @@ mod pt02_filtering_tests {
     #[test]
     fn test_pt02_filters_code_entities() {
         // Arrange: Create entities with different classifications
-        let entities = vec![
-            create_test_entity("code1.rs", "fn code1()", EntityClass::CodeImplementation),
+        let entities = [create_test_entity("code1.rs", "fn code1()", EntityClass::CodeImplementation),
             create_test_entity("test1.rs", "fn test1()", EntityClass::TestImplementation),
-            create_test_entity("code2.rs", "fn code2()", EntityClass::CodeImplementation),
-        ];
+            create_test_entity("code2.rs", "fn code2()", EntityClass::CodeImplementation)];
 
         // Act: Filter for code entities (simulating PT02 query)
         let code_entities: Vec<_> = entities.iter()
@@ -288,11 +286,9 @@ mod pt02_filtering_tests {
     #[test]
     fn test_pt02_filters_test_entities() {
         // Arrange: Create entities with different classifications
-        let entities = vec![
-            create_test_entity("code1.rs", "fn code1()", EntityClass::CodeImplementation),
+        let entities = [create_test_entity("code1.rs", "fn code1()", EntityClass::CodeImplementation),
             create_test_entity("test1.rs", "fn test1()", EntityClass::TestImplementation),
-            create_test_entity("test2.rs", "fn test2()", EntityClass::TestImplementation),
-        ];
+            create_test_entity("test2.rs", "fn test2()", EntityClass::TestImplementation)];
 
         // Act: Filter for test entities (simulating PT02 query)
         let test_entities: Vec<_> = entities.iter()
@@ -308,11 +304,9 @@ mod pt02_filtering_tests {
     #[test]
     fn test_pt02_dual_output_generation() {
         // Arrange: Create mixed entities
-        let entities = vec![
-            create_test_entity("code1.rs", "fn code1()", EntityClass::CodeImplementation),
+        let entities = [create_test_entity("code1.rs", "fn code1()", EntityClass::CodeImplementation),
             create_test_entity("test1.rs", "fn test1()", EntityClass::TestImplementation),
-            create_test_entity("code2.rs", "fn code2()", EntityClass::CodeImplementation),
-        ];
+            create_test_entity("code2.rs", "fn code2()", EntityClass::CodeImplementation)];
 
         // Act: Separate into code and test outputs (simulating PT02 dual output)
         let code_entities: Vec<_> = entities.iter()

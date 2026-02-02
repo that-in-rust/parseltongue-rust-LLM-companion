@@ -65,6 +65,7 @@ impl CozoDbStorage {
     ///
     /// Implements schema from 01-cozodb-schema.md specification
     /// v0.9.0 Enhancement: Added entity_class column for test/code separation
+    /// v1.5.0 ISGL1 v2: Added birth_timestamp, content_hash, semantic_path
     pub async fn create_schema(&self) -> Result<()> {
         let schema = r#"
             :create CodeGraph {
@@ -81,7 +82,10 @@ impl CozoDbStorage {
                 language: String,
                 last_modified: String,
                 entity_type: String,
-                entity_class: String
+                entity_class: String,
+                birth_timestamp: Int?,
+                content_hash: String?,
+                semantic_path: String?
             }
         "#;
 
@@ -563,7 +567,7 @@ impl CozoDbStorage {
         for row in result.rows {
             if row.len() >= 3 {
                 if let (Some(DataValue::Str(from_key)), Some(DataValue::Str(to_key)), Some(DataValue::Str(edge_type_str))) =
-                    (row.get(0), row.get(1), row.get(2))
+                    (row.first(), row.get(1), row.get(2))
                 {
                     let edge_type = match edge_type_str.as_str() {
                         "Calls" => EdgeType::Calls,
@@ -775,16 +779,16 @@ impl CozoDbStorage {
         let query = r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class] <-
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] <-
             [[$ISGL1_key, $Current_Code, $Future_Code, $interface_signature, $TDD_Classification,
               $lsp_meta_data, $current_ind, $future_ind, $Future_Action, $file_path, $language,
-              $last_modified, $entity_type, $entity_class]]
+              $last_modified, $entity_type, $entity_class, $birth_timestamp, $content_hash, $semantic_path]]
 
             :put CodeGraph {
                 ISGL1_key =>
                 Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
             }
         "#;
 
@@ -805,11 +809,11 @@ impl CozoDbStorage {
         let query = r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class] :=
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] :=
             *CodeGraph{
                 ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
             },
             ISGL1_key == $key
         "#;
@@ -885,11 +889,11 @@ impl CozoDbStorage {
         let query = r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class] :=
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] :=
             *CodeGraph{
                 ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
             },
             Future_Action != null
         "#;
@@ -918,11 +922,11 @@ impl CozoDbStorage {
         let query = r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class] :=
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] :=
             *CodeGraph{
                 ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
             }
         "#;
 
@@ -1089,15 +1093,42 @@ impl CozoDbStorage {
             ),
         );
 
+        // v1.5.0 ISGL1 v2: Add v2 fields
+        params.insert(
+            "birth_timestamp".to_string(),
+            entity
+                .birth_timestamp
+                .map(|ts| DataValue::from(ts as i64))
+                .unwrap_or(DataValue::Null),
+        );
+
+        params.insert(
+            "content_hash".to_string(),
+            entity
+                .content_hash
+                .as_ref()
+                .map(|h| DataValue::Str(h.clone().into()))
+                .unwrap_or(DataValue::Null),
+        );
+
+        params.insert(
+            "semantic_path".to_string(),
+            entity
+                .semantic_path
+                .as_ref()
+                .map(|p| DataValue::Str(p.clone().into()))
+                .unwrap_or(DataValue::Null),
+        );
+
         Ok(params)
     }
 
     /// Convert CozoDB row to CodeEntity
     fn row_to_entity(&self, row: &[DataValue]) -> Result<CodeEntity> {
-        if row.len() < 14 {
+        if row.len() < 17 {
             return Err(ParseltongError::DatabaseError {
                 operation: "row_to_entity".to_string(),
-                details: format!("Invalid row length: expected 14, got {}", row.len()),
+                details: format!("Invalid row length: expected 17 (with v2 fields), got {}", row.len()),
             });
         }
 
@@ -1258,6 +1289,28 @@ impl CozoDbStorage {
         entity.tdd_classification = tdd_classification;
         entity.lsp_metadata = lsp_metadata;
 
+        // v1.5.0 ISGL1 v2: Extract v2 fields (indices 14, 15, 16)
+        entity.birth_timestamp = match &row[14] {
+            DataValue::Num(n) => Some(match n {
+                cozo::Num::Int(i) => *i,
+                cozo::Num::Float(f) => *f as i64,
+            }),
+            DataValue::Null => None,
+            _ => None, // Ignore invalid types
+        };
+
+        entity.content_hash = match &row[15] {
+            DataValue::Str(s) => Some(s.to_string()),
+            DataValue::Null => None,
+            _ => None, // Ignore invalid types
+        };
+
+        entity.semantic_path = match &row[16] {
+            DataValue::Str(s) => Some(s.to_string()),
+            DataValue::Null => None,
+            _ => None, // Ignore invalid types
+        };
+
         Ok(entity)
     }
 
@@ -1306,11 +1359,11 @@ impl CozoDbStorage {
         let query = r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class] :=
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] :=
             *CodeGraph{
                 ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
             },
             file_path == $target_path
         "#;

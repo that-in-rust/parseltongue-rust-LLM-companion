@@ -339,6 +339,31 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     // v1.0.4: Populate languages from database
     state.populate_languages_from_database().await;
 
+    // v1.4.5: Perform initial codebase scan BEFORE starting file watcher
+    // This solves Bug #1: File watchers only detect changes AFTER they start.
+    // Industry standard pattern (rust-analyzer, VS Code, watchman):
+    //   1. Initial scan (manual directory walk)
+    //   2. Event watching (incremental updates)
+    // Reference: /tmp/file_watching_research.md
+    if !db_path.is_empty() && db_path != "mem" {
+        println!("[InitialScan] Performing initial codebase scan...");
+        let watch_dir = &config.target_directory_path_value;
+
+        match crate::initial_scan::execute_initial_codebase_scan(watch_dir, &state).await {
+            Ok(stats) => {
+                println!("[InitialScan] ✓ Initial scan complete:");
+                println!("  {} files indexed in {}ms",
+                    stats.files_processed_success_count,
+                    stats.scan_duration_milliseconds
+                );
+            }
+            Err(e) => {
+                println!("[InitialScan] ⚠ Warning: Initial scan failed: {}", e);
+                println!("  Continuing with file watcher (incremental only)");
+            }
+        }
+    }
+
     // v1.4.2: File watching always enabled - watches current directory
     {
         let watch_dir = config.target_directory_path_value.clone();

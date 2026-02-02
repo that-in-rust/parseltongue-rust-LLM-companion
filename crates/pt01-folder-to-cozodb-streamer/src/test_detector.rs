@@ -25,6 +25,12 @@ pub trait TestDetector: Send + Sync {
 /// Default implementation of test detection
 pub struct DefaultTestDetector;
 
+impl Default for DefaultTestDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultTestDetector {
     pub fn new() -> Self {
         Self

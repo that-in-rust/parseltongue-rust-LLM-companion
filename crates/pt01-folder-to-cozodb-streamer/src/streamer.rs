@@ -177,6 +177,17 @@ impl FileStreamerImpl {
         // Extract the code snippet from the source
         let code_snippet = self.extract_code_snippet(source_code, parsed.line_range.0, parsed.line_range.1);
 
+        // ISGL1 v2: Compute v2 fields BEFORE code_snippet is moved
+        use parseltongue_core::isgl1_v2::{
+            compute_birth_timestamp,
+            compute_content_hash,
+            extract_semantic_path,
+        };
+
+        entity.birth_timestamp = Some(compute_birth_timestamp(&parsed.file_path, &parsed.name));
+        entity.content_hash = Some(compute_content_hash(&code_snippet));
+        entity.semantic_path = Some(extract_semantic_path(&parsed.file_path));
+
         // Set current_code and future_code to the same value (unchanged state)
         entity.current_code = Some(code_snippet.clone());
         entity.future_code = Some(code_snippet);

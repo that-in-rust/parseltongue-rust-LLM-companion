@@ -9,6 +9,10 @@ use thiserror::Error;
 ///
 /// This error type provides structured, actionable error information
 /// for debugging and error recovery strategies.
+///
+/// Note: Custom Clone implementation required due to std::io::Error
+/// not implementing Clone. The io::Error is recreated from its kind
+/// and message during cloning.
 #[derive(Debug, Error)]
 pub enum ParseltongError {
     /// Database-related errors
@@ -141,6 +145,87 @@ pub enum ParseltongError {
     ParserError {
         message: String,
     },
+}
+
+/// Custom Clone implementation for ParseltongError.
+///
+/// Required because std::io::Error does not implement Clone.
+/// The FileSystemError variant recreates the io::Error from its kind and message.
+impl Clone for ParseltongError {
+    fn clone(&self) -> Self {
+        match self {
+            Self::DatabaseError { operation, details } => Self::DatabaseError {
+                operation: operation.clone(),
+                details: details.clone(),
+            },
+            Self::EntityNotFound { isgl1_key } => Self::EntityNotFound {
+                isgl1_key: isgl1_key.clone(),
+            },
+            Self::FileSystemError { path, source } => {
+                // std::io::Error doesn't implement Clone, so we recreate it
+                // from its kind and message
+                let new_io_error = std::io::Error::new(source.kind(), source.to_string());
+                Self::FileSystemError {
+                    path: path.clone(),
+                    source: new_io_error,
+                }
+            },
+            Self::ParseError { reason, location } => Self::ParseError {
+                reason: reason.clone(),
+                location: location.clone(),
+            },
+            Self::TemporalError { details } => Self::TemporalError {
+                details: details.clone(),
+            },
+            Self::InvalidIsgl1Key { key, reason } => Self::InvalidIsgl1Key {
+                key: key.clone(),
+                reason: reason.clone(),
+            },
+            Self::LlmError { reason } => Self::LlmError {
+                reason: reason.clone(),
+            },
+            Self::LspError { details } => Self::LspError {
+                details: details.clone(),
+            },
+            Self::ValidationError { field, expected, actual } => Self::ValidationError {
+                field: field.clone(),
+                expected: expected.clone(),
+                actual: actual.clone(),
+            },
+            Self::PerformanceViolation { constraint, details } => Self::PerformanceViolation {
+                constraint: constraint.clone(),
+                details: details.clone(),
+            },
+            Self::ConfigurationError { details } => Self::ConfigurationError {
+                details: details.clone(),
+            },
+            Self::SerializationError { details } => Self::SerializationError {
+                details: details.clone(),
+            },
+            Self::DependencyError { operation, reason } => Self::DependencyError {
+                operation: operation.clone(),
+                reason: reason.clone(),
+            },
+            Self::CircularDependency { path } => Self::CircularDependency {
+                path: path.clone(),
+            },
+            Self::DuplicateEdge { from_key, to_key, edge_type } => Self::DuplicateEdge {
+                from_key: from_key.clone(),
+                to_key: to_key.clone(),
+                edge_type: edge_type.clone(),
+            },
+            Self::MissingDependencyTarget { from_key, to_key } => Self::MissingDependencyTarget {
+                from_key: from_key.clone(),
+                to_key: to_key.clone(),
+            },
+            Self::UnsupportedLanguage { path } => Self::UnsupportedLanguage {
+                path: path.clone(),
+            },
+            Self::ParserError { message } => Self::ParserError {
+                message: message.clone(),
+            },
+        }
+    }
 }
 
 /// Result type alias for convenience

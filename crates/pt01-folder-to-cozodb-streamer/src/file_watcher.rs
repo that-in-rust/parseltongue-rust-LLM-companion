@@ -274,7 +274,7 @@ impl NotifyFileWatcherProvider {
     /// A new `NotifyFileWatcherProvider` instance ready to watch directories
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// use pt01_folder_to_cozodb_streamer::file_watcher::NotifyFileWatcherProvider;
     ///
     /// let watcher = NotifyFileWatcherProvider::create_notify_watcher_provider();
@@ -435,7 +435,19 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
             "Starting file watcher with debouncing"
         );
 
-        let path_buf = path.to_path_buf();
+        // CRITICAL FIX: macOS FSEvents requires absolute paths!
+        // Canonicalize the path before watching to ensure it works
+        let path_buf = path.canonicalize().map_err(|e| {
+            tracing::error!(
+                path = %path.display(),
+                error = %e,
+                "Failed to canonicalize watch path"
+            );
+            FileWatcherOperationError::WatchPathFailed {
+                path: path.to_path_buf(),
+            }
+        })?;
+
         let is_running = self.is_running.clone();
         let debounce_ms = self.debounce_duration_ms;
 
@@ -459,8 +471,14 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
             Duration::from_millis(debounce_ms),
             None, // No extra timeout
             move |result: DebounceEventResult| {
+                // DEBUG: Log when notify detects file changes
+                eprintln!("[DEBOUNCER] Received event from notify: {:?}", result);
+
                 // Send debounced events through channel (non-blocking)
-                let _ = event_tx.try_send(result);
+                match event_tx.try_send(result) {
+                    Ok(_) => eprintln!("[DEBOUNCER] Successfully sent to channel"),
+                    Err(e) => eprintln!("[DEBOUNCER] ERROR: Failed to send: {:?}", e),
+                }
             },
         )
         .map_err(|e| {
@@ -469,6 +487,7 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
         })?;
 
         // Start watching the path
+        eprintln!("[WATCHER] Starting watch on ABSOLUTE path: {:?}", path_buf.canonicalize().unwrap_or(path_buf.clone()));
         debouncer
             .watcher()
             .watch(&path_buf, RecursiveMode::Recursive)
@@ -482,6 +501,7 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
                     path: path_buf.clone(),
                 }
             })?;
+        eprintln!("[WATCHER] Successfully called .watch() on: {:?}", path_buf);
 
         tracing::debug!(
             path = %path_buf.display(),
@@ -490,14 +510,17 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
 
         // Store debouncer handle to keep it alive
         {
+            eprintln!("[WATCHER] Storing debouncer handle to keep it alive");
             let mut handle_lock = self.debouncer_handle_storage.lock().await;
             *handle_lock = Some(debouncer);
+            eprintln!("[WATCHER] Debouncer handle stored successfully");
         }
 
         is_running.store(true, Ordering::SeqCst);
 
         // Spawn event processing task using extracted helper
         let callback = Arc::new(callback);
+        eprintln!("[WATCHER] Spawning event handler task...");
         let _task_handle = spawn_event_handler_task_now(
             event_rx,
             callback,
@@ -507,6 +530,7 @@ impl FileWatchProviderTrait for NotifyFileWatcherProvider {
             stop_rx,
             is_running.clone(),
         );
+        eprintln!("[WATCHER] Event handler task spawned (task handle created)");
 
         Ok(())
     }
@@ -617,6 +641,7 @@ fn spawn_event_handler_task_now(
     is_running: Arc<AtomicBool>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
+        eprintln!("[EVENT_HANDLER] Task spawned and started - waiting for events...");
         tracing::debug!("File watcher event handler task started");
 
         loop {
@@ -629,6 +654,7 @@ fn spawn_event_handler_task_now(
                 }
                 // Handle debounced file events
                 Some(result) = event_rx.recv() => {
+                    eprintln!("[EVENT_HANDLER] Received event from channel: {:?}", result);
                     match result {
                         Ok(events) => {
                             // Update timestamp

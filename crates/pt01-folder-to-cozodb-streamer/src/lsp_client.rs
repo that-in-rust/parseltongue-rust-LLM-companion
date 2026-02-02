@@ -103,6 +103,13 @@ pub struct MockRustAnalyzerClient {
 }
 
 #[cfg(test)]
+impl Default for MockRustAnalyzerClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
 impl MockRustAnalyzerClient {
     pub fn new() -> Self {
         Self {

@@ -4,7 +4,7 @@
 //!
 //! Blast radius fails because external dependencies don't exist in the database.
 //! When code calls `build_cli()` from an external crate, we create a dependency edge
-//! pointing to `rust:fn:build_cli:unknown:0-0`, but this entity doesn't exist in the
+//! pointing to `rust:fn:build_cli:unresolved-reference:0-0`, but this entity doesn't exist in the
 //! database, causing graph traversal to fail.
 //!
 //! ## Architectural Solution
@@ -228,7 +228,7 @@ mod external_dependency_placeholder_tests {
         todo!("Implement blast radius integration test with external dependencies");
     }
 
-    /// RED TEST 5: Detect both :external-dependency- and :unknown:0-0 patterns
+    /// RED TEST 5: Detect both :external-dependency- and :unresolved-reference:0-0 patterns
     ///
     /// **Phase 1 TDD Test**: Extend extract_placeholders_from_edges_deduplicated()
     ///
@@ -240,7 +240,7 @@ mod external_dependency_placeholder_tests {
     /// - Deduplication works across both patterns
     ///
     /// **Postconditions**:
-    /// - All unknown:0-0 references have placeholder entities
+    /// - All unresolved-reference:0-0 references have placeholder entities
     ///
     /// **Current Status**: RED (will fail - only detects :external-dependency-)
     #[test]
@@ -257,17 +257,17 @@ mod external_dependency_placeholder_tests {
                 edge_type: EdgeType::Uses,
                 source_location: None,
             },
-            // Unknown pattern (unresolved reference)
+            // Unresolved reference pattern (edges now use :unresolved-reference:0-0)
             DependencyEdge {
                 from_key: Isgl1Key::new("rust:fn:main:src/main.rs:20-25").unwrap(),
-                to_key: Isgl1Key::new("rust:fn:build_cli:unknown:0-0").unwrap(),
+                to_key: Isgl1Key::new("rust:fn:build_cli:unresolved-reference:0-0").unwrap(),
                 edge_type: EdgeType::Calls,
                 source_location: None,
             },
-            // Another unknown pattern
+            // Another unresolved reference pattern
             DependencyEdge {
                 from_key: Isgl1Key::new("rust:fn:handler:src/api.rs:30-35").unwrap(),
-                to_key: Isgl1Key::new("rust:struct:Config:unknown:0-0").unwrap(),
+                to_key: Isgl1Key::new("rust:struct:Config:unresolved-reference:0-0").unwrap(),
                 edge_type: EdgeType::Uses,
                 source_location: None,
             },
@@ -296,7 +296,7 @@ mod external_dependency_placeholder_tests {
 
         // Verify unknown pattern creates placeholders
         let unknown_placeholders: Vec<_> = placeholders.iter()
-            .filter(|p| p.isgl1_key.contains(":unknown:0-0"))
+            .filter(|p| p.isgl1_key.contains(":unresolved-reference:0-0"))
             .collect();
 
         assert_eq!(
@@ -311,12 +311,12 @@ mod external_dependency_placeholder_tests {
             .collect();
 
         assert!(
-            keys.contains(&"rust:fn:build_cli:unknown:0-0"),
+            keys.contains(&"rust:fn:build_cli:unresolved-reference:0-0"),
             "Should have build_cli placeholder, got: {:?}",
             keys
         );
         assert!(
-            keys.contains(&"rust:struct:Config:unknown:0-0"),
+            keys.contains(&"rust:struct:Config:unresolved-reference:0-0"),
             "Should have Config placeholder, got: {:?}",
             keys
         );

@@ -391,11 +391,9 @@ mod tests {
         let session_timestamp = Utc.with_ymd_and_hms(2025, 11, 15, 14, 30, 22).unwrap();
 
         // Step 2: Resolve paths for all outputs
-        let outputs = vec![
-            repo_root.join("ISGLevel00.json"),
+        let outputs = [repo_root.join("ISGLevel00.json"),
             repo_root.join("ISGLevel01.json"),
-            repo_root.join("ISGLevel02.json"),
-        ];
+            repo_root.join("ISGLevel02.json")];
 
         let timestamped_paths: Vec<PathBuf> = outputs
             .iter()

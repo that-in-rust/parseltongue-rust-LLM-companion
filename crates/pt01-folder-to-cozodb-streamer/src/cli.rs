@@ -137,12 +137,12 @@ Patterns are simple substring matches (not regex)."),
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::ArgMatches;
+    
 
     #[test]
     fn test_cli_config_parsing() {
         let cli = CliConfig::build_cli();
-        let matches = cli.try_get_matches_from(&[
+        let matches = cli.try_get_matches_from([
             "parseltongue-01",
             "/test/dir",  // Positional argument (matches unified binary)
             "--db",
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let cli = CliConfig::build_cli();
-        let matches = cli.try_get_matches_from(&[
+        let matches = cli.try_get_matches_from([
             "parseltongue-01",
             ".",  // Directory is now required (positional argument)
         ]);
@@ -195,7 +195,7 @@ mod tests {
     fn test_prd_command_format() {
         // Test ultra-minimalist CLI (S01 principle)
         let cli = CliConfig::build_cli();
-        let matches = cli.try_get_matches_from(&[
+        let matches = cli.try_get_matches_from([
             "folder-to-cozoDB-streamer",
             "./src",  // Positional argument (matches unified binary)
             "--db",
@@ -219,7 +219,7 @@ mod tests {
     fn test_exclusion_patterns_cli_contract() {
         // Test REQ-V090-001.0: Exclusion patterns CLI support
         let cli = CliConfig::build_cli();
-        let matches = cli.try_get_matches_from(&[
+        let matches = cli.try_get_matches_from([
             "parseltongue-01",
             "./src",
             "-e", ".ref",
@@ -250,7 +250,7 @@ mod tests {
     fn test_no_exclusion_patterns_default() {
         // Test that defaults work when no -e flags specified
         let cli = CliConfig::build_cli();
-        let matches = cli.try_get_matches_from(&[
+        let matches = cli.try_get_matches_from([
             "parseltongue-01",
             "./src",
         ]);

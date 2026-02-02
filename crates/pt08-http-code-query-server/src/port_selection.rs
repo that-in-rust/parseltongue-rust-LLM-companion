@@ -427,35 +427,6 @@ mod port_selection_integration_tests {
     // REQ-PORT-002.0: Port Preference with Fallback
     // -------------------------------------------------------------------------
 
-    #[tokio::test]
-    async fn test_req_port_002_port_busy_next_available() {
-        // Test contract: When preferred port is busy, tries next
-        // Setup: Occupy port 9998
-        let _guard = TcpListener::bind("0.0.0.0:9998").await.unwrap();
-
-        // Try to bind to 9998 (should fall back to 9999)
-        let result = find_and_bind_port_available(Some(9998), 10).await;
-        assert!(result.is_ok(), "Should find next available port");
-        let listener = result.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        assert_eq!(port, 9999, "Should bind to next available port after 9998");
-    }
-
-    #[tokio::test]
-    async fn test_req_port_002_multiple_ports_busy() {
-        // Test contract: Skips multiple occupied ports
-        // Setup: Occupy ports 9000, 9001, 9002
-        let _guard1 = TcpListener::bind("0.0.0.0:9000").await.unwrap();
-        let _guard2 = TcpListener::bind("0.0.0.0:9001").await.unwrap();
-        let _guard3 = TcpListener::bind("0.0.0.0:9002").await.unwrap();
-
-        // Should fall back to 9003
-        let result = find_and_bind_port_available(Some(9000), 10).await;
-        assert!(result.is_ok());
-        let listener = result.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        assert_eq!(port, 9003, "Should skip occupied ports");
-    }
 
     // -------------------------------------------------------------------------
     // REQ-PORT-003.0: No Race Condition

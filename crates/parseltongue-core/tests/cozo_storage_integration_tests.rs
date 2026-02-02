@@ -94,8 +94,8 @@ async fn test_temporal_state_update() {
 
     // Verify update
     let updated = db.get_entity("test-file-rs-TestStruct").await.unwrap();
-    assert_eq!(updated.temporal_state.current_ind, true);
-    assert_eq!(updated.temporal_state.future_ind, false);
+    assert!(updated.temporal_state.current_ind);
+    assert!(!updated.temporal_state.future_ind);
     assert_eq!(updated.temporal_state.future_action, Some(TemporalAction::Delete));
 }
 
@@ -972,7 +972,7 @@ async fn test_transitive_closure_performance_1k_nodes() {
 
     // Verify correctness
     assert!(
-        result.len() > 0,
+        !result.is_empty(),
         "Should find reachable nodes in connected graph"
     );
 }
@@ -1013,7 +1013,7 @@ async fn test_forward_dependencies_performance_10k_nodes() {
 
     // Verify correctness
     assert!(
-        result.len() > 0,
+        !result.is_empty(),
         "Should find forward dependencies for first node"
     );
 }
