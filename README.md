@@ -1,6 +1,5 @@
 # Parseltongue
 
-> **v1.4.3** - Parse once, query forever. A local HTTP backend that makes any LLM agent understand your codebase.
 
 ```bash
 # Index your codebase
