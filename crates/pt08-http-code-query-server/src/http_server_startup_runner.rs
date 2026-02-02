@@ -47,6 +47,18 @@ pub struct SharedApplicationStateContainer {
     ///
     /// Tracks file watcher state for status endpoint.
     pub file_watcher_status_metadata_arc: Arc<RwLock<FileWatcherStatusMetadata>>,
+
+    /// File watcher service instance (kept alive for server lifetime)
+    ///
+    /// # 4-Word Name: watcher_service_instance_arc
+    ///
+    /// CRITICAL FIX (v1.4.6): Stores the file watcher service to prevent it from being dropped.
+    /// Without this field, the service created in start_http_server_blocking_loop() would go
+    /// out of scope at line 432 and be dropped, silently killing the filesystem watcher while
+    /// the event handler runs forever waiting for events that never arrive.
+    ///
+    /// Bug Report: docs/File-Watcher-Debug-20260202.md
+    pub watcher_service_instance_arc: Arc<RwLock<Option<crate::file_watcher_integration_service::ProductionFileWatcherService>>>,
 }
 
 /// Codebase statistics metadata
@@ -132,6 +144,7 @@ impl SharedApplicationStateContainer {
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
             // file_parser_instance_arc: Arc::new(parser),
             file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
+            watcher_service_instance_arc: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -152,6 +165,7 @@ impl SharedApplicationStateContainer {
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
             // file_parser_instance_arc: Arc::new(parser),
             file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
+            watcher_service_instance_arc: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -255,6 +269,24 @@ impl SharedApplicationStateContainer {
                 let mut stats = self.codebase_statistics_metadata_arc.write().await;
                 stats.languages_detected_list_vec = languages;
             }
+        }
+    }
+
+    /// Check if file watcher service is active
+    ///
+    /// # 4-Word Name: is_file_watcher_active
+    ///
+    /// Returns true if a file watcher service instance is stored and running.
+    /// Used for health check endpoint to verify watcher didn't silently die.
+    ///
+    /// # v1.4.6 Fix
+    /// Added as part of file watcher lifetime bug fix to provide observability.
+    pub async fn is_file_watcher_active(&self) -> bool {
+        let service_guard = self.watcher_service_instance_arc.read().await;
+        if let Some(ref service) = *service_guard {
+            service.check_service_running_status()
+        } else {
+            false
         }
     }
 }
@@ -402,7 +434,16 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
         match watcher_service.start_file_watcher_service().await {
             Ok(()) => {
                 println!("✓ File watcher started: {}", watch_dir.display());
-                println!("  Monitoring: .rs, .py, .js, .ts, .go, .java files");
+                println!("  Monitoring: 14 extensions across 12 languages (.rs, .py, .js, .ts, .go, .java, .c, .h, .cpp, .hpp, .rb, .php, .cs, .swift)");
+
+                // CRITICAL FIX (v1.4.6): Store service to keep it alive for server lifetime
+                // Without this, watcher_service goes out of scope at line 432 and is dropped,
+                // silently killing the filesystem watcher while event handler runs forever.
+                // Bug Report: docs/File-Watcher-Debug-20260202.md
+                {
+                    let mut service_arc = state.watcher_service_instance_arc.write().await;
+                    *service_arc = Some(watcher_service);
+                }
 
                 // Update file watcher status metadata
                 {

@@ -21,6 +21,8 @@ pub struct HealthCheckResponsePayload {
     pub status: String,
     pub server_uptime_seconds_count: i64,
     pub endpoint: String,
+    /// File watcher service active status (v1.4.6)
+    pub file_watcher_active: bool,
 }
 
 /// Handle server health check status request
@@ -42,10 +44,14 @@ pub async fn handle_server_health_check_status(
         .signed_duration_since(state.server_start_timestamp_utc)
         .num_seconds();
 
+    // v1.4.6: Check if file watcher is active
+    let file_watcher_active = state.is_file_watcher_active().await;
+
     Json(HealthCheckResponsePayload {
         success: true,
         status: "ok".to_string(),
         server_uptime_seconds_count: uptime,
         endpoint: "/server-health-check-status".to_string(),
+        file_watcher_active,
     })
 }
