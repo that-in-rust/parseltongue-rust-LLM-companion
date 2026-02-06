@@ -553,6 +553,7 @@ impl QueryBasedExtractor {
                     || capture_name.contains("type_ref")
                     || capture_name.contains("property_access")
                     || capture_name.contains("attribute_access")
+                    || capture_name.contains("field_access")
                     || capture_name.contains("decorator")
                     || capture_name.contains("type_generic")
                     || capture_name.contains("type_simple")
