@@ -184,7 +184,7 @@ pub struct TemporalQuery {
 #[async_trait]
 pub trait LanguageParser: Send + Sync {
     /// Parse a file and extract entities
-    async fn parse_file(&self, file_path: &PathBuf) -> Result<Vec<InterfaceChunk>>;
+    async fn parse_file(&self, file_path: &std::path::Path) -> Result<Vec<InterfaceChunk>>;
 
     /// Extract interfaces from source code
     async fn extract_interfaces(&self, code: &str, language: Language) -> Result<Vec<InterfaceChunk>>;

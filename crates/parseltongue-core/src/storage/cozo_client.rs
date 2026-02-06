@@ -1255,7 +1255,7 @@ impl CozoDbStorage {
             "birth_timestamp".to_string(),
             entity
                 .birth_timestamp
-                .map(|ts| DataValue::from(ts as i64))
+                .map(DataValue::from)
                 .unwrap_or(DataValue::Null),
         );
 

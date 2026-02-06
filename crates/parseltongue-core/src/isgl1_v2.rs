@@ -69,10 +69,7 @@ pub fn extract_semantic_path(file_path: &str) -> String {
 
     // Replace path separators and special chars with underscore
     let sanitized = without_ext
-        .replace('/', "_")
-        .replace('\\', "_")
-        .replace('-', "_")
-        .replace('.', "_");
+        .replace(['/', '\\', '-', '.'], "_");
 
     // Add leading underscores (ISGL1 convention)
     format!("__{}", sanitized)

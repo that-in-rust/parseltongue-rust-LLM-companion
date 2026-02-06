@@ -310,6 +310,8 @@ impl Isgl1KeyGeneratorImpl {
             // Check if this line is a test attribute
             if trimmed == "#[test]" || trimmed == "#[tokio::test]" || trimmed == "#[async_test]" {
                 // Look for entity on next non-attribute line
+                // Using index-based loop intentionally - we need next_idx for entity_line calculation
+                #[allow(clippy::needless_range_loop)]
                 for next_idx in (idx + 1)..lines.len() {
                     let next_line = lines[next_idx].trim();
 
@@ -409,6 +411,7 @@ pub struct Isgl1KeyGeneratorFactory;
 
 impl Isgl1KeyGeneratorFactory {
     /// Create new ISGL1 key generator instance
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> Arc<dyn Isgl1KeyGenerator> {
         Arc::new(Isgl1KeyGeneratorImpl::new())
     }
