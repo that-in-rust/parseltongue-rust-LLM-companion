@@ -577,25 +577,16 @@ impl FileStreamer for FileStreamerImpl {
         // so that dependency edges have valid targets and blast radius queries work.
         let external_placeholders = extract_placeholders_from_edges_deduplicated(&dependencies);
 
-        // Store external dependency placeholders first (before processing regular entities)
+        // Collect all entities to insert (external placeholders + regular entities)
+        let mut entities_to_insert: Vec<CodeEntity> = Vec::new();
+
+        // Add external dependency placeholders first
         for placeholder in external_placeholders {
-            match self.db.insert_entity(&placeholder).await {
-                Ok(_) => {
-                    entities_created += 1;
-                    code_count += 1; // External dependencies count as CODE entities
-                }
-                Err(e) => {
-                    // Graceful degradation: don't fail entire file if one placeholder fails
-                    let error_msg = format!(
-                        "Failed to insert external dependency placeholder {}: {}",
-                        placeholder.isgl1_key, e
-                    );
-                    errors.push(error_msg);
-                }
-            }
+            entities_to_insert.push(placeholder);
+            code_count += 1; // External dependencies count as CODE entities
         }
 
-        // Process each parsed entity
+        // Process each parsed entity and collect them for batch insertion
         for parsed_entity in parsed_entities {
             // Generate ISGL1 key
             let isgl1_key = self.key_generator.generate_key(&parsed_entity)?;
@@ -620,20 +611,29 @@ impl FileStreamer for FileStreamerImpl {
                         continue; // Don't insert tests into database
                     }
 
-                    // Store in real database (CODE entities only)
-                    match self.db.insert_entity(&code_entity).await {
-                        Ok(_) => {
-                            entities_created += 1;
-                            code_count += 1; // v0.9.6: Only CODE entities reach here
-                        }
-                        Err(e) => {
-                            let error_msg = format!("Failed to insert entity {}: {}", isgl1_key, e);
-                            errors.push(error_msg);
-                        }
-                    }
+                    // Add to batch insertion list (CODE entities only)
+                    entities_to_insert.push(code_entity);
+                    code_count += 1; // v0.9.6: Only CODE entities reach here
                 }
                 Err(e) => {
                     let error_msg = format!("Failed to convert entity {}: {}", isgl1_key, e);
+                    errors.push(error_msg);
+                }
+            }
+        }
+
+        // Batch insert all entities at once (external placeholders + regular entities)
+        if !entities_to_insert.is_empty() {
+            match self.db.insert_entities_batch(&entities_to_insert).await {
+                Ok(_) => {
+                    entities_created += entities_to_insert.len();
+                }
+                Err(e) => {
+                    let error_msg = format!(
+                        "Failed to batch insert {} entities: {}",
+                        entities_to_insert.len(),
+                        e
+                    );
                     errors.push(error_msg);
                 }
             }
