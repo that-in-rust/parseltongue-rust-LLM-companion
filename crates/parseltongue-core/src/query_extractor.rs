@@ -540,6 +540,8 @@ impl QueryBasedExtractor {
                     || capture_name.contains("collection_operation")
                     || capture_name.contains("async_call")
                     || capture_name.contains("async_method")
+                    || capture_name.contains("await_call")
+                    || capture_name.contains("await_method")
                     || capture_name.contains("promise_op")
                     || capture_name.contains("promise_operation")
                 {
@@ -550,6 +552,10 @@ impl QueryBasedExtractor {
                     || capture_name.contains("import")
                     || capture_name.contains("type_ref")
                     || capture_name.contains("property_access")
+                    || capture_name.contains("attribute_access")
+                    || capture_name.contains("decorator")
+                    || capture_name.contains("type_generic")
+                    || capture_name.contains("type_simple")
                     || capture_name.contains("generic_type")
                 {
                     dependency_type = Some(EdgeType::Uses);
