@@ -1,4 +1,4 @@
-; C Dependency Queries (v0.9.0)
+; C Dependency Queries (v1.4.9)
 
 ; Function calls
 (call_expression
@@ -10,3 +10,7 @@
 
 (preproc_include
   path: (system_lib_string) @reference.include_system) @dependency.include_system
+
+; Field access (arrow and dot operators)
+(field_expression
+  field: (field_identifier) @reference.field_access) @dependency.field_access

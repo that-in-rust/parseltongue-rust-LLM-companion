@@ -17,7 +17,3 @@
 ; Enums
 (enum_specifier
   name: (type_identifier) @name) @definition.enum
-
-; Namespaces
-(namespace_definition
-  name: (identifier) @name) @definition.namespace
