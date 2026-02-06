@@ -30,6 +30,7 @@ use anyhow::{Context, Result};
 use tree_sitter::{Query, QueryCursor, Tree, Parser, StreamingIterator};
 
 use crate::entities::{Language, DependencyEdge, EdgeType};
+use crate::isgl1_v2::{compute_birth_timestamp, extract_semantic_path};
 
 /// Parsed code entity representation
 #[derive(Debug, Clone)]
@@ -532,13 +533,30 @@ impl QueryBasedExtractor {
             if capture_name.starts_with("dependency.") {
                 location = Some(format!("{}:{}", file_path.display(), node.start_position().row + 1));
 
-                if capture_name.contains("call") || capture_name.contains("method_call") {
+                if capture_name.contains("call")
+                    || capture_name.contains("method_call")
+                    || capture_name.contains("constructor")
+                    || capture_name.contains("collection_op")
+                    || capture_name.contains("collection_operation")
+                    || capture_name.contains("async_call")
+                    || capture_name.contains("async_method")
+                    || capture_name.contains("promise_op")
+                    || capture_name.contains("promise_operation")
+                {
                     dependency_type = Some(EdgeType::Calls);
                     // For calls, find containing function
                     from_entity = self.find_containing_entity(node, entities);
-                } else if capture_name.contains("use") || capture_name.contains("import") || capture_name.contains("type_ref") {
+                } else if capture_name.contains("use")
+                    || capture_name.contains("import")
+                    || capture_name.contains("type_ref")
+                    || capture_name.contains("property_access")
+                    || capture_name.contains("generic_type")
+                {
                     dependency_type = Some(EdgeType::Uses);
-                } else if capture_name.contains("implement") || capture_name.contains("inherits") {
+                } else if capture_name.contains("implement")
+                    || capture_name.contains("inherits")
+                    || capture_name.contains("extends")
+                {
                     dependency_type = Some(EdgeType::Implements);
                 }
             }
@@ -594,14 +612,19 @@ impl QueryBasedExtractor {
 
             // For Calls and Implements, we need a from_entity
             if let Some(from) = from_entity {
+                // Bug Fix: Use ISGL1 v2 format with semantic path and birth timestamp
+                // Old format: rust:fn:name:path:10-20 (line-range based)
+                // New format: rust:fn:name:__semantic_path:T1234567890 (timestamp based)
+                let semantic_path = extract_semantic_path(&from.file_path);
+                let birth_timestamp = compute_birth_timestamp(&from.file_path, &from.name);
+
                 let from_key = format!(
-                    "{}:{}:{}:{}:{}-{}",
+                    "{}:{}:{}:{}:T{}",
                     language,
                     self.entity_type_to_key_component(&from.entity_type),
                     from.name,
-                    sanitize_path_for_key_format(&from.file_path),
-                    from.line_range.0,
-                    from.line_range.1
+                    semantic_path,
+                    birth_timestamp
                 );
 
                 let to_key = format!(
