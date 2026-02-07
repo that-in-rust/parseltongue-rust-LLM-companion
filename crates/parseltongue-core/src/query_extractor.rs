@@ -74,6 +74,27 @@ fn sanitize_path_for_key_format(path: &str) -> String {
     path.replace(['/', '\\', '.'], "_")
 }
 
+/// Sanitize qualified names for ISGL1 key format compliance
+///
+/// **Four-Word Naming**: sanitize_name_double_colon
+/// - sanitize: verb (transform input to valid format)
+/// - name: target (what we're sanitizing)
+/// - double: constraint (specifically :: patterns)
+/// - colon: qualifier (the delimiter being replaced)
+///
+/// ISGL1 v2 uses : as delimiter, expects 5 parts. Languages like C++, Rust,
+/// C#, and Ruby use :: in qualified names which breaks parsing.
+///
+/// # Examples
+/// ```
+/// # use parseltongue_core::query_extractor::sanitize_name_double_colon;
+/// assert_eq!(sanitize_name_double_colon("std::vector"), "std__vector");
+/// assert_eq!(sanitize_name_double_colon("ActiveRecord::Base"), "ActiveRecord__Base");
+/// ```
+fn sanitize_name_double_colon(name: &str) -> String {
+    name.replace("::", "__")
+}
+
 /// Parse external dependency from full use path
 ///
 /// **Four-Word Naming**: parse_external_dependency_from_path
@@ -587,6 +608,32 @@ impl QueryBasedExtractor {
             }
         }
 
+        // Debug logging for zero edge investigation (v1.5.1 BUG-002/BUG-003)
+        if matches!(language, Language::Rust | Language::Ruby) {
+            if let Some(ref to) = to_name {
+                eprintln!("[DEBUG-EDGE] Language: {:?}", language);
+                eprintln!("[DEBUG-EDGE] To: {}", to);
+
+                // Find the first node to get line number
+                if let Some(first_capture) = m.captures.first() {
+                    eprintln!("[DEBUG-EDGE] Node line: {}", first_capture.node.start_position().row + 1);
+                }
+
+                if let Some(ref dtype) = dependency_type {
+                    eprintln!("[DEBUG-EDGE] Edge type: {:?}", dtype);
+                } else {
+                    eprintln!("[DEBUG-EDGE] ❌ NO dependency_type identified");
+                }
+
+                if let Some(ref from) = from_entity {
+                    eprintln!("[DEBUG-EDGE] ✅ Found from_entity: {} (type: {:?})",
+                        from.name, from.entity_type);
+                } else {
+                    eprintln!("[DEBUG-EDGE] ❌ NO from_entity found");
+                }
+            }
+        }
+
         // Build DependencyEdge if we have enough information
         if let (Some(edge_type), Some(to)) = (dependency_type, to_name) {
             // For Uses edges (imports, use declarations), create simplified keys
@@ -598,14 +645,14 @@ impl QueryBasedExtractor {
                     // Try to parse as external dependency
                     if let Some((crate_name, item_name)) = parse_external_dependency_from_path(&full_path) {
                         // External dependency: rust:module:Parser:external-dependency-clap:0-0
-                        format!("{}:module:{}:external-dependency-{}:0-0", language, item_name, crate_name)
+                        format!("{}:module:{}:external-dependency-{}:0-0", language, sanitize_name_double_colon(&item_name), crate_name)
                     } else {
                         // Stdlib or local: rust:module:HashMap:0-0
-                        format!("{}:module:{}:0-0", language, to)
+                        format!("{}:module:{}:0-0", language, sanitize_name_double_colon(&to))
                     }
                 } else {
                     // Fallback: rust:module:Parser:0-0
-                    format!("{}:module:{}:0-0", language, to)
+                    format!("{}:module:{}:0-0", language, sanitize_name_double_colon(&to))
                 };
 
                 return DependencyEdge::builder()
@@ -637,7 +684,7 @@ impl QueryBasedExtractor {
                 let to_key = format!(
                     "{}:fn:{}:unresolved-reference:0-0",
                     language,
-                    to
+                    sanitize_name_double_colon(&to)
                 );
 
                 return DependencyEdge::builder()
@@ -715,5 +762,43 @@ impl QueryBasedExtractor {
             EntityType::Typedef => "typedef",
             EntityType::Namespace => "namespace",
         }
+    }
+}
+
+#[cfg(test)]
+mod sanitization_tests {
+    use super::sanitize_name_double_colon;
+
+    #[test]
+    fn test_sanitize_empty_string() {
+        assert_eq!(sanitize_name_double_colon(""), "");
+    }
+
+    #[test]
+    fn test_sanitize_no_colons() {
+        assert_eq!(sanitize_name_double_colon("HashMap"), "HashMap");
+    }
+
+    #[test]
+    fn test_sanitize_single_double_colon() {
+        assert_eq!(sanitize_name_double_colon("std::vector"), "std__vector");
+    }
+
+    #[test]
+    fn test_sanitize_multiple_double_colons() {
+        assert_eq!(
+            sanitize_name_double_colon("std::collections::HashMap"),
+            "std__collections__HashMap"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_leading_double_colon() {
+        assert_eq!(sanitize_name_double_colon("::Global"), "__Global");
+    }
+
+    #[test]
+    fn test_sanitize_trailing_double_colon() {
+        assert_eq!(sanitize_name_double_colon("Module::"), "Module__");
     }
 }

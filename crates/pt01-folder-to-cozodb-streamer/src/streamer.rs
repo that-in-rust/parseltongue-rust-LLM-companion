@@ -651,12 +651,43 @@ impl FileStreamer for FileStreamerImpl {
 
         // Batch insert dependencies after all entities are stored
         if !dependencies.is_empty() {
+            // Debug logging for v1.5.1 investigation
+            let rust_edges_count = dependencies.iter().filter(|e| {
+                let key_str: &str = e.from_key.as_ref();
+                key_str.starts_with("rust:")
+            }).count();
+            let ruby_edges_count = dependencies.iter().filter(|e| {
+                let key_str: &str = e.from_key.as_ref();
+                key_str.starts_with("ruby:")
+            }).count();
+            if rust_edges_count > 0 || ruby_edges_count > 0 {
+                eprintln!("[DEBUG-INSERT] About to insert {} total edges", dependencies.len());
+                eprintln!("[DEBUG-INSERT] Rust edges: {}", rust_edges_count);
+                eprintln!("[DEBUG-INSERT] Ruby edges: {}", ruby_edges_count);
+
+                // Log first 3 Rust edges to see their actual keys
+                eprintln!("[DEBUG-INSERT] Sample Rust edge keys:");
+                for (i, edge) in dependencies.iter().filter(|e| {
+                    let key_str: &str = e.from_key.as_ref();
+                    key_str.starts_with("rust:")
+                }).take(3).enumerate() {
+                    let from_key: &str = edge.from_key.as_ref();
+                    let to_key: &str = edge.to_key.as_ref();
+                    eprintln!("[DEBUG-INSERT]   #{}: from={} to={} type={:?}",
+                        i + 1, from_key, to_key, edge.edge_type);
+                }
+            }
+
             // Insert dependency edges
             match self.db.insert_edges_batch(&dependencies).await {
                 Ok(_) => {
                     // Successfully inserted dependencies
+                    if rust_edges_count > 0 || ruby_edges_count > 0 {
+                        eprintln!("[DEBUG-INSERT] ✅ Successfully inserted edges");
+                    }
                 }
                 Err(e) => {
+                    eprintln!("[DEBUG-INSERT] ❌ FAILED to insert edges: {}", e);
                     errors.push(format!("Failed to insert {} dependencies: {}", dependencies.len(), e));
                 }
             }
