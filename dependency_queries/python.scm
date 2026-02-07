@@ -79,16 +79,76 @@
   name: (identifier) @context.class_name)
 
 ; ============================================================================
+; DEPENDENCY TYPE 4: Attribute Access (v1.4.9)
+; ============================================================================
+
+; Attribute access: obj.name (property access)
+(attribute
+  attribute: (identifier) @reference.attribute_access) @dependency.attribute_access
+
+; ============================================================================
+; DEPENDENCY TYPE 5: Decorators (v1.4.9)
+; ============================================================================
+
+; Simple decorator: @property
+(decorator
+  (identifier) @reference.decorator) @dependency.decorator
+
+; Decorator call: @app.route("/")
+(decorator
+  (call
+    function: (attribute
+      attribute: (identifier) @reference.decorator_call))) @dependency.decorator_call
+
+; Decorator with dotted name: @app.route
+(decorator
+  (attribute
+    attribute: (identifier) @reference.decorator_dotted)) @dependency.decorator_dotted
+
+; ============================================================================
+; DEPENDENCY TYPE 6: Async/Await (v1.4.9)
+; ============================================================================
+
+; Await expression: await fetch_data()
+(await
+  (call
+    function: (identifier) @reference.await_call)) @dependency.await_call
+
+; Await method call: await obj.method()
+(await
+  (call
+    function: (attribute
+      attribute: (identifier) @reference.await_method))) @dependency.await_method
+
+; ============================================================================
+; DEPENDENCY TYPE 7: Type Hints (v1.4.9)
+; ============================================================================
+
+; Generic type annotation: List[str]
+(type
+  (subscript
+    value: (identifier) @reference.type_generic)) @dependency.type_generic
+
+; Simple type annotation: name: str
+(type
+  (identifier) @reference.type_simple) @dependency.type_simple
+
+; ============================================================================
 ; NOTES
 ; ============================================================================
 ;
 ; Python-specific considerations:
 ; - Dynamic imports (importlib) not captured (runtime only)
-; - Decorators could be added if needed
-; - Type hints could provide additional dependency information
+; - Decorators: captured as dependencies (v1.4.9)
+; - Type hints: captured for generic types (v1.4.9)
+; - Attribute access: distinguishes property access from method calls (v1.4.9)
 ;
 ; Parseltongue EdgeType mapping:
 ; - @dependency.import* → EdgeType::Uses
 ; - @dependency.call → EdgeType::Calls
 ; - @dependency.method_call → EdgeType::Calls
 ; - @dependency.inherits → EdgeType::Implements (semantic equivalence)
+; - @dependency.attribute_access → EdgeType::Uses (v1.4.9)
+; - @dependency.decorator* → EdgeType::Uses (v1.4.9)
+; - @dependency.await_* → EdgeType::Calls (v1.4.9)
+; - @dependency.type_* → EdgeType::Uses (v1.4.9)

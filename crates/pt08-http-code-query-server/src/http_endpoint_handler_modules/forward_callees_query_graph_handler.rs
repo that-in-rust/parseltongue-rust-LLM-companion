@@ -148,41 +148,45 @@ async fn query_forward_callees_direct_method(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
 ) -> Vec<CalleeEdgeDataPayload> {
-    let db_guard = state.database_storage_connection_arc.read().await;
-    if let Some(storage) = db_guard.as_ref() {
-        // Escape entity key for CozoDB query
-        let escaped_entity_key = entity_key
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"");
-
-        // Query for edges where this entity is the source (from_key)
-        let query = format!(
-            r#"
-            ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-                from_key == "{}"
-            "#,
-            escaped_entity_key
-        );
-
-        match storage.raw_query(&query).await {
-            Ok(result) => {
-                let mut callees = Vec::new();
-                for row in result.rows {
-                    if row.len() >= 4 {
-                        callees.push(CalleeEdgeDataPayload {
-                            from_key: extract_string_value(&row[0]).unwrap_or_else(|| entity_key.to_string()),
-                            to_key: extract_string_value(&row[1]).unwrap_or_else(|| "Unknown".to_string()),
-                            edge_type: extract_string_value(&row[2]).unwrap_or_else(|| "Unknown".to_string()),
-                            source_location: extract_string_value(&row[3]).unwrap_or_else(|| "unknown".to_string()),
-                        });
-                    }
-                }
-                callees
-            }
-            Err(_) => Vec::new(),
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return Vec::new(),
         }
-    } else {
-        Vec::new()
+    }; // Lock released here
+
+    // Escape entity key for CozoDB query
+    let escaped_entity_key = entity_key
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+
+    // Query for edges where this entity is the source (from_key)
+    let query = format!(
+        r#"
+        ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+            from_key == "{}"
+        "#,
+        escaped_entity_key
+    );
+
+    match storage.raw_query(&query).await {
+        Ok(result) => {
+            let mut callees = Vec::new();
+            for row in result.rows {
+                if row.len() >= 4 {
+                    callees.push(CalleeEdgeDataPayload {
+                        from_key: extract_string_value(&row[0]).unwrap_or_else(|| entity_key.to_string()),
+                        to_key: extract_string_value(&row[1]).unwrap_or_else(|| "Unknown".to_string()),
+                        edge_type: extract_string_value(&row[2]).unwrap_or_else(|| "Unknown".to_string()),
+                        source_location: extract_string_value(&row[3]).unwrap_or_else(|| "unknown".to_string()),
+                    });
+                }
+            }
+            callees
+        }
+        Err(_) => Vec::new(),
     }
 }
 

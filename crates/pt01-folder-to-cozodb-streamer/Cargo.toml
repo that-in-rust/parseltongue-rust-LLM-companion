@@ -36,6 +36,7 @@ tree-sitter-scala.workspace = true
 
 # Storage dependencies
 cozo = { workspace = true }
+rayon = { workspace = true }
 
 # CLI dependencies
 clap = { workspace = true, features = ["derive"] }

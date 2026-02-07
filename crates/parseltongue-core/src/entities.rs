@@ -50,7 +50,7 @@ impl Language {
     }
 
     /// Detect language from file path
-    pub fn from_file_path(path: &PathBuf) -> Option<Self> {
+    pub fn from_file_path(path: &std::path::Path) -> Option<Self> {
         let extension = path.extension()?.to_str()?;
 
         [

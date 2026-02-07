@@ -28,10 +28,9 @@ demo-walkthroughs/*/contexts/
 parseltongue-v*-macos-arm64
 /parseltongue
 
-# Workspace directories (timestamped analysis outputs)
-parseltongue*/
-parseltongue20*/
-parseltongue_*/
+# Workspace directories (timestamped analysis outputs) - anchored to root
+/parseltongue[0-9]*/
+/parseltongue_*/
 
 # Organized artifacts (preserved in artifacts/ directory)
 artifacts/

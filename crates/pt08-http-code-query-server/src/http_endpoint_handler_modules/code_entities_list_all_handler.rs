@@ -93,21 +93,27 @@ async fn query_entities_with_filter_from_database(
     state: &SharedApplicationStateContainer,
     entity_type_filter: Option<String>,
 ) -> Vec<EntitySummaryListItem> {
-    let db_guard = state.database_storage_connection_arc.read().await;
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return Vec::new(),
+        }
+    }; // Lock released here
 
-    if let Some(storage) = db_guard.as_ref() {
-        // Build query based on whether we have a filter
-        let query = match entity_type_filter {
-            Some(filter) => format!(
-                "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language}}, entity_type == \"{}\"",
-                filter.replace('"', "\\\"")
-            ),
-            None => "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}".to_string(),
-        };
+    // Build query based on whether we have a filter
+    let query = match entity_type_filter {
+        Some(filter) => format!(
+            "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language}}, entity_type == \"{}\"",
+            filter.replace('"', "\\\"")
+        ),
+        None => "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}".to_string(),
+    };
 
-        let result = storage.raw_query(&query).await;
+    let result = storage.raw_query(&query).await;
 
-        match result {
+    match result {
             Ok(named_rows) => {
                 named_rows.rows.iter().filter_map(|row| {
                     // Extract fields from row
@@ -140,10 +146,7 @@ async fn query_entities_with_filter_from_database(
                         language,
                     })
                 }).collect()
-            }
-            Err(_) => Vec::new(),
         }
-    } else {
-        Vec::new()
+        Err(_) => Vec::new(),
     }
 }

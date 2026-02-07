@@ -187,11 +187,14 @@ async fn compute_blast_radius_by_hops(
     source_entity: &str,
     max_hops: usize,
 ) -> Vec<BlastRadiusHopDataItem> {
-    let db_guard = state.database_storage_connection_arc.read().await;
-    let storage = match db_guard.as_ref() {
-        Some(s) => s,
-        None => return Vec::new(),
-    };
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return Vec::new(),
+        }
+    }; // Lock released here
 
     let mut result: Vec<BlastRadiusHopDataItem> = Vec::new();
     let mut visited: HashSet<String> = HashSet::new();

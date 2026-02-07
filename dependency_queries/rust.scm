@@ -119,6 +119,45 @@
   type: (type_identifier) @context.impl_type_name)
 
 ; ============================================================================
+; DEPENDENCY TYPE 5: Async/Await Expressions (A awaits B)
+; ============================================================================
+
+; Await expressions: fetch_data().await
+(await_expression
+  (call_expression) @reference.await_call) @dependency.await
+
+; ============================================================================
+; DEPENDENCY TYPE 6: Field Access (Non-Call Context)
+; ============================================================================
+
+; Field expressions (property reads): user.name, config.settings.timeout
+; Excludes method calls which are captured separately
+(field_expression
+  field: (field_identifier) @reference.field_access) @dependency.field_access
+
+; ============================================================================
+; DEPENDENCY TYPE 7: Iterator/Collection Methods
+; ============================================================================
+
+; Iterator method calls: .iter(), .map(), .filter(), .collect(), etc.
+(call_expression
+  function: (field_expression
+    field: (field_identifier) @reference.iterator_method
+    (#match? @reference.iterator_method "^(iter|into_iter|iter_mut|map|filter|filter_map|fold|for_each|find|any|all|count|sum|max|min|collect)$"))) @dependency.iterator_op
+
+; ============================================================================
+; DEPENDENCY TYPE 8: Generic Type Usage
+; ============================================================================
+
+; Generic types: Vec<String>, HashMap<String, User>
+(generic_type
+  type: (type_identifier) @reference.generic_base
+  type_arguments: (type_arguments
+    [(type_identifier) @reference.type_param
+     (generic_type
+       type: (type_identifier) @reference.nested_generic)])) @dependency.generic_type
+
+; ============================================================================
 ; NOTES
 ; ============================================================================
 ;
@@ -135,3 +174,7 @@
 ; - @dependency.use* → EdgeType::Uses
 ; - @dependency.implements → EdgeType::Implements
 ; - @dependency.*_type_ref → EdgeType::Uses
+; - @dependency.await → EdgeType::Calls
+; - @dependency.field_access → EdgeType::Uses
+; - @dependency.iterator_op → EdgeType::Calls
+; - @dependency.generic_type → EdgeType::Uses

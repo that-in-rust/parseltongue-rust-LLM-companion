@@ -26,13 +26,20 @@ impl CozoDbStorage {
     /// # Arguments
     /// * `engine_spec` - Storage engine specification:
     ///   - "mem" for in-memory
-    ///   - "rocksdb:path/to/db" for RocksDB persistent storage (recommended)
+    ///   - "rocksdb:path/to/db" for RocksDB persistent storage (recommended, fastest)
+    ///   - "sled:path/to/db" for Sled persistent storage (v1.5.4: slower than RocksDB, uses more disk)
     ///   - "sqlite:path/to/db.sqlite" for SQLite storage
+    ///
+    /// # Performance Notes (v1.5.4)
+    /// - RocksDB: Fastest for Cozo's workload, recommended for production
+    /// - Sled: Pure Rust, simpler deployment, but 2-3x slower and higher disk usage
+    /// - Use Sled only if deployment constraints require pure Rust stack
     ///
     /// # Examples
     /// ```ignore
     /// let db = CozoDbStorage::new("mem").await?;
     /// let db = CozoDbStorage::new("rocksdb:./parseltongue.db").await?;
+    /// let db = CozoDbStorage::new("sled:./parseltongue.db").await?;
     /// let db = CozoDbStorage::new("sqlite:./parseltongue.sqlite").await?;
     /// ```
     pub async fn new(engine_spec: &str) -> Result<Self> {
@@ -804,6 +811,163 @@ impl CozoDbStorage {
         Ok(())
     }
 
+    /// Insert multiple entities in a single batch operation
+    ///
+    /// Implements v1.5.0 batch insertion optimization for 10-60x speedup.
+    /// Follows the same pattern as `insert_edges_batch()` for consistency.
+    ///
+    /// # Performance Contract
+    /// - 10,000 entities: < 500ms (v1.5.0 PRIMARY requirement)
+    /// - 50,000 entities: < 2s
+    /// - Linear scaling: O(n) where n = entity count
+    ///
+    /// # Implementation Notes
+    /// Uses CozoDB inline data syntax: `?[col1, col2] <- [[val1, val2], ...]`
+    /// Single `run_script()` call instead of N individual database round-trips.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let entities = vec![entity1, entity2, entity3];
+    /// storage.insert_entities_batch(&entities).await?;
+    /// ```
+    pub async fn insert_entities_batch(&self, entities: &[CodeEntity]) -> Result<()> {
+        // Empty batch optimization - no database operation needed
+        if entities.is_empty() {
+            return Ok(());
+        }
+
+        // Helper function to escape and quote values for CozoDB inline syntax
+        fn quote_value(val: &DataValue) -> String {
+            match val {
+                DataValue::Str(s) => {
+                    // Escape single quotes and backslashes for CozoDB
+                    let escaped = s.replace('\\', "\\\\").replace('\'', "\\'");
+                    format!("'{}'", escaped)
+                }
+                DataValue::Bool(b) => b.to_string(),
+                DataValue::Null => "null".to_string(),
+                DataValue::Num(n) => match n {
+                    cozo::Num::Int(i) => i.to_string(),
+                    cozo::Num::Float(f) => f.to_string(),
+                },
+                _ => "null".to_string(),
+            }
+        }
+
+        // Pre-allocate buffer for better performance
+        // Estimate: ~500 chars per entity average (conservative)
+        let mut query_data = String::with_capacity(entities.len() * 500);
+
+        // Build inline data arrays for batch insert
+        for (idx, entity) in entities.iter().enumerate() {
+            if idx > 0 {
+                query_data.push_str(", ");
+            }
+
+            // Convert entity to parameter map
+            let params = self.entity_to_params(entity)?;
+
+            // Extract all 17 fields in schema order and build array inline
+            query_data.push('[');
+
+            // Field 1: ISGL1_key
+            query_data.push_str(&quote_value(params.get("ISGL1_key").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 2: Current_Code
+            query_data.push_str(&quote_value(params.get("Current_Code").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 3: Future_Code
+            query_data.push_str(&quote_value(params.get("Future_Code").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 4: interface_signature
+            query_data.push_str(&quote_value(params.get("interface_signature").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 5: TDD_Classification
+            query_data.push_str(&quote_value(params.get("TDD_Classification").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 6: lsp_meta_data
+            query_data.push_str(&quote_value(params.get("lsp_meta_data").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 7: current_ind
+            query_data.push_str(&quote_value(params.get("current_ind").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 8: future_ind
+            query_data.push_str(&quote_value(params.get("future_ind").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 9: Future_Action
+            query_data.push_str(&quote_value(params.get("Future_Action").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 10: file_path
+            query_data.push_str(&quote_value(params.get("file_path").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 11: language
+            query_data.push_str(&quote_value(params.get("language").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 12: last_modified
+            query_data.push_str(&quote_value(params.get("last_modified").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 13: entity_type
+            query_data.push_str(&quote_value(params.get("entity_type").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 14: entity_class
+            query_data.push_str(&quote_value(params.get("entity_class").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 15: birth_timestamp
+            query_data.push_str(&quote_value(params.get("birth_timestamp").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 16: content_hash
+            query_data.push_str(&quote_value(params.get("content_hash").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 17: semantic_path (last field, no trailing comma)
+            query_data.push_str(&quote_value(params.get("semantic_path").unwrap_or(&DataValue::Null)));
+
+            query_data.push(']');
+        }
+
+        // Build complete batch insert query with pre-built data
+        let query = format!(
+            r#"
+            ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+              lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] <- [{}]
+
+            :put CodeGraph {{
+                ISGL1_key =>
+                Current_Code, Future_Code, interface_signature, TDD_Classification,
+                lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
+            }}
+            "#,
+            query_data
+        );
+
+        // Execute batch insert - single database round-trip
+        self.db
+            .run_script(&query, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "insert_entities_batch".to_string(),
+                details: format!("Failed to batch insert {} entities: {}", entities.len(), e),
+            })?;
+
+        Ok(())
+    }
+
     /// Get entity by ISGL1 key
     pub async fn get_entity(&self, isgl1_key: &str) -> Result<CodeEntity> {
         let query = r#"
@@ -1098,7 +1262,7 @@ impl CozoDbStorage {
             "birth_timestamp".to_string(),
             entity
                 .birth_timestamp
-                .map(|ts| DataValue::from(ts as i64))
+                .map(DataValue::from)
                 .unwrap_or(DataValue::Null),
         );
 

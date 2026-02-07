@@ -119,11 +119,18 @@ async fn query_dependency_edges_paginated(
     limit: usize,
     offset: usize,
 ) -> (Vec<EdgeDataPayloadItem>, usize) {
-    let db_guard = state.database_storage_connection_arc.read().await;
-    if let Some(storage) = db_guard.as_ref() {
-        // First get total count
-        let count_query = "?[count(from_key)] := *DependencyEdges{from_key}";
-        let total_count = match storage.raw_query(count_query).await {
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return (Vec::new(), 0),
+        }
+    }; // Lock released here
+
+    // First get total count
+    let count_query = "?[count(from_key)] := *DependencyEdges{from_key}";
+    let total_count = match storage.raw_query(count_query).await {
             Ok(result) => {
                 if let Some(row) = result.rows.first() {
                     extract_count_value(&row[0]).unwrap_or(0)
@@ -132,41 +139,38 @@ async fn query_dependency_edges_paginated(
                 }
             }
             Err(_) => 0,
-        };
+    };
 
-        // Query edges with limit and offset
-        let query = format!(
-            r#"
-            ?[from_key, to_key, edge_type, source_location] :=
-                *DependencyEdges{{from_key, to_key, edge_type, source_location}}
-            :limit {}
-            :offset {}
-            "#,
-            limit, offset
-        );
+    // Query edges with limit and offset
+    let query = format!(
+        r#"
+        ?[from_key, to_key, edge_type, source_location] :=
+            *DependencyEdges{{from_key, to_key, edge_type, source_location}}
+        :limit {}
+        :offset {}
+        "#,
+        limit, offset
+    );
 
-        match storage.raw_query(&query).await {
-            Ok(result) => {
-                let edges: Vec<EdgeDataPayloadItem> = result.rows.iter()
-                    .filter_map(|row| {
-                        if row.len() >= 4 {
-                            Some(EdgeDataPayloadItem {
-                                from_key: extract_string_value(&row[0]).unwrap_or_default(),
-                                to_key: extract_string_value(&row[1]).unwrap_or_default(),
-                                edge_type: extract_string_value(&row[2]).unwrap_or_default(),
-                                source_location: extract_string_value(&row[3]).unwrap_or_default(),
-                            })
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                (edges, total_count)
-            }
-            Err(_) => (Vec::new(), 0),
+    match storage.raw_query(&query).await {
+        Ok(result) => {
+            let edges: Vec<EdgeDataPayloadItem> = result.rows.iter()
+                .filter_map(|row| {
+                    if row.len() >= 4 {
+                        Some(EdgeDataPayloadItem {
+                            from_key: extract_string_value(&row[0]).unwrap_or_default(),
+                            to_key: extract_string_value(&row[1]).unwrap_or_default(),
+                            edge_type: extract_string_value(&row[2]).unwrap_or_default(),
+                            source_location: extract_string_value(&row[3]).unwrap_or_default(),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            (edges, total_count)
         }
-    } else {
-        (Vec::new(), 0)
+        Err(_) => (Vec::new(), 0),
     }
 }
 

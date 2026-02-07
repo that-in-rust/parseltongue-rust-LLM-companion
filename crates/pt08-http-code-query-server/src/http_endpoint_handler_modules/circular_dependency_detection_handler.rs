@@ -105,11 +105,14 @@ pub async fn handle_circular_dependency_detection_scan(
 async fn detect_cycles_using_dfs_traversal(
     state: &SharedApplicationStateContainer,
 ) -> Vec<DetectedCycleDataPayload> {
-    let db_guard = state.database_storage_connection_arc.read().await;
-    let storage = match db_guard.as_ref() {
-        Some(s) => s,
-        None => return Vec::new(),
-    };
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return Vec::new(),
+        }
+    }; // Lock released here
 
     // Build adjacency list from edges
     let query = "?[from_key, to_key] := *DependencyEdges{from_key, to_key}";

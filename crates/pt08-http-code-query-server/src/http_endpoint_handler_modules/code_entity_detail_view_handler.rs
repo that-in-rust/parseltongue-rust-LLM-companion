@@ -143,40 +143,49 @@ struct EntityDatabaseQueryResult {
 /// Fetch entity details from database by key
 ///
 /// # 4-Word Name: fetch_entity_details_from_database
+///
+/// # v1.5.4 Fix: RwLock Deadlock Prevention
+/// Previously held RwLock read guard across .await boundary, causing deadlock.
+/// Now clones Arc<CozoDbStorage> inside lock scope, releases lock, then awaits.
 async fn fetch_entity_details_from_database(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
 ) -> Option<EntityDatabaseQueryResult> {
-    let db_guard = state.database_storage_connection_arc.read().await;
-    if let Some(storage) = db_guard.as_ref() {
-        // Properly escape the entity key for CozoDB query
-        let escaped_entity_key = entity_key
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"");
+    // CRITICAL: Clone Arc inside scope, release lock BEFORE .await
+    // Holding RwLock across .await causes deadlock (tokio rule violation)
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        db_guard.as_ref().cloned()? // Clone Arc<CozoDbStorage>, lock released at scope end
+    };
 
-        // Query for entity by key
-        let query_result = storage
-            .raw_query(&format!(
-                "?[file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{{ISGL1_key, file_path, entity_type, entity_class, language, Current_Code}}, ISGL1_key == \"{}\"",
-                escaped_entity_key
-            ))
-            .await
-            .ok()?;
+    // Properly escape the entity key for CozoDB query
+    let escaped_entity_key = entity_key
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
 
-        // Extract first row if exists
-        if let Some(row) = query_result.rows.first() {
-            if row.len() >= 5 {
-                return Some(EntityDatabaseQueryResult {
-                    key: entity_key.to_string(),
-                    file_path: extract_string_value(&row[0])?,
-                    entity_type: extract_string_value(&row[1])?,
-                    entity_class: extract_string_value(&row[2])?,
-                    language: extract_string_value(&row[3])?,
-                    code: extract_string_value(&row[4])?,
-                });
-            }
+    // Query for entity by key - now safe, no lock held
+    let query_result = storage
+        .raw_query(&format!(
+            "?[file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{{ISGL1_key, file_path, entity_type, entity_class, language, Current_Code}}, ISGL1_key == \"{}\"",
+            escaped_entity_key
+        ))
+        .await
+        .ok()?;
+
+    // Extract first row if exists
+    if let Some(row) = query_result.rows.first() {
+        if row.len() >= 5 {
+            return Some(EntityDatabaseQueryResult {
+                key: entity_key.to_string(),
+                file_path: extract_string_value(&row[0])?,
+                entity_type: extract_string_value(&row[1])?,
+                entity_class: extract_string_value(&row[2])?,
+                language: extract_string_value(&row[3])?,
+                code: extract_string_value(&row[4])?,
+            });
         }
     }
+
     None
 }
 

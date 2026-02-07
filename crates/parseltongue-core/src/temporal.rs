@@ -531,9 +531,9 @@ impl ConflictResolver {
 
         for conflict in conflicts {
             if let Conflict::MultipleChanges { changes: conflicting_changes, .. } = conflict {
-                // Keep only the last change
-                for i in 0..conflicting_changes.len() - 1 {
-                    to_remove.push(conflicting_changes[i].isgl1_key.clone());
+                // Keep only the last change - remove all but the last
+                for change in conflicting_changes.iter().take(conflicting_changes.len().saturating_sub(1)) {
+                    to_remove.push(change.isgl1_key.clone());
                 }
             }
         }
@@ -548,9 +548,9 @@ impl ConflictResolver {
 
         for conflict in conflicts {
             if let Conflict::MultipleChanges { changes: conflicting_changes, .. } = conflict {
-                // Keep only the first change
-                for i in 1..conflicting_changes.len() {
-                    to_remove.push(conflicting_changes[i].isgl1_key.clone());
+                // Keep only the first change - remove all but the first
+                for change in conflicting_changes.iter().skip(1) {
+                    to_remove.push(change.isgl1_key.clone());
                 }
             }
         }
