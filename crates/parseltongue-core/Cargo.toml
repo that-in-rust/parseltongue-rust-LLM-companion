@@ -39,6 +39,7 @@ tree-sitter-swift.workspace = true
 
 # Storage dependencies
 cozo.workspace = true
+rayon.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

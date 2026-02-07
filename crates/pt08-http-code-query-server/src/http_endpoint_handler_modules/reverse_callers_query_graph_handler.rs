@@ -170,60 +170,64 @@ async fn query_reverse_callers_direct_method(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
 ) -> Vec<CallerEdgeDataPayload> {
-    let db_guard = state.database_storage_connection_arc.read().await;
-    if let Some(storage) = db_guard.as_ref() {
-        let escaped_entity_key = entity_key
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"");
-
-        // v1.0.4: Build fuzzy matching query based on function name
-        let query = match extract_function_name_key(entity_key) {
-            Some(func_name) => {
-                let escaped_func_name = func_name
-                    .replace('\\', "\\\\")
-                    .replace('"', "\\\"");
-                // Fuzzy match: exact key OR keys ending with function name pattern
-                format!(
-                    r#"
-                    ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-                        (to_key == "{}" or
-                         starts_with(to_key, "rust:fn:{}:") or
-                         starts_with(to_key, "rust:method:{}:"))
-                    "#,
-                    escaped_entity_key, escaped_func_name, escaped_func_name
-                )
-            }
-            None => {
-                // Fallback to exact match only
-                format!(
-                    r#"
-                    ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-                        to_key == "{}"
-                    "#,
-                    escaped_entity_key
-                )
-            }
-        };
-
-        match storage.raw_query(&query).await {
-            Ok(result) => {
-                let mut callers = Vec::new();
-                for row in result.rows {
-                    if row.len() >= 4 {
-                        callers.push(CallerEdgeDataPayload {
-                            from_key: extract_string_value(&row[0]).unwrap_or_else(|| "Unknown".to_string()),
-                            to_key: extract_string_value(&row[1]).unwrap_or_else(|| entity_key.to_string()),
-                            edge_type: extract_string_value(&row[2]).unwrap_or_else(|| "Unknown".to_string()),
-                            source_location: extract_string_value(&row[3]).unwrap_or_else(|| "unknown".to_string()),
-                        });
-                    }
-                }
-                callers
-            }
-            Err(_) => Vec::new(),
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return Vec::new(),
         }
-    } else {
-        Vec::new()
+    }; // Lock released here
+
+    let escaped_entity_key = entity_key
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+
+    // v1.0.4: Build fuzzy matching query based on function name
+    let query = match extract_function_name_key(entity_key) {
+        Some(func_name) => {
+            let escaped_func_name = func_name
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"");
+            // Fuzzy match: exact key OR keys ending with function name pattern
+            format!(
+                r#"
+                ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+                    (to_key == "{}" or
+                     starts_with(to_key, "rust:fn:{}:") or
+                     starts_with(to_key, "rust:method:{}:"))
+                "#,
+                escaped_entity_key, escaped_func_name, escaped_func_name
+            )
+        }
+        None => {
+            // Fallback to exact match only
+            format!(
+                r#"
+                ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+                    to_key == "{}"
+                "#,
+                escaped_entity_key
+            )
+        }
+    };
+
+    match storage.raw_query(&query).await {
+        Ok(result) => {
+            let mut callers = Vec::new();
+            for row in result.rows {
+                if row.len() >= 4 {
+                    callers.push(CallerEdgeDataPayload {
+                        from_key: extract_string_value(&row[0]).unwrap_or_else(|| "Unknown".to_string()),
+                        to_key: extract_string_value(&row[1]).unwrap_or_else(|| entity_key.to_string()),
+                        edge_type: extract_string_value(&row[2]).unwrap_or_else(|| "Unknown".to_string()),
+                        source_location: extract_string_value(&row[3]).unwrap_or_else(|| "unknown".to_string()),
+                    });
+                }
+            }
+            callers
+        }
+        Err(_) => Vec::new(),
     }
 }
 

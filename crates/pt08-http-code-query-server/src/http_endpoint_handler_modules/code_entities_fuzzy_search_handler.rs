@@ -122,57 +122,60 @@ async fn search_entities_by_query_from_database(
     state: &SharedApplicationStateContainer,
     search_query: &str,
 ) -> Vec<SearchResultEntityItem> {
-    let db_guard = state.database_storage_connection_arc.read().await;
-
-    if let Some(storage) = db_guard.as_ref() {
-        // Query all entities from CodeGraph - don't require Current_Code to exist
-        let query = "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}";
-
-        let result = storage.raw_query(query).await;
-
-        match result {
-            Ok(named_rows) => {
-                let search_lower = search_query.to_lowercase();
-                named_rows.rows.iter().filter_map(|row| {
-                    // Extract fields from row
-                    let key = row.first().and_then(|v| match v {
-                        cozo::DataValue::Str(s) => Some(s.to_string()),
-                        _ => None,
-                    })?;
-                    let file_path = row.get(1).and_then(|v| match v {
-                        cozo::DataValue::Str(s) => Some(s.to_string()),
-                        _ => None,
-                    })?;
-                    let entity_type = row.get(2).and_then(|v| match v {
-                        cozo::DataValue::Str(s) => Some(s.to_string()),
-                        _ => None,
-                    })?;
-                    let entity_class = row.get(3).and_then(|v| match v {
-                        cozo::DataValue::Str(s) => Some(s.to_string()),
-                        _ => None,
-                    })?;
-                    let language = row.get(4).and_then(|v| match v {
-                        cozo::DataValue::Str(s) => Some(s.to_string()),
-                        _ => None,
-                    })?;
-
-                    // Filter entities that contain the search term (case-insensitive)
-                    if key.to_lowercase().contains(&search_lower) {
-                        Some(SearchResultEntityItem {
-                            key,
-                            file_path,
-                            entity_type,
-                            entity_class,
-                            language,
-                        })
-                    } else {
-                        None
-                    }
-                }).collect()
-            }
-            Err(_) => Vec::new(),
+    // Clone Arc, release lock, then await
+    let storage = {
+        let db_guard = state.database_storage_connection_arc.read().await;
+        match db_guard.as_ref() {
+            Some(s) => s.clone(),
+            None => return Vec::new(),
         }
-    } else {
-        Vec::new()
+    }; // Lock released here
+
+    // Query all entities from CodeGraph - don't require Current_Code to exist
+    let query = "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}";
+
+    let result = storage.raw_query(query).await;
+
+    match result {
+        Ok(named_rows) => {
+            let search_lower = search_query.to_lowercase();
+            named_rows.rows.iter().filter_map(|row| {
+                // Extract fields from row
+                let key = row.first().and_then(|v| match v {
+                    cozo::DataValue::Str(s) => Some(s.to_string()),
+                    _ => None,
+                })?;
+                let file_path = row.get(1).and_then(|v| match v {
+                    cozo::DataValue::Str(s) => Some(s.to_string()),
+                    _ => None,
+                })?;
+                let entity_type = row.get(2).and_then(|v| match v {
+                    cozo::DataValue::Str(s) => Some(s.to_string()),
+                    _ => None,
+                })?;
+                let entity_class = row.get(3).and_then(|v| match v {
+                    cozo::DataValue::Str(s) => Some(s.to_string()),
+                    _ => None,
+                })?;
+                let language = row.get(4).and_then(|v| match v {
+                    cozo::DataValue::Str(s) => Some(s.to_string()),
+                    _ => None,
+                })?;
+
+                // Filter entities that contain the search term (case-insensitive)
+                if key.to_lowercase().contains(&search_lower) {
+                    Some(SearchResultEntityItem {
+                        key,
+                        file_path,
+                        entity_type,
+                        entity_class,
+                        language,
+                    })
+                } else {
+                    None
+                }
+            }).collect()
+        }
+        Err(_) => Vec::new(),
     }
 }

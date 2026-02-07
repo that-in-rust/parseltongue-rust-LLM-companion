@@ -5,7 +5,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.5.0"
+version = "1.5.4"
 edition = "2021"
 authors = ["Parseltongue Team"]
 license = "MIT OR Apache-2.0"
@@ -47,7 +47,9 @@ syn = { version = "2.0", features = ["full", "parsing"] }
 
 # Storage dependencies
 # Using RocksDB for persistent storage (recommended by CozoDB)
-cozo = { version = "0.7.6", default-features = false, features = ["storage-rocksdb", "rayon"] }
+# v1.5.4: Added storage-sled for alternative backend (slower but simpler)
+cozo = { version = "0.7.6", default-features = false, features = ["storage-rocksdb", "storage-sled", "rayon"] }
+rayon = "1.10"
 
 # Export dependencies
 wasm-bindgen = "0.2"
