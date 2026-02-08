@@ -13,6 +13,7 @@ pub mod entity_class_specifications;
 // pub mod entity_conversion; // P5: Entity conversion utilities (TODO: implement)
 pub mod error;
 // pub mod file_parser; // P1: Thread-safe file parser facade (TODO: implement)
+pub mod graph_analysis; // v1.6.0: Shared graph infrastructure for 7 analysis algorithms
 pub mod interfaces;
 pub mod isgl1_v2; // v1.4.5: ISGL1 v2 stable entity identity with birth timestamps
 pub mod output_path_resolver; // v0.9.7: Timestamped folder creation
@@ -26,6 +27,7 @@ pub mod temporal;
 // Re-export commonly used types
 pub use entities::*;
 pub use error::*;
+pub use graph_analysis::*; // v1.6.0: Graph analysis infrastructure
 pub use interfaces::*;
 pub use query_json_graph_errors::*; // v0.9.7: Query error types
 pub use query_json_graph_helpers::*; // v0.9.7: Agent query functions
