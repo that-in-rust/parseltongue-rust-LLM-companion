@@ -26,6 +26,14 @@ use crate::http_endpoint_handler_modules::{
     // v1.5.0: ISGL1 v2 integration complete - re-enabled
     incremental_reindex_file_handler,
     file_watcher_status_handler,
+    // v1.6.0: Graph analysis endpoints
+    strongly_connected_components_handler,
+    technical_debt_sqale_handler,
+    kcore_decomposition_layering_handler,
+    centrality_measures_entity_handler,
+    entropy_complexity_measurement_handler,
+    coupling_cohesion_metrics_handler,
+    leiden_community_detection_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -126,6 +134,35 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/file-watcher-status-check",
             get(file_watcher_status_handler::handle_file_watcher_status_check)
+        )
+        // v1.6.0: Graph Analysis Endpoints
+        .route(
+            "/strongly-connected-components-analysis",
+            get(strongly_connected_components_handler::handle_strongly_connected_components_analysis)
+        )
+        .route(
+            "/technical-debt-sqale-scoring",
+            get(technical_debt_sqale_handler::handle_technical_debt_sqale_scoring)
+        )
+        .route(
+            "/kcore-decomposition-layering-analysis",
+            get(kcore_decomposition_layering_handler::handle_kcore_decomposition_layering_analysis)
+        )
+        .route(
+            "/centrality-measures-entity-ranking",
+            get(centrality_measures_entity_handler::handle_centrality_measures_entity_ranking)
+        )
+        .route(
+            "/entropy-complexity-measurement-scores",
+            get(entropy_complexity_measurement_handler::handle_entropy_complexity_measurement_scores)
+        )
+        .route(
+            "/coupling-cohesion-metrics-suite",
+            get(coupling_cohesion_metrics_handler::handle_coupling_cohesion_metrics_suite)
+        )
+        .route(
+            "/leiden-community-detection-clusters",
+            get(leiden_community_detection_handler::handle_leiden_community_detection_clusters)
         )
         // Test route for debugging
         .route(

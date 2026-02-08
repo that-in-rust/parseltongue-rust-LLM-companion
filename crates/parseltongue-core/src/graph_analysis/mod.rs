@@ -23,6 +23,7 @@ pub mod centrality_measures_algorithm;
 pub mod leiden_community_algorithm;
 pub mod ck_metrics_suite_algorithm;
 pub mod sqale_debt_scoring_algorithm;
+pub mod integration_cross_algorithm_tests;
 
 // Re-export for convenience
 pub use adjacency_list_graph_representation::AdjacencyListGraphRepresentation;

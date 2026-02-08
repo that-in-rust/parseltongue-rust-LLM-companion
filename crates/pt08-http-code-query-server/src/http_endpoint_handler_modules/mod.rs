@@ -21,3 +21,11 @@ pub mod smart_context_token_budget_handler;
 // v1.5.0: ISGL1 v2 integration complete - re-enabled
 pub mod incremental_reindex_file_handler;
 pub mod file_watcher_status_handler;
+// v1.6.0: Graph analysis endpoints
+pub mod strongly_connected_components_handler;
+pub mod technical_debt_sqale_handler;
+pub mod kcore_decomposition_layering_handler;
+pub mod centrality_measures_entity_handler;
+pub mod entropy_complexity_measurement_handler;
+pub mod coupling_cohesion_metrics_handler;
+pub mod leiden_community_detection_handler;
