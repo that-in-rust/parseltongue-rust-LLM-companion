@@ -11,6 +11,69 @@ use sha2::{Digest, Sha256};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+/// Sanitize entity name for ISGL1 v2.1 key compatibility
+///
+/// Replaces characters that would break CozoDB query parsing when used
+/// in entity keys. Critical for languages with generic types (C#, C++,
+/// Java, TypeScript) and array notation.
+///
+/// # Performance
+/// - Time complexity: O(n) where n = name.len()
+/// - Space complexity: O(n) in best case, O(2n) in worst case
+/// - Single-pass replacement (no regex overhead)
+///
+/// # Arguments
+/// * `name` - Raw entity name from parser (may contain generic syntax)
+///
+/// # Returns
+/// Sanitized name safe for CozoDB queries
+///
+/// # Example
+/// ```
+/// use parseltongue_core::isgl1_v2::sanitize_entity_name_for_isgl1;
+/// assert_eq!(
+///     sanitize_entity_name_for_isgl1("List<string>"),
+///     "List__lt__string__gt__"
+/// );
+/// assert_eq!(
+///     sanitize_entity_name_for_isgl1("Dictionary<string, object>"),
+///     "Dictionary__lt__string__c__object__gt__"
+/// );
+/// ```
+#[inline]
+pub fn sanitize_entity_name_for_isgl1(name: &str) -> String {
+    let mut result = String::with_capacity(name.len() * 2);
+    let chars: Vec<char> = name.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        let ch = chars[i];
+
+        // Handle comma followed by space as single unit
+        if ch == ',' && i + 1 < chars.len() && chars[i + 1] == ' ' {
+            result.push_str("__c__");
+            i += 2; // Skip both comma and space
+            continue;
+        }
+
+        match ch {
+            ' ' => result.push('_'),
+            '<' => result.push_str("__lt__"),
+            '>' => result.push_str("__gt__"),
+            ',' => result.push_str("__c__"),
+            '[' => result.push_str("__lb__"),
+            ']' => result.push_str("__rb__"),
+            '{' => result.push_str("__lc__"),
+            '}' => result.push_str("__rc__"),
+            _ => result.push(ch),
+        }
+
+        i += 1;
+    }
+
+    result
+}
+
 /// Format ISGL1 v2 key with birth timestamp
 ///
 /// # Arguments
@@ -44,6 +107,8 @@ pub fn format_key_v2(
         EntityType::TestFunction => "test",
         EntityType::Variable => "var",
         EntityType::Constant => "const",
+        EntityType::Table => "table",    // v1.5.6: SQL table
+        EntityType::View => "view",      // v1.5.6: SQL view
     };
 
     format!("{}:{}:{}:{}:T{}", language, type_str, name, semantic_path, birth_timestamp)

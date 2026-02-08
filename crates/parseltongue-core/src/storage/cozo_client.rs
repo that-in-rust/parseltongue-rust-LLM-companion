@@ -10,6 +10,27 @@ use async_trait::async_trait;
 use cozo::{DataValue, DbInstance, ScriptMutability};
 use std::collections::BTreeMap;
 
+/// Escape string for safe use in CozoDB query strings
+///
+/// Escapes backslashes and single quotes to prevent CozoDB query parsing errors.
+/// Critical for Windows file paths, PHP namespaces, and strings containing quotes.
+///
+/// # Escaping Order (CRITICAL)
+/// Must escape backslash BEFORE single quote to avoid double-escaping:
+/// 1. `\` → `\\` (escape backslashes first)
+/// 2. `'` → `\'` (then escape quotes)
+///
+/// # Examples
+/// ```
+/// use parseltongue_core::storage::cozo_client::escape_for_cozo_string;
+/// assert_eq!(escape_for_cozo_string(r"C:\Users"), r"C:\\Users");
+/// assert_eq!(escape_for_cozo_string("User's"), r"User\'s");
+/// assert_eq!(escape_for_cozo_string(r"C:\User's\Path"), r"C:\\User\'s\\Path");
+/// ```
+pub fn escape_for_cozo_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
 /// CozoDB storage client
 ///
 /// Provides real database storage with SQLite backend, supporting:
@@ -232,13 +253,13 @@ impl CozoDbStorage {
                     let source_loc = edge
                         .source_location
                         .as_ref()
-                        .map(|s| format!("'{}'", s.replace('\'', "\\'")))
+                        .map(|s| format!("'{}'", escape_for_cozo_string(s)))
                         .unwrap_or_else(|| "null".to_string());
 
                     format!(
                         "['{}', '{}', '{}', {}]",
-                        edge.from_key.as_ref().replace('\'', "\\'"),
-                        edge.to_key.as_ref().replace('\'', "\\'"),
+                        escape_for_cozo_string(edge.from_key.as_ref()),
+                        escape_for_cozo_string(edge.to_key.as_ref()),
                         edge.edge_type.as_str(),
                         source_loc
                     )
@@ -1240,6 +1261,8 @@ impl CozoDbStorage {
                     EntityType::Class => "class",
                     EntityType::Variable => "variable",
                     EntityType::Constant => "constant",
+                    EntityType::Table => "table",    // v1.5.6: SQL table
+                    EntityType::View => "view",      // v1.5.6: SQL view
                 }
                 .into(),
             ),
@@ -1573,7 +1596,7 @@ impl CozoDbStorage {
         // Build query with inline data for batch delete
         let escaped_keys: Vec<String> = keys
             .iter()
-            .map(|k| format!("['{}']", k.replace('\'', "\\'")))
+            .map(|k| format!("['{}']", escape_for_cozo_string(k)))
             .collect();
 
         let query = format!(
@@ -1614,7 +1637,7 @@ impl CozoDbStorage {
         // First count existing edges for these from_keys
         let escaped_keys: Vec<String> = from_keys
             .iter()
-            .map(|k| format!("'{}'", k.replace('\'', "\\'")))
+            .map(|k| format!("'{}'", escape_for_cozo_string(k)))
             .collect();
 
         let count_query = format!(

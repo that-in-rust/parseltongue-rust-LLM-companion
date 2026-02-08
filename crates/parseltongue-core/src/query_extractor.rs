@@ -57,6 +57,8 @@ pub enum EntityType {
     Method,
     Typedef,
     Namespace,
+    Table,      // v1.5.6: SQL tables
+    View,       // v1.5.6: SQL views
 }
 
 /// Query-based extractor using .scm query files
@@ -761,6 +763,8 @@ impl QueryBasedExtractor {
             EntityType::Impl => "impl",
             EntityType::Typedef => "typedef",
             EntityType::Namespace => "namespace",
+            EntityType::Table => "table",    // v1.5.6: SQL table
+            EntityType::View => "view",      // v1.5.6: SQL view
         }
     }
 }

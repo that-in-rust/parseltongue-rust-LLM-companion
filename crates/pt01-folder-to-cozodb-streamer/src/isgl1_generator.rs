@@ -52,11 +52,12 @@ pub struct ParsedEntity {
 
 /// Entity types that can be parsed
 ///
-/// **Design Rationale**: Supports entities across 12 languages
+/// **Design Rationale**: Supports entities across 13 languages
 /// - Rust-specific: Struct, Enum, Trait, Impl
 /// - Universal: Function, Class, Method, Module, Typedef, Namespace, Variable
 /// - OOP languages (Ruby, Python, JS, Java, C#, Swift, PHP): Class, Method
 /// - System languages (C, C++, Go): Typedef, Namespace
+/// - SQL: Table, View (v1.5.6)
 #[derive(Debug, Clone, PartialEq)]
 pub enum EntityType {
     // Functions (all languages)
@@ -81,6 +82,10 @@ pub enum EntityType {
 
     // Variables
     Variable,   // Module-level or global variables
+
+    // SQL-specific (v1.5.6)
+    Table,      // SQL CREATE TABLE
+    View,       // SQL CREATE VIEW
 }
 
 /// ISGL1 key generator implementation using tree-sitter
@@ -146,19 +151,23 @@ impl Isgl1KeyGeneratorImpl {
         }
     }
 
-    /// Generate ISGL1 v2 key format: {language}:{type}:{name}:{semantic_path}:T{timestamp}
+    /// Generate ISGL1 v2.1 key format: {language}:{type}:{name}:{semantic_path}:T{timestamp}
     ///
     /// Uses birth timestamp instead of line numbers for stable entity identity.
     /// This solves the incremental indexing false positive problem where line shifts
     /// would cause all keys to change.
     ///
-    /// # ISGL1 v2 Format
-    /// - Old: rust:fn:main:src_main_rs:10-50 (line-based, unstable)
-    /// - New: rust:fn:main:__src_main:T1706284800 (timestamp-based, stable)
+    /// # ISGL1 v2.1 Format (NEW: Sanitized entity names)
+    /// - Old v2.0: rust:fn:List<T>:__src_main:T1706284800 (BREAKS CozoDB queries)
+    /// - New v2.1: rust:fn:List__lt__T__gt__:__src_main:T1706284800 (sanitized)
+    ///
+    /// Sanitization fixes generic types (C#, C++, Java, TypeScript) that contain
+    /// special characters like `< > , [ ]` which break CozoDB query parsing.
     fn format_key(&self, entity: &ParsedEntity) -> String {
         use parseltongue_core::isgl1_v2::{
             compute_birth_timestamp,
             extract_semantic_path,
+            sanitize_entity_name_for_isgl1,  // v2.1: Add sanitization
         };
 
         let type_str = match entity.entity_type {
@@ -173,9 +182,12 @@ impl Isgl1KeyGeneratorImpl {
             EntityType::Namespace => "namespace",
             EntityType::Typedef => "typedef",
             EntityType::Variable => "var",
+            EntityType::Table => "table",  // v1.5.6: SQL table
+            EntityType::View => "view",    // v1.5.6: SQL view
         };
 
-        // ISGL1 v2: Use semantic path and birth timestamp
+        // ISGL1 v2.1: Sanitize entity name to handle generic types
+        let sanitized_name = sanitize_entity_name_for_isgl1(&entity.name);
         let semantic_path = extract_semantic_path(&entity.file_path);
         let birth_timestamp = compute_birth_timestamp(&entity.file_path, &entity.name);
 
@@ -183,7 +195,7 @@ impl Isgl1KeyGeneratorImpl {
             "{}:{}:{}:{}:T{}",
             entity.language,
             type_str,
-            entity.name,
+            sanitized_name,
             semantic_path,
             birth_timestamp
         )
@@ -267,6 +279,8 @@ impl Isgl1KeyGeneratorImpl {
             parseltongue_core::query_extractor::EntityType::Module => EntityType::Module,
             parseltongue_core::query_extractor::EntityType::Namespace => EntityType::Namespace,
             parseltongue_core::query_extractor::EntityType::Typedef => EntityType::Typedef,
+            parseltongue_core::query_extractor::EntityType::Table => EntityType::Table,  // v1.5.6: SQL table
+            parseltongue_core::query_extractor::EntityType::View => EntityType::View,    // v1.5.6: SQL view
         }
     }
 
