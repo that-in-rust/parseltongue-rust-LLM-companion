@@ -12,7 +12,9 @@
 # Usage: bash docs/v160-release-checklist.sh
 # Requires: jq, curl
 
-set -euo pipefail
+set -uo pipefail
+# Note: -e intentionally omitted because grep returns exit 1 on no-match,
+# which would kill the script under pipefail when checking for absence of errors.
 
 # Colors for output
 RED='\033[0;31m'
@@ -49,7 +51,7 @@ log_info() {
 }
 
 # Initialize report
-cat > "$REPORT_FILE" << 'HEADER'
+cat > "$REPORT_FILE" << HEADER
 # Parseltongue v1.6.0 Release Dry Run Report
 
 **Generated**: $(date)
@@ -83,7 +85,7 @@ else
 fi
 
 # Check for TODO/STUB in graph_analysis
-TODO_COUNT=$(grep -r "TODO\|STUB\|PLACEHOLDER" --include="*.rs" crates/parseltongue-core/src/graph_analysis/ 2>/dev/null | wc -l | tr -d ' ')
+TODO_COUNT=$(grep -rc "TODO\|STUB\|PLACEHOLDER" --include="*.rs" crates/parseltongue-core/src/graph_analysis/ 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
 if [ "$TODO_COUNT" = "0" ]; then
     log_pass "No TODO/STUB/PLACEHOLDER in graph_analysis"
 else
@@ -92,7 +94,8 @@ fi
 
 # Check clippy
 echo "Running clippy..."
-if cargo clippy -p parseltongue-core -- -D warnings 2>&1 | grep -q "^error"; then
+CLIPPY_OUTPUT=$(cargo clippy -p parseltongue-core -- -D warnings 2>&1 || true)
+if echo "$CLIPPY_OUTPUT" | grep -q "^error"; then
     log_fail "Clippy warnings in parseltongue-core"
 else
     log_pass "Clippy clean for parseltongue-core"
@@ -109,9 +112,9 @@ echo "" >> "$REPORT_FILE"
 
 # Run graph_analysis tests
 echo "Running graph_analysis tests..."
-GRAPH_TEST_OUTPUT=$(cargo test -p parseltongue-core -- graph_analysis 2>&1)
-GRAPH_TEST_COUNT=$(echo "$GRAPH_TEST_OUTPUT" | grep "^test result:" | head -1 | sed 's/.*ok\. \([0-9]*\) passed.*/\1/')
-GRAPH_TEST_FAIL=$(echo "$GRAPH_TEST_OUTPUT" | grep "^test result:" | head -1 | sed 's/.*; \([0-9]*\) failed.*/\1/')
+GRAPH_TEST_OUTPUT=$(cargo test -p parseltongue-core -- graph_analysis 2>&1 || true)
+GRAPH_TEST_COUNT=$(echo "$GRAPH_TEST_OUTPUT" | grep "^test result:" | head -1 | sed 's/.*ok\. \([0-9]*\) passed.*/\1/' || echo "0")
+GRAPH_TEST_FAIL=$(echo "$GRAPH_TEST_OUTPUT" | grep "^test result:" | head -1 | sed 's/.*; \([0-9]*\) failed.*/\1/' || echo "0")
 
 if [ "$GRAPH_TEST_FAIL" = "0" ]; then
     log_pass "Graph analysis: $GRAPH_TEST_COUNT tests passing"
@@ -121,7 +124,7 @@ fi
 
 # Run pt08 tests
 echo "Running pt08 HTTP server tests..."
-PT08_OUTPUT=$(cargo test -p pt08-http-code-query-server 2>&1)
+PT08_OUTPUT=$(cargo test -p pt08-http-code-query-server 2>&1 || true)
 if echo "$PT08_OUTPUT" | grep -q "test result: ok"; then
     log_pass "pt08 HTTP server tests passing"
 else
@@ -138,7 +141,8 @@ echo "## Release Build" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 echo "Building release binary..."
-if cargo build --release 2>&1 | tail -1 | grep -q "Finished"; then
+BUILD_OUTPUT=$(cargo build --release 2>&1 || true)
+if echo "$BUILD_OUTPUT" | tail -1 | grep -q "Finished"; then
     log_pass "Release binary built successfully"
 else
     log_fail "Release build failed"
@@ -156,9 +160,9 @@ echo "## Self-Ingestion" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 echo "Ingesting Parseltongue codebase..."
-INGEST_OUTPUT=$(./target/release/parseltongue pt01-folder-to-cozodb-streamer . 2>&1)
-DB_PATH=$(echo "$INGEST_OUTPUT" | grep -o 'rocksdb:[^ ]*' | head -1)
-WORKSPACE_DIR=$(echo "$INGEST_OUTPUT" | grep -o 'parseltongue[0-9]*' | head -1)
+INGEST_OUTPUT=$(./target/release/parseltongue pt01-folder-to-cozodb-streamer . 2>&1 || true)
+DB_PATH=$(echo "$INGEST_OUTPUT" | grep -o 'rocksdb:[^ ]*' | head -1 || echo "")
+WORKSPACE_DIR=$(echo "$INGEST_OUTPUT" | grep -o 'parseltongue[0-9]*' | head -1 || echo "")
 
 if [ -n "$DB_PATH" ]; then
     log_pass "Ingestion complete: $DB_PATH"
@@ -239,7 +243,7 @@ echo "" >> "$REPORT_FILE"
 
 test_endpoint "01. /server-health-check-status" \
     "$BASE/server-health-check-status" \
-    '.data.status == "healthy"'
+    '.status == "ok"'
 
 test_endpoint "02. /codebase-statistics-overview-summary" \
     "$BASE/codebase-statistics-overview-summary" \
@@ -253,12 +257,19 @@ test_endpoint "04. /code-entities-list-all" \
     "$BASE/code-entities-list-all" \
     '.data.entities | length > 0'
 
-# Get a real entity key for subsequent tests
-ENTITY_KEY=$(curl -s "$BASE/code-entities-list-all" | jq -r '.data.entities[0].key' 2>/dev/null)
-log_info "Using entity key: ${ENTITY_KEY:0:80}..."
+# Get entity keys for testing
+# Entity from entity list (for detail-view)
+ENTITY_KEY=$(curl -s "$BASE/code-entities-list-all" | jq -r '.data.entities[0].key' 2>/dev/null || echo "")
+# Entity from edge to_key (a callee - guaranteed to have at least one caller)
+EDGE_ENTITY=$(curl -s "$BASE/dependency-edges-list-all" | jq -r '.data.edges[0].to_key' 2>/dev/null || echo "")
+# Entity from edge from_key (a caller - guaranteed to have at least one callee)
+CALLER_ENTITY=$(curl -s "$BASE/dependency-edges-list-all" | jq -r '.data.edges[0].from_key' 2>/dev/null || echo "")
+log_info "Entity (list):  ${ENTITY_KEY:0:80}..."
+log_info "Entity (callee): ${EDGE_ENTITY:0:80}..."
+log_info "Entity (caller): ${CALLER_ENTITY:0:80}..."
 
 test_endpoint "05. /code-entity-detail-view" \
-    "$BASE/code-entity-detail-view?entity=$ENTITY_KEY"
+    "$BASE/code-entity-detail-view?key=$ENTITY_KEY"
 
 test_endpoint "06. /code-entities-search-fuzzy" \
     "$BASE/code-entities-search-fuzzy?q=main" \
@@ -269,13 +280,13 @@ test_endpoint "07. /dependency-edges-list-all" \
     '.data.edges | length > 0'
 
 test_endpoint "08. /reverse-callers-query-graph" \
-    "$BASE/reverse-callers-query-graph?entity=$ENTITY_KEY"
+    "$BASE/reverse-callers-query-graph?entity=$EDGE_ENTITY"
 
 test_endpoint "09. /forward-callees-query-graph" \
-    "$BASE/forward-callees-query-graph?entity=$ENTITY_KEY"
+    "$BASE/forward-callees-query-graph?entity=$CALLER_ENTITY"
 
 test_endpoint "10. /blast-radius-impact-analysis" \
-    "$BASE/blast-radius-impact-analysis?entity=$ENTITY_KEY&hops=2"
+    "$BASE/blast-radius-impact-analysis?entity=$EDGE_ENTITY&hops=2"
 
 test_endpoint "11. /circular-dependency-detection-scan" \
     "$BASE/circular-dependency-detection-scan"
@@ -287,7 +298,7 @@ test_endpoint "13. /semantic-cluster-grouping-list" \
     "$BASE/semantic-cluster-grouping-list"
 
 test_endpoint "14. /smart-context-token-budget" \
-    "$BASE/smart-context-token-budget?focus=$ENTITY_KEY&tokens=2000"
+    "$BASE/smart-context-token-budget?focus=$CALLER_ENTITY&tokens=2000"
 
 echo ""
 echo "### v1.6.0 Graph Analysis Endpoints (7 new)"
@@ -337,7 +348,7 @@ echo "## Deep Validation" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
 
 # SCC: verify risk levels are valid
-SCC_RISKS=$(curl -s "$BASE/strongly-connected-components-analysis" | jq -r '.data.sccs[].risk_level' 2>/dev/null | sort -u)
+SCC_RISKS=$(curl -s "$BASE/strongly-connected-components-analysis" | jq -r '.data.sccs[].risk_level' 2>/dev/null | sort -u || echo "")
 VALID_RISKS=true
 for risk in $SCC_RISKS; do
     if [[ "$risk" != "NONE" && "$risk" != "MEDIUM" && "$risk" != "HIGH" ]]; then
@@ -351,7 +362,7 @@ else
 fi
 
 # K-Core: verify layers are valid
-KCORE_LAYERS=$(curl -s "$BASE/kcore-decomposition-layering-analysis" | jq -r '.data.entities[].layer' 2>/dev/null | sort -u)
+KCORE_LAYERS=$(curl -s "$BASE/kcore-decomposition-layering-analysis" | jq -r '.data.entities[].layer' 2>/dev/null | sort -u || echo "")
 VALID_LAYERS=true
 for layer in $KCORE_LAYERS; do
     if [[ "$layer" != "CORE" && "$layer" != "MID" && "$layer" != "PERIPHERAL" ]]; then
@@ -365,7 +376,7 @@ else
 fi
 
 # SQALE: verify violation types
-SQALE_TYPES=$(curl -s "$BASE/technical-debt-sqale-scoring" | jq -r '[.data.entities[].violations[].type] | unique | .[]' 2>/dev/null)
+SQALE_TYPES=$(curl -s "$BASE/technical-debt-sqale-scoring" | jq -r '[.data.entities[].violations[].type] | unique | .[]' 2>/dev/null || echo "")
 if [ -z "$SQALE_TYPES" ]; then
     log_pass "SQALE: no violations (clean codebase or all below thresholds)"
 else
@@ -373,7 +384,7 @@ else
 fi
 
 # CK Metrics: verify health grades are valid
-CK_GRADES=$(curl -s "$BASE/coupling-cohesion-metrics-suite" | jq -r '.data.entities[].health_grade' 2>/dev/null | sort -u)
+CK_GRADES=$(curl -s "$BASE/coupling-cohesion-metrics-suite" | jq -r '.data.entities[].health_grade' 2>/dev/null | sort -u || echo "")
 VALID_GRADES=true
 for grade in $CK_GRADES; do
     if [[ "$grade" != "A" && "$grade" != "B" && "$grade" != "C" && "$grade" != "D" && "$grade" != "F" ]]; then
@@ -387,7 +398,7 @@ else
 fi
 
 # Leiden: modularity should be a number
-MODULARITY=$(curl -s "$BASE/leiden-community-detection-clusters" | jq -r '.data.modularity' 2>/dev/null)
+MODULARITY=$(curl -s "$BASE/leiden-community-detection-clusters" | jq -r '.data.modularity' 2>/dev/null || echo "")
 if [[ "$MODULARITY" =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
     log_pass "Leiden modularity is numeric: $MODULARITY"
 else
@@ -395,7 +406,7 @@ else
 fi
 
 # Entropy: verify complexity levels
-ENTROPY_LEVELS=$(curl -s "$BASE/entropy-complexity-measurement-scores" | jq -r '.data.entities[].complexity' 2>/dev/null | sort -u)
+ENTROPY_LEVELS=$(curl -s "$BASE/entropy-complexity-measurement-scores" | jq -r '.data.entities[].complexity' 2>/dev/null | sort -u || echo "")
 VALID_ENTROPY=true
 for level in $ENTROPY_LEVELS; do
     if [[ "$level" != "LOW" && "$level" != "MODERATE" && "$level" != "HIGH" ]]; then
