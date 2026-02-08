@@ -22,6 +22,7 @@ pub mod entropy_complexity_algorithm;
 pub mod centrality_measures_algorithm;
 pub mod leiden_community_algorithm;
 pub mod ck_metrics_suite_algorithm;
+pub mod sqale_debt_scoring_algorithm;
 
 // Re-export for convenience
 pub use adjacency_list_graph_representation::AdjacencyListGraphRepresentation;
@@ -49,4 +50,9 @@ pub use ck_metrics_suite_algorithm::{
     calculate_response_for_class, calculate_weighted_methods_class,
     compute_ck_metrics_suite, grade_ck_metrics_health,
     CkMetricsResult, HealthGrade, MetricStatus, evaluate_single_metric_status,
+};
+pub use sqale_debt_scoring_algorithm::{
+    calculate_technical_debt_sqale, compute_all_entities_sqale,
+    classify_debt_severity_level, SqaleViolationType, SqaleViolationRecord,
+    SqaleDebtResult, DebtSeverity,
 };
