@@ -627,7 +627,7 @@ impl QueryBasedExtractor {
                     eprintln!("[DEBUG-EDGE] ❌ NO dependency_type identified");
                 }
 
-                if let Some(ref from) = from_entity {
+                if let Some(from) = from_entity {
                     eprintln!("[DEBUG-EDGE] ✅ Found from_entity: {} (type: {:?})",
                         from.name, from.entity_type);
                 } else {
