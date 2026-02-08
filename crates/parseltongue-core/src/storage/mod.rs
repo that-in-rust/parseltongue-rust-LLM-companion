@@ -5,4 +5,4 @@
 
 pub mod cozo_client;
 
-pub use cozo_client::CozoDbStorage;
+pub use cozo_client::{CozoDbStorage, escape_for_cozo_string};

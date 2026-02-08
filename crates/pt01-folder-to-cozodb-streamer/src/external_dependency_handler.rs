@@ -372,6 +372,7 @@ pub fn create_external_dependency_placeholder_entity_validated(
         Language::Swift => "swift",
         Language::Kotlin => "kotlin",
         Language::Scala => "scala",
+        Language::Sql => "sql",  // v1.5.6: SQL language
     };
 
     // Create ISGL1 key based on crate_name type

@@ -26,6 +26,7 @@ pub enum Language {
     Swift,
     Kotlin,
     Scala,
+    Sql,  // v1.5.6: SQL language support
 }
 
 impl Language {
@@ -46,6 +47,7 @@ impl Language {
             Language::Swift => vec!["swift"],
             Language::Kotlin => vec!["kt", "kts"],
             Language::Scala => vec!["scala", "sc"],
+            Language::Sql => vec!["sql"],  // v1.5.6: SQL files
         }
     }
 
@@ -68,6 +70,7 @@ impl Language {
             Language::Swift,
             Language::Kotlin,
             Language::Scala,
+            Language::Sql,  // v1.5.6: SQL detection
         ].into_iter().find(|&language| language.file_extensions().contains(&extension))
     }
 }
@@ -89,6 +92,7 @@ impl fmt::Display for Language {
             Language::Swift => write!(f, "swift"),
             Language::Kotlin => write!(f, "kotlin"),
             Language::Scala => write!(f, "scala"),
+            Language::Sql => write!(f, "sql"),  // v1.5.6: SQL display name
         }
     }
 }
@@ -113,6 +117,9 @@ pub enum EntityType {
     Class,
     Variable,
     Constant,
+    // v1.5.6: SQL-specific entity types
+    Table,      // SQL CREATE TABLE
+    View,       // SQL CREATE VIEW
 }
 
 /// Temporal action for state transitions
@@ -910,6 +917,8 @@ impl CodeEntity {
             EntityType::Class => "class",
             EntityType::Variable => "var",
             EntityType::Constant => "const",
+            EntityType::Table => "table",    // v1.5.6: SQL table
+            EntityType::View => "view",      // v1.5.6: SQL view
         };
 
         // Create hash input: filepath + name + type + timestamp

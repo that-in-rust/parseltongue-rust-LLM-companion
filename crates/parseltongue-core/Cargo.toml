@@ -36,6 +36,7 @@ tree-sitter-php.workspace = true
 tree-sitter-c-sharp.workspace = true
 tree-sitter-swift.workspace = true
 # tree-sitter-kotlin.workspace = true  # NOTE: Incompatible tree-sitter version (0.20 vs 0.25)
+tree-sitter-sql = "0.0.2"  # v1.5.6: SQL language support (PostgreSQL-focused grammar)
 
 # Storage dependencies
 cozo.workspace = true

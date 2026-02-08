@@ -264,6 +264,10 @@ impl FileStreamerImpl {
                 trait_name: None,
                 struct_name: "Unknown".to_string(), // TODO: Extract from parsed entity
             },
+
+            // SQL-specific entities (v1.5.6)
+            crate::isgl1_generator::EntityType::Table => parseltongue_core::entities::EntityType::Table,
+            crate::isgl1_generator::EntityType::View => parseltongue_core::entities::EntityType::View,
         }
     }
 
