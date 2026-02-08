@@ -99,7 +99,7 @@ pub async fn handle_api_reference_documentation_help(
             success: true,
             endpoint: "/api-reference-documentation-help".to_string(),
             data: ApiReferenceDataPayload {
-                api_version: "1.4.2".to_string(),
+                api_version: "1.6.0".to_string(),
                 total_endpoints,
                 categories,
             },
@@ -282,6 +282,100 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             description: "Maximum token budget (default: 4000)".to_string(),
                         },
                     ],
+                },
+            ],
+        },
+        EndpointCategoryDocPayload {
+            name: "Graph Analysis (v1.6.0)".to_string(),
+            endpoints: vec![
+                EndpointDocumentationEntryPayload {
+                    path: "/strongly-connected-components-analysis".to_string(),
+                    method: "GET".to_string(),
+                    description: "Tarjan SCC detection - finds circular dependency cycles".to_string(),
+                    parameters: vec![],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/technical-debt-sqale-scoring".to_string(),
+                    method: "GET".to_string(),
+                    description: "SQALE technical debt scoring with ISO 25010 remediation constants".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "entity".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Entity key (omit for all entities)".to_string(),
+                        },
+                        EndpointParameterDocPayload {
+                            name: "min_debt".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Filter entities with debt >= N hours".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/kcore-decomposition-layering-analysis".to_string(),
+                    method: "GET".to_string(),
+                    description: "K-core decomposition - identifies core/mid/peripheral layers".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "k".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Filter entities with coreness >= k".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/centrality-measures-entity-ranking".to_string(),
+                    method: "GET".to_string(),
+                    description: "PageRank or betweenness centrality ranking".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "method".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Algorithm: 'pagerank' (default) or 'betweenness'".to_string(),
+                        },
+                        EndpointParameterDocPayload {
+                            name: "top".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Return top N entities".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/entropy-complexity-measurement-scores".to_string(),
+                    method: "GET".to_string(),
+                    description: "Shannon entropy complexity scores for edge type diversity".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "entity".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Entity key (omit for all entities)".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/coupling-cohesion-metrics-suite".to_string(),
+                    method: "GET".to_string(),
+                    description: "CK metrics suite: CBO, LCOM, RFC, WMC with health grades".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "entity".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Entity key (omit for all entities)".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/leiden-community-detection-clusters".to_string(),
+                    method: "GET".to_string(),
+                    description: "Leiden community detection with directed modularity".to_string(),
+                    parameters: vec![],
                 },
             ],
         },

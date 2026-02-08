@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Parseltongue is a code analysis toolkit that parses codebases into a graph database (CozoDB) for efficient LLM-optimized querying. Core value: 99% token reduction (2-5K tokens vs 500K raw dumps), 31x faster than grep.
 
-**Version**: 1.4.2 (HTTP-only architecture with always-on file watching)
+**Version**: 1.6.0 (HTTP-only architecture with always-on file watching + 7 graph analysis algorithms)
 **Languages Supported**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ## Build and Test Commands
@@ -57,7 +57,7 @@ curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hop
 
 **Note**: pt01 always creates a timestamped workspace folder - no `--db` flag needed.
 
-## HTTP Server Endpoints (14 Total)
+## HTTP Server Endpoints (21 Total)
 
 | Category | Endpoint | Description |
 |----------|----------|-------------|
@@ -75,6 +75,13 @@ curl "http://localhost:7777/blast-radius-impact-analysis?entity=rust:fn:main&hop
 | Analysis | `/complexity-hotspots-ranking-view?top=N` | Coupling hotspots |
 | Analysis | `/semantic-cluster-grouping-list` | Module clusters |
 | Advanced | `/smart-context-token-budget?focus=X&tokens=N` | LLM context |
+| Graph v1.6 | `/strongly-connected-components-analysis` | Tarjan SCC detection |
+| Graph v1.6 | `/technical-debt-sqale-scoring?entity=X` | SQALE tech debt (ISO 25010) |
+| Graph v1.6 | `/kcore-decomposition-layering-analysis?k=N` | K-core graph layering |
+| Graph v1.6 | `/centrality-measures-entity-ranking?method=pagerank` | PageRank/Betweenness |
+| Graph v1.6 | `/entropy-complexity-measurement-scores?entity=X` | Shannon entropy |
+| Graph v1.6 | `/coupling-cohesion-metrics-suite?entity=X` | CK metrics (CBO/LCOM/RFC/WMC) |
+| Graph v1.6 | `/leiden-community-detection-clusters` | Leiden community clustering |
 
 ## Workspace Architecture
 
