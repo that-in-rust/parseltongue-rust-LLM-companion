@@ -17,10 +17,11 @@
 5. [Cross-OS Path Normalization](#5-cross-os-path-normalization)
 6. [CozoDB Relation Schemas](#6-cozodb-relation-schemas)
 7. [API Design](#7-api-design)
-8. [Integration with Existing Pipeline](#8-integration-with-existing-pipeline)
-9. [Implementation Phases](#9-implementation-phases)
-10. [Acceptance Criteria](#10-acceptance-criteria)
-11. [Open Questions](#11-open-questions)
+8. [Folder-Scoped Queries](#8-folder-scoped-queries)
+9. [Integration with Existing Pipeline](#9-integration-with-existing-pipeline)
+10. [Implementation Phases](#10-implementation-phases)
+11. [Acceptance Criteria](#11-acceptance-criteria)
+12. [Open Questions](#12-open-questions)
 
 ---
 
@@ -305,7 +306,7 @@ fn normalize_split_file_path(abs_path: &Path, workspace_root: &Path) -> (String,
 
 ## 6. CozoDB Relation Schemas
 
-### Existing Relations (unchanged)
+### Existing Relations (modified)
 
 ```
 CodeGraph {
@@ -313,6 +314,8 @@ CodeGraph {
     Current_Code: String?, interface_signature: String,
     TDD_Classification: String, file_path: String,
     language: String, entity_type: String, entity_class: String,
+    root_subfolder_L1: String,    // NEW (v1.6.5): First-level folder, e.g. "src", "crates"
+    root_subfolder_L2: String,    // NEW (v1.6.5): Second-level folder, e.g. "core", "parseltongue-core"
     ...
 }
 
@@ -321,6 +324,24 @@ DependencyEdges {
     source_location: String?
 }
 ```
+
+**New columns on CodeGraph**:
+
+| Column | Type | Description | Examples |
+|--------|------|-------------|----------|
+| `root_subfolder_L1` | String | First path component (root-level folder). `"."` for root-level files. | `"src"`, `"crates"`, `"tests"`, `"."` |
+| `root_subfolder_L2` | String | Second path component (subfolder within L1). Empty string if file is directly inside L1. | `"core"`, `"parseltongue-core"`, `""` |
+
+**Extraction from `file_path`**:
+
+| `file_path` | `root_subfolder_L1` | `root_subfolder_L2` |
+|-------------|---------------------|---------------------|
+| `src/main.rs` | `src` | `""` |
+| `src/core/parser.rs` | `src` | `core` |
+| `crates/parseltongue-core/src/lib.rs` | `crates` | `parseltongue-core` |
+| `tests/unit/test_parser.rs` | `tests` | `unit` |
+| `Cargo.toml` | `.` | `""` |
+| `My Documents/code/app.rs` | `My Documents` | `code` |
 
 ### New Relation: `TestEntitiesExcluded`
 
@@ -517,7 +538,221 @@ Follows the 4-word naming convention: `ingestion-diagnostics-coverage-report`.
 
 ---
 
-## 8. Integration with Existing Pipeline
+## 8. Folder-Scoped Queries
+
+### Problem: "The Graph Is Too Big"
+
+After ingesting a large monorepo (e.g., 2,841 entities across 312 files), every query endpoint returns results from the **entire codebase**. An LLM agent investigating a bug in `src/core/` gets blast radius results polluted with entities from `tests/`, `docs/`, and `crates/utils/`. This wastes tokens and reduces relevance.
+
+### Solution: `?scope=` Parameter + Discovery Endpoint
+
+Two additions:
+1. **Discovery endpoint**: `GET /folder-structure-discovery-tree` — returns the L1/L2 folder tree with entity counts
+2. **Scope parameter**: `?scope=src|core` on ALL query endpoints — filters results to entities within that folder
+
+### Design Decisions
+
+**Pipe delimiter (`|`)**: The scope value uses `|` to separate L1 and L2, not `/` or `\`. This avoids confusion with filesystem path separators across platforms. Pipe `|` is illegal in Windows folder names and virtually never used in macOS/Linux folder names, making it a safe delimiter.
+
+**URL encoding handles special characters**: Spaces in folder names (e.g., `My Documents`) are handled by standard URL encoding (`%20`). Axum decodes automatically before the handler sees the value. No additional encoding layer needed.
+
+**Denormalized columns**: L1 and L2 are stored as precomputed columns on CodeGraph during ingestion (not computed at query time). This allows CozoDB Datalog to filter natively:
+
+```datalog
+?[ISGL1_key, file_path] := *CodeGraph{ISGL1_key, file_path, root_subfolder_L1: "src", root_subfolder_L2: "core"}
+```
+
+### Scope Parameter Syntax
+
+| `?scope=` value | L1 | L2 | Meaning |
+|----------------|-----|-----|---------|
+| `src` | `src` | *(any)* | All entities under `src/` |
+| `src\|core` | `src` | `core` | Only entities under `src/core/` |
+| *(absent)* | *(any)* | *(any)* | No filter (full graph, default) |
+
+**Parsing logic**:
+```rust
+fn parse_scope_filter(scope: &str) -> (String, Option<String>) {
+    match scope.split_once('|') {
+        Some((l1, l2)) if !l2.is_empty() => (l1.to_string(), Some(l2.to_string())),
+        _ => (scope.to_string(), None), // L1-only
+    }
+}
+```
+
+### Error Handling: Invalid Scope
+
+When `?scope=` matches no folders in the ingested codebase, the endpoint returns an error response with **did-you-mean suggestions** filtered by the same starting letter:
+
+```json
+{
+  "success": false,
+  "endpoint": "/code-entities-list-all",
+  "error": "Scope 'srcc' not found in ingested folders",
+  "suggestions": ["src"],
+  "valid_scopes": {
+    "L1": ["crates", "src", "tests"],
+    "L2_for_src": ["core", "utils", "generated"]
+  },
+  "tokens": 60
+}
+```
+
+**Suggestion algorithm**:
+1. Extract L1 from scope
+2. Query all distinct `root_subfolder_L1` values from CodeGraph
+3. Filter to those starting with the same first character as the input
+4. If L2 provided, do the same for `root_subfolder_L2` within the matched L1
+5. Return suggestions + full valid scope list
+
+This prevents silent failures — agents immediately know the scope was wrong and get corrective options.
+
+### Discovery Endpoint
+
+```
+GET /folder-structure-discovery-tree
+```
+
+Follows 4-word naming: `folder-structure-discovery-tree`.
+
+**Response shape**:
+```json
+{
+  "success": true,
+  "endpoint": "/folder-structure-discovery-tree",
+  "data": {
+    "total_L1_folders": 4,
+    "total_L2_folders": 11,
+    "total_entities": 2841,
+    "tree": [
+      {
+        "folder_L1": "crates",
+        "entity_count": 1820,
+        "subfolders": [
+          { "folder_L2": "parseltongue-core", "entity_count": 1200 },
+          { "folder_L2": "pt01-folder-to-cozodb-streamer", "entity_count": 340 },
+          { "folder_L2": "pt08-http-code-query-server", "entity_count": 280 }
+        ]
+      },
+      {
+        "folder_L1": "src",
+        "entity_count": 520,
+        "subfolders": [
+          { "folder_L2": "core", "entity_count": 310 },
+          { "folder_L2": "utils", "entity_count": 210 }
+        ]
+      },
+      {
+        "folder_L1": "tests",
+        "entity_count": 401,
+        "subfolders": [
+          { "folder_L2": "unit", "entity_count": 280 },
+          { "folder_L2": "integration", "entity_count": 121 }
+        ]
+      },
+      {
+        "folder_L1": ".",
+        "entity_count": 100,
+        "subfolders": []
+      }
+    ]
+  },
+  "tokens": 250
+}
+```
+
+**CozoDB query for discovery**:
+```datalog
+?[l1, l2, count(key)] := *CodeGraph{ISGL1_key: key, root_subfolder_L1: l1, root_subfolder_L2: l2}
+```
+
+### Endpoints That Gain `?scope=`
+
+All query endpoints (18 total). Non-query endpoints (health, API docs, file watcher) are excluded.
+
+| Endpoint | `?scope=` supported |
+|----------|:-------------------:|
+| `/code-entities-list-all` | Yes |
+| `/code-entity-detail-view?key=` | Yes |
+| `/code-entities-search-fuzzy?q=` | Yes |
+| `/reverse-callers-query-graph?entity=` | Yes |
+| `/forward-callees-query-graph?entity=` | Yes |
+| `/dependency-edges-list-all` | Yes |
+| `/blast-radius-impact-analysis?entity=&hops=` | Yes |
+| `/circular-dependency-detection-scan` | Yes |
+| `/complexity-hotspots-ranking-view?top=` | Yes |
+| `/semantic-cluster-grouping-list` | Yes |
+| `/smart-context-token-budget?focus=&tokens=` | Yes |
+| `/strongly-connected-components-analysis` | Yes |
+| `/technical-debt-sqale-scoring` | Yes |
+| `/kcore-decomposition-layering-analysis` | Yes |
+| `/centrality-measures-entity-ranking` | Yes |
+| `/entropy-complexity-measurement-scores` | Yes |
+| `/coupling-cohesion-metrics-suite` | Yes |
+| `/leiden-community-detection-clusters` | Yes |
+| `/server-health-check-status` | No |
+| `/api-reference-documentation-help` | No |
+| `/codebase-statistics-overview-summary` | No |
+| `/file-watcher-status-check` | No |
+| `/incremental-reindex-file-update` | No |
+| `/ingestion-coverage-folder-report` | No |
+| `/ingestion-diagnostics-coverage-report` | No |
+| `/folder-structure-discovery-tree` | No (it IS the discovery) |
+
+### Implementation: Shared Scope Utility
+
+Rather than modifying each handler independently, a shared utility function builds the Datalog filter clause:
+
+```rust
+/// Build a CozoDB filter clause for scope filtering.
+/// Returns empty string if no scope provided (no filter).
+///
+/// # 4-Word Name: build_scope_filter_clause
+fn build_scope_filter_clause(scope: &Option<String>) -> String {
+    match scope {
+        None => String::new(),
+        Some(s) => {
+            let (l1, l2) = parse_scope_filter(s);
+            let l1_escaped = escape_for_cozo_string(&l1);
+            match l2 {
+                Some(l2_val) => {
+                    let l2_escaped = escape_for_cozo_string(&l2_val);
+                    format!(", root_subfolder_L1: '{}', root_subfolder_L2: '{}'", l1_escaped, l2_escaped)
+                }
+                None => format!(", root_subfolder_L1: '{}'", l1_escaped),
+            }
+        }
+    }
+}
+```
+
+**Usage in any handler** (minimal change per handler):
+
+```rust
+// Before (existing query):
+let query = "?[ISGL1_key, file_path] := *CodeGraph{ISGL1_key, file_path}";
+
+// After (scope-aware):
+let scope_clause = build_scope_filter_clause(&params.scope);
+let query = format!(
+    "?[ISGL1_key, file_path] := *CodeGraph{{ISGL1_key, file_path{scope_clause}}}"
+);
+```
+
+### Agent Workflow Example
+
+```
+Agent: GET /folder-structure-discovery-tree
+       → sees "crates|parseltongue-core" has 1200 entities
+
+Agent: GET /blast-radius-impact-analysis?entity=rust:fn:parse_file&hops=3&scope=crates|parseltongue-core
+       → blast radius scoped to parseltongue-core only (not pt01, not pt08)
+       → fewer results, more relevant, fewer tokens
+```
+
+---
+
+## 9. Integration with Existing Pipeline
 
 ### pt01 Ingestion Changes
 
@@ -654,37 +889,46 @@ path-slash = "0.2"
 
 ---
 
-## 9. Implementation Phases
+## 10. Implementation Phases
 
 ### Phase 1: CozoDB Schema + Path Normalization
 
 1. Add `path-slash` dependency
 2. Implement `normalize_split_file_path()` utility function
-3. Create `TestEntitiesExcluded` relation schema
-4. Create `FileWordCoverage` relation schema
-5. Write unit tests for path normalization (Windows `\`, macOS `/`, root-level files, nested paths)
+3. Add `root_subfolder_L1` and `root_subfolder_L2` columns to CodeGraph schema
+4. Implement `extract_subfolder_levels()` function to derive L1/L2 from file_path
+5. Create `TestEntitiesExcluded` relation schema
+6. Create `FileWordCoverage` relation schema
+7. Write unit tests for path normalization and L1/L2 extraction (root files, 1-deep, 2-deep, 3+-deep, spaces in names)
 
 ### Phase 2: pt01 Ingestion Collection
 
-1. Modify test entity exclusion path to collect entity details
-2. Add import word count accumulation during `execute_dependency_query()` (uses existing `@dependency.*` captures)
-3. Add comment word count via AST root walk after tree-sitter parse
-4. Add word count computation with dual metrics (raw + effective) after entity extraction
-5. Batch insert both relations after ingestion completes
-6. Write integration tests verifying:
-   - Both relations are populated
+1. Modify entity insertion to populate `root_subfolder_L1` and `root_subfolder_L2` from file_path
+2. Modify test entity exclusion path to collect entity details
+3. Add import word count accumulation during `execute_dependency_query()` (uses existing `@dependency.*` captures)
+4. Add comment word count via AST root walk after tree-sitter parse
+5. Add word count computation with dual metrics (raw + effective) after entity extraction
+6. Batch insert both relations after ingestion completes
+7. Write integration tests verifying:
+   - `root_subfolder_L1` and `root_subfolder_L2` populated for all entities
+   - Both new relations are populated
    - `import_word_count > 0` for files with imports
    - `comment_word_count > 0` for files with comments
    - `effective_coverage_pct >= raw_coverage_pct` for all files
 
-### Phase 3: HTTP Endpoint Handler
+### Phase 3: HTTP Endpoint Handlers
 
-1. Create handler module with three data-fetching functions
+1. Create diagnostics coverage handler with three data-fetching functions
 2. Implement filesystem walk for ignored files report
 3. Implement CozoDB queries for test entities and word coverage
 4. Compose the three reports into the response JSON
-5. Register route
-6. Write endpoint tests
+5. Create folder structure discovery tree handler
+6. Implement shared `build_scope_filter_clause()` utility
+7. Implement shared `validate_scope_against_db()` function (returns error + suggestions on invalid scope)
+8. Add optional `scope` field to all 18 query endpoint param structs
+9. Modify all 18 query handler Datalog queries to include scope filter clause
+10. Register new routes
+11. Write endpoint tests for both new endpoints + scope filtering on existing endpoints
 
 ### Phase 4: End-to-End Verification
 
@@ -695,7 +939,7 @@ path-slash = "0.2"
 
 ---
 
-## 10. Acceptance Criteria
+## 11. Acceptance Criteria
 
 ### Functional
 
@@ -710,6 +954,19 @@ path-slash = "0.2"
 - [ ] All stored paths are relative to workspace root
 - [ ] `folder_path` and `filename` are correctly split for all path depths (root, nested, deep)
 - [ ] Response includes summary aggregates (total counts, averages for both raw and effective)
+
+### Folder-Scoped Queries
+
+- [ ] `root_subfolder_L1` and `root_subfolder_L2` populated for every entity during ingestion
+- [ ] `GET /folder-structure-discovery-tree` returns L1/L2 tree with entity counts
+- [ ] All 18 query endpoints accept optional `?scope=` parameter
+- [ ] `?scope=src` filters to L1 only (all L2 within `src/`)
+- [ ] `?scope=src|core` filters to L1+L2 (only `src/core/`)
+- [ ] Absent `?scope=` returns full unfiltered results (backward compatible)
+- [ ] Invalid scope returns `success: false` with error message, did-you-mean suggestions (same starting letter), and full valid scope list
+- [ ] Scope filtering happens at Datalog level (not post-filtering in Rust)
+- [ ] Root-level files (`Cargo.toml`) have `root_subfolder_L1: "."`, `root_subfolder_L2: ""`
+- [ ] Folder names with spaces work correctly via standard URL encoding
 
 ### Non-Functional
 
@@ -729,7 +986,7 @@ path-slash = "0.2"
 
 ---
 
-## 11. Open Questions
+## 12. Open Questions
 
 1. **Should `entity_word_count` include test entities?** Current plan: No -- test entities are excluded from CodeGraph, so their word count should not be part of the coverage metric. This means coverage metrics reflect only CODE entity coverage.
 
@@ -740,6 +997,12 @@ path-slash = "0.2"
 4. **Should comments inside function bodies be double-counted?** Current plan: No. Top-level comments only are counted for `comment_word_count` (comments inside entity bodies are already part of `entity_word_count`). A recursive AST walk would overcount.
 
 5. **Should we count doc-comments separately from regular comments?** For v1.6.5: No distinction. Both `/// doc comments` and `// regular comments` are counted as comments. Future: Could split into `doc_comment_word_count` vs `inline_comment_word_count`.
+
+6. **Should `?scope=` apply to DependencyEdges queries too?** Current plan: Scope filters CodeGraph entities. For edge-based queries (forward/reverse deps, blast radius), the starting entity must be in scope, but traversal can follow edges to entities outside scope. Alternative: Fully constrain traversal to in-scope entities only. Decision: Start with entity-level filtering; revisit if agents need edge-level scoping.
+
+7. **Should `/codebase-statistics-overview-summary` support `?scope=`?** It currently returns aggregate stats. Adding scope would make it "folder-level stats" which is useful but changes the endpoint's purpose. Decision: Not in v1.6.5. The discovery tree endpoint provides per-folder entity counts which covers most of this need.
+
+8. **Should the discovery endpoint include language breakdown per folder?** e.g., `"crates|parseltongue-core": { "rust": 1100, "python": 100 }`. Decision: Not in v1.6.5. Can be derived by combining discovery tree with scoped entity list.
 
 ---
 
