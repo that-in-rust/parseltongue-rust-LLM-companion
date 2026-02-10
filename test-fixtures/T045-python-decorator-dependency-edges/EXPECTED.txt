@@ -1,0 +1,35 @@
+FIXTURE: T045-python-decorator-dependency-edges
+LANGUAGE: Python
+CATEGORY: Dependency Edges
+VALIDATES: Decorators create dependency edges
+
+SOURCE FILES:
+  - class_decorators.py       (decorators on class methods)
+  - function_decorators.py    (decorators on functions)
+
+EXPECTED ENTITIES:
+  class_decorators.py:
+    - class "MyClass" with methods "name", "create", "index"
+
+  function_decorators.py:
+    - function "process_order"
+
+EXPECTED DEPENDENCY EDGES:
+  class_decorators.py:
+    - name -> property             (decorator)
+    - create -> staticmethod       (decorator)
+    - index -> route               (decorator)
+
+  function_decorators.py:
+    - process_order -> login_required    (decorator)
+    - process_order -> validate_input    (decorator)
+
+MINIMUM EDGE COUNTS:
+  class_decorators.py: at least 2 edges (property, staticmethod)
+  function_decorators.py: at least 2 edges (login_required, validate_input)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  None (decorators are Python-specific)

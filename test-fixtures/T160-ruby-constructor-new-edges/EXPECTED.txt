@@ -1,0 +1,36 @@
+FIXTURE: T160-ruby-constructor-new-edges
+LANGUAGE: Ruby
+CATEGORY: Dependency Edges
+VALIDATES: Ruby .new constructor calls create dependency edges
+
+SOURCE FILES:
+  - basic_new.rb       (User.new, Config.new in Service#create)
+  - new_with_args.rb   (Person, Logger, Server with arguments)
+  - qualified_new.rb   (Models::User, Database::Connection)
+
+EXPECTED ENTITIES:
+  - ruby:class:Service
+  - ruby:fn:create (in Service)
+  - ruby:fn:setup
+  - ruby:class:Factory
+  - ruby:fn:build (in Factory)
+
+EXPECTED DEPENDENCY EDGES (REQ-RUBY-001.0):
+  - create -> User (constructor call)
+  - create -> Config (constructor call)
+  - setup -> Person (constructor call)
+  - setup -> Logger (constructor call)
+  - setup -> Server (constructor call)
+  - build -> User (qualified: Models::User)
+  - build -> Connection (qualified: Database::Connection)
+
+MINIMUM EDGE COUNTS:
+  - basic_new.rb: 2 edges (User, Config)
+  - new_with_args.rb: 3 edges (Person, Logger, Server)
+  - qualified_new.rb: 2 edges (User, Connection)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/ruby_dependency_patterns_test.rs

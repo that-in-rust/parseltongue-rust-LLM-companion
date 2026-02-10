@@ -1,0 +1,36 @@
+FIXTURE: T046-python-type-hint-edges
+LANGUAGE: Python
+CATEGORY: Dependency Edges
+VALIDATES: Type hints create dependency edges
+
+SOURCE FILES:
+  - type_hints.py       (List, Dict type hints)
+  - optional_types.py   (Optional, Union type hints)
+
+EXPECTED ENTITIES:
+  type_hints.py:
+    - function "process"
+
+  optional_types.py:
+    - function "lookup"
+
+EXPECTED DEPENDENCY EDGES:
+  type_hints.py:
+    - process -> List              (type hint)
+    - process -> Dict              (type hint)
+    - process -> User              (type hint)
+
+  optional_types.py:
+    - lookup -> Optional           (type hint)
+    - lookup -> Union              (type hint)
+    - lookup -> User               (type hint)
+
+MINIMUM EDGE COUNTS:
+  type_hints.py: at least 2 edges (List, Dict)
+  optional_types.py: at least 2 edges (Optional, Union)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T090-typescript-generic-type-edges

@@ -1,0 +1,28 @@
+FIXTURE: T122-java-stream-operation-edges
+LANGUAGE: Java
+CATEGORY: Dependency Edges
+VALIDATES: Stream API operations (stream, filter, map, collect) create edges
+
+SOURCE FILES:
+  - stream.java  (stream operations chain)
+
+EXPECTED ENTITIES:
+  stream.java:
+    - class "DataService"
+    - method "getNames"
+
+EXPECTED DEPENDENCY EDGES:
+  stream.java:
+    - getNames -> stream   (method call)
+    - getNames -> filter   (method call)
+    - getNames -> map      (method call)
+    - getNames -> collect  (method call)
+
+MINIMUM EDGE COUNTS:
+  stream.java: at least 4 edges (stream, filter, map, collect)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-JAVA-003.0: Stream API / Collection Operations

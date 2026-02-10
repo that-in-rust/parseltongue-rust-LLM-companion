@@ -1,0 +1,73 @@
+FIXTURE: T024-rust-iterator-method-edges
+LANGUAGE: Rust
+CATEGORY: Dependency Edges
+VALIDATES: Iterator and collection method calls create dependency edges
+
+SOURCE FILES:
+  - iter_basic.rs        (iter, filter, map, collect chain)
+  - iter_into.rs         (into_iter, filter, sum chain)
+  - iter_aggregation.rs  (multiple iter calls with max, min, count)
+  - iter_find_any.rs     (iter with find, any, all methods)
+  - iter_fold.rs         (iter with fold accumulator)
+
+EXPECTED ENTITIES:
+  iter_basic.rs:
+    - fn "transform" (function using iterator transformation)
+
+  iter_into.rs:
+    - fn "process" (function consuming iterator)
+
+  iter_aggregation.rs:
+    - fn "analyze" (function using multiple aggregation methods)
+
+  iter_find_any.rs:
+    - fn "search" (function using search/predicate methods)
+
+  iter_fold.rs:
+    - fn "calculate" (function using fold accumulator)
+
+EXPECTED DEPENDENCY EDGES:
+  The extractor should detect method calls on iterators as dependency edges.
+  Each method in the iterator chain creates a separate dependency.
+
+  iter_basic.rs:
+    - transform -> iter      (create iterator)
+    - transform -> filter    (filter iterator)
+    - transform -> map       (map iterator)
+    - transform -> collect   (collect results)
+
+  iter_into.rs:
+    - process -> into_iter   (consuming iterator)
+    - process -> filter      (filter values)
+    - process -> sum         (aggregate sum)
+
+  iter_aggregation.rs:
+    - analyze -> iter        (first iter call)
+    - analyze -> max         (max aggregation)
+    - analyze -> iter        (second iter call)
+    - analyze -> min         (min aggregation)
+    - analyze -> iter        (third iter call)
+    - analyze -> count       (count aggregation)
+
+  iter_find_any.rs:
+    - search -> find         (find element)
+    - search -> any          (any predicate)
+    - search -> all          (all predicate)
+
+  iter_fold.rs:
+    - calculate -> fold      (fold accumulator)
+
+MINIMUM EDGE COUNTS:
+  iter_basic.rs: at least 4 edges (iter, filter, map, collect)
+  iter_into.rs: at least 3 edges (into_iter, filter, sum)
+  iter_aggregation.rs: at least 6 edges (3x iter + max + min + count)
+  iter_find_any.rs: at least 3 edges (find, any, all)
+  iter_fold.rs: at least 1 edge (fold)
+
+KNOWN LIMITATIONS:
+  Iterator method detection depends on tree-sitter capturing method calls
+  in chained expressions. Some complex iterator chains may not be fully captured.
+
+RELATED TESTS:
+  T064-javascript-array-method-edges (similar pattern, JavaScript)
+  T044-python-iterator-edges (similar pattern, Python)

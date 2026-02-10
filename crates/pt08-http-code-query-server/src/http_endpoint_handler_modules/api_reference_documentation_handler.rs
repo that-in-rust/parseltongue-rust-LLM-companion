@@ -99,7 +99,7 @@ pub async fn handle_api_reference_documentation_help(
             success: true,
             endpoint: "/api-reference-documentation-help".to_string(),
             data: ApiReferenceDataPayload {
-                api_version: "1.6.0".to_string(),
+                api_version: "1.6.1".to_string(),
                 total_endpoints,
                 categories,
             },
@@ -376,6 +376,24 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                     method: "GET".to_string(),
                     description: "Leiden community detection with directed modularity".to_string(),
                     parameters: vec![],
+                },
+            ],
+        },
+        EndpointCategoryDocPayload {
+            name: "Coverage (v1.6.1)".to_string(),
+            endpoints: vec![
+                EndpointDocumentationEntryPayload {
+                    path: "/ingestion-coverage-folder-report".to_string(),
+                    method: "GET".to_string(),
+                    description: "Per-folder ingestion coverage report showing total, eligible, and parsed file counts at configurable depth".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "depth".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Folder depth level (0=root only, 1=L1 folders, 2=L2 folders, default: 2)".to_string(),
+                        },
+                    ],
                 },
             ],
         },

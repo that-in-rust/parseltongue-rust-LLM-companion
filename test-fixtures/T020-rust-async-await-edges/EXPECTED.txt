@@ -1,0 +1,48 @@
+FIXTURE: T020-rust-async-await-edges
+LANGUAGE: Rust
+CATEGORY: Dependency Edges
+VALIDATES: Async/await expressions create dependency edges to awaited functions
+
+SOURCE FILES:
+  - async_basic.rs       (basic await on function call and method call)
+  - async_error.rs       (await with ? error propagation operator)
+  - async_chain.rs       (chained await expressions on method call results)
+
+EXPECTED ENTITIES:
+  async_basic.rs:
+    - fn "load_data" (async function)
+
+  async_error.rs:
+    - fn "process" (async function returning Result)
+
+  async_chain.rs:
+    - fn "complex_operation" (async function)
+
+EXPECTED DEPENDENCY EDGES:
+  The extractor should detect calls made through .await expressions.
+  Each await point creates a dependency edge from the enclosing function
+  to the awaited function/method.
+
+  async_basic.rs:
+    - load_data -> fetch_data        (await on function call)
+    - load_data -> get               (await on method call: client.get())
+
+  async_error.rs:
+    - process -> fetch               (await? on method: client.fetch())
+    - process -> save_data           (await? on function call)
+
+  async_chain.rs:
+    - complex_operation -> fetch_user  (first await in chain)
+    - complex_operation -> process     (second await in chain)
+
+MINIMUM EDGE COUNTS:
+  async_basic.rs: at least 2 edges
+  async_error.rs: at least 2 edges
+  async_chain.rs: at least 2 edges
+
+KNOWN LIMITATIONS:
+  None for Rust async/await detection.
+
+RELATED TESTS:
+  T064-javascript-async-await-edges (same pattern, JavaScript)
+  T044-python-async-await-edges (same pattern, Python)

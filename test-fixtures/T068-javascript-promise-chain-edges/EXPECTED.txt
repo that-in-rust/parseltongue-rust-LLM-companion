@@ -1,0 +1,37 @@
+FIXTURE: T068-javascript-promise-chain-edges
+LANGUAGE: JavaScript
+CATEGORY: Dependency Edges
+VALIDATES: Promise chain operations create dependency edges
+
+SOURCE FILES:
+  - promise_then_catch.js    (then and catch)
+  - promise_finally.js       (then, catch, finally)
+
+EXPECTED ENTITIES:
+  promise_then_catch.js:
+    - function "fetchUser"
+
+  promise_finally.js:
+    - function "request"
+
+EXPECTED DEPENDENCY EDGES:
+  promise_then_catch.js:
+    - fetchUser -> fetch       (call)
+    - fetchUser -> then        (promise method)
+    - fetchUser -> catch       (promise method)
+
+  promise_finally.js:
+    - request -> then          (promise method)
+    - request -> catch         (promise method)
+    - request -> finally       (promise method)
+
+MINIMUM EDGE COUNTS:
+  promise_then_catch.js: at least 3 edges (fetch, then, catch)
+  promise_finally.js: at least 3 edges (then, catch, finally)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T064-javascript-async-await-edges (related async pattern)
+  T088-typescript-async-await-edges (TypeScript equivalent)

@@ -1,0 +1,31 @@
+FIXTURE: T050-python-integration-all-patterns
+LANGUAGE: Python
+CATEGORY: Integration Test
+VALIDATES: Multiple Python dependency patterns working together
+
+SOURCE FILES:
+  - integration.py    (comprehensive test of all Python patterns)
+
+EXPECTED ENTITIES:
+  integration.py:
+    - class "UserService" with methods "config", "process_users"
+
+EXPECTED DEPENDENCY EDGES:
+  integration.py:
+    - config -> property           (decorator)
+    - process_users -> List        (type hint)
+    - process_users -> User        (type hint)
+    - process_users -> name        (attribute access)
+    - process_users -> save_user   (async call)
+    - process_users -> Logger      (constructor call)
+
+MINIMUM EDGE COUNTS:
+  integration.py: at least 5 edges
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T028-rust-integration-all-patterns
+  T070-javascript-integration-all-patterns
+  T092-typescript-integration-all-patterns

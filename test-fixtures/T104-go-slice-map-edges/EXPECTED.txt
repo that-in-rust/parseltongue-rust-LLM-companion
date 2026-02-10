@@ -1,0 +1,30 @@
+FIXTURE: T104-go-slice-map-edges
+LANGUAGE: Go
+CATEGORY: Dependency Edges
+VALIDATES: Slice and map literals with type references create edges
+
+SOURCE FILES:
+  - slice.go  (slice literals []Item{})
+  - map.go    (map literals map[string]User{})
+
+EXPECTED ENTITIES:
+  slice.go:
+    - fn "setup"
+  map.go:
+    - fn "setup"
+
+EXPECTED DEPENDENCY EDGES:
+  slice.go:
+    - setup -> Item  (slice literal type reference)
+  map.go:
+    - setup -> User  (map literal value type reference)
+
+MINIMUM EDGE COUNTS:
+  slice.go: at least 1 edge (Item)
+  map.go: at least 1 edge (User)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-GO-004.0: Slice/Array Literal Type References

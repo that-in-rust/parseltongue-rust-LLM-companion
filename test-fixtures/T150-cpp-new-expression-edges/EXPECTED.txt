@@ -1,0 +1,32 @@
+FIXTURE: T150-cpp-new-expression-edges
+LANGUAGE: C++
+CATEGORY: Dependency Edges
+VALIDATES: new_expression creates dependency edges
+
+SOURCE FILES:
+  - simple.cpp    (basic new expressions)
+  - template.cpp  (new with template types)
+
+EXPECTED ENTITIES:
+  simple.cpp:
+    - fn "create"
+  template.cpp:
+    - fn "allocate"
+
+EXPECTED DEPENDENCY EDGES:
+  simple.cpp:
+    - create -> User    (new expression)
+    - create -> Config  (new expression)
+  template.cpp:
+    - allocate -> vector  (new expression with template)
+    - allocate -> map     (new expression with template)
+
+MINIMUM EDGE COUNTS:
+  simple.cpp: at least 2 edges (User, Config)
+  template.cpp: at least 2 edges (vector, map)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-CPP-001.0: Constructor Calls (new_expression)

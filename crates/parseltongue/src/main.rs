@@ -162,10 +162,34 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
     let streamer = pt01_folder_to_cozodb_streamer::ToolFactory::create_streamer(config.clone()).await?;
     let result = streamer.stream_directory().await?;
 
+    // Write ingestion error log
+    {
+        use std::io::Write;
+        let error_log_path = format!("{}/ingestion-errors.txt", workspace_dir);
+        let mut error_file = std::fs::File::create(&error_log_path)?;
+        writeln!(error_file, "# Parseltongue Ingestion Error Log")?;
+        writeln!(error_file, "# Generated: {}", chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"))?;
+        writeln!(error_file, "# Database: {}", workspace_db_path)?;
+        writeln!(error_file, "# Source: {}", directory)?;
+        writeln!(error_file, "# Total files: {}, Processed: {}, Errors: {}",
+            result.total_files, result.processed_files, result.errors.len())?;
+        writeln!(error_file, "#")?;
+        if result.errors.is_empty() {
+            writeln!(error_file, "# No errors encountered during ingestion.")?;
+        } else {
+            for error in &result.errors {
+                writeln!(error_file, "{}", error)?;
+            }
+        }
+    }
+
     if !quiet {
         println!("{}", style("✓ Indexing completed").green().bold());
         println!("  Files processed: {}", result.processed_files);
         println!("  Entities created: {}", result.entities_created);
+        if !result.errors.is_empty() {
+            println!("  Errors: {} (see {}/ingestion-errors.txt)", result.errors.len(), workspace_dir);
+        }
         println!();
         println!("{}", style("📁 Workspace location:").green().bold());
         println!("  {}", style(&workspace_dir).yellow().bold());

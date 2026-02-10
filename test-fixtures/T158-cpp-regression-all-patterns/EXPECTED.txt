@@ -1,0 +1,25 @@
+FIXTURE: T158-cpp-regression-all-patterns
+LANGUAGE: C++
+CATEGORY: Dependency Edges
+VALIDATES: Existing function call patterns still work (regression test)
+
+SOURCE FILES:
+  - calls.cpp  (basic function calls)
+
+EXPECTED ENTITIES:
+  calls.cpp:
+    - fn "process"
+
+EXPECTED DEPENDENCY EDGES:
+  calls.cpp:
+    - process -> calculate  (function call)
+    - process -> validate   (function call)
+
+MINIMUM EDGE COUNTS:
+  calls.cpp: at least 2 edges (calculate, validate)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-CPP-REGRESS.0: Regression Tests

@@ -1,0 +1,36 @@
+FIXTURE: T060-javascript-constructor-new-edges
+LANGUAGE: JavaScript
+CATEGORY: Dependency Edges
+VALIDATES: Constructor calls (new expression) create dependency edges
+
+SOURCE FILES:
+  - constructor_basic.js       (basic new expression)
+  - constructor_qualified.js   (qualified constructor like new Models.User())
+
+EXPECTED ENTITIES:
+  constructor_basic.js:
+    - function "create"
+
+  constructor_qualified.js:
+    - function "build"
+
+EXPECTED DEPENDENCY EDGES:
+  constructor_basic.js:
+    - create -> User           (new expression)
+    - create -> Date           (new expression)
+    - create -> Map            (new expression)
+
+  constructor_qualified.js:
+    - build -> User            (qualified new)
+    - build -> Logger          (qualified new)
+
+MINIMUM EDGE COUNTS:
+  constructor_basic.js: at least 3 edges (User, Date, Map)
+  constructor_qualified.js: at least 2 edges (User, Logger)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T040-python-constructor-call-edges
+  T080-typescript-constructor-new-edges

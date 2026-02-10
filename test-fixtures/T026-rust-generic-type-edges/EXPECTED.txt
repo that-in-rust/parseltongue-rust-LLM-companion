@@ -1,0 +1,56 @@
+FIXTURE: T026-rust-generic-type-edges
+LANGUAGE: Rust
+CATEGORY: Dependency Edges
+VALIDATES: Generic type usage creates dependency edges to type names
+
+SOURCE FILES:
+  - generic_basic.rs    (Vec<String>, HashMap<String, User>)
+  - generic_nested.rs   (Vec<Vec<u32>>, HashMap<String, Vec<Item>>)
+  - generic_custom.rs   (Result<User, Error>, Option<Data>)
+
+EXPECTED ENTITIES:
+  generic_basic.rs:
+    - fn "setup" (function declaring generic types)
+
+  generic_nested.rs:
+    - fn "build" (function with nested generic types)
+
+  generic_custom.rs:
+    - fn "process" (function with Result and Option types)
+
+EXPECTED DEPENDENCY EDGES:
+  The extractor should detect type names used in generic type parameters
+  as dependencies. Each type parameter creates a dependency edge.
+
+  generic_basic.rs:
+    - setup -> Vec         (generic type Vec)
+    - setup -> HashMap     (generic type HashMap)
+    - setup -> String      (type parameter in Vec and HashMap)
+    - setup -> User        (type parameter in HashMap)
+
+  generic_nested.rs:
+    - build -> Vec         (outer and inner Vec)
+    - build -> HashMap     (generic type HashMap)
+    - build -> String      (type parameter in HashMap)
+    - build -> Item        (type parameter in nested Vec)
+
+  generic_custom.rs:
+    - process -> Result    (generic Result type)
+    - process -> Option    (generic Option type)
+    - process -> User      (type parameter in Result)
+    - process -> Error     (type parameter in Result)
+    - process -> Data      (type parameter in Option)
+
+MINIMUM EDGE COUNTS:
+  generic_basic.rs: at least 2 edges (Vec, HashMap as minimum)
+  generic_nested.rs: at least 3 edges (nested generics)
+  generic_custom.rs: at least 2 edges (Result, Option as minimum)
+
+KNOWN LIMITATIONS:
+  Generic type detection may vary based on tree-sitter's ability to parse
+  complex type annotations. Some nested or complex generic types may not
+  be fully captured.
+
+RELATED TESTS:
+  T064-javascript-generic-type-edges (TypeScript generics)
+  T044-python-generic-type-edges (Python type hints)

@@ -1,0 +1,27 @@
+FIXTURE: T124-java-generic-type-edges
+LANGUAGE: Java
+CATEGORY: Dependency Edges
+VALIDATES: Generic type references (List<T>, Map<K,V>) create edges
+
+SOURCE FILES:
+  - types.java  (generic type declarations)
+
+EXPECTED ENTITIES:
+  types.java:
+    - class "Repository"
+    - method "process"
+
+EXPECTED DEPENDENCY EDGES:
+  types.java:
+    - Repository -> List  (generic type reference)
+    - Repository -> Map   (generic type reference)
+    - process -> Set      (generic type reference)
+
+MINIMUM EDGE COUNTS:
+  types.java: at least 3 edges (List, Map, Set)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-JAVA-004.0: Generic Type References

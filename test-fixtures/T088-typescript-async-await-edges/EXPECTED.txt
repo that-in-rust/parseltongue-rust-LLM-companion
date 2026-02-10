@@ -1,0 +1,36 @@
+FIXTURE: T088-typescript-async-await-edges
+LANGUAGE: TypeScript
+CATEGORY: Dependency Edges
+VALIDATES: Async/await and Promise chains create dependency edges
+
+SOURCE FILES:
+  - async_basic.ts         (await on function calls)
+  - promise_operations.ts  (Promise .then/.catch chain)
+
+EXPECTED ENTITIES:
+  async_basic.ts:
+    - class "Fetcher" with async method "load"
+
+  promise_operations.ts:
+    - class "AsyncProcessor" with method "process"
+
+EXPECTED DEPENDENCY EDGES:
+  async_basic.ts:
+    - load -> fetchData            (await on function call)
+    - load -> getUser              (await on function call)
+
+  promise_operations.ts:
+    - process -> fetchData         (function call initiating promise)
+    - process -> handleSuccess     (then callback) OR then edge
+    - process -> handleError       (catch callback) OR catch edge
+
+MINIMUM EDGE COUNTS:
+  async_basic.ts: fetchData AND getUser edges present
+  promise_operations.ts: fetchData edge present, plus then OR catch
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T020-rust-async-await-edges (same pattern, Rust)
+  T064-javascript-async-await-edges (same pattern, JavaScript)

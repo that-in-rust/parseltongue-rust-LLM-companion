@@ -28,12 +28,13 @@ pub trait Isgl1KeyGenerator: Send + Sync {
 
     /// Parse source code into structured entities AND dependency edges
     ///
-    /// Returns (entities, dependencies) where dependencies contains function calls,
+    /// Returns (entities, dependencies, warnings) where dependencies contains function calls,
     /// type usages, and trait implementations extracted during the same tree-sitter pass.
+    /// The warnings vector contains extraction errors/warnings for logging.
     ///
     /// # Performance
     /// Single-pass extraction: adds ~5-10% overhead vs entity-only extraction
-    fn parse_source(&self, source: &str, file_path: &Path) -> Result<(Vec<ParsedEntity>, Vec<DependencyEdge>)>;
+    fn parse_source(&self, source: &str, file_path: &Path) -> Result<(Vec<ParsedEntity>, Vec<DependencyEdge>, Vec<String>)>;
 
     /// Get supported language for file extension
     fn get_language_type(&self, file_path: &Path) -> Result<Language>;
@@ -215,7 +216,7 @@ impl Isgl1KeyGenerator for Isgl1KeyGeneratorImpl {
         Ok(self.format_key(entity))
     }
 
-    fn parse_source(&self, source: &str, file_path: &Path) -> Result<(Vec<ParsedEntity>, Vec<DependencyEdge>)> {
+    fn parse_source(&self, source: &str, file_path: &Path) -> Result<(Vec<ParsedEntity>, Vec<DependencyEdge>, Vec<String>)> {
         let language_type = self.get_language_type(file_path)?;
 
         let parser_mutex = self.parsers.get(&language_type)
@@ -234,9 +235,10 @@ impl Isgl1KeyGenerator for Isgl1KeyGeneratorImpl {
 
         let mut entities = Vec::new();
         let mut dependencies = Vec::new();
-        self.extract_entities(&tree, source, file_path, language_type, &mut entities, &mut dependencies);
+        let mut extraction_warnings = Vec::new();
+        self.extract_entities(&tree, source, file_path, language_type, &mut entities, &mut dependencies, &mut extraction_warnings);
 
-        Ok((entities, dependencies))
+        Ok((entities, dependencies, extraction_warnings))
     }
 
     fn get_language_type(&self, file_path: &Path) -> Result<Language> {
@@ -373,6 +375,7 @@ impl Isgl1KeyGeneratorImpl {
         language: Language,
         entities: &mut Vec<ParsedEntity>,
         dependencies: &mut Vec<DependencyEdge>,
+        extraction_warnings: &mut Vec<String>,
     ) {
         // v0.8.9 CRITICAL FIX: Use QueryBasedExtractor for entity extraction
         //
@@ -406,12 +409,12 @@ impl Isgl1KeyGeneratorImpl {
                     }
                     Err(e) => {
                         // Graceful degradation: log error but continue
-                        eprintln!("QueryBasedExtractor failed for {:?}: {}", language, e);
+                        extraction_warnings.push(format!("[EXTRACT_FAIL] {}: QueryBasedExtractor failed for {:?}: {}", file_path.display(), language, e));
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Failed to lock query_extractor: {}", e);
+                extraction_warnings.push(format!("[EXTRACT_FAIL] {}: Failed to lock query_extractor: {}", file_path.display(), e));
             }
         }
 
@@ -477,7 +480,7 @@ struct TestStruct {
 "#;
 
         let file_path = Path::new("test.rs");
-        let (entities, dependencies) = generator.parse_source(source, file_path).unwrap();
+        let (entities, dependencies, _warnings) = generator.parse_source(source, file_path).unwrap();
 
         assert!(!entities.is_empty());
         assert_eq!(entities.len(), 2); // One function, one struct
@@ -511,7 +514,7 @@ fn build_cli() -> Command {
 "#;
 
         let file_path = Path::new("src/main.rs");
-        let (entities, _dependencies) = generator.parse_source(source, file_path).unwrap();
+        let (entities, _dependencies, _warnings) = generator.parse_source(source, file_path).unwrap();
 
         // Debug: print all entities
         println!("\nExtracted {} entities from main.rs:", entities.len());
@@ -554,7 +557,7 @@ mod tests {
 "#;
 
         let file_path = Path::new("test.rs");
-        let (entities, _dependencies) = generator.parse_source(source, file_path).unwrap();
+        let (entities, _dependencies, _warnings) = generator.parse_source(source, file_path).unwrap();
 
         // Debug: print all entities
         println!("\nExtracted {} entities:", entities.len());

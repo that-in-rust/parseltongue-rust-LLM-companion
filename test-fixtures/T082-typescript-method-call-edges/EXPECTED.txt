@@ -1,0 +1,25 @@
+FIXTURE: T082-typescript-method-call-edges
+LANGUAGE: TypeScript
+CATEGORY: Dependency Edges
+VALIDATES: Method calls create dependency edges
+
+SOURCE FILES:
+  - method_calls.ts    (basic method calls)
+
+EXPECTED ENTITIES:
+  method_calls.ts:
+    - class "Service" with method "process"
+
+EXPECTED DEPENDENCY EDGES:
+  method_calls.ts:
+    - process -> helper         (method call)
+    - process -> doWork         (method call)
+
+MINIMUM EDGE COUNTS:
+  method_calls.ts: at least 2 edges (helper, doWork)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  None (basic method calls)

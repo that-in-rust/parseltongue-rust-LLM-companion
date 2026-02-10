@@ -57,7 +57,7 @@ end
 "#;
 
     let file_path = Path::new("test_room.rb");
-    let (entities, _dependencies) = generator.parse_source(ruby_code, file_path)
+    let (entities, _dependencies, _warnings) = generator.parse_source(ruby_code, file_path)
         .expect("Should parse valid Ruby code without errors");
 
     // RED: This assertion will FAIL - currently returns 0 entities
@@ -110,7 +110,7 @@ def hello_world():
 "#;
 
     let file_path = Path::new("test_calculator.py");
-    let (entities, _dependencies) = generator.parse_source(python_code, file_path)
+    let (entities, _dependencies, _warnings) = generator.parse_source(python_code, file_path)
         .expect("Should parse valid Python code without errors");
 
     // RED: This assertion will FAIL - currently returns 0 entities
@@ -167,7 +167,7 @@ class Calculator {
 "#;
 
     let file_path = Path::new("test.js");
-    let (entities, _dependencies) = generator.parse_source(js_code, file_path)
+    let (entities, _dependencies, _warnings) = generator.parse_source(js_code, file_path)
         .expect("Should parse valid JavaScript code without errors");
 
     // RED: This assertion will FAIL - currently returns 0 entities
@@ -213,7 +213,7 @@ func (u *User) Greet() string {
 "#;
 
     let file_path = Path::new("test.go");
-    let (entities, _dependencies) = generator.parse_source(go_code, file_path)
+    let (entities, _dependencies, _warnings) = generator.parse_source(go_code, file_path)
         .expect("Should parse valid Go code without errors");
 
     // RED: This assertion will FAIL
@@ -250,7 +250,7 @@ fn test_all_languages_extract_nonzero_entities() {
 
     for (path, code, lang_name) in test_cases {
         match generator.parse_source(code, path) {
-            Ok((entities, _)) => {
+            Ok((entities, _, _)) => {
                 if entities.is_empty() {
                     failures.push(format!("{}: 0 entities extracted", lang_name));
                 }
@@ -291,7 +291,7 @@ fn test_multi_language_performance_parity() {
     let ruby_code = format!("class TestClass\n{}\nend", ruby_code);
 
     let start = Instant::now();
-    let (entities, _) = generator.parse_source(&ruby_code, Path::new("test.rb"))
+    let (entities, _, _) = generator.parse_source(&ruby_code, Path::new("test.rb"))
         .expect("Should parse Ruby");
     let elapsed = start.elapsed();
 

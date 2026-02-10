@@ -1,0 +1,24 @@
+FIXTURE: T186-php-regression-all-patterns
+LANGUAGE: PHP
+CATEGORY: Dependency Edges
+VALIDATES: PHP regression test - existing patterns still work
+
+SOURCE FILES:
+  - regression.php (function call, method call)
+
+EXPECTED ENTITIES:
+  - php:class:MyClass
+  - php:fn:run
+
+EXPECTED DEPENDENCY EDGES (REQ-PHP-004.0):
+  - run -> doSomething (function call)
+  - run -> method (method call)
+
+MINIMUM EDGE COUNTS:
+  - regression.php: 1+ edges (any existing pattern works)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/php_dependency_patterns_test.rs

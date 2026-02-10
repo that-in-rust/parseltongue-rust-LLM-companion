@@ -1,0 +1,52 @@
+FIXTURE: T022-rust-field-access-edges
+LANGUAGE: Rust
+CATEGORY: Dependency Edges
+VALIDATES: Field access expressions create dependency edges in non-call contexts
+
+SOURCE FILES:
+  - field_simple.rs       (simple field reads: user.name, user.age)
+  - field_assignment.rs   (field writes: user.age = 30, user.name = ...)
+  - field_nested.rs       (nested field access: config.settings.timeout)
+
+EXPECTED ENTITIES:
+  field_simple.rs:
+    - fn "process" (function accessing User fields)
+
+  field_assignment.rs:
+    - fn "update" (function assigning to User fields)
+
+  field_nested.rs:
+    - fn "get_value" (function accessing nested Config fields)
+
+EXPECTED DEPENDENCY EDGES:
+  The extractor should detect field access patterns in both read and write
+  contexts. Each field access creates a dependency edge from the enclosing
+  function to the accessed field identifier.
+
+  field_simple.rs:
+    - process -> name       (field read: user.name)
+    - process -> age        (field read: user.age)
+
+  field_assignment.rs:
+    - update -> age         (field write: user.age = 30)
+    - update -> name        (field write: user.name = String::from("Alice"))
+
+  field_nested.rs:
+    - get_value -> settings     (first level: config.settings)
+    - get_value -> timeout      (second level: settings.timeout)
+    - get_value -> database     (first level: config.database)
+    - get_value -> connection   (second level: database.connection)
+    - get_value -> host         (third level: connection.host)
+
+MINIMUM EDGE COUNTS:
+  field_simple.rs: at least 2 edges (name, age)
+  field_assignment.rs: at least 2 edges (age, name)
+  field_nested.rs: at least 3 edges (nested chain detection)
+
+KNOWN LIMITATIONS:
+  Field access detection may vary based on tree-sitter query patterns.
+  Some field accesses might be counted as method calls if followed by parentheses.
+
+RELATED TESTS:
+  T064-javascript-field-access-edges (same pattern, JavaScript)
+  T044-python-field-access-edges (same pattern, Python)

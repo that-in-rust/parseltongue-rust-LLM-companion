@@ -1,0 +1,30 @@
+FIXTURE: T222-swift-protocol-query-extraction
+LANGUAGE: Swift
+CATEGORY: Protocol Query
+VALIDATES: Swift protocol_declaration query works correctly
+
+SOURCE FILES:
+  - protocol_simple.swift (single protocol)
+  - all_types.swift       (func, class, struct, protocol)
+
+EXPECTED ENTITIES:
+  - swift:interface:Drawable (protocol)
+  - swift:fn:myFunc
+  - swift:class:MyClass
+  - swift:class:MyStruct (struct tagged as class)
+  - swift:interface:MyProtocol (protocol)
+
+VALIDATION REQUIREMENTS:
+  - Protocol query compiles without errors
+  - Protocols are tagged as Interface entity type (not Trait)
+  - All entity types extract successfully
+
+MINIMUM ENTITY COUNTS:
+  - protocol_simple.swift: 1 entity (Drawable)
+  - all_types.swift: 4 entities (myFunc, MyClass, MyStruct, MyProtocol)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/swift_protocol_query_test.rs

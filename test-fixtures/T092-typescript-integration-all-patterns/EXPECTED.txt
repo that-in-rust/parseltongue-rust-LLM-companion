@@ -1,0 +1,30 @@
+FIXTURE: T092-typescript-integration-all-patterns
+LANGUAGE: TypeScript
+CATEGORY: Integration
+VALIDATES: All TypeScript dependency patterns detected in a single comprehensive file
+
+SOURCE FILES:
+  - integration.ts    (combines constructors, property access, method calls, collections, async/await)
+
+EXPECTED ENTITIES:
+  integration.ts:
+    - class "DataService" with methods "fetchAndProcess" (async) and "helper"
+
+EXPECTED DEPENDENCY EDGES:
+  integration.ts:
+    - fetchAndProcess -> Array          (constructor: new Array<string>())
+    - fetchAndProcess -> DataModel      (constructor: new DataModel())
+    - fetchAndProcess -> name           (property access: model.name)
+    - fetchAndProcess -> helper         (method call: this.helper())
+    - fetchAndProcess -> filter         (collection op: list.filter())
+    - fetchAndProcess -> fetchData      (async: await fetchData())
+
+MINIMUM EDGE COUNTS:
+  integration.ts: at least 5 edges from various patterns
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T028-rust-integration-all-patterns (same concept, Rust)
+  T070-javascript-integration-all-patterns (same concept, JavaScript)

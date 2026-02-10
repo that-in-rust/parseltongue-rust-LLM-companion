@@ -505,11 +505,22 @@ impl FileStreamer for FileStreamerImpl {
         pb.set_message("Scanning files...");
 
         // Walk through directory
-        for entry in WalkDir::new(&self.config.root_dir)
+        let walk_entries: Vec<_> = WalkDir::new(&self.config.root_dir)
             .follow_links(false)
             .into_iter()
-            .filter_map(|e| e.ok())
-        {
+            .collect();
+
+        for entry_result in walk_entries {
+            let entry = match entry_result {
+                Ok(e) => e,
+                Err(e) => {
+                    let path_str = e.path().map(|p| p.display().to_string()).unwrap_or_else(|| "unknown".to_string());
+                    let error_msg = format!("[WALK_ERROR] {}: {}", path_str, e);
+                    errors.push(error_msg);
+                    continue;
+                }
+            };
+
             let path = entry.path();
 
             if path.is_file() && self.should_process_file(path) {
@@ -522,7 +533,21 @@ impl FileStreamer for FileStreamerImpl {
                         entities_created += result.entities_created;
                     }
                     Err(e) => {
-                        let error_msg = format!("{}: {}", path.display(), e);
+                        // Categorize error based on type
+                        let error_msg = match &e {
+                            StreamerError::FileTooLarge { path, size, limit } => {
+                                format!("[TOO_LARGE] {}: File size {} exceeds limit {}", path, size, limit)
+                            }
+                            StreamerError::UnsupportedFileType { path } => {
+                                format!("[UNSUPPORTED] {}: No parser available", path)
+                            }
+                            StreamerError::ParsingError { file, reason } => {
+                                format!("[PARSE_ERROR] {}: {}", file, reason)
+                            }
+                            _ => {
+                                format!("[EXTRACT_FAIL] {}: {}", path.display(), e)
+                            }
+                        };
                         errors.push(error_msg.clone());
                         pb.println(format!("{} {}", style("⚠").yellow().for_stderr(), error_msg));
                         self.update_stats(0, 0, 0, true);  // v0.9.3: No entities created on error
@@ -585,10 +610,18 @@ impl FileStreamer for FileStreamerImpl {
         pb.set_message("Scanning files...");
 
         // Step 1: Collect all file paths upfront (trade-off: memory for parallelism)
+        let mut walk_errors: Vec<String> = Vec::new();
         let files_to_process: Vec<PathBuf> = WalkDir::new(&self.config.root_dir)
             .follow_links(false)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(|entry_result| match entry_result {
+                Ok(e) => Some(e),
+                Err(e) => {
+                    let path_str = e.path().map(|p| p.display().to_string()).unwrap_or_else(|| "unknown".to_string());
+                    walk_errors.push(format!("[WALK_ERROR] {}: {}", path_str, e));
+                    None
+                }
+            })
             .filter_map(|entry| {
                 let path = entry.path();
                 if path.is_file() && self.should_process_file(path) {
@@ -635,10 +668,13 @@ impl FileStreamer for FileStreamerImpl {
                     }
                 }
                 Err(e) => {
-                    errors.push(format!("Processing error: {}", e));
+                    errors.push(format!("[EXTRACT_FAIL] Processing error: {}", e));
                 }
             }
         }
+
+        // Merge walk errors
+        errors.extend(walk_errors);
 
         // Step 4: Batch insert all entities
         if !all_entities.is_empty() {
@@ -648,7 +684,7 @@ impl FileStreamer for FileStreamerImpl {
                 }
                 Err(e) => {
                     errors.push(format!(
-                        "Failed to batch insert {} entities: {}",
+                        "[DB_INSERT] Failed to batch insert {} entities: {}",
                         all_entities.len(),
                         e
                     ));
@@ -667,7 +703,7 @@ impl FileStreamer for FileStreamerImpl {
                 }
                 Err(e) => {
                     errors.push(format!(
-                        "Failed to batch insert {} dependencies: {}",
+                        "[DB_INSERT] Failed to batch insert {} dependencies: {}",
                         all_dependencies.len(),
                         e
                     ));
@@ -718,12 +754,17 @@ impl FileStreamer for FileStreamerImpl {
         let content = self.read_file_content(file_path).await?;
 
         // Parse code entities AND dependencies (two-pass extraction)
-        let (parsed_entities, dependencies) = self.key_generator.parse_source(&content, file_path)?;
+        let (parsed_entities, dependencies, extraction_warnings) = self.key_generator.parse_source(&content, file_path)?;
 
         let mut entities_created = 0;
         let mut code_count = 0;  // v0.9.3: Track CODE entities
         let mut test_count = 0;  // v0.9.3: Track TEST entities
         let mut errors: Vec<String> = Vec::new();
+
+        // Collect extraction warnings from parsing
+        for warning in extraction_warnings {
+            errors.push(warning);
+        }
 
         // Bug #4 Fix: Extract external dependency placeholders from edges
         // These are dependencies to external crates (e.g., clap::Parser, tokio::Runtime)
@@ -770,7 +811,7 @@ impl FileStreamer for FileStreamerImpl {
                     code_count += 1; // v0.9.6: Only CODE entities reach here
                 }
                 Err(e) => {
-                    let error_msg = format!("Failed to convert entity {}: {}", isgl1_key, e);
+                    let error_msg = format!("[CONVERT_FAIL] {}: Failed to convert entity {}: {}", file_path.display(), isgl1_key, e);
                     errors.push(error_msg);
                 }
             }
@@ -784,7 +825,7 @@ impl FileStreamer for FileStreamerImpl {
                 }
                 Err(e) => {
                     let error_msg = format!(
-                        "Failed to batch insert {} entities: {}",
+                        "[DB_INSERT] Failed to batch insert {} entities: {}",
                         entities_to_insert.len(),
                         e
                     );
@@ -842,7 +883,7 @@ impl FileStreamer for FileStreamerImpl {
                 }
                 Err(e) => {
                     eprintln!("[DEBUG-INSERT] ❌ FAILED to insert edges: {}", e);
-                    errors.push(format!("Failed to insert {} dependencies: {}", dependencies.len(), e));
+                    errors.push(format!("[DB_INSERT] Failed to insert {} dependencies: {}", dependencies.len(), e));
                 }
             }
         }
@@ -907,11 +948,16 @@ impl FileStreamerImpl {
         }
 
         // Parse code entities AND dependencies (two-pass extraction)
-        let (parsed_entities, dependencies) = self.key_generator.parse_source(&content, file_path)?;
+        let (parsed_entities, dependencies, extraction_warnings) = self.key_generator.parse_source(&content, file_path)?;
 
         let mut code_count = 0;
         let mut test_count = 0;
         let mut errors: Vec<String> = Vec::new();
+
+        // Collect extraction warnings from parsing
+        for warning in extraction_warnings {
+            errors.push(warning);
+        }
 
         // Extract external dependency placeholders
         let external_placeholders = extract_placeholders_from_edges_deduplicated(&dependencies);
@@ -949,7 +995,7 @@ impl FileStreamerImpl {
                     code_count += 1;
                 }
                 Err(e) => {
-                    let error_msg = format!("Failed to convert entity {}: {}", isgl1_key, e);
+                    let error_msg = format!("[CONVERT_FAIL] {}: Failed to convert entity {}: {}", file_path.display(), isgl1_key, e);
                     errors.push(error_msg);
                 }
             }

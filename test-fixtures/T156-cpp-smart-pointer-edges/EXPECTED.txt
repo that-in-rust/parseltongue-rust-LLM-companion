@@ -1,0 +1,34 @@
+FIXTURE: T156-cpp-smart-pointer-edges
+LANGUAGE: C++
+CATEGORY: Dependency Edges
+VALIDATES: Smart pointer creation (make_unique, make_shared) creates edges
+
+SOURCE FILES:
+  - unique.cpp  (make_unique calls)
+  - shared.cpp  (make_shared calls)
+
+EXPECTED ENTITIES:
+  unique.cpp:
+    - fn "create"
+  shared.cpp:
+    - fn "share"
+
+EXPECTED DEPENDENCY EDGES:
+  unique.cpp:
+    - create -> make_unique  (function call)
+    - create -> User         (template argument)
+    - create -> Config       (template argument)
+  shared.cpp:
+    - share -> make_shared   (function call)
+    - share -> Config        (template argument)
+    - share -> Manager       (template argument)
+
+MINIMUM EDGE COUNTS:
+  unique.cpp: at least 3 edges (make_unique, User, Config)
+  shared.cpp: at least 3 edges (make_shared, Config, Manager)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-CPP-004.0: Smart Pointers

@@ -1,0 +1,43 @@
+FIXTURE: T080-typescript-constructor-new-edges
+LANGUAGE: TypeScript
+CATEGORY: Dependency Edges
+VALIDATES: Constructor calls (new expression) create dependency edges
+
+SOURCE FILES:
+  - constructor_simple.ts      (simple constructors)
+  - constructor_generic.ts     (generic constructors)
+  - constructor_qualified.ts   (qualified constructors)
+
+EXPECTED ENTITIES:
+  constructor_simple.ts:
+    - class "Manager" with method "create"
+
+  constructor_generic.ts:
+    - class "Container" with method "init"
+
+  constructor_qualified.ts:
+    - class "Factory" with method "build"
+
+EXPECTED DEPENDENCY EDGES:
+  constructor_simple.ts:
+    - create -> Person          (new expression)
+    - create -> DataModel       (new expression)
+
+  constructor_generic.ts:
+    - init -> Array             (generic new)
+    - init -> Map               (generic new)
+
+  constructor_qualified.ts:
+    - build -> User             (qualified new)
+
+MINIMUM EDGE COUNTS:
+  constructor_simple.ts: at least 2 edges (Person, DataModel)
+  constructor_generic.ts: at least 2 edges (Array, Map)
+  constructor_qualified.ts: at least 1 edge (User)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T040-python-constructor-call-edges
+  T060-javascript-constructor-new-edges

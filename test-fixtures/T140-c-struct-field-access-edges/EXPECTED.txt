@@ -1,0 +1,32 @@
+FIXTURE: T140-c-struct-field-access-edges
+LANGUAGE: C
+CATEGORY: Dependency Edges
+VALIDATES: Struct field access (-> and .) creates dependency edges
+
+SOURCE FILES:
+  - arrow.c  (pointer field access user->name)
+  - dot.c    (struct field access config.timeout)
+
+EXPECTED ENTITIES:
+  arrow.c:
+    - fn "process"
+  dot.c:
+    - fn "setup"
+
+EXPECTED DEPENDENCY EDGES:
+  arrow.c:
+    - process -> name  (field access via ->)
+    - process -> age   (field access via ->)
+  dot.c:
+    - setup -> timeout (field access via .)
+    - setup -> port    (field access via .)
+
+MINIMUM EDGE COUNTS:
+  arrow.c: at least 2 edges (name, age)
+  dot.c: at least 2 edges (timeout, port)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-C-001.0: Struct Field Access

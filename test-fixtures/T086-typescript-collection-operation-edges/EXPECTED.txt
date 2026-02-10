@@ -1,0 +1,36 @@
+FIXTURE: T086-typescript-collection-operation-edges
+LANGUAGE: TypeScript
+CATEGORY: Dependency Edges
+VALIDATES: Collection operations (map, filter, reduce) create dependency edges
+
+SOURCE FILES:
+  - collection_map_filter.ts    (separate map and filter calls)
+  - collection_chained.ts       (chained filter.map.reduce pipeline)
+
+EXPECTED ENTITIES:
+  collection_map_filter.ts:
+    - class "Transformer" with method "transform"
+
+  collection_chained.ts:
+    - class "Pipeline" with method "process"
+
+EXPECTED DEPENDENCY EDGES:
+  collection_map_filter.ts:
+    - transform -> map              (collection map operation)
+    - transform -> filter           (collection filter operation)
+
+  collection_chained.ts:
+    - process -> filter             (chained filter)
+    - process -> map                (chained map)
+    - process -> reduce             (chained reduce)
+
+MINIMUM EDGE COUNTS:
+  collection_map_filter.ts: map AND filter edges present
+  collection_chained.ts: at least one of filter/map/reduce present
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T066-javascript-array-method-edges (same pattern, JavaScript)
+  T024-rust-iterator-method-edges (same pattern, Rust)

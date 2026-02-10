@@ -1,0 +1,34 @@
+FIXTURE: T090-typescript-generic-type-edges
+LANGUAGE: TypeScript
+CATEGORY: Dependency Edges
+VALIDATES: Generic type annotations (Array<T>, Map<K,V>) create dependency edges
+
+SOURCE FILES:
+  - generic_annotations.ts    (class with generic type fields)
+  - generic_function.ts       (function with generic params and return type)
+
+EXPECTED ENTITIES:
+  generic_annotations.ts:
+    - class "Container" (generic class with T parameter)
+
+  generic_function.ts:
+    - fn "process" (generic function)
+
+EXPECTED DEPENDENCY EDGES:
+  generic_annotations.ts:
+    - Container -> Array           (generic type reference)
+    - Container -> Map             (generic type reference)
+
+  generic_function.ts:
+    - process -> Array             (parameter type)
+    - process -> Set               (return type / constructor)
+
+MINIMUM EDGE COUNTS:
+  generic_annotations.ts: Array AND Map edges present
+  generic_function.ts: Array OR Set edge present
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T026-rust-generic-type-edges (same pattern, Rust)

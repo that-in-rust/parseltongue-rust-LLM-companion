@@ -60,7 +60,7 @@ mod external_dependency_placeholder_tests {
         let generator = Isgl1KeyGeneratorImpl::new();
 
         // Act: Parse source and extract dependencies
-        let (_entities, dependencies) = generator
+        let (_entities, dependencies, _warnings) = generator
             .parse_source(source, &file_path)
             .expect("Failed to parse source");
 

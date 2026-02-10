@@ -1,0 +1,44 @@
+FIXTURE: T066-javascript-array-method-edges
+LANGUAGE: JavaScript
+CATEGORY: Dependency Edges
+VALIDATES: Array method calls create dependency edges
+
+SOURCE FILES:
+  - array_map_filter.js       (map and filter methods)
+  - array_reduce.js           (reduce method)
+  - array_find_some_every.js  (find, some, every methods)
+
+EXPECTED ENTITIES:
+  array_map_filter.js:
+    - function "processItems"
+
+  array_reduce.js:
+    - function "sum"
+
+  array_find_some_every.js:
+    - function "check"
+
+EXPECTED DEPENDENCY EDGES:
+  array_map_filter.js:
+    - processItems -> filter   (array method)
+    - processItems -> map      (array method)
+
+  array_reduce.js:
+    - sum -> reduce            (array method)
+
+  array_find_some_every.js:
+    - check -> find            (array method)
+    - check -> some            (array method)
+    - check -> every           (array method)
+
+MINIMUM EDGE COUNTS:
+  array_map_filter.js: at least 2 edges (filter, map)
+  array_reduce.js: at least 1 edge (reduce)
+  array_find_some_every.js: at least 3 edges (find, some, every)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T048-python-comprehension-call-edges
+  T086-typescript-collection-operation-edges

@@ -1,0 +1,34 @@
+FIXTURE: T120-java-constructor-call-edges
+LANGUAGE: Java
+CATEGORY: Dependency Edges
+VALIDATES: Constructor calls (new Foo()) create dependency edges
+
+SOURCE FILES:
+  - simple.java   (basic constructor calls)
+  - generic.java  (generic type constructors)
+
+EXPECTED ENTITIES:
+  simple.java:
+    - class "Manager"
+    - method "create"
+  generic.java:
+    - class "Container"
+    - method "init"
+
+EXPECTED DEPENDENCY EDGES:
+  simple.java:
+    - create -> Person      (constructor call)
+    - create -> DataModel   (constructor call)
+  generic.java:
+    - init -> ArrayList     (generic constructor)
+    - init -> HashMap       (generic constructor)
+
+MINIMUM EDGE COUNTS:
+  simple.java: at least 2 edges (Person, DataModel)
+  generic.java: at least 2 edges (ArrayList, HashMap)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-JAVA-001.0: Constructor Calls

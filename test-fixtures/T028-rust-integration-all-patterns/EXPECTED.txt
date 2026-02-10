@@ -1,0 +1,52 @@
+FIXTURE: T028-rust-integration-all-patterns
+LANGUAGE: Rust
+CATEGORY: Dependency Edges
+VALIDATES: Integration of multiple patterns (async, field access, iterators, generics)
+
+SOURCE FILES:
+  - combined.rs    (combines async/await, field access, iterator methods, generic types)
+
+EXPECTED ENTITIES:
+  combined.rs:
+    - fn "process_users" (async function integrating all patterns)
+
+EXPECTED DEPENDENCY EDGES:
+  This integration test combines all four dependency patterns:
+  1. Generic types: Vec<User>, Vec<String>, HashMap<String, String>, Result<...>
+  2. Iterator methods: iter, filter, map, collect
+  3. Async/await: fetch_data().await
+  4. Field access: u.active, u.name, data.field_value
+
+  combined.rs:
+    Generic type edges:
+      - process_users -> Vec        (Vec<User>, Vec<String>)
+      - process_users -> HashMap    (HashMap<String, String>)
+      - process_users -> Result     (Result<HashMap<...>, Error>)
+
+    Iterator method edges:
+      - process_users -> iter       (users.iter())
+      - process_users -> filter     (.filter(...))
+      - process_users -> map        (.map(...))
+      - process_users -> collect    (.collect())
+
+    Async/await edges:
+      - process_users -> fetch_data (fetch_data().await)
+
+    Field access edges:
+      - process_users -> active     (u.active in filter)
+      - process_users -> name       (u.name in map)
+      - process_users -> field_value (data.field_value)
+
+MINIMUM EDGE COUNTS:
+  combined.rs: at least 8 edges total (covers all patterns)
+
+KNOWN LIMITATIONS:
+  The exact edge count may vary depending on how tree-sitter captures
+  complex expressions. The minimum count validates that multiple patterns
+  are detected, not the precise count of each.
+
+RELATED TESTS:
+  T020-rust-async-await-edges
+  T022-rust-field-access-edges
+  T024-rust-iterator-method-edges
+  T026-rust-generic-type-edges

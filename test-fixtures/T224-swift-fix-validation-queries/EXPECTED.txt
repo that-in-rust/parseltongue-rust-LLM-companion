@@ -1,0 +1,32 @@
+FIXTURE: T224-swift-fix-validation-queries
+LANGUAGE: Swift
+CATEGORY: Fix Validation
+VALIDATES: Swift query compilation fix for v0.8.9 (no "Failed to create query" error)
+
+SOURCE FILES:
+  - fix_validation.swift (all entity types: func, class, struct, enum, protocol)
+
+EXPECTED ENTITIES:
+  - swift:fn:globalFunction
+  - swift:class:MyClass
+  - swift:fn:classMethod
+  - swift:class:MyStruct (struct tagged as class)
+  - swift:fn:structMethod
+  - swift:class:MyEnum (enum tagged as class)
+  - swift:interface:MyProtocol (protocol)
+  - swift:fn:protocolMethod
+
+VALIDATION REQUIREMENTS:
+  - QueryBasedExtractor::new() succeeds without "Failed to create query" error
+  - All entity types extract successfully
+  - Protocol uses Interface entity type
+  - No compilation errors in swift.scm
+
+MINIMUM ENTITY COUNTS:
+  - fix_validation.swift: 8 entities
+
+KNOWN LIMITATIONS:
+  - Swift uses class_declaration for struct/enum/class (limitation of tree-sitter-swift v0.7)
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/swift_fix_validation.rs

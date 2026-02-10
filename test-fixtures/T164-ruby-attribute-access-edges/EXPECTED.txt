@@ -1,0 +1,31 @@
+FIXTURE: T164-ruby-attribute-access-edges
+LANGUAGE: Ruby
+CATEGORY: Dependency Edges
+VALIDATES: Ruby attribute access (.name, .age) creates dependency edges
+
+SOURCE FILES:
+  - attr_basic.rb     (name, age, email)
+  - attr_chained.rb   (parent.child.value, config.settings.debug)
+
+EXPECTED ENTITIES:
+  - ruby:fn:process
+  - ruby:fn:get_value
+
+EXPECTED DEPENDENCY EDGES (REQ-RUBY-004.0):
+  - process -> name
+  - process -> age
+  - process -> email
+  - get_value -> parent
+  - get_value -> child
+  - get_value -> value
+  - get_value -> config
+
+MINIMUM EDGE COUNTS:
+  - attr_basic.rb: 3 edges (name, age, email)
+  - attr_chained.rb: 4 edges (parent, child, value, config)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/ruby_dependency_patterns_test.rs

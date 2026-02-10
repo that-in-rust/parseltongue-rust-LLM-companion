@@ -1,0 +1,32 @@
+FIXTURE: T128-java-integration-all-patterns
+LANGUAGE: Java
+CATEGORY: Dependency Edges
+VALIDATES: Integration test combining constructors, streams, field access
+
+SOURCE FILES:
+  - service.java  (complete service with multiple patterns)
+
+EXPECTED ENTITIES:
+  service.java:
+    - class "UserService"
+    - method "UserService" (constructor)
+    - method "getActiveUserNames"
+    - method "createUser"
+
+EXPECTED DEPENDENCY EDGES:
+  service.java:
+    - UserService -> UserRepository  (constructor call)
+    - createUser -> User             (constructor call)
+    - getActiveUserNames -> stream   (stream operation)
+    - getActiveUserNames -> filter   (stream operation)
+    - getActiveUserNames -> map      (stream operation)
+    - getActiveUserNames -> collect  (stream operation)
+
+MINIMUM EDGE COUNTS:
+  service.java: at least 5 edges (constructors + stream ops)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - Integration Test: Complex Real-World Java Code

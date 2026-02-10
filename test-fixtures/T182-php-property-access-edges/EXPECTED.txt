@@ -1,0 +1,32 @@
+FIXTURE: T182-php-property-access-edges
+LANGUAGE: PHP
+CATEGORY: Dependency Edges
+VALIDATES: PHP property access ($obj->prop) creates dependency edges
+
+SOURCE FILES:
+  - property_read.php    ($user->name, $user->age)
+  - property_write.php   ($user->name = ..., $user->age = ...)
+  - property_chained.php ($obj->parent->child->value)
+
+EXPECTED ENTITIES:
+  - php:fn:process
+  - php:fn:update
+  - php:fn:getValue
+
+EXPECTED DEPENDENCY EDGES (REQ-PHP-002.0):
+  - process -> name
+  - process -> age
+  - update -> name
+  - update -> age
+  - getValue -> parent (or child or value)
+
+MINIMUM EDGE COUNTS:
+  - property_read.php: 2 edges (name, age)
+  - property_write.php: 2 edges (name, age)
+  - property_chained.php: 1 edge (any property)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/php_dependency_patterns_test.rs

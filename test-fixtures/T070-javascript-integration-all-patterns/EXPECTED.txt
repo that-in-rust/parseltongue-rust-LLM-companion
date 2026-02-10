@@ -1,0 +1,33 @@
+FIXTURE: T070-javascript-integration-all-patterns
+LANGUAGE: JavaScript
+CATEGORY: Integration Test
+VALIDATES: Multiple JavaScript dependency patterns working together
+
+SOURCE FILES:
+  - integration.js    (comprehensive test of all JavaScript patterns)
+
+EXPECTED ENTITIES:
+  integration.js:
+    - class "DataService" with method "fetchAndProcess"
+
+EXPECTED DEPENDENCY EDGES:
+  integration.js:
+    - fetchAndProcess -> Logger        (constructor)
+    - fetchAndProcess -> fetch         (async call)
+    - fetchAndProcess -> json          (property/method)
+    - fetchAndProcess -> items         (property access)
+    - fetchAndProcess -> filter        (array method)
+    - fetchAndProcess -> map           (array method)
+    - fetchAndProcess -> then          (promise chain)
+    - fetchAndProcess -> catch         (promise chain)
+
+MINIMUM EDGE COUNTS:
+  integration.js: at least 10 edges
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T028-rust-integration-all-patterns
+  T050-python-integration-all-patterns
+  T092-typescript-integration-all-patterns

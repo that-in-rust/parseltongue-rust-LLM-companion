@@ -1,0 +1,37 @@
+FIXTURE: T100-go-composite-literal-edges
+LANGUAGE: Go
+CATEGORY: Dependency Edges
+VALIDATES: Composite literals (struct{}) create dependency edges
+
+SOURCE FILES:
+  - simple.go      (basic struct instantiation)
+  - pointer.go     (pointer composite literals &Server{})
+  - qualified.go   (qualified names models.User{})
+
+EXPECTED ENTITIES:
+  simple.go:
+    - fn "create"
+  pointer.go:
+    - fn "setup"
+  qualified.go:
+    - fn "build"
+
+EXPECTED DEPENDENCY EDGES:
+  simple.go:
+    - create -> User       (composite literal)
+    - create -> Config     (composite literal)
+  pointer.go:
+    - setup -> Server      (pointer composite literal)
+  qualified.go:
+    - build -> User        (qualified composite literal)
+
+MINIMUM EDGE COUNTS:
+  simple.go: at least 2 edges (User, Config)
+  pointer.go: at least 1 edge (Server)
+  qualified.go: at least 1 edge (User)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-GO-001.0: Composite Literal Detection

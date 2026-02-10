@@ -1,0 +1,26 @@
+FIXTURE: T126-java-annotation-dependency-edges
+LANGUAGE: Java
+CATEGORY: Dependency Edges
+VALIDATES: Annotation usage (@Entity, @Id, etc.) creates edges
+
+SOURCE FILES:
+  - annotations.java  (annotation declarations)
+
+EXPECTED ENTITIES:
+  annotations.java:
+    - class "User"
+    - method "toString"
+
+EXPECTED DEPENDENCY EDGES:
+  annotations.java:
+    - User -> Entity  (annotation usage)
+    - User -> Id      (annotation usage)
+
+MINIMUM EDGE COUNTS:
+  annotations.java: at least 1 edge (Entity annotation)
+
+KNOWN LIMITATIONS:
+  @Override may not be captured as it's a built-in annotation
+
+RELATED TESTS:
+  - REQ-JAVA-005.0: Annotations (Bonus Pattern)

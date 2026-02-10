@@ -1,0 +1,27 @@
+FIXTURE: T106-go-integration-all-patterns
+LANGUAGE: Go
+CATEGORY: Dependency Edges
+VALIDATES: Integration test combining multiple Go dependency patterns
+
+SOURCE FILES:
+  - combined.go  (composite literal + goroutine + field access)
+
+EXPECTED ENTITIES:
+  combined.go:
+    - struct "Server"
+    - method "Start"
+
+EXPECTED DEPENDENCY EDGES:
+  combined.go:
+    - Start -> Config           (composite literal)
+    - Start -> handleRequests   (goroutine launch)
+    - Start -> Port             (field access)
+
+MINIMUM EDGE COUNTS:
+  combined.go: at least 2 edges (Config, handleRequests)
+
+KNOWN LIMITATIONS:
+  Field access edges may not be captured (see REQ-GO-002.0)
+
+RELATED TESTS:
+  - REQ-GO-005.0: Integration Test

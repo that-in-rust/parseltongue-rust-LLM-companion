@@ -1,0 +1,36 @@
+FIXTURE: T040-python-constructor-call-edges
+LANGUAGE: Python
+CATEGORY: Dependency Edges
+VALIDATES: Class instantiation creates dependency edges
+
+SOURCE FILES:
+  - class_call.py               (basic class() calls)
+  - qualified_constructor.py    (qualified class calls like models.User())
+
+EXPECTED ENTITIES:
+  class_call.py:
+    - class "Service" with method "create"
+
+  qualified_constructor.py:
+    - class "Factory" with method "build"
+
+EXPECTED DEPENDENCY EDGES:
+  class_call.py:
+    - create -> User               (class instantiation)
+    - create -> Person             (class instantiation with args)
+    - create -> Configuration      (class instantiation)
+
+  qualified_constructor.py:
+    - build -> User                (qualified constructor)
+    - build -> Connection          (qualified constructor)
+
+MINIMUM EDGE COUNTS:
+  class_call.py: at least 3 edges (User, Person, Configuration)
+  qualified_constructor.py: at least 2 edges (User, Connection)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T060-javascript-constructor-new-edges (same pattern, JavaScript)
+  T080-typescript-constructor-new-edges (same pattern, TypeScript)

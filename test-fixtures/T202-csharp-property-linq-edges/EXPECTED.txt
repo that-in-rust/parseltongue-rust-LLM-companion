@@ -1,0 +1,43 @@
+FIXTURE: T202-csharp-property-linq-edges
+LANGUAGE: C#
+CATEGORY: Dependency Edges
+VALIDATES: C# property access and LINQ operations create dependency edges
+
+SOURCE FILES:
+  - property_simple.cs     (user.Name, user.Age)
+  - property_assignment.cs (user.Age = ..., user.Status = ...)
+  - linq_where_select.cs   (Where, Select, ToList)
+  - linq_aggregate.cs      (Count, Sum, Average)
+
+EXPECTED ENTITIES:
+  - csharp:class:Service
+  - csharp:fn:Process
+  - csharp:fn:Update
+  - csharp:class:DataService
+  - csharp:fn:GetNames
+  - csharp:class:Calculator
+  - csharp:fn:Calculate
+
+EXPECTED DEPENDENCY EDGES (REQ-CSHARP-002.0, REQ-CSHARP-003.0):
+  - Process -> Name
+  - Process -> Age
+  - Update -> Age
+  - Update -> Status
+  - GetNames -> Where
+  - GetNames -> Select
+  - GetNames -> ToList
+  - Calculate -> Count
+  - Calculate -> Sum
+  - Calculate -> Average
+
+MINIMUM EDGE COUNTS:
+  - property_simple.cs: 2 edges (Name, Age)
+  - property_assignment.cs: 2 edges (Age, Status)
+  - linq_where_select.cs: 3 edges (Where, Select, ToList)
+  - linq_aggregate.cs: 3 edges (Count, Sum, Average)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/csharp_remaining_patterns_test.rs

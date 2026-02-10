@@ -1,0 +1,38 @@
+FIXTURE: T042-python-attribute-access-edges
+LANGUAGE: Python
+CATEGORY: Dependency Edges
+VALIDATES: Property access creates dependency edges
+
+SOURCE FILES:
+  - attribute_access.py          (basic attribute access)
+  - property_getter_setter.py    (property getters and setters)
+
+EXPECTED ENTITIES:
+  attribute_access.py:
+    - function "process"
+
+  property_getter_setter.py:
+    - class "DataModel" with method "update"
+
+EXPECTED DEPENDENCY EDGES:
+  attribute_access.py:
+    - process -> name              (attribute read)
+    - process -> age               (attribute write)
+    - process -> parent            (nested access)
+    - process -> child             (nested access)
+
+  property_getter_setter.py:
+    - update -> setting            (property getter)
+    - update -> config             (property setter)
+    - update -> data               (nested property)
+
+MINIMUM EDGE COUNTS:
+  attribute_access.py: at least 2 edges (name, age)
+  property_getter_setter.py: at least 2 edges (setting, config)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T062-javascript-property-access-edges
+  T084-typescript-property-access-edges

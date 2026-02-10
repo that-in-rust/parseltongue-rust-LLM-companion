@@ -1,0 +1,298 @@
+
+▗ ▗   ▖ ▖  Claude Code v2.1.37
+           Opus 4.6 · Claude Max
+  ▘▘ ▝▝    ~/Desktop/A01_20260131/parseltongue-dependency-graph-generator
+
+✻ Conversation compacted (ctrl+o for history)
+
+
+⏺ Task "Phase 1: Tarjan SCC algorithm" completed in background
+
+⏺ Task "Phase 2: K-Core decomposition" completed in background
+
+⏺ Task "Phase 3: PageRank + Betweenness" completed in background
+
+⏺ Task "Phase 4: Shannon entropy" completed in background
+
+⏺ Task "Phase 5: CK Metrics suite" completed in background
+
+⏺ Task "Phase 7: Leiden clustering" completed in background
+
+⏺ Task "Integration tests all algorithms" completed in background
+
+⏺ Task "Create 7 HTTP endpoint handlers" completed in background
+  ⎿  Plan file referenced (~/.claude/plans/temporal-knitting-key.md)
+
+⏺ I'll update the plan file with all finalized decisions including the cross-OS
+  path research, then exit plan mode so we can proceed to writing the PRD.
+
+⏺ Read 1 file (ctrl+o to expand)
+
+⏺ The plan file needs to be updated with the user's final decisions. Let me
+  update it to reflect: raw word count (not line coverage), CozoDB table for
+  test entities, folder_path + filename columns with cross-OS normalization.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ Plan file updated with all finalized decisions. Exiting plan mode for
+  approval.
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/temporal-knitting-key.md · /plan to edit
+
+     Plan: Create PRD for Ingestion Diagnostics API (v1.6.5)
+
+     Context
+
+     Create docs/PRD-v165.md -- a Product Requirements Document for a new
+     HTTP endpoint that exposes ingestion quality diagnostics. Instead of
+     writing logs to disk, this feature surfaces parse coverage data via the
+      REST API so LLM agents can programmatically assess what was captured
+     and what was missed.
+
+     User Decisions (Final)
+
+     1. Coverage metric: Raw word count (NOT line coverage). User rationale:
+      "parse entities as end to end thing -- we do not worry about movement
+     in the page"
+     2. Test entity storage: New CozoDB relation TestEntitiesExcluded
+     populated during pt01 ingestion
+     3. Path columns: folder_path + filename as separate columns for faster
+     CozoDB queries (group by folder, filter by filename)
+     4. Cross-OS normalization: Forward slashes only, relative paths,
+     path-slash crate for Windows compat
+
+     Research Findings
+
+     Industry precedent
+
+     - Semgrep: tree-sitter based, measures parse rate via ERROR node
+     coverage
+     - CodeQL: database export-diagnostics (SARIF format)
+     - SonarQube: /api/measures
+     - No tool exposes this as a user-facing REST endpoint -- differentiator
+      for Parseltongue's LLM-agent-first model
+
+     Cross-OS path handling (from research)
+
+     - All major tools (Git, SCIP, Sourcegraph, SonarQube) normalize to
+     forward slashes
+     - Store relative paths only (strip workspace root)
+     - Rust's std::path::Path is platform-bound -- backslashes not
+     recognized on Linux
+     - Recommended: path-slash crate for normalization (to_slash() /
+     to_slash_lossy())
+     - Split at last / for folder_path + filename. Empty string "" for
+     root-level files
+
+     What data already exists
+
+     Data: Skipped file paths
+     Available?: NO -- silently dropped in should_process_file()
+     Where: Need to collect during WalkDir
+     ────────────────────────────────────────
+     Data: Test entity count
+     Available?: YES -- StreamStats.test_entities_created
+     Where: Only aggregate count, not individual names
+     ────────────────────────────────────────
+     Data: Test entity details
+     Available?: NO -- test_count += 1; continue; drops entity
+     Where: Need to collect before skipping
+     ────────────────────────────────────────
+     Data: File word counts
+     Available?: NO -- content read but word count not stored
+     Where: Computable from source.split_whitespace().count()
+     ────────────────────────────────────────
+     Data: Entity word counts
+     Available?: NO -- entity content not word-counted
+     Where: Computable from entity content field
+     ────────────────────────────────────────
+     Data: Existing coverage endpoint
+     Available?: YES -- /ingestion-coverage-folder-report
+     Where: Can complement
+     What to write in docs/PRD-v165.md
+
+     Endpoint: GET /ingestion-diagnostics-coverage-report
+
+     Section 1: Ignored Files
+     - Walk source directory at query time, detect language via
+     Language::from_file_path()
+     - Files with no language match → ignored by extension
+     - Group by extension, return counts + file list
+     - Data source: filesystem walk at query time (like existing coverage
+     endpoint)
+
+     Section 2: Excluded Test Entities
+     - New CozoDB relation TestEntitiesExcluded populated during pt01
+     ingestion
+     - Columns: entity_name, entity_class, folder_path, filename, language,
+     line_range, detection_reason
+     - Streamer change: before continue; on test entities, insert into this
+     relation
+     - Query at endpoint time: ?[name, folder_path, filename, language] := 
+     *TestEntitiesExcluded{...}
+
+     Section 3: Word Count Coverage Comparison
+     - Per file: source_word_count = source.split_whitespace().count() (raw
+     word count of entire file)
+     - Per file: entity_word_count = sum of word counts from all extracted
+     entities' content
+     - coverage_pct = (entity_word_count / source_word_count) * 100
+     - Stored in new CozoDB relation FileWordCoverage during pt01 ingestion
+     - Columns: folder_path, filename, language, source_word_count,
+     entity_word_count, coverage_pct, entity_count
+     - folder_path + filename split via path-slash normalization (forward
+     slashes, relative paths)
+
+     Response shape:
+     {
+       "success": true,
+       "endpoint": "/ingestion-diagnostics-coverage-report",
+       "data": {
+         "summary": {
+           "total_files_discovered": 521,
+           "files_parsed": 151,
+           "files_ignored_by_extension": 370,
+           "entities_extracted": 2961,
+           "test_entities_excluded": 1215,
+           "avg_word_coverage_pct": 72.3
+         },
+         "ignored_files": {
+           "by_extension": { ".md": 12, ".json": 8, ".toml": 5, ".yaml": 4
+     },
+           "files": ["README.md", "Cargo.lock", "..."]
+         },
+         "excluded_test_entities": {
+           "count": 1215,
+           "by_language": { "rust": 800, "python": 200, "javascript": 215 },
+           "entities": [
+             {
+               "name": "test_main_function",
+               "folder_path": "tests",
+               "filename": "test.rs",
+               "language": "rust",
+               "detection_reason": "test_prefix"
+             }
+           ]
+         },
+         "word_count_coverage": {
+           "avg_coverage_pct": 72.3,
+           "files": [
+             {
+               "folder_path": "src",
+               "filename": "main.rs",
+               "language": "rust",
+               "source_word_count": 1580,
+               "entity_word_count": 1203,
+               "coverage_pct": 76.1,
+               "entity_count": 12
+             }
+           ],
+           "lowest_coverage_files": ["..."],
+           "highest_coverage_files": ["..."]
+         }
+       },
+       "tokens": 1500
+     }
+
+     Files to create/modify
+
+
+
+
+     File: docs/PRD-v165.md
+     Action: CREATE -- PRD document
+     Phase: Now
+     ────────────────────────────────────────
+     File: crates/parseltongue-core/src/storage/cozo_client.rs
+     Action: MODIFY -- add TestEntitiesExcluded + FileWordCoverage relations
+     Phase: Implementation
+     ────────────────────────────────────────
+     File: crates/pt01-folder-to-cozodb-streamer/src/streamer.rs
+     Action: MODIFY -- collect test entity details + word counts during
+     ingestion
+     Phase: Implementation
+     ────────────────────────────────────────
+     File: crates/pt08-http-code-query-server/src/http_endpoint_handler_modu
+     les/ingestion_diagnostics_coverage_handler.rs
+     Action: CREATE -- endpoint handler
+     Phase: Implementation
+     ────────────────────────────────────────
+     File: Cargo.toml (pt01)
+     Action: MODIFY -- add path-slash dependency
+     Phase: Implementation
+
+     What I will do now
+
+     Write docs/PRD-v165.md containing:
+     1. Problem statement with industry research backing
+     2. Three reports with detailed specs (ignored files, test entities,
+     word count coverage)
+     3. User's decision: raw word count over line coverage, with rationale
+     4. Cross-OS path normalization approach (path-slash, forward slashes,
+     relative paths)
+     5. CozoDB relation schemas for TestEntitiesExcluded and
+     FileWordCoverage
+     6. Response JSON schema
+     7. Implementation phases
+     8. Acceptance criteria
+
+     Verification
+
+     After PRD is written:
+     - Review by user for alignment with intent
+     - No code changes in this step -- PRD only
+
+⏺ Plan approved. Now I'll create the PRD. Let me first check the existing docs
+  directory and read a couple of key source files to ensure accurate references
+  in the PRD.
+
+⏺ Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+⏺ Let me check the existing specs folder and one recent PRD for style reference.
+
+⏺ Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Good, I have the style reference. Now let me also read the DependencyEdges
+  schema and check how the existing coverage endpoint handler works for
+  reference.
+
+⏺ Read 2 files (ctrl+o to expand)
+
+⏺ Now I have all the context needed. Let me create the PRD.
+
+⏺ Write(docs/PRD-v165.md)
+  ⎿  Wrote 601 lines to docs/PRD-v165.md
+     # PRD: Ingestion Diagnostics Coverage Report (v1.6.5)
+
+     **Feature**: Ingestion Quality Diagnostics API
+     **Version**: v1.6.5
+     **Status**: Draft
+     **Date**: 2026-02-08
+     **Author**: Parseltongue Team
+
+     ---
+
+     … +591 lines (ctrl+o to expand)
+
+⏺ docs/PRD-v165.md has been created. The PRD covers:
+
+  1. Problem statement -- the three visibility gaps after pt01 ingestion
+  (ignored files, excluded tests, parse completeness)
+  2. Three diagnostic reports with detailed specs:
+    - Ignored files by extension (filesystem walk at query time)
+    - Excluded test entities (new TestEntitiesExcluded CozoDB relation)
+    - Word count coverage comparison (new FileWordCoverage CozoDB relation)
+  3. Cross-OS path normalization -- path-slash crate, forward slashes, relative
+  paths, folder_path + filename split
+  4. CozoDB relation schemas -- both new relations with composite keys and
+  column definitions
+  5. Full response JSON with all three report sections and summary aggregates
+  6. Integration details -- exact code change locations in streamer.rs:803-807,
+  cozo_client.rs, and new endpoint handler
+  7. 4-phase implementation plan -- schema, ingestion collection, HTTP handler,
+  E2E verification
+  8. Acceptance criteria -- functional, non-functional, and edge cases
+
+✻ Baked for 11m 32s

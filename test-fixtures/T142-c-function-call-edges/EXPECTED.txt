@@ -1,0 +1,25 @@
+FIXTURE: T142-c-function-call-edges
+LANGUAGE: C
+CATEGORY: Dependency Edges
+VALIDATES: Function calls create dependency edges (regression test)
+
+SOURCE FILES:
+  - calls.c  (basic function calls)
+
+EXPECTED ENTITIES:
+  calls.c:
+    - fn "main"
+
+EXPECTED DEPENDENCY EDGES:
+  calls.c:
+    - main -> printf        (function call)
+    - main -> process_data  (function call)
+
+MINIMUM EDGE COUNTS:
+  calls.c: at least 2 edges (printf, process_data)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - Regression test for existing function call detection

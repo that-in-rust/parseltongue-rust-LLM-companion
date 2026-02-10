@@ -1,0 +1,35 @@
+FIXTURE: T180-php-constructor-creation-edges
+LANGUAGE: PHP
+CATEGORY: Dependency Edges
+VALIDATES: PHP constructor calls (new ClassName()) create dependency edges
+
+SOURCE FILES:
+  - constructor_simple.php    (User, Config)
+  - constructor_qualified.php (\Models\User, \Utils\Logger)
+  - constructor_params.php    (Database, RedisCache with parameters)
+
+EXPECTED ENTITIES:
+  - php:class:Service
+  - php:fn:create
+  - php:fn:build
+  - php:class:Factory
+  - php:fn:make
+
+EXPECTED DEPENDENCY EDGES (REQ-PHP-001.0):
+  - create -> User
+  - create -> Config
+  - build -> User (qualified \Models\User)
+  - build -> Logger (qualified \Utils\Logger)
+  - make -> Database
+  - make -> RedisCache
+
+MINIMUM EDGE COUNTS:
+  - constructor_simple.php: 2 edges (User, Config)
+  - constructor_qualified.php: 2 edges (User, Logger)
+  - constructor_params.php: 2 edges (Database, RedisCache)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/php_dependency_patterns_test.rs

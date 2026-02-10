@@ -1,0 +1,32 @@
+FIXTURE: T152-cpp-field-access-pointer-edges
+LANGUAGE: C++
+CATEGORY: Dependency Edges
+VALIDATES: Field access via -> and . creates dependency edges
+
+SOURCE FILES:
+  - pointer.cpp    (pointer field access user->name)
+  - reference.cpp  (reference field access user.name)
+
+EXPECTED ENTITIES:
+  pointer.cpp:
+    - fn "process"
+  reference.cpp:
+    - fn "update"
+
+EXPECTED DEPENDENCY EDGES:
+  pointer.cpp:
+    - process -> name  (field access via ->)
+    - process -> age   (field access via ->)
+  reference.cpp:
+    - update -> name   (field access via .)
+    - update -> age    (field access via .)
+
+MINIMUM EDGE COUNTS:
+  pointer.cpp: at least 2 edges (name, age)
+  reference.cpp: at least 2 edges (name, age)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-CPP-002.0: Field Access (field_expression)

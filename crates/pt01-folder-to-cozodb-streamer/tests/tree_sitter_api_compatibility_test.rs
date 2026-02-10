@@ -32,7 +32,7 @@ fn test_rust_basic_parsing() {
 
     assert!(result.is_ok(), "Should parse valid Rust code");
 
-    let (entities, _) = result.unwrap();
+    let (entities, _, _) = result.unwrap();
     assert_eq!(entities.len(), 1, "Should extract one function");
     assert_eq!(entities[0].name, "hello");
 }

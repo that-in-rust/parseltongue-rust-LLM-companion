@@ -1,0 +1,36 @@
+FIXTURE: T064-javascript-async-await-edges
+LANGUAGE: JavaScript
+CATEGORY: Dependency Edges
+VALIDATES: Async/await operations create dependency edges
+
+SOURCE FILES:
+  - async_basic.js    (async function with await)
+  - async_method.js   (async class method with await)
+
+EXPECTED ENTITIES:
+  async_basic.js:
+    - async function "loadData"
+
+  async_method.js:
+    - class "Fetcher" with async method "load"
+
+EXPECTED DEPENDENCY EDGES:
+  async_basic.js:
+    - loadData -> fetch        (await call)
+    - loadData -> json         (await call)
+    - loadData -> saveToDb     (await call)
+
+  async_method.js:
+    - load -> fetchData        (await call)
+    - load -> processData      (await call)
+
+MINIMUM EDGE COUNTS:
+  async_basic.js: at least 3 edges (fetch, json, saveToDb)
+  async_method.js: at least 2 edges (fetchData, processData)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T044-python-async-await-edges
+  T088-typescript-async-await-edges

@@ -1,0 +1,37 @@
+FIXTURE: T062-javascript-property-access-edges
+LANGUAGE: JavaScript
+CATEGORY: Dependency Edges
+VALIDATES: Property access creates dependency edges
+
+SOURCE FILES:
+  - property_read.js    (basic property access)
+  - property_nested.js  (nested property access)
+
+EXPECTED ENTITIES:
+  property_read.js:
+    - function "process"
+
+  property_nested.js:
+    - function "extract"
+
+EXPECTED DEPENDENCY EDGES:
+  property_read.js:
+    - process -> name      (property read)
+    - process -> age       (property read)
+    - process -> email     (property read)
+
+  property_nested.js:
+    - extract -> config    (nested property)
+    - extract -> database  (nested property)
+    - extract -> host      (nested property)
+
+MINIMUM EDGE COUNTS:
+  property_read.js: at least 3 edges (name, age, email)
+  property_nested.js: at least 1 edge (any property)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T042-python-attribute-access-edges
+  T084-typescript-property-access-edges

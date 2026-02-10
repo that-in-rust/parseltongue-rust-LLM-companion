@@ -1,0 +1,35 @@
+FIXTURE: T154-cpp-template-type-edges
+LANGUAGE: C++
+CATEGORY: Dependency Edges
+VALIDATES: Template type usage creates dependency edges
+
+SOURCE FILES:
+  - simple.cpp  (basic template types)
+  - nested.cpp  (nested template types)
+
+EXPECTED ENTITIES:
+  simple.cpp:
+    - fn "setup"
+  nested.cpp:
+    - fn "complex"
+
+EXPECTED DEPENDENCY EDGES:
+  simple.cpp:
+    - setup -> vector  (template type)
+    - setup -> string  (template type)
+  nested.cpp:
+    - complex -> map         (template type)
+    - complex -> User        (template argument)
+    - complex -> vector      (template type)
+    - complex -> shared_ptr  (template type)
+    - complex -> Config      (template argument)
+
+MINIMUM EDGE COUNTS:
+  simple.cpp: at least 2 edges (vector, string)
+  nested.cpp: at least 5 edges (map, User, vector, shared_ptr, Config)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-CPP-003.0: Template Types

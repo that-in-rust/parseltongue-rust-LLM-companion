@@ -1,0 +1,36 @@
+FIXTURE: T204-csharp-edge-key-format
+LANGUAGE: C#
+CATEGORY: Edge Key Format
+VALIDATES: C# edges use ISGL1 v2 format (lang:type:name:semantic_path:Ttimestamp)
+
+SOURCE FILES:
+  - edge_key_format.cs (method calls with ISGL1 v2 key format)
+  - semantic_path.cs   (semantic path extraction)
+
+EXPECTED ENTITIES:
+  - csharp:class:Logger
+  - csharp:fn:DoWork
+  - csharp:fn:Helper
+  - csharp:class:DataModel
+  - csharp:fn:Save
+  - csharp:fn:Validate
+
+EXPECTED DEPENDENCY EDGES (REQ-EDGE-001.0):
+  - DoWork -> Helper (with ISGL1 v2 format)
+  - Save -> Validate (with ISGL1 v2 format)
+
+VALIDATION REQUIREMENTS:
+  - Edge from_key contains :T followed by timestamp
+  - Edge from_key does NOT contain line range separator '-' before timestamp
+  - Semantic path starts with '__'
+  - Key has at least 5 colon-separated parts
+
+MINIMUM EDGE COUNTS:
+  - edge_key_format.cs: 1 edge (Helper)
+  - semantic_path.cs: 1 edge (Validate)
+
+KNOWN LIMITATIONS:
+  - File-level edges use different format
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/csharp_edge_key_integration_test.rs

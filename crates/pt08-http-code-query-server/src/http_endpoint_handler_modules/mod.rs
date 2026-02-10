@@ -29,3 +29,5 @@ pub mod centrality_measures_entity_handler;
 pub mod entropy_complexity_measurement_handler;
 pub mod coupling_cohesion_metrics_handler;
 pub mod leiden_community_detection_handler;
+// v1.6.1: Ingestion coverage reporting
+pub mod ingestion_coverage_folder_handler;

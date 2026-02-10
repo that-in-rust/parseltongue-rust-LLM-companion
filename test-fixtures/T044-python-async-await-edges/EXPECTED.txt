@@ -1,0 +1,35 @@
+FIXTURE: T044-python-async-await-edges
+LANGUAGE: Python
+CATEGORY: Dependency Edges
+VALIDATES: Async/await operations create dependency edges
+
+SOURCE FILES:
+  - async_basic.py           (basic async function with await)
+  - async_class_method.py    (async class method with await)
+
+EXPECTED ENTITIES:
+  async_basic.py:
+    - async function "load_data"
+
+  async_class_method.py:
+    - class "Fetcher" with async method "load"
+
+EXPECTED DEPENDENCY EDGES:
+  async_basic.py:
+    - load_data -> fetch_data      (await call)
+    - load_data -> save_async      (await call)
+
+  async_class_method.py:
+    - load -> get_user             (await call)
+    - load -> process_data         (await call)
+
+MINIMUM EDGE COUNTS:
+  async_basic.py: at least 2 edges (fetch_data, save_async)
+  async_class_method.py: at least 2 edges (get_user, process_data)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T064-javascript-async-await-edges
+  T088-typescript-async-await-edges

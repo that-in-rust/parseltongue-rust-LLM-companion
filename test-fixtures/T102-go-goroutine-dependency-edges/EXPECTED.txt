@@ -1,0 +1,31 @@
+FIXTURE: T102-go-goroutine-dependency-edges
+LANGUAGE: Go
+CATEGORY: Dependency Edges
+VALIDATES: Goroutine launches (go keyword) create dependency edges
+
+SOURCE FILES:
+  - basic.go       (basic goroutine launches)
+  - anonymous.go   (anonymous goroutine with closure)
+
+EXPECTED ENTITIES:
+  basic.go:
+    - fn "main"
+  anonymous.go:
+    - fn "start"
+
+EXPECTED DEPENDENCY EDGES:
+  basic.go:
+    - main -> processData     (goroutine launch)
+    - main -> handleRequest   (goroutine launch)
+  anonymous.go:
+    - (anonymous) -> doWork   (call inside anonymous goroutine)
+
+MINIMUM EDGE COUNTS:
+  basic.go: at least 2 edges (processData, handleRequest)
+  anonymous.go: at least 1 edge (doWork)
+
+KNOWN LIMITATIONS:
+  None
+
+RELATED TESTS:
+  - REQ-GO-003.0: Goroutine Detection

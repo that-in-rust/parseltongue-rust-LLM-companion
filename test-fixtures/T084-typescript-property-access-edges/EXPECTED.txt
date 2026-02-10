@@ -1,0 +1,35 @@
+FIXTURE: T084-typescript-property-access-edges
+LANGUAGE: TypeScript
+CATEGORY: Dependency Edges
+VALIDATES: Property access (obj.prop) creates dependency edges
+
+SOURCE FILES:
+  - property_simple.ts    (simple read and write property access)
+  - property_chained.ts   (chained property access: sys.config.value)
+
+EXPECTED ENTITIES:
+  property_simple.ts:
+    - fn "process" (function with User parameter)
+
+  property_chained.ts:
+    - class "Processor" with method "process"
+
+EXPECTED DEPENDENCY EDGES:
+  property_simple.ts:
+    - process -> name               (property read: user.name)
+    - process -> age                (property write: user.age = 30)
+
+  property_chained.ts:
+    - process -> config             (chained: sys.config)
+    - process -> value              (chained: sys.config.value)
+
+MINIMUM EDGE COUNTS:
+  property_simple.ts: name AND age edges present
+  property_chained.ts: config OR value edge present
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T022-rust-field-access-edges (same pattern, Rust)
+  T062-javascript-property-access-edges (same pattern, JavaScript)

@@ -1,0 +1,35 @@
+FIXTURE: T184-php-static-method-edges
+LANGUAGE: PHP
+CATEGORY: Dependency Edges
+VALIDATES: PHP static method calls (Class::method()) create dependency edges
+
+SOURCE FILES:
+  - static_simple.php      (Factory::create, Helper::process)
+  - static_qualified.php   (\Models\UserFactory::build, \Utils\LogFactory::create)
+  - static_parent_self.php (parent::, self::, static::)
+
+EXPECTED ENTITIES:
+  - php:fn:setup
+  - php:fn:build
+  - php:class:MyClass
+  - php:fn:test
+
+EXPECTED DEPENDENCY EDGES (REQ-PHP-003.0):
+  - setup -> create
+  - setup -> process
+  - build -> build
+  - build -> create
+  - test -> doWork
+  - test -> helper
+  - test -> factory
+
+MINIMUM EDGE COUNTS:
+  - static_simple.php: 2 edges (create, process)
+  - static_qualified.php: 2 edges (build, create)
+  - static_parent_self.php: 3 edges (doWork, helper, factory)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/php_dependency_patterns_test.rs

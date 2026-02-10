@@ -1,0 +1,40 @@
+FIXTURE: T200-csharp-constructor-method-edges
+LANGUAGE: C#
+CATEGORY: Dependency Edges
+VALIDATES: C# constructor calls (new TypeName()) create dependency edges (REQ-CSHARP-001.0)
+
+SOURCE FILES:
+  - constructor_simple.cs     (new DataModel())
+  - constructor_generic.cs    (new List<string>(), new Dictionary<int,string>())
+  - constructor_initializer.cs (new Person { ... })
+  - constructor_fixture.cs    (new List<string>(), new DataModel(), list.Add())
+
+EXPECTED ENTITIES:
+  - csharp:class:Caller
+  - csharp:fn:Create (in Caller)
+  - csharp:class:Setup
+  - csharp:fn:Initialize
+  - csharp:class:PersonFactory
+  - csharp:class:DataManager
+  - csharp:class:DataModel
+
+EXPECTED DEPENDENCY EDGES (REQ-CSHARP-001.0):
+  - Create -> DataModel (simple constructor)
+  - Initialize -> List (generic constructor)
+  - Initialize -> Dictionary (generic constructor)
+  - Create (PersonFactory) -> Person (with initializer)
+  - Create (DataManager) -> List
+  - Create (DataManager) -> DataModel
+  - Create (DataManager) -> Add
+
+MINIMUM EDGE COUNTS:
+  - constructor_simple.cs: 1 edge (DataModel)
+  - constructor_generic.cs: 2 edges (List, Dictionary)
+  - constructor_initializer.cs: 1 edge (Person)
+  - constructor_fixture.cs: 3 edges (List, DataModel, Add)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/csharp_constructor_detection_test.rs

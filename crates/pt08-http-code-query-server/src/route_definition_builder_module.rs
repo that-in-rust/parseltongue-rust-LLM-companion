@@ -34,6 +34,8 @@ use crate::http_endpoint_handler_modules::{
     entropy_complexity_measurement_handler,
     coupling_cohesion_metrics_handler,
     leiden_community_detection_handler,
+    // v1.6.1: Ingestion coverage reporting
+    ingestion_coverage_folder_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -163,6 +165,11 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/leiden-community-detection-clusters",
             get(leiden_community_detection_handler::handle_leiden_community_detection_clusters)
+        )
+        // v1.6.1: Ingestion coverage reporting
+        .route(
+            "/ingestion-coverage-folder-report",
+            get(ingestion_coverage_folder_handler::handle_ingestion_coverage_folder_report)
         )
         // Test route for debugging
         .route(

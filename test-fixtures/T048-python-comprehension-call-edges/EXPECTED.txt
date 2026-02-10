@@ -1,0 +1,27 @@
+FIXTURE: T048-python-comprehension-call-edges
+LANGUAGE: Python
+CATEGORY: Dependency Edges
+VALIDATES: List comprehensions create dependency edges for function calls
+
+SOURCE FILES:
+  - list_comprehension.py    (list comprehension with function calls)
+
+EXPECTED ENTITIES:
+  list_comprehension.py:
+    - class "Transformer" with method "transform"
+
+EXPECTED DEPENDENCY EDGES:
+  list_comprehension.py:
+    - transform -> process         (comprehension call)
+    - transform -> validate        (comprehension call)
+    - transform -> check           (comprehension filter)
+
+MINIMUM EDGE COUNTS:
+  list_comprehension.py: at least 2 edges (process, validate)
+
+KNOWN LIMITATIONS:
+  None.
+
+RELATED TESTS:
+  T066-javascript-array-method-edges
+  T086-typescript-collection-operation-edges

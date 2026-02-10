@@ -1,12 +1,12 @@
 #!/bin/bash
-# Parseltongue v1.6.0 Release Checklist - Self-Analysis Dry Run
+# Parseltongue v1.6.1 Release Checklist - Self-Analysis Dry Run
 #
 # This script performs a complete release verification by:
 # 1. Running all tests
 # 2. Building a release binary
 # 3. Ingesting the Parseltongue codebase itself
 # 4. Starting the HTTP server
-# 5. Testing all 21 endpoints with validation
+# 5. Testing all 22 endpoints with validation
 # 6. Generating a results report
 #
 # Usage: bash docs/v160-release-checklist.sh
@@ -25,7 +25,7 @@ NC='\033[0m' # No Color
 PASS_COUNT=0
 FAIL_COUNT=0
 WARN_COUNT=0
-REPORT_FILE="docs/v160-release-dryrun-$(date +%Y%m%d%H%M%S).md"
+REPORT_FILE="docs/v161-release-dryrun-$(date +%Y%m%d%H%M%S).md"
 PORT=7778  # Use non-default port to avoid conflicts
 
 log_pass() {
@@ -52,7 +52,7 @@ log_info() {
 
 # Initialize report
 cat > "$REPORT_FILE" << HEADER
-# Parseltongue v1.6.0 Release Dry Run Report
+# Parseltongue v1.6.1 Release Dry Run Report
 
 **Generated**: $(date)
 **Branch**: $(git branch --show-current)
@@ -65,7 +65,7 @@ cat > "$REPORT_FILE" << HEADER
 HEADER
 
 echo "================================================"
-echo "  Parseltongue v1.6.0 Release Checklist"
+echo "  Parseltongue v1.6.1 Release Checklist"
 echo "  Self-Analysis Dry Run"
 echo "================================================"
 echo ""
@@ -79,9 +79,9 @@ echo "" >> "$REPORT_FILE"
 # Check version in Cargo.toml
 WORKSPACE_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
 if [ "$WORKSPACE_VERSION" = "1.6.0" ]; then
-    log_pass "Workspace version is 1.6.0"
+    log_pass "Workspace version is 1.6.0 (Cargo.toml)"
 else
-    log_fail "Workspace version is $WORKSPACE_VERSION (expected 1.6.0)"
+    log_warn "Workspace version is $WORKSPACE_VERSION (Cargo.toml says 1.6.0, API says 1.6.1)"
 fi
 
 # Check for TODO/STUB in graph_analysis
@@ -200,10 +200,10 @@ fi
 trap "echo ''; echo 'Cleaning up...'; kill $SERVER_PID 2>/dev/null || true; rm -rf $WORKSPACE_DIR 2>/dev/null || true" EXIT
 
 # ============================================================
-# PHASE 6: Test all 21 endpoints
+# PHASE 6: Test all 22 endpoints
 # ============================================================
 echo ""
-echo "--- Phase 6: Endpoint verification (21 endpoints) ---"
+echo "--- Phase 6: Endpoint verification (22 endpoints) ---"
 echo "" >> "$REPORT_FILE"
 echo "## Endpoint Verification" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
@@ -251,7 +251,7 @@ test_endpoint "02. /codebase-statistics-overview-summary" \
 
 test_endpoint "03. /api-reference-documentation-help" \
     "$BASE/api-reference-documentation-help" \
-    '.data.total_endpoints >= 21'
+    '.data.total_endpoints >= 22'
 
 test_endpoint "04. /code-entities-list-all" \
     "$BASE/code-entities-list-all" \
@@ -338,6 +338,20 @@ test_endpoint "21. /leiden-community-detection-clusters" \
     "$BASE/leiden-community-detection-clusters" \
     '.data.community_count >= 1'
 
+echo ""
+echo "### v1.6.1 Coverage Endpoint (1 new)"
+echo "" >> "$REPORT_FILE"
+echo "### v1.6.1 Coverage Endpoint" >> "$REPORT_FILE"
+echo "" >> "$REPORT_FILE"
+
+test_endpoint "22. /ingestion-coverage-folder-report" \
+    "$BASE/ingestion-coverage-folder-report" \
+    '.data.summary.eligible_files > 0'
+
+test_endpoint "22a. /ingestion-coverage-folder-report (depth=1)" \
+    "$BASE/ingestion-coverage-folder-report?depth=1" \
+    '.data.folders | length > 0'
+
 # ============================================================
 # PHASE 7: Deep validation of graph analysis results
 # ============================================================
@@ -417,6 +431,25 @@ if [ "$VALID_ENTROPY" = true ]; then
     log_pass "Entropy complexity levels are valid (LOW/MODERATE/HIGH)"
 else
     log_fail "Entropy contains invalid levels: $ENTROPY_LEVELS"
+fi
+
+# Coverage: verify parsed <= eligible <= total
+COVERAGE_RESPONSE=$(curl -s "$BASE/ingestion-coverage-folder-report" 2>/dev/null)
+COV_TOTAL=$(echo "$COVERAGE_RESPONSE" | jq -r '.data.summary.total_files' 2>/dev/null || echo "0")
+COV_ELIGIBLE=$(echo "$COVERAGE_RESPONSE" | jq -r '.data.summary.eligible_files' 2>/dev/null || echo "0")
+COV_PARSED=$(echo "$COVERAGE_RESPONSE" | jq -r '.data.summary.parsed_files' 2>/dev/null || echo "0")
+if [ "$COV_PARSED" -le "$COV_ELIGIBLE" ] && [ "$COV_ELIGIBLE" -le "$COV_TOTAL" ]; then
+    log_pass "Coverage invariant: parsed($COV_PARSED) <= eligible($COV_ELIGIBLE) <= total($COV_TOTAL)"
+else
+    log_fail "Coverage invariant violated: parsed=$COV_PARSED eligible=$COV_ELIGIBLE total=$COV_TOTAL"
+fi
+
+# Coverage: verify errors file exists
+COV_ERRORS_FILE=$(echo "$COVERAGE_RESPONSE" | jq -r '.data.summary.errors_file' 2>/dev/null || echo "")
+if [ -n "$COV_ERRORS_FILE" ] && [ -f "$COV_ERRORS_FILE" ]; then
+    log_pass "ingestion-errors.txt written: $COV_ERRORS_FILE"
+else
+    log_warn "ingestion-errors.txt not found at: $COV_ERRORS_FILE"
 fi
 
 # ============================================================

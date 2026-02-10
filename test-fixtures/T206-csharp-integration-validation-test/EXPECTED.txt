@@ -1,0 +1,38 @@
+FIXTURE: T206-csharp-integration-validation-test
+LANGUAGE: C#
+CATEGORY: Integration Test
+VALIDATES: Complete C# file with method calls and constructors using ISGL1 v2
+
+SOURCE FILES:
+  - complete_integration.cs (method calls + constructors + property)
+  - accuracy_test.cs        (accuracy validation: 5 expected dependencies)
+
+EXPECTED ENTITIES:
+  - csharp:class:Logger
+  - csharp:fn:DoWork
+  - csharp:fn:Helper
+  - csharp:class:DataManager
+  - csharp:fn:Create
+  - csharp:class:DataModel
+
+EXPECTED DEPENDENCY EDGES:
+  - DoWork -> Helper
+  - Helper -> WriteLine
+  - Create -> List (constructor)
+  - Create -> DataModel (constructor)
+  - Create -> Add (method call)
+
+VALIDATION REQUIREMENTS:
+  - All edges use ISGL1 v2 format (except file-level edges)
+  - At least 5 total edges (2 constructor + 3 method calls)
+  - Accuracy >= 80% for expected targets
+
+MINIMUM EDGE COUNTS:
+  - complete_integration.cs: 5 edges
+  - accuracy_test.cs: 5 edges
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/csharp_integration_validation_test.rs

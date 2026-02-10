@@ -1,0 +1,39 @@
+FIXTURE: T220-swift-entity-extraction-all
+LANGUAGE: Swift
+CATEGORY: Entity Extraction
+VALIDATES: Swift entity extraction for all declaration types
+
+SOURCE FILES:
+  - basic_entities.swift (func, class, struct, enum, protocol)
+  - real_world.swift     (production-like code with async/await)
+
+EXPECTED ENTITIES (basic_entities.swift):
+  - swift:fn:calculateSum
+  - swift:class:UserManager (struct/class/enum all use class_declaration)
+  - swift:fn:addUser
+  - swift:class:Point (struct)
+  - swift:fn:distance
+  - swift:class:Direction (enum)
+  - swift:interface:Drawable (protocol)
+
+EXPECTED ENTITIES (real_world.swift):
+  - swift:class:User (struct)
+  - swift:class:UserRole (enum)
+  - swift:interface:UserRepository (protocol)
+  - swift:fn:fetch
+  - swift:fn:save
+  - swift:class:InMemoryUserRepository
+  - swift:fn:validateEmail
+  - swift:fn:generateUserKey
+
+MINIMUM ENTITY COUNTS:
+  - basic_entities.swift: 7 entities (calculateSum, UserManager, addUser, Point, distance, Direction, Drawable)
+  - real_world.swift: 8 entities (User, UserRole, UserRepository, fetch, save, InMemoryUserRepository, validateEmail, generateUserKey)
+
+KNOWN LIMITATIONS:
+  - Swift uses class_declaration for struct/enum/class (all tagged as Class)
+  - Protocols correctly tagged as Interface
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/swift_integration_test.rs
+  - crates/parseltongue-core/tests/swift_fix_validation.rs

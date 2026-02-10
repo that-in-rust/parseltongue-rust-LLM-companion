@@ -1,0 +1,37 @@
+FIXTURE: T162-ruby-block-method-edges
+LANGUAGE: Ruby
+CATEGORY: Dependency Edges
+VALIDATES: Ruby block methods (.each, .map, .select) create dependency edges
+
+SOURCE FILES:
+  - block_basic.rb    (each, map, select with {} blocks)
+  - block_do_end.rb   (each, select with do...end blocks)
+  - block_chained.rb  (select, map, compact, uniq, sort chained)
+
+EXPECTED ENTITIES:
+  - ruby:fn:process
+  - ruby:fn:transform
+  - ruby:fn:complex_transform
+
+EXPECTED DEPENDENCY EDGES (REQ-RUBY-002.0):
+  - process -> each
+  - process -> map
+  - process -> select
+  - transform -> each
+  - transform -> select
+  - complex_transform -> select
+  - complex_transform -> map
+  - complex_transform -> compact
+  - complex_transform -> uniq
+  - complex_transform -> sort
+
+MINIMUM EDGE COUNTS:
+  - block_basic.rb: 3 edges (each, map, select)
+  - block_do_end.rb: 2 edges (each, select)
+  - block_chained.rb: 5 edges (select, map, compact, uniq, sort)
+
+KNOWN LIMITATIONS:
+  - None
+
+RELATED TESTS:
+  - crates/parseltongue-core/tests/ruby_dependency_patterns_test.rs

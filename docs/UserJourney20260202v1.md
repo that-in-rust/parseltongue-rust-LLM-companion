@@ -1,15 +1,16 @@
 # Parseltongue User Journey - Complete API Testing
 
-**Date**: February 2, 2026 (v1.4.7) | Updated: February 8, 2026 (v1.6.0)
-**Version**: 1.6.0
+**Date**: February 2, 2026 (v1.4.7) | Updated: February 9, 2026 (v1.6.1)
+**Version**: 1.6.1
 **Test Database**: parseltongue20260202160809/analysis.db
 **Codebase**: Parseltongue itself (self-analysis)
 
 ## Executive Summary
 
-Comprehensive end-to-end testing of all 21 Parseltongue HTTP API endpoints against the Parseltongue codebase itself. This document demonstrates real-world API usage, response formats, and practical integration patterns for LLM agents and development tools.
+Comprehensive end-to-end testing of all 22 Parseltongue HTTP API endpoints against the Parseltongue codebase itself. This document demonstrates real-world API usage, response formats, and practical integration patterns for LLM agents and development tools.
 
 **v1.6.0 additions**: 7 mathematical graph analysis endpoints backed by published research (Tarjan SCC, SQALE Technical Debt, K-Core Decomposition, PageRank/Betweenness Centrality, Shannon Entropy, CK Metrics Suite, Leiden Community Detection). Total: 81 graph_analysis unit tests + 2 doctests.
+**v1.6.1 addition**: Ingestion coverage reporting endpoint for per-folder parse coverage analysis with ingestion-errors.txt logging.
 
 ### Test Metrics
 - **Total Entities**: 755 CODE entities (1972 total including tests)
@@ -121,7 +122,7 @@ curl http://localhost:7777/codebase-statistics-overview-summary
 curl http://localhost:7777/api-reference-documentation-help
 ```
 
-**Response**: Complete endpoint catalog with descriptions, parameters, and examples (21 endpoints total across 5 categories: Core, Entity, Edge, Analysis, Graph Analysis v1.6.0).
+**Response**: Complete endpoint catalog with descriptions, parameters, and examples (22 endpoints total across 5 categories: Core, Entity, Edge, Analysis, Graph Analysis v1.6.0).
 
 **Use Case**: LLM agents discovering available tools dynamically.
 
@@ -376,7 +377,7 @@ curl "http://localhost:7777/smart-context-token-budget?focus=rust:fn:main:__crat
 
 ---
 
-## v1.6.0 Graph Analysis Endpoints (15-21)
+## v1.6.0 Graph Analysis Endpoints (15-21) & v1.6.1 Coverage (22)
 
 ### 15. Strongly Connected Components (Tarjan SCC)
 **Endpoint**: `GET /strongly-connected-components-analysis`
@@ -643,6 +644,56 @@ curl http://localhost:7777/leiden-community-detection-clusters
 
 ---
 
+### 22. Ingestion Coverage Folder Report (v1.6.1)
+**Endpoint**: `GET /ingestion-coverage-folder-report`
+**Purpose**: Per-folder ingestion coverage showing total, eligible, and parsed files at configurable depth
+**Query Params**: `depth` (optional, default: 2, values: 0=root, 1=L1, 2=L2)
+
+```bash
+# Default depth (L2 folders)
+curl http://localhost:7777/ingestion-coverage-folder-report
+
+# L1 folders only
+curl "http://localhost:7777/ingestion-coverage-folder-report?depth=1"
+```
+
+**Expected Response**:
+```json
+{
+  "success": true,
+  "endpoint": "/ingestion-coverage-folder-report",
+  "data": {
+    "summary": {
+      "root_directory": ".",
+      "total_files": 469,
+      "eligible_files": 152,
+      "parsed_files": 52,
+      "coverage_pct": 34.21,
+      "entity_count": 1112,
+      "edge_count": 8593,
+      "errors_file": "parseltongue20260209/ingestion-errors.txt",
+      "error_count": 101,
+      "unparsed_files": ["crates/parseltongue-core/src/isgl1_v2.rs", "..."]
+    },
+    "folders": [
+      {"folder_path": "crates/pt01-folder-to-cozodb-streamer/", "depth": 2, "total_files": 22, "eligible_files": 22, "parsed_files": 2, "coverage_pct": 9.09},
+      {"folder_path": "crates/parseltongue-core/", "depth": 2, "total_files": 62, "eligible_files": 62, "parsed_files": 6, "coverage_pct": 9.68}
+    ]
+  },
+  "tokens": 1470
+}
+```
+
+**Verification**:
+- `parsed_files <= eligible_files <= total_files` for every folder
+- Folders sorted by `coverage_pct` ascending (lowest first)
+- `ingestion-errors.txt` written to workspace directory with `[UNPARSED]` entries
+- Coverage 3 metrics: total (all files), eligible (supported extensions), parsed (entities in DB)
+
+**Use Case**: LLM agents assessing confidence in graph completeness before trusting query results. Low coverage folders indicate unparsed code that may affect analysis accuracy.
+
+---
+
 ## v1.6.0 Integration Patterns
 
 ### Pattern 4: Progressive Root Cause Analysis
@@ -826,23 +877,23 @@ Always use `rocksdb:` prefix:
 
 ## Conclusion
 
-Parseltongue v1.6.0 provides production-ready code analysis APIs with:
+Parseltongue v1.6.1 provides production-ready code analysis APIs with:
 - **99% token reduction** for LLM context efficiency
 - **Real-time updates** via file watcher (7ms average)
 - **Stable entity identities** with ISGL1 v2 timestamps
 - **Multi-language support** across 12 languages
-- **21 REST endpoints** for comprehensive analysis (14 original + 7 graph analysis)
+- **22 REST endpoints** for comprehensive analysis (14 original + 7 graph analysis + 1 coverage)
 - **7 mathematical graph analysis algorithms** backed by published research
 - **81 graph_analysis tests** (79 unit + 2 doctest) all passing
 
-All 21 endpoints tested against the Parseltongue codebase itself (755 entities, 4,055 edges).
+All 22 endpoints tested against the Parseltongue codebase itself (755 entities, 4,055 edges).
 
 ---
 
-**Generated**: February 2, 2026 (v1.4.7) | Updated: February 8, 2026 (v1.6.0)
+**Generated**: February 2, 2026 (v1.4.7) | Updated: February 9, 2026 (v1.6.1)
 **Test Environment**: macOS ARM64, Rust 1.83.0
 **Database**: parseltongue20260202160809/analysis.db
-**Version**: Parseltongue v1.6.0
+**Version**: Parseltongue v1.6.1
 
 ---
 
@@ -876,6 +927,9 @@ curl http://localhost:7777/centrality-measures-entity-ranking
 curl http://localhost:7777/entropy-complexity-measurement-scores
 curl http://localhost:7777/coupling-cohesion-metrics-suite
 curl http://localhost:7777/leiden-community-detection-clusters
+
+# v1.6.1: Coverage reporting
+curl http://localhost:7777/ingestion-coverage-folder-report
 ```
 
 ### Default Values

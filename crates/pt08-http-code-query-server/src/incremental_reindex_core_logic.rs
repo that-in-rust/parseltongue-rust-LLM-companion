@@ -224,7 +224,7 @@ async fn execute_reindex_with_storage_arc(
 
     // Parse file using pt01's Isgl1KeyGenerator
     let key_generator = Isgl1KeyGeneratorFactory::new();
-    let (parsed_entities, dependencies) = match key_generator.parse_source(&file_content_str, file_path) {
+    let (parsed_entities, dependencies, _warnings) = match key_generator.parse_source(&file_content_str, file_path) {
         Ok(result) => result,
         Err(e) => {
             // If parsing fails, delete all old entities and return
