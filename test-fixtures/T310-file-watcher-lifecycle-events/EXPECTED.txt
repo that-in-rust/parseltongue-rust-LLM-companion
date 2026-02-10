@@ -1,0 +1,115 @@
+FIXTURE: T310-file-watcher-lifecycle-events
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: File Watcher System
+VALIDATES: File watcher lifecycle, event detection, debouncing, metrics tracking, and cross-crate integration
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in:
+    - crates/pt01-folder-to-cozodb-streamer/src/file_watcher_tests.rs (25 tests)
+    - crates/pt08-http-code-query-server/tests/e2e_file_watcher_tests.rs (5 tests)
+
+TEST FUNCTIONS (30 total):
+
+  pt01 Mock Watcher Tests (6):
+    - test_mock_watcher_starts_successfully: Mock watcher starts and sets running flag
+    - test_mock_watcher_stops_successfully: Mock watcher stops and clears running flag
+    - test_mock_watcher_records_watched_paths: Watched path recorded in internal list
+    - test_mock_watcher_prevents_double_start: WatcherAlreadyRunning error on second start
+    - test_mock_watcher_stop_without_start_fails: WatcherNotRunning error when stopping before start
+    - test_file_change_type_equality: FileChangeType enum equality works correctly
+
+  pt01 Production Watcher Tests (6):
+    - test_notify_watcher_starts_and_stops: NotifyFileWatcherProvider lifecycle works
+    - test_notify_watcher_detects_file_create: Detects file creation events
+    - test_notify_watcher_detects_file_changes: Detects file modification events (or Create via atomic write)
+    - test_notify_watcher_prevents_double_start: WatcherAlreadyRunning error on double start
+    - test_file_change_event_payload_clone: FileChangeEventPayload cloning works
+    - test_convert_create_event_correctly: Debounced Create event → FileChangeEventPayload::Created
+
+  pt01 Event Conversion Tests (5):
+    - test_convert_modify_event_correctly: Debounced Modify event → FileChangeEventPayload::Modified
+    - test_convert_remove_event_correctly: Debounced Remove event → FileChangeEventPayload::Deleted
+    - test_filter_irrelevant_events_out: Access/Other events return None (filtered)
+    - test_handle_empty_paths_gracefully: Events with no paths return None
+
+  pt01 Debouncing Tests (2):
+    - test_debounce_rapid_file_modifications: 10 rapid edits → <10 processed events (proves debouncing)
+    - test_metrics_track_coalescing_correctly: events_coalesced_total_count increments when events merge
+
+  pt01 Performance Tests (2):
+    - test_event_latency_p99_threshold: P99 latency < 100ms (file save → callback)
+    - test_average_latency_reasonable_performance: Average latency < 50ms
+
+  pt08 E2E Integration Tests (5):
+    - test_file_change_updates_endpoint_metrics: File change updates /file-watcher-status-check
+    - test_multiple_file_types_detected: Rust, Python, JavaScript files all detected
+    - test_status_endpoint_returns_json: /file-watcher-status-check returns valid JSON
+    - test_watcher_disabled_by_default: watcher_currently_running_flag=false by default
+    - test_rapid_changes_are_debounced: Rapid edits result in fewer events
+
+CONTRACT:
+  Implementations:
+    - MockFileWatcherProvider: In-memory testing without filesystem
+    - NotifyFileWatcherProvider: Production implementation using notify-debouncer-full
+
+  Lifecycle:
+    - start_watching_directory_recursively(path, callback): Begin watching
+    - stop_watching_directory_now(): Stop watching
+    - check_watcher_running_status(): Query running state
+
+  Double-Start Prevention:
+    - WatcherAlreadyRunning error if start called twice
+    - WatcherNotRunning error if stop called without start
+
+  File Extensions:
+    - Configurable filter (e.g., only .rs files)
+    - Unknown extensions treated as code (non-test)
+
+  Event Types:
+    - FileChangeType::Created: New file detected
+    - FileChangeType::Modified: File content changed
+    - FileChangeType::Deleted: File removed
+    - Irrelevant events (Access, Other) filtered out
+
+  Debouncing:
+    - Configurable debounce duration (default 50ms)
+    - Rapid edits within window coalesced into single event
+    - 10 rapid edits (10ms apart) → <10 processed events (proves debouncing)
+    - events_coalesced_total_count metric increments when events merge
+
+  Metrics Tracking:
+    - events_processed_total_count: Total events processed
+    - events_coalesced_total_count: Number of coalesced events
+    - Exposed via /file-watcher-status-check endpoint (pt08)
+
+  Latency Measurement:
+    - P99 latency: < 100ms (file save → callback)
+    - Average latency: < 50ms
+    - Measured from file write timestamp to callback invocation
+
+  Cross-Crate Integration:
+    - pt01: File watcher implementation
+    - pt08: HTTP server exposes watcher status via REST API
+    - /file-watcher-status-check endpoint returns:
+      * watcher_currently_running_flag: boolean
+      * file_watching_enabled_flag: boolean
+      * events_processed_total_count: number
+      * status_message_text_value: string
+
+KNOWN LIMITATIONS:
+  - OS-specific event granularity (some platforms report Create instead of Modify)
+  - Atomic write behavior varies (editors may delete-then-recreate files)
+  - Performance tests timing sensitive (may flake on slow CI runners)
+  - Debounce duration affects latency vs coalescing trade-off
+  - Mock watcher doesn't simulate filesystem delays
+
+RELATED TESTS:
+  T309-http-port-selection-validation (same crate, pt08)
+  Integration with HTTP server ensures watcher status queryable via REST API
+
+PERFORMANCE CONTRACTS:
+  - P99 latency: < 100ms (file save → callback)
+  - Average latency: < 50ms
+  - Debouncing reduces 10 rapid edits to <10 processed events
+  - Handles 100+ file events without degradation

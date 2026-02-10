@@ -1,0 +1,161 @@
+FIXTURE: T305-language-field-extraction-detect
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: ISGL1 Key Infrastructure
+VALIDATES: Language detection from entity key prefix
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/language_field_extraction_tests.rs
+
+BUG CONTEXT:
+  v1.4.3 Bug #3a: Language Field Corruption
+    - ALL 233 entities stored with language: "rust" regardless of actual language
+    - Root cause: Language field hardcoded during ingestion
+    - Entity keys were CORRECT: "javascript:fn:greetUser:..." but field was "rust"
+
+  Fix (v1.4.5):
+    - Extract language from key prefix (first component before ':')
+    - Method: extract_language_from_key_validated()
+
+SUPPORTED LANGUAGES (12):
+  1. rust
+  2. python
+  3. javascript
+  4. typescript
+  5. go
+  6. java
+  7. c
+  8. cpp (C++)
+  9. ruby
+  10. php
+  11. csharp (C#)
+  12. swift
+
+KEY FORMAT:
+  {language}:{entity_class}:{entity_name}:{semantic_path}:{timestamp}
+
+  Example keys:
+    - rust:fn:main:__crates_parseltongue_src_main_rs:1-10
+    - javascript:fn:greetUser:__tests_e2e_workspace_src_test_v141_js:4-6
+    - python:class:Parser:__src_parser_py:10-50
+
+  Language prefix: First component (before first ':')
+
+TEST FUNCTIONS (8 tests):
+
+  1. test_extract_language_from_key_rust_function
+     - Key: "rust:fn:main:__crates_parseltongue_src_main_rs:1-10"
+     - Expected: "rust"
+     - Validates: Basic prefix extraction
+
+  2. test_extract_language_from_key_javascript_function
+     - Key: "javascript:fn:greetUser:__tests_e2e_workspace_src_test_v141_js:4-6"
+     - Expected: "javascript"
+     - Validates: Bug #3a fix (JavaScript entities no longer show "rust")
+     - Critical test: This was the actual corrupted entity from live server
+
+  3. test_extract_language_from_key_python_class
+     - Key: "python:class:Parser:__src_parser_py:10-50"
+     - Expected: "python"
+     - Validates: Python language detection
+
+  4. test_extract_language_from_key_go_function
+     - Key: "go:fn:handleRequest:__internal_server_go:5-15"
+     - Expected: "go"
+     - Validates: Go language detection
+
+  5. test_extract_language_from_key_typescript_interface
+     - Key: "typescript:interface:UserProfile:__src_types_ts:1-20"
+     - Expected: "typescript"
+     - Validates: TypeScript language detection
+
+  6. test_extract_language_from_empty_key
+     - Key: "" (empty string)
+     - Expected: "unknown"
+     - Validates: Safe fallback for edge case
+
+  7. test_extract_language_from_malformed_key
+     - Key: "malformed_key_no_colons"
+     - Expected: "malformed_key_no_colons" (whole string)
+     - Validates: Graceful handling of invalid keys
+
+  8. test_extract_language_from_single_component_key
+     - Key: "rust" (no colons)
+     - Expected: "rust"
+     - Validates: Single-component key handling
+
+CONTRACT:
+  Method signature:
+    fn extract_language_from_key_validated(&self) -> String
+
+  Extraction logic:
+    1. Split key by ':' delimiter
+    2. Take first component (before first ':')
+    3. If empty or no delimiter, return "unknown" or whole string
+    4. Return lowercase language string
+
+  Language validation:
+    - Language string must match one of 12 supported languages
+    - Case-insensitive matching recommended (future enhancement)
+    - Unknown languages return "unknown" (safe fallback)
+
+  Edge cases:
+    - Empty key: Return "unknown"
+    - No delimiter: Return whole key (defensive)
+    - Malformed key: Return first component or whole key
+
+MOTIVATION:
+  Before fix:
+    - Language field hardcoded to "rust" in all entities
+    - Entity keys correct: "javascript:fn:..." but field wrong: "rust"
+    - 100% corruption rate (all 233 entities affected)
+    - Users could not filter by language
+
+  After fix:
+    - Language extracted from key prefix (source of truth)
+    - 0% corruption rate (key and field consistent)
+    - Users can filter by language accurately
+
+DESIGN DECISIONS:
+  1. Key is source of truth:
+     - Language in key is generated correctly by tree-sitter parser
+     - Field should always match key prefix (no separate storage)
+
+  2. Validation in method name:
+     - extract_language_from_key_validated() implies validation
+     - Returns "unknown" for invalid cases (fail-safe)
+
+  3. No enum conversion (yet):
+     - Returns String, not Language enum
+     - Future enhancement: Convert to enum for type safety
+
+  4. No caching:
+     - Extract on every call (simple, no state)
+     - Performance: Split + index = O(1), negligible overhead
+
+PERFORMANCE:
+  - Split by ':': O(n) where n = key length (~50 chars)
+  - Take first component: O(1)
+  - Total: <100ns per call (negligible)
+  - For 10,000 entities: <1ms total extraction time
+
+BUG REGRESSION PREVENTION:
+  Integration test (future):
+    - Parse multi-language codebase (Rust, JS, Python)
+    - Verify ALL entities have language field matching key prefix
+    - Ensure 0 mismatches (was 100% corruption before fix)
+
+  Monitoring (future):
+    - Add metric: language_field_mismatches_total
+    - Alert if > 0 mismatches detected
+    - Prevents silent corruption
+
+KNOWN LIMITATIONS:
+  - Assumes key format is correct (garbage in, garbage out)
+  - No validation against Language enum (returns String)
+  - Case-sensitive matching (future: normalize to lowercase)
+  - No support for custom/unknown languages (returns "unknown")
+
+RELATED TESTS:
+  T300-isgl1-v2-key-generation-format (keys generated with language prefix)
+  (No other direct dependencies; this is a standalone field extraction utility)

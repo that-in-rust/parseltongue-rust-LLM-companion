@@ -1,0 +1,76 @@
+FIXTURE: T266-kcore-decomposition-layering
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Core Decomposition
+VALIDATES: K-Core decomposition using Batagelj-Zaversnik O(E) algorithm for architecture layering
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/kcore_decomposition_algorithm.rs
+
+REFERENCE GRAPHS:
+  1. 8-node graph: D-E-F form 3-cycle (coreness=2), G-H form 2-cycle (coreness=1)
+  2. 5-node chain: A→B→C→D→E (all coreness=1, no dense subgraphs)
+
+ALGORITHM CONTRACT:
+  - Reference: Batagelj & Zaversnik (2003) "An O(m) Algorithm for Cores Decomposition"
+  - Input: AdjacencyListGraphRepresentation (directed, but uses UNDIRECTED degree)
+  - Output: HashMap<String, usize> mapping node → coreness
+  - Complexity: O(E) using bucket sort
+  - Degree calculation: in-degree + out-degree, deduplicated neighbors
+
+K-CORE DEFINITION:
+  - k-core: Maximal subgraph where every node has degree ≥ k
+  - Coreness: Maximum k for which node is in the k-core
+  - Monotonic property: Nodes processed in non-decreasing degree order
+
+ALGORITHM STEPS:
+  1. Build undirected neighbor sets (forward + reverse, deduplicated)
+  2. Initialize degree for each node
+  3. Bucket sort: Group nodes by degree
+  4. Process nodes in increasing degree order:
+     - Remove node with minimum degree
+     - Coreness = max(current degree, previous max k)
+     - Decrement remaining neighbors' degrees
+  5. Monotonicity ensures coreness values are correct
+
+LAYER CLASSIFICATION:
+  - classify_coreness_layer_level(k):
+    * k ≥ 8 → CoreLayer::Core (highly coupled, critical infrastructure)
+    * 3 ≤ k < 8 → CoreLayer::Mid (moderately coupled components)
+    * k < 3 → CoreLayer::Peripheral (loosely coupled, leaf nodes)
+
+TEST FUNCTIONS (6):
+  - test_kcore_eight_node_max_coreness: Validates max coreness=2 (D-E-F cycle)
+  - test_kcore_cycle_nodes_coreness_two: Validates D, E, F all have coreness=2
+  - test_kcore_peripheral_nodes_coreness: Validates G, H have coreness=1 (2-cycle, degree=1)
+    * Note: A, B, C also have coreness=2 due to Batagelj-Zaversnik monotonicity
+  - test_kcore_layer_classification: Validates classification thresholds
+  - test_kcore_empty_graph: Validates empty graph returns empty HashMap
+  - test_kcore_chain_all_coreness_one: Validates linear chain has all coreness=1
+
+ALGORITHM DETAILS:
+  - Uses BTreeMap for bucket sort (automatic ordering)
+  - Processes ONE vertex at a time (not whole buckets)
+  - k = max(k, min_degree) ensures monotonicity
+  - Saturating subtraction prevents underflow when decrementing degrees
+
+UNDIRECTED DEGREE CALCULATION:
+  - Neighbors = forward_neighbors ∪ reverse_neighbors (deduplicated with HashSet)
+  - Degree = |neighbors|
+  - Handles self-loops correctly (if present)
+
+MONOTONICITY PROPERTY:
+  - Key invariant: coreness values are non-decreasing in processing order
+  - Result: A, B, C inherit coreness=2 from D-E-F processing (even though degree=2)
+  - This is correct behavior per Batagelj-Zaversnik algorithm
+
+KNOWN LIMITATIONS:
+  - Uses undirected degree (may not reflect directed dependency flow)
+  - Layer thresholds (3, 8) are heuristic (not empirically validated)
+  - Does not report core subgraph structure (only per-node coreness)
+  - Monotonicity can "inflate" coreness for peripheral nodes connected to core
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T261-tarjan-scc-cycle-detection (cycle nodes have higher k-core)
+  T268-cross-algorithm-integration-test (SCC nodes share k-core level)

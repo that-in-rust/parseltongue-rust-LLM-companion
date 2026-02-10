@@ -182,3 +182,81 @@ fn t164_ruby_attribute_chained_access() {
     assert!(value_edge, "Expected edge for .value");
     assert!(config_edge, "Expected edge for .config");
 }
+
+// ============================================================================
+// T165: Ruby Module Inclusion (include, extend, prepend)
+// ============================================================================
+// SKIPPED: Tree-sitter Ruby grammar limitation
+// The tree-sitter Ruby parser doesn't expose constant arguments for bareword
+// method calls like `include Enumerable` in a queryable way.
+// This is marked as P2 (low priority) and requires either tree-sitter updates
+// or custom parsing logic. T-folder serves as aspirational fixture.
+
+#[test]
+#[ignore] // Ruby module inclusion not yet implemented (REQ-RUBY-003.0)
+fn t165_ruby_module_inclusion_basic() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T165-ruby-module-inclusion-edges",
+        "module_basic.rb",
+    );
+
+    println!("\n=== T165: Ruby Module Inclusion Basic ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect include, extend, prepend statements
+    let include_edge = edges
+        .iter()
+        .any(|e| e.to_key.as_str().contains("Enumerable"));
+    let extend_edge = edges
+        .iter()
+        .any(|e| e.to_key.as_str().contains("Comparable"));
+    let prepend_edge = edges
+        .iter()
+        .any(|e| e.to_key.as_str().contains("Serializable"));
+
+    assert!(include_edge, "Expected edge for include Enumerable");
+    assert!(extend_edge, "Expected edge for extend Comparable");
+    assert!(prepend_edge, "Expected edge for prepend Serializable");
+}
+
+#[test]
+#[ignore] // Ruby module inclusion not yet implemented (REQ-RUBY-003.0)
+fn t165_ruby_module_inclusion_qualified() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T165-ruby-module-inclusion-edges",
+        "module_qualified.rb",
+    );
+
+    println!("\n=== T165: Ruby Module Inclusion Qualified ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect qualified module inclusion
+    let callbacks_edge = edges
+        .iter()
+        .any(|e| e.to_key.as_str().contains("Callbacks"));
+    let validations_edge = edges
+        .iter()
+        .any(|e| e.to_key.as_str().contains("Validations"));
+    let cacheable_edge = edges
+        .iter()
+        .any(|e| e.to_key.as_str().contains("Cacheable"));
+
+    assert!(
+        callbacks_edge,
+        "Expected edge for include ActiveSupport::Callbacks"
+    );
+    assert!(
+        validations_edge,
+        "Expected edge for extend ActiveSupport::Validations"
+    );
+    assert!(
+        cacheable_edge,
+        "Expected edge for prepend Concerns::Cacheable"
+    );
+}

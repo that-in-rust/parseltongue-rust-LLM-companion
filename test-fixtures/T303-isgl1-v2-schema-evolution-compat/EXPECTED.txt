@@ -1,0 +1,163 @@
+FIXTURE: T303-isgl1-v2-schema-evolution-compat
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: ISGL1 Key Infrastructure
+VALIDATES: Schema evolution from v1 to v2 with backward compatibility
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/isgl1_v2_schema_evolution_tests.rs
+
+SCHEMA EVOLUTION:
+  v1 CodeEntity fields (original):
+    - isgl1_key: String (format: rust:fn:name:path:10-50)
+    - signature: InterfaceSignature
+    - entity_class: EntityClass
+
+  v2 CodeEntity fields (added):
+    - birth_timestamp: Option<i64> (Unix timestamp, None for v1 entities)
+    - content_hash: Option<String> (SHA-256 hash, None for v1 entities)
+    - semantic_path: Option<String> (Sanitized file path, None for v1 entities)
+
+  Key change:
+    v1: rust:fn:name:path:10-50 (line range)
+    v2: rust:fn:name:path:T1706284800 (timestamp)
+
+BACKWARD COMPATIBILITY:
+  - v1 entities can coexist with v2 entities in same database
+  - v1 entities have v2 fields set to None
+  - v2 entities have v2 fields set to Some(...)
+  - Serialization/deserialization preserves both formats
+  - No migration required: v1 entities remain valid
+
+TEST FUNCTIONS (4 tests):
+
+  1. test_code_entity_with_v2_fields
+     - Creates entity with new_with_v2_fields() constructor
+     - Validates v2 fields are set:
+       - birth_timestamp: Some(1706284800)
+       - content_hash: Some("abc123")
+       - semantic_path: Some("__src_test_rs")
+     - Key format: rust:fn:test_func:__src_test_rs:T1706284800
+
+  2. test_code_entity_backward_compatible
+     - Creates entity with old new() constructor (v1)
+     - Validates v2 fields are None:
+       - birth_timestamp: None
+       - content_hash: None
+       - semantic_path: None
+     - Key format: rust:fn:old_func:__src_old_rs:5-15 (v1 with line range)
+     - Ensures v1 entities still work
+
+  3. test_code_entity_serialization_with_v2
+     - Creates v2 entity with all fields
+     - Serializes to JSON
+     - Deserializes from JSON
+     - Validates v2 fields preserved:
+       - birth_timestamp: Some(1706284900)
+       - content_hash: Some("def456")
+       - semantic_path: Some("__src_ser_rs")
+     - Ensures Serde serialization round-trip works
+
+  4. test_mixed_v1_v2_entities
+     - Creates both v1 and v2 entities
+     - Stores in same Vec<CodeEntity>
+     - Validates:
+       - v1_entity.birth_timestamp.is_none() == true
+       - v2_entity.birth_timestamp.is_some() == true
+     - Ensures both formats coexist in same collection
+
+CONTRACT:
+  Schema evolution principles:
+    1. Additive only: New fields added, no fields removed
+    2. Option<T> for all new fields: Backward compatibility
+    3. Two constructors:
+       - new(): Creates v1 entity (v2 fields = None)
+       - new_with_v2_fields(): Creates v2 entity (v2 fields = Some(...))
+    4. Serde derives support both formats
+
+  Key format detection:
+    - Contains ":T": v2 format (timestamp)
+    - Contains "-": v1 format (line range)
+    - Regex: .*:\d+-\d+$ (v1) vs .*:T\d+$ (v2)
+
+  Migration strategy (implicit):
+    - No explicit migration step required
+    - New entities created with v2 format
+    - Old entities remain in v1 format until reindexed
+    - Gradual migration as files are edited
+
+MOTIVATION:
+  Without backward compatibility:
+    - All existing databases would break on upgrade
+    - Forced migration of all entities (expensive, risky)
+    - Downtime during migration
+
+  With backward compatibility:
+    - Zero downtime upgrades
+    - Gradual migration (lazy, on-demand)
+    - Old entities remain valid indefinitely
+
+DESIGN DECISIONS:
+  1. Option<T> for new fields:
+     - Ensures v1 entities can be deserialized (None values)
+     - No need to backfill data for old entities
+
+  2. Two constructors (new vs new_with_v2_fields):
+     - Explicit opt-in to v2 features
+     - Prevents accidental v2 field usage in v1-only code
+
+  3. No automatic migration:
+     - Entities only upgraded when file is reindexed
+     - Reduces database write load on upgrade
+     - Users can defer migration indefinitely
+
+  4. Serde derives handle both formats:
+     - #[serde(skip_serializing_if = "Option::is_none")]
+     - JSON size reduced for v1 entities (omit null fields)
+
+SERIALIZATION EXAMPLES:
+  v1 entity JSON:
+    {
+      "isgl1_key": "rust:fn:old_func:__src_old_rs:5-15",
+      "signature": { ... },
+      "entity_class": "CodeImplementation"
+      // birth_timestamp, content_hash, semantic_path omitted (None)
+    }
+
+  v2 entity JSON:
+    {
+      "isgl1_key": "rust:fn:new_func:__src_new_rs:T1706284800",
+      "signature": { ... },
+      "entity_class": "CodeImplementation",
+      "birth_timestamp": 1706284800,
+      "content_hash": "abc123...",
+      "semantic_path": "__src_new_rs"
+    }
+
+PERFORMANCE:
+  - No overhead for v1 entities (fields are None, not computed)
+  - v2 entities have small overhead: 8 bytes (i64) + ~64 bytes (String) + ~20 bytes (String)
+  - Total per-entity overhead: ~100 bytes (negligible for 10K entities = 1MB)
+
+KNOWN LIMITATIONS:
+  - v1 entities cannot use incremental reindex features (no hash/timestamp)
+  - Mixed v1/v2 queries must handle Option<T> unwrapping
+  - No automatic backfill of v2 fields for v1 entities
+
+MIGRATION PATH:
+  Phase 1: Deploy v2 schema (backward compatible)
+    - All new entities created with v2 format
+    - Old entities remain in v1 format
+
+  Phase 2: Gradual reindex (lazy)
+    - Files edited -> reindexed -> entities upgraded to v2
+    - Unchanged files -> entities stay in v1 format
+
+  Phase 3: Optional bulk migration (future)
+    - Force reindex all files -> all entities upgraded to v2
+    - Not required for correctness, only for feature parity
+
+RELATED TESTS:
+  T300-isgl1-v2-key-generation-format (v2 key format specification)
+  T301-isgl1-v2-content-hash-stability (content_hash field usage)
+  T302-isgl1-v2-entity-matching-priority (requires v2 fields for matching)

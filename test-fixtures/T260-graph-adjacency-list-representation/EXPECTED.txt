@@ -1,0 +1,65 @@
+FIXTURE: T260-graph-adjacency-list-representation
+LANGUAGE: N/A (pure graph data structure, no source code parsing)
+CATEGORY: Graph Analysis - Foundation
+VALIDATES: Adjacency list graph representation correctly stores nodes, edges, and supports bidirectional traversal
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure data structure.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/adjacency_list_graph_representation.rs
+
+ALGORITHM CONTRACT:
+  - Input: Dependency edges as (from, to, edge_type) tuples
+  - Output: Bidirectional graph structure with O(1) neighbor access
+  - Data structure: HashMap-based adjacency lists for forward/reverse edges
+  - Edge types: Stored separately as (from, to) → EdgeType mapping
+  - Node set: HashSet of all unique nodes
+  - Edge count: Maintained incrementally
+
+OPERATIONS:
+  1. create_empty_graph_representation(): Initialize empty graph
+  2. insert_node_into_graph(node): Add node (idempotent)
+  3. insert_edge_with_type(from, to, edge_type): Add edge + auto-insert nodes
+  4. get_forward_neighbors_list(node): Who does this call? (O(1))
+  5. get_reverse_neighbors_list(node): Who calls this? (O(1))
+  6. calculate_node_out_degree(node): Count outgoing edges
+  7. calculate_node_in_degree(node): Count incoming edges
+  8. retrieve_all_graph_nodes(): Get all nodes
+  9. count_total_graph_nodes(): Get node count
+  10. count_total_graph_edges(): Get edge count
+  11. lookup_edge_type_between(from, to): Get edge type or None
+  12. build_from_dependency_edges(edges): Construct from edge list
+
+TEST FUNCTIONS (11):
+  - test_create_empty_graph_representation: Validates empty graph has 0 nodes, 0 edges
+  - test_insert_node_into_graph: Validates node insertion (idempotent, deduplication)
+  - test_insert_edge_with_type: Validates edge insertion with auto-node-creation
+  - test_forward_neighbors_correctness_check: Validates forward neighbor lookup (A→{B,C})
+  - test_reverse_neighbors_correctness_check: Validates reverse neighbor lookup ({A,B}→C)
+  - test_degree_calculations_exact_values: Validates in-degree and out-degree calculations
+  - test_build_from_dependency_edges: Validates bulk construction from edge list
+  - test_neighbors_for_nonexistent_node: Validates graceful handling of missing nodes (empty slice)
+  - test_lookup_edge_type_nonexistent: Validates edge type lookup returns None for missing edges
+  - test_clone_and_debug_traits: Validates Clone and Debug trait implementations
+  - test_lookup_edge_type_between: (Implicit) Validates edge type storage/retrieval
+
+KEY DESIGN PROPERTIES:
+  - Generic over String keys (not EntityKey) for algorithm reusability
+  - Bidirectional traversal (forward: A→B, reverse: B←A) in O(1)
+  - Edge types stored separately for flexible analysis
+  - No self-loops or multi-edges (implementation allows but not validated)
+  - Safe fallback: nonexistent nodes return empty slices, 0 degrees
+
+KNOWN LIMITATIONS:
+  - Does not validate self-loops or duplicate edges (callers must dedupe)
+  - Node names are Strings (heap allocation per node)
+  - No weighted edges (extension would require weight storage)
+
+RELATED TESTS:
+  T261-tarjan-scc-cycle-detection
+  T262-entropy-complexity-measurement
+  T263-leiden-community-detection
+  T264-ck-metrics-coupling-cohesion
+  T265-centrality-pagerank-betweenness
+  T266-kcore-decomposition-layering
+  T267-sqale-technical-debt-scoring
+  T268-cross-algorithm-integration-test

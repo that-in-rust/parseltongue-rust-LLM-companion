@@ -1,0 +1,140 @@
+FIXTURE: T245-sql-entity-extraction-basic
+CATEGORY: SQL Entity Extraction (v1.5.6+)
+VALIDATES: Basic SQL CREATE TABLE and CREATE VIEW statements extract entities
+SOURCE: test-fixtures/v156-sql-test/schema.sql
+
+SOURCE FILES:
+  - schema.sql (CREATE TABLE, CREATE VIEW)
+
+CONTEXT:
+  SQL language support was added in v1.5.6 to extract schema entities from
+  SQL files. This fixture validates that basic DDL statements (CREATE TABLE,
+  CREATE VIEW) are correctly parsed and stored as entities.
+
+EXPECTED ENTITIES:
+
+  schema.sql:
+    - table "users"
+        Properties: id (PRIMARY KEY), email (UNIQUE, NOT NULL), created_at (TIMESTAMP)
+    - view "active_users"
+        Definition: SELECT from users with date filter
+
+ENTITY KEY FORMAT:
+  Pattern: "sql:table:users:__schema:T123456"
+  Pattern: "sql:view:active_users:__schema:T789012"
+
+  Components:
+    - Language: "sql"
+    - Type: "table" or "view"
+    - Name: table/view name (e.g., "users", "active_users")
+    - Semantic path: "__schema" (from schema.sql)
+    - Timestamp: Deterministic birth timestamp
+
+ENTITY ATTRIBUTES:
+
+  Table entity "users":
+    - name: "users"
+    - entity_class: CodeImplementation
+    - language: SQL
+    - entity_type: "table"
+    - qualified_name: "users"
+    - semantic_path: "__schema"
+    - Optional: column_names = ["id", "email", "created_at"]
+    - Optional: primary_key = "id"
+
+  View entity "active_users":
+    - name: "active_users"
+    - entity_class: CodeImplementation
+    - language: SQL
+    - entity_type: "view"
+    - qualified_name: "active_users"
+    - semantic_path: "__schema"
+    - Optional: source_tables = ["users"]
+
+EXPECTED DEPENDENCY EDGES:
+
+  If view-to-table dependencies are tracked:
+    - active_users -> users (view depends on table)
+
+  Edge format:
+    source_key: "sql:view:active_users:__schema:T789012"
+    target_key: "sql:table:users:__schema:T123456"
+    relationship: "references" or "depends_on"
+
+MINIMUM ENTITY COUNT:
+  - At least 2 entities (1 table + 1 view)
+
+MINIMUM EDGE COUNT:
+  - At least 1 edge (if view dependencies tracked)
+  - 0 edges acceptable if view dependencies not yet implemented
+
+SQL LANGUAGE SUPPORT STATUS (v1.5.6):
+  Supported:
+    - CREATE TABLE statements
+    - CREATE VIEW statements
+    - Basic column definitions
+
+  Not yet supported (acceptable limitations):
+    - CREATE INDEX
+    - CREATE FUNCTION / STORED PROCEDURES
+    - ALTER TABLE statements
+    - Complex SQL DDL
+
+KNOWN LIMITATIONS:
+  - Tree-sitter SQL parser support may vary by SQL dialect (PostgreSQL vs MySQL vs SQLite)
+  - Column-level dependencies may not be tracked yet
+  - View query body parsing may be limited
+  - Foreign key constraints may not create explicit edges
+
+REGRESSION PROTECTION:
+  This fixture ensures that:
+    - SQL files are recognized and parsed
+    - CREATE TABLE extracts table entities
+    - CREATE VIEW extracts view entities
+    - Basic schema entities can be queried via REST API
+
+FUTURE ENHANCEMENTS:
+  - Extract column names and types
+  - Track foreign key relationships as edges
+  - Parse CREATE INDEX statements
+  - Extract stored procedures and functions
+  - Handle complex SQL dialects (PostgreSQL, MySQL, SQLite)
+
+TESTING WORKFLOW:
+
+  1. Ingest schema.sql:
+     parseltongue pt01-folder-to-cozodb-streamer test-fixtures/T245-sql-entity-extraction-basic
+
+  2. Query entities:
+     curl http://localhost:7777/code-entities-list-all
+     Expected: 2+ entities with language=SQL
+
+  3. Search for table:
+     curl "http://localhost:7777/code-entities-search-fuzzy?q=users"
+     Expected: Find "users" table entity
+
+  4. Search for view:
+     curl "http://localhost:7777/code-entities-search-fuzzy?q=active_users"
+     Expected: Find "active_users" view entity
+
+VALIDATION CRITERIA:
+
+  ✓ SQL files are detected and parsed
+  ✓ CREATE TABLE creates entity with type="table"
+  ✓ CREATE VIEW creates entity with type="view"
+  ✓ Entity keys use ISGL1 v2 format
+  ✓ Semantic path derived from filename (__schema)
+
+  Optional (may not be implemented yet):
+  - Column details extracted
+  - Foreign keys tracked
+  - View-to-table dependencies as edges
+
+RELATED TESTS:
+  None yet - this is the first SQL test fixture
+
+MINIMUM REQUIREMENTS:
+  - At least 1 table entity extracted
+  - At least 1 view entity extracted
+  - Entity keys use correct ISGL1 v2 format with "sql" language prefix
+  - Entities queryable via standard REST API endpoints

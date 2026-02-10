@@ -1,0 +1,86 @@
+FIXTURE: T241-cozo-special-char-escaping
+CATEGORY: Regression Test - CozoDB Escaping
+VALIDATES: Special characters (single quotes, angle brackets) must be safely escaped for CozoDB
+SOURCE: crates/parseltongue-core/tests/cozo_escaping_tests.rs
+
+CONTEXT:
+  CozoDB requires specific characters to be escaped within query string literals.
+  Beyond backslashes (covered in T240), single quotes and generic type brackets
+  need special handling to prevent query parse errors.
+
+CONTRACT: escape_for_cozo_string()
+  Function: parseltongue_core::storage::cozo_client::escape_for_cozo_string
+
+  Characters requiring escaping:
+    - Single quote (') → escaped as \'
+    - Backslash (\) → escaped as \\
+
+  Characters that DO NOT require escaping in string literals:
+    - Angle brackets (<, >) for generic types
+    - Square brackets ([, ]) for array notation
+    - Curly braces ({, }) for set notation
+    - Colons (:) for qualified names
+    - Commas (,) for generic parameters
+
+  Note: Angle brackets and other special chars are handled by sanitization
+  (see T242), not by CozoDB escaping.
+
+TEST CASES (from cozo_escaping_tests.rs):
+
+  1. test_escape_single_quote:
+     Input:  "User's Profile"
+     Output: r"User\'s Profile"
+     Use case: Entity names with apostrophes (e.g., O'Brien, User's)
+
+  2. test_escape_backslash_and_quote (combined):
+     Input:  r"C:\Path\User's\File.cs"
+     Output: r"C:\\Path\\User\'s\\File.cs"
+     Use case: Windows paths with apostrophes in directory names
+
+  3. test_escape_no_special_chars:
+     Input:  "normal/unix/path.rs"
+     Output: "normal/unix/path.rs"
+     Use case: Standard paths without special characters
+
+ESCAPING PRECEDENCE:
+  1. First: Escape backslashes (\ → \\)
+  2. Second: Escape single quotes (' → \')
+
+  This order matters for combined cases like: User's → User\'s
+
+GENERIC TYPE HANDLING:
+  Generic type characters (<, >, [, ], {, }, ,) are NOT escaped by
+  escape_for_cozo_string(). Instead, they are sanitized by
+  sanitize_entity_name_for_isgl1() BEFORE escaping.
+
+  Example flow for "List<string>":
+    1. Sanitization: "List<string>" → "List__lt__string__gt__"
+    2. Escaping: "List__lt__string__gt__" → "List__lt__string__gt__" (no change)
+
+  Only if the SANITIZED name contains backslashes or quotes:
+    "App\\User's" → "App\\\\User\\'s" (backslash doubled, quote escaped)
+
+COZO QUERY STRING FORMAT:
+  After escaping, strings are embedded in CozoDB queries like:
+    ?[key, name] <- [["entity_key_value", "entity_name_value"]]
+
+  Both key and name values must be properly escaped.
+
+EDGE CASES:
+  - Empty string: passes through unchanged
+  - Multiple quotes: each escaped independently ("it's a test" → "it\\'s a test")
+  - Mixed backslash/quote: both rules applied in sequence
+
+REGRESSION PROTECTION:
+  Without single quote escaping, entity names like "User's Profile" would
+  cause CozoDB query parse errors, terminating the string literal prematurely.
+
+RELATED TESTS:
+  T240-cozo-backslash-escaping-regression (backslash handling)
+  T242-generic-type-sanitization-keys (pre-escaping sanitization)
+
+MINIMUM REQUIREMENTS:
+  - All single quotes must be escaped with backslash prefix
+  - Escaping must work correctly with already-sanitized entity names
+  - Empty strings and strings without special chars pass through unchanged
+  - Combined backslash/quote cases must escape both correctly

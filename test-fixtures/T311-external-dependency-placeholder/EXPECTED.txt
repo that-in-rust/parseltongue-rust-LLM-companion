@@ -1,0 +1,102 @@
+FIXTURE: T311-external-dependency-placeholder
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: External Dependency Detection
+VALIDATES: Placeholder entity creation for external dependencies and unresolved references to prevent orphaned edges
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in:
+    - crates/pt01-folder-to-cozodb-streamer/src/external_dependency_handler.rs
+    - crates/pt01-folder-to-cozodb-streamer/src/external_dependency_tests.rs
+
+TEST FUNCTIONS (10):
+
+  Production Functions:
+    - extract_placeholders_from_edges_deduplicated(): Main extraction function
+    - parse_external_key_parts_validated(): Parse ISGL1 keys into components
+    - create_external_dependency_placeholder_entity_validated(): Create CodeEntity placeholders
+
+  Unit Tests (external_dependency_handler.rs):
+    - test_parse_external_key_parts_validated: Parse "rust:module:Parser:external-dependency-clap:0-0"
+    - test_parse_external_key_invalid_format: Invalid format returns ParsingError
+    - test_create_placeholder_entity: Create placeholder for tokio::Runtime
+    - test_extract_placeholders_deduplication: Two edges to same external → one placeholder
+    - test_extract_placeholders_mixed_edges: Mix of local and external edges → only extract external
+
+  TDD Tests (external_dependency_tests.rs):
+    - test_parse_rust_use_detects_external_crate: Detect "use clap::Parser" → external edge
+    - test_create_external_dependency_placeholder_entity: Create placeholder with 0-0 line range
+    - test_store_external_dependency_in_database: (ignored) Integration test for database storage
+    - test_blast_radius_includes_external_dependencies: (ignored) E2E test for blast radius
+    - test_extract_placeholders_unknown_pattern_detected: Both external-dependency and unresolved-reference patterns
+    - test_parse_unknown_pattern_key_validated: Parse "rust:fn:build_cli:unresolved-reference:0-0"
+    - test_differentiated_documentation_unresolved_vs_external: Different docs for unresolved vs external
+
+CONTRACT:
+  Problem Statement:
+    - Blast radius queries fail when edges point to non-existent external dependencies
+    - ISGL1 generator creates edges like "rust:module:Parser:external-dependency-clap:0-0"
+    - These targets don't exist in database → orphaned edges → query failures
+
+  Solution:
+    - Extract external dependency references from dependency edges
+    - Create placeholder CodeEntity nodes for each external dependency
+    - Store with ISGL1 key format: {lang}:{type}:{name}:external-dependency-{crate}:0-0
+    - Line range 0-0 = special marker for external dependencies
+    - EntityClass: CodeImplementation (external deps are still code)
+
+  Supported Patterns:
+    1. External Dependencies (Known Crates):
+       - Format: rust:module:Parser:external-dependency-clap:0-0
+       - Created for imported items from external crates (e.g., "use clap::Parser")
+       - Documentation: "External dependency from crate 'clap'. Imported via USE statement."
+
+    2. Unresolved References (Unknown Location):
+       - Format: rust:fn:build_cli:unresolved-reference:0-0
+       - Created for calls/references where target location is unknown
+       - Covers 6 scenarios: external deps, local functions, trait impls, macros, generics, dynamic dispatch
+       - Documentation: "Unresolved reference - target location unknown. May be external dependency, local function, trait implementation, macro expansion, generic instantiation, or dynamic dispatch target."
+
+  Parsing Logic:
+    - Scan all edges for to_key containing ":external-dependency-" OR ":unresolved-reference:0-0"
+    - Parse each key to extract: language, type, name, crate
+    - Create placeholder entity for each unique external dependency
+    - Deduplicate using HashSet (same dependency may be referenced by multiple files)
+
+  ISGL1 Key Format:
+    - External: rust:struct:Runtime:external-dependency-tokio:0-0
+    - Unresolved: rust:fn:build_cli:unresolved-reference:0-0
+    - Always ends with :0-0 (line range marker)
+    - Language prefix: rust, javascript, python, java, c, cpp, go, ruby, php, csharp, swift, kotlin, scala, sql
+
+  Entity Type Mapping:
+    - struct, fn/function, enum, trait, module, method, class, interface, macro, variable/var, constant/const
+
+  Deduplication:
+    - HashSet<Isgl1Key> ensures same external dependency only created once
+    - Multiple files importing "clap::Parser" → single placeholder
+
+  Error Handling:
+    - Invalid keys silently skipped (graceful degradation)
+    - Parse errors logged but don't fail entire operation
+    - Empty crate_name or item_name → ValidationError
+    - Unknown language prefix → ParsingError
+
+KNOWN LIMITATIONS:
+  - Cannot resolve actual location of external dependencies (no source code)
+  - Unresolved references may include local functions (false external classification)
+  - Line range 0-0 is magic value (breaks if codebase has actual line 0)
+  - Deduplication assumes same ISGL1 key = same entity (may miss aliased imports)
+  - Documentation generic (doesn't fetch actual external docs)
+
+RELATED TESTS:
+  T314-query-based-extraction-multilangs (generates edges that need placeholders)
+  T315-json-graph-contract-queries (blast radius queries rely on placeholder entities)
+  Integration tests verify blast radius includes external dependencies
+
+INTEGRATION FLOW:
+  1. ISGL1 generator parses source → creates edges with external references
+  2. extract_placeholders_from_edges_deduplicated() scans edges
+  3. Creates placeholder CodeEntity for each unique external/unresolved reference
+  4. All entities (local + placeholders) stored in database
+  5. Blast radius queries traverse edges without "No affected entities found" errors

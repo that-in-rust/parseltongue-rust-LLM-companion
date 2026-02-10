@@ -1,0 +1,30 @@
+FIXTURE: T121-java-field-access-edges
+LANGUAGE: Java
+CATEGORY: Dependency Edges
+VALIDATES: Field access via getter methods creates dependency edges
+
+SOURCE FILES:
+  - field_simple.java  (getter method calls for field access)
+
+EXPECTED ENTITIES:
+  field_simple.java:
+    - class "Reader"
+    - method "read"
+
+EXPECTED DEPENDENCY EDGES:
+  field_simple.java:
+    - read -> getSetting   (getter method call - field access pattern)
+    - read -> getPort      (getter method call - field access pattern)
+
+MINIMUM EDGE COUNTS:
+  field_simple.java: at least 2 edges (getSetting, getPort)
+
+KNOWN LIMITATIONS:
+  Java typically uses getters/setters instead of direct field access.
+  Field access nodes may not always be captured as separate dependencies
+  distinct from method calls. The tree-sitter parser captures method
+  invocations (getSetting(), getPort()) as method_invocation nodes.
+
+RELATED TESTS:
+  - REQ-JAVA-002.0: Field Access
+  - Original test: test_java_field_access_simple

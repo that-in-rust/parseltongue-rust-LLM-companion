@@ -1,0 +1,155 @@
+FIXTURE: T315-json-graph-contract-queries
+LANGUAGE: N/A (infrastructure, JSON graph queries)
+CATEGORY: JSON Graph Query Helpers
+VALIDATES: Agent-friendly query functions over Parseltongue JSON exports with performance contracts and error handling
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/query_json_graph_contract_tests.rs
+
+TEST FUNCTIONS (7):
+
+  Query Function Tests:
+    - contract_find_reverse_dependencies_by_key: Find blast radius (who calls X?)
+    - contract_find_reverse_dependencies_entity_not_found: EntityNotFound error handling
+    - contract_build_call_chain_from_root: Reconstruct execution path from main
+    - contract_filter_edges_by_type_only: Filter by Calls/Uses/Implements edge types
+    - contract_collect_entities_in_file_path: Find entities in specific files
+    - contract_query_performance_under_100ms: Performance validation (1,500 entities)
+    - contract_error_handling_graceful_degradation: Malformed JSON error handling
+
+CONTRACT:
+  Purpose (S06 Principle #1):
+    - Executable specifications proving agents can query Parseltongue JSON exports
+    - LLM-friendly helpers for common graph queries
+    - No database required (operates on JSON exports)
+
+  Query Functions:
+
+    1. find_reverse_dependencies_by_key(json, key) → Result<Vec<String>>:
+       - Returns all callers of given entity
+       - Uses reverse_deps array from JSON
+       - Example: "what breaks if I change validate_payment?"
+       - Error: EntityNotFound if key doesn't exist
+
+    2. build_call_chain_from_root(json, root_key) → Result<Vec<String>>:
+       - Reconstructs execution path from root function
+       - Follows edges with type="Calls"
+       - Example: main → process_payment → validate_payment → check_balance
+       - Returns ordered list of entity keys
+
+    3. filter_edges_by_type_only(json, edge_type) → Result<Vec<serde_json::Value>>:
+       - Filters edges by type: "Calls", "Uses", "Implements"
+       - Returns matching edge objects
+       - Error: InvalidEdgeType for unknown types
+
+    4. collect_entities_in_file_path(json, path_substring) → Result<Vec<serde_json::Value>>:
+       - Finds all entities where file_path contains substring
+       - Example: "auth" → all entities in auth.rs
+       - Returns entity objects with metadata
+
+  Test Data Structure:
+    JSON format:
+      {
+        "entities": [
+          {
+            "isgl1_key": "rust:fn:main:src_main_rs:1-10",
+            "name": "main",
+            "file_path": "./src/main.rs",
+            "reverse_deps": []
+          },
+          ...
+        ],
+        "edges": [
+          {
+            "from_key": "rust:fn:main:src_main_rs:1-10",
+            "to_key": "rust:fn:process_payment:src_payment_rs:145-167",
+            "edge_type": "Calls"
+          },
+          ...
+        ]
+      }
+
+  Realistic Test Scenario (Payment Processing):
+    - 7 entities: main, process_payment, validate_payment, check_balance, handle_checkout, login, logout
+    - 7 edges: Calls, Implements, Uses relationships
+    - Payment flow: main → process_payment → validate_payment → check_balance
+    - Checkout flow: main → handle_checkout
+    - Auth isolated: login, logout (no dependencies)
+
+  Performance Contract (S06 Principle #5):
+    - Query execution: < 100ms for 1,500 entities (release build)
+    - Debug builds: < 150ms allowed (1.5x slower)
+    - Tested functions:
+      * find_reverse_dependencies_by_key: < 100ms
+      * build_call_chain_from_root: < 500ms (5x multiplier for recursive traversal)
+      * filter_edges_by_type_only: < 100ms
+      * collect_entities_in_file_path: < 100ms
+
+  Error Handling:
+    1. EntityNotFound:
+       - Querying non-existent entity key
+       - Returns error with key (no panic)
+
+    2. InvalidEdgeType:
+       - Filtering by unknown edge type (not Calls/Uses/Implements)
+       - Returns error with type string
+
+    3. MalformedJson:
+       - Missing "entities" field → "entities not array"
+       - Missing "edges" field → "edges not array"
+       - "entities" not an array → error
+       - Missing "reverse_deps" field → "reverse_deps not array"
+       - Graceful degradation (no panic)
+
+  Edge Types:
+    - Calls: Function/method invocation
+    - Uses: Type/module usage
+    - Implements: Trait/interface implementation
+
+PERFORMANCE MEASUREMENTS:
+  Large Dataset (1,500 entities):
+    - reverse_deps query: < 100ms (release) / < 150ms (debug)
+    - call_chain query: < 500ms (release) / < 750ms (debug)
+    - edge_filter query: < 100ms (release) / < 150ms (debug)
+    - file_path query: < 100ms (release) / < 150ms (debug)
+
+KNOWN LIMITATIONS:
+  - Operates on pre-generated JSON (not live database queries)
+  - No incremental updates (full JSON re-export required)
+  - Call chain traversal may infinite loop on cycles (not validated)
+  - Performance degradation possible with >10,000 entities
+  - JSON parsing overhead not included in performance measurements
+  - Reverse deps array must be pre-computed during export
+
+RELATED TESTS:
+  T311-external-dependency-placeholder (blast radius includes external deps)
+  T314-query-based-extraction-multilangs (generates entities and edges)
+  Integration tests verify JSON export format matches query expectations
+
+DESIGN RATIONALE:
+  Agent-Friendly API:
+    - Simple function signatures (no complex types)
+    - JSON input/output (universal format)
+    - Error messages guide debugging
+    - No database setup required
+
+  Performance Optimization:
+    - Linear scans acceptable for <10,000 entities
+    - Pre-computed reverse_deps avoid expensive graph traversal
+    - Lazy evaluation where possible
+    - JSON kept in memory (no disk I/O during queries)
+
+  Error Handling Philosophy:
+    - Graceful degradation (never panic)
+    - Specific error types (EntityNotFound vs MalformedJson)
+    - Error messages include context (key name, field name)
+    - Partial results on malformed JSON where safe
+
+INTEGRATION FLOW:
+  1. Parseltongue exports codebase → JSON file
+  2. Agent loads JSON into memory
+  3. Agent calls query functions with JSON + parameters
+  4. Functions return results or structured errors
+  5. Agent interprets results for user queries
+  6. No database connection required (stateless queries)

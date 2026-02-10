@@ -1,0 +1,69 @@
+FIXTURE: T262-entropy-complexity-measurement
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Complexity Measurement
+VALIDATES: Shannon entropy algorithm correctly measures edge type diversity
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/entropy_complexity_algorithm.rs
+
+ALGORITHM CONTRACT:
+  - Input: AdjacencyListGraphRepresentation + node name
+  - Output: Entropy score H (0 to log₂(3) ≈ 1.585 for 3 edge types)
+  - Formula: H(X) = -Σ p(x) log₂ p(x) (Shannon 1948)
+  - Semantic meaning: Diversity of edge types (Calls, Uses, Implements)
+    * H = 0: All edges same type (focused responsibility)
+    * H ≈ 1.585: Uniform distribution across 3 types (mixed responsibility)
+
+EDGE TYPES:
+  - Calls (function invocations)
+  - Uses (data dependencies)
+  - Implements (interface/trait implementations)
+
+ENTROPY SCENARIOS:
+  1. Single edge type: H = 0.0 (perfect focus)
+  2. Two types (3 Calls, 1 Uses): H ≈ 0.811 (moderate diversity)
+  3. Uniform 3 types (2 Calls, 2 Uses, 2 Implements): H ≈ 1.585 (high diversity)
+  4. No edges: H = 0.0 (trivial case)
+
+COMPLEXITY CLASSIFICATION:
+  - classify_entropy_complexity_level(H):
+    * H < 1.0 → EntropyComplexity::Low
+    * 1.0 ≤ H < 1.4 → EntropyComplexity::Moderate
+    * H ≥ 1.4 → EntropyComplexity::High
+  - Semantic meaning:
+    * Low: Focused responsibility (good separation of concerns)
+    * Moderate: Mixed responsibility (needs review)
+    * High: Scattered responsibility (refactoring candidate)
+
+TEST FUNCTIONS (8):
+  - test_entropy_uniform_three_types: Validates H ≈ 1.585 for uniform distribution (2 of each type)
+  - test_entropy_single_type_zero: Validates H = 0.0 for all Calls edges
+  - test_entropy_no_edges_zero: Validates H = 0.0 for node with no outgoing edges
+  - test_entropy_nonexistent_node: Validates H = 0.0 for nonexistent node (graceful fallback)
+  - test_classify_entropy_levels: Validates classification thresholds (Low/Moderate/High)
+  - test_entropy_two_types_mixed: Validates H ≈ 0.811 for 3 Calls + 1 Uses (asymmetric distribution)
+  - test_compute_all_entropy_scores: Validates batch computation for all nodes
+  - test_entropy_two_types_mixed: Validates correct probability calculation (p=0.75, p=0.25)
+
+ALGORITHM DETAILS:
+  - Only considers outgoing edges (forward neighbors)
+  - Uses forward edge type lookup via graph.lookup_edge_type_between()
+  - Graceful handling: nonexistent nodes or no edges → H = 0.0
+  - Batch computation: compute_all_entity_entropy() for whole graph
+
+MATHEMATICAL PROPERTIES:
+  - H_max = log₂(k) where k = number of edge types (3 for Parseltongue)
+  - H_max ≈ 1.585 for 3 types
+  - H = 0 when all edges are same type (deterministic)
+  - H increases with edge type uniformity
+
+KNOWN LIMITATIONS:
+  - Only considers outgoing edges (ignores incoming edge diversity)
+  - Fixed to 3 edge types (Calls, Uses, Implements)
+  - Does not account for edge weight or frequency beyond counts
+  - Classification thresholds are heuristic (not derived from empirical data)
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T268-cross-algorithm-integration-test (entropy correlation with coupling)

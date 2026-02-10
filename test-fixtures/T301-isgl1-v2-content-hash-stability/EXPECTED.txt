@@ -1,0 +1,88 @@
+FIXTURE: T301-isgl1-v2-content-hash-stability
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: ISGL1 Key Infrastructure
+VALIDATES: Content hash uses SHA-256 for entity change detection
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/isgl1_v2_content_hashing_tests.rs
+
+CONTENT HASH PURPOSE:
+  Enables incremental indexing by detecting when entity code changes.
+  Critical for the 3-priority entity matching algorithm:
+    - Priority 1: Content hash match -> entity unchanged (keep old key)
+    - Priority 2: Position match -> entity changed (keep old key via position)
+    - Priority 3: No match -> new entity (create new key)
+
+ALGORITHM:
+  - SHA-256 hash of entity code content
+  - Output: 64-character hexadecimal string
+  - Deterministic: same input -> same hash
+  - Collision-resistant: different input -> different hash (with high probability)
+
+TEST FUNCTIONS (4 tests):
+
+  1. test_compute_content_hash_sha256
+     - Validates SHA-256 output format: 64 hex characters
+     - All characters are valid hexadecimal digits (0-9, a-f)
+     - Example: "fn main() { println!(\"Hello\"); }" -> 64-char hash
+
+  2. test_content_hash_deterministic
+     - Same code produces identical hash across multiple calls
+     - Critical for incremental indexing reliability
+     - Example: "fn calculate() -> i32 { 42 }" always produces same hash
+
+  3. test_content_hash_differs_by_content
+     - Different code produces different hashes
+     - Example: "println!(\"Hello\")" vs "println!(\"World\")" -> different hashes
+     - Ensures hash sensitivity to code changes
+
+  4. test_content_hash_whitespace_sensitive
+     - Formatting changes produce different hashes (intentional)
+     - Example: "fn main(){println!(\"test\");}" vs formatted version -> different
+     - Rationale: Catch ALL changes, including style refactoring
+
+CONTRACT:
+  - Hash function: SHA-256
+  - Output format: 64-character lowercase hexadecimal string
+  - Deterministic: f(content) always returns same hash
+  - Collision-resistant: f(content1) != f(content2) for content1 != content2
+  - Whitespace-sensitive: Formatting changes are detected
+
+  Input: Entity code content (string)
+  Output: Hash (e.g., "a3f5...c8d2" - 64 chars)
+
+MOTIVATION:
+  Without content hashing:
+    - Cannot detect if entity code changed between reindexes
+    - Must re-parse and re-insert all entities (slow, wasteful)
+
+  With content hashing:
+    - ContentMatch: Hash unchanged -> skip re-parsing (fast path)
+    - PositionMatch: Hash changed, position similar -> update entity
+    - NewEntity: Hash new -> insert entity
+
+WHITESPACE SENSITIVITY:
+  Design choice: Intentionally whitespace-sensitive
+  Rationale:
+    - Detects formatting changes (rustfmt, prettier, etc.)
+    - Prevents false negatives (missed changes)
+    - Trade-off: More updates, but precise change detection
+
+  Alternative considered: Normalize whitespace before hashing
+  Rejected because: Would miss legitimate formatting refactoring
+
+PERFORMANCE:
+  - SHA-256 is fast: ~500 MB/s on modern CPUs
+  - For typical entity size (100-1000 bytes), hash time < 1μs
+  - Hashing 10,000 entities: ~10ms total (negligible overhead)
+
+KNOWN LIMITATIONS:
+  - Whitespace changes trigger false positives for "entity unchanged"
+  - Hash collisions theoretically possible (probability: ~2^-256, negligible)
+  - No semantic normalization (e.g., variable renaming is detected as change)
+
+RELATED TESTS:
+  T300-isgl1-v2-key-generation-format (keys use birth_timestamp, not hash)
+  T302-isgl1-v2-entity-matching-priority (uses content_hash for Priority 1 matching)
+  T304-isgl1-v2-incremental-reindex-e2e (validates hash-based change detection)

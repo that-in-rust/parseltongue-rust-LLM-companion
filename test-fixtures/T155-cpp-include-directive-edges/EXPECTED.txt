@@ -1,0 +1,39 @@
+FIXTURE: T155-cpp-include-directive-edges
+LANGUAGE: C++
+CATEGORY: Dependency Edges
+VALIDATES: #include directives create dependency edges (preprocessor-level)
+
+SOURCE FILES:
+  - includes.cpp  (system and local includes)
+
+EXPECTED ENTITIES:
+  includes.cpp:
+    - fn "main"
+
+EXPECTED DEPENDENCY EDGES:
+  includes.cpp:
+    - (module-level) -> iostream   (system include)
+    - (module-level) -> custom     (local include)
+
+MINIMUM EDGE COUNTS:
+  includes.cpp: at least 0 edges (see Known Limitations)
+
+KNOWN LIMITATIONS:
+  CURRENT STATUS: Test is marked #[ignore] in cpp_dependency_patterns_test.rs
+
+  C++ #include directives are preprocessor-level constructs. tree-sitter
+  parses the post-preprocessor AST, meaning #include statements may not
+  appear in the parse tree at all (they're replaced with the included content).
+
+  Most tree-sitter C++ parsers do not expose preproc_include nodes as part
+  of the standard AST. This is a fundamental limitation of parsing pre-processed
+  code rather than source code.
+
+  Future enhancement: Would require either:
+  1. A custom preprocessing step to extract #include before parsing
+  2. Using tree-sitter-cpp with preproc nodes enabled (if available)
+  3. Static analysis of raw source text before tree-sitter parsing
+
+RELATED TESTS:
+  - REQ-CPP-REGRESS.0: Regression Tests - Existing Patterns
+  - Original test: test_cpp_existing_includes

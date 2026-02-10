@@ -1,0 +1,26 @@
+FIXTURE: T205-csharp-async-await-edges
+LANGUAGE: C#
+CATEGORY: Dependency Edges
+VALIDATES: Async/await pattern detection (Task-based asynchronous programming)
+
+SOURCE FILES:
+- async_simple.cs: Simple async/await calls (FetchDataAsync, SaveAsync)
+- async_member.cs: Async calls on member/property chains (GetAsync, ReadAsync, ParseJsonAsync)
+- async_task.cs: Task utility methods (Task.Delay, Task.WhenAll, Task.WhenAny)
+
+EXPECTED BEHAVIORS:
+1. async_simple.cs:
+   - Detect FetchDataAsync method call (async)
+   - Detect SaveAsync method call (async)
+
+2. async_member.cs:
+   - Detect GetAsync method call on HttpClient property
+   - Detect ReadAsync method call on response.Content
+   - Detect ParseJsonAsync method call
+
+3. async_task.cs:
+   - Detect Task.Delay method call
+   - Detect Task.WhenAll method call
+   - Detect Task.WhenAny method call
+
+REQUIREMENT: REQ-CSHARP-004.0 (Async/Await)

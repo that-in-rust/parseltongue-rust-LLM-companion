@@ -1,0 +1,59 @@
+FIXTURE: T165-ruby-module-inclusion-edges
+LANGUAGE: Ruby
+CATEGORY: Dependency Edges
+VALIDATES: Ruby module inclusion (include, extend, prepend) creates dependency edges
+
+SOURCE FILES:
+  - module_basic.rb       (basic include/extend/prepend statements)
+  - module_qualified.rb   (qualified module inclusion: ActiveSupport::Callbacks)
+
+EXPECTED ENTITIES:
+  - ruby:module:Enumerable
+  - ruby:module:Comparable
+  - ruby:module:Serializable
+  - ruby:class:MyCollection
+  - ruby:module:ActiveSupport::Callbacks
+  - ruby:module:ActiveSupport::Validations
+  - ruby:module:Concerns::Cacheable
+  - ruby:class:Model
+
+EXPECTED DEPENDENCY EDGES (REQ-RUBY-003.0):
+  From module_basic.rb:
+  - MyCollection -> Enumerable (include statement)
+  - MyCollection -> Comparable (extend statement)
+  - MyCollection -> Serializable (prepend statement)
+
+  From module_qualified.rb:
+  - Model -> ActiveSupport::Callbacks (include qualified)
+  - Model -> ActiveSupport::Validations (extend qualified)
+  - Model -> Concerns::Cacheable (prepend qualified)
+
+MINIMUM EDGE COUNTS:
+  - module_basic.rb: 3 edges (Enumerable, Comparable, Serializable)
+  - module_qualified.rb: 3 edges (Callbacks, Validations, Cacheable)
+
+KNOWN LIMITATIONS:
+  These tests are currently IGNORED (#[ignore]) because Ruby module inclusion
+  detection is not yet implemented. The tree-sitter Ruby parser doesn't expose
+  constant arguments for bareword method calls like `include Enumerable` in a
+  queryable way. This is marked as P2 (low priority) and requires either
+  tree-sitter grammar updates or custom parsing logic.
+
+  T-folder serves as aspirational fixture for future implementation.
+
+TREE-SITTER LIMITATION:
+  The tree-sitter Ruby grammar currently represents `include Enumerable` as:
+  - A method call node with method name "include"
+  - A constant node "Enumerable" as an argument
+  However, the constant argument is not captured in standard query patterns
+  because it appears as a bare constant rather than in a queryable position.
+
+RELATED TESTS:
+  T160-ruby-constructor-new-edges (REQ-RUBY-001.0)
+  T162-ruby-block-method-edges (REQ-RUBY-002.0)
+  T164-ruby-attribute-access-edges (REQ-RUBY-004.0)
+
+REFERENCE:
+  See crates/parseltongue-core/tests/ruby_dependency_patterns_test.rs
+  - test_ruby_module_inclusion_basic_skipped
+  - test_ruby_module_inclusion_qualified_skipped

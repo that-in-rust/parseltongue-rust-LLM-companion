@@ -1,0 +1,65 @@
+FIXTURE: T240-cozo-backslash-escaping-regression
+CATEGORY: Regression Test - CozoDB Escaping
+VALIDATES: Backslash characters must be properly escaped in CozoDB query strings
+SOURCE: crates/parseltongue-core/tests/cozo_escaping_tests.rs
+
+CONTEXT:
+  CozoDB query strings require backslashes to be escaped to prevent query parse errors.
+  This is critical for:
+    - PHP namespace separators (e.g., App\Models\User)
+    - Windows file paths (e.g., C:\Users\Developer\Service.cs)
+    - Any entity names or paths containing backslash characters
+
+CONTRACT: escape_for_cozo_string()
+  Function: parseltongue_core::storage::cozo_client::escape_for_cozo_string
+
+  Input: String that may contain backslashes
+  Output: String with all backslashes doubled for CozoDB safety
+
+ESCAPING RULES:
+  1. Single backslash '\' becomes double backslash '\\'
+  2. Applied to all contexts: entity names, file paths, qualified names
+  3. Must be applied BEFORE insertion into CozoDB query strings
+
+TEST CASES (from cozo_escaping_tests.rs):
+
+  1. test_escape_backslash_windows_path:
+     Input:  r"C:\Users\Developer\MyApp\Service.cs"
+     Output: r"C:\\Users\\Developer\\MyApp\\Service.cs"
+
+  2. test_escape_php_namespace:
+     Input:  r"MyApp\Controllers\UserController"
+     Output: r"MyApp\\Controllers\\UserController"
+
+  3. test_escape_backslash_and_quote (combined):
+     Input:  r"C:\Path\User's\File.cs"
+     Output: r"C:\\Path\\User\'s\\File.cs"
+     Note: Both backslash AND single quote escaping applied
+
+  4. test_escape_empty_string:
+     Input:  ""
+     Output: ""
+
+  5. test_escape_no_special_chars:
+     Input:  "normal/unix/path.rs"
+     Output: "normal/unix/path.rs"
+     Note: Forward slashes remain unchanged
+
+REGRESSION PROTECTION:
+  Without proper escaping, CozoDB queries containing backslashes will fail
+  to parse, causing storage operations to fail silently or with cryptic errors.
+
+  Example query that would fail without escaping:
+    ?[key, name] <- [["php:class:User:App\Models\User", "User"]]
+
+  Correct escaped version:
+    ?[key, name] <- [["php:class:User:App\\Models\\User", "User"]]
+
+RELATED TESTS:
+  T241-cozo-special-char-escaping (single quote handling)
+  T243-qualified-name-cross-language (PHP namespace storage)
+
+MINIMUM REQUIREMENTS:
+  - All backslashes in entity keys must be doubled before CozoDB insertion
+  - Escaping must not break other path separators (/, ::, .)
+  - Empty strings and strings without backslashes must pass through unchanged

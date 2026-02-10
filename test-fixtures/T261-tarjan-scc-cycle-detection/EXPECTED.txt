@@ -1,0 +1,67 @@
+FIXTURE: T261-tarjan-scc-cycle-detection
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Cycle Detection
+VALIDATES: Tarjan's Strongly Connected Components algorithm correctly identifies cycles and risk levels
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/tarjan_scc_algorithm.rs
+
+REFERENCE GRAPH:
+  8-node fixture graph with known cycle structure (defined in test_fixture_reference_graphs.rs)
+  Structure:
+    A → B, A → C (tree root)
+    B → D, C → D (converge to D)
+    D → E → F → D (3-node cycle)
+    G → H → G (2-node cycle, isolated)
+
+  Expected SCCs (5 components):
+    - {D, E, F} (3-node cycle, HIGH risk)
+    - {G, H} (2-node cycle, MEDIUM risk)
+    - {A} (singleton, NONE risk)
+    - {B} (singleton, NONE risk)
+    - {C} (singleton, NONE risk)
+
+ALGORITHM CONTRACT:
+  - Input: AdjacencyListGraphRepresentation (directed graph)
+  - Output: Vec<Vec<String>> of SCCs, sorted by size descending
+  - Complexity: O(V + E) single DFS pass (Tarjan 1972)
+  - Risk classification:
+    * NONE: size 1 (no cycle)
+    * MEDIUM: size 2 (2-node cycle)
+    * HIGH: size 3+ (multi-node cycle)
+
+TEST FUNCTIONS (7):
+  - test_tarjan_scc_count_exact: Validates exactly 5 SCCs found on 8-node graph
+  - test_tarjan_scc_three_node_cycle: Validates D-E-F form a 3-member SCC (sorted members)
+  - test_tarjan_scc_two_node_cycle: Validates G-H form a 2-member SCC (sorted members)
+  - test_tarjan_scc_singleton_nodes: Validates A, B, C are singleton SCCs (3 total)
+  - test_classify_scc_risk_level: Validates risk level classification (None/Medium/High)
+  - test_tarjan_empty_graph: Validates empty graph returns 0 SCCs
+  - test_tarjan_chain_all_singletons: Validates linear chain (5 nodes) produces 5 singleton SCCs
+
+ALGORITHM DETAILS:
+  - Uses Tarjan's 1972 algorithm with DFS + lowlink values
+  - Maintains stack and on_stack set for efficient SCC extraction
+  - SCCs sorted by size descending for consistent output
+  - Handles disconnected components correctly
+
+RISK LEVEL CLASSIFICATION:
+  - classify_scc_risk_level(size):
+    * size 0 or 1 → SccRiskLevel::None
+    * size 2 → SccRiskLevel::Medium
+    * size 3+ → SccRiskLevel::High
+  - Semantic meaning:
+    * NONE: No cycle (safe)
+    * MEDIUM: Simple cycle (moderate refactoring risk)
+    * HIGH: Complex cycle (high maintenance burden)
+
+KNOWN LIMITATIONS:
+  - Does not report cycle paths (only membership)
+  - Does not distinguish inner vs outer cycles in nested structures
+  - SCCs sorted by size, not by topological order
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T266-kcore-decomposition-layering (cycle nodes have higher k-core)
+  T268-cross-algorithm-integration-test (SCC consistency with Leiden/K-Core)

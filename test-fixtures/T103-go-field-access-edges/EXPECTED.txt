@@ -1,0 +1,41 @@
+FIXTURE: T103-go-field-access-edges
+LANGUAGE: Go
+CATEGORY: Dependency Edges
+VALIDATES: Field access (non-call context) creates dependency edges
+
+SOURCE FILES:
+  - field_basic.go     (basic field access user.Name, user.Age)
+  - field_nested.go    (nested field access sys.config.Settings.Timeout)
+
+EXPECTED ENTITIES:
+  field_basic.go:
+    - fn "process"
+  field_nested.go:
+    - fn "read"
+
+EXPECTED DEPENDENCY EDGES:
+  field_basic.go:
+    - process -> Name     (field access: user.Name read)
+    - process -> Age      (field access: user.Age write)
+  field_nested.go:
+    - read -> config      (field access: sys.config)
+    - read -> Settings    (field access: config.Settings)
+    - read -> Timeout     (field access: Settings.Timeout)
+
+MINIMUM EDGE COUNTS:
+  field_basic.go: at least 2 edges (Name, Age)
+  field_nested.go: at least 3 edges (config, Settings, Timeout)
+
+KNOWN LIMITATIONS:
+  CURRENT STATUS: Tests are marked #[ignore] in go_dependency_patterns_test.rs
+
+  Go's tree-sitter grammar cannot distinguish field access from method calls
+  without type information. Field access (user.Name) is a bare selector_expression,
+  while method calls (user.Method()) are call_expression wrapping selector_expression.
+
+  Capturing both would create duplicates for method calls. Future enhancement:
+  add field_access pattern and mark duplicates with different EdgeType.
+
+RELATED TESTS:
+  - REQ-GO-002.0: Field Access (Non-Call Context)
+  - Original tests: test_go_field_access_basic, test_go_field_access_nested

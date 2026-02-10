@@ -1,0 +1,116 @@
+FIXTURE: T314-query-based-extraction-multilangs
+LANGUAGE: Multi-language (Rust, Python, C, JavaScript)
+CATEGORY: Core Extraction Pipeline
+VALIDATES: QueryBasedExtractor parses functions, structs, classes across 4 languages with graceful error handling
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/query_based_extraction_test.rs
+
+TEST FUNCTIONS (5):
+
+  Language-Specific Tests:
+    - test_query_rust_functions_and_structs: Rust extraction (function, struct, enum)
+    - test_query_python_classes_and_functions: Python extraction (class, 2 functions)
+    - test_query_c_functions_and_structs: C extraction (function, 2 structs)
+    - test_query_javascript_functions_and_classes: JavaScript extraction (function, arrow function, class)
+
+  Error Handling:
+    - test_malformed_code_no_panic: Broken syntax doesn't panic (graceful degradation)
+
+CONTRACT:
+  Core Type:
+    - QueryBasedExtractor: Tree-sitter based extraction engine
+    - parse_source(code: &str, path: &Path, language: Language) → (Vec<Entity>, Vec<Dependency>)
+
+  Rust Extraction (Language::Rust):
+    Detected Entities:
+      - Functions: fn calculate_sum(a: i32, b: i32) -> i32
+      - Structs: struct User { name: String, age: u32 }
+      - Enums: enum Status { Active, Inactive }
+
+    Expected Output:
+      - 3 entities (function + struct + enum)
+      - Entity names: "calculate_sum", "User", "Status"
+
+  Python Extraction (Language::Python):
+    Detected Entities:
+      - Classes: class Calculator
+      - Methods: def add(self, a, b)
+      - Functions: def hello_world()
+
+    Expected Output:
+      - 3 entities (class + 2 functions/methods)
+
+  C Extraction (Language::C):
+    Detected Entities:
+      - Functions: int add(int a, int b)
+      - Structs: struct Node { ... }
+      - Typedefs: typedef struct { ... } Person
+
+    Expected Output:
+      - 3 entities (function + 2 structs)
+
+  JavaScript Extraction (Language::JavaScript):
+    Detected Entities:
+      - Functions: function greet(name) { ... }
+      - Arrow Functions: const add = (a, b) => a + b
+      - Classes: class Calculator { ... }
+
+    Expected Output:
+      - 3+ entities (function + arrow function + class)
+      - Entity names: "greet", "Calculator"
+
+  Error Handling:
+    - Malformed code: fn main( { println!("broken";
+    - Expected: No panic (may return Ok with partial entities or Err)
+    - Graceful degradation principle
+
+  Tree-Sitter Queries:
+    - Query files stored in entity_queries/ directory
+    - One query file per language (e.g., rust.scm, python.scm)
+    - Queries extract: name, type, line range, visibility
+
+PERFORMANCE CONTRACT:
+  - < 20ms per 1,000 LOC
+  - Zero panics on malformed code
+  - Partial extraction on syntax errors (where possible)
+
+KNOWN LIMITATIONS:
+  - Limited to 4 languages tested (Rust, Python, C, JavaScript)
+  - Dependency edge extraction not validated in these tests
+  - Complex language features may be missed (generics, macros, etc.)
+  - Arrow function extraction may not capture name (anonymous functions)
+  - Query files must exist in entity_queries/ or parser initialization fails
+  - No validation of entity metadata accuracy (only count and names)
+
+RELATED TESTS:
+  T311-external-dependency-placeholder (generates edges that need placeholders)
+  T315-json-graph-contract-queries (queries over extracted entities)
+  Integration tests verify complete parsing pipeline with dependencies
+
+DESIGN RATIONALE:
+  Query-Based Approach:
+    - Declarative queries vs imperative AST traversal
+    - Easier to maintain and extend (add new query pattern vs code)
+    - Tree-sitter provides fast, incremental parsing
+    - Queries reusable across codebase (same pattern applied everywhere)
+
+  Graceful Error Handling:
+    - Malformed code common in real-world codebases (work-in-progress files)
+    - Partial extraction better than complete failure
+    - Allows analysis of incomplete/broken code during development
+
+  Multi-Language Support:
+    - Single extractor interface across all languages
+    - Language-specific behavior encapsulated in query files
+    - Easy to add new languages (implement query + add Language enum variant)
+
+INTEGRATION FLOW:
+  1. QueryBasedExtractor initialized with tree-sitter parsers
+  2. parse_source() called with code, path, language
+  3. Tree-sitter parses code into AST
+  4. Language-specific query executed against AST
+  5. Entities extracted with name, type, line range
+  6. Dependencies extracted from call sites (not validated in these tests)
+  7. Results returned as (Vec<Entity>, Vec<Dependency>)

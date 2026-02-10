@@ -1,0 +1,152 @@
+FIXTURE: T244-blast-radius-key-alignment
+CATEGORY: Regression Test - Key Format Consistency
+VALIDATES: Entity keys and edge keys must use identical ISGL1 v2 format for graph queries
+SOURCE: crates/parseltongue-core/tests/edge_key_format_test.rs
+
+REGRESSION CONTEXT (v1.5.1 Bug):
+  Blast radius queries returned empty results because entity keys and edge keys
+  used different qualified name formats. This created a key mismatch:
+    - Entity stored as: "csharp:method:DoWork:__Logger:T123456"
+    - Edge referenced:   "csharp:method:DoWork:Logger.cs:10-20" (wrong format)
+
+  Result: Blast radius queries found NO matching nodes despite edges existing.
+
+ROOT CAUSE:
+  Entity keys used ISGL1 v2 format (semantic path + timestamp), but edge
+  source/target references still used old format (file path + line range).
+
+FIX (v1.5.1):
+  Both entity keys AND edge keys now use ISGL1 v2 format consistently.
+
+ISGL1 v2 KEY FORMAT SPECIFICATION:
+  Pattern: "lang:type:name:semantic_path:Ttimestamp"
+
+  Components:
+    - lang:            Language identifier (rust, python, csharp, etc.)
+    - type:            Entity type (fn, method, class, struct, etc.)
+    - name:            Entity name (sanitized via T242 rules)
+    - semantic_path:   File-based path with __ prefix and _ separators
+    - Ttimestamp:      Birth timestamp (deterministic hash)
+
+  Examples:
+    Rust:     "rust:fn:process_data:__src_lib:T9876543210"
+    C#:       "csharp:method:DoWork:__Logger:T1234567890"
+    Java:     "java:class:UserService:__com_example_services_UserService:T5555555555"
+
+SEMANTIC PATH EXTRACTION (from edge_key_format_test.rs):
+
+  Test 1: Root-level file
+    File:   "Logger.cs"
+    Path:   "__Logger"
+    Rule:   Strip extension, prefix with __
+
+  Test 2: Nested file
+    File:   "MyNamespace/MyClass.cs"
+    Path:   "__MyNamespace_MyClass"
+    Rule:   Replace path separators with _, strip extension, prefix with __
+
+  Test 3: Complex nested path
+    File:   "src/Services/Data/Repository.cs"
+    Path:   "__src_Services_Data_Repository"
+    Rule:   All separators become _, strip extension, prefix with __
+
+BIRTH TIMESTAMP PROPERTIES (from edge_key_format_test.rs):
+
+  Test 4: Stability
+    Same file + same entity → identical timestamp
+    Function: compute_birth_timestamp(file_path, entity_name)
+    Property: Deterministic (hash-based, no actual time component)
+
+  Test 5: Uniqueness - Different entities
+    Same file + different entities → different timestamps
+    Example: Logger.cs:DoWork vs Logger.cs:Helper → different T values
+
+  Test 6: Uniqueness - Different files
+    Different files + same entity → different timestamps
+    Example: Logger.cs:ToString vs DataModel.cs:ToString → different T values
+
+KEY FORMAT INVARIANTS (from edge_key_format_test.rs test_isgl1_v2_format_no_line_ranges):
+
+  MUST NOT contain:
+    - Hyphen separator (-) for line ranges
+    - Line numbers (10, 20, etc.)
+    - File extensions in semantic path
+
+  MUST contain:
+    - Exactly 4 colons separating the 5 components
+    - Timestamp prefix ':T' before numeric timestamp
+    - Semantic path prefix '__'
+
+EDGE KEY ALIGNMENT CONTRACT:
+
+  When creating a dependency edge from entity A to entity B:
+
+    Edge creation:
+      source_key = entity_A.key  // ISGL1 v2 format
+      target_key = entity_B.key  // ISGL1 v2 format
+      edge = DependencyEdge { source_key, target_key, ... }
+
+    Blast radius query:
+      ?[entity] <- [[start_entity_key]]  // Start with ISGL1 v2 key
+      ?[entity, hop] := *edges[entity, target, _], hop = 1
+      // Query expects edges to use ISGL1 v2 keys for matching
+
+  Both queries use the SAME key format → graph traversal succeeds.
+
+TEST COVERAGE (edge_key_format_test.rs):
+
+  1. test_req_edge_002_semantic_path_root_class
+  2. test_req_edge_002_semantic_path_nested_class
+  3. test_req_edge_002_semantic_path_complex
+  4. test_req_edge_003_timestamp_stability
+  5. test_req_edge_003_timestamp_uniqueness
+  6. test_req_edge_003_timestamp_uniqueness_different_files
+  7. test_semantic_path_empty_file (edge case)
+  8. test_semantic_path_only_extension (edge case)
+  9. test_semantic_path_multiple_dots (edge case)
+  10. test_isgl1_v2_format_no_line_ranges (format validation)
+
+REGRESSION PROTECTION:
+
+  Without key alignment, the following query patterns fail:
+
+    ❌ Blast radius query:
+       Start key: "csharp:method:DoWork:__Logger:T123"
+       Edge has:  "csharp:method:DoWork:Logger.cs:10-20"
+       Result:    No match → empty blast radius
+
+    ❌ Reverse caller query:
+       Target key: "rust:fn:main:__src_main:T456"
+       Edge has:   "rust:fn:main:src/main.rs:5-10"
+       Result:     No callers found → misleading analysis
+
+    ✅ With alignment:
+       Both use:  ISGL1 v2 format consistently
+       Result:    Queries return correct graph traversal results
+
+CROSS-LANGUAGE CONSISTENCY:
+
+  All languages use the same semantic path rules:
+    - Rust:   src/lib.rs           → __src_lib
+    - Python: app/models/user.py   → __app_models_user
+    - Java:   com/example/App.java → __com_example_App
+    - C#:     Services/Logger.cs   → __Services_Logger
+    - C++:    include/vector.hpp   → __include_vector
+
+EDGE CASES HANDLED:
+
+  1. Empty file path → "__"
+  2. Extension-only path (.cs) → "__"
+  3. Multiple dots (My.Class.Helper.cs) → "__My_Class_Helper"
+  4. Windows backslashes (src\lib.rs) → "__src_lib" (normalized)
+
+RELATED TESTS:
+  T242-generic-type-sanitization-keys (name sanitization before key assembly)
+  T240-cozo-backslash-escaping-regression (post-key CozoDB escaping)
+
+MINIMUM REQUIREMENTS:
+  - Entity keys and edge keys MUST use identical ISGL1 v2 format
+  - Semantic path extraction MUST be deterministic
+  - Birth timestamp MUST be stable for same file+entity
+  - No line ranges allowed in ISGL1 v2 keys
+  - All graph queries (blast radius, callers, callees) rely on this alignment

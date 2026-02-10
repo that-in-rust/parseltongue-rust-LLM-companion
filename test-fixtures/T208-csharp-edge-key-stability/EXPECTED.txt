@@ -1,0 +1,28 @@
+FIXTURE: T208-csharp-edge-key-stability
+LANGUAGE: C#
+CATEGORY: Edge Key Format (ISGL1 v2)
+VALIDATES: Edge key stability and timestamp handling across multiple entities/parses
+
+SOURCE FILES:
+- different_timestamps.cs: Multiple methods calling each other (tests timestamp diversity)
+- key_stability.cs: Simple method call (tests key stability across parses)
+
+EXPECTED BEHAVIORS:
+1. different_timestamps.cs:
+   - DoWork -> Helper edge (from DoWork)
+   - Process -> DoWork edge (from Process)
+   - Each edge should have unique timestamp if from different methods
+   - Timestamps should be part of from_key format
+
+2. key_stability.cs:
+   - DoWork -> Helper edge
+   - Same code parsed twice should produce identical edge keys
+   - Keys should be deterministic and reproducible
+
+KEY FORMAT VALIDATION:
+- All from_keys should use ISGL1 v2 format: lang:type:name:semantic_path:Ttimestamp
+- No line range separators ('-') before timestamp
+- Semantic path starts with '__'
+- Last component starts with 'T' (timestamp)
+
+REQUIREMENT: REQ-EDGE-004.0 (Edge Key Stability)

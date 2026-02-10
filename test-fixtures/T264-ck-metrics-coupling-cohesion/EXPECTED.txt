@@ -1,0 +1,84 @@
+FIXTURE: T264-ck-metrics-coupling-cohesion
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Software Metrics
+VALIDATES: CK metrics suite (Chidamber & Kemerer 1994) for coupling and cohesion measurement
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/ck_metrics_suite_algorithm.rs
+
+REFERENCE GRAPH:
+  8-node fixture graph (test_fixture_reference_graphs.rs)
+  Key node: D (high coupling: in-degree=3 from B,C,F; out-degree=1 to E)
+
+CK METRICS (4 of 6):
+  1. CBO (Coupling Between Objects): Count unique coupled entities (forward + reverse)
+     - Threshold: FAIL if CBO > 10
+     - Semantic: High coupling = fragile design
+
+  2. LCOM (Lack of Cohesion of Methods): Measure shared dependencies
+     - Threshold: FAIL if LCOM > 0.8
+     - Formula: P / (P + Q) where P = pairs sharing NO targets, Q = pairs sharing ≥1 target
+     - Semantic: High LCOM = low cohesion
+
+  3. RFC (Response For a Class): Count 1-hop transitive closure
+     - Threshold: WARNING if RFC > 50
+     - Semantic: Large response set = complex testing
+
+  4. WMC (Weighted Methods per Class): Sum of method complexity (proxy: out-degree)
+     - Threshold: WARNING if WMC > 50
+     - Semantic: High WMC = high cyclomatic complexity
+
+SKIPPED METRICS (deferred to v1.7.0):
+  - DIT (Depth of Inheritance Tree): No "Inherits" edge type
+  - NOC (Number of Children): No "Inherits" edge type
+
+HEALTH GRADING (A-F):
+  - A: All OK (no violations)
+  - B: 1 WARNING
+  - C: 2 WARNING
+  - D: 1 FAIL or 3+ WARNING
+  - F: 2+ FAIL
+
+THRESHOLDS (Chidamber & Kemerer 1994):
+  - FAIL: CBO > 10, LCOM > 0.8
+  - WARNING: RFC > 50, WMC > 50
+
+TEST FUNCTIONS (12):
+  - test_cbo_node_d_high_coupling: Validates D has CBO=4 (forward={E}, reverse={B,C,F})
+  - test_cbo_node_a_source: Validates A has CBO=2 (forward={B,C}, reverse={})
+  - test_cbo_nonexistent_node: Validates nonexistent node returns CBO=0
+  - test_rfc_node_a: Validates RFC(A)=3 (A calls {B,C}, B calls {D}, C calls {D} → {B,C,D})
+  - test_rfc_leaf_node: Validates RFC(E)=2 (E calls {F}, F calls {D} → {F,D})
+  - test_wmc_proxy_out_degree: Validates WMC(A)=2 (out-degree=2)
+  - test_wmc_node_d: Validates WMC(D)=1 (out-degree=1)
+  - test_lcom_independent_branches: Validates LCOM=1.0 for non-overlapping children
+  - test_lcom_shared_target: Validates LCOM=0.0 for children sharing target
+  - test_health_grade_all_ok: Validates HealthGrade::A for low metrics
+  - test_health_grade_one_warning: Validates HealthGrade::B for RFC=55
+  - test_health_grade_one_fail: Validates HealthGrade::D for CBO=15
+  - test_health_grade_two_fails: Validates HealthGrade::F for CBO=15 + LCOM=0.9
+
+ALGORITHM DETAILS:
+  - CBO: Union of forward_neighbors + reverse_neighbors (deduplicated)
+  - LCOM: Compare all pairs of forward neighbors' targets
+    * Perfect cohesion: LCOM=0.0 (all share targets)
+    * No cohesion: LCOM=1.0 (no shared targets)
+  - RFC: Direct callees + callees' callees (1-hop transitive closure)
+  - WMC: Proxy using out-degree (no AST access for cyclomatic complexity)
+
+SPECIAL CASES:
+  - LCOM: 0-1 children → LCOM=0.0 (perfect cohesion)
+  - LCOM: No pairs → LCOM=0.0
+  - Nonexistent node: All metrics=0
+
+KNOWN LIMITATIONS:
+  - WMC uses out-degree as proxy (not true cyclomatic complexity)
+  - LCOM treats forward neighbors as "methods" and their targets as "attributes" (graph analogy)
+  - DIT/NOC skipped (no inheritance edges)
+  - Thresholds from 1994 literature (may need calibration for modern codebases)
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T267-sqale-technical-debt-scoring (uses CBO/LCOM/WMC for debt calculation)
+  T268-cross-algorithm-integration-test (coupling correlation with SQALE debt)

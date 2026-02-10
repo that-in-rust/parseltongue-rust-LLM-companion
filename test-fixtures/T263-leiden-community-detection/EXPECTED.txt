@@ -1,0 +1,71 @@
+FIXTURE: T263-leiden-community-detection
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Community Detection
+VALIDATES: Leiden algorithm correctly detects communities using modularity optimization
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/leiden_community_algorithm.rs
+
+REFERENCE GRAPH:
+  8-node fixture graph (test_fixture_reference_graphs.rs)
+  Expected communities:
+    - Community 1: {A, B, C, D, E, F} (main tree + 3-cycle)
+    - Community 2: {G, H} (isolated 2-cycle)
+
+  Leiden detects at least 2 communities with positive modularity.
+
+ALGORITHM CONTRACT:
+  - Input: AdjacencyListGraphRepresentation, resolution γ, max_iterations
+  - Output: (HashMap<String, usize>, f64) - (node → community_id, modularity Q)
+  - Algorithm: Leiden (Traag et al. 2019) - Louvain with refinement phase
+  - Modularity formula (directed):
+    Q = 1/(2m) × Σ[A_ij - (k_i^out × k_j^in)/m] × δ(c_i, c_j)
+    where:
+      * A_ij = 1 if edge i→j exists
+      * k_i^out = out-degree of node i
+      * k_j^in = in-degree of node j
+      * m = total edges
+      * δ(c_i, c_j) = 1 if same community
+
+LEIDEN PHASES:
+  1. Local moving: Nodes join communities that maximize modularity gain (Louvain-style)
+  2. Refinement: Split poorly-connected communities (key Leiden improvement)
+  3. Aggregation: Merge communities (iteration loop)
+  4. Convergence: Stop when no improvement or max_iterations reached
+
+PARAMETERS:
+  - resolution γ = 1.0 (standard, higher values → more communities)
+  - max_iterations = 100 (typical convergence in <10 iterations)
+
+TEST FUNCTIONS (8):
+  - test_leiden_two_clusters_detected: Validates ≥2 communities found on 8-node graph
+  - test_leiden_gh_same_community: Validates G and H in same community (tight cycle)
+  - test_leiden_gh_separate_from_main: Validates G,H separate from A-F cluster
+  - test_leiden_modularity_positive: Validates Q > 0.0 (better than random)
+  - test_modularity_calculation_exact: Validates Q formula on simple 2-node cycle
+  - test_leiden_empty_graph: Validates empty graph returns empty communities, Q=0
+  - test_leiden_single_node: Validates single node gets assigned to community 0
+  - test_leiden_all_nodes_assigned: Validates all 8 nodes have community assignments
+
+MODULARITY SEMANTICS:
+  - Q > 0: Better community structure than random
+  - Q ≈ 0.3-0.7: Typical strong community structure
+  - Q ≤ 0: Worse than random (rare in practice)
+
+REFINEMENT PHASE:
+  - Unique to Leiden (vs Louvain)
+  - Splits communities where nodes have more external than internal edges
+  - Prevents merging of poorly-connected nodes
+  - Ensures well-connected communities (Leiden guarantee)
+
+KNOWN LIMITATIONS:
+  - Community IDs are arbitrary (renumbered 0, 1, 2, ...)
+  - Resolution parameter γ affects granularity (requires tuning)
+  - Local optimum not guaranteed (randomized algorithm)
+  - Does not report hierarchical structure (single-level partition)
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T261-tarjan-scc-cycle-detection (cycle nodes should cluster)
+  T268-cross-algorithm-integration-test (Leiden + SCC consistency)

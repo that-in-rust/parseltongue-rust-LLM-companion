@@ -1,0 +1,138 @@
+FIXTURE: T302-isgl1-v2-entity-matching-priority
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: ISGL1 Key Infrastructure
+VALIDATES: 3-priority entity matching algorithm for incremental reindexing
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/isgl1_v2_entity_matching_tests.rs
+
+MATCHING ALGORITHM:
+  During incremental reindex, match new parsed entities against old index:
+
+  Priority 1: ContentMatch (hash match)
+    - Same content_hash -> entity code unchanged
+    - Result: Keep old key, skip re-processing
+    - Use case: Entity moved in file but code identical
+
+  Priority 2: PositionMatch (position + name match)
+    - Same name + same file + similar position (±10 lines)
+    - Different content_hash -> entity code changed
+    - Result: Keep old key, update content
+    - Use case: Function body modified, signature unchanged
+
+  Priority 3: NewEntity (no match)
+    - No matching entity in old index
+    - Result: Assign new birth_timestamp, create new key
+    - Use case: New function added to file
+
+INPUT:
+  - new_entity: EntityCandidate (from tree-sitter parsing)
+  - old_entities: Vec<OldEntity> (from database)
+
+OUTPUT:
+  - EntityMatchResult::ContentMatch { old_key }
+  - EntityMatchResult::PositionMatch { old_key }
+  - EntityMatchResult::NewEntity
+
+TEST FUNCTIONS (5 tests):
+
+  1. test_match_by_content_hash_priority1
+     - Entity moved from line 10-20 to line 50-60
+     - content_hash SAME: "abc123"
+     - Result: ContentMatch (Priority 1 takes precedence)
+     - Old key preserved: "rust:fn:calculate:__src_math_rs:T1706284800"
+
+  2. test_match_by_position_when_hash_differs_priority2
+     - Entity at similar position (line 25-35 vs old 20-30)
+     - content_hash DIFFERENT: "new_hash_456" vs "old_hash_789"
+     - Result: PositionMatch (Priority 2)
+     - Old key preserved: "rust:fn:process:__src_data_rs:T1706284900"
+
+  3. test_new_entity_detection_priority3
+     - Entity "brand_new_function" not in old index
+     - Result: NewEntity (Priority 3)
+     - Action: Create new key with new birth_timestamp
+
+  4. test_position_match_within_tolerance
+     - Entity at line 108-118, old position 100-110
+     - Difference: 8 lines (within ±10 tolerance)
+     - content_hash changed
+     - Result: PositionMatch
+     - Rationale: Small line shifts common during editing
+
+  5. test_hash_priority_over_position
+     - Multiple candidates:
+       a) Same name, close position (line 48-58 vs 50-60), wrong hash
+       b) Same name, far position (line 200-210 vs 50-60), CORRECT hash
+     - Result: ContentMatch with candidate b (Priority 1 > Priority 2)
+     - Validates that hash match always wins over position proximity
+
+CONTRACT:
+  Priority ordering:
+    1. ContentMatch (exact hash) > PositionMatch (name+file+~position)
+    2. PositionMatch > NewEntity
+    3. Only one match type returned per entity
+
+  Position tolerance:
+    - ±10 lines from old position
+    - Rationale: Common for entities to shift slightly during file edits
+
+  Matching criteria:
+    ContentMatch: name == old.name && file == old.file && hash == old.hash
+    PositionMatch: name == old.name && file == old.file && abs(line - old.line) <= 10 && hash != old.hash
+    NewEntity: No match found in old index
+
+MOTIVATION:
+  Without entity matching:
+    - All entities get new keys on reindex (100% key churn)
+    - Breaks LLM context windows (tokens explode from key changes)
+    - Users lose entity references in conversations
+
+  With 3-priority matching:
+    - ContentMatch: 0% churn for moved entities (most common)
+    - PositionMatch: 0% churn for edited entities (second most common)
+    - NewEntity: Only truly new entities get new keys
+
+DESIGN DECISIONS:
+  1. Hash priority over position:
+     - Entity moved 100 lines but code unchanged -> ContentMatch (keep key)
+     - Entity at same position but code changed -> PositionMatch (keep key)
+     - Rationale: Code identity > position proximity
+
+  2. Position tolerance (±10 lines):
+     - Too small: False negatives (entity edited -> NewEntity)
+     - Too large: False positives (wrong entity matched)
+     - ±10 balances precision and recall
+
+  3. No fuzzy name matching:
+     - Entity renamed -> NewEntity (expected)
+     - Rationale: Renaming is semantic change, not refactoring
+
+EDGE CASES:
+  - Multiple entities with same name in file:
+    - Matched by position + hash combination
+    - Unlikely to cause collision (different positions/hashes)
+
+  - Entity moved outside ±10 line tolerance:
+    - If hash matches: ContentMatch (key preserved)
+    - If hash differs: NewEntity (new key)
+
+  - Diamond pattern (same name, same hash, different positions):
+    - Rarely occurs (would need duplicate code blocks)
+    - First match wins (deterministic ordering)
+
+PERFORMANCE:
+  - O(n*m) worst case: n new entities, m old entities
+  - Typical case O(n): Most files have <100 entities
+  - For 1000 entities: <10ms matching time (linear scan)
+
+KNOWN LIMITATIONS:
+  - Renaming entity creates new key (expected, not a bug)
+  - Moving entity to different file creates new key (expected)
+  - Position tolerance hardcoded (±10 lines, not configurable)
+
+RELATED TESTS:
+  T300-isgl1-v2-key-generation-format (keys preserved by matching algorithm)
+  T301-isgl1-v2-content-hash-stability (hash used for Priority 1 matching)
+  T304-isgl1-v2-incremental-reindex-e2e (validates matching in real workflows)

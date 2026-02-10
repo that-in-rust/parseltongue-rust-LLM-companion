@@ -1,0 +1,80 @@
+FIXTURE: T309-http-port-selection-validation
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: HTTP Server Infrastructure
+VALIDATES: Port selection logic correctly handles validation, scanning, race conditions, and edge cases
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/pt08-http-code-query-server/src/port_selection.rs
+
+TEST FUNCTIONS (13):
+  Unit Tests - L1 Core (ValidatedPortNumber):
+    - test_create_valid_port_number_success: Valid non-privileged port (8080) accepted
+    - test_reject_privileged_port_80: Port 80 (< 1024) rejected with PrivilegedPort error
+    - test_reject_privileged_port_1023: Port 1023 still privileged, rejected
+    - test_accept_minimum_non_privileged_port: Port 1024 is minimum valid port
+    - test_reject_zero_port: Port 0 rejected with ZeroPort error
+
+  Unit Tests - L2 Standard (PortRangeIterator):
+    - test_port_range_iterator_yields_valid_ports: Iterator yields [7777, 7778, 7779] for range 7777..7780
+    - test_port_range_iterator_empty_range: Empty range yields nothing
+    - test_port_range_iterator_skips_invalid_ports: Iterator skips privileged ports (1022, 1023), yields valid (1024, 1025)
+
+  Integration Tests - L3 External (find_and_bind_port_available):
+    - test_req_port_001_first_port_available: Binds to first available port when requested port is free
+    - test_req_port_001_default_port_7777: Defaults to port 7777 when no preference given
+    - test_req_port_003_no_race_condition: Listener is actually bound (atomic check-and-bind)
+    - test_req_port_005_range_exhaustion: Returns RangeExhausted error when all ports occupied
+    - test_req_port_005_zero_attempts_returns_error: Zero max_attempts returns RangeExhausted immediately
+    - test_privileged_port_error: Privileged ports return PermissionDenied (unless running as root)
+
+CONTRACT:
+  Default Port:
+    - 7777 when no preference specified
+
+  Valid Port Range:
+    - 1024-65535 (non-privileged ports only)
+    - Port 0 explicitly rejected (ZeroPort error)
+    - Ports < 1024 rejected (PrivilegedPort error)
+
+  Port Scanning:
+    - Sequential scanning from requested port upward
+    - max_attempts parameter limits scan range
+    - Each port attempt logged to stderr ("Trying 7777... ✓" or "in use, trying next...")
+
+  Race Condition Handling:
+    - Atomic bind operation (no check-then-bind gap)
+    - TcpListener held open and returned to caller
+    - Eliminates TOCTOU (time-of-check-time-of-use) vulnerability
+
+  Error Handling:
+    - RangeExhausted: All ports in range occupied or zero attempts
+    - PermissionDenied: Binding failed due to permissions (e.g., privileged ports)
+    - SystemError: OS-level bind failure (AddrInUse handled separately)
+
+  Performance:
+    - Sequential port probing with immediate feedback
+    - No async delays between attempts
+    - Typical latency: <10ms to find available port
+
+  Layered Architecture:
+    - L1 Core: ValidatedPortNumber newtype for type safety
+    - L2 Standard: PortRangeIterator for port enumeration
+    - L3 External: tokio::net::TcpListener for async binding
+
+KNOWN LIMITATIONS:
+  - Sequential scanning only (no random port selection)
+  - No port reservation mechanism (relies on immediate bind)
+  - PermissionDenied test may succeed if running as root
+  - Privileged port binding requires OS-level permissions
+
+RELATED TESTS:
+  T310-file-watcher-lifecycle-events (same crate, pt08-http-code-query-server)
+  Integration tests in pt08 verify HTTP server starts with selected port
+
+REQUIREMENTS COVERAGE:
+  - REQ-PORT-001.0: First port available (default 7777)
+  - REQ-PORT-002.0: Port busy, fallback to next
+  - REQ-PORT-003.0: No race condition (atomic bind)
+  - REQ-PORT-004.0: Progress logging to stderr
+  - REQ-PORT-005.0: Range exhaustion error handling

@@ -1,0 +1,81 @@
+FIXTURE: T267-sqale-technical-debt-scoring
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Technical Debt
+VALIDATES: SQALE technical debt scoring based on ISO 25010 metrics violations
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/sqale_debt_scoring_algorithm.rs
+
+REFERENCE GRAPH:
+  8-node fixture graph (test_fixture_reference_graphs.rs)
+  Node D: High coupling candidate (in-degree=3, out-degree=1)
+
+SQALE DEBT MODEL (ISO 25010):
+  - Technical debt = sum of remediation hours for violated metrics
+  - Based on CK metrics: CBO, LCOM, WMC (proxy for cyclomatic complexity)
+  - DIT (Depth of Inheritance Tree) SKIPPED: no "Inherits" edge type
+
+VIOLATION THRESHOLDS:
+  1. CBO > 10 → HighCoupling → 4.0 hours remediation
+  2. LCOM > 0.8 → LowCohesion → 8.0 hours remediation
+  3. WMC > 15 → HighComplexity → 2.0 hours remediation
+
+DEBT SEVERITY CLASSIFICATION:
+  - classify_debt_severity_level(total_hours):
+    * 0.0 → DebtSeverity::None (no violations)
+    * 0.0 < debt ≤ 4.0 → DebtSeverity::Low
+    * 4.0 < debt ≤ 8.0 → DebtSeverity::Medium
+    * debt > 8.0 → DebtSeverity::High
+
+VIOLATION TYPES:
+  - SqaleViolationType::HighCoupling (CBO > 10)
+  - SqaleViolationType::LowCohesion (LCOM > 0.8)
+  - SqaleViolationType::HighComplexity (WMC > 15)
+
+TEST FUNCTIONS (9):
+  - test_sqale_no_violations_low_coupling: Validates node G has 0.0 debt (low coupling)
+  - test_sqale_node_d_highest_debt: Validates node D is assessed (cycle node)
+  - test_sqale_violation_types_correct: Validates HighCoupling violation for CBO=11
+  - test_sqale_high_complexity_violation: Validates HighComplexity violation for WMC=16
+  - test_sqale_empty_graph: Validates empty graph returns empty results
+  - test_sqale_debt_severity_classification: Validates severity thresholds
+  - test_sqale_all_entities_sorted_by_debt: Validates results sorted descending by debt
+  - test_sqale_multiple_violations_sum: Validates 3 violations (CBO + LCOM + WMC) sum to 14.0 hours
+  - test_sqale_debt_correlates_with_coupling: (Implicit in integration tests)
+
+ALGORITHM DETAILS:
+  - calculate_technical_debt_sqale(node, graph):
+    * Check CBO via calculate_coupling_between_objects()
+    * Check LCOM via calculate_lack_cohesion_methods()
+    * Check WMC via calculate_weighted_methods_class()
+    * Sum remediation hours for all violations
+
+  - compute_all_entities_sqale(graph):
+    * Calculate debt for all nodes
+    * Sort by total_debt_hours descending (highest debt first)
+
+MULTI-VIOLATION EXAMPLE:
+  - Node with 16 outgoing disconnected edges:
+    * CBO = 16 > 10 → +4.0 hours
+    * LCOM = 1.0 > 0.8 → +8.0 hours (no shared targets)
+    * WMC = 16 > 15 → +2.0 hours
+    * Total debt = 14.0 hours (High severity)
+
+DEBT INTERPRETATION:
+  - 0 hours: Clean code (no violations)
+  - 4 hours: One coupling violation (1 sprint story point)
+  - 8 hours: One cohesion violation (1 day refactoring)
+  - 14+ hours: Multiple violations (high priority refactoring)
+
+KNOWN LIMITATIONS:
+  - Remediation hours are ISO 25010 estimates (not calibrated to codebase)
+  - WMC uses out-degree as proxy (not true cyclomatic complexity)
+  - LCOM uses graph structure (not field access patterns)
+  - DIT skipped (no inheritance edges)
+  - Does not account for business value or risk (only technical metrics)
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T264-ck-metrics-coupling-cohesion (CBO, LCOM, WMC sources)
+  T268-cross-algorithm-integration-test (debt correlates with coupling)

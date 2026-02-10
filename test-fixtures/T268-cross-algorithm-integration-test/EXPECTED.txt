@@ -1,0 +1,99 @@
+FIXTURE: T268-cross-algorithm-integration-test
+LANGUAGE: N/A (pure algorithm integration, no source code parsing)
+CATEGORY: Graph Analysis - Cross-Algorithm Consistency
+VALIDATES: All 7 graph analysis algorithms work together correctly and produce correlated results
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for integration testing.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/integration_cross_algorithm_tests.rs
+
+ALGORITHMS TESTED (7):
+  1. Tarjan SCC (Strongly Connected Components)
+  2. K-Core Decomposition
+  3. PageRank Centrality
+  4. Betweenness Centrality
+  5. Shannon Entropy Complexity
+  6. CK Metrics Suite (CBO, LCOM, RFC, WMC)
+  7. Leiden Community Detection
+  8. SQALE Technical Debt Scoring
+
+REFERENCE GRAPHS:
+  1. 8-node graph: A→B, A→C, B→D, C→D, D→E→F→D, G→H→G
+  2. 5-node chain: A→B→C→D→E
+  3. 1000-node performance graph: hub-and-spoke + chain
+
+TEST FUNCTIONS (9):
+  BASIC INTEGRATION TESTS:
+  - test_all_seven_algorithms_run_on_eight_node_graph: Validates all 7 algorithms succeed
+    * Tarjan: 5 SCCs ({D,E,F}, {G,H}, {A}, {B}, {C})
+    * K-Core: 8 coreness values
+    * PageRank: 8 values, sum ≈ 1.0
+    * Betweenness: 8 values
+    * Entropy: 8 values
+    * CK Metrics: 8 CBO values
+    * Leiden: ≥1 community
+    * SQALE: 8 debt results
+
+  - test_all_seven_algorithms_run_on_chain_graph: Validates all 7 on linear chain
+    * Tarjan: 5 singleton SCCs
+    * K-Core: all coreness ≤ 1
+    * PageRank: E (sink) highest
+    * Betweenness: middle nodes highest
+    * Entropy: all ≈ 0 (single edge type)
+    * CK Metrics: all CBO ≤ 2
+    * Leiden: 5 communities
+    * SQALE: all debt ≤ 100.0
+
+  CROSS-ALGORITHM CONSISTENCY TESTS:
+  - test_scc_nodes_share_kcore_level: Validates D-E-F (SCC) share k-core=2
+  - test_high_betweenness_implies_high_pagerank: Validates D (bridge) in top 3 PageRank
+  - test_cycle_nodes_detected_by_both_scc_and_leiden: Validates D-E-F in same SCC + same Leiden community
+  - test_isolated_pair_consistent_across_algorithms: Validates G-H consistency:
+    * Same SCC (2-node cycle)
+    * Same Leiden community
+    * Same k-core value
+    * Similar PageRank (symmetric cycle)
+  - test_sqale_debt_correlates_with_coupling: Validates higher CBO → higher debt
+
+  PERFORMANCE TEST:
+  - test_performance_large_graph_completes: Validates 1000-node graph completes without panic
+
+  EDGE CASE TEST:
+  - test_empty_graph_all_algorithms_return_empty: Validates graceful empty graph handling
+
+CONSISTENCY PROPERTIES VALIDATED:
+  1. SCC membership → same k-core level (structural correlation)
+  2. High betweenness → high PageRank (importance correlation)
+  3. Cycle detection: SCC + Leiden agree (algorithmic consistency)
+  4. Isolated components: consistent across all metrics (modularity consistency)
+  5. Coupling → debt: higher CBO → higher SQALE debt (metric correlation)
+  6. Empty graph: all algorithms return empty/zero (robustness)
+  7. Large graph: all algorithms complete (scalability)
+
+CORRELATION SEMANTICS:
+  - SCC + K-Core: Cycle nodes have higher coreness (dense subgraphs)
+  - Betweenness + PageRank: Bridge nodes are important (centrality correlation)
+  - SCC + Leiden: Cycles form communities (modularity alignment)
+  - CBO + SQALE: High coupling = high debt (maintainability correlation)
+  - Entropy + CK: Mixed edge types = low cohesion (complexity correlation)
+
+PERFORMANCE EXPECTATIONS:
+  - 8-node graph: <10ms total (all 7 algorithms)
+  - 1000-node graph: <1s total (with reduced PageRank iterations=50)
+  - Empty graph: <1ms total (graceful early exit)
+
+KNOWN LIMITATIONS:
+  - Leiden is randomized (community IDs may vary across runs)
+  - PageRank convergence may vary (tolerance-dependent)
+  - K-Core monotonicity can inflate peripheral node coreness
+  - Large graphs (>10K nodes) may timeout Betweenness (O(VE))
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T261-tarjan-scc-cycle-detection
+  T262-entropy-complexity-measurement
+  T263-leiden-community-detection
+  T264-ck-metrics-coupling-cohesion
+  T265-centrality-pagerank-betweenness
+  T266-kcore-decomposition-layering
+  T267-sqale-technical-debt-scoring

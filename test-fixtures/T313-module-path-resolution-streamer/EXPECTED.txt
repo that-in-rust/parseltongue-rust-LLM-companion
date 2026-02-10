@@ -1,0 +1,106 @@
+FIXTURE: T313-module-path-resolution-streamer
+LANGUAGE: Rust (infrastructure, module path extraction)
+CATEGORY: Module Path Resolution
+VALIDATES: Rust and Python module path extraction from file paths following language-specific conventions
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/pt01-folder-to-cozodb-streamer/src/streamer_module_path_tests.rs
+
+TEST FUNCTIONS (8):
+
+  Rust Module Path Tests:
+    - test_module_path_lib_returns_empty: lib.rs → [] (crate root)
+    - test_module_path_main_returns_empty: main.rs → [] (binary root)
+    - test_module_path_single_file_module: calculator.rs → ["calculator"]
+    - test_module_path_mod_rs_returns_parent: utils/mod.rs → ["utils"]
+    - test_module_path_nested_file: utils/helpers.rs → ["utils", "helpers"]
+    - test_module_path_deeply_nested: math/geometry/shapes.rs → ["math", "geometry", "shapes"]
+
+  Other Language Tests:
+    - test_module_path_python_file: utils/helpers.py → ["utils", "helpers"]
+    - test_module_path_without_src_directory: test.rs (no src/) → ["test"]
+
+CONTRACT:
+  Function:
+    - derive_file_module_path(file_path: &Path) → Vec<String>
+    - Returns module path segments as string vector
+    - Used in ISGL1 key generation and entity metadata
+
+  Rust Module Path Rules:
+
+    1. Crate Root Files → Empty Path:
+       - src/lib.rs → []
+       - src/main.rs → []
+       - Rationale: These are top-level module declarations
+
+    2. Single File Modules → Filename Stem:
+       - src/calculator.rs → ["calculator"]
+       - src/utils.rs → ["utils"]
+       - Extracts filename without .rs extension
+
+    3. mod.rs → Parent Directory Name:
+       - src/utils/mod.rs → ["utils"]
+       - src/math/mod.rs → ["math"]
+       - Rationale: mod.rs represents the module declaration for its directory
+
+    4. Nested Files → Directory Structure + Filename:
+       - src/utils/helpers.rs → ["utils", "helpers"]
+       - src/db/pool.rs → ["db", "pool"]
+       - Chains directory names with filename stem
+
+    5. Deeply Nested → Full Path Chain:
+       - src/math/geometry/shapes.rs → ["math", "geometry", "shapes"]
+       - src/api/v1/handlers.rs → ["api", "v1", "handlers"]
+       - All directory segments included in path
+
+  Python Module Path Rules:
+    - Follows directory structure like Rust nested files
+    - utils/helpers.py → ["utils", "helpers"]
+    - __init__.py behavior not explicitly tested (may follow mod.rs pattern)
+
+  Path Normalization:
+    - Strips src/ prefix if present
+    - Works with files outside src/ directory (test.rs → ["test"])
+    - Relative to project root
+
+  Module Path in ISGL1 Keys:
+    - Used to populate InterfaceSignature.module_path field
+    - Enables module-level queries (e.g., "all entities in utils module")
+    - Helps resolve symbol conflicts across modules
+
+KNOWN LIMITATIONS:
+  - Assumes standard Rust project structure (src/ directory)
+  - Does not validate module path against actual mod declarations
+  - Python __init__.py handling not explicitly documented
+  - Other languages (Go, Java, C) not tested (may default to simple directory structure)
+  - Workspace member paths not tested (may include workspace name)
+  - Symlinks and non-standard layouts not covered
+
+RELATED TESTS:
+  T312-test-detector-classification-code (same crate, uses module paths for classification)
+  T314-query-based-extraction-multilangs (uses module paths in entity creation)
+  Integration with ISGL1 key generator ensures module paths included in entity keys
+
+DESIGN RATIONALE:
+  Empty Path for lib.rs/main.rs:
+    - lib.rs and main.rs are module roots, not submodules
+    - Empty path prevents redundant "lib" or "main" in module hierarchy
+    - Example: lib.rs defines crate::utils, not crate::lib::utils
+
+  mod.rs Special Handling:
+    - Old Rust module system: utils/mod.rs declares utils module
+    - New Rust 2018: utils.rs preferred, but mod.rs still supported
+    - mod.rs path uses parent directory name (utils/mod.rs → ["utils"])
+
+  Nested File Path Composition:
+    - Mirrors Rust module declaration structure
+    - utils/helpers.rs corresponds to mod utils { pub mod helpers { ... } }
+    - Path segments match use statement: use crate::utils::helpers;
+
+INTEGRATION FLOW:
+  1. FileStreamerImpl receives file path
+  2. derive_file_module_path() extracts module segments
+  3. Module path stored in InterfaceSignature.module_path
+  4. ISGL1 key generator uses module path for uniqueness
+  5. Queries filter entities by module (e.g., "all functions in utils module")

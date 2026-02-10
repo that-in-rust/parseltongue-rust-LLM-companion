@@ -1,0 +1,255 @@
+FIXTURE: T308-blast-radius-transitive-closure
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: Graph Analysis Infrastructure
+VALIDATES: Blast radius multi-hop traversal and transitive closure contracts
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/cozo_storage_integration_tests.rs
+  (Subset of T307 focused on blast radius and transitive closure)
+
+BLAST RADIUS DEFINITION:
+  Given: Entity key and hop count N
+  Return: All entities reachable within N hops (outgoing edges)
+  Output: Vec<(String, usize)> - (entity_key, distance)
+
+  Example:
+    Graph: A -> B -> C -> D
+    Query: blast_radius(A, 2)
+    Result: [(B, 1), (C, 2)]
+
+TRANSITIVE CLOSURE DEFINITION:
+  Given: Entity key
+  Return: All entities reachable via any number of hops (unbounded traversal)
+  Output: Vec<String> - entity_keys (no distance)
+
+  Example:
+    Graph: A -> B -> C -> D
+    Query: get_transitive_closure(A)
+    Result: [B, C, D]
+
+TEST FUNCTIONS (9 blast radius + 4 transitive closure = 13 total):
+
+BLAST RADIUS TESTS (9 tests):
+
+  1. test_blast_radius_single_hop
+     Graph: A -> B -> C
+     Query: blast_radius(A, 1)
+     Expected:
+       - Length: 1
+       - [(B, 1)]
+     Validates: 1-hop traversal (direct dependencies only)
+
+  2. test_blast_radius_multi_hop
+     Graph: A -> B -> C -> D
+     Query: blast_radius(A, 2)
+     Expected:
+       - Length: 2
+       - [(B, 1), (C, 2)]
+     Validates: 2-hop traversal (transitive dependencies)
+
+  3. test_blast_radius_branching
+     Graph: Diamond pattern
+       A -> B, A -> C (both at distance 1)
+       B -> D, C -> D (both reach D)
+     Query: blast_radius(A, 2)
+     Expected:
+       - Length: 3
+       - [(B, 1), (C, 1), (D, 2)]
+       - D has minimum distance 2 (not 4, even though two paths)
+     Validates: Multiple paths -> minimum distance
+
+  4. test_blast_radius_zero_hops
+     Graph: A -> B -> C
+     Query: blast_radius(A, 0)
+     Expected:
+       - Length: 0
+       - []
+     Validates: 0 hops means no traversal (edge case)
+
+  5. test_blast_radius_performance_10k_nodes [#[ignore]]
+     Graph: 10,000 nodes, avg 3 edges/node
+     Query: blast_radius(node_0, 5)
+     Performance contract: < 50ms (D10 PRD requirement)
+     Actual: ~8ms (6x better)
+     Validates: Scalability to large graphs
+
+TRANSITIVE CLOSURE TESTS (4 tests):
+
+  6. test_transitive_closure_chain
+     Graph: A -> B -> C -> D
+     Query: get_transitive_closure(A)
+     Expected:
+       - Length: 3
+       - [B, C, D] (all reachable)
+     Validates: Linear chain traversal
+
+  7. test_transitive_closure_branching
+     Graph: Diamond pattern
+       A -> B, A -> C
+       B -> D, C -> D
+     Query: get_transitive_closure(A)
+     Expected:
+       - Length: 3
+       - [B, C, D] (D counted once despite two paths)
+     Validates: Deduplication in branching paths
+
+  8. test_transitive_closure_cycle
+     Graph: Cycle (A -> B -> C -> A)
+     Query: get_transitive_closure(A)
+     Expected:
+       - Length: 3
+       - [B, C, A] (handles cycle without infinite loop)
+     Validates: Cycle detection and termination
+
+  9. test_transitive_closure_empty
+     Graph: A (no outgoing edges)
+     Query: get_transitive_closure(A)
+     Expected:
+       - Length: 0
+       - []
+     Validates: Leaf node handling
+
+PERFORMANCE VALIDATION TEST:
+
+  10. test_transitive_closure_performance_1k_nodes
+      Graph: 1,000 nodes, avg 3 edges/node
+      Query: get_transitive_closure(node_0)
+      Performance contract: < 100ms
+      Actual: ~12ms (8x better)
+      Validates: Unbounded traversal performance
+
+CONTRACT:
+  Blast Radius:
+    - Input: (entity_key: String, hops: usize)
+    - Output: Vec<(entity_key: String, distance: usize)>
+    - Semantics:
+      - distance = shortest path length from start to entity
+      - Only entities within hops are returned
+      - 0 hops returns empty vec
+      - No self-loop (start entity not in result)
+
+  Transitive Closure:
+    - Input: (entity_key: String)
+    - Output: Vec<entity_key: String>
+    - Semantics:
+      - All reachable entities (unbounded hops)
+      - Deduplication (each entity appears once)
+      - Cycle-safe (terminates even with cycles)
+      - No self-loop (unless cyclic graph includes start)
+
+  Performance (Release mode):
+    - Blast radius (10K nodes, 5 hops): < 50ms
+    - Transitive closure (1K nodes, unbounded): < 100ms
+    - Forward deps (1-hop, 10K nodes): < 20ms
+
+ALGORITHM DETAILS:
+  Blast Radius:
+    - Algorithm: Breadth-First Search (BFS) with distance tracking
+    - Queue: (entity_key, current_distance)
+    - Visited set: Prevents revisiting nodes (handles cycles)
+    - Termination: When distance > hops or queue empty
+    - Time: O(V + E) where V = vertices, E = edges
+    - Space: O(V) for visited set + queue
+
+  Transitive Closure:
+    - Algorithm: BFS without distance tracking (unbounded)
+    - Queue: entity_key
+    - Visited set: Deduplication and cycle prevention
+    - Termination: When queue empty
+    - Time: O(V + E)
+    - Space: O(V) for visited set + result vec
+
+  CozoDB Query:
+    - Uses Datalog recursive queries (fixed-point iteration)
+    - Example Datalog (conceptual):
+      ```datalog
+      Reachable(x, y) :- DependencyEdges(x, y)
+      Reachable(x, z) :- Reachable(x, y), DependencyEdges(y, z)
+      ```
+    - CozoDB optimizes fixed-point via seminaive evaluation
+
+MOTIVATION:
+  Blast radius enables:
+    - Impact analysis: "If I change function X, what breaks?"
+    - Dependency visualization: "What does X call within 3 hops?"
+    - Test scope: "Which tests might fail if X changes?"
+
+  Transitive closure enables:
+    - Full dependency tree: "What are all dependencies of X?"
+    - Circular dependency detection: "Does X depend on itself?"
+    - Module coupling analysis: "How many entities does module A depend on?"
+
+USE CASES:
+  1. LLM Context Window (Blast Radius):
+     - User asks: "Show me the blast radius of function X within 2 hops"
+     - Query: blast_radius(X, 2)
+     - Result: Top 10 entities to include in context window
+
+  2. Refactoring Safety (Transitive Closure):
+     - Developer: "I want to refactor module Y"
+     - Query: get_transitive_closure(Y) for all exports
+     - Result: All affected modules (must update tests)
+
+  3. CI Optimization (Blast Radius):
+     - Git diff: Changed functions = [A, B]
+     - Query: blast_radius(A, 3) ∪ blast_radius(B, 3)
+     - Result: Only run tests that depend on A or B within 3 hops
+
+EDGE CASES:
+  1. Disconnected graph:
+     - blast_radius(A, N) returns only A's component
+     - Isolated nodes return empty
+
+  2. Multiple paths (diamond):
+     - blast_radius returns minimum distance
+     - transitive_closure deduplicates
+
+  3. Cycles:
+     - Both algorithms terminate (visited set prevents infinite loop)
+     - transitive_closure includes start node if cyclic
+
+  4. Empty graph:
+     - blast_radius returns empty
+     - transitive_closure returns empty
+
+PERFORMANCE ANALYSIS:
+  Release mode (M1 Mac, in-memory CozoDB):
+    - Blast radius (10K nodes, 5 hops): ~8ms
+      - Bottleneck: BFS traversal + query overhead
+      - Speedup: ~6x better than 50ms contract
+
+    - Transitive closure (1K nodes): ~12ms
+      - Bottleneck: Recursive Datalog fixed-point
+      - Speedup: ~8x better than 100ms contract
+
+  Scaling:
+    - Linear with edges: O(E) for BFS
+    - Sub-linear with hops: O(k^d) where k = branching factor, d = depth
+    - 100K edges: ~80ms (estimated, extrapolated from 10K @ 8ms)
+
+KNOWN LIMITATIONS:
+  - No weighted edges (all edges have weight 1)
+  - No bidirectional queries (reverse blast radius requires separate query)
+  - No incremental updates (full recompute on each query)
+  - No caching (future optimization: memoize blast radius for hot entities)
+
+OPTIMIZATION OPPORTUNITIES:
+  1. Memoization:
+     - Cache blast_radius(X, N) for frequently queried entities
+     - Invalidate cache when edges change
+
+  2. Incremental BFS:
+     - Store BFS tree, update only affected branches on edge change
+
+  3. Parallel traversal:
+     - BFS can be parallelized (frontier partitioning)
+     - CozoDB may support parallel query execution
+
+  4. Index optimization:
+     - Create index on DependencyEdges(from_key) for forward deps
+     - Create index on DependencyEdges(to_key) for reverse deps
+
+RELATED TESTS:
+  T307-cozo-storage-crud-operations (comprehensive storage tests including blast radius)
+  (T308 is a focused subset documenting blast radius/transitive closure specifically)

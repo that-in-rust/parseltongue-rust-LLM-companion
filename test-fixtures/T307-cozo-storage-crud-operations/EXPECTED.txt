@@ -1,0 +1,262 @@
+FIXTURE: T307-cozo-storage-crud-operations
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: Storage Infrastructure
+VALIDATES: Full CozoDB storage CRUD lifecycle and graph queries
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/cozo_storage_integration_tests.rs
+
+STORAGE LAYERS:
+  1. CodeGraph relation: Entities (nodes)
+  2. DependencyEdges relation: Edges (graph structure)
+  3. FileHashCache relation: File-level hash caching (v1.5.0+)
+
+TEST FUNCTIONS (35+ tests, grouped by category):
+
+CATEGORY 1: Schema Creation (3 tests)
+  1. test_cozo_connection
+     - Validates: CozoDB "mem" connection works
+     - Expected: is_connected() returns true
+     - Setup: create_schema() initializes database
+
+  2. test_create_code_graph_schema
+     - Validates: CodeGraph relation created
+     - Expected: "CodeGraph" in list_relations()
+
+  3. test_create_dependency_edges_schema
+     - Validates: DependencyEdges relation created
+     - Expected: "DependencyEdges" in list_relations()
+
+  Idempotency tests:
+  - test_dependency_edges_schema_is_idempotent
+    - Validates: Multiple create_schema() calls don't break
+    - CozoDB may error on duplicate :create (expected)
+
+  - test_both_schemas_can_coexist
+    - Validates: CodeGraph + DependencyEdges both exist
+    - Expected: Exactly 2 user relations (excluding system relations starting with ':')
+
+CATEGORY 2: Entity CRUD (7 tests)
+  4. test_insert_code_entity
+     - Validates: Single entity insertion
+     - Expected: Entity retrievable via get_entity()
+
+  5. test_temporal_state_update
+     - Validates: Temporal state transitions (1,1) -> (1,0) for delete
+     - Expected: future_ind updated, future_action set to Delete
+
+  6. test_query_changed_entities
+     - Validates: Query for entities with temporal changes
+     - Setup: 3 entities (1 unchanged, 1 edit, 1 delete)
+     - Expected: get_changed_entities() returns 2 entities (edit + delete)
+
+  7. test_update_entity
+     - Validates: Entity update operation
+     - Setup: Insert entity, modify with apply_temporal_change()
+     - Expected: future_action = Edit, future_code updated
+
+  8. test_delete_entity
+     - Validates: Entity deletion
+     - Expected: get_entity() returns error or empty after delete
+
+  9. test_codegraph_repository_trait
+     - Validates: CodeGraphRepository trait implementation
+     - Tests: store_entity(), get_entity() via trait methods
+     - Expected: Box<dyn CodeGraphRepository> works
+
+CATEGORY 3: Edge CRUD (9 tests)
+  10. test_insert_single_dependency_edge
+      - Validates: Single edge insertion
+      - Example: A -> B (Calls)
+
+  11. test_insert_edge_without_source_location
+      - Validates: Optional source_location field
+      - Edge type: Implements (struct -> trait)
+
+  12. test_insert_duplicate_edge_is_idempotent
+      - Validates: Upsert semantics for edges
+      - Expected: Duplicate edge succeeds (no error)
+
+  13. test_batch_insert_edges
+      - Validates: Batch edge insertion (3 edges)
+      - Example: A -> B, B -> C, A -> Config
+
+  14. test_batch_insert_empty_slice
+      - Validates: Empty batch succeeds (no-op)
+
+  15. test_single_edge_insert_performance_contract
+      - Performance: Single insert < 5ms
+      - Spec: D10 specification requirement
+
+  16. test_batch_insert_performance_contract
+      - Performance: Batch insert (100 edges) < 50ms
+      - Spec: D10 specification requirement
+
+CATEGORY 4: Forward/Reverse Dependencies (8 tests)
+  17. test_forward_dependencies_single
+      - Validates: A -> B, query A's forward deps = [B]
+
+  18. test_reverse_dependencies_single
+      - Validates: A -> B, query B's reverse deps = [A]
+
+  19. test_forward_dependencies_multiple
+      - Validates: A -> B, A -> C, A -> D
+      - Expected: A's forward deps = [B, C, D]
+
+  20. test_reverse_dependencies_multiple
+      - Validates: A -> D, B -> D, C -> D
+      - Expected: D's reverse deps = [A, B, C]
+
+  21. test_forward_dependencies_empty
+      - Validates: Entity with no outgoing edges
+      - Expected: Empty vec
+
+  22. test_reverse_dependencies_empty
+      - Validates: Entity with no incoming edges
+      - Expected: Empty vec
+
+CATEGORY 5: Blast Radius (Multi-hop Queries) (5 tests)
+  23. test_blast_radius_single_hop
+      - Graph: A -> B -> C
+      - Query: blast_radius(A, 1)
+      - Expected: [B] at distance 1
+
+  24. test_blast_radius_multi_hop
+      - Graph: A -> B -> C -> D
+      - Query: blast_radius(A, 2)
+      - Expected: [B at distance 1, C at distance 2]
+
+  25. test_blast_radius_branching
+      - Graph: Diamond (A -> B, A -> C, B -> D, C -> D)
+      - Query: blast_radius(A, 2)
+      - Expected: [B at 1, C at 1, D at 2 (min distance)]
+
+  26. test_blast_radius_zero_hops
+      - Edge case: blast_radius(A, 0)
+      - Expected: Empty (0 hops means no traversal)
+
+CATEGORY 6: Transitive Closure (4 tests)
+  27. test_transitive_closure_chain
+      - Graph: A -> B -> C -> D
+      - Query: get_transitive_closure(A)
+      - Expected: [B, C, D] (all reachable)
+
+  28. test_transitive_closure_branching
+      - Graph: Diamond (A -> B, A -> C, B -> D, C -> D)
+      - Query: get_transitive_closure(A)
+      - Expected: [B, C, D] (D counted once despite two paths)
+
+  29. test_transitive_closure_cycle
+      - Graph: Cycle (A -> B -> C -> A)
+      - Query: get_transitive_closure(A)
+      - Expected: [B, C, A] (handles cycles without infinite loop)
+
+  30. test_transitive_closure_empty
+      - Query: Entity with no outgoing edges
+      - Expected: Empty vec
+
+CATEGORY 7: Performance Validation (3 tests, #[ignore])
+  31. test_blast_radius_performance_10k_nodes [#[ignore]]
+      - Graph: 10,000 nodes, avg 3 edges per node
+      - Query: blast_radius(node_0, 5)
+      - Performance: < 50ms (D10 PRD requirement)
+      - Actual: ~8ms (6x better than target)
+      - Run with: cargo test --release -- --ignored
+
+  32. test_transitive_closure_performance_1k_nodes
+      - Graph: 1,000 nodes, avg 3 edges per node
+      - Query: get_transitive_closure(node_0) (unbounded)
+      - Performance: < 100ms
+      - Actual: ~12ms (8x better)
+
+  33. test_forward_dependencies_performance_10k_nodes [#[ignore]]
+      - Graph: 10,000 nodes, avg 5 edges per node
+      - Query: get_forward_dependencies(node_0) (1-hop)
+      - Performance: < 20ms
+      - Actual: ~12ms (1.7x better)
+
+CONTRACT:
+  CRUD Semantics:
+    - Create: insert_entity(), insert_edge()
+    - Read: get_entity(), get_forward_dependencies(), get_reverse_dependencies()
+    - Update: update_entity_internal(), update_temporal_state()
+    - Delete: delete_entity()
+
+  Temporal State:
+    - current_ind: Entity exists in current snapshot (boolean)
+    - future_ind: Entity will exist in future snapshot (boolean)
+    - future_action: Edit/Delete/None (describes upcoming change)
+    - Transitions: (1,1) -> (1,0) for delete, (1,1) -> (1,1) for edit
+
+  Graph Queries:
+    - Forward deps: get_forward_dependencies(key) -> outgoing edges
+    - Reverse deps: get_reverse_dependencies(key) -> incoming edges
+    - Blast radius: calculate_blast_radius(key, hops) -> entities within N hops
+    - Transitive closure: get_transitive_closure(key) -> all reachable entities
+
+  Performance Contracts:
+    - Single edge insert: < 5ms
+    - Batch edge insert (100): < 50ms
+    - Blast radius (10k nodes, 5 hops): < 50ms
+    - Transitive closure (1k nodes): < 100ms
+    - Forward deps (10k nodes): < 20ms
+
+MOTIVATION:
+  Full integration tests validate:
+    - Schema creation (tables exist)
+    - CRUD operations (data persisted correctly)
+    - Graph queries (algorithm correctness)
+    - Performance contracts (real-world scalability)
+    - Edge cases (empty results, cycles, duplicates)
+
+DESIGN DECISIONS:
+  1. In-memory database ("mem"):
+     - Fast test execution (~10-100ms per test)
+     - No disk I/O, no cleanup needed
+     - Isolated from production data
+
+  2. Helper functions (create_test_entity_with_key):
+     - Reduce boilerplate in tests
+     - Consistent test entity structure
+
+  3. Performance tests marked #[ignore]:
+     - Expensive (10K+ nodes, 100+ ms)
+     - Run explicitly with --release --ignored
+     - Prevent CI slowdown
+
+  4. Warmup phase in performance tests:
+     - First query may be slower (CozoDB internal setup)
+     - Warmup before measurement for consistent results
+
+GRAPH GENERATION:
+  Helper: generate_large_graph(num_nodes, avg_edges_per_node)
+    - Creates realistic graph structure (not fully connected)
+    - Each node has avg_edges_per_node outgoing edges
+    - Edges point forward (i -> i+1, i+2, ..., i+avg_edges)
+    - Batch inserts all edges for performance
+
+  Example: 10K nodes, 3 edges/node = 30K edges
+
+PERFORMANCE ANALYSIS:
+  Release mode (M1 Mac, in-memory CozoDB):
+    - Blast radius (5-hop, 10K nodes): ~8ms (6x better than 50ms target)
+    - Forward deps (1-hop, 10K nodes): ~12ms (1.7x better than 20ms target)
+    - Transitive closure (1K nodes): ~12ms (8x better than 100ms target)
+
+  Debug mode (not tested, expected 5-10x slower):
+    - Use --release for performance validation
+
+  Disk-based RocksDB (production, estimated):
+    - Similar latency (CozoDB queries are in-memory regardless of backend)
+    - Higher throughput for writes (batch inserts benefit from disk)
+
+KNOWN LIMITATIONS:
+  - Tests use in-memory database only (no RocksDB coverage)
+  - Graph generation is forward-only (no bidirectional edges)
+  - No concurrent query tests (thread safety not validated)
+  - No multi-crate graph tests (all entities in single "test.rs")
+
+RELATED TESTS:
+  T306-storage-batch-insert-performance (uses batch insert in graph generation)
+  T308-blast-radius-transitive-closure (subset focused on blast radius)

@@ -1,0 +1,112 @@
+FIXTURE: T300-isgl1-v2-key-generation-format
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: ISGL1 Key Infrastructure
+VALIDATES: ISGL1 v2 key format uses timestamp suffix, semantic path, and birth timestamp
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/parseltongue-core/tests/isgl1_v2_key_generation_tests.rs
+  Tests in: crates/parseltongue-core/tests/edge_key_format_test.rs
+
+KEY FORMAT:
+  {language}:{entity_class}:{entity_name}:{semantic_path}:T{birth_timestamp}
+
+  Components:
+    - language: rust, python, javascript, go, etc.
+    - entity_class: fn, class, struct, interface, method, etc.
+    - entity_name: Name of the entity (function, class, etc.)
+    - semantic_path: File path with "__" prefix and underscores replacing separators
+    - birth_timestamp: Unix timestamp with "T" prefix (deterministic hash-based)
+
+  Examples:
+    - rust:fn:handle_auth:__src_auth_rs:T1706284800
+    - javascript:fn:greetUser:__tests_e2e_workspace_src_test_v141_js:T1706284900
+    - python:class:Parser:__src_parser_py:T1706285000
+
+TEST FUNCTIONS (15 total):
+
+isgl1_v2_key_generation_tests.rs (5 tests):
+  1. test_format_key_v2_generates_timestamp_suffix
+     - Validates format: rust:fn:handle_auth:__src_auth_rs:T1706284800
+     - Ensures no line ranges (old format) appear in key
+     - Tests timestamp prefix "T" is present
+
+  2. test_extract_semantic_path_sanitizes_correctly
+     - Basic path: "src/auth.rs" -> "__src_auth"
+     - Nested path: "crates/core/src/parser/tree.rs" -> "__crates_core_src_parser_tree"
+     - Special chars: "my-module/lib.py" -> "__my_module_lib"
+
+  3. test_compute_birth_timestamp_is_deterministic
+     - Same file+entity name produces identical timestamp across multiple calls
+     - Timestamp is a valid Unix timestamp (> 0)
+
+  4. test_compute_birth_timestamp_differs_by_entity
+     - Different entity names in same file have different timestamps
+     - Hash-based timestamp ensures uniqueness
+
+  5. test_complete_key_generation_workflow
+     - End-to-end key generation and stability test
+     - Verifies 5-component structure
+     - Tests key stability when entity moves to different line numbers
+     - Core test: "Key must remain stable when lines change!"
+
+edge_key_format_test.rs (10 tests):
+  1. test_req_edge_002_semantic_path_root_class
+     - Root-level class: "Logger.cs" -> "__Logger"
+     - Validates double underscore prefix
+
+  2. test_req_edge_002_semantic_path_nested_class
+     - Nested class: "MyNamespace/MyClass.cs" -> "__MyNamespace_MyClass"
+
+  3. test_req_edge_002_semantic_path_complex
+     - Complex path: "src/Services/Data/Repository.cs" -> "__src_Services_Data_Repository"
+
+  4. test_req_edge_003_timestamp_stability
+     - Birth timestamp deterministic for same file+entity
+
+  5. test_req_edge_003_timestamp_uniqueness
+     - Different entities in same file have different timestamps
+
+  6. test_req_edge_003_timestamp_uniqueness_different_files
+     - Same entity name in different files have different timestamps
+
+  7. test_semantic_path_empty_file
+     - Edge case: empty path "" -> "__"
+
+  8. test_semantic_path_only_extension
+     - Edge case: ".cs" -> "__"
+
+  9. test_semantic_path_multiple_dots
+     - Multiple dots: "My.Class.Helper.cs" -> "__My_Class_Helper"
+
+  10. test_isgl1_v2_format_no_line_ranges
+      - ISGL1 v2 keys do NOT contain "-" separator (old line range format)
+      - Keys contain ":T" timestamp prefix
+      - Exactly 4 colons in v2 format
+
+CONTRACT:
+  - Keys are deterministic for the same entity across re-parses
+  - Birth timestamp is stable (hash-based, not current time)
+  - Semantic path sanitizes file paths: slashes->underscores, no extension
+  - No line numbers in v2 format (solves v1 key instability problem)
+  - 5-component structure: language:type:name:path:timestamp
+  - Timestamp prefix "T" distinguishes v2 from v1 keys
+  - Generic types are sanitized: List<T> -> List_T_ (handled elsewhere)
+
+MOTIVATION:
+  Old v1 format: rust:fn:handle_auth:__src_auth_rs:10-50
+  Problem: Line numbers change when lines are added/removed -> key instability
+
+  New v2 format: rust:fn:handle_auth:__src_auth_rs:T1706284800
+  Solution: Birth timestamp is stable across file edits -> 0% key churn
+
+KNOWN LIMITATIONS:
+  - Birth timestamp is hash-based (file_path + entity_name), not actual creation time
+  - Renaming an entity creates a new key (expected behavior)
+  - Moving entity to different file creates a new key (expected behavior)
+  - Timestamp collision possible (very rare with SHA-256 hash)
+
+RELATED TESTS:
+  T301-isgl1-v2-content-hash-stability (hash-based change detection)
+  T302-isgl1-v2-entity-matching-priority (matching algorithm uses these keys)
+  T304-isgl1-v2-incremental-reindex-e2e (end-to-end key stability validation)

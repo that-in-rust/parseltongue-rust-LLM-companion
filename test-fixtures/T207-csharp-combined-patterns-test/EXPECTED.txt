@@ -1,0 +1,31 @@
+FIXTURE: T207-csharp-combined-patterns-test
+LANGUAGE: C#
+CATEGORY: Dependency Edges (Integration)
+VALIDATES: Multiple C# dependency patterns in a single method (property access, LINQ, async/await, constructors)
+
+SOURCE FILES:
+- combined.cs: Comprehensive test combining property access, LINQ operations, async/await, and constructors
+
+EXPECTED BEHAVIORS:
+1. Property access detection:
+   - users.Count (read)
+   - result.Capacity (write)
+
+2. LINQ method detection:
+   - Where
+   - OrderBy
+   - ToList
+
+3. Async/await detection:
+   - FetchDataAsync method call
+
+4. Constructor detection:
+   - new List<string>()
+
+MINIMUM EDGE COUNT: 6 edges (conservative estimate across all patterns)
+
+REQUIREMENTS:
+- REQ-CSHARP-002.0 (Property Access)
+- REQ-CSHARP-003.0 (LINQ Operations)
+- REQ-CSHARP-004.0 (Async/Await)
+- REQ-CSHARP-001.0 (Constructor Calls)

@@ -1,0 +1,117 @@
+FIXTURE: T312-test-detector-classification-code
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: Test File Detection
+VALIDATES: Language-specific test detection across Rust, Go, JavaScript, TypeScript, Python, Java with special handling for main.rs/lib.rs
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/pt01-folder-to-cozodb-streamer/src/test_detector.rs
+
+TEST FUNCTIONS (5):
+
+  Contract Tests:
+    - test_rust_test_detection_contract: Rust test detection across multiple patterns
+    - test_go_test_detection_contract: Go test detection (_test.go, TestXxx functions)
+    - test_javascript_test_detection_contract: JS/TS test patterns (*.test.*, *.spec.*, __tests__/)
+    - test_unknown_file_extensions_contract: Unknown extensions treated as non-test code
+    - test_main_with_test_module_is_code: main.rs with #[cfg(test)] module still classified as CODE
+
+CONTRACT:
+  EntityClass:
+    - Code: Production code
+    - Test: Test code
+    - Default: Unknown extensions → Code (non-test)
+
+  Trait Interface:
+    - TestDetector trait with dependency injection
+    - detect_test_from_path_and_name(file_path, content) → EntityClass
+    - DefaultTestDetector: Standard implementation
+
+  Rust Test Detection (REQ-V090-003.1):
+    Patterns Detected:
+      - #[test] attribute
+      - #[tokio::test] attribute
+      - #[cfg(test)] attribute
+      - tests/ directory
+      - _test.rs filename suffix
+
+    Special Cases:
+      - main.rs ALWAYS classified as Code (even with #[cfg(test)] modules)
+      - lib.rs ALWAYS classified as Code (even with #[cfg(test)] modules)
+      - Rationale: These files contain production entrypoints (fn main, pub use declarations)
+
+  Go Test Detection (REQ-V090-003.2):
+    Patterns Detected:
+      - *_test.go filename suffix (standard Go test convention)
+      - Functions starting with "func Test" (e.g., func TestMain)
+      - Functions starting with "func Example" (Go example tests)
+      - Functions starting with "func Benchmark" (Go benchmarks)
+
+  JavaScript/TypeScript Test Detection (REQ-V090-003.3):
+    Filename Patterns:
+      - *.test.js, *.test.ts, *.test.tsx
+      - *.spec.js, *.spec.ts, *.spec.jsx
+      - __tests__/ directory (Jest convention)
+
+    Content Patterns:
+      - test( function calls (Jest/Vitest)
+      - it( function calls (Mocha/Jasmine)
+      - describe( function calls (test suites)
+      - expect( assertions
+
+  Python Test Detection (REQ-V090-003.4):
+    Filename Patterns:
+      - test_*.py (unittest/pytest convention)
+      - *_test.py (alternative naming)
+
+    Content Patterns:
+      - def test_ function definitions
+      - class Test class definitions
+      - @pytest decorators
+      - unittest imports
+
+  Java Test Detection (REQ-V090-003.5):
+    Filename Patterns:
+      - *Test.java (JUnit convention)
+      - *Tests.java (alternative)
+
+    Content Patterns:
+      - @Test annotation (JUnit 4/5)
+      - @BeforeEach annotation
+      - @AfterEach annotation
+      - junit imports
+
+  Unknown Extensions:
+    - Files with unknown extensions (e.g., .xyz, .dat) → EntityClass::Code
+    - Rationale: Conservative default prevents false test classification
+
+PERFORMANCE CONTRACT:
+  - Completes in < 20μs per file
+  - Language detection cached for repeated operations
+  - Parse errors default to "non-test" classification
+
+KNOWN LIMITATIONS:
+  - Content-based detection requires file read (cannot detect from path alone in all cases)
+  - False negatives: Custom test frameworks not using standard patterns
+  - False positives: Production code containing "test(" strings (e.g., API endpoint names)
+  - No detection for: C, C++, Ruby, PHP, C#, Swift (missing language-specific patterns)
+  - main.rs special case may miss if file renamed but still contains main() function
+
+RELATED TESTS:
+  T313-module-path-resolution-streamer (same crate, pt01-folder-to-cozodb-streamer)
+  EntityClass used in CodeEntity classification for test vs code separation
+
+REQUIREMENTS COVERAGE:
+  - REQ-V090-003.0: Language-specific test detection
+  - REQ-V090-003.1: Rust test detection
+  - REQ-V090-003.2: Go test detection
+  - REQ-V090-003.3: JavaScript/TypeScript test detection
+  - REQ-V090-003.4: Python test detection
+  - REQ-V090-003.5: Java test detection
+
+DESIGN RATIONALE:
+  Special main.rs/lib.rs Handling:
+    - Problem: Files with #[cfg(test)] modules incorrectly classified as Test
+    - Solution: Priority check for main.rs and lib.rs before content-based detection
+    - Impact: Ensures production entrypoints always classified as Code
+    - Test case: main.rs with both main() and #[cfg(test)] module → Code

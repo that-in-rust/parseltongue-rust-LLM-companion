@@ -1,0 +1,28 @@
+FIXTURE: T203-csharp-linq-advanced-edges
+LANGUAGE: C#
+CATEGORY: Dependency Edges
+VALIDATES: Advanced LINQ method detection (OrderBy, ThenBy, FirstOrDefault, SingleOrDefault, Last, Distinct, Union, Intersect)
+
+SOURCE FILES:
+- linq_ordering.cs: LINQ ordering operations (OrderBy, ThenBy, ToList)
+- linq_first_single.cs: LINQ element access (FirstOrDefault, SingleOrDefault, Last)
+- linq_set_ops.cs: LINQ set operations (Distinct, Union, Intersect, ToList)
+
+EXPECTED BEHAVIORS:
+1. linq_ordering.cs:
+   - Detect OrderBy LINQ method call
+   - Detect ThenBy LINQ method call
+   - Detect ToList LINQ method call
+
+2. linq_first_single.cs:
+   - Detect FirstOrDefault LINQ method call
+   - Detect SingleOrDefault LINQ method call
+   - Detect Last LINQ method call
+
+3. linq_set_ops.cs:
+   - Detect Distinct LINQ method call
+   - Detect Union LINQ method call
+   - Detect Intersect LINQ method call
+   - Detect ToList LINQ method call
+
+REQUIREMENT: REQ-CSHARP-003.0 (LINQ Operations)

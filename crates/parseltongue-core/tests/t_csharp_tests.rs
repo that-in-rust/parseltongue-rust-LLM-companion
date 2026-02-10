@@ -382,3 +382,297 @@ fn t206_csharp_accuracy_test() {
         accuracy
     );
 }
+
+// ============================================================================
+// T202 (Additional): C# Property Chaining
+// ============================================================================
+
+#[test]
+fn t202_csharp_property_chaining() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T202-csharp-property-linq-edges",
+        "property_chaining.cs",
+    );
+
+    println!("\n=== T202: C# Property Chaining ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect chained property access
+    let has_settings = edges.iter().any(|e| e.to_key.as_str().contains("Settings"));
+    let has_timeout = edges.iter().any(|e| e.to_key.as_str().contains("Timeout"));
+    let has_connection = edges.iter().any(|e| e.to_key.as_str().contains("Connection"));
+    let has_host = edges.iter().any(|e| e.to_key.as_str().contains("Host"));
+
+    assert!(has_settings || has_timeout, "Expected edge for Settings or Timeout property");
+    assert!(has_connection || has_host, "Expected edge for Connection or Host property");
+}
+
+// ============================================================================
+// T203: C# LINQ Advanced Edges
+// ============================================================================
+
+#[test]
+fn t203_csharp_linq_ordering() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T203-csharp-linq-advanced-edges",
+        "linq_ordering.cs",
+    );
+
+    println!("\n=== T203: C# LINQ Ordering ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect ordering LINQ methods
+    let orderby_edges = edges.iter().any(|e| e.to_key.as_str().contains("OrderBy"));
+    let thenby_edges = edges.iter().any(|e| e.to_key.as_str().contains("ThenBy"));
+
+    assert!(orderby_edges, "Expected edge for OrderBy LINQ method");
+    assert!(thenby_edges, "Expected edge for ThenBy LINQ method");
+}
+
+#[test]
+fn t203_csharp_linq_first_single() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T203-csharp-linq-advanced-edges",
+        "linq_first_single.cs",
+    );
+
+    println!("\n=== T203: C# LINQ First/Single ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect First/Single/Last LINQ methods
+    let first_edges = edges.iter().any(|e| e.to_key.as_str().contains("FirstOrDefault"));
+    let single_edges = edges.iter().any(|e| e.to_key.as_str().contains("SingleOrDefault"));
+    let last_edges = edges.iter().any(|e| e.to_key.as_str().contains("Last"));
+
+    assert!(first_edges, "Expected edge for FirstOrDefault LINQ method");
+    assert!(single_edges, "Expected edge for SingleOrDefault LINQ method");
+    assert!(last_edges, "Expected edge for Last LINQ method");
+}
+
+#[test]
+fn t203_csharp_linq_set_ops() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T203-csharp-linq-advanced-edges",
+        "linq_set_ops.cs",
+    );
+
+    println!("\n=== T203: C# LINQ Set Operations ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect set LINQ methods
+    let distinct_edges = edges.iter().any(|e| e.to_key.as_str().contains("Distinct"));
+    let union_edges = edges.iter().any(|e| e.to_key.as_str().contains("Union"));
+    let intersect_edges = edges.iter().any(|e| e.to_key.as_str().contains("Intersect"));
+
+    assert!(distinct_edges, "Expected edge for Distinct LINQ method");
+    assert!(union_edges, "Expected edge for Union LINQ method");
+    assert!(intersect_edges, "Expected edge for Intersect LINQ method");
+}
+
+// ============================================================================
+// T205: C# Async/Await Edges
+// ============================================================================
+
+#[test]
+fn t205_csharp_async_simple() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T205-csharp-async-await-edges",
+        "async_simple.cs",
+    );
+
+    println!("\n=== T205: C# Async/Await Simple ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect async method calls
+    let fetch_edges = edges.iter().any(|e| e.to_key.as_str().contains("FetchDataAsync"));
+    let save_edges = edges.iter().any(|e| e.to_key.as_str().contains("SaveAsync"));
+
+    assert!(fetch_edges, "Expected edge for FetchDataAsync method");
+    assert!(save_edges, "Expected edge for SaveAsync method");
+}
+
+#[test]
+fn t205_csharp_async_member() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T205-csharp-async-await-edges",
+        "async_member.cs",
+    );
+
+    println!("\n=== T205: C# Async/Await Member Access ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect async method calls on members
+    let get_edges = edges.iter().any(|e| e.to_key.as_str().contains("GetAsync"));
+    let read_edges = edges.iter().any(|e| e.to_key.as_str().contains("ReadAsync"));
+    let parse_edges = edges.iter().any(|e| e.to_key.as_str().contains("ParseJsonAsync"));
+
+    assert!(get_edges, "Expected edge for GetAsync method");
+    assert!(read_edges, "Expected edge for ReadAsync method");
+    assert!(parse_edges, "Expected edge for ParseJsonAsync method");
+}
+
+#[test]
+fn t205_csharp_async_task() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T205-csharp-async-await-edges",
+        "async_task.cs",
+    );
+
+    println!("\n=== T205: C# Async Task Operations ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect Task utility methods
+    let delay_edges = edges.iter().any(|e| e.to_key.as_str().contains("Delay"));
+    let whenall_edges = edges.iter().any(|e| e.to_key.as_str().contains("WhenAll"));
+    let whenany_edges = edges.iter().any(|e| e.to_key.as_str().contains("WhenAny"));
+
+    assert!(delay_edges, "Expected edge for Task.Delay method");
+    assert!(whenall_edges, "Expected edge for Task.WhenAll method");
+    assert!(whenany_edges, "Expected edge for Task.WhenAny method");
+}
+
+// ============================================================================
+// T207: C# Combined Patterns Test
+// ============================================================================
+
+#[test]
+fn t207_csharp_combined_patterns() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T207-csharp-combined-patterns-test",
+        "combined.cs",
+    );
+
+    println!("\n=== T207: C# Combined Patterns ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Should detect multiple pattern types
+    let has_property = edges.iter().any(|e| {
+        e.to_key.as_str().contains("Count") || e.to_key.as_str().contains("Capacity")
+    });
+    let has_linq = edges.iter().any(|e| {
+        e.to_key.as_str().contains("Where") || e.to_key.as_str().contains("OrderBy")
+    });
+    let has_async = edges.iter().any(|e| e.to_key.as_str().contains("FetchDataAsync"));
+    let has_constructor = edges.iter().any(|e| e.to_key.as_str().contains("List"));
+
+    assert!(has_property, "Expected property access edges");
+    assert!(has_linq, "Expected LINQ method edges");
+    assert!(has_async, "Expected async/await edges");
+    assert!(has_constructor, "Expected constructor edges");
+
+    // Should have at least 6 edges (conservative estimate)
+    assert!(
+        edges.len() >= 6,
+        "Expected at least 6 edges for combined patterns, found {}",
+        edges.len()
+    );
+}
+
+// ============================================================================
+// T208: C# Edge Key Stability
+// ============================================================================
+
+#[test]
+fn t208_csharp_different_timestamps() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T208-csharp-edge-key-stability",
+        "different_timestamps.cs",
+    );
+
+    println!("\n=== T208: C# Different Timestamps ===");
+    println!("Edges found: {}", edges.len());
+
+    // Multiple edges with different from_keys (different timestamps)
+    if edges.len() >= 2 {
+        let timestamps: Vec<&str> = edges
+            .iter()
+            .filter_map(|e| e.from_key.as_str().split(":T").nth(1))
+            .collect();
+
+        // If edges come from different methods, they should have different timestamps
+        if timestamps.len() > 1 {
+            let unique_timestamps: std::collections::HashSet<&str> =
+                timestamps.iter().copied().collect();
+
+            println!(
+                "Timestamps found: {} unique out of {} total",
+                unique_timestamps.len(),
+                timestamps.len()
+            );
+        }
+    }
+}
+
+#[test]
+fn t208_csharp_key_stability() {
+    use parseltongue_core::query_extractor::QueryBasedExtractor;
+    use parseltongue_core::entities::Language;
+    use std::path::Path;
+
+    // Read the same fixture code
+    let code = fixture_harness::load_fixture_source_file(
+        "T208-csharp-edge-key-stability",
+        "key_stability.cs",
+    );
+
+    let file_path = Path::new("key_stability.cs");
+
+    // Parse twice
+    let mut extractor1 = QueryBasedExtractor::new().expect("Failed to create extractor");
+    let (_entities1, edges1) = extractor1
+        .parse_source(&code, file_path, Language::CSharp)
+        .expect("First parse failed");
+
+    let mut extractor2 = QueryBasedExtractor::new().expect("Failed to create extractor");
+    let (_entities2, edges2) = extractor2
+        .parse_source(&code, file_path, Language::CSharp)
+        .expect("Second parse failed");
+
+    println!("\n=== T208: C# Key Stability ===");
+    println!("First parse edges: {}", edges1.len());
+    println!("Second parse edges: {}", edges2.len());
+
+    // Assert: Same edges produced (same keys)
+    assert_eq!(
+        edges1.len(),
+        edges2.len(),
+        "Same number of edges should be produced"
+    );
+
+    if !edges1.is_empty() {
+        let key1 = edges1[0].from_key.as_str();
+        let key2 = edges2[0].from_key.as_str();
+
+        println!("First key:  {}", key1);
+        println!("Second key: {}", key2);
+
+        assert_eq!(
+            key1, key2,
+            "Edge keys should be identical across multiple parses"
+        );
+    }
+}

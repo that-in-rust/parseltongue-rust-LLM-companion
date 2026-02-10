@@ -1,0 +1,81 @@
+FIXTURE: T265-centrality-pagerank-betweenness
+LANGUAGE: N/A (pure algorithm, no source code parsing)
+CATEGORY: Graph Analysis - Centrality Measures
+VALIDATES: PageRank and Betweenness centrality algorithms for identifying important nodes
+
+SOURCE FILES:
+  None. This is a documentation-only T-folder for a pure-logic algorithm.
+  Tests are inline in: crates/parseltongue-core/src/graph_analysis/centrality_measures_algorithm.rs
+
+REFERENCE GRAPHS:
+  1. 5-node chain: A→B→C→D→E (for PageRank sink accumulation)
+  2. 8-node graph: A→B, A→C, B→D, C→D, D→E→F→D, G→H→G (for betweenness)
+
+PAGERANK ALGORITHM:
+  - Reference: Page et al. (1999) "The PageRank Citation Ranking"
+  - Formula: PR(v) = (1-d)/N + d × Σ(PR(u)/L(u))
+    where:
+      * d = damping factor (0.85 recommended)
+      * N = total nodes
+      * u = predecessor nodes (reverse neighbors)
+      * L(u) = out-degree of node u
+
+  - Dangling node handling: Nodes with out-degree=0 (sinks) teleport uniformly
+  - Convergence: Iterate until change < tolerance (1e-10 recommended)
+  - Output: HashMap<String, f64> where values sum to ≈1.0
+
+PAGERANK SEMANTICS:
+  - High PageRank = heavily-depended-upon component
+  - In chain A→B→C→D→E: E (sink) has highest PageRank
+  - Sum of all PageRank values ≈ 1.0 (probability distribution)
+
+BETWEENNESS ALGORITHM:
+  - Reference: Brandes (2001) "A faster algorithm for betweenness centrality"
+  - Formula: CB(v) = Σ σ(s,t|v) / σ(s,t)
+    where:
+      * σ(s,t) = number of shortest paths from s to t
+      * σ(s,t|v) = number of those paths passing through v
+
+  - Complexity: O(VE) for unweighted graphs
+  - Output: HashMap<String, f64> with unnormalized scores
+
+BETWEENNESS SEMANTICS:
+  - High betweenness = critical bridge node
+  - In chain A→B→C→D→E: C (middle) has highest betweenness
+  - Source/sink nodes have betweenness=0
+
+TEST FUNCTIONS (6):
+  PAGERANK TESTS:
+  - test_pagerank_chain_sink_highest: Validates E > D > C > B > A in chain
+  - test_pagerank_chain_values_approximate: Validates E ≈ 0.30, A ≈ 0.08, sum ≈ 1.0
+  - test_pagerank_sums_to_one: Validates Σ PR(v) ≈ 1.0
+  - test_pagerank_empty_graph: Validates empty graph returns empty HashMap
+  - test_pagerank_eight_node_graph: Validates D (3 callers) outranks A (0 callers)
+
+  BETWEENNESS TESTS:
+  - test_betweenness_chain_middle_highest: Validates C ≥ B, C ≥ D in chain
+  - test_betweenness_empty_graph: Validates empty graph returns empty HashMap
+
+DANGLING NODE HANDLING:
+  - Nodes with out-degree=0 don't contribute via edges
+  - Dangling mass redistributed uniformly: (1-d + d×dangling_sum)/N
+  - Ensures PageRank sum ≈ 1.0
+
+ALGORITHM PARAMETERS:
+  - PageRank damping: d=0.85 (Google's original value)
+  - Max iterations: 100 (typical convergence in <20)
+  - Tolerance: 1e-10 (high precision)
+
+KNOWN LIMITATIONS:
+  - PageRank implementation variant: dangling mass NOT redistributed via edges
+    * Our values: A:0.0812, B:0.1502, C:0.2088, D:0.2587, E:0.3011
+    * Reference values: A:0.0486, B:0.0782, C:0.1366, D:0.2479, E:0.4887
+    * Both follow same ordering (E > D > C > B > A) and sum to 1.0
+  - Betweenness: Unnormalized scores (not divided by (n-1)(n-2)/2)
+  - PageRank: Local optimum not guaranteed for large graphs
+  - Betweenness: O(VE) complexity may be slow for large graphs
+
+RELATED TESTS:
+  T260-graph-adjacency-list-representation (foundation)
+  T266-kcore-decomposition-layering (high PageRank nodes often in core)
+  T268-cross-algorithm-integration-test (high betweenness implies high PageRank)

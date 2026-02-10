@@ -1,0 +1,151 @@
+FIXTURE: T242-generic-type-sanitization-keys
+CATEGORY: Regression Test - ISGL1 v2 Key Format
+VALIDATES: Generic type syntax must be sanitized to valid entity key characters
+SOURCE: crates/parseltongue-core/tests/isgl1_v2_generic_sanitization_tests.rs
+
+CONTEXT:
+  Entity keys in ISGL1 v2 format cannot contain special characters used in
+  generic type syntax. These characters must be replaced with readable tokens
+  that preserve the semantic meaning while being safe for use in keys.
+
+CONTRACT: sanitize_entity_name_for_isgl1()
+  Function: parseltongue_core::isgl1_v2::sanitize_entity_name_for_isgl1
+
+  Input: Entity name that may contain generic syntax
+  Output: Sanitized name with special chars replaced by tokens
+
+SANITIZATION MAPPING:
+  Character(s)  Token          Example
+  -----------   -----          -------
+  <             __lt__         List<T> → List__lt__T__gt__
+  >             __gt__
+  [             __lb__         int[] → int__lb____rb__
+  ]             __rb__
+  {             __lc__         Set{T} → Set__lc__T__rc__
+  }             __rc__
+  ,             __c__          Map<K,V> → Map__lt__K__c__V__gt__
+  (space)       _              My Class → My_Class
+
+COMPLETE TEST MATRIX (13 tests from isgl1_v2_generic_sanitization_tests.rs):
+
+  1. test_sanitize_single_generic_type:
+     Input:  "List<string>"
+     Output: "List__lt__string__gt__"
+
+  2. test_sanitize_multiple_generic_params_with_space:
+     Input:  "Dictionary<string, object>"
+     Output: "Dictionary__lt__string__c__object__gt__"
+
+  3. test_sanitize_nested_generics:
+     Input:  "List<List<Integer>>"
+     Output: "List__lt__List__lt__Integer__gt____gt__"
+
+  4. test_sanitize_array_notation:
+     Input:  "int[]"
+     Output: "int__lb____rb__"
+
+  5. test_sanitize_multidimensional_array:
+     Input:  "string[][]"
+     Output: "string__lb____rb____lb____rb__"
+
+  6. test_sanitize_all_special_chars:
+     Input:  "Func<int[], Map<K, V>>"
+     Output: "Func__lt__int__lb____rb____c__Map__lt__K__c__V__gt____gt__"
+
+  7. test_sanitize_brace_notation:
+     Input:  "Set{T}"
+     Output: "Set__lc__T__rc__"
+
+  8. test_sanitize_no_special_chars:
+     Input:  "SimpleClass"
+     Output: "SimpleClass"
+     Note: No change when no special characters present
+
+  9. test_sanitize_only_spaces:
+     Input:  "My Class Name"
+     Output: "My_Class_Name"
+
+  10. test_sanitize_mixed_spaces_and_generics:
+      Input:  "Dictionary<string, List<int>>"
+      Output: "Dictionary__lt__string__c__List__lt__int__gt____gt__"
+
+  11. test_sanitize_complex_cpp_template:
+      Input:  "std::vector<std::pair<int, string>>"
+      Output: "std::vector__lt__std::pair__lt__int__c__string__gt____gt__"
+      Note: Colons (::) preserved, generics sanitized
+
+  12. test_sanitize_java_generic_wildcard:
+      Input:  "List<? extends Number>"
+      Output: "List__lt__?_extends_Number__gt__"
+      Note: Spaces within generics replaced with underscores
+
+  13. test_sanitize_empty_string:
+      Input:  ""
+      Output: ""
+
+CROSS-LANGUAGE GENERIC PATTERNS:
+
+  Java/C#/TypeScript:
+    List<T>           → List__lt__T__gt__
+    Map<K, V>         → Map__lt__K__c__V__gt__
+    List<? extends T> → List__lt__?_extends_T__gt__
+
+  C++:
+    std::vector<int>               → std::vector__lt__int__gt__
+    std::map<std::string, int>     → std::map__lt__std::string__c__int__gt__
+
+  Python type hints:
+    List[int]         → List__lb__int__rb__
+    Dict[str, Any]    → Dict__lb__str__c__Any__rb__
+    Tuple[int, ...]   → Tuple__lb__int__c__...__rb__
+
+  Rust:
+    Vec<T>            → Vec__lt__T__gt__
+    HashMap<K, V>     → HashMap__lt__K__c__V__gt__
+    Option<Box<T>>    → Option__lt__Box__lt__T__gt____gt__
+
+  Swift:
+    Array<Int>        → Array__lt__Int__gt__
+    [String: Any]     → __lb__String:_Any__rb__ (dict literal syntax)
+
+TOKEN DESIGN RATIONALE:
+  - Tokens use double underscores (__) to avoid collision with identifiers
+  - Mnemonic: lt=less-than, gt=greater-than, lb=left-bracket, etc.
+  - Preserves readability: List__lt__T__gt__ clearly maps to List<T>
+  - Single underscores for spaces maintain word boundaries
+  - Comma token (__c__) keeps parameter lists readable
+
+ORDERING GUARANTEES:
+  Sanitization happens BEFORE CozoDB escaping:
+    1. Parse entity name from source code
+    2. Sanitize generic syntax (this contract)
+    3. Escape for CozoDB (T240, T241)
+    4. Insert into database
+
+EDGE CASES COVERED:
+  - Empty strings: pass through unchanged
+  - No special chars: pass through unchanged (SimpleClass → SimpleClass)
+  - Nested generics: recursive token replacement works correctly
+  - Mixed syntax: handles <, [, {, and spaces simultaneously
+
+REGRESSION PROTECTION:
+  Prior to v1.5.6, generic type names with <, >, etc. would either:
+    - Cause key format inconsistencies
+    - Break CozoDB query parsing
+    - Create duplicate entities with different name representations
+
+  This sanitization ensures:
+    - Consistent key format across all languages
+    - Safe storage in CozoDB
+    - Invertible mapping (can reconstruct original syntax from tokens)
+
+RELATED TESTS:
+  T240-cozo-backslash-escaping-regression (post-sanitization escaping)
+  T241-cozo-special-char-escaping (CozoDB safety layer)
+  T244-blast-radius-key-alignment (key format consistency)
+
+MINIMUM REQUIREMENTS:
+  - All 13 test cases must pass
+  - Sanitization must be idempotent (sanitizing twice = sanitizing once)
+  - No loss of semantic information (tokens must be reversible)
+  - Performance: O(n) where n is string length

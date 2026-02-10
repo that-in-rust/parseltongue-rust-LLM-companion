@@ -1,0 +1,181 @@
+FIXTURE: T304-isgl1-v2-incremental-reindex-e2e
+LANGUAGE: N/A (infrastructure, no source code parsing)
+CATEGORY: ISGL1 Key Infrastructure
+VALIDATES: End-to-end incremental reindex with key stability validation
+
+SOURCE FILES:
+  None. Documentation-only T-folder.
+  Tests in: crates/pt08-http-code-query-server/tests/e2e_incremental_reindex_isgl1v2_tests.rs
+
+E2E WORKFLOW:
+  1. Initial index: Parse file, assign birth_timestamps, create v2 keys
+  2. File edit: Add lines, modify functions, delete entities
+  3. Incremental reindex: Match entities using 3-priority algorithm
+  4. Validate: Key preservation rate, statistics accuracy, hash caching
+
+ENDPOINT TESTED:
+  POST /incremental-reindex-file-update?path={file_path}
+
+  Response format:
+    {
+      "success": true,
+      "data": {
+        "entities_added": 0,
+        "entities_removed": 0,
+        "hash_changed": true
+      }
+    }
+
+TEST FUNCTIONS (5 tests):
+
+  1. test_add_lines_preserves_keys (E2E-ISGL1V2-001)
+     Scenario: Add 10 comment lines at top of file
+
+     GIVEN: File with 3 functions (alpha, beta, gamma)
+     WHEN: Add 10 comment lines at top (lines shift +10)
+     THEN:
+       - All 3 entity keys preserved (100% preservation rate)
+       - entities_added: 0 (no new entities)
+       - entities_removed: 0 (no deletions)
+       - hash_changed: true (content changed)
+       - Timestamp portion of keys unchanged
+
+     Validates: ContentMatch algorithm (Priority 1)
+     Critical: Zero false positives despite line number changes
+
+  2. test_modify_body_preserves_key (E2E-ISGL1V2-002)
+     Scenario: Modify function body (change println message)
+
+     GIVEN: File with beta_function at line 20-25
+     WHEN: Modify body: println!("Beta") -> println!("Beta modified...")
+     THEN:
+       - beta_function key preserved (PositionMatch)
+       - entities_added: 0
+       - entities_removed: 0
+       - hash_changed: true
+
+     Validates: PositionMatch algorithm (Priority 2)
+     Key insight: Code change detected, but key stable via position
+
+  3. test_add_function_new_key (E2E-ISGL1V2-003)
+     Scenario: Add new delta_function to file
+
+     GIVEN: File with 3 functions (alpha, beta, gamma)
+     WHEN: Add new delta_function at end
+     THEN:
+       - entities_added: 1 (delta_function)
+       - entities_removed: 0
+       - Total entities: 4
+       - New key contains "delta_function" and ":T" timestamp
+       - Old keys preserved (alpha, beta, gamma)
+
+     Validates: NewEntity algorithm (Priority 3)
+
+  4. test_delete_function_removes_entity (E2E-ISGL1V2-004)
+     Scenario: Delete beta_function from file
+
+     GIVEN: File with 3 functions (alpha, beta, gamma)
+     WHEN: Delete beta_function (remove lines)
+     THEN:
+       - entities_removed: 1 (beta_function)
+       - entities_added: 0
+       - Total entities: 2 (alpha, gamma remain)
+       - beta_function key no longer in database
+
+     Validates: Entity deletion detection
+
+  5. test_unchanged_file_cached_hash (E2E-ISGL1V2-005)
+     Scenario: Reindex unchanged file (hash cache hit)
+
+     GIVEN: File indexed once (hash cached in FileHashCache table)
+     WHEN: Reindex same file without changes
+     THEN:
+       - hash_changed: false (cache hit)
+       - entities_added: 0
+       - entities_removed: 0
+       - Processing time: <100ms (fast path via cache)
+
+     Validates: File-level hash caching optimization
+     Performance: Cache hit avoids tree-sitter parsing (10-100x speedup)
+
+CONTRACT:
+  Key stability guarantees:
+    - Adding lines at top: 100% key preservation
+    - Modifying function body: 100% key preservation
+    - Adding new function: Old keys preserved, 1 new key added
+    - Deleting function: Remaining keys preserved, 1 key removed
+    - Unchanged file: 0 entities added/removed (cache hit)
+
+  Statistics accuracy:
+    - entities_added: Count of new entities (NewEntity matches)
+    - entities_removed: Count of deleted entities (old entities not matched)
+    - hash_changed: true if file content hash differs from cache
+
+  Hash caching:
+    - File-level SHA-256 hash stored in FileHashCache table
+    - Cache key: file_path (absolute)
+    - Cache value: hash (64-char hex string)
+    - Cache miss: Parse file, compute hashes, update cache
+    - Cache hit: Skip parsing, return early
+
+MOTIVATION:
+  Without E2E tests:
+    - Unit tests pass, but integration bugs slip through
+    - HTTP endpoint might not wire algorithms correctly
+    - Database persistence might lose data
+
+  With E2E tests:
+    - Full stack validation: HTTP -> matching -> storage -> response
+    - Real file I/O, real tree-sitter parsing, real database
+    - Confidence in production behavior
+
+DESIGN DECISIONS:
+  1. Temporary directory for test files:
+     - Isolated from source code (no pollution)
+     - Cleaned up after test (tempfile::TempDir)
+
+  2. In-memory database (CozoDB "mem"):
+     - Fast test execution (<100ms per test)
+     - No disk I/O, no cleanup needed
+
+  3. Real HTTP requests (Axum router):
+     - Tests full HTTP stack (routing, middleware, serialization)
+     - Not mocked, not stubbed (highest fidelity)
+
+  4. Assertions on both key preservation AND statistics:
+     - Key preservation: Validates matching algorithm
+     - Statistics: Validates counting logic
+
+PERFORMANCE:
+  - test_add_lines_preserves_keys: ~150ms (parse + match + insert)
+  - test_modify_body_preserves_key: ~100ms (parse + match + update)
+  - test_add_function_new_key: ~120ms (parse + match + insert)
+  - test_delete_function_removes_entity: ~110ms (parse + match + delete)
+  - test_unchanged_file_cached_hash: ~50ms (cache hit, no parsing)
+
+  Total E2E test suite: ~530ms (5 tests)
+
+EDGE CASES COVERED:
+  - Add lines at top (most common edit pattern)
+  - Modify function body (second most common)
+  - Add function (growth pattern)
+  - Delete function (refactoring pattern)
+  - Unchanged file (incremental reindex common case)
+
+EDGE CASES NOT COVERED (future work):
+  - Rename function (expect new key, old key removed)
+  - Move function to different file (expect new key in new file)
+  - Copy function (expect 2 keys, same name, different timestamps)
+  - Merge files (expect keys redistributed across files)
+
+KNOWN LIMITATIONS:
+  - Tests use Rust files only (coverage gap for other languages)
+  - Tests use simple syntax (no complex generics, macros)
+  - Tests use single file (no multi-file dependencies)
+  - No concurrent reindex tests (thread safety not validated)
+
+RELATED TESTS:
+  T300-isgl1-v2-key-generation-format (keys generated in E2E workflow)
+  T301-isgl1-v2-content-hash-stability (hashes computed in E2E workflow)
+  T302-isgl1-v2-entity-matching-priority (matching algorithm used in E2E)
+  T303-isgl1-v2-schema-evolution-compat (v2 entities created in E2E)

@@ -1,0 +1,202 @@
+FIXTURE: T243-qualified-name-cross-language
+CATEGORY: Cross-Language Qualified Names
+VALIDATES: Qualified name separators are correctly preserved in entity keys across languages
+SOURCE: Combined validation of qualified name handling
+
+SOURCE FILES:
+  - qualified_rust.rs       (Rust :: separator)
+  - qualified_java.java     (Java . separator)
+  - qualified_php.php       (PHP \ separator - requires escaping)
+  - qualified_csharp.cs     (C# . separator)
+  - qualified_cpp.cpp       (C++ :: separator)
+  - qualified_typescript.ts (TypeScript . separator)
+
+CONTEXT:
+  Different languages use different separators for qualified/namespaced names.
+  Parseltongue must preserve these separators in entity keys for accurate
+  cross-language analysis while handling language-specific escaping requirements.
+
+QUALIFIED NAME SEPARATOR BY LANGUAGE:
+
+  Language      Separator   Example                         Storage Format
+  --------      ---------   -------                         --------------
+  Rust          ::          std::collections::HashMap       std::collections::HashMap
+  C++           ::          std::vector<int>                std::vector__lt__int__gt__
+  Java          .           java.util.ArrayList             java.util.ArrayList
+  C#            .           System.Collections.List         System.Collections.List
+  TypeScript    .           MyApp.Services.UserService      MyApp.Services.UserService
+  Python        .           os.path.join                    os.path.join
+  PHP           \           App\Models\User                 App\\Models\\User (escaped)
+  Go            .           fmt.Println                     fmt.Println
+
+EXPECTED ENTITIES:
+
+  qualified_rust.rs:
+    - mod "core"
+    - struct "Config" (may be qualified as core::Config)
+    - mod "services"
+    - fn "init"
+    - fn "main"
+
+  qualified_java.java:
+    - class "Application" (in package com.example.myapp)
+    - method "main"
+    References: java.util.ArrayList, com.example.services.UserService
+
+  qualified_php.php:
+    - class "UserController" (in namespace App\Controllers)
+    - method "index"
+    References: App\Models\User (backslash separator)
+
+  qualified_csharp.cs:
+    - class "UserController" (in namespace MyApp.Controllers)
+    - method "Index"
+    References: System.Collections.Generic.List, MyApp.Services.UserService
+
+  qualified_cpp.cpp:
+    - namespace "myapp"
+    - namespace "services" (nested)
+    - class "UserService"
+    - method "process"
+    - function "main"
+    References: std::vector
+
+  qualified_typescript.ts:
+    - namespace "MyApp.Controllers"
+    - class "UserController"
+    - method "index"
+    References: Array<string>, UserService
+
+ENTITY KEY STORAGE PATTERNS:
+
+  Pattern: "lang:type:name:semantic_path:Ttimestamp"
+
+  Where 'name' component contains the qualified name with:
+    - Separator preserved (::, ., or \\)
+    - Generic syntax sanitized (T242 rules)
+    - CozoDB-escaped (T240/T241 rules)
+
+  Examples:
+    Rust:       "rust:struct:std::collections::HashMap:__qualified_rust:T123"
+    Java:       "java:class:java.util.ArrayList:__qualified_java:T456"
+    PHP:        "php:class:App\\\\Models\\\\User:__qualified_php:T789"
+                (Note: Double-escaped for CozoDB - \ becomes \\ in key, then \\\\ in query)
+    C#:         "csharp:class:System.Collections.Generic.List:__qualified_csharp:T321"
+    C++:        "cpp:class:std::vector:__qualified_cpp:T654"
+    TypeScript: "typescript:class:MyApp.Services.UserService:__qualified_typescript:T987"
+
+PROCESSING PIPELINE:
+
+  1. Parse qualified name from source code
+     Input: "std::vector<int>" (C++)
+     Output: qualified_name = "std::vector<int>"
+
+  2. Sanitize generic syntax (T242)
+     Input: "std::vector<int>"
+     Output: "std::vector__lt__int__gt__"
+     Note: Separator :: preserved during sanitization
+
+  3. Escape for CozoDB (T240/T241)
+     Input: "App\Models\User" (PHP)
+     Output: "App\\Models\\User" (backslash doubled)
+
+  4. Assemble ISGL1 v2 key
+     Input: name="App\\Models\\User", path="__qualified_php", timestamp=T789
+     Output: "php:class:App\\Models\\User:__qualified_php:T789"
+
+SEPARATOR PRESERVATION RULES:
+
+  DO preserve:
+    - :: (Rust, C++)
+    - . (Java, C#, TypeScript, Python, Go)
+    - \ → \\ (PHP, after escaping)
+
+  DO sanitize (separate from separator):
+    - < → __lt__
+    - > → __gt__
+    - [ → __lb__
+    - ] → __rb__
+    - , → __c__
+    - (space) → _
+
+CROSS-LANGUAGE NORMALIZATION:
+
+  NO cross-language normalization is performed. Each language's separator
+  is preserved as-is in the entity key. This maintains language semantics:
+
+    - Rust std::Vec is DIFFERENT from Java java.util.Vector
+    - PHP App\User is DIFFERENT from TypeScript App.User
+    - C++ std::string is DIFFERENT from Rust std::string::String
+
+  Reasoning: Different languages, different standard libraries, different semantics.
+
+PHP BACKSLASH HANDLING (Critical):
+
+  PHP uses backslash as namespace separator, which creates a special case:
+
+  1. Source code:      namespace App\Controllers;
+  2. Parsed name:      "App\Controllers"
+  3. After sanitize:   "App\Controllers" (no change - not a generic char)
+  4. After CozoDB esc: "App\\Controllers" (backslash doubled)
+  5. In database:      Stored as "App\\Controllers"
+  6. In CozoDB query:  "App\\\\Controllers" (escaped again for query string)
+
+  This is covered by T240-cozo-backslash-escaping-regression tests.
+
+EXPECTED DEPENDENCY EDGES:
+
+  qualified_rust.rs:
+    - services::init -> core::Config (struct construction)
+    - main -> std::collections::HashMap (type reference)
+
+  qualified_java.java:
+    - Application::main -> java.util.ArrayList (constructor call)
+    - Application::main -> com.example.services.UserService (constructor call)
+
+  qualified_php.php:
+    - UserController::index -> App\Models\User (constructor - note backslash)
+    - UserController::index -> AuthService (same namespace reference)
+
+  qualified_csharp.cs:
+    - UserController::Index -> System.Collections.Generic.List (constructor)
+    - UserController::Index -> MyApp.Services.UserService (constructor)
+
+  qualified_cpp.cpp:
+    - main -> std::vector (type reference)
+    - main -> myapp::services::UserService (object creation)
+    - main -> myapp::services::UserService::process (method call)
+
+  qualified_typescript.ts:
+    - UserController::index -> Array (type reference)
+    - UserController::index -> UserService (constructor)
+
+MINIMUM EDGE COUNTS:
+  qualified_rust.rs:       at least 2 edges
+  qualified_java.java:     at least 2 edges
+  qualified_php.php:       at least 2 edges
+  qualified_csharp.cs:     at least 2 edges
+  qualified_cpp.cpp:       at least 3 edges
+  qualified_typescript.ts: at least 2 edges
+
+KNOWN LIMITATIONS:
+  - Some parsers may not extract ALL qualified references (standard library types)
+  - Implicit using/import statements may not create explicit edges
+  - Type aliases may complicate qualified name resolution
+
+REGRESSION PROTECTION:
+  This fixture ensures that:
+    - Qualified names are not mangled during parsing
+    - Separator characters are preserved correctly
+    - PHP backslashes are properly escaped
+    - Cross-language qualified name patterns work consistently
+
+RELATED TESTS:
+  T240-cozo-backslash-escaping-regression (PHP backslash handling)
+  T242-generic-type-sanitization-keys (generic syntax in qualified names)
+  T244-blast-radius-key-alignment (key format consistency)
+
+MINIMUM REQUIREMENTS:
+  - Each language's separator must be preserved in entity keys
+  - PHP backslashes must be escaped for CozoDB
+  - Generic syntax in qualified names (std::vector<int>) must be sanitized
+  - No false normalization across language boundaries

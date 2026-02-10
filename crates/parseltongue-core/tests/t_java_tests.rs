@@ -190,3 +190,32 @@ fn t128_java_integration_complex_service() {
     assert!(has_constructor, "Expected constructor call edges");
     assert!(has_stream_ops, "Expected stream operation edges");
 }
+
+// ============================================================================
+// T121: Field Access Edges
+// ============================================================================
+
+#[test]
+fn t121_java_field_access_simple() {
+    let (_entities, edges) = parse_fixture_extract_results(
+        "T121-java-field-access-edges",
+        "field_simple.java",
+    );
+
+    println!("\n=== Java Field Access (Method Calls) Test ===");
+    println!("Edges found: {}", edges.len());
+    for edge in &edges {
+        println!("  {} -> {}", edge.from_key.as_str(), edge.to_key.as_str());
+    }
+
+    // Java typically uses getters/setters, which are method calls
+    // Field access nodes may not always be captured as separate dependencies
+    let getter_edges = edges.iter().any(|e| {
+        e.to_key.as_str().contains("getSetting") || e.to_key.as_str().contains("getPort")
+    });
+
+    assert!(
+        getter_edges,
+        "Expected edges for getter method calls (field access pattern)"
+    );
+}
