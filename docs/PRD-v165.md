@@ -95,9 +95,93 @@ Line coverage penalizes blank lines, comments, and import statements -- all of w
 
 - `source_word_count`: `source.split_whitespace().count()` on the raw file
 - `entity_word_count`: Sum of word counts from all extracted entities' content fields
-- `coverage_pct`: `(entity_word_count / source_word_count) * 100`
+- `raw_coverage_pct`: `(entity_word_count / source_word_count) * 100`
 
-A file with 72% word coverage means 28% of the file's words are outside any extracted entity. This is expected for imports, comments, and module-level declarations -- but a file at 30% coverage likely has entire functions or classes being missed.
+A file with 72% raw word coverage means 28% of the file's words are outside any extracted entity. But not all of that 28% is a problem -- imports and comments are *expected* to fall outside entity boundaries.
+
+### Dual Coverage Metrics: Raw vs Effective
+
+**The problem with a single coverage number**: A file with 10 import statements and 50 comment lines will always show low raw coverage even if every function body is perfectly captured. This makes it impossible to distinguish "expected gaps" from "real gaps."
+
+**Solution**: Two metrics per file.
+
+| Metric | Formula | What It Measures |
+|--------|---------|-----------------|
+| `raw_coverage_pct` | `entity_words / source_words × 100` | Total extraction ratio (includes expected gaps) |
+| `effective_coverage_pct` | `entity_words / (source_words - import_words - comment_words) × 100` | Extraction ratio of *meaningful* code only |
+
+**Why this works**:
+- A file at **72% raw / 96% effective** → healthy. The 28% gap is imports and comments.
+- A file at **72% raw / 73% effective** → problem. Almost no imports/comments, so the 28% gap is real missed code.
+- A file at **30% raw / 45% effective** → bad. Even after subtracting imports/comments, over half the code is missing.
+
+**The key insight**: `effective_coverage_pct` should approach 90-100% for well-parsed files. If it's below 80%, the parser is missing real code constructs.
+
+### Import Word Counting (Zero New Queries)
+
+Parseltongue's dependency query system (`query_extractor.rs`) already matches import/use/require/include nodes in all 12 languages via tree-sitter. The import byte ranges are already traversed during `execute_dependency_query()` -- we just need to accumulate the word count from those ranges.
+
+**Existing dependency capture patterns by language**:
+
+| Language | Capture Names |
+|----------|--------------|
+| Rust | `@dependency.use`, `@dependency.use_external` |
+| Python | `@dependency.import`, `@dependency.import_from` |
+| JavaScript/TypeScript | `@dependency.import`, `@dependency.require` |
+| Go | `@dependency.import` |
+| Java | `@dependency.import` |
+| C/C++ | `@dependency.include` |
+| Ruby | `@dependency.require` |
+| PHP | `@dependency.use`, `@dependency.require` |
+| C# | `@dependency.using` |
+| Swift | `@dependency.import` |
+
+**Implementation**: During `execute_dependency_query()`, when a capture name starts with `@dependency`, accumulate the node's byte range. After the loop, compute `import_word_count` from deduplicated byte ranges:
+
+```rust
+import_word_count = deduplicated_import_ranges
+    .iter()
+    .map(|(start, end)| source[*start..*end].split_whitespace().count())
+    .sum()
+```
+
+Byte range deduplication handles overlapping captures (e.g., `use std::collections::{HashMap, HashSet}` matched by both `@dependency.use` and a sub-pattern).
+
+### Comment Word Counting (AST Root Walk)
+
+After tree-sitter parses a file, walk `tree.root_node()` children to find comment nodes. Each language has specific comment node types:
+
+| Language | Comment Node Types |
+|----------|--------------------|
+| Rust | `line_comment`, `block_comment` |
+| Python | `comment` |
+| JavaScript/TypeScript | `comment` |
+| Go | `comment` |
+| Java | `line_comment`, `block_comment` |
+| C/C++ | `comment` |
+| Ruby | `comment` |
+| PHP | `comment` |
+| C# | `comment` |
+| Swift | `comment`, `multiline_comment` |
+
+**Implementation**: Walk all descendants of the root node (not just direct children, since comments can be nested inside blocks). For each node whose `kind()` matches a comment type, sum word counts:
+
+```rust
+let mut comment_word_count = 0;
+let mut cursor = tree.root_node().walk();
+// Depth-first traversal
+loop {
+    let node = cursor.node();
+    if is_comment_node(node.kind(), language) {
+        comment_word_count += source[node.byte_range()].split_whitespace().count();
+    }
+    if !cursor.goto_next_sibling() && !cursor.goto_parent() {
+        break;
+    }
+}
+```
+
+**Note**: Top-level comments only are counted (comments inside function bodies are already included in `entity_word_count` since the entity content includes the full function body with its internal comments).
 
 ---
 
@@ -140,22 +224,32 @@ if matches!(entity_class, EntityClass::TestImplementation) {
 - How many tests per folder/language
 - Enables LLM agents to find test entities when debugging test failures
 
-### Report 3: Word Count Coverage Comparison
+### Report 3: Word Count Coverage Comparison (Dual Metrics)
 
-**What**: Per-file comparison of raw word count of the source file vs. aggregate word count of all extracted entities from that file.
+**What**: Per-file comparison of source word count vs. extracted entity word count, with both raw and effective coverage percentages.
 
 **Data source**: New CozoDB relation `FileWordCoverage`, populated during pt01 ingestion.
 
 **Logic** (during pt01 ingestion, per file):
 1. After reading file content: `source_word_count = source.split_whitespace().count()`
 2. After extracting entities: `entity_word_count = sum of entity.content.split_whitespace().count()` for all entities in that file
-3. `coverage_pct = if source_word_count > 0 { (entity_word_count as f64 / source_word_count as f64) * 100.0 } else { 100.0 }`
-4. Store in `FileWordCoverage` relation
+3. During dependency query execution: `import_word_count` accumulated from `@dependency.*` capture byte ranges
+4. After tree-sitter parse: `comment_word_count` accumulated from top-level comment node byte ranges
+5. Compute dual metrics:
+   ```
+   raw_coverage_pct = (entity_word_count / source_word_count) × 100
+   effective_source = source_word_count - import_word_count - comment_word_count
+   effective_coverage_pct = (entity_word_count / effective_source) × 100
+   ```
+6. Store all fields in `FileWordCoverage` relation
 
 **What it reveals**:
-- Files with low coverage (< 50%) likely have missed constructs
-- Files with very high coverage (> 100%) indicate overlapping entity content (e.g., nested functions counted in both parent and child)
-- Aggregate average gives an overall "extraction completeness" score
+- **Raw coverage < 50%**: Likely has missed constructs OR is import/comment-heavy
+- **Effective coverage < 80%**: Real code is being missed (imports/comments already excluded)
+- **Raw ≈ 72%, Effective ≈ 96%**: Healthy file -- the gap is expected (imports + comments)
+- **Raw ≈ 72%, Effective ≈ 73%**: Problem -- almost no imports/comments, so the gap is real missed code
+- **Coverage > 100%**: Overlapping entity content (e.g., nested functions counted in both parent and child)
+- The **delta** between raw and effective tells you how import/comment-heavy a file is
 
 ---
 
@@ -269,7 +363,10 @@ DependencyEdges {
     language: String,
     source_word_count: Int,
     entity_word_count: Int,
-    coverage_pct: Float,
+    import_word_count: Int,
+    comment_word_count: Int,
+    raw_coverage_pct: Float,
+    effective_coverage_pct: Float,
     entity_count: Int
 }
 ```
@@ -285,7 +382,10 @@ DependencyEdges {
 | `language` | String | e.g., `rust` |
 | `source_word_count` | Int | `source.split_whitespace().count()` on raw file |
 | `entity_word_count` | Int | Sum of word counts from all extracted entities |
-| `coverage_pct` | Float | `(entity_word_count / source_word_count) * 100.0` |
+| `import_word_count` | Int | Word count from import/use/require/include statements (from dependency query captures) |
+| `comment_word_count` | Int | Word count from top-level comment nodes (from AST walk) |
+| `raw_coverage_pct` | Float | `(entity_word_count / source_word_count) * 100.0` |
+| `effective_coverage_pct` | Float | `(entity_word_count / (source_word_count - import_word_count - comment_word_count)) * 100.0` |
 | `entity_count` | Int | Number of code entities extracted from this file |
 
 ---
@@ -313,7 +413,8 @@ Follows the 4-word naming convention: `ingestion-diagnostics-coverage-report`.
       "files_ignored_by_extension": 535,
       "entities_extracted": 2841,
       "test_entities_excluded": 109,
-      "avg_word_coverage_pct": 72.3
+      "avg_raw_coverage_pct": 72.3,
+      "avg_effective_coverage_pct": 91.7
     },
     "ignored_files": {
       "by_extension": {
@@ -358,9 +459,10 @@ Follows the 4-word naming convention: `ingestion-diagnostics-coverage-report`.
       ]
     },
     "word_count_coverage": {
-      "avg_coverage_pct": 72.3,
-      "files_above_80_pct": 198,
-      "files_below_50_pct": 14,
+      "avg_raw_coverage_pct": 72.3,
+      "avg_effective_coverage_pct": 91.7,
+      "files_above_80_pct_effective": 278,
+      "files_below_80_pct_effective": 34,
       "files": [
         {
           "folder_path": "src/core",
@@ -368,26 +470,35 @@ Follows the 4-word naming convention: `ingestion-diagnostics-coverage-report`.
           "language": "rust",
           "source_word_count": 1580,
           "entity_word_count": 1203,
-          "coverage_pct": 76.1,
+          "import_word_count": 245,
+          "comment_word_count": 87,
+          "raw_coverage_pct": 76.1,
+          "effective_coverage_pct": 96.4,
           "entity_count": 12
         }
       ],
-      "lowest_coverage_files": [
+      "lowest_effective_coverage_files": [
         {
           "folder_path": "src/generated",
           "filename": "bindings.rs",
-          "coverage_pct": 12.4,
+          "raw_coverage_pct": 12.4,
+          "effective_coverage_pct": 14.1,
           "source_word_count": 8200,
-          "entity_word_count": 1017
+          "entity_word_count": 1017,
+          "import_word_count": 980,
+          "comment_word_count": 0
         }
       ],
-      "highest_coverage_files": [
+      "highest_effective_coverage_files": [
         {
           "folder_path": "src/core",
           "filename": "types.rs",
-          "coverage_pct": 94.7,
+          "raw_coverage_pct": 94.7,
+          "effective_coverage_pct": 99.5,
           "source_word_count": 420,
-          "entity_word_count": 398
+          "entity_word_count": 398,
+          "import_word_count": 18,
+          "comment_word_count": 2
         }
       ]
     }
@@ -444,7 +555,7 @@ if matches!(entity_class, EntityClass::TestImplementation) {
 }
 ```
 
-**2. Word count collection** (after entity extraction per file):
+**2. Word count collection** (after entity extraction + dependency queries per file):
 
 ```rust
 // After all entities extracted for this file
@@ -453,11 +564,29 @@ let entity_word_count: usize = entities_for_file
     .iter()
     .map(|e| e.content.split_whitespace().count())
     .sum();
-let coverage_pct = if source_word_count > 0 {
+
+// Import word count: accumulated during execute_dependency_query()
+// (byte ranges from @dependency.* captures, deduplicated)
+let import_word_count = deduplicated_import_ranges
+    .iter()
+    .map(|(start, end)| source[*start..*end].split_whitespace().count())
+    .sum::<usize>();
+
+// Comment word count: AST walk for top-level comment nodes
+let comment_word_count = count_top_level_comment_words(&tree, &source, &language);
+
+// Dual metrics
+let raw_coverage_pct = if source_word_count > 0 {
     (entity_word_count as f64 / source_word_count as f64) * 100.0
-} else {
-    100.0
-};
+} else { 100.0 };
+
+let effective_source = source_word_count
+    .saturating_sub(import_word_count)
+    .saturating_sub(comment_word_count);
+let effective_coverage_pct = if effective_source > 0 {
+    (entity_word_count as f64 / effective_source as f64) * 100.0
+} else { 100.0 };
+
 let (folder, file) = normalize_split_file_path(&file_path, &workspace_root);
 word_coverages.push(FileWordCoverageRow {
     folder_path: folder,
@@ -465,7 +594,10 @@ word_coverages.push(FileWordCoverageRow {
     language: language.to_string(),
     source_word_count,
     entity_word_count,
-    coverage_pct,
+    import_word_count,
+    comment_word_count,
+    raw_coverage_pct,
+    effective_coverage_pct,
     entity_count: code_count,
 });
 ```
@@ -535,9 +667,15 @@ path-slash = "0.2"
 ### Phase 2: pt01 Ingestion Collection
 
 1. Modify test entity exclusion path to collect entity details
-2. Add word count computation after entity extraction
-3. Batch insert both relations after ingestion completes
-4. Write integration tests verifying both relations are populated
+2. Add import word count accumulation during `execute_dependency_query()` (uses existing `@dependency.*` captures)
+3. Add comment word count via AST root walk after tree-sitter parse
+4. Add word count computation with dual metrics (raw + effective) after entity extraction
+5. Batch insert both relations after ingestion completes
+6. Write integration tests verifying:
+   - Both relations are populated
+   - `import_word_count > 0` for files with imports
+   - `comment_word_count > 0` for files with comments
+   - `effective_coverage_pct >= raw_coverage_pct` for all files
 
 ### Phase 3: HTTP Endpoint Handler
 
@@ -564,11 +702,14 @@ path-slash = "0.2"
 - [ ] `GET /ingestion-diagnostics-coverage-report` returns HTTP 200 with all three report sections
 - [ ] Ignored files section lists all files with unsupported extensions, grouped by extension
 - [ ] Excluded test entities section lists all test entities with name, folder_path, filename, language, detection reason
-- [ ] Word count coverage section shows per-file source vs entity word counts with coverage percentage
+- [ ] Word count coverage section shows per-file dual metrics: `raw_coverage_pct` and `effective_coverage_pct`
+- [ ] Import word count is populated from existing `@dependency.*` tree-sitter captures (all 12 languages)
+- [ ] Comment word count is populated from AST comment node walk (all 12 languages)
+- [ ] `effective_coverage_pct >= raw_coverage_pct` for all files (subtracting words can only increase the ratio)
 - [ ] All stored paths use forward slashes regardless of OS
 - [ ] All stored paths are relative to workspace root
 - [ ] `folder_path` and `filename` are correctly split for all path depths (root, nested, deep)
-- [ ] Response includes summary aggregates (total counts, averages)
+- [ ] Response includes summary aggregates (total counts, averages for both raw and effective)
 
 ### Non-Functional
 
@@ -583,17 +724,61 @@ path-slash = "0.2"
 - [ ] File with zero words returns `coverage_pct: 100.0`
 - [ ] Root-level files have `folder_path: ""`
 - [ ] Binary files (images, compiled artifacts) correctly appear in ignored files list
-- [ ] Files with only comments/imports show low coverage (expected, not a bug)
+- [ ] Files with only comments/imports show low `raw_coverage_pct` but high `effective_coverage_pct` (expected gap)
+- [ ] Files where `import_word_count + comment_word_count >= source_word_count` get `effective_coverage_pct: 100.0` (saturating subtraction)
 
 ---
 
 ## 11. Open Questions
 
-1. **Should `entity_word_count` include test entities?** Current plan: No -- test entities are excluded from CodeGraph, so their word count should not be part of the coverage metric. This means coverage_pct reflects only CODE entity coverage.
+1. **Should `entity_word_count` include test entities?** Current plan: No -- test entities are excluded from CodeGraph, so their word count should not be part of the coverage metric. This means coverage metrics reflect only CODE entity coverage.
 
 2. **Should the endpoint support pagination for large codebases?** For v1.6.5: No. Return all data. For future: Add `?limit=N&offset=M` if responses exceed reasonable token counts.
 
 3. **Should the `FileWordCoverage` relation be updated during incremental reindex?** For v1.6.5: Only populated during full pt01 ingestion. Incremental reindex (file watcher) does not update word coverage. Future enhancement.
+
+4. **Should comments inside function bodies be double-counted?** Current plan: No. Top-level comments only are counted for `comment_word_count` (comments inside entity bodies are already part of `entity_word_count`). A recursive AST walk would overcount.
+
+5. **Should we count doc-comments separately from regular comments?** For v1.6.5: No distinction. Both `/// doc comments` and `// regular comments` are counted as comments. Future: Could split into `doc_comment_word_count` vs `inline_comment_word_count`.
+
+---
+
+## Appendix A: Import/Comment Coverage -- Design Rationale
+
+### The Problem
+
+Parseltongue extracts named entities (functions, classes, traits, interfaces, etc.) from source files. By design, certain code constructs fall *outside* any entity boundary:
+
+- **Import statements**: `use std::collections::HashMap;`, `import React from 'react';`
+- **Top-level comments**: Module-level documentation, license headers
+- **Module declarations**: `mod foo;`, `package main`
+- **Type aliases**: `type Result<T> = std::result::Result<T, Error>;`
+- **Global constants**: `const MAX_RETRIES: u32 = 3;`
+
+These are "expected gaps" -- code that *should* be outside entity boundaries. The original single `coverage_pct` metric conflated expected gaps with real missed code, making it impossible to tell whether 72% coverage was healthy or problematic.
+
+### Why Dual Metrics Solve This
+
+By counting import and comment words separately, we can subtract them from the denominator:
+
+```
+effective_source = total_words - import_words - comment_words
+effective_coverage = entity_words / effective_source
+```
+
+This isolates the *real* coverage: what fraction of meaningful code (excluding boilerplate) did we actually capture?
+
+### Why Zero New Tree-Sitter Queries
+
+The dependency extraction system (`query_extractor.rs`) already walks every import/use/require/include node to build the dependency edge graph. The byte ranges of these nodes are already available during that traversal. We simply accumulate word counts from those ranges -- no additional tree-sitter query patterns needed.
+
+Similarly, tree-sitter already parses the full AST. Walking for comment nodes is a traversal of the existing tree, not a new parse.
+
+### Limitations
+
+- **Module declarations, type aliases, global constants** are NOT subtracted. They are less common and harder to reliably detect across all 12 languages. Future enhancement.
+- **Inline comments inside entity bodies** are NOT counted separately (they're already in `entity_word_count`).
+- **Multi-line string literals** at module level (e.g., Python docstrings at module scope) are not identified as comments by tree-sitter and would reduce effective coverage. Acceptable edge case.
 
 ---
 
