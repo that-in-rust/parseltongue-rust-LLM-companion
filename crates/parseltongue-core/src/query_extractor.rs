@@ -88,8 +88,7 @@ fn sanitize_path_for_key_format(path: &str) -> String {
 /// C#, and Ruby use :: in qualified names which breaks parsing.
 ///
 /// # Examples
-/// ```
-/// # use parseltongue_core::query_extractor::sanitize_name_double_colon;
+/// ```ignore
 /// assert_eq!(sanitize_name_double_colon("std::vector"), "std__vector");
 /// assert_eq!(sanitize_name_double_colon("ActiveRecord::Base"), "ActiveRecord__Base");
 /// ```

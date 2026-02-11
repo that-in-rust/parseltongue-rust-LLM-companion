@@ -12,7 +12,32 @@ parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 curl http://localhost:7777/codebase-statistics-overview-summary
 ```
 
-**12 languages**: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
+**12 languages** | **26 HTTP endpoints** | **670 tests** | **2.92x parallel ingestion**
+
+Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
+
+---
+
+## What's New
+
+### v1.6.5 — Folder-Scoped Queries + Diagnostics + 2.92x Parallelism
+
+- **Folder-scoped queries**: All 18 query endpoints accept `?scope=L1||L2` to filter results by folder
+- **Ingestion diagnostics**: `/ingestion-diagnostics-coverage-report` with test exclusions, word coverage, ignored files
+- **Folder discovery**: `/folder-structure-discovery-tree` for L1/L2 navigation
+- **Thread-local parser parallelism**: 2.92x streaming speedup (5.4s to 1.8s on 302-file codebase, 364% CPU)
+- **Dual coverage metrics**: `raw_coverage_pct` vs `effective_coverage_pct` (accounting for imports/comments)
+- **670 tests** across 12 languages and all subsystems
+
+### v1.6.0 — 7 Mathematical Graph Analysis Algorithms
+
+- **Tarjan SCC**: Strongly connected component cycle detection
+- **K-Core decomposition**: Core/mid/peripheral layer analysis
+- **PageRank + Betweenness centrality**: Entity importance ranking
+- **Shannon entropy**: Information complexity measurement
+- **CK Metrics suite**: CBO, LCOM, RFC, WMC coupling/cohesion
+- **SQALE technical debt**: ISO 25010 maintainability scoring
+- **Leiden community detection**: Automatic module clustering
 
 ---
 
@@ -398,7 +423,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 ## Installation
 
 ```bash
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.4.3/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.5/parseltongue -o parseltongue && chmod +x parseltongue
 ./parseltongue --version
 ```
 
