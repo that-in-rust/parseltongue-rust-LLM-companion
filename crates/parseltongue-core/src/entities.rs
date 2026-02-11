@@ -1694,3 +1694,103 @@ mod tests {
         assert_eq!(deserialized, edge);
     }
 }
+
+// ============================================================================
+// v1.6.5: Ingestion Diagnostics Data Structures
+// ============================================================================
+
+/// Test entity excluded from the code graph (v1.6.5).
+///
+/// Parseltongue intentionally excludes test entities to optimize LLM context.
+/// This structure captures the test entities that were detected and excluded
+/// during ingestion, enabling LLM agents to know what was filtered out.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ExcludedTestEntity {
+    /// Entity name (e.g., "test_parse_rust_function")
+    pub entity_name: String,
+
+    /// Forward-slash normalized folder path (e.g., "src/tests")
+    pub folder_path: String,
+
+    /// Filename only (e.g., "parser_tests.rs")
+    pub filename: String,
+
+    /// Entity class (always "TestImplementation" for now)
+    pub entity_class: String,
+
+    /// Programming language
+    pub language: String,
+
+    /// Start line number (1-indexed)
+    pub line_start: usize,
+
+    /// End line number (1-indexed)
+    pub line_end: usize,
+
+    /// Reason the entity was detected as a test (e.g., "test_prefix", "test_attribute")
+    pub detection_reason: String,
+}
+
+/// File-level word count coverage metrics (v1.6.5).
+///
+/// Tracks how much of each parsed file's content was captured in extracted
+/// entities vs. how much fell outside entity boundaries (imports, comments,
+/// module declarations, etc.).
+///
+/// Dual metrics distinguish expected gaps (imports/comments) from real gaps
+/// (missed code constructs):
+/// - `raw_coverage_pct`: Total extraction ratio (includes expected gaps)
+/// - `effective_coverage_pct`: Extraction ratio of meaningful code only
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct FileWordCoverageRow {
+    /// Forward-slash normalized folder path (e.g., "src/core")
+    pub folder_path: String,
+
+    /// Filename only (e.g., "parser.rs")
+    pub filename: String,
+
+    /// Programming language
+    pub language: String,
+
+    /// Total word count from raw source file
+    pub source_word_count: usize,
+
+    /// Word count from all extracted entities
+    pub entity_word_count: usize,
+
+    /// Word count from import/use/require statements
+    pub import_word_count: usize,
+
+    /// Word count from top-level comments
+    pub comment_word_count: usize,
+
+    /// Raw coverage percentage: (entity_words / source_words) * 100
+    pub raw_coverage_pct: f64,
+
+    /// Effective coverage percentage: (entity_words / (source_words - import_words - comment_words)) * 100
+    pub effective_coverage_pct: f64,
+
+    /// Number of code entities extracted from this file
+    pub entity_count: usize,
+}
+
+/// Ignored file that was skipped during ingestion (v1.6.5 Wave 1).
+///
+/// Files ignored because they lack a supported language parser
+/// (e.g., .md, .toml, .json, binary files).
+///
+/// # 4-Word Name: IgnoredFileRow
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct IgnoredFileRow {
+    /// Forward-slash normalized folder path (e.g., "docs/design")
+    pub folder_path: String,
+
+    /// Filename only (e.g., "README.md")
+    pub filename: String,
+
+    /// File extension (e.g., "md", "toml", "json")
+    pub extension: String,
+
+    /// Reason for ignoring (e.g., "no_parser", "binary_file", "excluded_pattern")
+    pub reason: String,
+}

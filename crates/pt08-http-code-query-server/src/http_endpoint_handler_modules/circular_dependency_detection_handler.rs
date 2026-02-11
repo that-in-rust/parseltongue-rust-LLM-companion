@@ -17,6 +17,18 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
+use axum::extract::Query;
+use serde::Deserialize;
+
+/// Query parameters for circular dependency detection
+///
+/// # 4-Word Name: CircularDependencyQueryParams
+#[derive(Debug, Deserialize)]
+pub struct CircularDependencyQueryParams {
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
+}
 
 /// Single cycle data structure
 ///
@@ -67,12 +79,13 @@ pub struct CircularDependencyResponsePayload {
 /// A cycle exists when we encounter a GRAY node during DFS.
 pub async fn handle_circular_dependency_detection_scan(
     State(state): State<SharedApplicationStateContainer>,
+    Query(params): Query<CircularDependencyQueryParams>,
 ) -> impl IntoResponse {
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
     // Detect cycles using DFS
-    let cycles = detect_cycles_using_dfs_traversal(&state).await;
+    let cycles = detect_cycles_using_dfs_traversal(&state, &params.scope).await;
 
     let has_cycles = !cycles.is_empty();
     let cycle_count = cycles.len();
@@ -104,6 +117,7 @@ pub async fn handle_circular_dependency_detection_scan(
 /// When a GRAY node is encountered, we've found a cycle.
 async fn detect_cycles_using_dfs_traversal(
     state: &SharedApplicationStateContainer,
+    scope_filter: &Option<String>,
 ) -> Vec<DetectedCycleDataPayload> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -114,9 +128,17 @@ async fn detect_cycles_using_dfs_traversal(
         }
     }; // Lock released here
 
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+    let scope_join = if scope_clause.is_empty() {
+        String::new()
+    } else {
+        format!(", *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}", scope_clause)
+    };
+
     // Build adjacency list from edges
-    let query = "?[from_key, to_key] := *DependencyEdges{from_key, to_key}";
-    let edges = match storage.raw_query(query).await {
+    let query = format!("?[from_key, to_key] := *DependencyEdges{{from_key, to_key}}{}", scope_join);
+    let edges = match storage.raw_query(&query).await {
         Ok(result) => result.rows,
         Err(_) => return Vec::new(),
     };

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Query parameters for complexity hotspots
 ///
@@ -26,6 +27,8 @@ use crate::http_server_startup_runner::SharedApplicationStateContainer;
 pub struct ComplexityHotspotsQueryParamsStruct {
     /// Number of top hotspots to return (default: 10)
     pub top: Option<usize>,
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
 }
 
 /// Single hotspot entry in the ranking
@@ -87,7 +90,7 @@ pub async fn handle_complexity_hotspots_ranking_view(
     let top = params.top.unwrap_or(10);
 
     // Calculate coupling scores for all entities
-    let hotspots = calculate_entity_coupling_scores(&state, top).await;
+    let hotspots = calculate_entity_coupling_scores(&state, top, &params.scope).await;
 
     let total_entities = hotspots.len();
 
@@ -118,6 +121,7 @@ pub async fn handle_complexity_hotspots_ranking_view(
 async fn calculate_entity_coupling_scores(
     state: &SharedApplicationStateContainer,
     top: usize,
+    scope_filter: &Option<String>,
 ) -> Vec<ComplexityHotspotEntryPayload> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -128,9 +132,20 @@ async fn calculate_entity_coupling_scores(
         }
     }; // Lock released here
 
-    // Query all edges
-    let query = "?[from_key, to_key] := *DependencyEdges{from_key, to_key}";
-    let edges = match storage.raw_query(query).await {
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+
+    // Query edges with optional scope filtering
+    let query = if scope_clause.is_empty() {
+        "?[from_key, to_key] := *DependencyEdges{from_key, to_key}".to_string()
+    } else {
+        format!(
+            "?[from_key, to_key] := *DependencyEdges{{from_key, to_key}}, *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}",
+            scope_clause
+        )
+    };
+
+    let edges = match storage.raw_query(&query).await {
         Ok(result) => result.rows,
         Err(_) => return Vec::new(),
     };

@@ -242,20 +242,24 @@ async fn test_both_schemas_can_coexist() {
     db.create_schema().await.unwrap();
     db.create_dependency_edges_schema().await.unwrap();
 
-    // Verify both relations exist
+    // Verify all relations exist (v1.6.5: now includes diagnostic relations)
     let relations = db.list_relations().await.unwrap();
     assert!(relations.contains(&"CodeGraph".to_string()));
     assert!(relations.contains(&"DependencyEdges".to_string()));
+    assert!(relations.contains(&"TestEntitiesExcluded".to_string())); // v1.6.5
+    assert!(relations.contains(&"FileWordCoverage".to_string())); // v1.6.5
+    assert!(relations.contains(&"IgnoredFiles".to_string())); // v1.6.5 Wave 1
 
-    // Verify we have exactly 2 relations (plus any system relations)
+    // Verify we have exactly 5 user relations (plus any system relations)
+    // v1.6.5 Wave 1: Updated from 4 to 5 to include IgnoredFiles
     let user_relations: Vec<_> = relations
         .iter()
         .filter(|r| !r.starts_with(':'))
         .collect();
     assert_eq!(
         user_relations.len(),
-        2,
-        "Should have exactly 2 user relations. Found: {:?}",
+        5,
+        "Should have exactly 5 user relations. Found: {:?}",
         user_relations
     );
 }

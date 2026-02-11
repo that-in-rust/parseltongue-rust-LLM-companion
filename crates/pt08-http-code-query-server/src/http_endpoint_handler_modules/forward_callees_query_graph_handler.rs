@@ -16,6 +16,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Query parameters for forward callees endpoint
 ///
@@ -24,6 +25,8 @@ use crate::http_server_startup_runner::SharedApplicationStateContainer;
 pub struct ForwardCalleesQueryParams {
     /// Entity key to find forward dependencies for (required)
     pub entity: String,
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
 }
 
 /// Callee edge data
@@ -106,7 +109,7 @@ pub async fn handle_forward_callees_query_graph(
     };
 
     // Query forward callees using direct CozoDB query
-    let callees = query_forward_callees_direct_method(&state, &entity_key).await;
+    let callees = query_forward_callees_direct_method(&state, &entity_key, &params.scope).await;
     let total_count = callees.len();
 
     // Estimate tokens (~50 per callee + entity key)
@@ -147,6 +150,7 @@ pub async fn handle_forward_callees_query_graph(
 async fn query_forward_callees_direct_method(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
+    scope_filter: &Option<String>,
 ) -> Vec<CalleeEdgeDataPayload> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -162,13 +166,21 @@ async fn query_forward_callees_direct_method(
         .replace('\\', "\\\\")
         .replace('"', "\\\"");
 
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+    let scope_join = if scope_clause.is_empty() {
+        String::new()
+    } else {
+        format!(", *CodeGraph{{ISGL1_key: to_key, root_subfolder_L1, root_subfolder_L2}}{}", scope_clause)
+    };
+
     // Query for edges where this entity is the source (from_key)
     let query = format!(
         r#"
         ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-            from_key == "{}"
+            from_key == "{}"{}
         "#,
-        escaped_entity_key
+        escaped_entity_key, scope_join
     );
 
     match storage.raw_query(&query).await {

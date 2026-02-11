@@ -36,6 +36,9 @@ use crate::http_endpoint_handler_modules::{
     leiden_community_detection_handler,
     // v1.6.1: Ingestion coverage reporting
     ingestion_coverage_folder_handler,
+    // v1.6.5: Diagnostics and folder discovery
+    ingestion_diagnostics_coverage_handler,
+    folder_structure_discovery_handler,
 };
 
 /// Build the complete router with all endpoints
@@ -170,6 +173,15 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
         .route(
             "/ingestion-coverage-folder-report",
             get(ingestion_coverage_folder_handler::handle_ingestion_coverage_folder_report)
+        )
+        // v1.6.5: Diagnostics and folder discovery
+        .route(
+            "/ingestion-diagnostics-coverage-report",
+            get(ingestion_diagnostics_coverage_handler::handle_ingestion_diagnostics_coverage_report)
+        )
+        .route(
+            "/folder-structure-discovery-tree",
+            get(folder_structure_discovery_handler::handle_folder_structure_discovery_tree)
         )
         // Test route for debugging
         .route(

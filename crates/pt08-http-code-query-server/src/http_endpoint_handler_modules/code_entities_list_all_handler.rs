@@ -6,11 +6,14 @@
 
 use axum::{
     extract::{Query, State},
+    http::StatusCode,
     Json,
+    response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Query parameters for entities list endpoint
 ///
@@ -19,6 +22,8 @@ use crate::http_server_startup_runner::SharedApplicationStateContainer;
 pub struct EntitiesListQueryParams {
     /// Filter entities by type (e.g., "function", "struct", "class")
     pub entity_type: Option<String>,
+    /// Filter entities by folder scope (e.g., "src||core" or "src")
+    pub scope: Option<String>,
 }
 
 /// Entity summary for list response
@@ -64,26 +69,29 @@ pub struct EntitiesListResponsePayload {
 pub async fn handle_code_entities_list_all(
     State(state): State<SharedApplicationStateContainer>,
     Query(params): Query<EntitiesListQueryParams>,
-) -> Json<EntitiesListResponsePayload> {
+) -> impl IntoResponse {
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
     // Query entities from database with optional filtering
-    let entities = query_entities_with_filter_from_database(&state, params.entity_type).await;
+    let entities = query_entities_with_filter_from_database(&state, params.entity_type, &params.scope).await;
     let total_count = entities.len();
 
     // Estimate tokens (~20 per entity)
     let tokens = 50 + (total_count * 20);
 
-    Json(EntitiesListResponsePayload {
-        success: true,
-        endpoint: "/code-entities-list-all".to_string(),
-        data: EntitiesListDataPayload {
-            total_count,
-            entities,
-        },
-        tokens,
-    })
+    (
+        StatusCode::OK,
+        Json(EntitiesListResponsePayload {
+            success: true,
+            endpoint: "/code-entities-list-all".to_string(),
+            data: EntitiesListDataPayload {
+                total_count,
+                entities,
+            },
+            tokens,
+        }),
+    ).into_response()
 }
 
 /// Query entities from database with optional filtering
@@ -92,6 +100,7 @@ pub async fn handle_code_entities_list_all(
 async fn query_entities_with_filter_from_database(
     state: &SharedApplicationStateContainer,
     entity_type_filter: Option<String>,
+    scope_filter: &Option<String>,
 ) -> Vec<EntitySummaryListItem> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -102,13 +111,20 @@ async fn query_entities_with_filter_from_database(
         }
     }; // Lock released here
 
-    // Build query based on whether we have a filter
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+
+    // Build query based on whether we have filters
     let query = match entity_type_filter {
         Some(filter) => format!(
-            "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language}}, entity_type == \"{}\"",
+            "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language, root_subfolder_L1, root_subfolder_L2}}{}, entity_type == \"{}\"",
+            scope_clause,
             filter.replace('"', "\\\"")
         ),
-        None => "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}".to_string(),
+        None => format!(
+            "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language, root_subfolder_L1, root_subfolder_L2}}{}",
+            scope_clause
+        ),
     };
 
     let result = storage.raw_query(&query).await;

@@ -15,6 +15,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Query parameters for edges list endpoint
 ///
@@ -27,6 +28,8 @@ pub struct DependencyEdgesQueryParams {
     /// Offset for pagination (default: 0)
     #[serde(default)]
     pub offset: usize,
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
 }
 
 fn default_limit() -> usize {
@@ -88,7 +91,7 @@ pub async fn handle_dependency_edges_list_all(
     state.update_last_request_timestamp().await;
 
     // Query all edges with pagination
-    let (edges, total_count) = query_dependency_edges_paginated(&state, params.limit, params.offset).await;
+    let (edges, total_count) = query_dependency_edges_paginated(&state, params.limit, params.offset, &params.scope).await;
     let returned_count = edges.len();
 
     // Estimate tokens (~40 per edge + overhead)
@@ -118,6 +121,7 @@ async fn query_dependency_edges_paginated(
     state: &SharedApplicationStateContainer,
     limit: usize,
     offset: usize,
+    scope_filter: &Option<String>,
 ) -> (Vec<EdgeDataPayloadItem>, usize) {
     // Clone Arc, release lock, then await
     let storage = {
@@ -128,9 +132,20 @@ async fn query_dependency_edges_paginated(
         }
     }; // Lock released here
 
-    // First get total count
-    let count_query = "?[count(from_key)] := *DependencyEdges{from_key}";
-    let total_count = match storage.raw_query(count_query).await {
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+
+    // Build count query based on scope
+    let count_query = if scope_clause.is_empty() {
+        "?[count(from_key)] := *DependencyEdges{from_key}".to_string()
+    } else {
+        format!(
+            "?[count(from_key)] := *DependencyEdges{{from_key, to_key, edge_type, source_location}}, *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}",
+            scope_clause
+        )
+    };
+
+    let total_count = match storage.raw_query(&count_query).await {
             Ok(result) => {
                 if let Some(row) = result.rows.first() {
                     extract_count_value(&row[0]).unwrap_or(0)
@@ -141,16 +156,29 @@ async fn query_dependency_edges_paginated(
             Err(_) => 0,
     };
 
-    // Query edges with limit and offset
-    let query = format!(
-        r#"
-        ?[from_key, to_key, edge_type, source_location] :=
-            *DependencyEdges{{from_key, to_key, edge_type, source_location}}
-        :limit {}
-        :offset {}
-        "#,
-        limit, offset
-    );
+    // Build edges query with scope filtering
+    let query = if scope_clause.is_empty() {
+        format!(
+            r#"
+            ?[from_key, to_key, edge_type, source_location] :=
+                *DependencyEdges{{from_key, to_key, edge_type, source_location}}
+            :limit {}
+            :offset {}
+            "#,
+            limit, offset
+        )
+    } else {
+        format!(
+            r#"
+            ?[from_key, to_key, edge_type, source_location] :=
+                *DependencyEdges{{from_key, to_key, edge_type, source_location}},
+                *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}
+            :limit {}
+            :offset {}
+            "#,
+            scope_clause, limit, offset
+        )
+    };
 
     match storage.raw_query(&query).await {
         Ok(result) => {

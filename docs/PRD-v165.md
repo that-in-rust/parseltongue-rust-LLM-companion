@@ -22,6 +22,7 @@
 10. [Implementation Phases](#10-implementation-phases)
 11. [Acceptance Criteria](#11-acceptance-criteria)
 12. [Open Questions](#12-open-questions)
+13. [Parallel Folder Streaming Architecture](#13-parallel-folder-streaming-architecture)
 
 ---
 
@@ -548,13 +549,15 @@ After ingesting a large monorepo (e.g., 2,841 entities across 312 files), every 
 
 Two additions:
 1. **Discovery endpoint**: `GET /folder-structure-discovery-tree` — returns the L1/L2 folder tree with entity counts
-2. **Scope parameter**: `?scope=src|core` on ALL query endpoints — filters results to entities within that folder
+2. **Scope parameter**: `?scope=src||core` on ALL query endpoints — filters results to entities within that folder
 
 ### Design Decisions
 
-**Pipe delimiter (`|`)**: The scope value uses `|` to separate L1 and L2, not `/` or `\`. This avoids confusion with filesystem path separators across platforms. Pipe `|` is illegal in Windows folder names and virtually never used in macOS/Linux folder names, making it a safe delimiter.
+**Double-pipe delimiter (`||`)**: The scope value uses `||` to separate L1 and L2, not `/` or `\`. This avoids confusion with filesystem path separators across platforms. Double-pipe `||` never appears in folder names on any OS and is visually unambiguous — clearly distinct from a single pipe which some shells and URL parsers treat specially.
 
 **URL encoding handles special characters**: Spaces in folder names (e.g., `My Documents`) are handled by standard URL encoding (`%20`). Axum decodes automatically before the handler sees the value. No additional encoding layer needed.
+
+**No schema migration needed**: pt01 always creates a fresh timestamped workspace (`parseltongueTIMESTAMP/analysis.db`). v1.6.5 schema changes only apply to newly ingested databases. Existing v1.6.4 databases are untouched and work with older server versions. There is no upgrade-in-place path by design.
 
 **Denormalized columns**: L1 and L2 are stored as precomputed columns on CodeGraph during ingestion (not computed at query time). This allows CozoDB Datalog to filter natively:
 
@@ -567,13 +570,13 @@ Two additions:
 | `?scope=` value | L1 | L2 | Meaning |
 |----------------|-----|-----|---------|
 | `src` | `src` | *(any)* | All entities under `src/` |
-| `src\|core` | `src` | `core` | Only entities under `src/core/` |
+| `src\|\|core` | `src` | `core` | Only entities under `src/core/` |
 | *(absent)* | *(any)* | *(any)* | No filter (full graph, default) |
 
 **Parsing logic**:
 ```rust
 fn parse_scope_filter(scope: &str) -> (String, Option<String>) {
-    match scope.split_once('|') {
+    match scope.split_once("||") {
         Some((l1, l2)) if !l2.is_empty() => (l1.to_string(), Some(l2.to_string())),
         _ => (scope.to_string(), None), // L1-only
     }
@@ -743,9 +746,9 @@ let query = format!(
 
 ```
 Agent: GET /folder-structure-discovery-tree
-       → sees "crates|parseltongue-core" has 1200 entities
+       → sees "crates||parseltongue-core" has 1200 entities
 
-Agent: GET /blast-radius-impact-analysis?entity=rust:fn:parse_file&hops=3&scope=crates|parseltongue-core
+Agent: GET /blast-radius-impact-analysis?entity=rust:fn:parse_file&hops=3&scope=crates||parseltongue-core
        → blast radius scoped to parseltongue-core only (not pt01, not pt08)
        → fewer results, more relevant, fewer tokens
 ```
@@ -937,6 +940,16 @@ path-slash = "0.2"
 3. Query the endpoint, verify all three reports are populated
 4. Verify cross-platform path format in stored data
 
+### Phase 5: Thread-Local Parser Parallelism
+
+1. Create thread-local `Isgl1KeyGeneratorImpl` instances for Rayon threads
+2. Add `process_file_sync_with_local_generator()` method that accepts thread-local generator
+3. Update `stream_directory_with_parallel_rayon()` to use thread-local generators
+4. Eliminate shared `Mutex<Parser>` contention in parallel codepath
+5. Write benchmark test verifying > 3x speedup on multi-core systems
+6. Write robustness test: malformed file does not poison other threads
+7. Verify identical ingestion results between sequential and parallel modes
+
 ---
 
 ## 11. Acceptance Criteria
@@ -961,7 +974,7 @@ path-slash = "0.2"
 - [ ] `GET /folder-structure-discovery-tree` returns L1/L2 tree with entity counts
 - [ ] All 18 query endpoints accept optional `?scope=` parameter
 - [ ] `?scope=src` filters to L1 only (all L2 within `src/`)
-- [ ] `?scope=src|core` filters to L1+L2 (only `src/core/`)
+- [ ] `?scope=src||core` filters to L1+L2 (only `src/core/`)
 - [ ] Absent `?scope=` returns full unfiltered results (backward compatible)
 - [ ] Invalid scope returns `success: false` with error message, did-you-mean suggestions (same starting letter), and full valid scope list
 - [ ] Scope filtering happens at Datalog level (not post-filtering in Rust)
@@ -1002,7 +1015,156 @@ path-slash = "0.2"
 
 7. **Should `/codebase-statistics-overview-summary` support `?scope=`?** It currently returns aggregate stats. Adding scope would make it "folder-level stats" which is useful but changes the endpoint's purpose. Decision: Not in v1.6.5. The discovery tree endpoint provides per-folder entity counts which covers most of this need.
 
-8. **Should the discovery endpoint include language breakdown per folder?** e.g., `"crates|parseltongue-core": { "rust": 1100, "python": 100 }`. Decision: Not in v1.6.5. Can be derived by combining discovery tree with scoped entity list.
+8. **Should the discovery endpoint include language breakdown per folder?** e.g., `"crates||parseltongue-core": { "rust": 1100, "python": 100 }`. Decision: Not in v1.6.5. Can be derived by combining discovery tree with scoped entity list.
+
+9. **Schema migration?** Not needed. pt01 always creates a fresh timestamped workspace (`parseltongueTIMESTAMP/analysis.db`). New schema only applies to newly ingested databases. Old databases remain valid with older server versions.
+
+10. **Should thread-local parsers use `thread_local!` or Rayon's `ThreadLocal` crate?** `thread_local!` is simpler and zero-dependency. Rayon's `rayon::ThreadLocal` allows collecting values after iteration but is unnecessary here since we don't need post-parse access to thread-local state. Decision: Use `std::thread_local!`.
+
+11. **Should the parallel path fall back to sequential on single-core machines?** The thread-local approach has negligible overhead on single-core (one thread = one parser set, same as today). No fallback logic needed.
+
+12. **Should `QueryBasedExtractor` also be thread-local?** Yes. It holds compiled tree-sitter queries and a `Parser` internally. Same contention pattern as the language parsers. Making it thread-local is part of the same fix.
+
+---
+
+## 13. Parallel Folder Streaming Architecture
+
+### Problem: Parser Mutex Serializes All Rayon Threads
+
+`stream_directory_with_parallel_rayon()` already uses Rayon `par_iter()` over all discovered files. However, all Rayon threads contend on a shared `Mutex<Parser>` inside `Isgl1KeyGeneratorImpl`, which effectively serializes the tree-sitter parsing stage:
+
+```
+isgl1_generator.rs:
+    parsers: HashMap<Language, Arc<Mutex<Parser>>>     // 13 language parsers behind mutexes
+    query_extractor: Mutex<QueryBasedExtractor>        // Single shared extractor behind mutex
+
+isgl1_generator.rs:3406:
+    let mut parser = parser_mutex.lock().unwrap();     // Every Rayon thread blocks here
+```
+
+**The kitchen analogy**: Eight chefs (Rayon threads) sharing one knife (parser mutex). They queue up and take turns instead of working in parallel. The `par_iter()` distributes files across threads, but each thread immediately serializes on the parser lock.
+
+**Measured impact**: The code comments promise 5-7x speedup on multi-core systems, but actual parallelism is limited to the non-parsing work (file I/O, DB writes) because parsing -- the dominant cost -- is serialized.
+
+### Why Not Multiple pt01 Instances?
+
+A natural question: can we run `pt01 crates/streamer` and `pt01 crates/extractor` in parallel, each targeting the same `rocksdb:parseltongue.db`?
+
+**No.** RocksDB takes an exclusive file lock on the database directory. Only one process can open it at a time. A second pt01 instance targeting the same `rocksdb:` path fails immediately with a lock error.
+
+| Approach | Feasible? | Why |
+|----------|-----------|-----|
+| Multiple pt01 → same RocksDB | No | Exclusive file lock |
+| Multiple pt01 → separate DBs, then merge | Possible but lossy | Cross-folder edges lost until merge |
+| Single pt01, internal parallelism | **Yes** | Thread-local parsers eliminate contention |
+| CozoDB HTTP server as single writer | Future option | Multiple workers POST entities to server |
+
+### Current Architecture Is Already Two-Phase
+
+The existing `stream_directory_with_parallel_rayon()` already has the right shape:
+
+```
+Step 1: WalkDir → collect all file paths into Vec
+Step 2: par_iter() → parse each file → returns (FileResult, Vec<CodeEntity>, Vec<DependencyEdge>)
+Step 3: collect() → aggregate all results
+Step 4: insert_entities_batch() → all entities at once
+Step 5: insert_edges_batch() → all edges at once
+```
+
+Entities and edges are already **sequenced** in the DB write phase. The dependency edges produced by `extract_placeholders_from_edges_deduplicated()` are unresolved text-based ISGL1 keys (e.g., `rust:fn:helper:unknown:0-0`), not database lookups. They don't require entities to exist first.
+
+This means the two-phase split is already implicit:
+
+| Phase | Work | Cross-file knowledge needed? | Parallelizable? |
+|-------|------|------------------------------|-----------------|
+| **Phase 1**: Parse + extract | Entities + unresolved edge placeholders | No (per-file only) | **Yes** |
+| **Phase 2**: Resolve + insert | Match placeholders to ISGL1 keys, batch insert | Yes (Datalog join) | Sequential but fast |
+
+### Fix: Thread-Local Parsers (~50 Lines)
+
+The fix is to give each Rayon thread its own set of parsers instead of sharing one set behind mutexes. Tree-sitter `Parser` is `!Send`, so it can't be shared across threads -- but it can be created per-thread.
+
+```rust
+// In isgl1_generator.rs or streamer.rs
+thread_local! {
+    static LOCAL_GENERATOR: RefCell<Isgl1KeyGeneratorImpl> =
+        RefCell::new(Isgl1KeyGeneratorImpl::new());
+}
+
+// In the Rayon par_iter closure
+.par_iter()
+.map(|file_path| {
+    LOCAL_GENERATOR.with(|gen| {
+        let gen = gen.borrow();
+        self.process_file_sync_with_local_generator(file_path, &gen)
+    })
+})
+```
+
+**New method**: `process_file_sync_with_local_generator()` -- copy of `process_file_sync_for_parallel()` that takes `&Isgl1KeyGeneratorImpl` as a parameter instead of using `self.key_generator`.
+
+**Trade-off**: On an 8-core machine, this creates 8 copies of 13 language parsers + `QueryBasedExtractor`. One-time initialization cost of ~200ms. After that, zero contention.
+
+**Files to modify**:
+
+| File | Change |
+|------|--------|
+| `crates/pt01-folder-to-cozodb-streamer/src/isgl1_generator.rs` | Add `process_file_sync_with_local_generator()`, add `thread_local!` |
+| `crates/pt01-folder-to-cozodb-streamer/src/streamer.rs` | Update `stream_directory_with_parallel_rayon()` to use thread-local generators |
+
+### Unwrap Safety Audit
+
+The `parser_mutex.lock().unwrap()` at `isgl1_generator.rs:3406` is the only production unwrap that poses a real risk. If any Rayon thread panics while holding the lock, the mutex is "poisoned" and every subsequent thread panics too -- a chain reaction that kills the entire parallel batch.
+
+**Full audit results**:
+
+| Location | Count | Risk | Action |
+|----------|-------|------|--------|
+| Test code (`#[test]` functions) | 185 | None (idiomatic) | Leave as-is |
+| `cli.rs:213-214` (clap args) | 2 | None (clap guarantees presence) | Leave as-is |
+| `cli.rs:227` (print_help) | 1 | None (stdout failure) | Leave as-is |
+| `isgl1_generator.rs:3406` (parser lock) | 1 | **High** (poisons Rayon pool) | **Eliminated by thread-local fix** |
+
+**Existing defensive patterns in `streamer.rs`** (already correct):
+
+```rust
+// Line 4549 -- graceful: silently skips if poisoned
+if let Ok(mut stats) = self.stats.lock() { ... }
+
+// Line 4942 -- recovers from poison
+self.stats.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+
+// Line 3560 -- handled with match
+match self.query_extractor.lock() { Ok(...) => ..., Err(e) => eprintln!(...) }
+```
+
+The thread-local fix eliminates the only dangerous unwrap entirely -- no mutex means no lock, no poison, no unwrap.
+
+### Implementation Phase
+
+This is a self-contained refactor within `pt01-folder-to-cozodb-streamer` that does not affect any other crate, schema, or HTTP endpoint.
+
+**Phase 5: Thread-Local Parser Parallelism**
+
+1. Create `Isgl1KeyGeneratorImpl::new_for_thread_local()` constructor (or reuse existing `new()`)
+2. Add `thread_local!` static in `streamer.rs` (or `isgl1_generator.rs`)
+3. Add `process_file_sync_with_local_generator()` method
+4. Update `stream_directory_with_parallel_rayon()` to use thread-local generators in `par_iter()` closure
+5. Remove `parser_mutex.lock().unwrap()` codepath (dead code after thread-local)
+6. Write benchmark test: parallel ingestion of Parseltongue's own codebase, verify speedup > 3x on 4+ cores
+7. Write test: verify no mutex poisoning on deliberate parse failure (malformed file in test fixture)
+
+### Acceptance Criteria: Parallel Streaming
+
+- [ ] `stream_directory_with_parallel_rayon()` achieves > 3x speedup on 4-core machines (vs sequential `stream_directory()`)
+- [ ] No shared `Mutex<Parser>` contention between Rayon threads during parsing
+- [ ] Each Rayon thread owns its own tree-sitter `Parser` instances (thread-local)
+- [ ] Parser initialization overhead < 500ms for 8 threads × 13 languages
+- [ ] A single malformed file does not crash/poison other threads -- graceful per-file error handling
+- [ ] Zero production `unwrap()` calls on mutex locks in the parallel codepath
+- [ ] Entities and edges are still batch-inserted sequentially after parallel parse phase (correctness preserved)
+- [ ] `cargo test --all` passes with thread-local parsers (no test regressions)
+- [ ] Ingestion results (entity count, edge count, diagnostics) are identical between sequential and parallel modes
 
 ---
 

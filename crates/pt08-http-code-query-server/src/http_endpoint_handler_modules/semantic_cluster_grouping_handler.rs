@@ -9,15 +9,25 @@
 //! Entities that call each other frequently belong to the same cluster.
 
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     Json,
     response::IntoResponse,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
+
+/// Query parameters for semantic clustering
+///
+/// # 4-Word Name: SemanticClusterQueryParamsStruct
+#[derive(Debug, Deserialize)]
+pub struct SemanticClusterQueryParamsStruct {
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
+}
 
 /// Single cluster entry in the response
 ///
@@ -69,12 +79,13 @@ pub struct SemanticClusterResponsePayload {
 /// 4. Group nodes by final label
 pub async fn handle_semantic_cluster_grouping_list(
     State(state): State<SharedApplicationStateContainer>,
+    Query(params): Query<SemanticClusterQueryParamsStruct>,
 ) -> impl IntoResponse {
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
     // Run label propagation clustering
-    let clusters = run_label_propagation_clustering(&state).await;
+    let clusters = run_label_propagation_clustering(&state, &params.scope).await;
 
     let total_entities: usize = clusters.iter().map(|c| c.entity_count).sum();
     let cluster_count = clusters.len();
@@ -110,6 +121,7 @@ pub async fn handle_semantic_cluster_grouping_list(
 /// - Converge when labels stabilize
 async fn run_label_propagation_clustering(
     state: &SharedApplicationStateContainer,
+    scope_filter: &Option<String>,
 ) -> Vec<SemanticClusterEntryPayload> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -120,9 +132,20 @@ async fn run_label_propagation_clustering(
         }
     }; // Lock released here
 
-    // Query all edges
-    let query = "?[from_key, to_key] := *DependencyEdges{from_key, to_key}";
-    let edges = match storage.raw_query(query).await {
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+
+    // Query edges with optional scope filtering
+    let query = if scope_clause.is_empty() {
+        "?[from_key, to_key] := *DependencyEdges{from_key, to_key}".to_string()
+    } else {
+        format!(
+            "?[from_key, to_key] := *DependencyEdges{{from_key, to_key}}, *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}",
+            scope_clause
+        )
+    };
+
+    let edges = match storage.raw_query(&query).await {
         Ok(result) => result.rows,
         Err(_) => return Vec::new(),
     };

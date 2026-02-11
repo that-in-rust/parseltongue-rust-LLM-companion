@@ -13,6 +13,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Query parameters for fuzzy search endpoint
 ///
@@ -21,6 +22,8 @@ use crate::http_server_startup_runner::SharedApplicationStateContainer;
 pub struct FuzzySearchQueryParams {
     /// Search query string
     pub q: String,
+    /// Filter entities by folder scope (e.g., "src||core" or "src")
+    pub scope: Option<String>,
 }
 
 /// Entity summary for search results
@@ -95,7 +98,7 @@ pub async fn handle_code_entities_fuzzy_search(
     }
 
     // Search entities in database
-    let entities = search_entities_by_query_from_database(&state, &params.q).await;
+    let entities = search_entities_by_query_from_database(&state, &params.q, &params.scope).await;
     let total_count = entities.len();
 
     // Estimate tokens (~20 per entity + query length)
@@ -121,6 +124,7 @@ pub async fn handle_code_entities_fuzzy_search(
 async fn search_entities_by_query_from_database(
     state: &SharedApplicationStateContainer,
     search_query: &str,
+    scope_filter: &Option<String>,
 ) -> Vec<SearchResultEntityItem> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -131,10 +135,16 @@ async fn search_entities_by_query_from_database(
         }
     }; // Lock released here
 
-    // Query all entities from CodeGraph - don't require Current_Code to exist
-    let query = "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{ISGL1_key: key, file_path, entity_type, entity_class, language}";
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
 
-    let result = storage.raw_query(query).await;
+    // Query all entities from CodeGraph with optional scope filter
+    let query = format!(
+        "?[key, file_path, entity_type, entity_class, language] := *CodeGraph{{ISGL1_key: key, file_path, entity_type, entity_class, language, root_subfolder_L1, root_subfolder_L2}}{}",
+        scope_clause
+    );
+
+    let result = storage.raw_query(&query).await;
 
     match result {
         Ok(named_rows) => {

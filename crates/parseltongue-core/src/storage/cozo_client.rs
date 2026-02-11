@@ -113,7 +113,9 @@ impl CozoDbStorage {
                 entity_class: String,
                 birth_timestamp: Int?,
                 content_hash: String?,
-                semantic_path: String?
+                semantic_path: String?,
+                root_subfolder_L1: String,
+                root_subfolder_L2: String
             }
         "#;
 
@@ -123,6 +125,11 @@ impl CozoDbStorage {
                 operation: "schema_creation".to_string(),
                 details: format!("Failed to create schema: {}", e),
             })?;
+
+        // v1.6.5: Create diagnostic relations
+        self.create_test_entities_excluded_schema().await?;
+        self.create_file_word_coverage_schema().await?;
+        self.create_ignored_files_schema().await?;
 
         Ok(())
     }
@@ -162,6 +169,113 @@ impl CozoDbStorage {
             .map_err(|e| ParseltongError::DependencyError {
                 operation: "create_dependency_edges_schema".to_string(),
                 reason: format!("Failed to create DependencyEdges schema: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Create TestEntitiesExcluded schema for tracking excluded test entities (v1.6.5).
+    ///
+    /// Stores test entities that were intentionally excluded from the CodeGraph
+    /// to optimize LLM context. Enables agents to know what was filtered out
+    /// during ingestion.
+    ///
+    /// # Schema
+    /// - **Keys**: entity_name, folder_path, filename (composite key)
+    /// - **Fields**: entity_class, language, line_start, line_end, detection_reason
+    ///
+    /// # 4-Word Name: create_test_entities_excluded_schema
+    pub async fn create_test_entities_excluded_schema(&self) -> Result<()> {
+        let schema = r#"
+            :create TestEntitiesExcluded {
+                entity_name: String,
+                folder_path: String,
+                filename: String
+                =>
+                entity_class: String,
+                language: String,
+                line_start: Int,
+                line_end: Int,
+                detection_reason: String
+            }
+        "#;
+
+        self.db
+            .run_script(schema, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "create_test_entities_excluded_schema".to_string(),
+                details: format!("Failed to create TestEntitiesExcluded schema: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Create FileWordCoverage schema for tracking word count coverage metrics (v1.6.5).
+    ///
+    /// Stores per-file word count comparison between source code and extracted
+    /// entities. Enables dual coverage metrics: raw (total extraction) vs
+    /// effective (meaningful code only, excluding imports/comments).
+    ///
+    /// # Schema
+    /// - **Keys**: folder_path, filename (composite key)
+    /// - **Fields**: language, source_word_count, entity_word_count, import_word_count,
+    ///   comment_word_count, raw_coverage_pct, effective_coverage_pct, entity_count
+    ///
+    /// # 4-Word Name: create_file_word_coverage_schema
+    pub async fn create_file_word_coverage_schema(&self) -> Result<()> {
+        let schema = r#"
+            :create FileWordCoverage {
+                folder_path: String,
+                filename: String
+                =>
+                language: String,
+                source_word_count: Int,
+                entity_word_count: Int,
+                import_word_count: Int,
+                comment_word_count: Int,
+                raw_coverage_pct: Float,
+                effective_coverage_pct: Float,
+                entity_count: Int
+            }
+        "#;
+
+        self.db
+            .run_script(schema, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "create_file_word_coverage_schema".to_string(),
+                details: format!("Failed to create FileWordCoverage schema: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Create IgnoredFiles schema for tracking files skipped during ingestion (v1.6.5 Wave 1).
+    ///
+    /// Stores files that were ignored during ingestion due to missing language
+    /// parsers or exclusion patterns. Enables diagnostics endpoint to report
+    /// what was not analyzed.
+    ///
+    /// # Schema
+    /// - **Keys**: folder_path, filename (composite key)
+    /// - **Fields**: extension, reason
+    ///
+    /// # 4-Word Name: create_ignored_files_schema
+    pub async fn create_ignored_files_schema(&self) -> Result<()> {
+        let schema = r#"
+            :create IgnoredFiles {
+                folder_path: String,
+                filename: String
+                =>
+                extension: String,
+                reason: String
+            }
+        "#;
+
+        self.db
+            .run_script(schema, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "create_ignored_files_schema".to_string(),
+                details: format!("Failed to create IgnoredFiles schema: {}", e),
             })?;
 
         Ok(())
@@ -807,20 +921,29 @@ impl CozoDbStorage {
         let query = r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] <-
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path,
+              root_subfolder_L1, root_subfolder_L2] <-
             [[$ISGL1_key, $Current_Code, $Future_Code, $interface_signature, $TDD_Classification,
               $lsp_meta_data, $current_ind, $future_ind, $Future_Action, $file_path, $language,
-              $last_modified, $entity_type, $entity_class, $birth_timestamp, $content_hash, $semantic_path]]
+              $last_modified, $entity_type, $entity_class, $birth_timestamp, $content_hash, $semantic_path,
+              $root_subfolder_L1, $root_subfolder_L2]]
 
             :put CodeGraph {
                 ISGL1_key =>
                 Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path,
+                root_subfolder_L1, root_subfolder_L2
             }
         "#;
 
-        let params = self.entity_to_params(entity)?;
+        let mut params = self.entity_to_params(entity)?;
+
+        // v1.6.5: Compute L1/L2 from file_path
+        let file_path_str = entity.interface_signature.file_path.to_str().unwrap_or("");
+        let (l1, l2) = crate::storage::path_utils::extract_subfolder_levels_from_path(file_path_str);
+        params.insert("root_subfolder_L1".to_string(), DataValue::Str(l1.into()));
+        params.insert("root_subfolder_L2".to_string(), DataValue::Str(l2.into()));
 
         self.db
             .run_script(query, params, ScriptMutability::Mutable)
@@ -955,8 +1078,19 @@ impl CozoDbStorage {
             query_data.push_str(&quote_value(params.get("content_hash").unwrap_or(&DataValue::Null)));
             query_data.push_str(", ");
 
-            // Field 17: semantic_path (last field, no trailing comma)
+            // Field 17: semantic_path
             query_data.push_str(&quote_value(params.get("semantic_path").unwrap_or(&DataValue::Null)));
+            query_data.push_str(", ");
+
+            // Field 18: root_subfolder_L1 (v1.6.5)
+            // Extract from file_path
+            let file_path_str = entity.interface_signature.file_path.to_str().unwrap_or("");
+            let (l1, l2) = crate::storage::path_utils::extract_subfolder_levels_from_path(file_path_str);
+            query_data.push_str(&quote_value(&DataValue::Str(l1.into())));
+            query_data.push_str(", ");
+
+            // Field 19: root_subfolder_L2 (v1.6.5, last field, no trailing comma)
+            query_data.push_str(&quote_value(&DataValue::Str(l2.into())));
 
             query_data.push(']');
         }
@@ -966,13 +1100,15 @@ impl CozoDbStorage {
             r#"
             ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
               lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path] <- [{}]
+              last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path,
+              root_subfolder_L1, root_subfolder_L2] <- [{}]
 
             :put CodeGraph {{
                 ISGL1_key =>
                 Current_Code, Future_Code, interface_signature, TDD_Classification,
                 lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
-                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path
+                last_modified, entity_type, entity_class, birth_timestamp, content_hash, semantic_path,
+                root_subfolder_L1, root_subfolder_L2
             }}
             "#,
             query_data
@@ -984,6 +1120,245 @@ impl CozoDbStorage {
             .map_err(|e| ParseltongError::DatabaseError {
                 operation: "insert_entities_batch".to_string(),
                 details: format!("Failed to batch insert {} entities: {}", entities.len(), e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Batch insert excluded test entities (v1.6.5).
+    ///
+    /// Inserts test entities that were intentionally excluded from CodeGraph
+    /// to optimize LLM context. Enables diagnostics reporting.
+    ///
+    /// # 4-Word Name: insert_test_entities_excluded_batch
+    ///
+    /// # Performance
+    /// - Empty batch: immediate return (no DB operation)
+    /// - Single round-trip to database
+    ///
+    /// # Arguments
+    /// * `entities` - Slice of ExcludedTestEntity structs
+    pub async fn insert_test_entities_excluded_batch(
+        &self,
+        entities: &[crate::entities::ExcludedTestEntity],
+    ) -> Result<()> {
+        // Empty batch optimization
+        if entities.is_empty() {
+            return Ok(());
+        }
+
+        // Helper function to escape and quote string values
+        fn quote_str(s: &str) -> String {
+            let escaped = s.replace('\\', "\\\\").replace('\'', "\\'");
+            format!("'{}'", escaped)
+        }
+
+        // Pre-allocate buffer
+        let mut query_data = String::with_capacity(entities.len() * 200);
+
+        // Build inline data arrays
+        for (idx, entity) in entities.iter().enumerate() {
+            if idx > 0 {
+                query_data.push_str(", ");
+            }
+
+            query_data.push('[');
+            query_data.push_str(&quote_str(&entity.entity_name));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&entity.folder_path));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&entity.filename));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&entity.entity_class));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&entity.language));
+            query_data.push_str(", ");
+            query_data.push_str(&entity.line_start.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&entity.line_end.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&entity.detection_reason));
+            query_data.push(']');
+        }
+
+        // Build batch insert query
+        let query = format!(
+            r#"
+            ?[entity_name, folder_path, filename, entity_class, language, line_start, line_end, detection_reason] <- [{}]
+
+            :put TestEntitiesExcluded {{
+                entity_name, folder_path, filename =>
+                entity_class, language, line_start, line_end, detection_reason
+            }}
+            "#,
+            query_data
+        );
+
+        // Execute batch insert
+        self.db
+            .run_script(&query, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "insert_test_entities_excluded_batch".to_string(),
+                details: format!("Failed to batch insert {} test entities: {}", entities.len(), e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Batch insert file word coverage metrics (v1.6.5).
+    ///
+    /// Inserts per-file word count coverage comparison between source code
+    /// and extracted entities. Enables dual coverage metrics reporting.
+    ///
+    /// # 4-Word Name: insert_file_word_coverage_batch
+    ///
+    /// # Performance
+    /// - Empty batch: immediate return (no DB operation)
+    /// - Single round-trip to database
+    ///
+    /// # Arguments
+    /// * `coverages` - Slice of FileWordCoverageRow structs
+    pub async fn insert_file_word_coverage_batch(
+        &self,
+        coverages: &[crate::entities::FileWordCoverageRow],
+    ) -> Result<()> {
+        // Empty batch optimization
+        if coverages.is_empty() {
+            return Ok(());
+        }
+
+        // Helper function to escape and quote string values
+        fn quote_str(s: &str) -> String {
+            let escaped = s.replace('\\', "\\\\").replace('\'', "\\'");
+            format!("'{}'", escaped)
+        }
+
+        // Pre-allocate buffer
+        let mut query_data = String::with_capacity(coverages.len() * 250);
+
+        // Build inline data arrays
+        for (idx, coverage) in coverages.iter().enumerate() {
+            if idx > 0 {
+                query_data.push_str(", ");
+            }
+
+            query_data.push('[');
+            query_data.push_str(&quote_str(&coverage.folder_path));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&coverage.filename));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&coverage.language));
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.source_word_count.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.entity_word_count.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.import_word_count.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.comment_word_count.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.raw_coverage_pct.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.effective_coverage_pct.to_string());
+            query_data.push_str(", ");
+            query_data.push_str(&coverage.entity_count.to_string());
+            query_data.push(']');
+        }
+
+        // Build batch insert query
+        let query = format!(
+            r#"
+            ?[folder_path, filename, language, source_word_count, entity_word_count,
+              import_word_count, comment_word_count, raw_coverage_pct, effective_coverage_pct,
+              entity_count] <- [{}]
+
+            :put FileWordCoverage {{
+                folder_path, filename =>
+                language, source_word_count, entity_word_count, import_word_count,
+                comment_word_count, raw_coverage_pct, effective_coverage_pct, entity_count
+            }}
+            "#,
+            query_data
+        );
+
+        // Execute batch insert
+        self.db
+            .run_script(&query, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "insert_file_word_coverage_batch".to_string(),
+                details: format!("Failed to batch insert {} word coverage rows: {}", coverages.len(), e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Batch insert ignored files (v1.6.5 Wave 1).
+    ///
+    /// Inserts files that were skipped during ingestion due to missing
+    /// language parsers or exclusion patterns.
+    ///
+    /// # 4-Word Name: insert_ignored_files_batch
+    ///
+    /// # Performance
+    /// - Empty batch: immediate return (no DB operation)
+    /// - Single round-trip to database
+    ///
+    /// # Arguments
+    /// * `files` - Slice of IgnoredFileRow structs
+    pub async fn insert_ignored_files_batch(
+        &self,
+        files: &[crate::entities::IgnoredFileRow],
+    ) -> Result<()> {
+        // Empty batch optimization
+        if files.is_empty() {
+            return Ok(());
+        }
+
+        // Helper function to escape and quote string values
+        fn quote_str(s: &str) -> String {
+            let escaped = s.replace('\\', "\\\\").replace('\'', "\\'");
+            format!("'{}'", escaped)
+        }
+
+        // Pre-allocate buffer
+        let mut query_data = String::with_capacity(files.len() * 150);
+
+        // Build inline data arrays
+        for (idx, file) in files.iter().enumerate() {
+            if idx > 0 {
+                query_data.push_str(", ");
+            }
+
+            query_data.push('[');
+            query_data.push_str(&quote_str(&file.folder_path));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&file.filename));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&file.extension));
+            query_data.push_str(", ");
+            query_data.push_str(&quote_str(&file.reason));
+            query_data.push(']');
+        }
+
+        // Build batch insert query
+        let query = format!(
+            r#"
+            ?[folder_path, filename, extension, reason] <- [{}]
+
+            :put IgnoredFiles {{
+                folder_path, filename =>
+                extension, reason
+            }}
+            "#,
+            query_data
+        );
+
+        // Execute batch insert
+        self.db
+            .run_script(&query, Default::default(), ScriptMutability::Mutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "insert_ignored_files_batch".to_string(),
+                details: format!("Failed to batch insert {} ignored files: {}", files.len(), e),
             })?;
 
         Ok(())

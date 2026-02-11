@@ -49,6 +49,9 @@ async-trait.workspace = true
 notify = { workspace = true }
 notify-debouncer-full = "0.3"
 
+# Path normalization dependencies (v1.6.5)
+path-slash = "0.2"
+
 # Logging dependencies
 tracing = "0.1"
 

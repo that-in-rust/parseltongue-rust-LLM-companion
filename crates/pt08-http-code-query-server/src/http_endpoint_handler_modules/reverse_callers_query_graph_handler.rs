@@ -17,6 +17,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Extract function name from ISGL1 key for fuzzy matching
 ///
@@ -44,6 +45,8 @@ fn extract_function_name_key(key: &str) -> Option<&str> {
 pub struct ReverseCallersQueryParams {
     /// Entity key to find reverse dependencies for (required)
     pub entity: String,
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
 }
 
 /// Caller edge data
@@ -126,7 +129,7 @@ pub async fn handle_reverse_callers_query_graph(
     };
 
     // Use direct query method compatible with test database setup
-    let callers = query_reverse_callers_direct_method(&state, &entity_key).await;
+    let callers = query_reverse_callers_direct_method(&state, &entity_key, &params.scope).await;
     let total_count = callers.len();
 
     // Estimate tokens (~50 per caller + entity key)
@@ -169,6 +172,7 @@ pub async fn handle_reverse_callers_query_graph(
 async fn query_reverse_callers_direct_method(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
+    scope_filter: &Option<String>,
 ) -> Vec<CallerEdgeDataPayload> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -183,6 +187,14 @@ async fn query_reverse_callers_direct_method(
         .replace('\\', "\\\\")
         .replace('"', "\\\"");
 
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+    let scope_join = if scope_clause.is_empty() {
+        String::new()
+    } else {
+        format!(", *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}", scope_clause)
+    };
+
     // v1.0.4: Build fuzzy matching query based on function name
     let query = match extract_function_name_key(entity_key) {
         Some(func_name) => {
@@ -195,9 +207,9 @@ async fn query_reverse_callers_direct_method(
                 ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
                     (to_key == "{}" or
                      starts_with(to_key, "rust:fn:{}:") or
-                     starts_with(to_key, "rust:method:{}:"))
+                     starts_with(to_key, "rust:method:{}:")){}
                 "#,
-                escaped_entity_key, escaped_func_name, escaped_func_name
+                escaped_entity_key, escaped_func_name, escaped_func_name, scope_join
             )
         }
         None => {
@@ -205,9 +217,9 @@ async fn query_reverse_callers_direct_method(
             format!(
                 r#"
                 ?[from_key, to_key, edge_type, source_location] := *DependencyEdges{{from_key, to_key, edge_type, source_location}},
-                    to_key == "{}"
+                    to_key == "{}"{}
                 "#,
-                escaped_entity_key
+                escaped_entity_key, scope_join
             )
         }
     };

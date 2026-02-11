@@ -17,10 +17,22 @@ use serde::Serialize;
 use std::sync::Arc;
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
+use axum::extract::Query;
+use serde::Deserialize;
 use parseltongue_core::graph_analysis::{
     AdjacencyListGraphRepresentation,
     leiden_community_detection_clustering,
 };
+
+/// Query parameters for Leiden clustering
+///
+/// # 4-Word Name: LeidenClusteringQueryParams
+#[derive(Debug, Deserialize)]
+pub struct LeidenClusteringQueryParams {
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
+}
 
 /// Single community data structure
 ///
@@ -74,6 +86,7 @@ pub struct ErrorResponsePayloadStructure {
 /// - Error Handling: Returns error JSON if database unavailable
 pub async fn handle_leiden_community_detection_clusters(
     State(state): State<SharedApplicationStateContainer>,
+    Query(params): Query<LeidenClusteringQueryParams>,
 ) -> impl IntoResponse {
     // Update last request timestamp
     state.update_last_request_timestamp().await;
@@ -98,7 +111,7 @@ pub async fn handle_leiden_community_detection_clusters(
     }; // Lock released here
 
     // Build graph from database
-    let graph = match build_graph_from_database_edges(&storage).await {
+    let graph = match build_graph_from_database_edges(&storage, &params.scope).await {
         Ok(g) => g,
         Err(e) => {
             return (
@@ -162,10 +175,19 @@ pub async fn handle_leiden_community_detection_clusters(
 /// # 4-Word Name: build_graph_from_database_edges
 async fn build_graph_from_database_edges(
     storage: &Arc<parseltongue_core::storage::CozoDbStorage>,
+    scope_filter: &Option<String>,
 ) -> Result<AdjacencyListGraphRepresentation, String> {
-    let query = "?[from_key, to_key, edge_type] := *DependencyEdges{from_key, to_key, edge_type}";
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+    let scope_join = if scope_clause.is_empty() {
+        String::new()
+    } else {
+        format!(", *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}", scope_clause)
+    };
+
+    let query = format!("?[from_key, to_key, edge_type] := *DependencyEdges{{from_key, to_key, edge_type}}{}", scope_join);
     let result = storage
-        .raw_query(query)
+        .raw_query(&query)
         .await
         .map_err(|e| format!("Database query failed: {}", e))?;
 

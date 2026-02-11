@@ -12,6 +12,8 @@ use rayon::prelude::*;
 
 use parseltongue_core::entities::*;
 use parseltongue_core::storage::CozoDbStorage;
+use parseltongue_core::storage::path_utils::normalize_split_file_path;
+use parseltongue_core::query_extractor::{count_top_level_comment_words, compute_import_word_count_safely};
 use crate::errors::*;
 use crate::external_dependency_handler::extract_placeholders_from_edges_deduplicated;
 use crate::isgl1_generator::*;
@@ -490,6 +492,10 @@ impl FileStreamer for FileStreamerImpl {
         let mut entities_created = 0;
         let mut errors = Vec::new();
 
+        // v1.6.5 Wave 1: Collect ignored files
+        let mut ignored_files: Vec<IgnoredFileRow> = Vec::new();
+        let workspace_root = self.config.root_dir.clone();
+
         println!(
             "{}",
             style("Starting directory streaming...").blue().bold()
@@ -523,7 +529,28 @@ impl FileStreamer for FileStreamerImpl {
 
             let path = entry.path();
 
-            if path.is_file() && self.should_process_file(path) {
+            if path.is_file() {
+                // v1.6.5 Wave 1: Collect ignored files
+                if !self.should_process_file(path) {
+                    // Check if it's ignored due to no parser (Language::from_file_path returns None)
+                    if Language::from_file_path(path).is_none() {
+                        let (folder_path, filename) = normalize_split_file_path(path, &workspace_root);
+                        let extension = path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        ignored_files.push(IgnoredFileRow {
+                            folder_path,
+                            filename,
+                            extension,
+                            reason: "no_parser".to_string(),
+                        });
+                    }
+                    continue;
+                }
+
                 total_files += 1;
                 pb.set_message(format!("Processing: {}", path.display()));
 
@@ -583,6 +610,18 @@ impl FileStreamer for FileStreamerImpl {
             );
         }
 
+        // v1.6.5 Wave 1: Batch insert ignored files
+        if !ignored_files.is_empty() {
+            if let Err(e) = self.db.insert_ignored_files_batch(&ignored_files).await {
+                eprintln!("Warning: Failed to insert {} ignored files: {}", ignored_files.len(), e);
+            } else {
+                println!("\n{} {} files ignored (no parser available)",
+                    style("ℹ").cyan(),
+                    ignored_files.len()
+                );
+            }
+        }
+
         Ok(StreamResult {
             total_files,
             processed_files,
@@ -594,6 +633,10 @@ impl FileStreamer for FileStreamerImpl {
 
     async fn stream_directory_with_parallel_rayon(&self) -> Result<StreamResult> {
         let start_time = Instant::now();
+
+        // v1.6.5 Wave 1: Collect ignored files
+        let workspace_root = self.config.root_dir.clone();
+        let mut ignored_files: Vec<IgnoredFileRow> = Vec::new();
 
         println!(
             "{}",
@@ -624,7 +667,26 @@ impl FileStreamer for FileStreamerImpl {
             })
             .filter_map(|entry| {
                 let path = entry.path();
-                if path.is_file() && self.should_process_file(path) {
+                if path.is_file() {
+                    // v1.6.5 Wave 1: Collect ignored files
+                    if !self.should_process_file(path) {
+                        if Language::from_file_path(path).is_none() {
+                            let (folder_path, filename) = normalize_split_file_path(path, &workspace_root);
+                            let extension = path
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .unwrap_or("")
+                                .to_string();
+
+                            ignored_files.push(IgnoredFileRow {
+                                folder_path,
+                                filename,
+                                extension,
+                                reason: "no_parser".to_string(),
+                            });
+                        }
+                        return None;
+                    }
                     Some(path.to_path_buf())
                 } else {
                     None
@@ -637,7 +699,7 @@ impl FileStreamer for FileStreamerImpl {
 
         // Step 2: Process files in parallel using Rayon
         // Note: tree-sitter Parser is !Send, so we use thread-local initialization
-        let results: Vec<Result<(FileResult, Vec<CodeEntity>, Vec<parseltongue_core::entities::DependencyEdge>)>> =
+        let results: Vec<Result<(FileResult, Vec<CodeEntity>, Vec<parseltongue_core::entities::DependencyEdge>, Vec<ExcludedTestEntity>, Vec<FileWordCoverageRow>)>> =
             files_to_process
                 .par_iter()
                 .map(|file_path| {
@@ -655,14 +717,18 @@ impl FileStreamer for FileStreamerImpl {
         let mut errors = Vec::new();
         let mut all_entities: Vec<CodeEntity> = Vec::new();
         let mut all_dependencies: Vec<parseltongue_core::entities::DependencyEdge> = Vec::new();
+        let mut all_excluded_tests: Vec<ExcludedTestEntity> = Vec::new();
+        let mut all_word_coverages: Vec<FileWordCoverageRow> = Vec::new();
 
         for result in results {
             match result {
-                Ok((file_result, entities, dependencies)) => {
+                Ok((file_result, entities, dependencies, excluded_tests, word_coverages)) => {
                     processed_files += 1;
                     entities_created += file_result.entities_created;
                     all_entities.extend(entities);
                     all_dependencies.extend(dependencies);
+                    all_excluded_tests.extend(excluded_tests);
+                    all_word_coverages.extend(word_coverages);
                     if let Some(error) = file_result.error {
                         errors.push(error);
                     }
@@ -711,6 +777,20 @@ impl FileStreamer for FileStreamerImpl {
             }
         }
 
+        // v1.6.5: Batch insert excluded test entities
+        if !all_excluded_tests.is_empty() {
+            if let Err(e) = self.db.insert_test_entities_excluded_batch(&all_excluded_tests).await {
+                errors.push(format!("[v1.6.5] Failed to insert {} excluded tests: {}", all_excluded_tests.len(), e));
+            }
+        }
+
+        // v1.6.5: Batch insert word coverage metrics
+        if !all_word_coverages.is_empty() {
+            if let Err(e) = self.db.insert_file_word_coverage_batch(&all_word_coverages).await {
+                errors.push(format!("[v1.6.5] Failed to insert {} word coverage rows: {}", all_word_coverages.len(), e));
+            }
+        }
+
         let duration = start_time.elapsed();
 
         // Get final stats for CODE/TEST breakdown
@@ -738,6 +818,18 @@ impl FileStreamer for FileStreamerImpl {
             );
         }
 
+        // v1.6.5 Wave 1: Batch insert ignored files
+        if !ignored_files.is_empty() {
+            if let Err(e) = self.db.insert_ignored_files_batch(&ignored_files).await {
+                eprintln!("Warning: Failed to insert {} ignored files: {}", ignored_files.len(), e);
+            } else {
+                println!("\n{} {} files ignored (no parser available)",
+                    style("ℹ").cyan(),
+                    ignored_files.len()
+                );
+            }
+        }
+
         Ok(StreamResult {
             total_files,
             processed_files,
@@ -760,6 +852,14 @@ impl FileStreamer for FileStreamerImpl {
         let mut code_count = 0;  // v0.9.3: Track CODE entities
         let mut test_count = 0;  // v0.9.3: Track TEST entities
         let mut errors: Vec<String> = Vec::new();
+
+        // v1.6.5: Collectors for diagnostics coverage
+        let mut excluded_tests: Vec<ExcludedTestEntity> = Vec::new();
+        let workspace_root = self.config.root_dir.clone();
+        let (folder_path, filename) = normalize_split_file_path(file_path, &workspace_root);
+        let lang_str = self.key_generator.get_language_type(file_path)
+            .map(|l| format!("{:?}", l).to_lowercase())
+            .unwrap_or_else(|_| "unknown".to_string());
 
         // Collect extraction warnings from parsing
         for warning in extraction_warnings {
@@ -802,6 +902,17 @@ impl FileStreamer for FileStreamerImpl {
 
                     // ✅ v0.9.6: Skip test entities - they pollute LLM context
                     if matches!(entity_class, parseltongue_core::EntityClass::TestImplementation) {
+                        // v1.6.5: Collect excluded test entity for diagnostics
+                        excluded_tests.push(ExcludedTestEntity {
+                            entity_name: code_entity.isgl1_key.clone(),
+                            folder_path: folder_path.clone(),
+                            filename: filename.clone(),
+                            entity_class: "TestImplementation".to_string(),
+                            language: lang_str.clone(),
+                            line_start: parsed_entity.line_range.0,
+                            line_end: parsed_entity.line_range.1,
+                            detection_reason: "test_classification".to_string(),
+                        });
                         test_count += 1;
                         continue; // Don't insert tests into database
                     }
@@ -888,6 +999,47 @@ impl FileStreamer for FileStreamerImpl {
             }
         }
 
+        // v1.6.5: Compute word coverage metrics for this file
+        let source_word_count = content.split_whitespace().count();
+        let entity_word_count: usize = entities_to_insert.iter()
+            .filter_map(|e| e.current_code.as_deref())
+            .map(|code| code.split_whitespace().count())
+            .sum();
+        let comment_word_count = self.compute_comment_word_count_safely(&content, &lang_str);
+        let import_word_count = self.compute_import_word_count_safely(&content, &lang_str);
+        let raw_coverage_pct = if source_word_count > 0 {
+            (entity_word_count as f64 / source_word_count as f64) * 100.0
+        } else { 100.0 };
+        let effective_source = source_word_count.saturating_sub(import_word_count + comment_word_count);
+        let effective_coverage_pct = if effective_source > 0 {
+            (entity_word_count as f64 / effective_source as f64) * 100.0
+        } else { 100.0 };
+
+        let word_coverage = FileWordCoverageRow {
+            folder_path: folder_path.clone(),
+            filename: filename.clone(),
+            language: lang_str.clone(),
+            source_word_count,
+            entity_word_count,
+            import_word_count,
+            comment_word_count,
+            raw_coverage_pct,
+            effective_coverage_pct,
+            entity_count: entities_to_insert.len(),
+        };
+
+        // v1.6.5: Batch insert excluded tests
+        if !excluded_tests.is_empty() {
+            if let Err(e) = self.db.insert_test_entities_excluded_batch(&excluded_tests).await {
+                errors.push(format!("[v1.6.5] Failed to insert {} excluded tests: {}", excluded_tests.len(), e));
+            }
+        }
+
+        // v1.6.5: Insert word coverage for this file
+        if let Err(e) = self.db.insert_file_word_coverage_batch(&[word_coverage]).await {
+            errors.push(format!("[v1.6.5] Failed to insert word coverage for {}: {}", filename, e));
+        }
+
         self.update_stats(entities_created, code_count, test_count, !errors.is_empty());
 
         Ok(FileResult {
@@ -908,6 +1060,85 @@ impl FileStreamer for FileStreamerImpl {
 }
 
 impl FileStreamerImpl {
+    /// Compute comment word count safely with tree-sitter re-parse (v1.6.5).
+    ///
+    /// # 4-Word Name: compute_comment_word_count_safely
+    fn compute_comment_word_count_safely(&self, source: &str, language: &str) -> usize {
+        let ts_lang: Option<tree_sitter::Language> = match language {
+            "rust" => Some(tree_sitter_rust::LANGUAGE.into()),
+            "python" => Some(tree_sitter_python::LANGUAGE.into()),
+            "javascript" => Some(tree_sitter_javascript::LANGUAGE.into()),
+            "typescript" => Some(tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
+            "go" => Some(tree_sitter_go::LANGUAGE.into()),
+            "java" => Some(tree_sitter_java::LANGUAGE.into()),
+            "c" => Some(tree_sitter_c::LANGUAGE.into()),
+            "cpp" => Some(tree_sitter_cpp::LANGUAGE.into()),
+            "ruby" => Some(tree_sitter_ruby::LANGUAGE.into()),
+            "php" => Some(tree_sitter_php::LANGUAGE_PHP.into()),
+            "csharp" => Some(tree_sitter_c_sharp::LANGUAGE.into()),
+            "swift" => Some(tree_sitter_swift::LANGUAGE.into()),
+            _ => None,
+        };
+
+        if let Some(lang) = ts_lang {
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(&lang).is_ok() {
+                if let Some(tree) = parser.parse(source, None) {
+                    return count_top_level_comment_words(tree.root_node(), source, language);
+                }
+            }
+        }
+        0
+    }
+
+    /// Compute import word count safely with tree-sitter re-parse (v1.6.5).
+    ///
+    /// # 4-Word Name: compute_import_word_count_safely
+    fn compute_import_word_count_safely(&self, source: &str, language_str: &str) -> usize {
+        // Convert string to Language enum
+        let language = match language_str {
+            "rust" => Language::Rust,
+            "python" => Language::Python,
+            "javascript" => Language::JavaScript,
+            "typescript" => Language::TypeScript,
+            "go" => Language::Go,
+            "java" => Language::Java,
+            "c" => Language::C,
+            "cpp" => Language::Cpp,
+            "ruby" => Language::Ruby,
+            "php" => Language::Php,
+            "csharp" => Language::CSharp,
+            "swift" => Language::Swift,
+            _ => return 0, // Unknown language
+        };
+
+        let ts_lang: Option<tree_sitter::Language> = match language {
+            Language::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
+            Language::Python => Some(tree_sitter_python::LANGUAGE.into()),
+            Language::JavaScript => Some(tree_sitter_javascript::LANGUAGE.into()),
+            Language::TypeScript => Some(tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
+            Language::Go => Some(tree_sitter_go::LANGUAGE.into()),
+            Language::Java => Some(tree_sitter_java::LANGUAGE.into()),
+            Language::C => Some(tree_sitter_c::LANGUAGE.into()),
+            Language::Cpp => Some(tree_sitter_cpp::LANGUAGE.into()),
+            Language::Ruby => Some(tree_sitter_ruby::LANGUAGE.into()),
+            Language::Php => Some(tree_sitter_php::LANGUAGE_PHP.into()),
+            Language::CSharp => Some(tree_sitter_c_sharp::LANGUAGE.into()),
+            Language::Swift => Some(tree_sitter_swift::LANGUAGE.into()),
+            _ => None,
+        };
+
+        if let Some(lang) = ts_lang {
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(&lang).is_ok() {
+                if let Some(tree) = parser.parse(source, None) {
+                    return compute_import_word_count_safely(&tree, source, language);
+                }
+            }
+        }
+        0
+    }
+
     /// v1.5.4: Synchronous file processing for parallel context with Rayon
     ///
     /// # 4-Word Name: process_file_sync_for_parallel
@@ -923,12 +1154,12 @@ impl FileStreamerImpl {
     /// because file parsing (tree-sitter) dominates I/O time.
     ///
     /// # Return Type
-    /// Returns (FileResult, entities_to_insert, dependencies_to_insert)
+    /// Returns (FileResult, entities, dependencies, excluded_tests, word_coverage)
     /// The entities and dependencies need to be inserted after parallel processing
     fn process_file_sync_for_parallel(
         &self,
         file_path: &Path,
-    ) -> Result<(FileResult, Vec<CodeEntity>, Vec<parseltongue_core::entities::DependencyEdge>)> {
+    ) -> Result<(FileResult, Vec<CodeEntity>, Vec<parseltongue_core::entities::DependencyEdge>, Vec<ExcludedTestEntity>, Vec<FileWordCoverageRow>)> {
         let file_path_str = file_path.to_string_lossy().to_string();
 
         // Read file content synchronously
@@ -953,6 +1184,14 @@ impl FileStreamerImpl {
         let mut code_count = 0;
         let mut test_count = 0;
         let mut errors: Vec<String> = Vec::new();
+
+        // v1.6.5: Collectors for diagnostics
+        let mut excluded_tests: Vec<ExcludedTestEntity> = Vec::new();
+        let workspace_root = self.config.root_dir.clone();
+        let (folder_path, filename) = normalize_split_file_path(file_path, &workspace_root);
+        let lang_str = self.key_generator.get_language_type(file_path)
+            .map(|l| format!("{:?}", l).to_lowercase())
+            .unwrap_or_else(|_| "unknown".to_string());
 
         // Collect extraction warnings from parsing
         for warning in extraction_warnings {
@@ -986,6 +1225,17 @@ impl FileStreamerImpl {
 
                     // Skip test entities
                     if matches!(entity_class, parseltongue_core::EntityClass::TestImplementation) {
+                        // v1.6.5: Collect excluded test entity
+                        excluded_tests.push(ExcludedTestEntity {
+                            entity_name: code_entity.isgl1_key.clone(),
+                            folder_path: folder_path.clone(),
+                            filename: filename.clone(),
+                            entity_class: "TestImplementation".to_string(),
+                            language: lang_str.clone(),
+                            line_start: parsed_entity.line_range.0,
+                            line_end: parsed_entity.line_range.1,
+                            detection_reason: "test_classification".to_string(),
+                        });
                         test_count += 1;
                         continue;
                     }
@@ -1003,6 +1253,35 @@ impl FileStreamerImpl {
 
         let entities_created = entities_to_insert.len();
 
+        // v1.6.5: Compute word coverage
+        let source_word_count = content.split_whitespace().count();
+        let entity_word_count: usize = entities_to_insert.iter()
+            .filter_map(|e| e.current_code.as_deref())
+            .map(|code| code.split_whitespace().count())
+            .sum();
+        let comment_word_count = self.compute_comment_word_count_safely(&content, &lang_str);
+        let import_word_count = self.compute_import_word_count_safely(&content, &lang_str);
+        let raw_coverage_pct = if source_word_count > 0 {
+            (entity_word_count as f64 / source_word_count as f64) * 100.0
+        } else { 100.0 };
+        let effective_source = source_word_count.saturating_sub(import_word_count + comment_word_count);
+        let effective_coverage_pct = if effective_source > 0 {
+            (entity_word_count as f64 / effective_source as f64) * 100.0
+        } else { 100.0 };
+
+        let word_coverages = vec![FileWordCoverageRow {
+            folder_path,
+            filename,
+            language: lang_str,
+            source_word_count,
+            entity_word_count,
+            import_word_count,
+            comment_word_count,
+            raw_coverage_pct,
+            effective_coverage_pct,
+            entity_count: entities_to_insert.len(),
+        }];
+
         // Update stats
         self.update_stats(entities_created, code_count, test_count, !errors.is_empty());
 
@@ -1017,7 +1296,7 @@ impl FileStreamerImpl {
             },
         };
 
-        Ok((file_result, entities_to_insert, dependencies))
+        Ok((file_result, entities_to_insert, dependencies, excluded_tests, word_coverages))
     }
 
     /// Fetch LSP metadata for an entity using rust-analyzer hover

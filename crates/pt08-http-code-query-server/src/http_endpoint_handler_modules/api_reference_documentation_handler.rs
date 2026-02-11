@@ -99,13 +99,25 @@ pub async fn handle_api_reference_documentation_help(
             success: true,
             endpoint: "/api-reference-documentation-help".to_string(),
             data: ApiReferenceDataPayload {
-                api_version: "1.6.1".to_string(),
+                api_version: "1.6.5".to_string(),
                 total_endpoints,
                 categories,
             },
             tokens,
         }),
     ).into_response()
+}
+
+/// Create scope parameter documentation
+///
+/// # 4-Word Name: create_scope_parameter_doc
+fn create_scope_parameter_doc() -> EndpointParameterDocPayload {
+    EndpointParameterDocPayload {
+        name: "scope".to_string(),
+        param_type: "query".to_string(),
+        required: false,
+        description: "Filter by folder scope (e.g., 'crates' or 'crates||parseltongue-core' for L1||L2)".to_string(),
+    }
 }
 
 /// Build API documentation categories with all endpoints
@@ -150,6 +162,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Filter by entity type (fn, struct, etc)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
@@ -176,6 +189,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: true,
                             description: "Search pattern (case-insensitive substring match)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
             ],
@@ -187,7 +201,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                     path: "/dependency-edges-list-all".to_string(),
                     method: "GET".to_string(),
                     description: "Lists all dependency edges in the graph".to_string(),
-                    parameters: vec![],
+                    parameters: vec![create_scope_parameter_doc()],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/reverse-callers-query-graph".to_string(),
@@ -200,6 +214,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: true,
                             description: "Entity key to find callers for".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
@@ -213,6 +228,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: true,
                             description: "Entity key to find callees for".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
             ],
@@ -237,13 +253,14 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Maximum depth to traverse (default: 3)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/circular-dependency-detection-scan".to_string(),
                     method: "GET".to_string(),
                     description: "Detects cycles in the dependency graph".to_string(),
-                    parameters: vec![],
+                    parameters: vec![create_scope_parameter_doc()],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/complexity-hotspots-ranking-view".to_string(),
@@ -256,13 +273,14 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Number of hotspots to return (default: 10)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/semantic-cluster-grouping-list".to_string(),
                     method: "GET".to_string(),
                     description: "Groups entities into semantic clusters by connectivity".to_string(),
-                    parameters: vec![],
+                    parameters: vec![create_scope_parameter_doc()],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/smart-context-token-budget".to_string(),
@@ -281,6 +299,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Maximum token budget (default: 4000)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
             ],
@@ -292,7 +311,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                     path: "/strongly-connected-components-analysis".to_string(),
                     method: "GET".to_string(),
                     description: "Tarjan SCC detection - finds circular dependency cycles".to_string(),
-                    parameters: vec![],
+                    parameters: vec![create_scope_parameter_doc()],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/technical-debt-sqale-scoring".to_string(),
@@ -311,6 +330,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Filter entities with debt >= N hours".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
@@ -324,6 +344,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Filter entities with coreness >= k".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
@@ -343,6 +364,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Return top N entities".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
@@ -356,6 +378,7 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Entity key (omit for all entities)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
@@ -369,13 +392,14 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             required: false,
                             description: "Entity key (omit for all entities)".to_string(),
                         },
+                        create_scope_parameter_doc(),
                     ],
                 },
                 EndpointDocumentationEntryPayload {
                     path: "/leiden-community-detection-clusters".to_string(),
                     method: "GET".to_string(),
                     description: "Leiden community detection with directed modularity".to_string(),
-                    parameters: vec![],
+                    parameters: vec![create_scope_parameter_doc()],
                 },
             ],
         },
@@ -392,6 +416,32 @@ fn build_api_documentation_categories() -> Vec<EndpointCategoryDocPayload> {
                             param_type: "query".to_string(),
                             required: false,
                             description: "Folder depth level (0=root only, 1=L1 folders, 2=L2 folders, default: 2)".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/ingestion-diagnostics-coverage-report".to_string(),
+                    method: "GET".to_string(),
+                    description: "Comprehensive diagnostics report with test entity exclusions, word coverage, and ignored files (v1.6.5)".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "section".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Filter sections: 'test_entities', 'word_coverage', 'ignored_files', 'summary', or omit for all (v1.6.5 Wave 3)".to_string(),
+                        },
+                    ],
+                },
+                EndpointDocumentationEntryPayload {
+                    path: "/folder-structure-discovery-tree".to_string(),
+                    method: "GET".to_string(),
+                    description: "Returns hierarchical folder tree structure with file counts (v1.6.5)".to_string(),
+                    parameters: vec![
+                        EndpointParameterDocPayload {
+                            name: "depth".to_string(),
+                            param_type: "query".to_string(),
+                            required: false,
+                            description: "Maximum tree depth (default: unlimited)".to_string(),
                         },
                     ],
                 },

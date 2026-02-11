@@ -31,3 +31,6 @@ pub mod coupling_cohesion_metrics_handler;
 pub mod leiden_community_detection_handler;
 // v1.6.1: Ingestion coverage reporting
 pub mod ingestion_coverage_folder_handler;
+// v1.6.5: Diagnostics and folder discovery
+pub mod ingestion_diagnostics_coverage_handler;
+pub mod folder_structure_discovery_handler;

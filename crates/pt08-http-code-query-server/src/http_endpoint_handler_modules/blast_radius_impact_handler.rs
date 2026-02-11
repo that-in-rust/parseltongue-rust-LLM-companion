@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Extract function name from ISGL1 key for fuzzy matching
 ///
@@ -51,6 +52,8 @@ pub struct BlastRadiusQueryParamsStruct {
     /// Maximum hops to traverse (default: 3)
     #[serde(default = "default_hops")]
     pub hops: usize,
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
 }
 
 fn default_hops() -> usize {
@@ -134,7 +137,7 @@ pub async fn handle_blast_radius_impact_analysis(
     }
 
     // Compute blast radius using BFS traversal
-    let by_hop = compute_blast_radius_by_hops(&state, &params.entity, params.hops).await;
+    let by_hop = compute_blast_radius_by_hops(&state, &params.entity, params.hops, &params.scope).await;
 
     // Calculate total affected
     let total_affected: usize = by_hop.iter().map(|h| h.count).sum();
@@ -186,6 +189,7 @@ async fn compute_blast_radius_by_hops(
     state: &SharedApplicationStateContainer,
     source_entity: &str,
     max_hops: usize,
+    scope_filter: &Option<String>,
 ) -> Vec<BlastRadiusHopDataItem> {
     // Clone Arc, release lock, then await
     let storage = {
@@ -195,6 +199,14 @@ async fn compute_blast_radius_by_hops(
             None => return Vec::new(),
         }
     }; // Lock released here
+
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+    let scope_join = if scope_clause.is_empty() {
+        String::new()
+    } else {
+        format!(", *CodeGraph{{ISGL1_key: from_key, root_subfolder_L1, root_subfolder_L2}}{}", scope_clause)
+    };
 
     let mut result: Vec<BlastRadiusHopDataItem> = Vec::new();
     let mut visited: HashSet<String> = HashSet::new();
@@ -228,9 +240,9 @@ async fn compute_blast_radius_by_hops(
                         ?[from_key] := *DependencyEdges{{from_key, to_key}},
                             (to_key == "{}" or
                              starts_with(to_key, "rust:fn:{}:") or
-                             starts_with(to_key, "rust:method:{}:"))
+                             starts_with(to_key, "rust:method:{}:")){}
                         "#,
-                        escaped_entity, escaped_func_name, escaped_func_name
+                        escaped_entity, escaped_func_name, escaped_func_name, scope_join
                     )
                 }
                 None => {
@@ -238,9 +250,9 @@ async fn compute_blast_radius_by_hops(
                     format!(
                         r#"
                         ?[from_key] := *DependencyEdges{{from_key, to_key}},
-                            to_key == "{}"
+                            to_key == "{}"{}
                         "#,
-                        escaped_entity
+                        escaped_entity, scope_join
                     )
                 }
             };

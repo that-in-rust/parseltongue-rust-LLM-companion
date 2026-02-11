@@ -16,6 +16,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
+use crate::scope_filter_utilities_module::parse_scope_build_filter_clause;
 
 /// Query parameters for entity detail endpoint
 ///
@@ -24,6 +25,8 @@ use crate::http_server_startup_runner::SharedApplicationStateContainer;
 pub struct EntityDetailQueryParams {
     /// Entity key (required)
     pub key: String,
+    /// Filter by folder scope (e.g., "crates||parseltongue-core")
+    pub scope: Option<String>,
 }
 
 /// Entity detail response data
@@ -96,7 +99,7 @@ pub async fn handle_code_entity_detail_view(
     };
 
     // Query for entity details
-    if let Some(entity_details) = fetch_entity_details_from_database(&state, &entity_key).await {
+    if let Some(entity_details) = fetch_entity_details_from_database(&state, &entity_key, &params.scope).await {
         let tokens = 100 + entity_details.code.len();
         (
             StatusCode::OK,
@@ -150,6 +153,7 @@ struct EntityDatabaseQueryResult {
 async fn fetch_entity_details_from_database(
     state: &SharedApplicationStateContainer,
     entity_key: &str,
+    scope_filter: &Option<String>,
 ) -> Option<EntityDatabaseQueryResult> {
     // CRITICAL: Clone Arc inside scope, release lock BEFORE .await
     // Holding RwLock across .await causes deadlock (tokio rule violation)
@@ -163,10 +167,14 @@ async fn fetch_entity_details_from_database(
         .replace('\\', "\\\\")
         .replace('"', "\\\"");
 
+    // Build scope filter clause
+    let scope_clause = parse_scope_build_filter_clause(scope_filter);
+
     // Query for entity by key - now safe, no lock held
     let query_result = storage
         .raw_query(&format!(
-            "?[file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{{ISGL1_key, file_path, entity_type, entity_class, language, Current_Code}}, ISGL1_key == \"{}\"",
+            "?[file_path, entity_type, entity_class, language, Current_Code] := *CodeGraph{{ISGL1_key, file_path, entity_type, entity_class, language, Current_Code, root_subfolder_L1, root_subfolder_L2}}{}, ISGL1_key == \"{}\"",
+            scope_clause,
             escaped_entity_key
         ))
         .await
