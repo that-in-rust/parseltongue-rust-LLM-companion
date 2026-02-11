@@ -160,7 +160,8 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
 
     // Create and run streamer
     let streamer = pt01_folder_to_cozodb_streamer::ToolFactory::create_streamer(config.clone()).await?;
-    let result = streamer.stream_directory().await?;
+    // Phase 5: Use parallel streaming by default for better performance
+    let result = streamer.stream_directory_with_parallel_rayon().await?;
 
     // Write ingestion error log
     {

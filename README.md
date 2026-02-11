@@ -94,10 +94,48 @@ With grep: 500K tokens, no dependency info. With Parseltongue: 2K tokens, full g
 | "Is file watching on?" | `GET /file-watcher-status-check` | ~50 |
 | "Reindex this file" | `POST /incremental-reindex-file-update?path=X` | ~100 |
 | "How much was parsed?" | `GET /ingestion-coverage-folder-report?depth=2` | ~1.5K |
+| "What folders exist?" | `GET /folder-structure-discovery-tree` | ~250 |
+| "Parse quality report" | `GET /ingestion-diagnostics-coverage-report` | ~1.8K |
+| "Just the summary" | `GET /ingestion-diagnostics-coverage-report?section=summary` | ~100 |
 
 ---
 
-## HTTP API Reference (22 Endpoints)
+## Folder-Scoped Queries (v1.6.5)
+
+All 18 query endpoints accept an optional `?scope=` parameter to filter results by folder:
+
+```bash
+# Discover folder structure first
+curl http://localhost:7777/folder-structure-discovery-tree
+
+# Scope queries to a specific folder
+curl "http://localhost:7777/code-entities-list-all?scope=crates||parseltongue-core"
+curl "http://localhost:7777/blast-radius-impact-analysis?entity=ENTITY_KEY&hops=2&scope=crates||parseltongue-core"
+curl "http://localhost:7777/circular-dependency-detection-scan?scope=crates||pt08-http-code-query-server"
+```
+
+**Scope syntax**: `?scope=L1` (top-level folder) or `?scope=L1||L2` (subfolder). Double-pipe `||` delimiter avoids path separator confusion. Absent `?scope=` returns full unfiltered results (backward compatible). Invalid scope returns suggestions.
+
+---
+
+## Ingestion Diagnostics (v1.6.5)
+
+```bash
+# Full diagnostics report (test exclusions + word coverage + ignored files)
+curl http://localhost:7777/ingestion-diagnostics-coverage-report
+
+# Request specific section only (saves tokens)
+curl "http://localhost:7777/ingestion-diagnostics-coverage-report?section=summary"
+curl "http://localhost:7777/ingestion-diagnostics-coverage-report?section=word_coverage"
+curl "http://localhost:7777/ingestion-diagnostics-coverage-report?section=test_entities"
+curl "http://localhost:7777/ingestion-diagnostics-coverage-report?section=ignored_files"
+```
+
+**Dual coverage metrics**: Each parsed file gets `raw_coverage_pct` (entity words / source words) and `effective_coverage_pct` (entity words / source words minus imports and comments). A file at 72% raw / 96% effective is healthy -- the gap is imports and comments.
+
+---
+
+## HTTP API Reference (26 Endpoints)
 
 ### Core Endpoints
 
@@ -111,12 +149,14 @@ With grep: 500K tokens, no dependency info. With Parseltongue: 2K tokens, full g
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /code-entities-list-all` | All entities |
+| `GET /code-entities-list-all` | All entities (supports `?scope=`) |
 | `GET /code-entities-list-all?entity_type=function` | Filter by type |
-| `GET /code-entity-detail-view?key=X` | Single entity details |
-| `GET /code-entities-search-fuzzy?q=pattern` | Fuzzy search by name |
+| `GET /code-entity-detail-view?key=X` | Single entity details (supports `?scope=`) |
+| `GET /code-entities-search-fuzzy?q=pattern` | Fuzzy search by name (supports `?scope=`) |
 
 ### Graph Query Endpoints
+
+All graph endpoints support `?scope=` for folder-scoped analysis.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -126,6 +166,8 @@ With grep: 500K tokens, no dependency info. With Parseltongue: 2K tokens, full g
 | `GET /blast-radius-impact-analysis?entity=X&hops=N` | What breaks if X changes? |
 
 ### Analysis Endpoints
+
+All analysis endpoints support `?scope=` for folder-scoped analysis.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -146,11 +188,19 @@ With grep: 500K tokens, no dependency info. With Parseltongue: 2K tokens, full g
 | `GET /file-watcher-status-check` | File watcher status |
 | `POST /incremental-reindex-file-update?path=X` | Reindex a specific file |
 
-### Coverage Endpoints
+### Coverage & Diagnostics Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /ingestion-coverage-folder-report?depth=N` | Per-folder parse coverage (total, eligible, parsed files) |
+| `GET /ingestion-diagnostics-coverage-report` | Test exclusions, word coverage, ignored files (v1.6.5) |
+| `GET /ingestion-diagnostics-coverage-report?section=summary` | Summary aggregates only (v1.6.5) |
+
+### Navigation Endpoints (v1.6.5)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /folder-structure-discovery-tree` | L1/L2 folder tree with entity counts |
 
 ### Graph Analysis Endpoints (v1.6.0)
 
@@ -428,6 +478,9 @@ curl "http://localhost:7777/smart-context-token-budget?focus=ENTITY_KEY&tokens=8
 | What are the modules? | `/semantic-cluster-grouping-list` |
 | Give me LLM context | `/smart-context-token-budget` |
 | How much was parsed? | `/ingestion-coverage-folder-report` |
+| What folders exist? | `/folder-structure-discovery-tree` |
+| Parse quality diagnostics? | `/ingestion-diagnostics-coverage-report` |
+| Scope to one folder? | Add `?scope=L1\|\|L2` to any query endpoint |
 
 ---
 

@@ -15,11 +15,43 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tree_sitter::{Parser, Tree};
 use parseltongue_core::entities::{Language, DependencyEdge};
 use parseltongue_core::query_extractor::QueryBasedExtractor;
 use crate::errors::*;
+
+/// Thread-local parser cache for parallel processing.
+///
+/// # Phase 5: Thread-Local Parsers for Rayon Parallelism
+///
+/// Each Rayon worker thread maintains its own HashMap of parsers (one per language).
+/// This eliminates mutex contention from the previous `Arc<Mutex<Parser>>` design.
+///
+/// # Memory Model
+/// - `thread_local!` ensures each OS thread has independent storage
+/// - `RefCell` provides interior mutability within a single thread
+/// - No cross-thread synchronization needed (tree-sitter Parser is !Send)
+///
+/// # Performance Impact
+/// - Expected 3-5x speedup on 10-core systems
+/// - Zero mutex contention
+/// - Parser creation amortized across multiple files per thread
+thread_local! {
+    static THREAD_PARSERS: std::cell::RefCell<HashMap<Language, Parser>> =
+        std::cell::RefCell::new(HashMap::new());
+}
+
+/// Thread-local QueryBasedExtractor cache for parallel processing.
+///
+/// # Phase 5.1: Eliminate QueryBasedExtractor Mutex
+///
+/// The QueryBasedExtractor was the second bottleneck after Parser.
+/// Each thread now gets its own extractor instance.
+thread_local! {
+    static THREAD_EXTRACTOR: std::cell::RefCell<Option<QueryBasedExtractor>> =
+        std::cell::RefCell::new(None);
+}
 
 /// ISGL1 key generator interface
 pub trait Isgl1KeyGenerator: Send + Sync {
@@ -98,9 +130,16 @@ pub enum EntityType {
 ///
 /// **Rationale**: QueryBasedExtractor handles entity extraction perfectly, but dependency
 /// extraction (function call graphs) requires custom traversal logic for Rust.
+///
+/// ## Phase 5 Update: Thread-Local Parsers & Extractors
+///
+/// Replaced both:
+/// - `parsers: HashMap<Language, Arc<Mutex<Parser>>>` → thread_local! THREAD_PARSERS
+/// - `query_extractor: Mutex<QueryBasedExtractor>` → thread_local! THREAD_EXTRACTOR
+///
+/// Zero shared state = zero contention = true parallelism.
 pub struct Isgl1KeyGeneratorImpl {
-    parsers: HashMap<Language, Arc<Mutex<Parser>>>,
-    query_extractor: Mutex<QueryBasedExtractor>,  // v0.8.9: Multi-language entity extraction
+    // Phase 5: All state moved to thread_local! storage
 }
 
 impl Default for Isgl1KeyGeneratorImpl {
@@ -111,44 +150,14 @@ impl Default for Isgl1KeyGeneratorImpl {
 
 impl Isgl1KeyGeneratorImpl {
     /// Create new ISGL1 key generator with support for 13 languages
+    ///
+    /// # Phase 5: Zero-State Constructor
+    ///
+    /// All state (parsers, extractors) moved to thread-local storage.
+    /// This instance is just a marker - real work happens per-thread.
     pub fn new() -> Self {
-        let mut parsers = HashMap::new();
-
-        // Helper macro to initialize parser for a language
-        macro_rules! init_parser {
-            ($lang:expr, $grammar:expr) => {
-                let mut parser = Parser::new();
-                if parser.set_language($grammar).is_ok() {
-                    parsers.insert($lang, Arc::new(Mutex::new(parser)));
-                }
-            };
-        }
-
-        // Initialize all language parsers
-        // LanguageFn must be converted to Language using .into() for tree-sitter 0.24+
-        init_parser!(Language::Rust, &tree_sitter_rust::LANGUAGE.into());
-        init_parser!(Language::Python, &tree_sitter_python::LANGUAGE.into());
-        init_parser!(Language::JavaScript, &tree_sitter_javascript::LANGUAGE.into());
-        init_parser!(Language::TypeScript, &tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into());
-        init_parser!(Language::Go, &tree_sitter_go::LANGUAGE.into());
-        init_parser!(Language::Java, &tree_sitter_java::LANGUAGE.into());
-        init_parser!(Language::C, &tree_sitter_c::LANGUAGE.into());  // v1.0.0: Add missing C parser
-        init_parser!(Language::Cpp, &tree_sitter_cpp::LANGUAGE.into());
-        init_parser!(Language::Ruby, &tree_sitter_ruby::LANGUAGE.into());
-        init_parser!(Language::Php, &tree_sitter_php::LANGUAGE_PHP.into());
-        init_parser!(Language::CSharp, &tree_sitter_c_sharp::LANGUAGE.into());
-        init_parser!(Language::Swift, &tree_sitter_swift::LANGUAGE.into());
-        // Note: Kotlin not supported in v0.8.7 - tree-sitter-kotlin v0.3 uses incompatible tree-sitter 0.20
-        // Will be added when tree-sitter-kotlin updates to 0.24+
-        init_parser!(Language::Scala, &tree_sitter_scala::LANGUAGE.into());
-
-        // v0.8.9: Initialize QueryBasedExtractor for multi-language entity extraction
-        let query_extractor = QueryBasedExtractor::new()
-            .expect("Failed to initialize QueryBasedExtractor - .scm query files missing");
-
         Self {
-            parsers,
-            query_extractor: Mutex::new(query_extractor),
+            // Phase 5: No shared state - everything is thread-local
         }
     }
 
@@ -219,19 +228,9 @@ impl Isgl1KeyGenerator for Isgl1KeyGeneratorImpl {
     fn parse_source(&self, source: &str, file_path: &Path) -> Result<(Vec<ParsedEntity>, Vec<DependencyEdge>, Vec<String>)> {
         let language_type = self.get_language_type(file_path)?;
 
-        let parser_mutex = self.parsers.get(&language_type)
-            .ok_or_else(|| StreamerError::ParsingError {
-                file: file_path.to_string_lossy().to_string(),
-                reason: format!("No parser available for language: {:?}", language_type),
-            })?;
-
-        let mut parser = parser_mutex.lock().unwrap();
-        let tree = parser
-            .parse(source, None)
-            .ok_or_else(|| StreamerError::ParsingError {
-                file: file_path.to_string_lossy().to_string(),
-                reason: "Failed to parse source code".to_string(),
-            })?;
+        // Phase 5: Use thread-local parser instead of Arc<Mutex<Parser>>
+        // This eliminates mutex contention in parallel processing
+        let tree = self.parse_source_with_thread_parser(source, language_type, file_path)?;
 
         let mut entities = Vec::new();
         let mut dependencies = Vec::new();
@@ -244,23 +243,140 @@ impl Isgl1KeyGenerator for Isgl1KeyGeneratorImpl {
     fn get_language_type(&self, file_path: &Path) -> Result<Language> {
         // Use Language::from_file_path to detect language from extension
         let path_buf = file_path.to_path_buf();
-        let language = Language::from_file_path(&path_buf)
+        Language::from_file_path(&path_buf)
             .ok_or_else(|| StreamerError::UnsupportedFileType {
                 path: file_path.to_string_lossy().to_string(),
-            })?;
-
-        // Verify we have a parser for this language
-        if self.parsers.contains_key(&language) {
-            Ok(language)
-        } else {
-            Err(StreamerError::UnsupportedFileType {
-                path: file_path.to_string_lossy().to_string(),
             })
-        }
     }
 }
 
 impl Isgl1KeyGeneratorImpl {
+    /// Get or create thread-local parser for a language.
+    ///
+    /// # 4-Word Name: get_thread_local_parser_instance
+    ///
+    /// # Phase 5: Thread-Local Parser Parallelism
+    ///
+    /// This function replaces the shared `Arc<Mutex<Parser>>` with thread-local
+    /// parser instances. Each Rayon worker thread gets its own parser, eliminating
+    /// mutex contention.
+    ///
+    /// # Performance Contract
+    /// - No mutex locks (zero contention)
+    /// - Parser creation amortized across file processing
+    /// - Target: 3-5x speedup on 10-core systems
+    ///
+    /// # Safety
+    /// - tree-sitter Parser is !Send, so we use thread_local!
+    /// - RefCell provides interior mutability within a thread
+    /// - Each thread independently manages its parser cache
+    fn get_thread_local_parser_instance(&self, language: Language) -> std::result::Result<(), StreamerError> {
+        THREAD_PARSERS.with(|parsers| {
+            let mut parsers = parsers.borrow_mut();
+
+            // Return early if parser already exists for this language
+            if parsers.contains_key(&language) {
+                return Ok(());
+            }
+
+            // Create new parser for this language
+            let mut parser = Parser::new();
+
+            // Get tree-sitter language grammar
+            let ts_lang: tree_sitter::Language = match language {
+                Language::Rust => tree_sitter_rust::LANGUAGE.into(),
+                Language::Python => tree_sitter_python::LANGUAGE.into(),
+                Language::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
+                Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+                Language::Go => tree_sitter_go::LANGUAGE.into(),
+                Language::Java => tree_sitter_java::LANGUAGE.into(),
+                Language::C => tree_sitter_c::LANGUAGE.into(),
+                Language::Cpp => tree_sitter_cpp::LANGUAGE.into(),
+                Language::Ruby => tree_sitter_ruby::LANGUAGE.into(),
+                Language::Php => tree_sitter_php::LANGUAGE_PHP.into(),
+                Language::CSharp => tree_sitter_c_sharp::LANGUAGE.into(),
+                Language::Swift => tree_sitter_swift::LANGUAGE.into(),
+                Language::Scala => tree_sitter_scala::LANGUAGE.into(),
+                _ => {
+                    return Err(StreamerError::ParsingError {
+                        file: "".to_string(),
+                        reason: format!("Unsupported language: {:?}", language),
+                    });
+                }
+            };
+
+            // Configure parser with language
+            parser.set_language(&ts_lang)
+                .map_err(|e| StreamerError::ParsingError {
+                    file: "".to_string(),
+                    reason: format!("Failed to set parser language: {}", e),
+                })?;
+
+            // Store parser in thread-local cache
+            parsers.insert(language, parser);
+            Ok(())
+        })
+    }
+
+    /// Parse source using thread-local parser.
+    ///
+    /// # 4-Word Name: parse_source_with_thread_parser
+    ///
+    /// # Phase 5: Zero-Contention Parsing
+    ///
+    /// This function replaces `parser_mutex.lock().unwrap()` with thread-local
+    /// parser access. No locks, no contention.
+    fn parse_source_with_thread_parser(
+        &self,
+        source: &str,
+        language: Language,
+        file_path: &Path,
+    ) -> Result<Tree> {
+        // Ensure thread-local parser exists
+        self.get_thread_local_parser_instance(language)?;
+
+        // Parse with thread-local parser (no mutex!)
+        THREAD_PARSERS.with(|parsers| {
+            let mut parsers = parsers.borrow_mut();
+            let parser = parsers.get_mut(&language)
+                .ok_or_else(|| StreamerError::ParsingError {
+                    file: file_path.to_string_lossy().to_string(),
+                    reason: format!("Parser not initialized for language: {:?}", language),
+                })?;
+
+            parser.parse(source, None)
+                .ok_or_else(|| StreamerError::ParsingError {
+                    file: file_path.to_string_lossy().to_string(),
+                    reason: "Failed to parse source code".to_string(),
+                })
+        })
+    }
+
+    /// Get or create thread-local QueryBasedExtractor.
+    ///
+    /// # 4-Word Name: get_thread_extractor_instance_safely
+    ///
+    /// # Phase 5.1: Eliminate QueryBasedExtractor Mutex
+    ///
+    /// Creates extractor on first use per thread, amortizing initialization cost.
+    fn get_thread_extractor_instance_safely(&self) -> std::result::Result<(), StreamerError> {
+        THREAD_EXTRACTOR.with(|extractor_cell| {
+            let mut extractor_opt = extractor_cell.borrow_mut();
+
+            if extractor_opt.is_none() {
+                // Create new extractor for this thread
+                let extractor = QueryBasedExtractor::new()
+                    .map_err(|e| StreamerError::ParsingError {
+                        file: "".to_string(),
+                        reason: format!("Failed to initialize QueryBasedExtractor: {}", e),
+                    })?;
+                *extractor_opt = Some(extractor);
+            }
+
+            Ok(())
+        })
+    }
+
     /// Map QueryBasedExtractor's EntityType to pt01's EntityType
     ///
     /// **Design Pattern**: Pure function with exhaustive pattern matching
@@ -367,6 +483,10 @@ impl Isgl1KeyGeneratorImpl {
     /// **Pass 2** (Rust only): Use manual traversal for dependency extraction
     /// - Function call graphs require custom logic not yet in .scm queries
     /// - Future: Move dependency extraction to queries as well
+    ///
+    /// ## Phase 5.1 Update: Thread-Local Extractor
+    ///
+    /// Replaced `query_extractor.lock()` with thread-local access.
     fn extract_entities(
         &self,
         _tree: &Tree,
@@ -377,46 +497,46 @@ impl Isgl1KeyGeneratorImpl {
         dependencies: &mut Vec<DependencyEdge>,
         extraction_warnings: &mut Vec<String>,
     ) {
-        // v0.8.9 CRITICAL FIX: Use QueryBasedExtractor for entity extraction
-        //
-        // This replaces the broken walk_node() approach that only worked for Rust.
-        // Now ALL 12 languages extract entities correctly via .scm query files.
-        match self.query_extractor.lock() {
-            Ok(mut extractor) => {
-                match extractor.parse_source(source, file_path, language) {
-                    Ok((query_entities, query_deps)) => {
-                        // Convert QueryBasedExtractor entities to pt01 ParsedEntity format
-                        for query_entity in query_entities {
-                            entities.push(ParsedEntity {
-                                entity_type: self.map_query_entity_type(&query_entity.entity_type),
-                                name: query_entity.name,
-                                language: query_entity.language,
-                                line_range: query_entity.line_range,
-                                file_path: query_entity.file_path,
-                                metadata: query_entity.metadata,
-                            });
-                        }
+        // Phase 5.1: Use thread-local QueryBasedExtractor (no mutex!)
+        if let Err(e) = self.get_thread_extractor_instance_safely() {
+            extraction_warnings.push(format!("[EXTRACT_FAIL] {}: Failed to initialize thread extractor: {}", file_path.display(), e));
+            return;
+        }
 
-                        // v0.9.0 FEATURE: Rust-specific attribute parsing
-                        // Enrich Rust entities with #[test] metadata after extraction
-                        if language == Language::Rust {
-                            self.enrich_rust_entities_with_attributes(entities, source);
-                        }
+        THREAD_EXTRACTOR.with(|extractor_cell| {
+            let mut extractor_opt = extractor_cell.borrow_mut();
+            let extractor = extractor_opt.as_mut().expect("Extractor should be initialized");
 
-                        // v0.9.0 CRITICAL FIX: Use query-based dependency extraction
-                        // This replaces manual tree-walking for dependency extraction
-                        dependencies.extend(query_deps);
+            match extractor.parse_source(source, file_path, language) {
+                Ok((query_entities, query_deps)) => {
+                    // Convert QueryBasedExtractor entities to pt01 ParsedEntity format
+                    for query_entity in query_entities {
+                        entities.push(ParsedEntity {
+                            entity_type: self.map_query_entity_type(&query_entity.entity_type),
+                            name: query_entity.name,
+                            language: query_entity.language,
+                            line_range: query_entity.line_range,
+                            file_path: query_entity.file_path,
+                            metadata: query_entity.metadata,
+                        });
                     }
-                    Err(e) => {
-                        // Graceful degradation: log error but continue
-                        extraction_warnings.push(format!("[EXTRACT_FAIL] {}: QueryBasedExtractor failed for {:?}: {}", file_path.display(), language, e));
+
+                    // v0.9.0 FEATURE: Rust-specific attribute parsing
+                    // Enrich Rust entities with #[test] metadata after extraction
+                    if language == Language::Rust {
+                        self.enrich_rust_entities_with_attributes(entities, source);
                     }
+
+                    // v0.9.0 CRITICAL FIX: Use query-based dependency extraction
+                    // This replaces manual tree-walking for dependency extraction
+                    dependencies.extend(query_deps);
+                }
+                Err(e) => {
+                    // Graceful degradation: log error but continue
+                    extraction_warnings.push(format!("[EXTRACT_FAIL] {}: QueryBasedExtractor failed for {:?}: {}", file_path.display(), language, e));
                 }
             }
-            Err(e) => {
-                extraction_warnings.push(format!("[EXTRACT_FAIL] {}: Failed to lock query_extractor: {}", file_path.display(), e));
-            }
-        }
+        });
 
         // v0.9.0: Manual dependency extraction replaced by query-based approach (REFACTORED)
         // All entity and dependency extraction now handled by QueryBasedExtractor

@@ -23,6 +23,7 @@
 11. [Acceptance Criteria](#11-acceptance-criteria)
 12. [Open Questions](#12-open-questions)
 13. [Parallel Folder Streaming Architecture](#13-parallel-folder-streaming-architecture)
+14. [Appendix B: Corrections and Errata](#appendix-b-corrections-and-errata)
 
 ---
 
@@ -1204,6 +1205,63 @@ Similarly, tree-sitter already parses the full AST. Walking for comment nodes is
 - **Module declarations, type aliases, global constants** are NOT subtracted. They are less common and harder to reliably detect across all 12 languages. Future enhancement.
 - **Inline comments inside entity bodies** are NOT counted separately (they're already in `entity_word_count`).
 - **Multi-line string literals** at module level (e.g., Python docstrings at module scope) are not identified as comments by tree-sitter and would reduce effective coverage. Acceptable edge case.
+
+---
+
+## Appendix B: Corrections and Errata
+
+This section documents deviations between the original PRD specification and the actual implementation, discovered during verification against the live Parseltongue server (2026-02-11).
+
+### Function Name Corrections
+
+| PRD Name | Actual Name | Location |
+|----------|-------------|----------|
+| `build_scope_filter_clause` | `parse_scope_build_filter_clause` | `scope_filter_utilities_module.rs` |
+| `parse_scope_filter_components` | Does not exist as separate function | Parsing is inline in `parse_scope_build_filter_clause` |
+| `validate_scope_against_database` | `validate_scope_exists_in_database` | `scope_filter_utilities_module.rs` |
+| `escape_for_cozo_string` (core) | `escape_single_quotes` (in scope module) | `scope_filter_utilities_module.rs` |
+
+### File Location Corrections
+
+| PRD Location | Actual Location |
+|-------------|----------------|
+| `http_endpoint_handler_modules/scope_filter_utils.rs` | `crates/pt08-http-code-query-server/src/scope_filter_utilities_module.rs` (at crate root, NOT inside handler modules) |
+
+### CozoDB Datalog Syntax Correction
+
+The PRD (Section 8) showed literal values in atom binding positions:
+```datalog
+-- PRD EXAMPLE (INCORRECT):
+?[ISGL1_key, file_path] := *CodeGraph{ISGL1_key, file_path, root_subfolder_L1: "src", root_subfolder_L2: "core"}
+```
+
+The actual working syntax binds variables first, then applies equality constraints:
+```datalog
+-- ACTUAL WORKING SYNTAX:
+?[key, file_path] := *CodeGraph{ISGL1_key: key, file_path, root_subfolder_L1, root_subfolder_L2},
+    root_subfolder_L1 = 'crates', root_subfolder_L2 = 'parseltongue-core'
+```
+
+CozoDB does not accept literal values in atom binding positions. Variables must be bound, then filtered with `=` conditions in the rule body.
+
+### CodeGraph Schema Correction
+
+The PRD listed 17 columns for CodeGraph. The actual schema has **19 columns** (already includes `root_subfolder_L1` and `root_subfolder_L2` from v1.6.5 implementation).
+
+### Scope Delimiter Correction
+
+The PRD used `|` (single pipe) in some examples. The actual implementation uses `||` (double pipe) as the L1/L2 delimiter in the `?scope=` parameter, consistent with the PRD's own design decision section.
+
+### Implementation Approach Deviation: import_word_count
+
+The PRD specified accumulating byte ranges during `execute_dependency_query()` from `@dependency.*` captures (Section 3, "Import Word Counting"). The actual implementation uses a **separate tree-sitter query pass** via `compute_import_word_count_safely()` in `query_extractor.rs`. This follows the existing `compute_comment_word_count_safely()` pattern and was chosen for:
+- Lower coupling (no modification to dependency extraction pipeline)
+- Independent testability
+- Consistent pattern with comment word counting
+
+### Implementation Approach Deviation: Ignored Files
+
+The PRD specified filesystem walk at query time (Section 4, Report 1). The actual implementation stores ignored files in a CozoDB relation (`IgnoredFiles`) during pt01 ingestion, following the same ingestion-time storage pattern as `TestEntitiesExcluded` and `FileWordCoverage`. This was chosen for consistency and reliability (data survives workspace directory moves).
 
 ---
 
