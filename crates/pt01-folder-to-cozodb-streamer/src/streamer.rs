@@ -482,112 +482,6 @@ impl FileStreamerImpl {
         }
     }
 
-    /// Platform-aware batch insert strategy (v1.6.7).
-    ///
-    /// Windows: chunked sequential inserts with sleep between chunks to prevent
-    /// RocksDB write stall caused by Defender scanning SST files during compaction.
-    /// Mac/Linux: concurrent giant batch via tokio::join! for maximum speed.
-    ///
-    /// # 4-Word Name: insert_all_batches_platform_aware
-    #[allow(clippy::type_complexity)]
-    async fn insert_all_batches_platform_aware(
-        db: &CozoDbStorage,
-        entities: &[CodeEntity],
-        edges: &[DependencyEdge],
-        excluded_tests: &[ExcludedTestEntity],
-        word_coverages: &[FileWordCoverageRow],
-        ignored_files: &[IgnoredFileRow],
-    ) -> (
-        parseltongue_core::error::Result<()>,
-        parseltongue_core::error::Result<()>,
-        parseltongue_core::error::Result<()>,
-        parseltongue_core::error::Result<()>,
-        parseltongue_core::error::Result<()>,
-    ) {
-        #[cfg(target_os = "windows")]
-        {
-            // Windows: chunked sequential inserts to prevent RocksDB write stall.
-            // Defender scans every new SST file → compaction can't keep up with burst writes.
-            // Chunking with sleep spreads writes so compaction keeps pace.
-            const CHUNK_SIZE_ENTITIES: usize = 200;
-            const CHUNK_SIZE_EDGES: usize = 500;
-            const CHUNK_SLEEP_MS: u64 = 10;
-
-            use std::time::Duration;
-
-            // Insert entities in chunks
-            let result_entities = async {
-                for chunk in entities.chunks(CHUNK_SIZE_ENTITIES) {
-                    db.insert_entities_batch(chunk).await?;
-                    if chunk.len() == CHUNK_SIZE_ENTITIES {
-                        tokio::time::sleep(Duration::from_millis(CHUNK_SLEEP_MS)).await;
-                    }
-                }
-                Ok(())
-            }.await;
-
-            // Insert edges in chunks
-            let result_edges = async {
-                for chunk in edges.chunks(CHUNK_SIZE_EDGES) {
-                    db.insert_edges_batch(chunk).await?;
-                    if chunk.len() == CHUNK_SIZE_EDGES {
-                        tokio::time::sleep(Duration::from_millis(CHUNK_SLEEP_MS)).await;
-                    }
-                }
-                Ok(())
-            }.await;
-
-            // Small tables — one shot each (negligible size)
-            let result_excluded_tests = if excluded_tests.is_empty() {
-                Ok(())
-            } else {
-                db.insert_test_entities_excluded_batch(excluded_tests).await
-            };
-
-            let result_word_coverage = if word_coverages.is_empty() {
-                Ok(())
-            } else {
-                db.insert_file_word_coverage_batch(word_coverages).await
-            };
-
-            let result_ignored_files = if ignored_files.is_empty() {
-                Ok(())
-            } else {
-                db.insert_ignored_files_batch(ignored_files).await
-            };
-
-            (result_entities, result_edges, result_excluded_tests, result_word_coverage, result_ignored_files)
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            // Mac/Linux: concurrent giant batch via tokio::join! for maximum speed.
-            // Safe because each insert writes to a DIFFERENT CozoDB relation.
-            // Performance: Sequential ~900ms → Concurrent ~450ms (50% reduction)
-            tokio::join!(
-                async {
-                    if entities.is_empty() { Ok(()) }
-                    else { db.insert_entities_batch(entities).await }
-                },
-                async {
-                    if edges.is_empty() { Ok(()) }
-                    else { db.insert_edges_batch(edges).await }
-                },
-                async {
-                    if excluded_tests.is_empty() { Ok(()) }
-                    else { db.insert_test_entities_excluded_batch(excluded_tests).await }
-                },
-                async {
-                    if word_coverages.is_empty() { Ok(()) }
-                    else { db.insert_file_word_coverage_batch(word_coverages).await }
-                },
-                async {
-                    if ignored_files.is_empty() { Ok(()) }
-                    else { db.insert_ignored_files_batch(ignored_files).await }
-                },
-            )
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -879,19 +773,60 @@ impl FileStreamer for FileStreamerImpl {
             let _ = self.db.create_dependency_edges_schema().await;
         }
 
-        // v1.6.7: Windows uses chunked sequential inserts to prevent RocksDB write stall.
-        // Defender scans every new SST file, slowing compaction below burst write rate.
-        // Chunking spreads writes over time so compaction can keep pace.
-        // Mac/Linux: concurrent giant batch via tokio::join! for maximum speed.
-        let (result_entities, result_edges, result_excluded_tests, result_word_coverage, result_ignored_files) =
-            Self::insert_all_batches_platform_aware(
-                &self.db,
-                &all_entities,
-                &all_dependencies,
-                &all_excluded_tests,
-                &all_word_coverages,
-                &ignored_files,
-            ).await;
+        // Step 4 & 5 & v1.6.5: Concurrent batch inserts for all 5 relations
+        // Use tokio::join! to run inserts in parallel - safe because:
+        // 1. Each insert writes to a DIFFERENT CozoDB relation (no contention)
+        // 2. CozoDB uses per-relation ShardedLock (independent locks)
+        // 3. All functions take &self (not &mut self), allowing concurrent borrows
+        // 4. Arc<CozoDbStorage> enables multiple async tasks to hold references
+        let (
+            result_entities,
+            result_edges,
+            result_excluded_tests,
+            result_word_coverage,
+            result_ignored_files,
+        ) = tokio::join!(
+            // Task 1: Insert entities
+            async {
+                if all_entities.is_empty() {
+                    Ok(())
+                } else {
+                    self.db.insert_entities_batch(&all_entities).await
+                }
+            },
+            // Task 2: Insert dependency edges
+            async {
+                if all_dependencies.is_empty() {
+                    Ok(())
+                } else {
+                    self.db.insert_edges_batch(&all_dependencies).await
+                }
+            },
+            // Task 3: Insert excluded test entities
+            async {
+                if all_excluded_tests.is_empty() {
+                    Ok(())
+                } else {
+                    self.db.insert_test_entities_excluded_batch(&all_excluded_tests).await
+                }
+            },
+            // Task 4: Insert file word coverage
+            async {
+                if all_word_coverages.is_empty() {
+                    Ok(())
+                } else {
+                    self.db.insert_file_word_coverage_batch(&all_word_coverages).await
+                }
+            },
+            // Task 5: Insert ignored files
+            async {
+                if ignored_files.is_empty() {
+                    Ok(())
+                } else {
+                    self.db.insert_ignored_files_batch(&ignored_files).await
+                }
+            },
+        );
 
         // Collect errors from all operations
         if let Err(e) = result_entities {

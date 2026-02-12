@@ -128,8 +128,17 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
     let workspace_db_path = if db == "mem" {
         "mem".to_string()
     } else {
-        // Always use rocksdb with timestamped workspace
-        format!("rocksdb:{}/analysis.db", workspace_dir)
+        // v1.6.9: Windows uses Sled (pure Rust, no SST files for Defender to scan)
+        // Mac/Linux uses RocksDB (fastest)
+        #[cfg(target_os = "windows")]
+        {
+            println!("  Engine: {} (optimized for Windows)", style("Sled").green());
+            format!("sled:{}/analysis.db", workspace_dir)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            format!("rocksdb:{}/analysis.db", workspace_dir)
+        }
     };
 
     println!("{}", style("Running Tool 1: folder-to-cozodb-streamer").cyan());

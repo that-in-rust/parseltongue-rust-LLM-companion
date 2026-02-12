@@ -458,7 +458,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 ## Installation
 
 ```bash
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.8/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.9/parseltongue -o parseltongue && chmod +x parseltongue
 ./parseltongue --version
 ```
 

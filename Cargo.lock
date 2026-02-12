@@ -1895,7 +1895,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue"
-version = "1.6.8"
+version = "1.6.9"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1910,7 +1910,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue-core"
-version = "1.6.8"
+version = "1.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2153,7 +2153,7 @@ dependencies = [
 
 [[package]]
 name = "pt01-folder-to-cozodb-streamer"
-version = "1.6.8"
+version = "1.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2195,7 +2195,7 @@ dependencies = [
 
 [[package]]
 name = "pt08-http-code-query-server"
-version = "1.6.8"
+version = "1.6.9"
 dependencies = [
  "anyhow",
  "async-trait",

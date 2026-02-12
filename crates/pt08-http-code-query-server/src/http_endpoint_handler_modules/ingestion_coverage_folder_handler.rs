@@ -251,8 +251,11 @@ pub async fn handle_ingestion_coverage_folder_report(
 ///
 /// # 4-Word Name: derive_workspace_directory_from_database
 fn derive_workspace_directory_from_database(db_path: &str) -> PathBuf {
-    // Strip "rocksdb:" prefix if present
-    let path_str = db_path.strip_prefix("rocksdb:").unwrap_or(db_path);
+    // Strip engine prefix (rocksdb:, sled:, or sqlite:) if present
+    let path_str = db_path.strip_prefix("rocksdb:")
+        .or_else(|| db_path.strip_prefix("sled:"))
+        .or_else(|| db_path.strip_prefix("sqlite:"))
+        .unwrap_or(db_path);
 
     // Parse as path and get parent directory of analysis.db
     let path = Path::new(path_str);
