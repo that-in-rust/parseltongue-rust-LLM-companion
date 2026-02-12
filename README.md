@@ -458,7 +458,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 ## Installation
 
 ```bash
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.7.0/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.7.2/parseltongue -o parseltongue && chmod +x parseltongue
 ./parseltongue --version
 ```
 
@@ -555,14 +555,13 @@ curl "http://localhost:7777/smart-context-token-budget?focus=ENTITY_KEY&tokens=8
 
 ### Windows Users
 
-Parseltongue auto-tunes RocksDB on first run. If ingestion appears stuck at ~75MB, add the database directory to Windows Defender exclusions:
+Parseltongue automatically handles Windows by ingesting into memory first, then saving to a SQLite database file in one atomic operation. This avoids Windows Defender interference during write-heavy ingestion. No configuration needed — same commands as Mac/Linux.
 
+```bash
+# Same workflow on all platforms
+parseltongue pt01-folder-to-cozodb-streamer .
+parseltongue pt08-http-code-query-server --db "sqlite:parseltongueXXX/analysis.db"
 ```
-Windows Security → Virus & Threat Protection → Manage Settings → Exclusions
-→ Add folder: parseltongue*/analysis.db
-```
-
-Or use a [Dev Drive](https://learn.microsoft.com/en-us/windows/dev-drive/) (Windows 11) which scans asynchronously.
 
 ### Large Codebases (10K+ files)
 
