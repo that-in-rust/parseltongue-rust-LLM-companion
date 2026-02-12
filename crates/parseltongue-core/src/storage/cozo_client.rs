@@ -61,9 +61,13 @@ fn write_rocksdb_options_file_tuned(path: &str) {
     }
 
     // Write tuned OPTIONS file
+    // use_direct_io bypasses Windows filesystem filter driver (Defender hook on SST files)
+    // compaction_readahead_size=2MB recommended by RocksDB wiki when using direct IO
     let options_content = r#"[DBOptions]
 max_background_jobs=4
 create_if_missing=true
+use_direct_io_for_flush_and_compaction=true
+compaction_readahead_size=2097152
 
 [CFOptions "default"]
 write_buffer_size=134217728

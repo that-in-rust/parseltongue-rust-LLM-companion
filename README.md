@@ -20,6 +20,11 @@ Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ## What's New
 
+### v1.6.7 — Windows Direct IO Fix for 144MB Stall
+
+- **Direct IO for compaction**: `use_direct_io_for_flush_and_compaction=true` bypasses Windows Defender filesystem filter driver that was scanning every SST file during compaction, causing stalls at 144MB
+- **Compaction readahead**: `compaction_readahead_size=2MB` as recommended by RocksDB wiki for direct IO mode
+
 ### v1.6.6 — LLM Agent System Prompt + Windows RocksDB Fix
 
 - **LLM Agent System Prompt**: Copy-paste block with every endpoint and exact parameter names — zero guesswork for agents
@@ -487,7 +492,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 ## Installation
 
 ```bash
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.6/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.7/parseltongue -o parseltongue && chmod +x parseltongue
 ./parseltongue --version
 ```
 
