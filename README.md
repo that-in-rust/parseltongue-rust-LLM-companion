@@ -20,6 +20,12 @@ Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ## What's New
 
+### v1.6.6 — LLM Agent System Prompt + Windows RocksDB Fix
+
+- **LLM Agent System Prompt**: Copy-paste block with every endpoint and exact parameter names — zero guesswork for agents
+- **Windows RocksDB write stall fix**: Auto-tunes RocksDB OPTIONS (128MB write buffer, 4 background jobs) to prevent 75MB ingestion stall caused by Windows Defender scanning SST files
+- **Concurrent batch insert**: All 5 CozoDB relation inserts now run in parallel via `tokio::join!` (was 4+1 sequential)
+
 ### v1.6.5 — Folder-Scoped Queries + Diagnostics + 2.92x Parallelism
 
 - **Folder-scoped queries**: All 18 query endpoints accept `?scope=L1||L2` to filter results by folder
@@ -38,6 +44,64 @@ Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 - **CK Metrics suite**: CBO, LCOM, RFC, WMC coupling/cohesion
 - **SQALE technical debt**: ISO 25010 maintainability scoring
 - **Leiden community detection**: Automatic module clustering
+
+---
+
+## LLM Agent System Prompt
+
+Copy this block into your LLM agent's system prompt. It contains every endpoint with exact parameter names — no guessing required.
+
+```text
+PARSELTONGUE CODE ANALYSIS API — Base URL: http://localhost:7777
+All responses: {"success": bool, "endpoint": str, "data": {…}, "tokens": int}
+Entity keys look like: language:type:name:file_path:line_range (e.g. rust:fn:main:src_main_rs:1-50)
+All query endpoints accept optional ?scope=L1||L2 to filter by folder.
+
+STEP 1 — ORIENT (no params needed)
+  GET /server-health-check-status                              → server ok + uptime
+  GET /codebase-statistics-overview-summary                    → entity count, edge count, languages
+  GET /folder-structure-discovery-tree                          → L1/L2 folder tree with entity counts
+  GET /api-reference-documentation-help                        → full API docs with examples
+
+STEP 2 — FIND ENTITIES
+  GET /code-entities-list-all                                  → all entities (data.total_count, data.entities[])
+  GET /code-entities-list-all?entity_type=function             → filter by type
+  GET /code-entities-search-fuzzy?q=PATTERN                    → fuzzy name search (data.total_count, data.entities[])
+  GET /code-entity-detail-view?key=ENTITY_KEY                  → full source code of one entity
+
+STEP 3 — TRACE DEPENDENCIES
+  GET /dependency-edges-list-all                               → all edges (from_key, to_key, edge_type)
+  GET /reverse-callers-query-graph?entity=ENTITY_KEY           → who calls this entity
+  GET /forward-callees-query-graph?entity=ENTITY_KEY           → what does this entity call
+  GET /blast-radius-impact-analysis?entity=ENTITY_KEY&hops=N   → transitive impact (default hops=2)
+
+STEP 4 — ANALYZE ARCHITECTURE
+  GET /circular-dependency-detection-scan                      → circular dependency cycles
+  GET /complexity-hotspots-ranking-view?top=N                  → most coupled entities (default top=10)
+  GET /semantic-cluster-grouping-list                           → module groupings
+  GET /strongly-connected-components-analysis                   → Tarjan SCC cycle detection
+  GET /technical-debt-sqale-scoring                             → ISO 25010 SQALE debt scores
+  GET /kcore-decomposition-layering-analysis                    → core/mid/peripheral layers
+  GET /centrality-measures-entity-ranking?method=pagerank       → entity importance (method: pagerank|betweenness)
+  GET /entropy-complexity-measurement-scores                    → Shannon entropy per entity
+  GET /coupling-cohesion-metrics-suite                          → CK metrics: CBO, LCOM, RFC, WMC
+  GET /leiden-community-detection-clusters                      → Leiden community detection
+
+STEP 5 — CONTEXT FOR LLM
+  GET /smart-context-token-budget?focus=ENTITY_KEY&tokens=N    → optimal code context within token budget
+
+STEP 6 — DIAGNOSTICS
+  GET /file-watcher-status-check                               → file watcher status
+  POST /incremental-reindex-file-update?path=FILE_PATH         → reindex one file
+  GET /ingestion-coverage-folder-report?depth=N                → per-folder parse coverage
+  GET /ingestion-diagnostics-coverage-report                   → full diagnostics report
+  GET /ingestion-diagnostics-coverage-report?section=summary   → summary only (saves tokens)
+  GET /ingestion-diagnostics-coverage-report?section=word_coverage    → per-file coverage
+  GET /ingestion-diagnostics-coverage-report?section=test_entities   → excluded test functions
+  GET /ingestion-diagnostics-coverage-report?section=ignored_files   → skipped files
+
+WORKFLOW: Orient → Search → Read code → Trace callers → Check blast radius → Get LLM context
+```
 
 ---
 
@@ -423,7 +487,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 ## Installation
 
 ```bash
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.5/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.6/parseltongue -o parseltongue && chmod +x parseltongue
 ./parseltongue --version
 ```
 
@@ -505,7 +569,73 @@ curl "http://localhost:7777/smart-context-token-budget?focus=ENTITY_KEY&tokens=8
 | How much was parsed? | `/ingestion-coverage-folder-report` |
 | What folders exist? | `/folder-structure-discovery-tree` |
 | Parse quality diagnostics? | `/ingestion-diagnostics-coverage-report` |
+| Find dependency cycles (SCC) | `/strongly-connected-components-analysis` |
+| Technical debt score | `/technical-debt-sqale-scoring` |
+| Core vs peripheral code | `/kcore-decomposition-layering-analysis` |
+| Most important entities | `/centrality-measures-entity-ranking?method=pagerank` |
+| Information complexity | `/entropy-complexity-measurement-scores` |
+| Coupling/cohesion metrics | `/coupling-cohesion-metrics-suite` |
+| Automatic module detection | `/leiden-community-detection-clusters` |
 | Scope to one folder? | Add `?scope=L1\|\|L2` to any query endpoint |
+
+---
+
+## Best Practices: Performance and Deployment
+
+### Windows Users
+
+Parseltongue auto-tunes RocksDB on first run. If ingestion appears stuck at ~75MB, add the database directory to Windows Defender exclusions:
+
+```
+Windows Security → Virus & Threat Protection → Manage Settings → Exclusions
+→ Add folder: parseltongue*/analysis.db
+```
+
+Or use a [Dev Drive](https://learn.microsoft.com/en-us/windows/dev-drive/) (Windows 11) which scans asynchronously.
+
+### Large Codebases (10K+ files)
+
+```bash
+# Use RocksDB for persistence (not in-memory)
+parseltongue pt01-folder-to-cozodb-streamer ./large-project --db "rocksdb:mydb"
+
+# Verify coverage after ingestion
+curl "http://localhost:7777/ingestion-coverage-folder-report?depth=2"
+
+# Check for parse quality issues
+curl "http://localhost:7777/ingestion-diagnostics-coverage-report?section=summary"
+```
+
+### Architecture Review (7 queries)
+
+```bash
+# 1. Scale
+curl http://localhost:7777/codebase-statistics-overview-summary
+
+# 2. Dependency cycles (Tarjan SCC)
+curl http://localhost:7777/strongly-connected-components-analysis
+
+# 3. Technical debt hotspots (ISO 25010 SQALE)
+curl http://localhost:7777/technical-debt-sqale-scoring
+
+# 4. Core vs peripheral (K-Core decomposition)
+curl http://localhost:7777/kcore-decomposition-layering-analysis
+
+# 5. Most important entities (PageRank)
+curl "http://localhost:7777/centrality-measures-entity-ranking?method=pagerank"
+
+# 6. Coupling and cohesion (CK Metrics)
+curl http://localhost:7777/coupling-cohesion-metrics-suite
+
+# 7. Natural module boundaries (Leiden clustering)
+curl http://localhost:7777/leiden-community-detection-clusters
+```
+
+After these 7 queries you know: size, cycles, debt, core structure, critical entities, coupling health, and natural modules.
+
+### Using Parseltongue with LLM Agents
+
+See the **LLM Agent System Prompt** section at the top of this README. Copy that block into your agent's system prompt — it has every endpoint with exact parameter names and a recommended workflow.
 
 ---
 

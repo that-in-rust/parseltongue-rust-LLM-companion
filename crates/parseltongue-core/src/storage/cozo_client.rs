@@ -31,6 +31,57 @@ pub fn escape_for_cozo_string(s: &str) -> String {
     s.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
+/// Write tuned RocksDB options file to prevent Windows 75MB write stall
+///
+/// Creates an options file in the RocksDB database directory with tuned settings
+/// that prevent write stalls on Windows when ingesting large codebases (>75MB).
+/// The tuning increases buffer sizes and background jobs to handle burst writes.
+///
+/// If the options file already exists, this function does nothing (preserves user customizations).
+/// If writing fails, the error is ignored - the database will still work with defaults.
+///
+/// # Arguments
+/// * `path` - RocksDB database directory path (e.g., "parseltongue20251201/analysis.db")
+fn write_rocksdb_options_file_tuned(path: &str) {
+    use std::fs;
+    use std::io::Write;
+    use std::path::Path;
+
+    let options_path = Path::new(path).join("options");
+
+    // Don't overwrite existing options file (preserve user customizations)
+    if options_path.exists() {
+        return;
+    }
+
+    // Create directory if it doesn't exist
+    if let Err(e) = fs::create_dir_all(path) {
+        eprintln!("Warning: failed to create RocksDB directory {}: {}", path, e);
+        return;
+    }
+
+    // Write tuned OPTIONS file
+    let options_content = r#"[DBOptions]
+max_background_jobs=4
+create_if_missing=true
+
+[CFOptions "default"]
+write_buffer_size=134217728
+max_write_buffer_number=4
+level0_slowdown_writes_trigger=40
+level0_stop_writes_trigger=56
+target_file_size_base=67108864
+max_bytes_for_level_base=268435456
+"#;
+
+    if let Err(e) = fs::File::create(&options_path)
+        .and_then(|mut f| f.write_all(options_content.as_bytes()))
+    {
+        eprintln!("Warning: failed to write RocksDB options file: {}", e);
+        // Continue anyway - database will use defaults
+    }
+}
+
 /// CozoDB storage client
 ///
 /// Provides real database storage with SQLite backend, supporting:
@@ -71,6 +122,11 @@ impl CozoDbStorage {
         } else {
             (engine_spec, "")
         };
+
+        // Write tuned RocksDB options file if using rocksdb engine (fixes Windows 75MB write stall)
+        if engine == "rocksdb" && !path.is_empty() {
+            write_rocksdb_options_file_tuned(path);
+        }
 
         let db = DbInstance::new(engine, path, Default::default())
             .map_err(|e| ParseltongError::DatabaseError {
