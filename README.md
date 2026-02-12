@@ -18,40 +18,6 @@ Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
 
 ---
 
-## What's New
-
-### v1.6.7 — Windows Direct IO Fix for 144MB Stall
-
-- **Direct IO for compaction**: `use_direct_io_for_flush_and_compaction=true` bypasses Windows Defender filesystem filter driver that was scanning every SST file during compaction, causing stalls at 144MB
-- **Compaction readahead**: `compaction_readahead_size=2MB` as recommended by RocksDB wiki for direct IO mode
-
-### v1.6.6 — LLM Agent System Prompt + Windows RocksDB Fix
-
-- **LLM Agent System Prompt**: Copy-paste block with every endpoint and exact parameter names — zero guesswork for agents
-- **Windows RocksDB write stall fix**: Auto-tunes RocksDB OPTIONS (128MB write buffer, 4 background jobs) to prevent 75MB ingestion stall caused by Windows Defender scanning SST files
-- **Concurrent batch insert**: All 5 CozoDB relation inserts now run in parallel via `tokio::join!` (was 4+1 sequential)
-
-### v1.6.5 — Folder-Scoped Queries + Diagnostics + 2.92x Parallelism
-
-- **Folder-scoped queries**: All 18 query endpoints accept `?scope=L1||L2` to filter results by folder
-- **Ingestion diagnostics**: `/ingestion-diagnostics-coverage-report` with test exclusions, word coverage, ignored files
-- **Folder discovery**: `/folder-structure-discovery-tree` for L1/L2 navigation
-- **Thread-local parser parallelism**: 2.92x streaming speedup (5.4s to 1.8s on 302-file codebase, 364% CPU)
-- **Dual coverage metrics**: `raw_coverage_pct` vs `effective_coverage_pct` (accounting for imports/comments)
-- **670 tests** across 12 languages and all subsystems
-
-### v1.6.0 — 7 Mathematical Graph Analysis Algorithms
-
-- **Tarjan SCC**: Strongly connected component cycle detection
-- **K-Core decomposition**: Core/mid/peripheral layer analysis
-- **PageRank + Betweenness centrality**: Entity importance ranking
-- **Shannon entropy**: Information complexity measurement
-- **CK Metrics suite**: CBO, LCOM, RFC, WMC coupling/cohesion
-- **SQALE technical debt**: ISO 25010 maintainability scoring
-- **Leiden community detection**: Automatic module clustering
-
----
-
 ## LLM Agent System Prompt
 
 Copy this block into your LLM agent's system prompt. It contains every endpoint with exact parameter names — no guessing required.
@@ -492,7 +458,7 @@ parseltongue pt08-http-code-query-server [OPTIONS]
 ## Installation
 
 ```bash
-curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.7/parseltongue -o parseltongue && chmod +x parseltongue
+curl -L https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/download/v1.6.8/parseltongue -o parseltongue && chmod +x parseltongue
 ./parseltongue --version
 ```
 
