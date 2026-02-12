@@ -125,19 +125,19 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
     std::fs::create_dir_all(&workspace_dir)?;
 
     // Construct database path within workspace
-    let workspace_db_path = if db == "mem" {
-        "mem".to_string()
+    let (workspace_db_path, backup_target): (String, Option<String>) = if db == "mem" {
+        ("mem".to_string(), None)
     } else {
-        // v1.7.0: Windows uses SQLite (CozoDB-recommended, stable, no data loss)
-        // Mac/Linux uses RocksDB (fastest)
+        // v1.7.2: Windows uses in-memory ingestion + SQLite backup (avoids Defender filesystem interference)
+        // Mac/Linux uses RocksDB directly (fastest, no issues)
         #[cfg(target_os = "windows")]
         {
-            println!("  Engine: {} (optimized for Windows)", style("SQLite").green());
-            format!("sqlite:{}/analysis.db", workspace_dir)
+            println!("  Engine: {} (in-memory ingestion, SQLite backup)", style("mem→SQLite").green());
+            ("mem".to_string(), Some(format!("{}/analysis.db", workspace_dir)))
         }
         #[cfg(not(target_os = "windows"))]
         {
-            format!("rocksdb:{}/analysis.db", workspace_dir)
+            (format!("rocksdb:{}/analysis.db", workspace_dir), None)
         }
     };
 
@@ -172,6 +172,17 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
     // Phase 5: Use parallel streaming by default for better performance
     let result = streamer.stream_directory_with_parallel_rayon().await?;
 
+    // v1.7.2: Windows - backup in-memory database to SQLite file
+    if let Some(ref target) = backup_target {
+        if !quiet {
+            println!("  {} Saving database to disk...", style("↓").cyan());
+        }
+        streamer.backup_to_sqlite(target).await?;
+        if !quiet {
+            println!("  {} Database saved: {}", style("✓").green(), style(target).yellow());
+        }
+    }
+
     // Write ingestion error log
     {
         use std::io::Write;
@@ -193,6 +204,13 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
         }
     }
 
+    // Determine display path for next command
+    let display_db_path = if let Some(target) = &backup_target {
+        format!("sqlite:{}", target)
+    } else {
+        workspace_db_path.clone()
+    };
+
     if !quiet {
         println!("{}", style("✓ Indexing completed").green().bold());
         println!("  Files processed: {}", result.processed_files);
@@ -204,9 +222,12 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
         println!("{}", style("📁 Workspace location:").green().bold());
         println!("  {}", style(&workspace_dir).yellow().bold());
         println!();
+        println!("{}", style("Database:").green().bold());
+        println!("  {}", style(&display_db_path).yellow());
+        println!();
         println!("{}", style("Next step:").cyan());
         println!("  parseltongue pt08-http-code-query-server \\");
-        println!("    --db \"{}\"", workspace_db_path);
+        println!("    --db \"{}\"", display_db_path);
         println!();
         println!("{}", style("Quick test:").cyan());
         println!("  curl http://localhost:7777/server-health-check-status");

@@ -1,39 +1,11 @@
 //! v1.5.4 Parallel Ingestion Tests
 //!
-//! Test parallel file parsing with Rayon and Sled backend.
+//! Test parallel file parsing with Rayon and RocksDB/SQLite backends.
 
 use parseltongue_core::storage::CozoDbStorage;
 use pt01_folder_to_cozodb_streamer::*;
 use std::sync::Arc;
 use tempfile::TempDir;
-
-/// Test Sled backend initialization
-#[tokio::test]
-async fn test_sled_backend_initialization_works() {
-    let temp_dir = TempDir::new().unwrap();
-    let db_path = temp_dir.path().join("test_sled.db");
-    let sled_spec = format!("sled:{}", db_path.display());
-
-    // Initialize Sled backend
-    let storage = CozoDbStorage::new(&sled_spec).await;
-    assert!(storage.is_ok(), "Sled backend initialization should succeed");
-
-    let storage = storage.unwrap();
-
-    // Verify connection
-    assert!(storage.is_connected().await, "Sled backend should be connected");
-
-    // Create schema
-    let schema_result = storage.create_schema().await;
-    assert!(schema_result.is_ok(), "Schema creation should succeed");
-
-    // Verify schema exists by listing relations
-    let relations = storage.list_relations().await.unwrap();
-    assert!(
-        relations.contains(&"CodeGraph".to_string()),
-        "CodeGraph relation should exist"
-    );
-}
 
 /// Test RocksDB backend still works (regression test)
 #[tokio::test]

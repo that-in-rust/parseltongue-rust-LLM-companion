@@ -251,9 +251,8 @@ pub async fn handle_ingestion_coverage_folder_report(
 ///
 /// # 4-Word Name: derive_workspace_directory_from_database
 fn derive_workspace_directory_from_database(db_path: &str) -> PathBuf {
-    // Strip engine prefix (rocksdb:, sled:, or sqlite:) if present
+    // Strip engine prefix (rocksdb: or sqlite:) if present
     let path_str = db_path.strip_prefix("rocksdb:")
-        .or_else(|| db_path.strip_prefix("sled:"))
         .or_else(|| db_path.strip_prefix("sqlite:"))
         .unwrap_or(db_path);
 

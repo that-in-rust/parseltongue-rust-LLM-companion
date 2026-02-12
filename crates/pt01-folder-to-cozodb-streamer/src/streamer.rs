@@ -40,6 +40,11 @@ pub trait FileStreamer: Send + Sync {
 
     /// Get current streaming statistics
     fn get_stats(&self) -> StreamStats;
+
+    /// Backup in-memory database to SQLite file (Windows workflow)
+    ///
+    /// # 4-Word Name: backup_to_sqlite
+    async fn backup_to_sqlite(&self, path: &str) -> Result<()>;
 }
 
 /// Streaming operation results
@@ -773,11 +778,6 @@ impl FileStreamer for FileStreamerImpl {
             let _ = self.db.create_dependency_edges_schema().await;
         }
 
-        // v1.7.1: Platform-aware batch insert strategy
-        // - Mac/Linux (RocksDB): concurrent via tokio::join! (RocksDB handles concurrent writes natively)
-        // - Windows (SQLite): sequential (SQLite is single-writer; concurrent writes cause silent SQLITE_BUSY failures)
-
-        #[cfg(not(target_os = "windows"))]
         let (
             result_entities,
             result_edges,
@@ -826,17 +826,6 @@ impl FileStreamer for FileStreamerImpl {
                 }
             },
         );
-
-        #[cfg(target_os = "windows")]
-        let (result_entities, result_edges, result_excluded_tests, result_word_coverage, result_ignored_files) = {
-            // SQLite single-writer: serialize all batch inserts to avoid SQLITE_BUSY silent failures
-            let result_entities = if all_entities.is_empty() { Ok(()) } else { self.db.insert_entities_batch(&all_entities).await };
-            let result_edges = if all_dependencies.is_empty() { Ok(()) } else { self.db.insert_edges_batch(&all_dependencies).await };
-            let result_excluded_tests = if all_excluded_tests.is_empty() { Ok(()) } else { self.db.insert_test_entities_excluded_batch(&all_excluded_tests).await };
-            let result_word_coverage = if all_word_coverages.is_empty() { Ok(()) } else { self.db.insert_file_word_coverage_batch(&all_word_coverages).await };
-            let result_ignored_files = if ignored_files.is_empty() { Ok(()) } else { self.db.insert_ignored_files_batch(&ignored_files).await };
-            (result_entities, result_edges, result_excluded_tests, result_word_coverage, result_ignored_files)
-        };
 
         // Collect errors from all operations
         if let Err(e) = result_entities {
@@ -1141,6 +1130,15 @@ impl FileStreamer for FileStreamerImpl {
 
     fn get_stats(&self) -> StreamStats {
         self.stats.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+    }
+
+    /// Backup in-memory database to SQLite file (Windows workflow)
+    ///
+    /// # 4-Word Name: backup_to_sqlite
+    async fn backup_to_sqlite(&self, path: &str) -> Result<()> {
+        self.db.backup_to_sqlite_file(path).await.map_err(|e| StreamerError::StorageError {
+            details: format!("Backup to SQLite failed: {}", e),
+        })
     }
 }
 
