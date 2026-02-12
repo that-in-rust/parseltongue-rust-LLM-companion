@@ -773,12 +773,11 @@ impl FileStreamer for FileStreamerImpl {
             let _ = self.db.create_dependency_edges_schema().await;
         }
 
-        // Step 4 & 5 & v1.6.5: Concurrent batch inserts for all 5 relations
-        // Use tokio::join! to run inserts in parallel - safe because:
-        // 1. Each insert writes to a DIFFERENT CozoDB relation (no contention)
-        // 2. CozoDB uses per-relation ShardedLock (independent locks)
-        // 3. All functions take &self (not &mut self), allowing concurrent borrows
-        // 4. Arc<CozoDbStorage> enables multiple async tasks to hold references
+        // v1.7.1: Platform-aware batch insert strategy
+        // - Mac/Linux (RocksDB): concurrent via tokio::join! (RocksDB handles concurrent writes natively)
+        // - Windows (SQLite): sequential (SQLite is single-writer; concurrent writes cause silent SQLITE_BUSY failures)
+
+        #[cfg(not(target_os = "windows"))]
         let (
             result_entities,
             result_edges,
@@ -827,6 +826,17 @@ impl FileStreamer for FileStreamerImpl {
                 }
             },
         );
+
+        #[cfg(target_os = "windows")]
+        let (result_entities, result_edges, result_excluded_tests, result_word_coverage, result_ignored_files) = {
+            // SQLite single-writer: serialize all batch inserts to avoid SQLITE_BUSY silent failures
+            let result_entities = if all_entities.is_empty() { Ok(()) } else { self.db.insert_entities_batch(&all_entities).await };
+            let result_edges = if all_dependencies.is_empty() { Ok(()) } else { self.db.insert_edges_batch(&all_dependencies).await };
+            let result_excluded_tests = if all_excluded_tests.is_empty() { Ok(()) } else { self.db.insert_test_entities_excluded_batch(&all_excluded_tests).await };
+            let result_word_coverage = if all_word_coverages.is_empty() { Ok(()) } else { self.db.insert_file_word_coverage_batch(&all_word_coverages).await };
+            let result_ignored_files = if ignored_files.is_empty() { Ok(()) } else { self.db.insert_ignored_files_batch(&ignored_files).await };
+            (result_entities, result_edges, result_excluded_tests, result_word_coverage, result_ignored_files)
+        };
 
         // Collect errors from all operations
         if let Err(e) = result_entities {
