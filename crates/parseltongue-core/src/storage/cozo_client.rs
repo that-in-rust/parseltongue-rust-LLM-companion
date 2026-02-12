@@ -99,21 +99,18 @@ impl CozoDbStorage {
     /// # Arguments
     /// * `engine_spec` - Storage engine specification:
     ///   - "mem" for in-memory
-    ///   - "rocksdb:path/to/db" for RocksDB persistent storage (recommended, fastest)
-    ///   - "sled:path/to/db" for Sled persistent storage (v1.5.4: slower than RocksDB, uses more disk)
-    ///   - "sqlite:path/to/db.sqlite" for SQLite storage
+    ///   - "rocksdb:path/to/db" for RocksDB persistent storage (recommended for Mac/Linux, fastest)
+    ///   - "sqlite:path/to/db.sqlite" for SQLite storage (recommended for Windows, stable)
     ///
-    /// # Performance Notes (v1.5.4)
-    /// - RocksDB: Fastest for Cozo's workload, recommended for production
-    /// - Sled: Pure Rust, simpler deployment, but 2-3x slower and higher disk usage
-    /// - Use Sled only if deployment constraints require pure Rust stack
+    /// # Performance Notes (v1.7.0)
+    /// - RocksDB: Fastest for Cozo's workload, recommended for Mac/Linux
+    /// - SQLite: Rock-solid, CozoDB-recommended for Windows (replaced abandoned Sled)
     ///
     /// # Examples
     /// ```ignore
     /// let db = CozoDbStorage::new("mem").await?;
     /// let db = CozoDbStorage::new("rocksdb:./parseltongue.db").await?;
-    /// let db = CozoDbStorage::new("sled:./parseltongue.db").await?;
-    /// let db = CozoDbStorage::new("sqlite:./parseltongue.sqlite").await?;
+    /// let db = CozoDbStorage::new("sqlite:./parseltongue.db").await?;
     /// ```
     pub async fn new(engine_spec: &str) -> Result<Self> {
         // Parse engine specification: "engine:path" or just "engine" (for mem)

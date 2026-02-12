@@ -5,7 +5,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.6.9"
+version = "1.7.0"
 edition = "2021"
 authors = ["Parseltongue Team"]
 license = "MIT OR Apache-2.0"
@@ -47,8 +47,8 @@ syn = { version = "2.0", features = ["full", "parsing"] }
 
 # Storage dependencies
 # Using RocksDB for persistent storage (recommended by CozoDB)
-# v1.5.4: Added storage-sled for alternative backend (slower but simpler)
-cozo = { version = "0.7.6", default-features = false, features = ["storage-rocksdb", "storage-sled", "rayon"] }
+# v1.7.0: SQLite for Windows (CozoDB-recommended, stable, replaces abandoned Sled)
+cozo = { version = "0.7.6", default-features = false, features = ["storage-rocksdb", "storage-sqlite", "rayon"] }
 rayon = "1.10"
 
 # Export dependencies

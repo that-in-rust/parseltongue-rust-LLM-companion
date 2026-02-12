@@ -128,12 +128,12 @@ async fn run_folder_to_cozodb_streamer(matches: &ArgMatches) -> Result<()> {
     let workspace_db_path = if db == "mem" {
         "mem".to_string()
     } else {
-        // v1.6.9: Windows uses Sled (pure Rust, no SST files for Defender to scan)
+        // v1.7.0: Windows uses SQLite (CozoDB-recommended, stable, no data loss)
         // Mac/Linux uses RocksDB (fastest)
         #[cfg(target_os = "windows")]
         {
-            println!("  Engine: {} (optimized for Windows)", style("Sled").green());
-            format!("sled:{}/analysis.db", workspace_dir)
+            println!("  Engine: {} (optimized for Windows)", style("SQLite").green());
+            format!("sqlite:{}/analysis.db", workspace_dir)
         }
         #[cfg(not(target_os = "windows"))]
         {
