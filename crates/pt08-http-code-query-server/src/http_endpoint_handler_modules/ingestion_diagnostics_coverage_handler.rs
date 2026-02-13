@@ -165,6 +165,18 @@ pub async fn handle_ingestion_diagnostics_coverage_report(
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
+    // v1.7.3: Endpoint not available in snapshot mode (requires diagnostic tables)
+    if state.loaded_from_snapshot_flag {
+        return (
+            StatusCode::NOT_IMPLEMENTED,
+            Json(ErrorResponsePayloadStructure {
+                success: false,
+                endpoint: "/ingestion-diagnostics-coverage-report".to_string(),
+                error: "Endpoint not available in snapshot mode. This endpoint requires TestEntitiesExcluded, FileWordCoverage, and IgnoredFiles tables which are not included in .ptgraph snapshots. Use pt01-folder-to-cozodb-streamer for full ingestion with diagnostics.".to_string(),
+            }),
+        ).into_response();
+    }
+
     // Clone Arc inside RwLock scope, release lock
     let storage = {
         let db_guard = state.database_storage_connection_arc.read().await;

@@ -40,11 +40,6 @@ pub trait FileStreamer: Send + Sync {
 
     /// Get current streaming statistics
     fn get_stats(&self) -> StreamStats;
-
-    /// Backup in-memory database to SQLite file (Windows workflow)
-    ///
-    /// # 4-Word Name: backup_to_sqlite
-    async fn backup_to_sqlite(&self, path: &str) -> Result<()>;
 }
 
 /// Streaming operation results
@@ -150,6 +145,13 @@ impl FileStreamerImpl {
             db: Arc::new(db),
             stats: std::sync::Mutex::new(StreamStats::default()),
         })
+    }
+
+    /// Get reference to the database storage (for pt02 export).
+    ///
+    /// # 4-Word Name: get_database_storage_reference
+    pub fn get_database_storage_reference(&self) -> Arc<CozoDbStorage> {
+        self.db.clone()
     }
 
     /// Convert ParsedEntity to CodeEntity for database storage
@@ -1130,15 +1132,6 @@ impl FileStreamer for FileStreamerImpl {
 
     fn get_stats(&self) -> StreamStats {
         self.stats.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
-    }
-
-    /// Backup in-memory database to SQLite file (Windows workflow)
-    ///
-    /// # 4-Word Name: backup_to_sqlite
-    async fn backup_to_sqlite(&self, path: &str) -> Result<()> {
-        self.db.backup_to_sqlite_file(path).await.map_err(|e| StreamerError::StorageError {
-            details: format!("Backup to SQLite failed: {}", e),
-        })
     }
 }
 

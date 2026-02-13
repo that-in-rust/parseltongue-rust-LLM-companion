@@ -5,7 +5,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.7.2"
+version = "1.7.3"
 edition = "2021"
 authors = ["Parseltongue Team"]
 license = "MIT OR Apache-2.0"
@@ -67,3 +67,10 @@ async-trait = "0.1"
 # Export format dependencies
 mermaid = "0.1"
 graphviz = "0.2"
+rmp-serde = "1.3"
+
+# Local workspace crates
+parseltongue-core = { path = "crates/parseltongue-core" }
+pt01-folder-to-cozodb-streamer = { path = "crates/pt01-folder-to-cozodb-streamer" }
+pt02-folder-to-ram-snapshot = { path = "crates/pt02-folder-to-ram-snapshot" }
+pt08-http-code-query-server = { path = "crates/pt08-http-code-query-server" }

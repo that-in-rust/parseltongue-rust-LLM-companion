@@ -50,9 +50,9 @@ impl CozoDbStorage {
     ///   - "rocksdb:path/to/db" for RocksDB persistent storage (recommended for Mac/Linux, fastest)
     ///   - "sqlite:path/to/db.sqlite" for SQLite storage (recommended for Windows, stable)
     ///
-    /// # Performance Notes (v1.7.0)
+    /// # Performance Notes (v1.7.3)
     /// - RocksDB: Fastest for Cozo's workload, recommended for Mac/Linux
-    /// - SQLite: Rock-solid, CozoDB-recommended for Windows (replaced abandoned Sled)
+    /// - Windows: Use pt02 (MessagePack) or pt03 (JSON) instead of pt01
     ///
     /// # Examples
     /// ```ignore
@@ -84,17 +84,6 @@ impl CozoDbStorage {
         self.db
             .run_script("::relations", Default::default(), ScriptMutability::Immutable)
             .is_ok()
-    }
-
-    /// Backup database to SQLite file (Windows mem→SQLite workflow)
-    ///
-    /// # 4-Word Name: backup_to_sqlite_file
-    pub async fn backup_to_sqlite_file(&self, path: &str) -> Result<()> {
-        self.db.backup_db(path).map_err(|e| ParseltongError::DatabaseError {
-            operation: "backup".to_string(),
-            details: format!("Backup to SQLite failed: {:?}", e),
-        })?;
-        Ok(())
     }
 
     /// Create CodeGraph schema
@@ -2206,6 +2195,313 @@ impl CozoDbStorage {
         }
 
         Ok(0)
+    }
+
+    // ========================================================================
+    // v1.7.3: Slim Graph Snapshot Export/Import Methods
+    // ========================================================================
+
+    /// Export slim entity data from database (v1.7.3).
+    ///
+    /// Queries CodeGraph relation and extracts the 9 essential fields needed
+    /// for graph analysis. Parses interface_signature JSON to extract line numbers.
+    ///
+    /// # 4-Word Name: export_slim_entities_from_database
+    pub async fn export_slim_entities_from_database(&self) -> Result<Vec<SlimEntityGraphSnapshot>> {
+        // Query all entities with fields needed for slim export
+        let query = r#"
+            ?[k, fp, lang, et, ec, isig, l1, l2] :=
+                *CodeGraph{
+                    ISGL1_key: k,
+                    file_path: fp,
+                    language: lang,
+                    entity_type: et,
+                    entity_class: ec,
+                    interface_signature: isig,
+                    root_subfolder_L1: l1,
+                    root_subfolder_L2: l2
+                }
+        "#;
+
+        let result = self.db.run_script(query, BTreeMap::new(), ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "export_slim_entities".to_string(),
+                details: format!("Failed to query entities for export: {}", e),
+            })?;
+
+        let rows = result.rows;
+        let mut entities = Vec::with_capacity(rows.len());
+
+        for row in rows {
+            // Extract field values directly from DataValue
+            let isgl1_key = match &row[0] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let file_path = match &row[1] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let language = match &row[2] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let entity_type = match &row[3] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let entity_class = match &row[4] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let interface_sig_json = match &row[5] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let root_subfolder_l1 = match &row[6] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let root_subfolder_l2 = match &row[7] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+
+            // Parse interface_signature JSON to extract line_start and line_end
+            let (line_start, line_end) = match serde_json::from_str::<serde_json::Value>(&interface_sig_json) {
+                Ok(json) => {
+                    let start = json.get("line_range")
+                        .and_then(|lr| lr.get("start"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    let end = json.get("line_range")
+                        .and_then(|lr| lr.get("end"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    (start, end)
+                },
+                Err(_) => {
+                    // Default to 0,0 on parse failure
+                    (0, 0)
+                }
+            };
+
+            entities.push(SlimEntityGraphSnapshot {
+                isgl1_key,
+                file_path,
+                line_start,
+                line_end,
+                entity_type,
+                entity_class,
+                language,
+                root_subfolder_l1,
+                root_subfolder_l2,
+            });
+        }
+
+        Ok(entities)
+    }
+
+    /// Export slim edge data from database (v1.7.3).
+    ///
+    /// Queries DependencyEdges relation and extracts the 3 fields needed
+    /// for graph traversal.
+    ///
+    /// # 4-Word Name: export_slim_edges_from_database
+    pub async fn export_slim_edges_from_database(&self) -> Result<Vec<SlimEdgeGraphSnapshot>> {
+        let query = r#"
+            ?[fk, tk, et] :=
+                *DependencyEdges{
+                    from_key: fk,
+                    to_key: tk,
+                    edge_type: et
+                }
+        "#;
+
+        let result = self.db.run_script(query, BTreeMap::new(), ScriptMutability::Immutable)
+            .map_err(|e| ParseltongError::DatabaseError {
+                operation: "export_slim_edges".to_string(),
+                details: format!("Failed to query edges for export: {}", e),
+            })?;
+
+        let rows = result.rows;
+        let mut edges = Vec::with_capacity(rows.len());
+
+        for row in rows {
+            let from_key = match &row[0] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let to_key = match &row[1] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+            let edge_type = match &row[2] {
+                DataValue::Str(s) => s.to_string(),
+                _ => continue,
+            };
+
+            edges.push(SlimEdgeGraphSnapshot {
+                from_key,
+                to_key,
+                edge_type,
+            });
+        }
+
+        Ok(edges)
+    }
+
+    /// Insert slim entities in batch (v1.7.3).
+    ///
+    /// Populates CodeGraph with slim entity data, filling missing fields
+    /// with defaults. Chunks into batches of 5000 to avoid query size limits.
+    ///
+    /// CRITICAL: Current_Code MUST be empty string (""), NOT null, to avoid
+    /// 404 errors in detail view handler.
+    ///
+    /// # 4-Word Name: insert_slim_entities_batch_directly
+    pub async fn insert_slim_entities_batch_directly(&self, entities: &[SlimEntityGraphSnapshot]) -> Result<()> {
+        const BATCH_SIZE: usize = 5000;
+
+        for chunk in entities.chunks(BATCH_SIZE) {
+            // Build CozoScript :put query for this batch
+            let mut rows = Vec::new();
+
+            for entity in chunk {
+                // Escape all string values for CozoScript
+                let isgl1_key = escape_for_cozo_string(&entity.isgl1_key);
+                let file_path = escape_for_cozo_string(&entity.file_path);
+                let language = escape_for_cozo_string(&entity.language);
+                let entity_type = escape_for_cozo_string(&entity.entity_type);
+                let entity_class = escape_for_cozo_string(&entity.entity_class);
+                let root_l1 = escape_for_cozo_string(&entity.root_subfolder_l1);
+                let root_l2 = escape_for_cozo_string(&entity.root_subfolder_l2);
+
+                // Build row with all 19 CodeGraph columns
+                // CRITICAL: Current_Code = "" (empty string, NOT null)
+                let row = format!(
+                    "['{}', '', null, '{{}}', 'not_a_test', null, true, false, null, '{}', '{}', 'ptgraph_import', '{}', '{}', null, null, null, '{}', '{}']",
+                    isgl1_key,      // ISGL1_key
+                                    // Current_Code = "" (empty string)
+                                    // Future_Code = null
+                                    // interface_signature = "{}"
+                                    // TDD_Classification = "not_a_test"
+                                    // lsp_meta_data = null
+                                    // current_ind = true
+                                    // future_ind = false
+                                    // Future_Action = null
+                    file_path,      // file_path
+                    language,       // language
+                                    // last_modified = "ptgraph_import"
+                    entity_type,    // entity_type
+                    entity_class,   // entity_class
+                                    // birth_timestamp = null
+                                    // content_hash = null
+                                    // semantic_path = null
+                    root_l1,        // root_subfolder_L1
+                    root_l2         // root_subfolder_L2
+                );
+                rows.push(row);
+            }
+
+            let rows_str = rows.join(",\n            ");
+            let query = format!(
+                r#"
+                ?[ISGL1_key, Current_Code, Future_Code, interface_signature, TDD_Classification,
+                  lsp_meta_data, current_ind, future_ind, Future_Action, file_path, language,
+                  last_modified, entity_type, entity_class, birth_timestamp, content_hash,
+                  semantic_path, root_subfolder_L1, root_subfolder_L2] <- [
+            {}
+                ]
+                :put CodeGraph {{
+                    ISGL1_key,
+                    Current_Code,
+                    Future_Code,
+                    interface_signature,
+                    TDD_Classification,
+                    lsp_meta_data,
+                    current_ind,
+                    future_ind,
+                    Future_Action,
+                    file_path,
+                    language,
+                    last_modified,
+                    entity_type,
+                    entity_class,
+                    birth_timestamp,
+                    content_hash,
+                    semantic_path,
+                    root_subfolder_L1,
+                    root_subfolder_L2
+                }}
+                "#,
+                rows_str
+            );
+
+            self.db.run_script(&query, BTreeMap::new(), ScriptMutability::Mutable)
+                .map_err(|e| ParseltongError::DatabaseError {
+                    operation: "insert_slim_entities_batch".to_string(),
+                    details: format!("Failed to insert slim entities batch: {}", e),
+                })?;
+        }
+
+        Ok(())
+    }
+
+    /// Insert slim edges in batch (v1.7.3).
+    ///
+    /// Populates DependencyEdges with slim edge data. Chunks into batches
+    /// of 5000 to avoid query size limits.
+    ///
+    /// # 4-Word Name: insert_slim_edges_batch_directly
+    pub async fn insert_slim_edges_batch_directly(&self, edges: &[SlimEdgeGraphSnapshot]) -> Result<()> {
+        const BATCH_SIZE: usize = 5000;
+
+        for chunk in edges.chunks(BATCH_SIZE) {
+            // Build CozoScript :put query for this batch
+            let mut rows = Vec::new();
+
+            for edge in chunk {
+                // Escape all string values for CozoScript
+                let from_key = escape_for_cozo_string(&edge.from_key);
+                let to_key = escape_for_cozo_string(&edge.to_key);
+                let edge_type = escape_for_cozo_string(&edge.edge_type);
+
+                // Build row with all 4 DependencyEdges columns
+                let row = format!(
+                    "['{}', '{}', '{}', null]",
+                    from_key,   // from_key
+                    to_key,     // to_key
+                    edge_type,  // edge_type
+                                // source_location = null
+                );
+                rows.push(row);
+            }
+
+            let rows_str = rows.join(",\n            ");
+            let query = format!(
+                r#"
+                ?[from_key, to_key, edge_type, source_location] <- [
+            {}
+                ]
+                :put DependencyEdges {{
+                    from_key,
+                    to_key,
+                    edge_type,
+                    source_location
+                }}
+                "#,
+                rows_str
+            );
+
+            self.db.run_script(&query, BTreeMap::new(), ScriptMutability::Mutable)
+                .map_err(|e| ParseltongError::DatabaseError {
+                    operation: "insert_slim_edges_batch".to_string(),
+                    details: format!("Failed to insert slim edges batch: {}", e),
+                })?;
+        }
+
+        Ok(())
     }
 }
 

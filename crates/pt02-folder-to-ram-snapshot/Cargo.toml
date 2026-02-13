@@ -1,0 +1,28 @@
+[package]
+name = "pt02-folder-to-ram-snapshot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Core dependencies
+parseltongue-core = { workspace = true }
+pt01-folder-to-cozodb-streamer = { workspace = true }
+rmp-serde = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+console = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio-test = { workspace = true }
+
+[lib]
+name = "pt02_folder_to_ram_snapshot"
+path = "src/lib.rs"

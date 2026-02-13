@@ -22,6 +22,8 @@ pub mod route_definition_builder_module;
 pub mod structured_error_handling_types;
 pub mod http_endpoint_handler_modules;
 pub mod scope_filter_utilities_module;
+// v1.7.3: Snapshot loader for .ptgraph files
+pub mod snapshot_loader_module;
 
 // Re-export main types for convenience
 pub use command_line_argument_parser::HttpServerStartupConfig;

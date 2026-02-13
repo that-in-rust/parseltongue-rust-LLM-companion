@@ -1,11 +1,19 @@
 //! Route definition builder for HTTP server
 //!
 //! # 4-Word Naming: route_definition_builder_module
+//!
+//! v1.7.3: Routes nested under /{mode}/ prefix (db or mem).
+//! Health check + shutdown at root level (no prefix).
 
 use axum::{
     Router,
+    extract::State,
+    http::StatusCode,
+    Json,
+    response::IntoResponse,
     routing::{get, post},
 };
+use serde_json::json;
 
 use crate::http_server_startup_runner::SharedApplicationStateContainer;
 use crate::http_endpoint_handler_modules::{
@@ -23,10 +31,8 @@ use crate::http_endpoint_handler_modules::{
     semantic_cluster_grouping_handler,
     api_reference_documentation_handler,
     smart_context_token_budget_handler,
-    // v1.5.0: ISGL1 v2 integration complete - re-enabled
     incremental_reindex_file_handler,
     file_watcher_status_handler,
-    // v1.6.0: Graph analysis endpoints
     strongly_connected_components_handler,
     technical_debt_sqale_handler,
     kcore_decomposition_layering_handler,
@@ -34,56 +40,20 @@ use crate::http_endpoint_handler_modules::{
     entropy_complexity_measurement_handler,
     coupling_cohesion_metrics_handler,
     leiden_community_detection_handler,
-    // v1.6.1: Ingestion coverage reporting
     ingestion_coverage_folder_handler,
-    // v1.6.5: Diagnostics and folder discovery
     ingestion_diagnostics_coverage_handler,
     folder_structure_discovery_handler,
 };
 
-/// Build the complete router with all endpoints
+/// Build API routes (nested under mode prefix)
 ///
-/// # 4-Word Name: build_complete_router_instance
-///
-/// ## Core Endpoints
-/// - GET /server-health-check-status
-/// - GET /codebase-statistics-overview-summary
-/// - GET /api-reference-documentation-help
-///
-/// ## Entity Endpoints
-/// - GET /code-entities-list-all
-/// - GET /code-entity-detail-view/{*key}
-/// - GET /fuzzy-entity-search-query?q=pattern
-///
-/// ## Edge Endpoints
-/// - GET /dependency-edges-list-all
-/// - GET /reverse-callers-query-graph/{*entity}
-/// - GET /forward-callees-query-graph/{*entity}
-///
-/// ## Analysis Endpoints
-/// - GET /blast-radius-impact-analysis/{entity}?hops=N
-/// - GET /circular-dependency-detection-scan
-/// - GET /complexity-hotspots-ranking-view?top=N
-/// - GET /semantic-cluster-grouping-list
-///
-/// ## Context Optimization
-/// - GET /smart-context-token-budget?focus=X&tokens=N
-pub fn build_complete_router_instance(state: SharedApplicationStateContainer) -> Router {
+/// # 4-Word Name: build_api_routes_subrouter
+fn build_api_routes_subrouter() -> Router<SharedApplicationStateContainer> {
     Router::new()
-        // Core endpoints
-        .route(
-            "/server-health-check-status",
-            get(server_health_check_handler::handle_server_health_check_status)
-        )
         .route(
             "/codebase-statistics-overview-summary",
             get(codebase_statistics_overview_handler::handle_codebase_statistics_overview_summary)
         )
-        .route(
-            "/api-reference-documentation-help",
-            get(api_reference_documentation_handler::handle_api_reference_documentation_help)
-        )
-        // Entity endpoints
         .route(
             "/code-entities-list-all",
             get(code_entities_list_all_handler::handle_code_entities_list_all)
@@ -96,7 +66,6 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/code-entities-search-fuzzy",
             get(code_entities_fuzzy_search_handler::handle_code_entities_fuzzy_search)
         )
-        // Graph query endpoints (using query parameters to avoid colon routing issues)
         .route(
             "/reverse-callers-query-graph",
             get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
@@ -129,18 +98,14 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/smart-context-token-budget",
             get(smart_context_token_budget_handler::handle_smart_context_token_budget)
         )
-        // v1.5.0: ISGL1 v2 integration complete - re-enabled
-        // Incremental reindex endpoint (PRD-2026-01-28)
         .route(
             "/incremental-reindex-file-update",
             post(incremental_reindex_file_handler::handle_incremental_reindex_file_request)
         )
-        // File watcher status endpoint (PRD-2026-01-29)
         .route(
             "/file-watcher-status-check",
             get(file_watcher_status_handler::handle_file_watcher_status_check)
         )
-        // v1.6.0: Graph Analysis Endpoints
         .route(
             "/strongly-connected-components-analysis",
             get(strongly_connected_components_handler::handle_strongly_connected_components_analysis)
@@ -169,12 +134,10 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/leiden-community-detection-clusters",
             get(leiden_community_detection_handler::handle_leiden_community_detection_clusters)
         )
-        // v1.6.1: Ingestion coverage reporting
         .route(
             "/ingestion-coverage-folder-report",
             get(ingestion_coverage_folder_handler::handle_ingestion_coverage_folder_report)
         )
-        // v1.6.5: Diagnostics and folder discovery
         .route(
             "/ingestion-diagnostics-coverage-report",
             get(ingestion_diagnostics_coverage_handler::handle_ingestion_diagnostics_coverage_report)
@@ -183,11 +146,66 @@ pub fn build_complete_router_instance(state: SharedApplicationStateContainer) ->
             "/folder-structure-discovery-tree",
             get(folder_structure_discovery_handler::handle_folder_structure_discovery_tree)
         )
-        // Test route for debugging
+}
+
+/// Handle POST /shutdown — graceful server stop
+///
+/// # 4-Word Name: handle_shutdown_request_endpoint
+async fn handle_shutdown_request_endpoint(
+    State(state): State<SharedApplicationStateContainer>,
+) -> impl IntoResponse {
+    state.shutdown_notify_signal_arc.notify_one();
+    (StatusCode::OK, Json(json!({
+        "success": true,
+        "message": "Server shutting down"
+    })))
+}
+
+/// Build the complete router with mode-prefixed API routes
+///
+/// # 4-Word Name: build_complete_router_instance
+///
+/// v1.7.3: All API routes nested under /{mode}/ prefix.
+/// Root-level routes: health check, API docs, shutdown.
+/// Wrong-prefix requests get clear error message.
+pub fn build_complete_router_instance(
+    state: SharedApplicationStateContainer,
+    mode: &str,
+) -> Router {
+    let api_routes = build_api_routes_subrouter();
+    let wrong_mode = if mode == "db" { "mem" } else { "db" };
+    let mode_string = mode.to_string();
+    let wrong_mode_string = wrong_mode.to_string();
+
+    // Wrong-prefix fallback router returns helpful error
+    let wrong_prefix_fallback = Router::new()
+        .fallback(move || async move {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({
+                    "success": false,
+                    "error": format!(
+                        "This server runs in /{mode}/ mode. Use /{mode}/ prefix.",
+                        mode = mode_string
+                    )
+                })),
+            )
+        });
+
+    Router::new()
+        // Root-level endpoints (no prefix)
         .route(
-            "/test-simple/{param}",
-            get(reverse_callers_query_graph_handler::handle_reverse_callers_query_graph)
+            "/server-health-check-status",
+            get(server_health_check_handler::handle_server_health_check_status)
         )
-        // More endpoints will be added in subsequent phases
+        .route(
+            "/api-reference-documentation-help",
+            get(api_reference_documentation_handler::handle_api_reference_documentation_help)
+        )
+        .route("/shutdown", post(handle_shutdown_request_endpoint))
+        // API routes nested under /{mode}/
+        .nest(&format!("/{}", mode), api_routes)
+        // Wrong prefix gets clear error
+        .nest(&format!("/{}", wrong_mode_string), wrong_prefix_fallback)
         .with_state(state)
 }

@@ -19,6 +19,7 @@ parseltongue-core = { path = "../parseltongue-core" }
 
 # Import all tool crates as libraries (HTTP-only architecture)
 pt01-folder-to-cozodb-streamer = { path = "../pt01-folder-to-cozodb-streamer" }
+pt02-folder-to-ram-snapshot = { path = "../pt02-folder-to-ram-snapshot" }
 pt08-http-code-query-server = { path = "../pt08-http-code-query-server" }
 
 # Core dependencies

@@ -25,7 +25,7 @@ async fn setup_test_environment_with_database() -> (SharedApplicationStateContai
     storage_raw.create_dependency_edges_schema().await.unwrap();
     storage_raw.create_file_hash_cache_schema().await.unwrap();
 
-    let state = SharedApplicationStateContainer::create_with_database_storage(storage_raw);
+    let state = SharedApplicationStateContainer::create_with_database_storage(storage_raw, false);
 
     // Create temp directory for test files
     let temp_dir = tempfile::TempDir::new().unwrap();

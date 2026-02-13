@@ -1842,7 +1842,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue"
-version = "1.7.2"
+version = "1.7.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1850,6 +1850,7 @@ dependencies = [
  "console",
  "parseltongue-core",
  "pt01-folder-to-cozodb-streamer",
+ "pt02-folder-to-ram-snapshot",
  "pt08-http-code-query-server",
  "serde_json",
  "tokio",
@@ -1857,7 +1858,7 @@ dependencies = [
 
 [[package]]
 name = "parseltongue-core"
-version = "1.7.2"
+version = "1.7.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2100,7 +2101,7 @@ dependencies = [
 
 [[package]]
 name = "pt01-folder-to-cozodb-streamer"
-version = "1.7.2"
+version = "1.7.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2141,17 +2142,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "pt02-folder-to-ram-snapshot"
+version = "1.7.3"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "console",
+ "parseltongue-core",
+ "pt01-folder-to-cozodb-streamer",
+ "rmp-serde",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tokio-test",
+]
+
+[[package]]
 name = "pt08-http-code-query-server"
-version = "1.7.2"
+version = "1.7.3"
 dependencies = [
  "anyhow",
  "async-trait",
  "axum",
  "chrono",
+ "console",
  "cozo",
  "hex",
  "parseltongue-core",
  "pt01-folder-to-cozodb-streamer",
+ "rmp-serde",
  "serde",
  "serde_json",
  "sha2",

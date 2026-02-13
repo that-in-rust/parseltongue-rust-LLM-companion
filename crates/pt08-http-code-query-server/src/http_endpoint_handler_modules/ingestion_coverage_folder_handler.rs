@@ -123,6 +123,18 @@ pub async fn handle_ingestion_coverage_folder_report(
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
+    // v1.7.3: Endpoint not available in snapshot mode (requires file path metadata)
+    if state.loaded_from_snapshot_flag {
+        return (
+            StatusCode::NOT_IMPLEMENTED,
+            Json(ErrorResponsePayloadStructure {
+                success: false,
+                endpoint: "/ingestion-coverage-folder-report".to_string(),
+                error: "Endpoint not available in snapshot mode. This endpoint requires comprehensive file path metadata and directory walking which are not available in .ptgraph snapshots. Use pt01-folder-to-cozodb-streamer for full ingestion with coverage reporting.".to_string(),
+            }),
+        ).into_response();
+    }
+
     // Clone Arc inside RwLock scope, release lock
     let storage = {
         let db_guard = state.database_storage_connection_arc.read().await;

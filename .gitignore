@@ -36,3 +36,6 @@ parseltongue-v*-macos-arm64
 artifacts/
 
 # Archive folder (for cleanup - can be deleted later)
+
+# Competitor research
+competitor_research/

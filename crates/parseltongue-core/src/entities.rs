@@ -1794,3 +1794,90 @@ pub struct IgnoredFileRow {
     /// Reason for ignoring (e.g., "no_parser", "binary_file", "excluded_pattern")
     pub reason: String,
 }
+
+// ============================================================================
+// v1.7.3: Slim Graph Snapshot Types
+// ============================================================================
+
+/// Slim entity representation for graph snapshots (v1.7.3).
+///
+/// Contains only the 9 essential fields needed for graph analysis,
+/// dropping code bodies and metadata to achieve 95% RAM reduction.
+///
+/// # 4-Word Name: slim_entity_graph_snapshot
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlimEntityGraphSnapshot {
+    /// ISGL1 key (primary identifier)
+    pub isgl1_key: String,
+
+    /// File path (for LLM to read actual code)
+    pub file_path: String,
+
+    /// Start line number (1-indexed)
+    pub line_start: u32,
+
+    /// End line number (1-indexed)
+    pub line_end: u32,
+
+    /// Entity type (function, struct, class, etc.)
+    pub entity_type: String,
+
+    /// Entity class (TEST or CODE)
+    pub entity_class: String,
+
+    /// Programming language
+    pub language: String,
+
+    /// Root subfolder level 1 (e.g., "crates")
+    pub root_subfolder_l1: String,
+
+    /// Root subfolder level 2 (e.g., "parseltongue-core")
+    pub root_subfolder_l2: String,
+}
+
+/// Slim edge representation for graph snapshots (v1.7.3).
+///
+/// Contains only the 3 fields needed for dependency graph traversal.
+///
+/// # 4-Word Name: slim_edge_graph_snapshot
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlimEdgeGraphSnapshot {
+    /// Source entity ISGL1 key
+    pub from_key: String,
+
+    /// Target entity ISGL1 key
+    pub to_key: String,
+
+    /// Edge type (Calls, Uses, Implements)
+    pub edge_type: String,
+}
+
+/// Container for serialized graph snapshot (v1.7.3).
+///
+/// Wraps entities and edges with metadata for version tracking.
+/// Serialized to MessagePack (.ptgraph) or JSON format.
+///
+/// # 4-Word Name: ptgraph_snapshot_container_format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PtGraphSnapshotContainer {
+    /// Snapshot format version (e.g., "1.7.3")
+    pub version: String,
+
+    /// ISO 8601 timestamp of generation
+    pub generated_at: String,
+
+    /// Source directory that was analyzed
+    pub source_directory: String,
+
+    /// Total entity count
+    pub entity_count: usize,
+
+    /// Total edge count
+    pub edge_count: usize,
+
+    /// All entities in slim format
+    pub entities: Vec<SlimEntityGraphSnapshot>,
+
+    /// All dependency edges
+    pub edges: Vec<SlimEdgeGraphSnapshot>,
+}

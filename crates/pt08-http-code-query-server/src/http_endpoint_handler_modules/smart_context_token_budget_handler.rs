@@ -92,6 +92,18 @@ pub async fn handle_smart_context_token_budget(
     // Update last request timestamp
     state.update_last_request_timestamp().await;
 
+    // v1.7.3: Endpoint not available in snapshot mode (requires code bodies)
+    if state.loaded_from_snapshot_flag {
+        return (
+            StatusCode::NOT_IMPLEMENTED,
+            Json(serde_json::json!({
+                "success": false,
+                "endpoint": "/smart-context-token-budget",
+                "error": "Endpoint not available in snapshot mode. This endpoint requires code bodies which are not included in .ptgraph snapshots. Use pt01-folder-to-cozodb-streamer for full ingestion with code bodies."
+            })),
+        ).into_response();
+    }
+
     let focus = params.focus;
     let token_budget = params.tokens.unwrap_or(4000);
 

@@ -7,7 +7,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 
 use crate::command_line_argument_parser::HttpServerStartupConfig;
 use crate::file_watcher_integration_service::{
@@ -18,6 +18,8 @@ use crate::route_definition_builder_module::build_complete_router_instance;
 // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
 // use parseltongue_core::file_parser::FileParser;
 use parseltongue_core::storage::CozoDbStorage;
+// v1.7.3: Snapshot loader
+use crate::snapshot_loader_module;
 
 /// Shared application state container
 ///
@@ -59,6 +61,34 @@ pub struct SharedApplicationStateContainer {
     ///
     /// Bug Report: docs/File-Watcher-Debug-20260202.md
     pub watcher_service_instance_arc: Arc<RwLock<Option<crate::file_watcher_integration_service::ProductionFileWatcherService>>>,
+
+    /// Whether database was loaded from snapshot file (v1.7.3)
+    ///
+    /// # 4-Word Name: loaded_from_snapshot_flag
+    ///
+    /// When true, certain endpoints that require code bodies are disabled (501).
+    pub loaded_from_snapshot_flag: bool,
+
+    /// Server mode: "db" or "mem" (v1.7.3)
+    ///
+    /// # 4-Word Name: server_mode_string_value
+    ///
+    /// Determines route prefix (/db/* or /mem/*) and behavior differences.
+    pub server_mode_string_value: String,
+
+    /// Shutdown signal for graceful server stop (v1.7.3)
+    ///
+    /// # 4-Word Name: shutdown_notify_signal_arc
+    ///
+    /// POST /shutdown triggers this to gracefully stop the server.
+    pub shutdown_notify_signal_arc: Arc<Notify>,
+
+    /// Source directory for filesystem reads in /mem/ mode (v1.7.3)
+    ///
+    /// # 4-Word Name: source_directory_path_option
+    ///
+    /// When set, /mem/ detail view reads source code from disk using this base path.
+    pub source_directory_path_option: Option<PathBuf>,
 }
 
 /// Codebase statistics metadata
@@ -134,17 +164,17 @@ impl SharedApplicationStateContainer {
     /// The parser is created once and shared across all handler invocations.
     pub fn create_new_application_state() -> Self {
         let now = Utc::now();
-        // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
-        // let parser = FileParser::create_new_parser_instance()
-        //     .expect("Failed to initialize FileParser - tree-sitter grammars missing");
         Self {
             database_storage_connection_arc: Arc::new(RwLock::new(None)),
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
-            // file_parser_instance_arc: Arc::new(parser),
             file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
             watcher_service_instance_arc: Arc::new(RwLock::new(None)),
+            loaded_from_snapshot_flag: false,
+            server_mode_string_value: "db".to_string(),
+            shutdown_notify_signal_arc: Arc::new(Notify::new()),
+            source_directory_path_option: None,
         }
     }
 
@@ -153,19 +183,20 @@ impl SharedApplicationStateContainer {
     /// # 4-Word Name: create_with_database_storage
     ///
     /// Initializes state with database and thread-safe FileParser for incremental reindexing.
-    pub fn create_with_database_storage(storage: CozoDbStorage) -> Self {
+    pub fn create_with_database_storage(storage: CozoDbStorage, is_snapshot: bool) -> Self {
         let now = Utc::now();
-        // TODO v1.4.3: Re-enable after implementing file_parser and entity_conversion
-        // let parser = FileParser::create_new_parser_instance()
-        //     .expect("Failed to initialize FileParser - tree-sitter grammars missing");
+        let mode = if is_snapshot { "mem" } else { "db" };
         Self {
             database_storage_connection_arc: Arc::new(RwLock::new(Some(Arc::new(storage)))),
             server_start_timestamp_utc: now,
             last_request_timestamp_arc: Arc::new(RwLock::new(now)),
             codebase_statistics_metadata_arc: Arc::new(RwLock::new(CodebaseStatisticsMetadata::default())),
-            // file_parser_instance_arc: Arc::new(parser),
             file_watcher_status_metadata_arc: Arc::new(RwLock::new(FileWatcherStatusMetadata::default())),
             watcher_service_instance_arc: Arc::new(RwLock::new(None)),
+            loaded_from_snapshot_flag: is_snapshot,
+            server_mode_string_value: mode.to_string(),
+            shutdown_notify_signal_arc: Arc::new(Notify::new()),
+            source_directory_path_option: None,
         }
     }
 
@@ -345,12 +376,28 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
 
     // Connect to database if path provided
     let db_path = &config.database_connection_string_value;
-    let state = if !db_path.is_empty() && db_path != "mem" {
+    let mut state = if db_path.starts_with("ptgraph:") {
+        // v1.7.3: Load snapshot from .ptgraph file
+        let ptgraph_path = db_path.strip_prefix("ptgraph:").unwrap_or(db_path);
+        println!("Loading snapshot from: {}", ptgraph_path);
+        match snapshot_loader_module::load_ptgraph_snapshot_database(ptgraph_path).await {
+            Ok(storage) => {
+                println!("✓ Snapshot loaded successfully");
+                SharedApplicationStateContainer::create_with_database_storage(storage, true)
+            }
+            Err(e) => {
+                println!("⚠ Warning: Could not load snapshot: {}", e);
+                println!("  Starting with empty state");
+                SharedApplicationStateContainer::create_new_application_state()
+            }
+        }
+    } else if !db_path.is_empty() && db_path != "mem" {
+        // Standard RocksDB/SQLite database
         println!("Connecting to database: {}", db_path);
         match CozoDbStorage::new(db_path).await {
             Ok(storage) => {
                 println!("✓ Database connected successfully");
-                SharedApplicationStateContainer::create_with_database_storage(storage)
+                SharedApplicationStateContainer::create_with_database_storage(storage, false)
             }
             Err(e) => {
                 println!("⚠ Warning: Could not connect to database: {}", e);
@@ -377,7 +424,8 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     //   1. Initial scan (manual directory walk)
     //   2. Event watching (incremental updates)
     // Reference: /tmp/file_watching_research.md
-    if !db_path.is_empty() && db_path != "mem" {
+    // v1.7.3: Skip initial scan for snapshot mode
+    if !state.loaded_from_snapshot_flag && !db_path.is_empty() && db_path != "mem" {
         println!("[InitialScan] Performing initial codebase scan...");
         let watch_dir = &config.target_directory_path_value;
 
@@ -397,6 +445,7 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
     }
 
     // v1.4.2: File watching always enabled - watches current directory
+    // v1.7.3: File watching enabled for BOTH modes (CozoDB mem accepts same watcher updates)
     {
         let watch_dir = config.target_directory_path_value.clone();
 
@@ -472,26 +521,49 @@ pub async fn start_http_server_blocking_loop(config: HttpServerStartupConfig) ->
         }
     }
 
-    // Build router
-    let router = build_complete_router_instance(state);
+    // v1.7.3: Set source directory for filesystem reads in /mem/ mode
+    if state.loaded_from_snapshot_flag {
+        state.source_directory_path_option = Some(config.target_directory_path_value.clone());
+    }
 
-    // Print startup message with actual bound port
+    // Build router with mode prefix
+    let mode = state.server_mode_string_value.clone();
+    let shutdown_signal = state.shutdown_notify_signal_arc.clone();
+    let router = build_complete_router_instance(state, &mode);
+
+    // v1.7.3: Write port file for shutdown discovery
+    let port_file_path = format!("/tmp/parseltongue-server-{}.port", mode);
+    std::fs::write(&port_file_path, port.to_string())
+        .unwrap_or_else(|e| eprintln!("Warning: Could not write port file: {}", e));
+
+    // Print startup message with mode prefix
+    let endpoint_count = if mode == "mem" { "23/24" } else { "24/24" };
     println!("Parseltongue HTTP Server");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!();
-    println!("HTTP Server running at: http://localhost:{}", port);
-    println!();
-    println!("┌─────────────────────────────────────────────────────────────────┐");
-    println!("│  Add to your LLM agent: PARSELTONGUE_URL=http://localhost:{}  │", port);
-    println!("└─────────────────────────────────────────────────────────────────┘");
+    println!("  Mode:      /{}/", mode);
+    println!("  Port:      {}", port);
+    println!("  Endpoints: {}", endpoint_count);
+    println!("  Server:    http://localhost:{}/{}/", port, mode);
     println!();
     println!("Quick test:");
     println!("  curl http://localhost:{}/server-health-check-status", port);
+    println!("  curl http://localhost:{}/{}/code-entities-list-all", port, mode);
     println!();
 
-    // Start server with the already-bound listener
-    // REQ-PORT-003.0: No race condition - listener is already bound
-    axum::serve(listener, router).await?;
+    // Start server with graceful shutdown
+    let port_file_cleanup = port_file_path.clone();
+    axum::serve(listener, router)
+        .with_graceful_shutdown(async move {
+            shutdown_signal.notified().await;
+            println!("Shutdown signal received, stopping server...");
+            // Clean up port file
+            let _ = std::fs::remove_file(&port_file_cleanup);
+        })
+        .await?;
+
+    // Clean up port file on normal exit too
+    let _ = std::fs::remove_file(&port_file_path);
 
     Ok(())
 }
