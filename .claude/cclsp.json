@@ -1,0 +1,24 @@
+{
+  "servers": [
+    {
+      "extensions": ["rs"],
+      "command": ["rust-analyzer"],
+      "rootDir": "."
+    },
+    {
+      "extensions": ["ts", "tsx", "js", "jsx"],
+      "command": ["typescript-language-server", "--stdio"],
+      "rootDir": "."
+    },
+    {
+      "extensions": ["py", "pyi"],
+      "command": ["pyright-langserver", "--stdio"],
+      "rootDir": "."
+    },
+    {
+      "extensions": ["lua"],
+      "command": ["lua-language-server", "--stdio"],
+      "rootDir": "."
+    }
+  ]
+}

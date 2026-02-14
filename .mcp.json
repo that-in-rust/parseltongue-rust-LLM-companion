@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cclsp": {
+      "type": "stdio",
+      "command": "cclsp",
+      "args": [],
+      "env": {
+        "CCLSP_CONFIG_PATH": "/Users/amuldotexe/Desktop/A01_20260131/parseltongue-dependency-graph-generator/.claude/cclsp.json"
+      }
+    }
+  }
+}
