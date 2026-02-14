@@ -396,6 +396,103 @@ pt01 ingestion dumps debug `eprintln!` noise to stderr that pollutes LLM context
 
 ---
 
+## Respect .gitignore During Ingestion (Fix in v1.7.3)
+
+pt01 uses the `walkdir` crate which **does not respect `.gitignore`**. It has 8 hardcoded exclusions (`target`, `node_modules`, `.git`, `build`, `dist`, `__pycache__`, `.venv`, `venv`) but ignores everything else in `.gitignore`.
+
+This means generated code, vendored dependencies, and any project-specific gitignored files get ingested into the graph — adding noise entities and false edges.
+
+**Fix**: Replace `walkdir` with the `ignore` crate (same author, drop-in API). The `ignore` crate automatically reads `.gitignore`, `.git/info/exclude`, and global gitignore. The 8 hardcoded exclusions become unnecessary — `.gitignore` handles them.
+
+| Before | After |
+|--------|-------|
+| `walkdir` crate | `ignore` crate |
+| 8 hardcoded exclusions in `cli.rs` | `.gitignore` rules (+ keep hardcoded as fallback for non-git dirs) |
+| Generated code ingested | Respects project's own exclusion rules |
+| `Cargo.toml`: `walkdir = "2.0"` | `Cargo.toml`: `ignore = "0.4"` |
+
+**Files changed**: `streamer.rs` (swap `WalkDir::new()` for `ignore::WalkBuilder::new()`), `cli.rs` (remove hardcoded defaults or keep as fallback), `Cargo.toml` (swap dependency).
+
+**Stale entity cleanup**: The file watcher must watch `.gitignore` itself. When `.gitignore` changes, diff "files currently in graph" vs "files the `ignore` walker would now visit" — compute which entities and edges need to be added or removed, then update the graph accordingly. This prevents phantom dependencies to excluded code and ensures newly un-ignored files get ingested.
+
+---
+
+## XML-Tagged Context Categories (v1.7.3+)
+
+**Insight from**: Zed editor (`agent/src/thread.rs`) — every piece of context sent to an LLM is wrapped in semantic XML tags so the model knows the provenance of each information block.
+
+**Problem**: Parseltongue API responses return flat JSON arrays. An LLM receiving 200 entities in a list has no structural signal about what it's looking at — CoreCode entities, imports, tests, and edges are all mixed together.
+
+**Solution**: Structure API responses with tagged categories so LLMs can filter and reason about entity types without parsing ISGL1 keys.
+
+### Response Format (Current → Proposed)
+
+**Current** (flat):
+```json
+{
+  "entities": [
+    {"isgl1_key": "rust|||fn|||login|||src/auth.rs|||5|||20", ...},
+    {"isgl1_key": "rust|||fn|||test_login|||src/auth.rs|||81|||100", ...},
+    {"isgl1_key": "rust|||import|||auth_imports|||src/auth.rs|||1|||3", ...}
+  ]
+}
+```
+
+**Proposed** (tagged):
+```json
+{
+  "core_code": [
+    {"isgl1_key": "rust|||fn|||login|||src/auth.rs|||5|||20", ...},
+    {"isgl1_key": "rust|||fn|||register|||src/auth.rs|||23|||50", ...}
+  ],
+  "test_code": [
+    {"isgl1_key": "rust|||test|||test_login|||src/auth.rs|||81|||100", ...}
+  ],
+  "import_blocks": [
+    {"isgl1_key": "rust|||import|||auth_imports|||src/auth.rs|||1|||3", ...}
+  ],
+  "unparsed_constructs": [],
+  "edges": {
+    "calls": [...],
+    "uses": [...],
+    "implements": [...]
+  },
+  "meta": {
+    "total_entities": 5,
+    "file_coverage_pct": 100,
+    "entity_class_counts": {"core_code": 2, "test_code": 1, "import_blocks": 1, "gap_fragments": 1}
+  }
+}
+```
+
+### Why This Matters
+
+1. **LLM filtering without parsing**: An LLM that only wants production code reads `core_code` and ignores the rest. No regex on ISGL1 keys needed.
+2. **Provenance awareness**: The LLM knows "these 3 entities are tests" vs "these 5 are production code" without inferring from names.
+3. **Edge type separation**: `edges.calls` vs `edges.uses` vs `edges.implements` lets LLMs reason about relationship types directly.
+4. **Coverage transparency**: `meta.entity_class_counts` tells the LLM exactly what's in the response and what was filtered.
+
+### Applies To These Endpoints
+
+All entity-returning endpoints adopt tagged categories:
+- `/code-entities-list-all`
+- `/code-entity-detail-view`
+- `/code-entities-search-fuzzy`
+- `/smart-context-token-budget`
+- `/blast-radius-impact-analysis`
+- `/forward-callees-query-graph`
+- `/reverse-callers-query-graph`
+
+Edge-only endpoints (`/dependency-edges-list-all`) group edges by type.
+
+### Connects To
+
+- **ISGL1 v3 entity taxonomy**: CoreCode, TestCode, ImportBlock, GapFragment, UnparsedConstruct map directly to response categories.
+- **Exhaustive file coverage**: When every line maps to an entity class, the tagged response covers 100% of the file.
+- **See**: `docs/RESEARCH-isgl1v3-exhaustive-graph-identity.md` for the full v3 design.
+
+---
+
 ## Port Management
 
 ### No `--port` flag. No conflicts. No confusion.
@@ -441,6 +538,9 @@ Edge cases:
 | 14 | Path normalization consistent | `./crates/foo.rs` and `crates/foo.rs` match correctly in coverage comparison |
 | 15 | Error log has 3 categories | `ingestion-errors.txt` uses `[UNPARSED]`, `[TEST_EXCLUDED]`, `[ZERO_ENTITIES]` tags |
 | 16 | No debug eprintln in pt01 | `grep -n "DEBUG-INSERT\|DEBOUNCER\|WATCHER\|EVENT_HANDLER" streamer.rs file_watcher.rs` returns 0 matches |
+| 17 | API responses use tagged categories | `/code-entities-list-all` response has `core_code`, `test_code`, `import_blocks`, `edges` top-level keys (not flat array) |
+| 18 | Ingestion respects .gitignore | Files in `.gitignore` are not ingested; `ignore` crate used instead of `walkdir` |
+| 19 | .gitignore changes update graph | Edit `.gitignore` → file watcher detects it → newly ignored files' entities/edges removed, newly un-ignored files ingested |
 
 ---
 
@@ -472,8 +572,10 @@ TODO 21. Coverage: path normalize → coverage handler      (~5 lines, strip ./ 
 TODO 22. Coverage: error log tags → coverage handler      (~15 lines, [TEST_EXCLUDED] + [ZERO_ENTITIES] tags)
 TODO 23. Remove debug eprintln    → streamer.rs           (~-40 lines, delete [DEBUG-INSERT] blocks)
 TODO 24. Remove watcher eprintln  → file_watcher.rs       (~-30 lines, delete [DEBOUNCER]/[WATCHER]/[EVENT_HANDLER] blocks)
-TODO 25. README audit            → README.md             (verify)
-TODO 26. Testing journal         → root .md file         (document)
+TODO 25. XML-tagged responses     → all entity handlers   (~60 lines, group by entity class + edge type)
+TODO 26. Swap walkdir → ignore   → streamer.rs + Cargo.toml (~20 lines, respect .gitignore)
+TODO 27. README audit            → README.md             (verify)
+TODO 28. Testing journal         → root .md file         (document)
 ```
 
 **Done: ~365 lines. Remaining: ~1,190 lines. Total: ~1,555 lines.**
