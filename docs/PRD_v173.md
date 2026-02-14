@@ -381,6 +381,21 @@ See: `docs/v173-bugs01-COVERAGE-REPORTING-BUG-ISSUES.md` for per-file analysis.
 
 ---
 
+## Terminal Output Cleanup (Fix in v1.7.3)
+
+pt01 ingestion dumps debug `eprintln!` noise to stderr that pollutes LLM context windows. Leftover from v1.5.1 edge investigation, never cleaned up.
+
+| File | Lines | Tag | What It Prints |
+|------|-------|-----|----------------|
+| `streamer.rs` | 1036-1075 | `[DEBUG-INSERT]` | Per-file edge counts, sample edge keys, insert success/fail |
+| `file_watcher.rs` | 475-533 | `[DEBOUNCER]` `[WATCHER]` `[EVENT_HANDLER]` | Watcher startup confirmations, event receipts, channel sends |
+
+**Nothing is lost** — edges are in `DependencyEdges` table (queryable via API), insert failures already surface in the `errors` vec and final summary, watcher status is queryable via `/file-watcher-status-check`.
+
+**Fix**: Delete all `[DEBUG-INSERT]` eprintln blocks in `streamer.rs`. Delete all `[DEBOUNCER]`/`[WATCHER]`/`[EVENT_HANDLER]` eprintln blocks in `file_watcher.rs`.
+
+---
+
 ## Port Management
 
 ### No `--port` flag. No conflicts. No confusion.
@@ -425,6 +440,7 @@ Edge cases:
 | 13 | Coverage separates zero-entity files | `__init__.py` files tagged `[ZERO_ENTITIES]`, not `[UNPARSED]` |
 | 14 | Path normalization consistent | `./crates/foo.rs` and `crates/foo.rs` match correctly in coverage comparison |
 | 15 | Error log has 3 categories | `ingestion-errors.txt` uses `[UNPARSED]`, `[TEST_EXCLUDED]`, `[ZERO_ENTITIES]` tags |
+| 16 | No debug eprintln in pt01 | `grep -n "DEBUG-INSERT\|DEBOUNCER\|WATCHER\|EVENT_HANDLER" streamer.rs file_watcher.rs` returns 0 matches |
 
 ---
 
@@ -454,8 +470,10 @@ TODO 19. Coverage: exclude tests  → coverage handler      (~20 lines, query Te
 TODO 20. Coverage: zero-entity tag → coverage handler     (~15 lines, [ZERO_ENTITIES] vs [UNPARSED])
 TODO 21. Coverage: path normalize → coverage handler      (~5 lines, strip ./ prefix)
 TODO 22. Coverage: error log tags → coverage handler      (~15 lines, [TEST_EXCLUDED] + [ZERO_ENTITIES] tags)
-TODO 23. README audit            → README.md             (verify)
-TODO 24. Testing journal         → root .md file         (document)
+TODO 23. Remove debug eprintln    → streamer.rs           (~-40 lines, delete [DEBUG-INSERT] blocks)
+TODO 24. Remove watcher eprintln  → file_watcher.rs       (~-30 lines, delete [DEBOUNCER]/[WATCHER]/[EVENT_HANDLER] blocks)
+TODO 25. README audit            → README.md             (verify)
+TODO 26. Testing journal         → root .md file         (document)
 ```
 
 **Done: ~365 lines. Remaining: ~1,190 lines. Total: ~1,555 lines.**
