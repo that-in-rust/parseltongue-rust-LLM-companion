@@ -891,6 +891,331 @@ The CLI still exists. Power users can use it directly. But Parseltongue Central 
 
 ---
 
+## Structural Taint Analysis (New in v1.7.3)
+
+### The Problem
+
+Security teams need to know: "Can user input reach a SQL query without sanitization?" Today, only two tools answer this — code-scalpel (Python AST + Z3 symbolic solver) and semgrep (pattern-matching `mode: taint`). Both are Python-only or require external tooling. Neither integrates with a dependency graph database.
+
+Parseltongue already has the graph. Every function call is an edge in CozoDB. The missing piece: **data-flow edges** — tracking how values move through assignments, parameters, and returns — and **source/sink classification** — labeling which entities produce dangerous data and which consume it unsafely.
+
+### The Insight
+
+Taint analysis has three layers:
+
+| Layer | What It Tracks | code-scalpel | semgrep | Parseltongue (proposed) |
+|-------|---------------|-------------|---------|------------------------|
+| **Structural** | "A path exists from source entity to sink entity through call edges" | Yes | Yes | Yes — CozoDB Datalog reachability query |
+| **Intra-procedural** | "Variable `x` assigned from `request.get()` flows to `cursor.execute(x)`" | Yes (Python AST walker) | Yes (pattern matching) | Yes — tree-sitter assignment/param extraction |
+| **Symbolic** | "Does `html_escape(x)` actually neutralize SQL injection?" | Yes (Z3 solver) | No | **No** — curated registry instead |
+
+Parseltongue targets Layers 1 + 2. Layer 3 (symbolic reasoning) is explicitly out of scope — we use a curated sanitizer registry instead of Z3. This means our taint analysis is **structural + intra-procedural** but not symbolic. The tradeoff: ~15% more false positives than code-scalpel, but works across 12 languages (not just Python), runs in milliseconds (not seconds), and leverages the existing graph.
+
+### How It Works — End to End
+
+#### Step 1: Tree-Sitter Extracts Data-Flow Edges (pt01 ingestion)
+
+During ingestion, new tree-sitter queries extract three new edge types:
+
+```
+DataFlowEdge types:
+  assign    — x = foo()         → edge from foo()'s return to x
+  param     — bar(x)            → edge from x to bar()'s parameter
+  return    — return x          → edge from x to bar()'s return value
+```
+
+These are intra-function edges. They connect to the existing `DependencyEdges` (call edges) to form a complete flow graph.
+
+**Tree-sitter query example** (Rust — assignment extraction):
+```scheme
+;; Captures: let x = some_function_call();
+(let_declaration
+  pattern: (identifier) @assign_target
+  value: (call_expression
+    function: (_) @assign_source))
+```
+
+**Tree-sitter query example** (Python — parameter passing):
+```scheme
+;; Captures: some_function(tainted_var)
+(call
+  function: (_) @call_target
+  arguments: (argument_list
+    (_) @param_value))
+```
+
+Each language gets 3-5 new queries. The existing tree-sitter infrastructure in `parseltongue-core` handles this — same pattern as entity extraction.
+
+#### Step 2: Source/Sink Classification (curated registry)
+
+A Rust module defines known taint sources and sinks per language:
+
+```rust
+/// Taint source — where dangerous data enters the program
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TaintSourceKind {
+    UserInput,        // request.get(), input(), stdin, argv
+    FileContent,      // read(), open(), fs::read_to_string
+    NetworkData,      // recv(), fetch(), http::get
+    DatabaseQuery,    // cursor.fetchone(), query.row()
+    EnvironmentVar,   // env::var(), os.environ
+    CommandLineArg,   // sys.argv, std::env::args
+    Deserialization,  // serde_json::from_str, pickle.loads
+}
+
+/// Security sink — where unsanitized data becomes a vulnerability
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SecuritySinkKind {
+    SqlQuery,         // execute(), query(), raw SQL — CWE-89
+    ShellCommand,     // system(), exec(), Command::new — CWE-78
+    HtmlOutput,       // innerHTML, render(), write_html — CWE-79
+    FileWrite,        // write(), create(), open("w") — CWE-73
+    NetworkSend,      // send(), post(), fetch — CWE-918
+    Deserialization,  // from_str with untrusted data — CWE-502
+    PathTraversal,    // open(user_path), read_dir — CWE-22
+    LogInjection,     // log::info!("{}", user_data) — CWE-117
+    RedirectUrl,      // redirect(url), Location header — CWE-601
+    LdapQuery,        // ldap.search(filter) — CWE-90
+    XpathQuery,       // xpath(expr) — CWE-643
+    RegexInput,       // Regex::new(user_input) — CWE-1333
+}
+```
+
+**Pattern matching** — sources and sinks are identified by matching entity names and signatures against curated patterns:
+
+```rust
+/// Source patterns per language
+static TAINT_SOURCES: LazyLock<HashMap<&str, Vec<SourcePattern>>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    m.insert("python", vec![
+        SourcePattern::new("request.get", TaintSourceKind::UserInput),
+        SourcePattern::new("request.form", TaintSourceKind::UserInput),
+        SourcePattern::new("input", TaintSourceKind::UserInput),
+        SourcePattern::new("sys.argv", TaintSourceKind::CommandLineArg),
+        SourcePattern::new("os.environ", TaintSourceKind::EnvironmentVar),
+        SourcePattern::new("open", TaintSourceKind::FileContent),
+        // ... 20+ patterns per language
+    ]);
+    m.insert("rust", vec![
+        SourcePattern::new("std::io::stdin", TaintSourceKind::UserInput),
+        SourcePattern::new("std::env::args", TaintSourceKind::CommandLineArg),
+        SourcePattern::new("std::env::var", TaintSourceKind::EnvironmentVar),
+        SourcePattern::new("std::fs::read", TaintSourceKind::FileContent),
+        SourcePattern::new("reqwest::get", TaintSourceKind::NetworkData),
+        // ...
+    ]);
+    // JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
+    m
+});
+```
+
+During pt01 ingestion, entities matching source patterns get a `taint_source: Some(TaintSourceKind)` field. Entities matching sink patterns get a `taint_sink: Some(SecuritySinkKind)` field.
+
+#### Step 3: Sanitizer Registry (curated, not symbolic)
+
+```rust
+/// Maps sanitizer function names to which sink types they neutralize
+static SANITIZER_REGISTRY: LazyLock<HashMap<&str, Vec<SecuritySinkKind>>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    // SQL sanitizers
+    m.insert("escape_sql", vec![SecuritySinkKind::SqlQuery]);
+    m.insert("parameterize", vec![SecuritySinkKind::SqlQuery]);
+    m.insert("sqlx::query", vec![SecuritySinkKind::SqlQuery]); // parameterized by design
+    m.insert("prepared_statement", vec![SecuritySinkKind::SqlQuery]);
+
+    // HTML/XSS sanitizers
+    m.insert("html_escape", vec![SecuritySinkKind::HtmlOutput]);
+    m.insert("sanitize_html", vec![SecuritySinkKind::HtmlOutput]);
+    m.insert("encode_html", vec![SecuritySinkKind::HtmlOutput]);
+    m.insert("bleach.clean", vec![SecuritySinkKind::HtmlOutput]);
+    m.insert("DOMPurify.sanitize", vec![SecuritySinkKind::HtmlOutput]);
+
+    // Shell sanitizers
+    m.insert("shlex.quote", vec![SecuritySinkKind::ShellCommand]);
+    m.insert("shell_escape", vec![SecuritySinkKind::ShellCommand]);
+
+    // Path sanitizers
+    m.insert("canonicalize", vec![SecuritySinkKind::PathTraversal]);
+    m.insert("realpath", vec![SecuritySinkKind::PathTraversal]);
+
+    // Multi-purpose
+    m.insert("validate_input", vec![
+        SecuritySinkKind::SqlQuery,
+        SecuritySinkKind::ShellCommand,
+        SecuritySinkKind::HtmlOutput,
+    ]);
+
+    // ... 60+ entries across all languages
+    m
+});
+```
+
+**Key difference from code-scalpel**: code-scalpel uses Z3 to symbolically reason "does `html_escape(x)` neutralize SQL injection?" (answer: no). We use a lookup table. This means if a sanitizer isn't in our registry, we can't reason about it. Tradeoff: faster, simpler, works across 12 languages, but less precise for custom sanitizers.
+
+#### Step 4: CozoDB Relations (graph storage)
+
+```
+TaintSources {
+  entity_key: String,         // ISGL1 key of source entity
+  source_kind: String,        // UserInput, FileContent, etc.
+  confidence: Float,          // 1.0 = exact match, 0.7 = heuristic
+}
+
+TaintSinks {
+  entity_key: String,         // ISGL1 key of sink entity
+  sink_kind: String,          // SqlQuery, ShellCommand, etc.
+  cwe_id: String,             // CWE-89, CWE-78, etc.
+  confidence: Float,
+}
+
+DataFlowEdges {
+  from_key: String,           // Source entity
+  to_key: String,             // Target entity
+  flow_type: String,          // assign, param, return
+  variable_name: String,      // The variable carrying the data
+}
+
+Sanitizers {
+  entity_key: String,         // ISGL1 key of sanitizer entity
+  neutralizes: [String],      // List of SecuritySinkKind values
+}
+```
+
+#### Step 5: Taint Propagation via Datalog (the query)
+
+The core taint query is a recursive CozoDB Datalog rule:
+
+```datalog
+# Find all taint flows: source → ... → sink (without sanitization)
+tainted_path[source, sink, path] :=
+  # Start from a known taint source
+  *TaintSources[source, source_kind, _],
+  # Find reachable sinks via data-flow + call edges
+  *DataFlowEdges[source, next, _, _],
+  reachable[next, sink, path],
+  # Sink must be a known security sink
+  *TaintSinks[sink, sink_kind, cwe, _],
+  # No sanitizer on the path neutralizes this sink type
+  not sanitized_for[path, sink_kind]
+
+# Recursive reachability through data-flow and call edges
+reachable[start, end, path] :=
+  *DataFlowEdges[start, end, _, _],
+  path = [start, end]
+reachable[start, end, path] :=
+  *DataFlowEdges[start, mid, _, _],
+  reachable[mid, end, rest],
+  path = [start | rest]
+# Also traverse call edges (cross-function flow)
+reachable[start, end, path] :=
+  *DependencyEdges[start, mid, _],
+  reachable[mid, end, rest],
+  path = [start | rest]
+
+# A path is sanitized if any entity on it is a sanitizer for the sink type
+sanitized_for[path, sink_kind] :=
+  *Sanitizers[entity, neutralizes],
+  sink_kind in neutralizes,
+  entity in path
+```
+
+This runs in milliseconds for typical codebases (< 50K entities). CozoDB's Datalog engine handles the recursion natively.
+
+#### Step 6: HTTP Endpoints (2 new)
+
+```
+GET /{mode}/taint-flow-path-analysis?entity=X&hops=N
+  → Returns all taint flows reachable from entity X within N hops
+  → Response: { flows: [{ source, sink, path, cwe_id, confidence }] }
+
+GET /{mode}/taint-source-sink-discovery
+  → Returns all classified sources and sinks in the codebase
+  → Response: { sources: [...], sinks: [...], sanitizers: [...],
+                summary: { total_sources, total_sinks, unsanitized_flows } }
+```
+
+#### Step 7: MCP Tools (2 new)
+
+```
+taint_flow_path_analysis(entity="rust:fn:handle_request", hops=5)
+taint_source_sink_discovery()
+```
+
+### CWE Mapping
+
+| Sink Type | CWE | OWASP | Severity |
+|-----------|-----|-------|----------|
+| SqlQuery | CWE-89 | A03:2021 Injection | Critical |
+| ShellCommand | CWE-78 | A03:2021 Injection | Critical |
+| HtmlOutput | CWE-79 | A03:2021 Injection | High |
+| FileWrite | CWE-73 | A01:2021 Broken Access | High |
+| PathTraversal | CWE-22 | A01:2021 Broken Access | High |
+| Deserialization | CWE-502 | A08:2021 Integrity | Critical |
+| NetworkSend | CWE-918 | A10:2021 SSRF | High |
+| LogInjection | CWE-117 | A09:2021 Logging | Medium |
+| RedirectUrl | CWE-601 | A01:2021 Broken Access | Medium |
+| LdapQuery | CWE-90 | A03:2021 Injection | High |
+| XpathQuery | CWE-643 | A03:2021 Injection | High |
+| RegexInput | CWE-1333 | A03:2021 Injection | Medium |
+
+### What This Is NOT
+
+- **Not a SAST scanner** — we don't replace semgrep or SonarQube. We provide taint flow *visibility* in a dependency graph.
+- **Not symbolic** — we can't reason about whether `custom_sanitize(x)` actually works. We only know about sanitizers in our registry.
+- **Not a vulnerability scanner** — we find *potential* taint flows. A human or LLM must assess whether each flow is a real vulnerability.
+- **Not a replacement for code-scalpel** — code-scalpel's Z3 reasoning catches things we'll miss. Our advantage: 12 languages, millisecond queries, graph integration.
+
+### Honest Accuracy Assessment
+
+| Metric | code-scalpel | semgrep | Parseltongue (projected) |
+|--------|-------------|---------|--------------------------|
+| Languages | Python only | 30+ (but taint mode quality varies) | 12 (tree-sitter supported) |
+| Intra-function flow | High (AST walker) | High (pattern engine) | Medium (tree-sitter assignment/param) |
+| Cross-function flow | High (inter-procedural) | Low (intra-procedural) | High (CozoDB graph reachability) |
+| Sanitizer reasoning | Z3 symbolic | Pattern match | Curated registry |
+| False positive rate | ~10% | ~20% | ~25% (estimated) |
+| Query speed | Seconds | Seconds | Milliseconds (pre-computed graph) |
+| Integration | Standalone CLI | Standalone CLI / MCP | Native in dependency graph + MCP |
+
+### Files Changed
+
+- `parseltongue-core/src/taint/mod.rs` — NEW: TaintSourceKind, SecuritySinkKind, sanitizer registry, source/sink patterns (~400 lines)
+- `parseltongue-core/src/taint/registry.rs` — NEW: TAINT_SOURCES, TAINT_SINKS, SANITIZER_REGISTRY static maps (~300 lines)
+- `parseltongue-core/src/taint/tree_sitter_queries/` — NEW: data-flow extraction queries per language (~150 lines, 12 files)
+- `parseltongue-core/src/storage/cozo_client.rs` — Add TaintSources, TaintSinks, DataFlowEdges, Sanitizers relations (~60 lines)
+- `pt01/.../streamer.rs` — Extract data-flow edges during ingestion, classify sources/sinks (~80 lines)
+- `pt08/.../taint_flow_path_analysis_handler.rs` — NEW: Datalog taint query endpoint (~100 lines)
+- `pt08/.../taint_source_sink_discovery_handler.rs` — NEW: Source/sink listing endpoint (~60 lines)
+- `pt08/.../startup_runner.rs` — Register 2 new routes (~4 lines)
+
+**Total: ~1,150 lines of new Rust code. No new dependencies** (tree-sitter and CozoDB already in the stack).
+
+### Build Order (appended to existing)
+
+```
+TODO 33. Taint types + enums        → parseltongue-core/src/taint/mod.rs     (~100 lines)
+TODO 34. Source/sink registry        → parseltongue-core/src/taint/registry.rs (~300 lines)
+TODO 35. Data-flow tree-sitter queries → parseltongue-core/src/taint/queries/  (~150 lines)
+TODO 36. CozoDB taint relations      → cozo_client.rs                         (~60 lines)
+TODO 37. pt01 taint extraction       → streamer.rs                            (~80 lines)
+TODO 38. Taint flow endpoint         → taint_flow_path_analysis_handler.rs    (~100 lines)
+TODO 39. Source/sink discovery endpoint → taint_source_sink_discovery_handler.rs (~60 lines)
+TODO 40. MCP taint tools             → pt09 tool registry                     (~40 lines)
+```
+
+### Acceptance Criteria (appended)
+
+| # | Test | Pass Condition |
+|---|------|---------------|
+| 22 | `cargo test -p parseltongue-core -- taint` | Taint registry tests pass — sources, sinks, sanitizers correctly classified |
+| 23 | pt01 ingestion with taint | `TaintSources`, `TaintSinks`, `DataFlowEdges` relations populated after ingestion |
+| 24 | `/taint-flow-path-analysis?entity=X` | Returns taint flows with source→path→sink, CWE IDs |
+| 25 | `/taint-source-sink-discovery` | Returns classified sources, sinks, sanitizers, unsanitized flow count |
+| 26 | Sanitizer interrupts flow | Path through known sanitizer NOT reported as unsanitized |
+| 27 | MCP tools work | `taint_flow_path_analysis()` and `taint_source_sink_discovery()` return results via JSON-RPC |
+
+---
+
 ## What We're NOT Building
 
 | Temptation | Why Not |
@@ -904,7 +1229,7 @@ The CLI still exists. Power users can use it directly. But Parseltongue Central 
 
 ---
 
-## Risks (4)
+## Risks (6)
 
 | Risk | So What | Mitigation |
 |------|---------|-----------|
@@ -912,6 +1237,8 @@ The CLI still exists. Power users can use it directly. But Parseltongue Central 
 | `/mem/` filesystem read fails (file moved/deleted) | Detail view returns error instead of code | Return clear error: "Source file not found at {path}. Re-run pt02 if codebase moved." |
 | CozoDB batch insert limits | Large codebases exceed query size | Chunk 5000 entities/batch (already implemented). |
 | `rmcp` SDK is v0.15 (pre-1.0) | API may change in future versions | Pin exact version. stdio transport is stable in spec. Wrapper is thin (~400 lines) — easy to update. |
+| Taint false positives (~25%) | Users may lose trust if too many flows are not real vulnerabilities | Confidence scores per flow. Label as "structural taint" not "vulnerability". Let LLM/human triage. |
+| Curated sanitizer registry gaps | Custom sanitizers not in registry → false unsanitized warnings | Ship with 60+ known sanitizers. Expose `/taint-source-sink-discovery` so users see what's classified. Accept this limitation honestly in docs. |
 
 ---
 

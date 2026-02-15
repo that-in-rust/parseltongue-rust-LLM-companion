@@ -1,0 +1,707 @@
+================================================================================
+SESSION CONTEXT KNOWLEDGE DUMP
+Generated: 2026-02-15
+Source: Claude Code session for parseltongue-dependency-graph-generator
+Branch: v173
+================================================================================
+
+================================================================================
+SECTION 1: PROJECT OVERVIEW
+================================================================================
+
+Parseltongue is a code analysis toolkit that parses codebases into a graph
+database (CozoDB) for efficient LLM-optimized querying.
+
+Core value: 99% token reduction (2-5K tokens vs 500K raw dumps), 31x faster
+than grep.
+
+Version: 1.6.1 (HTTP-only architecture with always-on file watching + 7 graph
+analysis algorithms)
+
+Languages Supported: Rust, Python, JavaScript, TypeScript, Go, Java, C, C++,
+Ruby, PHP, C#, Swift
+
+Workspace Architecture:
+  crates/
+  ├── parseltongue/                        # CLI binary - dispatches to tools
+  ├── parseltongue-core/                   # Shared types, traits, storage, tree-sitter parsing
+  ├── pt01-folder-to-cozodb-streamer/      # Tool 1: Ingest codebase -> CozoDB
+  └── pt08-http-code-query-server/         # Tool 8: HTTP REST API server
+
+Dependency Flow: parseltongue (binary) -> pt01/pt08 (tools) -> parseltongue-core (shared)
+
+Database: CozoDB with RocksDB backend
+Naming Convention: FOUR-WORD naming for all functions/crates/commands
+  Pattern: verb_constraint_target_qualifier()
+  Example: filter_implementation_entities_only()
+
+HTTP Server: 22 endpoints total on port 7777 (default)
+
+================================================================================
+SECTION 2: GIT STATUS AT SESSION START
+================================================================================
+
+Current branch: v173
+Main branch: main
+
+Untracked files:
+  ?? .claude/
+  ?? .mcp.json
+  ?? docs/CR-v173-02.md
+
+Recent commits:
+  2ed57a3b3 docs(v1.7.3): PRD with Tauri desktop app + MCP + coverage bugs + competitor research
+  13f61b697 feat(v1.7.3): dual-mode server infra -- slim types, pt02 crate, snapshot loader, route nesting
+  adae9d797 docs: archive pre-v1.7.3 docs to docs/pre175/
+  73352418a docs: update README for v1.7.2 Windows mem->SQLite workflow
+  52e1e2607 fix(v1.7.2): Windows mem->SQLite backup ingestion (removes all failed workarounds)
+
+Current git status (at time of last check):
+  M docs/PRD_v173.md
+  ?? docs/RESEARCH-v173-rustanalyzer-explore-agent-raw-dump.txt
+  ?? docs/THESIS-taint-analysis-for-parseltongue.md
+  ?? docs/v173-pt04-bidirectional-workflow.md
+
+================================================================================
+SECTION 3: FILES CREATED/MODIFIED THIS SESSION (AND PRIOR CONTINUED SESSION)
+================================================================================
+
+3a. docs/PRD_v173.md (MODIFIED -- ~320 lines added)
+-----------------------------------------------------
+- Added "Structural Taint Analysis (New in v1.7.3)" section before "What We're
+  NOT Building" (around line 893)
+- Contains: 7-step implementation walkthrough, Rust enums, sanitizer registry
+  design, CozoDB Datalog query, 2 new HTTP endpoints, 2 new MCP tools, CWE
+  mapping table, "What This Is NOT" section, accuracy assessment, files changed
+  list, build order items 33-40, acceptance criteria 22-27
+- Updated Risks from 4 to 6 (added taint false positives + sanitizer registry gaps)
+- Key Rust code added to PRD:
+
+    pub enum TaintSourceKind {
+        UserInput, FileContent, NetworkData, DatabaseQuery,
+        EnvironmentVar, CommandLineArg, Deserialization,
+    }
+    pub enum SecuritySinkKind {
+        SqlQuery, ShellCommand, HtmlOutput, FileWrite,
+        NetworkSend, Deserialization, PathTraversal, LogInjection,
+        RedirectUrl, LdapQuery, XpathQuery, RegexInput,
+    }
+
+- Build items added: TODO 33-40 (~1,150 lines new Rust code)
+- Acceptance criteria added: Tests 22-27
+
+
+3b. docs/THESIS-taint-analysis-for-parseltongue.md (CREATED -- 786 lines, 41KB)
+---------------------------------------------------------------------------------
+- 11-section technical thesis document
+- Sections: Abstract, Academic Foundations (Denning, Joern, DOOP, Souffle),
+  code-scalpel Deep-Dive (full source analysis), Semgrep Deep-Dive, Proposed
+  Architecture (CozoDB relations, tree-sitter queries, Datalog propagation),
+  CWE Top 25 (2025), False Positive Rates, Tooling Gap Analysis, Honest
+  Assessment, Implementation Plan, Shreyas Doshi Analysis, References (25 sources)
+- Key Datalog query for taint propagation:
+
+    taint_flow[source_key, sink_key, source_kind, sink_kind, cwe, depth] :=
+        *TaintSources[source_key, source_kind, _, _],
+        *TaintSinks[sink_key, sink_kind, cwe, _, _, _],
+        reachable[source_key, sink_key, depth],
+        not sanitized_path[source_key, sink_key, sink_kind]
+
+- 4 new CozoDB relations defined: TaintSources, TaintSinks, DataFlowEdges, Sanitizers
+- 2 new HTTP endpoints: /taint-flow-path-analysis, /taint-source-sink-discovery
+- 2 new MCP tools: taint_flow_path_analysis, taint_source_sink_discovery
+
+
+3c. docs/CR-v173-03.md (EXISTS -- 125KB)
+-----------------------------------------
+- Competitor feature deep-dive document
+- Created in prior session segments
+
+
+3d. docs/CR-v173-04-oh-my-pi.md (EXISTS -- 17KB)
+--------------------------------------------------
+- oh-my-pi competitive analysis
+- Created in prior session segments
+
+
+3e. docs/CR-v173-02.md (EXISTS -- untracked)
+----------------------------------------------
+- Parseltongue graph analysis data (19,431 entities, 144,137 edges)
+- Created in prior session segments
+
+================================================================================
+SECTION 4: COMPETITOR RESEARCH -- oh-my-pi DEEP DIVE (CR-v173-04)
+================================================================================
+
+Repo: https://github.com/can1357/oh-my-pi (fork of pi-mono by @mariozechner)
+Stack: TypeScript (Bun) + Rust monorepo -- 831 .ts files, 3 Rust crates
+Nature: Full AI coding agent for terminal -- direct competitor to Claude Code
+        and Gemini CLI
+Package: @oh-my-pi/pi-coding-agent (npm), version 12.4.0
+
+10 Features Analyzed:
+
+Feature 1: Multi-Provider LLM Client with Streaming
+  - Unified LLM client speaking to 10+ providers (Anthropic, OpenAI, Google,
+    Google Vertex, Kimi, Cursor, Azure OpenAI)
+  - Single streamSimple() function
+  - 13,843-line models.json with pricing, context windows, capabilities
+  - Token cost calculation, cache retention, retry logic
+  - Key path: packages/ai/src/index.ts -> providers/* -> models.ts -> stream.ts
+  - vs Parseltongue: PT outputs JSON, not LLM calls. Intentionally excluded.
+
+Feature 2: Agent Runtime with Steering & Follow-Up Queues
+  - Agent class with event-driven agentic loop
+  - Steering: user injects messages mid-execution via agent.steer(message)
+  - Follow-up messages queued for after agent stops naturally
+  - Key path: packages/agent/src/agent.ts:147 -> agent-loop.ts:129
+  - vs Parseltongue: PT is stateless HTTP API. Agent loop is UI/orchestrator concern.
+
+Feature 3: Full MCP Client with Discovery, OAuth & Tool Caching
+  - Discovers MCP servers from .mcp.json files (project + user level)
+  - Parallel connection at startup with 250ms timeout
+  - DeferredMCPTool proxies for slow servers (cached from previous session)
+  - Supports stdio + HTTP + SSE transports
+  - OAuth with PKCE
+  - Key path: coding-agent/src/mcp/manager.ts:80 -> tool-bridge.ts -> client.ts
+  - vs Parseltongue: PT should be MCP SERVER (pt09, P0-1 priority). Complementary.
+
+Feature 4: Built-in LSP Integration
+  - Starts language servers at startup (rust-analyzer, tsc, go, pyright)
+  - Single LspTool with actions: definition, references, hover, symbols,
+    diagnostics, rename, reload, status
+  - LSP writethrough: sync + format + diagnostics + write in one atomic op
+  - Custom linter clients (Biome, SwiftLint)
+  - Key path: coding-agent/src/lsp/index.ts:853 -> lsp/client.ts -> lsp/config.ts
+  - vs Parseltongue: PT uses tree-sitter (static). LSP is real-time, PT is pre-computed.
+
+Feature 5: Swarm Extension -- DAG-Based Multi-Agent Orchestration
+  - Multi-agent workflows defined in YAML
+  - DAG builder with Kahn's algorithm cycle detection
+  - Execution waves (groups running in parallel)
+  - PipelineController executes waves sequentially
+  - Supports pipeline mode (repeat iterations) and sequential mode
+  - Key path: packages/swarm-extension/src/swarm/dag.ts -> pipeline.ts -> executor.ts
+  - Key code: PipelineController class (pipeline.ts) with #waves, #stateTracker,
+    run() method iterating through waves with Promise.all for parallelism
+  - vs Parseltongue: PT already computes dependency graphs, SCCs, topological ordering.
+    Future: /topological-execution-wave-planner endpoint.
+
+Feature 6: Task System with Git Worktree Isolation
+  - Each task gets unique ID, subprocess with own model/tools/skills
+  - Git worktree isolation: isolated tasks get separate working copy
+  - Changes captured as patches, applied back after completion
+  - Key path: coding-agent/src/task/index.ts:134 -> worktree.ts -> parallel.ts
+  - vs Parseltongue: No equivalent. Orchestrator-layer. But blast radius analysis
+    could help intelligent task decomposition.
+
+Feature 7: Session Compaction with File Operation Tracking
+  - Conversation summarization when too long
+  - Tracks files read/modified across session
+  - Branch summarization for conversation forks
+  - Key path: coding-agent/src/session/compaction/compaction.ts -> utils.ts
+  - vs Parseltongue: PT has /smart-context-token-budget. Similar purpose.
+
+Feature 8: Extension System (Custom Tools, Commands, Skills, Slash Commands)
+  - 4 extension types: Extensions, Custom Tools, Skills, Slash Commands
+  - Extensions subscribe to lifecycle events
+  - Skills are markdown files with frontmatter
+  - Key path: coding-agent/src/extensibility/
+  - vs Parseltongue: No plugins. Platform concern (P3, deferred).
+
+Feature 9: Native Rust Bindings (grep, glob, image, shell, PTY, highlight)
+  - Performance-critical ops in Rust via N-API
+  - ripgrep-based search, glob with caching, image processing
+  - tree-sitter syntax highlighting, brush-core vendored shell
+  - Key path: packages/natives/src/ -> crates/pi-natives/
+  - vs Parseltongue: PT is already 100% Rust. No bridging needed.
+
+Feature 10: Stats Dashboard (Local Observability)
+  - Local dashboard at http://localhost:3847
+  - JSONL session files -> SQLite -> aggregated stats
+  - CLI: omp-stats --json, --sync, --port
+  - vs Parseltongue: No usage tracking. Optional P2.
+
+Shreyas Doshi LNO Assessment:
+  Leverage: MCP server (validates P0-1 priority)
+  Neutral: LSP integration, session compaction, agent runtime
+  Overhead: Multi-LLM client, extension system, stats dashboard
+
+Key Takeaway: oh-my-pi is an MCP CLIENT, Parseltongue should be an MCP SERVER.
+They're complementary. oh-my-pi validates our existing roadmap rather than
+introducing new P0 priorities. Building a competing orchestrator would be 6+
+months with no defensible moat.
+
+================================================================================
+SECTION 5: oh-my-pi PIPELINE.TS SOURCE CODE (FULL -- 217 lines)
+================================================================================
+
+File: competitor_research/oh-my-pi/packages/swarm-extension/src/swarm/pipeline.ts
+
+PipelineController class:
+  - Constructor takes SwarmDefinition, waves (string[][]), StateTracker
+  - run(options: PipelineOptions) -> Promise<PipelineResult>
+    - Iterates through targetCount iterations
+    - Each iteration calls #runIteration()
+    - Tracks progress, errors, agent results
+    - Handles abort signals
+  - #runIteration() -> Promise<Map<string, SingleResult>>
+    - Iterates through waves sequentially
+    - Within each wave, executes all agents in parallel via Promise.all()
+    - Each agent executed via executeSwarmAgent()
+    - Per-agent error catching with failResult generation
+  - #buildProgressSnapshot() -> Record<string, {status, iteration}>
+
+Types:
+  - PipelineOptions: workspace, signal?, onProgress?, authStorage?, modelRegistry?, settings?
+  - PipelineProgress: iteration, targetCount, currentWave, totalWaves, agents
+  - PipelineResult: status ("completed"|"failed"|"aborted"), iterations, agentResults, errors
+
+================================================================================
+SECTION 6: oh-my-pi TUI PACKAGE EXPORTS
+================================================================================
+
+File: competitor_research/oh-my-pi/packages/tui/src/index.ts (66 lines)
+
+Exports:
+  - Autocomplete: AutocompleteItem, AutocompleteProvider, CombinedAutocompleteProvider, SlashCommand
+  - Components: Box, CancellableLoader, Editor, Image, Input, Loader, Markdown,
+    SelectList, SettingsList, Spacer, TabBar, Text, TruncatedText
+  - EditorComponent interface
+  - Fuzzy: FuzzyMatch, fuzzyFilter, fuzzyMatch
+  - Keybindings: EditorAction, EditorKeybindingsConfig, EditorKeybindingsManager
+  - Kitty keyboard protocol: isKeyRelease, isKeyRepeat, parseKey, parseKittySequence
+  - Mermaid: extractMermaidBlocks, MermaidImage, prerenderMermaidBlocks, renderMermaidToPng
+  - StdinBuffer for input buffering
+  - Terminal: emergencyTerminalRestore, ProcessTerminal, Terminal interface
+  - Terminal capabilities
+  - TUI: Component, Container, OverlayHandle, SizeValue, TUI
+  - Utilities: Ellipsis, padding, replaceTabs, truncateToWidth, visibleWidth, wrapTextWithAnsi
+
+================================================================================
+SECTION 7: TAINT ANALYSIS RESEARCH -- CODE-SCALPEL FINDINGS
+================================================================================
+
+Source: Agent a1da4ab (completed) + direct file reading
+
+Repository: competitor_research/code-scalpel/
+File: src/code_scalpel/security/analyzers/taint_tracker.py (2,466 lines)
+
+TaintSource enum (7 values):
+  USER_INPUT, FILE_INPUT, NETWORK_INPUT, DATABASE_INPUT,
+  ENVIRONMENT_VARIABLE, COMMAND_LINE_ARG, DESERIALIZATION
+
+SecuritySink enum (27 values):
+  SQL_QUERY, SHELL_COMMAND, FILE_WRITE, FILE_READ, NETWORK_SEND,
+  NETWORK_RECEIVE, HTML_OUTPUT, URL_REDIRECT, LDAP_QUERY,
+  XPATH_QUERY, XML_PARSE, JSON_PARSE, YAML_PARSE, REGEX,
+  TEMPLATE_RENDER, CODE_EVAL, CRYPTO_KEY, CRYPTO_HASH,
+  CRYPTO_ENCRYPT, CRYPTO_DECRYPT, LOG_OUTPUT, EMAIL_SEND,
+  SMS_SEND, AUTHENTICATION, AUTHORIZATION, SESSION_MANAGEMENT,
+  DESERIALIZATION
+
+TaintLevel enum (4 values):
+  NONE, LOW, MEDIUM, HIGH
+
+TaintInfo dataclass:
+  - source: TaintSource
+  - level: TaintLevel
+  - sanitizers_applied: Set[str]
+  - propagation_path: List[str]
+  - propagate() method
+  - apply_sanitizer() method
+
+SANITIZER_REGISTRY: 80+ entries
+  Maps sanitizer function names to what they sanitize (e.g., "html_escape" -> {"HTML_OUTPUT"})
+
+SINK_SANITIZERS: Maps each sink type to required sanitizers
+
+TaintTracker class (line 673):
+  - taint_source(): marks a variable as tainted
+  - mark_tainted(): directly taints a variable
+  - propagate_assignment(): propagates taint through assignments
+  - propagate_concat(): propagates through string concatenation
+  - apply_sanitizer(): applies sanitizer to remove taint for specific sinks
+  - is_dangerous_for(): checks if tainted data reaching a sink is dangerous
+  - Key propagation rule: when merging taint from multiple sources,
+    pick MOST tainted level, INTERSECT sanitizer sets (conservative)
+
+Uses Z3 for symbolic reasoning (cross-function constraint solving).
+Python AST-based, not tree-sitter.
+
+================================================================================
+SECTION 8: TAINT ANALYSIS RESEARCH -- SEMGREP MCP FINDINGS
+================================================================================
+
+Source: Agent a137a80 (completed)
+
+Two semgrep MCP implementations found:
+
+1. mcp-server-semgrep (Node.js/TypeScript)
+   - Location: competitor_research/mcp-grep-servers/mcp-server-semgrep/
+   - 7 MCP tools: scan_directory, list_rules, analyze_results, create_rule,
+     filter_results, export_results, compare_results
+   - Entry point: src/index.ts (773 lines)
+   - Supports SEMGREP_APP_TOKEN for Pro rules
+
+2. semgrep-mcp (Python -- Official, DEPRECATED)
+   - Location: competitor_research/mcp-grep-servers/semgrep-mcp/
+   - Uses FastMCP framework
+   - Only 1 active tool: deprecation_notice
+   - Deprecated in favor of native `semgrep mcp` command
+   - Server: src/semgrep_mcp/server.py (494 lines)
+   - Semgrep interaction: src/semgrep_mcp/semgrep.py (293 lines)
+
+CRITICAL FINDING: No explicit taint analysis mode exposed through MCP tools.
+Semgrep supports taint natively (mode: taint in YAML rules), but MCP servers
+are just CLI wrappers. Global taint tracking requires paid Semgrep Pro tier.
+
+================================================================================
+SECTION 9: TAINT ANALYSIS RESEARCH -- INTERNET/ACADEMIC FINDINGS
+================================================================================
+
+Source: Agent a6c7763 (completed)
+
+9a. Academic Foundations
+------------------------
+- Dorothy E. Denning, "A Lattice Model of Secure Information Flow" (1976)
+  - Communications of the ACM, 19(5):236-243
+  - 2,079 citations, 137 highly influential
+  - Foundational: security classes form a lattice, flows are partial orderings
+  - Maps directly to Datalog relations in CozoDB
+
+- Denning & Denning, "Certification of Programs for Secure Information Flow" (1977)
+  - Static certification mechanism for flow policy compliance
+
+- Andrew C. Myers, "JFlow: Practical Mostly-Static Information Flow Control" (POPL 1999)
+  - Extended Java with statically-checked info flow annotations
+  - Evolved into Jif (Java + Information Flow) at Cornell
+
+- Sabelfeld & Myers, "Language-Based Information-Flow Security" (IEEE S&P 2003)
+  - Canonical survey, ~150 papers cited
+
+- Yamaguchi et al., "Modeling and Discovering Vulnerabilities with Code Property Graphs"
+  (IEEE S&P 2014)
+  - CPG = AST + CFG + PDG merged into single graph
+  - IEEE Test-of-Time Award 2024
+  - Taint pattern inference reduced code to inspect by 94.9%
+  - Discovered 8 previously unknown vulnerabilities
+
+9b. Modern Tool Landscape
+--------------------------
+- CodeQL (GitHub/Semmle):
+  - Extracts TRAP files -> relational DB -> QL (Datalog-based) queries
+  - Severs taint at library boundaries unless explicitly modeled
+  - 360+ library modules with manual source/sink specs
+  - IRIS (2024): LLM-augmented CodeQL found 55 vulns vs CodeQL's 27
+
+- Semgrep:
+  - tree-sitter for parsing, OCaml engine for taint
+  - Global taint = paid Pro tier only
+  - 2025: Opengrep fork after license change (Aikido + 10 companies)
+
+- SonarQube:
+  - Graph model of all execution paths
+  - Cross-function, cross-file analysis
+  - 2025.4: Full SAST for Go, VB.NET, Kotlin, rewritten JS/TS engine
+
+- Joern:
+  - Open-source CPG platform (Scala/JVM)
+  - 8 language frontends
+  - Overapproximates taint for unresolvable methods
+  - Most popular tool for ML-based vulnerability detection (2024 survey)
+
+- Snyk Code:
+  - AI/ML-driven, caught 0/5 vulnerabilities in Python/Django benchmark
+
+- YASA (Ant Group, 2025):
+  - Scalable multi-language taint on unified AST
+
+- TaintTyper (ECOOP 2025):
+  - Type-based taint checking, 2.93x-22.9x faster than whole-program
+
+9c. Tree-sitter + Taint Analysis Gap
+--------------------------------------
+KEY GAP CONFIRMED: No existing tool combines tree-sitter + Datalog for taint.
+  - Semgrep: tree-sitter + OCaml engine (not Datalog)
+  - Bearer CLI: tree-sitter + custom data flow logic (not Datalog)
+  - CodeQL: Datalog semantics + custom extractors (not tree-sitter)
+  - Joern: CPG + Scala traversals (not tree-sitter, not Datalog)
+
+This is the exact gap Parseltongue would fill.
+
+9d. Datalog for Taint Analysis (Proven Superiority)
+-----------------------------------------------------
+- Souffle: Datalog engine for static program analysis
+  - Compiles Datalog to parallel C++ via Futamura projection
+  - Points-to analysis: 8 hours -> 20 minutes
+  - Trie data structures: 16x faster, <1/20th memory vs B-tree
+  - Used by: Facebook, Google, Oracle Labs
+
+- DOOP: Datalog-based points-to analysis framework
+  - 15x faster than PADDLE (prior state-of-art)
+  - Explicit relation representation vs BDDs
+
+- P/Taint (Grech & Smaragdakis, 2017):
+  - Unified points-to + taint in Datalog
+
+CozoDB advantage over Souffle: embeddable (like SQLite) with RocksDB persistence,
+HTTP-servable. Trade-off: likely slower on billion-tuple analyses, adequate for
+project-scale.
+
+9e. CWE Top 25 (2025)
+-----------------------
+Released December 2025 by MITRE/CISA, compiled from 39,080 CVEs.
+
+5/10 top CWEs are taint-detectable:
+  Rank 1: CWE-79  XSS                  Score 60.38  YES
+  Rank 2: CWE-89  SQL Injection         Score 28.72  YES
+  Rank 6: CWE-22  Path Traversal        N/A          YES
+  Rank 9: CWE-78  OS Command Injection  Score 15.65  YES
+  Rank 10: CWE-94 Code Injection        N/A          YES
+
+NOT taint-detectable:
+  Rank 4: CWE-862 Missing Authorization
+  Rank 7: CWE-416 Use-After-Free (Rust handles this)
+
+XSS (CWE-79) held #1 for two consecutive years.
+Authorization weaknesses surged in 2025 but aren't taint-detectable.
+
+9f. Rust SAST Landscape
+------------------------
+- RustGuard (2025):
+  - Extends rustc compiler
+  - Precision and recall: both 91.67%
+  - 14.07% runtime overhead
+  - Rust's ownership system improves taint precision
+
+- Aalborg University Thesis:
+  - Rust is "excellent candidate for taint analysis"
+  - Strict aliasing rules reduce ambiguity
+  - Forward, over-approximating, context-sensitive interprocedural
+
+- MIRAI (Meta):
+  - Abstract interpreter for Rust MIR
+
+- PySpector:
+  - Rust-powered SAST for Python
+  - Flow-sensitive, interprocedural taint engine
+
+- 62 Rust static analysis tools cataloged at analysis-tools.dev
+
+- cpg-rs: Rust library for Code Property Graphs
+
+9g. False Positive Rates
+--------------------------
+Rates span two orders of magnitude:
+
+  Tool/Approach                  FP Rate
+  CodeQL/SUTURE (kernel)         ~90%
+  SUTURE (grouped)               51.23%
+  Hybrid Pruning                 36-56% fewer warnings
+  SFlow/SFlowInfer (type-based)  15%
+  RustGuard                      8.33%
+  CFTaint (compositional)        0.83-6.49%
+
+Key drivers:
+  - Over-approximation causes most FPs
+  - Type-based approaches achieve ~15% FP
+  - Context sensitivity dramatically helps (RustGuard: 91.67% precision)
+  - LLM augmentation: AdaTaint showed 43.7% FP reduction
+
+Realistic target for Parseltongue: 15-25% FP rate
+Achieving <5% would require path-sensitive analysis or LLM augmentation.
+
+9h. Positioning of tree-sitter + CozoDB in Rust
+-------------------------------------------------
+  Dimension        | Parseltongue          | Closest Competitor
+  Parsing          | tree-sitter           | CodeQL extractors (need compilation)
+  Query Engine     | CozoDB Datalog        | Souffle (compiled to C++)
+  Graph Model      | Relational-graph      | CPG (Joern)
+  Language         | Rust                  | Joern (Scala), CodeQL (Java/C++), Semgrep (OCaml)
+  Deployment       | Embedded + HTTP       | Server-based or CI-only
+  Built-in Algos   | PageRank, SCC, k-core | Limited graph algorithms
+
+Novel combination: tree-sitter (parsing) + CozoDB Datalog (taint propagation) +
+Rust-native + embeddable. No existing tool occupies this niche.
+
+================================================================================
+SECTION 10: PROPOSED TAINT ANALYSIS ARCHITECTURE (FROM THESIS)
+================================================================================
+
+Three-layer architecture:
+  Layer 1: tree-sitter extracts data-flow edges (AST -> DFG)
+  Layer 2: Curated registry classifies sources/sinks/sanitizers
+  Layer 3: CozoDB Datalog does propagation via graph reachability
+
+No Z3 dependency. Curated sanitizer registry instead of symbolic reasoning.
+Trade-off: ~15% more false positives for 12-language coverage + millisecond queries.
+
+4 New CozoDB Relations:
+  :create TaintSources { entity_key: String, source_kind: String, file: String, line: Int }
+  :create TaintSinks { entity_key: String, sink_kind: String, cwe: String, file: String, line: Int, severity: String }
+  :create DataFlowEdges { from_key: String, to_key: String, flow_type: String, file: String, from_line: Int, to_line: Int }
+  :create Sanitizers { entity_key: String, sanitizer_name: String, protects_against: [String] }
+
+Key Datalog Query (taint propagation):
+  reachable[a, b, 1] := *DataFlowEdges[a, b, _, _, _, _]
+  reachable[a, c, d] := reachable[a, b, d1], *DataFlowEdges[b, c, _, _, _, _], d = d1 + 1, d <= 20
+
+  sanitized_path[source, sink, sink_kind] :=
+      reachable[source, sanitizer_key, _],
+      reachable[sanitizer_key, sink, _],
+      *Sanitizers[sanitizer_key, _, protects],
+      sink_kind in protects
+
+  taint_flow[source_key, sink_key, source_kind, sink_kind, cwe, depth] :=
+      *TaintSources[source_key, source_kind, _, _],
+      *TaintSinks[sink_key, sink_kind, cwe, _, _, _],
+      reachable[source_key, sink_key, depth],
+      not sanitized_path[source_key, sink_key, sink_kind]
+
+2 New HTTP Endpoints:
+  /taint-flow-path-analysis?entity=X&hops=N
+  /taint-source-sink-discovery
+
+2 New MCP Tools:
+  taint_flow_path_analysis
+  taint_source_sink_discovery
+
+Implementation Estimate: ~1,090-1,150 lines new Rust code
+Build Items: PRD TODO 33-40
+Acceptance Criteria: Tests 22-27
+
+================================================================================
+SECTION 11: PLAN FILE (CR-v173-03 -- 3-Pass Sequential)
+================================================================================
+
+Plan exists at: ~/.claude/plans/validated-puzzling-lovelace.md
+
+Purpose: Create CR-v173-03.md -- Competitor Feature Deep-Dive (3-Pass Sequential)
+Status: CR-v173-03.md already exists (125KB), so this plan appears complete.
+
+3-Pass Architecture:
+  Pass 1: cclsp code reading (primary research)
+  Pass 2: Parseltongue validation & enrichment
+  Pass 3: Spec writing + Shreyas Doshi table
+
+Data Sources:
+  - cclsp (LSP MCP tools)
+  - Parseltongue (port 7779): 19,431 entities, 144,137 edges
+  - CR-v173-02.md: entity counts, coupling, k-core, Leiden, SCC, PageRank
+  - FEATURE-MATRIX-COMPARISON.md: 60+ features across 16 tools
+
+================================================================================
+SECTION 12: AGENTS LAUNCHED THIS SESSION
+================================================================================
+
+All agents completed successfully:
+
+  a52fdd9: Deep explore oh-my-pi codebase (completed)
+  a06d2a0: Deep explore code-scalpel taint analysis (completed)
+  a941893: Deep explore semgrep taint analysis (completed)
+  a1da4ab: Retrieve code-scalpel taint findings (completed)
+  a137a80: Retrieve semgrep taint findings (completed)
+  a6c7763: Internet research on taint analysis (completed)
+
+Stopped agents (from earlier in extended session):
+  a591591: Research code-scalpel features via Parseltongue+cclsp (stopped by user)
+  ad59327: Research AiDex features via Parseltongue+cclsp (stopped by user)
+  a7f64bd: Research gemini-cli features via Parseltongue+cclsp (stopped by user)
+  a614d1e: Research grep MCP servers via Parseltongue (stopped by user)
+  ad282ac: Analyze code-scalpel features via Parseltongue+code reading (stopped by user)
+  a09e723: Analyze AiDex+gemini-cli via Parseltongue+cclsp (stopped by user)
+  ad5fe65: Analyze grep servers+codecompanion via cclsp+reading (stopped by user)
+  a08b838: Build Shreyas Doshi opinion table (stopped by user)
+
+================================================================================
+SECTION 13: COMPETITOR RESEARCH REPOS (FROM PRIOR SESSION)
+================================================================================
+
+15 repos cloned into competitor_research/:
+  - code-scalpel (6,521 entities, Python)
+  - gemini-cli (3,410 entities, TypeScript)
+  - AiDex (159 entities, TypeScript)
+  - codecompanion.nvim (Lua)
+  - oh-my-pi (831 .ts files, 3 Rust crates)
+  - greptile-mcp
+  - grep_app_mcp
+  - mcp-server-semgrep
+  - ast-grep-mcp
+  - kp-ripgrep-mcp
+  - semgrep-mcp
+  - CodeSeeker-MCP
+  - (and others from FEATURE-MATRIX-COMPARISON.md covering 60+ features across 16 tools)
+
+Parseltongue ingestion stats (port 7779):
+  19,431 entities total across competitor repos
+  144,137 edges total
+
+================================================================================
+SECTION 14: V1.7.3 ROADMAP CONTEXT
+================================================================================
+
+PRD_v173.md covers:
+  - Tauri desktop app
+  - MCP protocol bridge server (pt09) -- P0-1 priority
+  - Coverage bugs fixes
+  - Competitor research (CR-v173-01 through CR-v173-04)
+  - Structural taint analysis (newly added)
+  - pt02 crate for dual-mode server infra
+
+Build order items 1-40 (items 33-40 are taint analysis)
+Acceptance criteria 1-27 (items 22-27 are taint analysis)
+
+Key architectural decisions:
+  - Slim types for pt02 crate
+  - Snapshot loader
+  - Route nesting
+  - Dual-mode server infrastructure
+
+================================================================================
+SECTION 15: HTTP ENDPOINTS (22 TOTAL -- EXISTING)
+================================================================================
+
+Core:
+  /server-health-check-status
+  /codebase-statistics-overview-summary
+  /api-reference-documentation-help
+
+Entity:
+  /code-entities-list-all
+  /code-entity-detail-view/{key}
+  /code-entities-search-fuzzy?q=pattern
+
+Graph:
+  /dependency-edges-list-all
+  /reverse-callers-query-graph?entity=X
+  /forward-callees-query-graph?entity=X
+
+Analysis:
+  /blast-radius-impact-analysis?entity=X&hops=N
+  /circular-dependency-detection-scan
+  /complexity-hotspots-ranking-view?top=N
+  /semantic-cluster-grouping-list
+
+Advanced:
+  /smart-context-token-budget?focus=X&tokens=N
+
+Graph v1.6:
+  /strongly-connected-components-analysis
+  /technical-debt-sqale-scoring?entity=X
+  /kcore-decomposition-layering-analysis?k=N
+  /centrality-measures-entity-ranking?method=pagerank
+  /entropy-complexity-measurement-scores?entity=X
+  /coupling-cohesion-metrics-suite?entity=X
+  /leiden-community-detection-clusters
+
+Coverage:
+  /ingestion-coverage-folder-report?depth=N
+
+Planned (taint analysis):
+  /taint-flow-path-analysis?entity=X&hops=N
+  /taint-source-sink-discovery
+
+================================================================================
+END OF CONTEXT DUMP
+================================================================================

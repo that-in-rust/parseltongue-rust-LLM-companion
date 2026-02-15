@@ -1,0 +1,791 @@
+RAW EXPLORE AGENT OUTPUT — rust-analyzer API research
+Agent ID: a70d8fb
+Date: 2026-02-15
+Total tokens: 104,597 | Tool uses: 21 | Duration: 104,742ms
+Source: CR03/ (shallow clone of rust-lang/rust-analyzer)
+
+================================================================================
+
+## COMPREHENSIVE RUST-ANALYZER PUBLIC API ANALYSIS
+
+Based on thorough exploration of the rust-analyzer codebase at `/Users/amuldotexe/Desktop/A01_20260131/parseltongue-dependency-graph-generator/CR03`, here is everything about rust-analyzer's public APIs and analysis capabilities:
+
+---
+
+### 1. CORE ENTRY POINTS
+
+#### **AnalysisHost & Analysis** (crates/ide/src/lib.rs)
+The main API surface for rust-analyzer:
+
+```rust
+pub struct AnalysisHost {
+    db: RootDatabase,
+}
+
+pub struct Analysis {
+    db: RootDatabase,
+}
+```
+
+**Key AnalysisHost Methods:**
+- `new(lru_capacity: Option<u16>)` - Create analysis instance
+- `analysis()` -> `Analysis` - Get snapshot for queries
+- `apply_change(&mut self, change: ChangeWithProcMacros)` - Apply code changes
+- `update_lru_capacity()` / `update_lru_capacities()` - Cache management
+
+---
+
+### 2. CODEBASE LOADING (load_workspace_at)
+
+**crates/load-cargo/src/lib.rs** - Load Cargo projects programmatically:
+
+```rust
+pub fn load_workspace_at(
+    root: &Path,
+    cargo_config: &CargoConfig,
+    load_config: &LoadCargoConfig,
+    progress: &(dyn Fn(String) + Sync),
+) -> anyhow::Result<(RootDatabase, vfs::Vfs, Option<ProcMacroClient>)>
+
+pub fn load_workspace(
+    ws: ProjectWorkspace,
+    extra_env: &FxHashMap<String, Option<String>>,
+    load_config: &LoadCargoConfig,
+) -> anyhow::Result<(RootDatabase, vfs::Vfs, Option<ProcMacroClient>)>
+```
+
+**Config Options:**
+- `load_out_dirs_from_check: bool` - Run build scripts
+- `with_proc_macro_server: ProcMacroServerChoice` - Macro processing
+- `prefill_caches: bool` - Pre-populate caches
+
+---
+
+### 3. SEMANTIC QUERIES (Analysis API)
+
+#### **Type Information**
+
+```rust
+// Type querying
+pub fn inlay_hints(&self, config: &InlayHintsConfig, file_id: FileId, range: Option<TextRange>) -> Cancellable<Vec<InlayHint>>
+pub fn hover(&self, config: &HoverConfig, range: FileRange) -> Cancellable<Option<RangeInfo<HoverResult>>>
+pub fn signature_help(&self, position: FilePosition) -> Cancellable<Option<SignatureHelp>>
+
+// Definition and implementation finding
+pub fn goto_definition(&self, position: FilePosition, config: &GotoDefinitionConfig) -> Cancellable<Option<RangeInfo<Vec<NavigationTarget>>>>
+pub fn goto_declaration(&self, position: FilePosition, config: &GotoDefinitionConfig) -> Cancellable<Option<RangeInfo<Vec<NavigationTarget>>>>
+pub fn goto_implementation(&self, config: &GotoImplementationConfig, position: FilePosition) -> Cancellable<Option<RangeInfo<Vec<NavigationTarget>>>>
+pub fn goto_type_definition(&self, position: FilePosition) -> Cancellable<Option<RangeInfo<Vec<NavigationTarget>>>>
+
+// Reference finding
+pub fn find_all_refs(&self, position: FilePosition, config: &FindAllRefsConfig) -> Cancellable<Option<Vec<ReferenceSearchResult>>>
+```
+
+#### **Symbol and Structure Navigation**
+
+```rust
+pub fn symbol_search(&self, query: Query, limit: usize) -> Cancellable<Vec<NavigationTarget>>
+pub fn file_structure(&self, config: &FileStructureConfig, file_id: FileId) -> Cancellable<Vec<StructureNode>>
+pub fn parent_module(&self, position: FilePosition) -> Cancellable<Vec<NavigationTarget>>
+pub fn child_modules(&self, position: FilePosition) -> Cancellable<Vec<NavigationTarget>>
+pub fn crates_for(&self, file_id: FileId) -> Cancellable<Vec<Crate>>
+pub fn transitive_rev_deps(&self, crate_id: Crate) -> Cancellable<Vec<Crate>>
+```
+
+#### **Call Hierarchy**
+
+```rust
+pub fn call_hierarchy(&self, position: FilePosition, config: &CallHierarchyConfig) -> Cancellable<Option<RangeInfo<Vec<NavigationTarget>>>>
+pub fn incoming_calls(&self, config: &CallHierarchyConfig, position: FilePosition) -> Cancellable<Option<Vec<CallItem>>>
+pub fn outgoing_calls(&self, config: &CallHierarchyConfig, position: FilePosition) -> Cancellable<Option<Vec<CallItem>>>
+```
+
+#### **Macro Expansion**
+
+```rust
+pub fn expand_macro(&self, position: FilePosition) -> Cancellable<Option<ExpandedMacro>>
+pub fn view_hir(&self, position: FilePosition) -> Cancellable<String>       // View HIR after macro expansion
+pub fn view_mir(&self, position: FilePosition) -> Cancellable<String>       // View MIR
+pub fn view_syntax_tree(&self, file_id: FileId) -> Cancellable<String>
+pub fn interpret_function(&self, position: FilePosition) -> Cancellable<String>
+```
+
+---
+
+### 4. HIR (High-Level Intermediate Representation)
+
+The semantic model layer providing full code analysis. Key types in **crates/hir/src/lib.rs**:
+
+#### **Crate Level**
+
+```rust
+pub struct Crate {
+    pub(crate) id: base_db::Crate,
+}
+
+impl Crate {
+    pub fn root_module(self, db: &dyn HirDatabase) -> Module
+    pub fn modules(self, db: &dyn HirDatabase) -> Vec<Module>
+    pub fn dependencies(self, db: &dyn HirDatabase) -> Vec<CrateDependency>
+    pub fn reverse_dependencies(self, db: &dyn HirDatabase) -> Vec<Crate>
+    pub fn transitive_reverse_dependencies(self, db: &dyn HirDatabase) -> impl Iterator<Item = Crate>
+    pub fn all(db: &dyn HirDatabase) -> Vec<Crate>
+    pub fn edition(self, db: &dyn HirDatabase) -> Edition
+    pub fn root_file(self, db: &dyn HirDatabase) -> FileId
+    pub fn cfg<'db>(&self, db: &'db dyn HirDatabase) -> &'db CfgOptions
+}
+```
+
+#### **Module System**
+
+```rust
+pub struct Module {
+    pub(crate) id: ModuleId,
+}
+
+impl Module {
+    pub fn name(self, db: &dyn HirDatabase) -> Option<Name>
+    pub fn declarations(self, db: &dyn HirDatabase) -> Vec<ModuleDef>
+    pub fn impl_defs(self, db: &dyn HirDatabase) -> Vec<Impl>
+    pub fn scope(&self, db: &dyn HirDatabase, visible_from: Option<Module>) -> ModuleScope
+    pub fn find_path(self, db: &dyn HirDatabase, item: impl Into<ItemInNs>, config: FindPathConfig) -> Option<ModPath>
+    pub fn path_to_root(self, db: &dyn HirDatabase) -> Vec<Module>
+    pub fn parent(self, db: &dyn HirDatabase) -> Option<Module>
+    pub fn children(self, db: &dyn HirDatabase) -> impl Iterator<Item = Module>
+}
+
+pub enum ModuleDef {
+    Module(Module),
+    Function(Function),
+    Adt(Adt),
+    Variant(Variant),
+    Const(Const),
+    Static(Static),
+    Trait(Trait),
+    TypeAlias(TypeAlias),
+    BuiltinType(BuiltinType),
+    Macro(Macro),
+}
+```
+
+#### **Type Definitions (ADTs)**
+
+```rust
+pub enum Adt {
+    Struct(Struct),
+    Enum(Enum),
+    Union(Union),
+}
+
+pub struct Struct {
+    pub fn fields(self, db: &dyn HirDatabase) -> Vec<Field>
+    pub fn ty(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn ty_params(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn kind(self, db: &dyn HirDatabase) -> StructKind
+    pub fn repr(self, db: &dyn HirDatabase) -> Option<ReprOptions>
+}
+
+pub struct Enum {
+    pub fn variants(self, db: &dyn HirDatabase) -> Vec<Variant>
+    pub fn ty<'db>(self, db: &'db dyn HirDatabase) -> Type<'db>
+    pub fn repr(self, db: &dyn HirDatabase) -> Option<ReprOptions>
+    pub fn layout(self, db: &dyn HirDatabase) -> Result<Layout, LayoutError>
+}
+
+pub struct Union {
+    pub fn fields(self, db: &dyn HirDatabase) -> Vec<Field>
+    pub fn ty(self, db: &dyn HirDatabase) -> Type<'_>
+}
+
+pub struct Variant {
+    pub fn parent_enum(self, db: &dyn HirDatabase) -> Enum
+    pub fn fields(self, db: &dyn HirDatabase) -> Vec<Field>
+    pub fn value(self, db: &dyn HirDatabase) -> Option<ast::Expr>
+    pub fn eval(self, db: &dyn HirDatabase) -> Result<i128, ConstEvalError>
+    pub fn layout(&self, db: &dyn HirDatabase) -> Result<Layout, LayoutError>
+}
+
+pub struct Field {
+    pub fn name(&self, db: &dyn HirDatabase) -> Name
+    pub fn ty<'db>(&self, db: &'db dyn HirDatabase) -> TypeNs<'db>
+}
+```
+
+#### **Functions & Callables**
+
+```rust
+pub struct Function {
+    pub fn module(self, db: &dyn HirDatabase) -> Module
+    pub fn name(self, db: &dyn HirDatabase) -> Name
+    pub fn ty(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn ret_type(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn ret_type_with_args<'db>(self, db: &'db dyn HirDatabase, generics: impl Iterator<Item = Type<'db>>) -> Type<'db>
+    pub fn async_ret_type<'db>(self, db: &'db dyn HirDatabase) -> Option<Type<'db>>
+    pub fn params_without_self(self, db: &dyn HirDatabase) -> Vec<Param<'_>>
+    pub fn method_params(self, db: &dyn HirDatabase) -> Option<Vec<Param<'_>>>
+    pub fn has_self_param(self, db: &dyn HirDatabase) -> bool
+    pub fn self_param(self, db: &dyn HirDatabase) -> Option<SelfParam>
+    pub fn is_unsafe_to_call(&self, db: &dyn HirDatabase) -> bool
+}
+
+pub struct Param<'db> {
+    pub fn name(&self) -> Option<&Name>
+    pub fn ty(&self) -> &Type<'db>
+}
+```
+
+#### **Traits & Implementations**
+
+```rust
+pub struct Trait {
+    pub fn module(self, db: &dyn HirDatabase) -> Module
+    pub fn name(self, db: &dyn HirDatabase) -> Name
+    pub fn direct_supertraits(self, db: &dyn HirDatabase) -> Vec<Trait>
+    pub fn all_supertraits(self, db: &dyn HirDatabase) -> Vec<Trait>
+    pub fn items_with_supertraits(self, db: &dyn HirDatabase) -> Vec<AssocItem>
+    pub fn function(self, db: &dyn HirDatabase, name: impl PartialEq<Name>) -> Option<Function>
+    pub fn type_or_const_param_count(&self, db: &dyn HirDatabase) -> (usize, usize)
+}
+
+pub struct Impl {
+    pub fn all_in_crate(db: &dyn HirDatabase, krate: Crate) -> Vec<Impl>
+    pub fn all_in_module(db: &dyn HirDatabase, module: Module) -> Vec<Impl>
+    pub fn all_for_type<'db>(db: &'db dyn HirDatabase, ty: Type<'db>) -> Vec<Impl>  // ALL impls for a type
+    pub fn all_for_trait(db: &dyn HirDatabase, trait_: Trait) -> Vec<Impl>
+    pub fn trait_(self, db: &dyn HirDatabase) -> Option<Trait>
+    pub fn trait_ref(self, db: &dyn HirDatabase) -> Option<TraitRef<'_>>
+    pub fn self_ty(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn items(self, db: &dyn HirDatabase) -> Vec<AssocItem>
+    pub fn is_negative(self, db: &dyn HirDatabase) -> bool
+    pub fn is_unsafe(self, db: &dyn HirDatabase) -> bool
+}
+
+pub struct AssocItem {
+    pub fn container_trait(self, db: &dyn HirDatabase) -> Option<Trait>
+    pub fn implemented_trait(self, db: &dyn HirDatabase) -> Option<Trait>
+}
+```
+
+---
+
+### 5. TYPE SYSTEM (Type<'db>)
+
+The **Type** struct is the most powerful API for semantic analysis:
+
+```rust
+pub struct Type<'db> {
+    env: ParamEnvAndCrate<'db>,
+    ty: Ty<'db>,
+}
+
+impl<'db> Type<'db> {
+    // Type checking predicates
+    pub fn is_unit(&self) -> bool
+    pub fn is_bool(&self) -> bool
+    pub fn is_str(&self) -> bool
+    pub fn is_never(&self) -> bool
+    pub fn is_scalar(&self) -> bool
+    pub fn is_tuple(&self) -> bool
+    pub fn is_array(&self) -> bool
+    pub fn is_slice(&self) -> bool
+    pub fn is_fn(&self) -> bool
+    pub fn is_closure(&self) -> bool
+    pub fn is_reference(&self) -> bool
+    pub fn is_mutable_reference(&self) -> bool
+    pub fn is_raw_ptr(&self) -> bool
+    pub fn is_unknown(&self) -> bool
+    pub fn is_copy(&self, db: &'db dyn HirDatabase) -> bool
+    pub fn is_packed(&self, db: &'db dyn HirDatabase) -> bool
+    pub fn contains_reference(&self, db: &'db dyn HirDatabase) -> bool
+
+    // Type decomposition
+    pub fn as_reference(&self) -> Option<(Type<'db>, Mutability)>
+    pub fn as_slice(&self) -> Option<Type<'db>>
+    pub fn as_array(&self, db: &'db dyn HirDatabase) -> Option<(Self, usize)>
+    pub fn as_adt(&self) -> Option<Adt>
+    pub fn as_builtin(&self) -> Option<BuiltinType>
+    pub fn as_dyn_trait(&self) -> Option<Trait>
+    pub fn as_closure(&self) -> Option<Closure<'db>>
+    pub fn as_callable(&self, db: &'db dyn HirDatabase) -> Option<Callable<'db>>
+    pub fn as_impl_traits(&self, db: &'db dyn HirDatabase) -> Option<impl Iterator<Item = Trait>>
+
+    // Field access
+    pub fn fields(&self, db: &'db dyn HirDatabase) -> Vec<(Field, Self)>
+    pub fn tuple_fields(&self, _db: &'db dyn HirDatabase) -> Vec<Self>
+
+    // References and pointers
+    pub fn remove_ref(&self) -> Option<Type<'db>>
+    pub fn remove_raw_ptr(&self) -> Option<Type<'db>>
+    pub fn strip_references(&self) -> Self
+    pub fn add_reference(&self, mutability: Mutability) -> Self
+
+    // Dereferencing
+    pub fn autoderef(&self, db: &'db dyn HirDatabase) -> impl Iterator<Item = Type<'db>>
+
+    // Type arguments and generics
+    pub fn type_arguments(&self) -> impl Iterator<Item = Type<'db>>
+    pub fn type_and_const_arguments(&self, db: &'db dyn HirDatabase, display_target: DisplayTarget) -> Vec<GenericArg<'db>>
+
+    // Trait implementation checking
+    pub fn impls_trait(&self, db: &'db dyn HirDatabase, trait_: Trait, args: &[Type<'db>]) -> bool
+    pub fn impls_fnonce(&self, db: &'db dyn HirDatabase) -> bool
+    pub fn impls_iterator(self, db: &'db dyn HirDatabase) -> bool
+    pub fn fingerprint_for_trait_impl(&self) -> Option<SimplifiedType>
+
+    // Iterator/Future support
+    pub fn iterator_item(self, db: &'db dyn HirDatabase) -> Option<Type<'db>>
+    pub fn into_iterator_iter(self, db: &'db dyn HirDatabase) -> Option<Type<'db>>
+    pub fn into_future_output(&self, db: &'db dyn HirDatabase) -> Option<Type<'db>>
+    pub fn future_output(self, db: &'db dyn HirDatabase) -> Option<Type<'db>>
+
+    // Associated types
+    pub fn normalize_trait_assoc_type(&self, db: &'db dyn HirDatabase, args: &[Type<'db>], alias: TypeAlias) -> Option<Type<'db>>
+
+    // Method resolution
+    pub fn iterate_method_candidates<T>(&self, db: &'db dyn HirDatabase, scope: &SemanticsScope<'_>,
+                                         name: Option<&Name>, callback: impl FnMut(Function) -> Option<T>) -> Option<T>
+    pub fn iterate_method_candidates_with_traits<T>(&self, db: &'db dyn HirDatabase, scope: &SemanticsScope<'_>,
+                                                      traits_in_scope: &FxHashSet<TraitId>, name: Option<&Name>,
+                                                      callback: impl FnMut(Function) -> Option<T>) -> Option<T>
+    pub fn iterate_method_candidates_split_inherent(&self, db: &'db dyn HirDatabase, scope: &SemanticsScope<'_>,
+                                                     traits_in_scope: &FxHashSet<TraitId>, name: Option<&Name>,
+                                                     callback: impl MethodCandidateCallback)
+    pub fn iterate_path_candidates<T>(&self, db: &'db dyn HirDatabase, scope: &SemanticsScope<'_>,
+                                       traits_in_scope: &FxHashSet<TraitId>, name: Option<&Name>,
+                                       callback: impl FnMut(AssocItem) -> Option<T>) -> Option<T>
+
+    // Associated items
+    pub fn iterate_assoc_items<T>(&self, db: &'db dyn HirDatabase, callback: impl FnMut(AssocItem) -> Option<T>) -> Option<T>
+
+    // Trait bounds
+    pub fn applicable_inherent_traits(&self, db: &'db dyn HirDatabase) -> impl Iterator<Item = Trait>
+    pub fn env_traits(&self, db: &'db dyn HirDatabase) -> impl Iterator<Item = Trait>
+
+    // Layout information
+    pub fn layout(&self, db: &dyn HirDatabase) -> Result<Layout, LayoutError>
+
+    // Display/formatting
+    pub fn display(&self, db: &'db dyn HirDatabase, display_target: DisplayTarget) -> HirDisplay<'db>
+}
+```
+
+#### **Callable Analysis**
+
+```rust
+pub struct Callable<'db> {
+    pub ty: Type<'db>,
+    pub sig: PolyFnSig<'db>,
+    pub callee: Callee,
+    pub is_bound_method: bool,
+}
+
+pub enum Callee {
+    Def(AnyCallableId),
+    FnPtr,
+    Closure(InternedClosureId, GenericArgs<'db>),
+    CoroutineClosure(InternedCoroutineId, GenericArgs<'db>),
+    FnImpl(TraitId),
+}
+```
+
+#### **Closure Analysis**
+
+```rust
+pub struct Closure<'db> {
+    id: AnyClosureId,
+    subst: GenericArgs<'db>,
+}
+
+impl<'db> Closure<'db> {
+    pub fn captured_items(&self, db: &'db dyn HirDatabase) -> Vec<ClosureCapture<'db>>
+    pub fn capture_types(&self, db: &'db dyn HirDatabase) -> Vec<Type<'db>>
+    pub fn fn_trait(&self, db: &dyn HirDatabase) -> FnTrait  // FnOnce, FnMut, Fn, AsyncFn*
+}
+
+pub struct ClosureCapture<'db> {
+    pub fn local(&self) -> Local
+    pub fn has_field_projections(&self) -> bool
+    pub fn kind(&self) -> CaptureKind  // SharedRef, MutableRef, Move
+    pub fn place_to_name(&self, db: &dyn HirDatabase) -> String
+    pub fn display_place(&self, db: &dyn HirDatabase) -> String
+}
+```
+
+---
+
+### 6. SEMANTICS API (Source-to-def Mapping)
+
+**crates/hir/src/semantics.rs** - Maps source code to semantic elements:
+
+```rust
+pub struct Semantics<'db, DB: HirDatabase> {
+    db: &'db DB,
+    // ...
+}
+
+impl<'db, DB: HirDatabase> Semantics<'db, DB> {
+    pub fn new(db: &'db DB) -> Semantics<'db, DB>
+
+    // AST to HIR conversion
+    pub fn to_def(&self, src: SourceToDefNode) -> Option<DefinitionId>
+    pub fn to_fn_def(&self, f: &ast::Fn) -> Option<Function>
+    pub fn to_struct_def(&self, s: &ast::Struct) -> Option<Struct>
+    pub fn to_enum_def(&self, e: &ast::Enum) -> Option<Enum>
+    pub fn to_union_def(&self, u: &ast::Union) -> Option<Union>
+    pub fn to_enum_variant_def(&self, v: &ast::Variant) -> Option<Variant>
+    pub fn to_const_def(&self, c: &ast::Const) -> Option<Const>
+    pub fn to_trait_def(&self, t: &ast::Trait) -> Option<Trait>
+    pub fn to_impl_def(&self, i: &ast::Impl) -> Option<Impl>
+    pub fn to_macro_def(&self, m: &ast::Macro) -> Option<Macro>
+    pub fn to_adt_def(&self, a: &ast::Adt) -> Option<Adt>
+    pub fn to_module_def(&self, m: &ast::Module) -> Option<Module>
+    pub fn to_type_alias_def(&self, t: &ast::TypeAlias) -> Option<TypeAlias>
+    pub fn to_static_def(&self, s: &ast::Static) -> Option<Static>
+
+    // Path resolution
+    pub fn resolve_path(&self, path: &ast::Path) -> Option<PathResolution>
+    pub fn resolve_await_to_poll(&self, await_expr: &ast::AwaitExpr) -> Option<Function>
+    pub fn resolve_prefix_expr(&self, prefix_expr: &ast::PrefixExpr) -> Option<Function>
+    pub fn resolve_index_expr(&self, index_expr: &ast::IndexExpr) -> Option<Function>
+    pub fn resolve_bin_expr(&self, bin_expr: &ast::BinExpr) -> Option<Function>
+    pub fn resolve_try_expr(&self, try_expr: &ast::TryExpr) -> Option<Function>
+
+    // Macro expansion
+    pub fn expand_macro_call(&self, macro_call: &ast::MacroCall) -> Option<InFile<SyntaxNode>>
+    pub fn expand_attr_macro(&self, item: &ast::Item) -> Option<ExpandResult<InFile<SyntaxNode>>>
+    pub fn expand_derive_macro(&self, attr: &ast::Attr) -> Option<Vec<InFile<SyntaxNode>>>
+    pub fn speculative_expand_macro_call(&self, macro_call: &ast::MacroCall, items: Vec<ast::Item>) -> Option<Vec<ast::Item>>
+    pub fn resolve_derive_macro(&self, attr: &ast::Attr) -> Option<Vec<Option<Macro>>>
+    pub fn derive_helpers_in_scope(&self, adt: &ast::Adt) -> Option<Vec<(Symbol, Symbol)>>
+
+    // Token handling
+    pub fn descend_into_macros(&self, token: SyntaxToken) -> SmallVec<[SyntaxToken; 1]>
+    pub fn descend_into_macros_exact(&self, token: SyntaxToken) -> SmallVec<[SyntaxToken; 1]>
+    pub fn descend_token_into_include_expansion(&self, token: InFile<&SyntaxToken>) -> SmallVec<[InFile<SyntaxToken>; 1]>
+
+    // Type information
+    pub fn type_of_expr(&self, expr: &ast::Expr) -> Option<TypeInfo>
+    pub fn type_of_pat(&self, pat: &ast::Pat) -> Option<TypeInfo>
+    pub fn type_of_self_param(&self, param: &ast::SelfParam) -> Option<TypeInfo>
+
+    // Diagnostics
+    pub fn get_failed_obligations(&self, token: SyntaxToken) -> Option<String>
+
+    // Module/File mapping
+    pub fn file_to_module_def(&self, file: impl Into<FileId>) -> Option<Module>
+    pub fn file_to_module_defs(&self, file: impl Into<FileId>) -> impl Iterator<Item = Module>
+
+    // Parsing
+    pub fn parse(&self, file_id: EditionedFileId) -> ast::SourceFile
+    pub fn parse_guess_edition(&self, file_id: FileId) -> ast::SourceFile
+}
+
+pub struct TypeInfo {
+    pub original: Type<'db>,
+    pub adjusted: Type<'db>,
+}
+
+pub enum PathResolution {
+    Def(ModuleDef),
+    AssocItem(AssocItem),
+    // ... and others
+}
+```
+
+---
+
+### 7. GENERICS & PARAMETERS
+
+```rust
+pub struct GenericParam {
+    TypeParam(TypeParam),
+    ConstParam(ConstParam),
+    LifetimeParam(LifetimeParam),
+}
+
+pub struct TypeParam {
+    pub fn name(self, db: &dyn HirDatabase) -> Name
+    pub fn ty(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn default(self, db: &dyn HirDatabase) -> Option<Type<'_>>
+    pub fn trait_bounds(self, db: &dyn HirDatabase) -> Vec<Trait>
+}
+
+pub struct ConstParam {
+    pub fn name(self, db: &dyn HirDatabase) -> Name
+    pub fn ty(self, db: &dyn HirDatabase) -> Type<'_>
+}
+
+pub struct LifetimeParam {
+    pub fn name(self, db: &dyn HirDatabase) -> Name
+}
+
+pub struct GenericDef {
+    pub fn params(self, db: &dyn HirDatabase) -> Vec<GenericParam>
+    pub fn lifetime_params(self, db: &dyn HirDatabase) -> Vec<LifetimeParam>
+    pub fn type_or_const_params(self, db: &dyn HirDatabase) -> Vec<TypeOrConstParam>
+}
+```
+
+---
+
+### 8. LOCAL VARIABLES & BINDINGS
+
+```rust
+pub struct Local {
+    pub fn name(self, db: &dyn HirDatabase) -> Name
+    pub fn ty(self, db: &dyn HirDatabase) -> Type<'_>
+    pub fn is_param(self, db: &dyn HirDatabase) -> bool
+    pub fn is_self(self, db: &dyn HirDatabase) -> bool
+    pub fn is_mut(self, db: &dyn HirDatabase) -> bool
+    pub fn is_ref(self, db: &dyn HirDatabase) -> bool
+    pub fn module(self, db: &dyn HirDatabase) -> Module
+    pub fn sources(self, db: &dyn HirDatabase) -> Vec<LocalSource>
+}
+
+pub struct LocalSource {
+    pub fn as_ident_pat(&self) -> Option<&ast::IdentPat>
+    pub fn name(&self) -> Option<InFile<ast::Name>>
+    pub fn syntax(&self) -> &SyntaxNode
+}
+```
+
+---
+
+### 9. COMPILE-TIME ANALYSIS
+
+```rust
+pub struct DefWithBody {
+    pub fn expression_types<'db>(self, db: &'db dyn HirDatabase) -> impl Iterator<Item = (ExprId, Type<'db>)>
+    pub fn pattern_types<'db>(self, db: &'db dyn HirDatabase) -> impl Iterator<Item = Type<'db>>
+    pub fn binding_types<'db>(self, db: &'db dyn HirDatabase) -> impl Iterator<Item = Type<'db>>
+    pub fn debug_hir(self, db: &dyn HirDatabase) -> String
+    pub fn debug_mir(self, db: &dyn HirDatabase) -> String
+}
+
+// Enum discriminant evaluation
+pub fn eval(self, db: &dyn HirDatabase) -> Result<i128, ConstEvalError>
+
+// Layout analysis (SQALE metrics)
+pub fn layout(&self, db: &dyn HirDatabase) -> Result<Layout, LayoutError>
+```
+
+---
+
+### 10. IDE FEATURES
+
+```rust
+// Refactoring
+pub fn rename(&self, position: FilePosition, new_name: &str, config: &RenameConfig) -> Cancellable<Result<SourceChange, RenameError>>
+pub fn prepare_rename(&self, position: FilePosition) -> Cancellable<Result<RangeInfo<()>, RenameError>>
+pub fn will_rename_file(&self, file_id: FileId, new_name_stem: &str, config: &RenameConfig) -> Cancellable<Option<SourceChange>>
+
+// Code transformations
+pub fn structural_search_replace(&self, query: &str, parse_only: bool, resolve_context: FilePosition, selections: Vec<FileRange>) -> Cancellable<Result<SourceChange, SsrError>>
+pub fn move_item(&self, range: FileRange, direction: Direction) -> Cancellable<Option<TextEdit>>
+
+// Completion
+pub fn completions(&self, config: &CompletionConfig, position: FilePosition, trigger_character: Option<char>) -> Cancellable<Option<Vec<CompletionItem>>>
+pub fn resolve_completion_edits(&self, config: &CompletionConfig, position: FilePosition, imports: impl IntoIterator<Item = String>) -> Cancellable<Vec<TextEdit>>
+
+// Diagnostics
+pub fn syntax_diagnostics(&self, config: &DiagnosticsConfig, file_id: FileId) -> Cancellable<Vec<Diagnostic>>
+pub fn semantic_diagnostics(&self, config: &DiagnosticsConfig, resolve: AssistResolveStrategy, file_id: FileId) -> Cancellable<Vec<Diagnostic>>
+pub fn full_diagnostics(&self, config: &DiagnosticsConfig, resolve: AssistResolveStrategy, file_id: FileId) -> Cancellable<Vec<Diagnostic>>
+
+// Syntax highlighting
+pub fn highlight(&self, highlight_config: HighlightConfig, file_id: FileId) -> Cancellable<Vec<HlRange>>
+pub fn highlight_range(&self, highlight_config: HighlightConfig, frange: FileRange) -> Cancellable<Vec<HlRange>>
+pub fn highlight_as_html(&self, file_id: FileId, rainbow: bool) -> Cancellable<String>
+
+// Annotations (inlay hints, codelens)
+pub fn annotations(&self, config: &AnnotationConfig, file_id: FileId) -> Cancellable<Vec<Annotation>>
+
+// Assists/quick fixes
+pub fn assists_with_fixes(&self, assist_config: &AssistConfig, diagnostics_config: &DiagnosticsConfig, resolve: AssistResolveStrategy, frange: FileRange) -> Cancellable<Vec<Assist>>
+```
+
+---
+
+### 11. DEBUGGING & VISUALIZATION
+
+```rust
+pub fn view_crate_graph(&self, full: bool) -> Cancellable<Result<String, String>>  // GraphViz dot format
+pub fn view_item_tree(&self, file_id: FileId) -> Cancellable<String>
+pub fn view_hir(&self, position: FilePosition) -> Cancellable<String>
+pub fn view_mir(&self, position: FilePosition) -> Cancellable<String>
+pub fn get_recursive_memory_layout(&self, position: FilePosition) -> Cancellable<Option<RecursiveMemoryLayout>>
+```
+
+---
+
+### 12. DATABASE INTERFACES
+
+Three key database traits (**crates/hir/src/db.rs**):
+
+```rust
+pub trait DefDatabase: ... {
+    // Definition resolution, name resolution
+}
+
+pub trait ExpandDatabase: ... {
+    // Macro expansion
+}
+
+pub trait HirDatabase: DefDatabase + ExpandDatabase + ... {
+    // High-level semantic queries
+    // Type checking, trait resolution, method resolution
+}
+```
+
+**Key HirDatabase Queries:**
+- `ty(def: impl Into<TyDefId>) -> PolyFnSig<'_>` - Type of definition
+- `impl_trait(impl_id: ImplId) -> Option<PolyTraitRef<'_>>` - Trait for impl
+- `impl_self_ty(impl_id: ImplId) -> PolyFnSig<'_>` - Self type of impl
+- `field_types(var: VariantId) -> Arc<ArenaMap<LocalFieldId, Binder<Ty<'_>>>>`
+- `generic_params(def: GenericDefId) -> GenericParams`
+- `impl_items(impl_id: ImplId) -> ImplItems`
+
+---
+
+### 13. KEY DATA EXTRACTION CAPABILITIES
+
+#### **For pt04 Crate - What Can Be Extracted:**
+
+1. **Function Signatures**
+   - Full type information (parameters, return types)
+   - Generic bounds and constraints
+   - Async/await tracking
+   - Unsafety information
+   - Visibility and attributes
+
+2. **Type Information**
+   - Fully resolved types (not just syntax)
+   - Type arguments for generics
+   - Trait implementations for any type
+   - Associated types
+   - Generic bounds on type parameters
+
+3. **Trait Analysis**
+   - Direct trait implementations
+   - Blanket impls
+   - All supertraits (with resolution)
+   - Associated types and their bounds
+   - Method availability (inherent vs trait)
+
+4. **Call Relationships**
+   - Method calls with full type resolution
+   - Function calls with argument types
+   - Trait method calls (which impl was used)
+   - Closure captures and types
+
+5. **Module Structure**
+   - Visibility (public/private/pub(crate)/pub(path))
+   - Re-exports and imports
+   - Module hierarchy
+   - Item accessibility
+
+6. **Generics & Lifetimes**
+   - Generic parameters with bounds
+   - Lifetime requirements
+   - Default generic arguments
+   - Where clauses
+
+7. **Memory Layout**
+   - Type layout (size, alignment, padding)
+   - Repr attributes
+   - Field layout
+   - Closure capture information
+
+8. **Macro Expansion**
+   - Expanded code
+   - Macro invocation locations
+   - Generated items
+   - Macro inputs and outputs
+
+---
+
+### 14. COMPLETE WORKFLOW EXAMPLE
+
+```rust
+// Load codebase
+let (mut db, _vfs, _pm) = load_workspace_at(
+    ".",
+    &CargoConfig::default(),
+    &LoadCargoConfig {
+        load_out_dirs_from_check: true,
+        with_proc_macro_server: ProcMacroServerChoice::Sysroot,
+        prefill_caches: true,
+        proc_macro_processes: 0,
+    },
+    &|msg| println!("{msg}"),
+)?;
+
+// Create analysis snapshot
+let analysis = db.analysis();
+
+// Get crate info
+let krate = Crate::all(&db).first().unwrap();
+let root = krate.root_module(&db);
+
+// Find all functions
+for module in krate.modules(&db) {
+    for decl in module.declarations(&db) {
+        if let ModuleDef::Function(func) = decl {
+            let name = func.name(&db);
+            let ty = func.ty(&db);
+            let params = func.params_without_self(&db);
+            let ret_ty = func.ret_type(&db);
+            println!("fn {}: {:?}", name, ret_ty);
+        }
+    }
+}
+
+// Find trait impls for a type
+for impl_def in Impl::all_for_type(&db, some_type) {
+    if let Some(trait_) = impl_def.trait_(&db) {
+        println!("impl {} for ...", trait_.name(&db));
+        for item in impl_def.items(&db) {
+            println!("  - {}", item.name(&db));
+        }
+    }
+}
+
+// Method resolution
+let scope = SemanticsScope::new(&analysis, position);
+some_type.iterate_method_candidates(&db, &scope, None, |method| {
+    println!("Available method: {}", method.name(&db));
+    None
+});
+```
+
+---
+
+### 15. KEY ARCHITECTURAL POINTS FOR PT04
+
+1. **Thread Safety**: `RootDatabase` is `Send + Sync` (uses Arc internally)
+2. **Cancellation**: Use `Cancellable<T>` return type for long-running operations
+3. **Lifetime Binding**: Many types require `'db` lifetime binding to database
+4. **Query System**: Salsa-based incremental computation with automatic caching
+5. **No Mutable Iteration**: Queries return snapshots; modifications create new snapshots
+6. **Macro Support**: Full macro expansion with proc-macro support
+7. **Edition-aware**: Handles Rust 2015/2018/2021 with `EditionedFileId`
+8. **Trait Coherence**: Orphan rule checking and trait resolution support
+
+---
+
+### SUMMARY
+
+rust-analyzer exposes a comprehensive semantic analysis API through three main layers:
+
+1. **IDE Layer** (`ide` crate) - High-level queries returning user-friendly results
+2. **HIR Layer** (`hir` crate) - Type definitions and semantic information
+3. **Database Layer** (`ide_db`, `hir_ty`, `hir_def`) - Query infrastructure
+
+For pt04, the key APIs are:
+- `AnalysisHost`/`Analysis` for queries
+- `Semantics` for source-to-def mapping
+- `Type<'db>` for type analysis
+- `Impl`/`Trait`/`Function` for code structure
+- `load_workspace_*` for loading Cargo projects
+
+All types are fully resolved with proper generics, lifetimes, and trait bounds -- exactly what Parseltongue needs for semantic analysis.
