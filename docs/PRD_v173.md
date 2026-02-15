@@ -493,6 +493,76 @@ Edge-only endpoints (`/dependency-edges-list-all`) group edges by type.
 
 ---
 
+## Project Slug in URL Path (Fix in v1.7.3)
+
+### The Problem
+
+You're running 3 Parseltongue servers:
+```
+http://localhost:52341/db/code-entities-search-fuzzy?q=login
+http://localhost:52387/mem/code-entities-search-fuzzy?q=login
+http://localhost:52412/db/code-entities-search-fuzzy?q=login
+```
+
+Which project is which? Port numbers are meaningless. When an LLM or a human sees `localhost:52387`, there is zero signal about what codebase that server is analyzing.
+
+### The Fix
+
+Derive a project slug from the ingested folder name and mount all routes under it:
+
+```
+http://localhost:52341/parseltongue-dependency-graph/db/code-entities-search-fuzzy?q=login
+http://localhost:52387/my-react-app/mem/code-entities-search-fuzzy?q=login
+http://localhost:52412/competitor-api/db/code-entities-search-fuzzy?q=login
+```
+
+Now every URL is self-describing. An LLM reading the URL knows exactly which codebase it's querying.
+
+### URL Structure
+
+```
+http://localhost:{port}/{project-slug}/{mode}/{endpoint}?{params}
+```
+
+### How It Works
+
+```
+pt01 ingestion:
+  1. Folder name = last component of ingested path (e.g., "parseltongue-dependency-graph-generator")
+  2. Slug = lowercase, truncate to reasonable length, replace spaces with hyphens
+  3. Store slug in workspace config (analysis.db metadata or .ptgraph header)
+
+pt08 startup:
+  1. Read slug from database/snapshot metadata
+  2. Mount all routes under /{slug}/{mode}/
+  3. Print: "Server: http://localhost:{port}/{slug}/{mode}/"
+
+Root endpoints (no slug needed):
+  GET /server-health-check-status  →  returns { project: "parseltongue-dependency-graph", mode: "db", port: 52341 }
+```
+
+### Edge Cases
+
+- **No slug stored** (old databases): fall back to current behavior (`/{mode}/` only)
+- **Duplicate slugs** (two servers for same project name): ports are already different, slug is informational
+- **Slug in port file**: `/tmp/parseltongue-server-{slug}-{mode}.port` — now shutdown knows which project to target
+
+### LLM Benefit
+
+When an LLM reads its system prompt, it sees:
+```
+Parseltongue server: http://localhost:52341/my-project/db/
+```
+
+Instead of:
+```
+Parseltongue server: http://localhost:52341/db/
+```
+
+The project name in the URL is context the LLM can use to reason about which codebase it's working with — especially when multiple servers are running.
+
+---
+
 ## Port Management
 
 ### No `--port` flag. No conflicts. No confusion.
@@ -500,12 +570,12 @@ Edge-only endpoints (`/dependency-edges-list-all`) group edges by type.
 ```
 Server startup:
   1. Bind to port 0 → OS assigns available port
-  2. Write port to /tmp/parseltongue-server-{mode}.port
-  3. Print: "Server: http://localhost:{port}/{mode}/"
+  2. Write port to /tmp/parseltongue-server-{slug}-{mode}.port
+  3. Print: "Server: http://localhost:{port}/{slug}/{mode}/"
 
 Server shutdown:
   1. parseltongue shutdown --{mode}
-  2. Read /tmp/parseltongue-server-{mode}.port
+  2. Read /tmp/parseltongue-server-{slug}-{mode}.port
   3. POST http://localhost:{port}/shutdown
   4. Delete port file
 
@@ -518,7 +588,7 @@ Edge cases:
 
 ## Acceptance Criteria
 
-**Ship when all 15 pass.**
+**Ship when all 21 pass.**
 
 | # | Test | Pass Condition |
 |---|------|---------------|
@@ -541,6 +611,8 @@ Edge cases:
 | 17 | API responses use tagged categories | `/code-entities-list-all` response has `core_code`, `test_code`, `import_blocks`, `edges` top-level keys (not flat array) |
 | 18 | Ingestion respects .gitignore | Files in `.gitignore` are not ingested; `ignore` crate used instead of `walkdir` |
 | 19 | .gitignore changes update graph | Edit `.gitignore` → file watcher detects it → newly ignored files' entities/edges removed, newly un-ignored files ingested |
+| 20 | URL contains project slug | `curl http://localhost:{port}/{slug}/db/server-health-check-status` works; slug derived from ingested folder name |
+| 21 | Entities have real token counts | `CodeGraph` relation has `token_count` column; `smart-context-token-budget` uses it instead of heuristic |
 
 ---
 
@@ -574,11 +646,15 @@ TODO 23. Remove debug eprintln    → streamer.rs           (~-40 lines, delete 
 TODO 24. Remove watcher eprintln  → file_watcher.rs       (~-30 lines, delete [DEBOUNCER]/[WATCHER]/[EVENT_HANDLER] blocks)
 TODO 25. XML-tagged responses     → all entity handlers   (~60 lines, group by entity class + edge type)
 TODO 26. Swap walkdir → ignore   → streamer.rs + Cargo.toml (~20 lines, respect .gitignore)
-TODO 27. README audit            → README.md             (verify)
-TODO 28. Testing journal         → root .md file         (document)
+TODO 27. Project slug in URL     → pt01 metadata + pt08 router (~30 lines, derive slug from folder name)
+TODO 28. Slug in port file       → startup runner         (~5 lines, /tmp/parseltongue-server-{slug}-{mode}.port)
+TODO 29. Token count at ingest   → streamer.rs + entities.rs + cozo_client.rs (~40 lines, bpe-openai count per entity)
+TODO 30. Smart-context real tokens → smart_context handler  (~10 lines, read token_count column instead of heuristic)
+TODO 31. README audit            → README.md             (verify)
+TODO 32. Testing journal         → root .md file         (document)
 ```
 
-**Done: ~365 lines. Remaining: ~1,190 lines. Total: ~1,555 lines.**
+**Done: ~365 lines. Remaining: ~1,275 lines. Total: ~1,640 lines.**
 
 ---
 
@@ -836,6 +912,67 @@ The CLI still exists. Power users can use it directly. But Parseltongue Central 
 | `/mem/` filesystem read fails (file moved/deleted) | Detail view returns error instead of code | Return clear error: "Source file not found at {path}. Re-run pt02 if codebase moved." |
 | CozoDB batch insert limits | Large codebases exceed query size | Chunk 5000 entities/batch (already implemented). |
 | `rmcp` SDK is v0.15 (pre-1.0) | API may change in future versions | Pin exact version. stdio transport is stable in spec. Wrapper is thin (~400 lines) — easy to update. |
+
+---
+
+## Real Token Counts Per Entity (Fix in v1.7.3)
+
+### The Problem
+
+`smart-context-token-budget` estimates tokens with `100 + key_length / 10`. A 5-line function and a 200-line function both estimate at ~110 tokens. The token budget is fiction.
+
+### The Fix
+
+During pt01 ingestion, count real tokens for every entity's source code and store it in the `CodeGraph` relation.
+
+**Crate**: `bpe-openai = "0.3"` (by GitHub, pure Rust, 3.5x faster than tiktoken-rs)
+
+```rust
+use bpe_openai::Tokenizer;
+use std::sync::LazyLock;
+
+static TOKENIZER: LazyLock<&'static Tokenizer> = LazyLock::new(|| bpe_openai::cl100k_base());
+
+fn count_entity_tokens_fast(source_code: &str) -> usize {
+    TOKENIZER.count(source_code)
+}
+```
+
+**Why `bpe-openai`**:
+- **Dedicated `count()` method** — counts without allocating a token list. Critical for 50K+ entities.
+- **3.5x faster than tiktoken-rs** with linear worst-case scaling (tiktoken-rs is quadratic).
+- **Lightweight** — ~5 dependencies vs tiktoken-rs's 8.79 MB embedded vocab data.
+- **Maintained by GitHub** (the company) — 93 stars, 13 contributors.
+- **`cl100k_base` as universal proxy** — within ~10-20% of Claude's actual counts. Good enough for budgeting.
+
+### CozoDB Schema Change
+
+Add `token_count` column to `CodeGraph` relation:
+
+```
+CodeGraph {
+  ISGL1_key: String,
+  ...existing columns...,
+  token_count: Int,       ← NEW: real BPE token count of source code
+  word_count: Int,        ← NEW: split_whitespace().count() as cheap fallback
+}
+```
+
+### What This Unlocks
+
+1. **Real smart-context budgets**: `smart-context-token-budget` reads `token_count` from DB instead of guessing. The budget means something.
+2. **Lookahead calculations**: "Sum all entity token counts in this module" → instant answer. Plan context allocation before fetching code.
+3. **Cost estimation**: "This blast radius of 47 entities would cost 12,400 tokens" — the LLM can decide whether to expand or constrain the query.
+4. **File-level totals**: Sum entity token counts per file → "this file costs 3,200 tokens to include fully."
+5. **Surgical extraction**: When adding source code to smart-context responses, pack entities by real token count into the budget (greedy knapsack with accurate weights).
+
+### Files Changed
+
+- `pt01/.../streamer.rs`: After tree-sitter extraction, call `TOKENIZER.count(&code)` and store in entity
+- `parseltongue-core/src/entities.rs`: Add `token_count: usize` and `word_count: usize` to entity structs
+- `parseltongue-core/src/storage/cozo_client.rs`: Add columns to `CodeGraph` CREATE RELATION and INSERT queries
+- `pt08/.../smart_context_token_budget_handler.rs`: Replace `estimate_entity_tokens()` heuristic with DB column lookup
+- `Cargo.toml` (pt01 or parseltongue-core): Add `bpe-openai = "0.3"`
 
 ---
 
