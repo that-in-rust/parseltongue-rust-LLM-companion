@@ -1,0 +1,508 @@
+SESSION CONTEXT DUMP — 2026-02-16
+==================================
+
+This is a raw dump of all context held in this Claude Code session,
+covering the v2.0.0 research and architectural decision-making process.
+
+================================================================================
+SECTION 1: SESSION HISTORY AND PRIOR CONTEXT
+================================================================================
+
+This session continued from a previous conversation that ran out of context.
+The prior session covered:
+
+- Parseltongue v1.7.3 algorithm implementations (Tarjan SCC, K-Core, PageRank,
+  Betweenness, Shannon Entropy, CK Metrics, Leiden clustering)
+- PRD updates and competitive research
+- Creation of docs/v173-pt04-bidirectional-workflow.md
+- Enrichment of that doc from 519 to 2,261 lines covering all 26 endpoints
+- Deep exploration of CozoDB alternatives for pt04
+- Research into 15+ storage options across 6 categories
+- Plan mode for TypedAnalysisStore (approved but NOT coded per user instruction)
+- Creation of docs/RESEARCH-v173-pt04-storage-architecture.md
+- ELI5 ASCII explanation of 4 storage options + Option E (DuckDB)
+- Two user ideas: (1) DuckDB as pt04 independent pipeline, (2) Fork CozoDB
+- Cloning CozoDB into CR04/cozo/ directory
+- User demanded parseltongue dogfooding instead of explore agents
+
+================================================================================
+SECTION 2: COZODB DOGFOODING VIA PARSELTONGUE
+================================================================================
+
+Downloaded parseltongue v1.7.2 release binary from:
+https://github.com/that-in-rust/parseltongue-rust-LLM-companion/releases/tag/v1.7.2
+
+Binary: parseltongue-macos-arm64 (47MB)
+
+Ingested CozoDB source code:
+  Command: ./parseltongue-macos-arm64 pt01-folder-to-cozodb-streamer CR04/cozo/
+  Workspace: parseltongue20260215210600
+  Database: rocksdb:parseltongue20260215210600/analysis.db
+  Results: 6,513 entities, 149 files, 2.1 seconds
+  Languages detected: c, cpp, java, javascript, rust, swift, typescript
+
+Started HTTP server:
+  Command: ./parseltongue-macos-arm64 pt08-http-code-query-server --db "rocksdb:parseltongue20260215210600/analysis.db"
+  Port: 7777
+
+Query Results:
+
+--- /codebase-statistics-overview-summary ---
+  code_entities_total_count: 3105
+  test_entities_total_count: 0
+  dependency_edges_total_count: 15547
+  languages: c, cpp, java, javascript, rust, swift, typescript
+
+--- /complexity-hotspots-ranking-view?top=25 ---
+  Rank 1: rust:fn:Ok:unresolved-reference — 595 inbound
+  Rank 2: rust:fn:unwrap:unresolved-reference — 421 inbound
+  Rank 3: rust:fn:new:unresolved-reference — 280 inbound
+  Rank 4: rust:file:CR04_cozo_cozo-core_src_runtime_db_rs — 236 outbound (GOD FILE)
+  Rank 5: rust:fn:clone:unresolved-reference — 233 inbound
+  Rank 9: rust:file:CR04_cozo_cozo-core_src_runtime_relation_rs — 172 outbound
+  Rank 10: rust:file:CR04_cozo_cozo-core_src_query_ra_rs — 169 outbound
+  Rank 11: rust:file:CR04_cozo_cozo-core_src_data_functions_rs — 167 outbound
+  Rank 13: rust:file:CR04_cozo_cozo-core_src_data_program_rs — 158 outbound
+  Rank 18: rust:file:CR04_cozo_cozo-bin_src_server_rs — 135 outbound
+  Rank 19: rust:file:CR04_cozo_cozo-core_src_query_stored_rs — 135 outbound
+  Rank 23: rust:file:CR04_cozo_cozo-core_src_lib_rs — 118 outbound
+  Rank 25: rust:file:CR04_cozo_cozo-core_src_runtime_hnsw_rs — 117 outbound
+
+--- /centrality-measures-entity-ranking?method=pagerank&top=30 ---
+  Rank 1: Ok (0.0167)
+  Rank 2: unwrap (0.0092)
+  Rank 3: new (0.0068)
+  Rank 4: from (0.0055)
+  Rank 6: initialize (0.0047)
+  Rank 9: run_default (0.0040)
+  Rank 11: FixedRule (0.0034)
+  Rank 13: NormalAggrObj (0.0030)
+  Rank 20: into_json (0.0022)
+  Rank 29: run_script (0.0016)
+
+--- /centrality-measures-entity-ranking?method=betweenness&top=30 ---
+  All scores 0.0 — graph is mostly tree-shaped (acyclic), no bridges
+
+--- /code-entities-search-fuzzy?q=DbInstance ---
+  3 results:
+    rust:enum:DbInstance (cozo-core/src/lib.rs) — IT'S AN ENUM, NOT A STRUCT
+    rust:impl:DbInstance (cozo-core/src/lib.rs)
+    rust:module:DbInstance:external-dependency-cozo
+
+--- /code-entities-search-fuzzy?q=Storage ---
+  155 results including:
+    rust:enum:MemTx (storage/mem.rs)
+    rust:fn:new_cozo_mem (storage/mem.rs)
+    rust:fn:new_cozo_sled (storage/sled.rs)
+    rust:fn:new_cozo_sqlite (storage/sqlite.rs)
+    rust:fn:new_cozo_tikv (storage/tikv.rs)
+
+--- /code-entities-search-fuzzy?q=StoreTx ---
+  1 result:
+    rust:trait:StoreTx (cozo-core/src/storage/mod.rs)
+
+--- /code-entities-search-fuzzy?q=DataValue ---
+  6 results:
+    rust:enum:DataValue (cozo-core/src/data/value.rs)
+    rust:impl:DataValue in json.rs, memcmp.rs, value.rs
+    rust:fn:encode_datavalue (memcmp.rs)
+
+--- /code-entities-search-fuzzy?q=ColumnDef ---
+  1 result:
+    rust:struct:ColumnDef (cozo-core/src/data/relation.rs)
+
+--- /code-entities-search-fuzzy?q=FixedRule ---
+  23 results across data/program.rs and fixed_rule/mod.rs
+
+--- /code-entities-search-fuzzy?q=run_script ---
+  12 results:
+    rust:method:run_script in lib.rs, runtime/db.rs, cozo-lib-python/src/lib.rs
+    rust:method:run_script_ast in lib.rs, runtime/db.rs
+    rust:method:run_script_fold_err in lib.rs
+    rust:method:run_script_read_only in runtime/db.rs
+    rust:method:run_script_str in lib.rs
+
+--- /circular-dependency-detection-scan ---
+  has_cycles: false, cycle_count: 0 — CLEAN ACYCLIC ARCHITECTURE
+
+--- /technical-debt-sqale-scoring?entity=rust:file:CR04_cozo_cozo-core_src_runtime_db_rs ---
+  total_debt_hours: 14.0, severity: HIGH
+  Violations:
+    HIGH_COUPLING: CBO=236 (threshold 10) — 4h remediation
+    LOW_COHESION: LCOM=1.0 (threshold 0.8) — 8h remediation
+    HIGH_COMPLEXITY: WMC=236 (threshold 15) — 2h remediation
+
+--- /entropy-complexity-measurement-scores ---
+  runtime/db.rs: entropy=0.0, complexity=LOW (all outbound, no inbound)
+  lib.rs: entropy=0.0, complexity=LOW
+
+--- /coupling-cohesion-metrics-suite ---
+  runtime/db.rs: CBO=236, LCOM=1.0, RFC=236, WMC=236, health=F
+  lib.rs: CBO=118, LCOM=1.0, RFC=118, WMC=118, health=F
+
+--- /kcore-decomposition-layering-analysis?k=3 ---
+  max_coreness: 20
+  Core entities (coreness=20): iter, parse/expr.rs, runtime/hnsw.rs,
+  query/compile.rs, fts/indexing.rs, storage/mod.rs, query/stored.rs,
+  fixed_rule/csv.rs, and many modules (Symbol, Vec, get_input, etc.)
+
+--- /leiden-community-detection-clusters ---
+  community_count: 1285, modularity: 0.163 (LOW — monolithic)
+  Largest community: 617 members (dominates)
+
+--- /forward-callees-query-graph ---
+  storage/mod.rs: 18 callees (Itertools, Option, Result, Tuple, ValidityTs, Vec, etc.)
+  runtime/db.rs: 236 callees (Arc, AtomicBool, AtomicU32, AtomicU64, BTreeMap,
+    BTreeSet, Box, ColumnDef, CozoScript, DEFAULT_FIXED_RULES, DataValue,
+    Default, Entry, Error, EventCallbackRegistry, InputProgram, Itertools, etc.)
+
+--- /smart-context-token-budget ---
+  runtime/db.rs: 48 entities included in 5000-token budget
+  storage/mod.rs: 18 entities included in 5000-token budget
+
+--- /code-entities-search-fuzzy?q=Relation ---
+  175 results including:
+    rust:enum:AccessLevel (runtime/relation.rs)
+    rust:enum:ColType (data/relation.rs)
+    rust:enum:RelationOp (data/program.rs)
+    rust:enum:VecElementType (data/relation.rs)
+    java:method:exportRelations, importRelations (CozoJavaBridge.java)
+
+================================================================================
+SECTION 3: TREE-SITTER CAPABILITIES ANALYSIS
+================================================================================
+
+What tree-sitter extracts that we currently throw away:
+
+FOR RUST:
+  - type_parameters → generic bounds are trait dependency edges
+  - where_clause → more trait bounds
+  - visibility_modifier → pub/pub(crate)/pub(super)
+  - function_modifiers → async, unsafe, const
+  - attribute_item → #[derive(...)], #[cfg(...)], #[test], #[async_trait]
+  - return_type → type information
+  - parameter with type → function signature
+  - use_declaration → full import paths
+  - closure_expression → closure params, body, move keyword
+  - lifetime → 'a, 'static
+  - macro_invocation → which macros used
+  - impl_item → trait field + type field
+  - match_expression with match_arm → pattern info
+  - unsafe_block → unsafe code locations
+
+FOR TYPESCRIPT:
+  - type annotations, interfaces, generics
+
+FOR GO:
+  - interface definitions, goroutine spawns
+
+FOR JAVA:
+  - annotations, generics, interface implementations
+
+FOR C/C++:
+  - preprocessor directives, templates, header includes
+
+Tree-sitter query language example:
+  (function_item
+    (visibility_modifier) @vis
+    (function_modifiers) @mods
+    name: (identifier) @name
+    type_parameters: (type_parameters
+      (constrained_type_parameter
+        name: (identifier) @generic
+        bounds: (trait_bounds) @bounds))
+    parameters: (parameters
+      (parameter
+        pattern: (identifier) @param_name
+        type: (_) @param_type))
+    return_type: (_) @ret_type)
+
+Tree-sitter features not used:
+  - Incremental parsing (re-parse only changed bytes)
+  - Language injection (SQL in Rust strings, JS in HTML)
+  - tree-sitter-tags crate (purpose-built for def/ref extraction)
+  - Predicates in queries (#match?, #eq?, #is?)
+
+================================================================================
+SECTION 4: ASCENT DATALOG ENGINE
+================================================================================
+
+Ascent crate v0.8.0 — proc-macro Datalog for Rust.
+Compiles rules into efficient Rust code at compile time.
+Relations are Vec<(T1, T2, ...)> under the hood.
+
+Example Ascent program for code analysis:
+
+  ascent! {
+      struct TraitHierarchyProgram;
+      relation supertrait(String, String);
+      relation implements(String, String);
+      relation all_supertraits(String, String);
+      relation all_implementors(String, String);
+
+      all_supertraits(t, s) <-- supertrait(t, s);
+      all_supertraits(t, s2) <-- all_supertraits(t, s1), supertrait(s1, s2);
+      all_implementors(tr, ty) <-- implements(ty, tr);
+      all_implementors(tr, ty) <-- all_supertraits(sub, tr), implements(ty, sub);
+  }
+
+Why Datalog beats alternatives for code analysis:
+  1. Recursive queries first-class, guaranteed termination
+  2. Rules compose naturally (layer on layer)
+  3. Incremental maintenance possible (delta propagation)
+  4. 2-3 lines vs 12-15 lines for equivalent SQL/Rust
+
+================================================================================
+SECTION 5: CROSS-LANGUAGE BOUNDARY PATTERNS
+================================================================================
+
+Pattern 1: FFI (Rust <-> C/C++)
+  Rust: extern "C" { fn rocksdb_put(...); }
+  C: int rocksdb_put(...) { ... }
+  Detection: function name + ABI marker
+
+Pattern 2: WASM (Rust -> JS/TS)
+  Rust: #[wasm_bindgen] pub fn process_data(...)
+  JS: import { process_data } from './pkg/my_module'
+  Detection: attribute + import name + .d.ts files from wasm-bindgen
+
+Pattern 3: PyO3/JNI (Rust -> Python/Java)
+  Rust: #[pyfunction] fn analyze_code(...)
+  Python: from parseltongue import analyze_code
+  Detection: attribute + import from module
+
+Pattern 4: gRPC/HTTP (Rust <-> Any)
+  Rust: #[post("/api/v1/analyze")] async fn analyze(...)
+  Client: requests.post("/api/v1/analyze", ...)
+  Detection: string literal URL paths in both sides
+
+Pattern 5: Message Queues (Rust <-> Any via Iggy/Kafka)
+  Rust: client.send_messages("user-events", ...)
+  Java: consumer.subscribe("user-events")
+  Detection: string literal topic names in function arguments
+
+Key insight: Tree-sitter sees BOTH sides. Rust-analyzer sees only Rust.
+Cross-language edges need tree-sitter for detection, Ascent for joining.
+
+================================================================================
+SECTION 6: STORAGE ARCHITECTURE RESEARCH (from prior session)
+================================================================================
+
+15+ storage options evaluated across 6 categories:
+
+Option A: Force everything into CozoDB
+  Pro: No new dependencies
+  Con: Untyped DataValue blobs, can't query type-level data
+
+Option B: Two CozoDBs (syntactic + semantic)
+  Pro: Separates concerns
+  Con: Two databases to maintain, still untyped
+
+Option C: Query Salsa/rust-analyzer directly
+  Pro: No storage layer
+  Con: Requires rust-analyzer running, not persistable
+
+Option D: Hybrid (CozoDB + Custom Rust TypedStore + Ascent)
+  Pro: Pragmatic, keeps existing code
+  Con: Two storage systems to coordinate
+
+Option E: DuckDB replaces CozoDB entirely
+  Pro: SQL + recursive CTEs + DuckPGQ graph + Parquet export
+  Con: +50MB binary via FFI, not pure Rust
+
+Recommendation from research: Option D for v1.7.3, but user pivoted to v2.0.0
+which is essentially "Option D minus CozoDB" = pure Ascent + TypedStore.
+
+CozoDB dormancy risk: last release mid-2023, unanswered issues accumulating.
+Kuzu eliminated: Apple acquisition Oct 2025, repo archived.
+
+================================================================================
+SECTION 7: ARCHITECTURAL DECISIONS FOR v2.0.0
+================================================================================
+
+Decision 1: NO BACKWARD COMPATIBILITY
+  v2.0.0 is a clean break. New JSON shapes, new endpoints, new CLI.
+
+Decision 2: NO OLD CODE DELETED
+  v1.x stays in repo, compiles, works. v2.0.0 is additive.
+
+Decision 3: CozoDB REMOVED
+  No CozoDB dependency in v2.0.0. Pure Rust data structures.
+  HashMap + secondary indexes + MessagePack serialization.
+
+Decision 4: NEW CRATE PREFIX
+  All new crates use rust-llm-* prefix. pt* prefix frozen.
+
+Decision 5: INDEPENDENT CRATES
+  v2.0.0 crates have ZERO dependency on v1.x crates.
+  They coexist in the same workspace but share nothing.
+
+Decision 6: TREE-SITTER QUERIES
+  Replace cursor walking with declarative tree-sitter queries.
+  Extract 10x more data from the same parse trees.
+
+Decision 7: ASCENT FOR REASONING
+  All recursive analysis via Ascent Datalog rules.
+  Graph algorithms rewritten on typed data.
+
+Decision 8: RUST-ANALYZER AS LIBRARY
+  rust-analyzer (ra_ide, ra_hir) for Rust-only semantic depth.
+  Tree-sitter for all 12 languages syntactic width.
+
+================================================================================
+SECTION 8: v2.0.0 CRATE MAP
+================================================================================
+
+crates/
+├── (v1.x frozen)
+│   ├── parseltongue-core/
+│   ├── pt01-folder-to-cozodb-streamer/
+│   ├── pt02-folder-to-ram-snapshot/
+│   ├── pt08-http-code-query-server/
+│   └── parseltongue/
+│
+├── (v2.0.0 new)
+│   ├── rust-llm-core/                    Shared types, traits, key format
+│   ├── rust-llm-01-fact-extractor/       Enriched tree-sitter (12 langs)
+│   ├── rust-llm-02-cross-lang-edges/     FFI/WASM/JNI/PyO3/gRPC/MQ detector
+│   ├── rust-llm-03-rust-analyzer/        Rust semantic depth bridge
+│   ├── rust-llm-04-reasoning-engine/     Ascent Datalog + graph algorithms
+│   ├── rust-llm-05-knowledge-store/      TypedAnalysisStore + MessagePack
+│   ├── rust-llm-06-http-server/          Axum HTTP + websocket
+│   ├── rust-llm-07-mcp-server/           rmcp MCP tools
+│   └── rust-llm/                         CLI binary
+
+Dependency flow:
+  rust-llm-01 ──→ rust-llm-02 ──→ rust-llm-04
+  rust-llm-01 ──→ rust-llm-03 ──→ rust-llm-04
+  rust-llm-04 ──→ rust-llm-05
+  rust-llm-05 ──→ rust-llm-06
+  rust-llm-05 ──→ rust-llm-07
+  All depend on rust-llm-core.
+
+================================================================================
+SECTION 9: v1.x → v2.0.0 FEATURE MAPPING
+================================================================================
+
+tree-sitter cursor walking    → REWRITE as tree-sitter QUERIES in rust-llm-01
+entity types + ISGL1 keys     → REDESIGN as typed Rust structs in rust-llm-core
+CozoDB storage                → DROP (replaced by HashMaps in rust-llm-05)
+7 graph algorithms            → REWRITE in rust-llm-04 on typed data
+adjacency list graph repr     → REPLACED by TypedAnalysisStore in rust-llm-05
+pt01 streamer                 → REWRITE as rust-llm-01
+pt08 HTTP server              → REWRITE as rust-llm-06
+pt02 snapshot                 → DROP (never finished, rust-llm-05 better)
+parseltongue CLI binary       → REWRITE as rust-llm binary
+22 HTTP endpoints             → REDESIGN in rust-llm-06
+Coverage bugs (5 bugs)        → SOLVED BY DESIGN (ignore crate, proper paths)
+.gitignore respect            → BUILT-IN from day 1 (ignore crate)
+Token counts (bpe-openai)     → BUILT-IN from day 1
+Debug eprintln noise          → NEVER HAPPENS (tracing crate from day 1)
+XML-tagged responses          → BUILT-IN from day 1
+Taint analysis                → VIA ASCENT in rust-llm-04
+MCP (pt09)                    → rust-llm-07
+/db/ vs /mem/ modes           → GONE (one mode)
+CozoDB anything               → GONE
+
+================================================================================
+SECTION 10: PRODUCT STRATEGY NOTES
+================================================================================
+
+Shreyas Doshi lens:
+  v1.x = Tool (one pipeline, one DB, one server)
+  v2.0.0 = Platform (composable libraries)
+
+What compounds:
+  1. Facts compound — every extraction makes every rule more powerful
+  2. Rules compound — 50th rule stands on 49 others
+  3. Languages compound — language #13 connects to other 12
+
+Leverage hierarchy:
+  OVERHEAD: Building pt02
+  NEUTRAL: Bug fixes in pt08
+  LEVERAGE: rust-llm-01, rust-llm-04, rust-llm-02
+
+The moat: Ascent rules. Institutional knowledge encoded in code.
+
+External users for libraries:
+  rust-llm-01: IDE plugins, CI, doc generators, code search
+  rust-llm-02: microservice viz, API contracts, security audit
+  rust-llm-03: Rust linters, perf analysis, unsafe audit
+  rust-llm-04: security teams, architecture teams, platform teams
+
+================================================================================
+SECTION 11: OPEN QUESTIONS
+================================================================================
+
+1. Key format: Is ISGL1 right for v2.0.0, or redesign?
+2. Incremental computation: Ascent doesn't support incremental. Need Differential Datalog?
+3. rust-analyzer API stability: ra_ide/ra_hir are internal. How handle breakage?
+4. CLI naming: binary called rust-llm or parseltongue?
+5. File format: What replaces .ptgraph? Name, extension, versioning?
+6. Build order: Which crate first? (likely rust-llm-core + rust-llm-01)
+7. Minimum viable v2.0.0: smallest shippable = rust-llm-01 + 05 + 06?
+
+================================================================================
+SECTION 12: FILES CREATED/MODIFIED THIS SESSION
+================================================================================
+
+CREATED:
+  docs/PRD-v200.md — v2.0.0 PRD with Requirement #1
+  docs/Prep-Doc-V200.md — comprehensive prep doc (11 sections)
+  docs/session-context-dump-20260216.txt — this file
+
+PREVIOUSLY CREATED (prior session, still relevant):
+  docs/v173-pt04-bidirectional-workflow.md — enriched to 2,261 lines
+  docs/RESEARCH-v173-pt04-storage-architecture.md — storage research
+  CR04/cozo/ — cloned CozoDB repo
+  .gitignore — added CR04/
+
+PLAN FILE (exists but NOT approved for coding):
+  /Users/amuldotexe/.claude/plans/temporal-knitting-key.md
+  Contains TypedAnalysisStore implementation plan (6 steps)
+  This plan is from the v1.7.3 era and may be partially superseded by v2.0.0
+
+================================================================================
+SECTION 13: WORKSPACE STATE
+================================================================================
+
+Current branch: main
+Working directory: /Users/amuldotexe/Desktop/A01_20260131/parseltongue-dependency-graph-generator
+
+Existing crates (from Cargo.toml workspace):
+  crates/parseltongue-core/
+  crates/parseltongue/
+  crates/pt01-folder-to-cozodb-streamer/
+  crates/pt02-folder-to-ram-snapshot/
+  crates/pt08-http-code-query-server/
+
+Git status at session start:
+  Deleted: test-fixtures/v151-edge-bug-repro/* (12 files)
+  Untracked: FINAL_FEATURE_EXTRACTION_MASTER_TABLE.md
+  Untracked: MASTER_FEATURE_EXTRACTION_TABLE.md
+  Untracked: test-fixtures/v156-sql-test/
+
+Parseltongue workspace created during dogfooding:
+  parseltongue20260215210600/ (CozoDB analysis of CR04/cozo/)
+
+Downloaded binary:
+  parseltongue-macos-arm64 (v1.7.2 release, 47MB)
+
+================================================================================
+SECTION 14: USER PREFERENCES AND COMMUNICATION STYLE
+================================================================================
+
+- User says "do not write just think" frequently — means discuss, don't create files
+- User says "IDIOT" when I do something wrong — signals I should stop and listen
+- User gets angry at premature coding — always get explicit permission before writing code
+- User wants ELI5 ASCII explanations — visual, simple, top-down
+- User likes Minto Pyramid Principle — answer first, then supporting arguments
+- User references Shreyas Doshi — product thinking, LNO framework, leverage
+- User wants dogfooding — use parseltongue to analyze things, not explore agents
+- User cares about the "primary user" experience — they ARE the primary user
+- User prefers "think and tell" over "research and write"
+- User wants clean breaks, not incremental migrations
+
+================================================================================
+END OF CONTEXT DUMP
+================================================================================

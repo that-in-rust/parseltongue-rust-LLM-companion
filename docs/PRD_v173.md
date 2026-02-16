@@ -893,6 +893,12 @@ The CLI still exists. Power users can use it directly. But Parseltongue Central 
 
 ## Structural Taint Analysis (New in v1.7.3)
 
+> **Reference Documents**
+>
+> - **Thesis**: [`docs/THESIS-taint-analysis-for-parseltongue.md`](THESIS-taint-analysis-for-parseltongue.md) — 786-line technical thesis covering academic foundations (Denning 1976, Joern CPG, DOOP/Souffle), code-scalpel deep-dive (2,466-line taint_tracker.py), semgrep MCP analysis, proposed CozoDB Datalog architecture, CWE Top 25 (2025) mapping, false positive rate benchmarks, tooling gap analysis, and Shreyas Doshi LNO assessment. 25 references.
+> - **Z3 Tradeoff**: [`docs/v173-z3-tradeoff-analysis.md`](v173-z3-tradeoff-analysis.md) — Architecture decision record for why Parseltongue uses CozoDB Datalog reachability instead of Z3 SMT solving. Covers three problems (C++ binary dependency, 12-language scaling, NP-hard vs polynomial category mismatch), quantified precision trade-off (~10% FP with Z3 vs ~20% without), and what we honestly lose (path feasibility pruning, constraint-based sanitizer verification).
+> - **Competitor Research**: [`docs/CR-v173-03.md`](CR-v173-03.md) — 125KB competitor feature deep-dive with code-scalpel and semgrep taint implementation details from direct source reading.
+
 ### The Problem
 
 Security teams need to know: "Can user input reach a SQL query without sanitization?" Today, only two tools answer this — code-scalpel (Python AST + Z3 symbolic solver) and semgrep (pattern-matching `mode: taint`). Both are Python-only or require external tooling. Neither integrates with a dependency graph database.
@@ -1163,7 +1169,7 @@ taint_source_sink_discovery()
 - **Not a SAST scanner** — we don't replace semgrep or SonarQube. We provide taint flow *visibility* in a dependency graph.
 - **Not symbolic** — we can't reason about whether `custom_sanitize(x)` actually works. We only know about sanitizers in our registry.
 - **Not a vulnerability scanner** — we find *potential* taint flows. A human or LLM must assess whether each flow is a real vulnerability.
-- **Not a replacement for code-scalpel** — code-scalpel's Z3 reasoning catches things we'll miss. Our advantage: 12 languages, millisecond queries, graph integration.
+- **Not a replacement for code-scalpel** — code-scalpel's Z3 reasoning catches things we'll miss. Our advantage: 12 languages, millisecond queries, graph integration. See [`docs/v173-z3-tradeoff-analysis.md`](v173-z3-tradeoff-analysis.md) for the full Z3 vs Datalog decision record.
 
 ### Honest Accuracy Assessment
 
