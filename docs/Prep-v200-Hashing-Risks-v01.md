@@ -42,6 +42,23 @@ Method reference: `docs/Prep-v200-Dependency-Graph-Contract-Hardening.md`
 - Crates with no 80-89 queue items in this cycle: `rust-llm-core-foundation`, `rust-llm-rust-semantics`, `rust-llm-cross-boundaries`, `rust-llm-graph-reasoning`.
 - Execution rule: run this queue crate-wise after G1..G4 gate probes, without changing crate topology.
 
+## V200 Promoted Requirement Bundle (requested, pre-PRD)
+```text
++----+--------------------------------------+------------------------------+-------------------------+-----------------------------------------------+
+| ID | Requested idea                       | Crate owner                  | Pass/probe linkage      | Requirement intent                             |
++----+--------------------------------------+------------------------------+-------------------------+-----------------------------------------------+
+| R1 | #7 Route prefix nesting              | rust-llm-interface-gateway   | Pass 07 / GW-P7-G       | Stable namespaced routing by active mode       |
+| R2 | #8 Auto port + port file             | rust-llm-interface-gateway   | Pass 07 / GW-P7-H       | Deterministic startup/discovery lifecycle      |
+| R3 | #10 shutdown CLI command             | rust-llm-interface-gateway   | Pass 07 / GW-P7-I       | Graceful stop contract from CLI to server      |
+| R4 | #25 XML-tagged responses             | rust-llm-interface-gateway   | Pass 07 / GW-P7-J       | Semantic response grouping for LLM consumption |
+| R5 | #27 Project slug in URL              | rust-llm-interface-gateway   | Pass 07 / GW-P7-K       | Self-describing multi-project endpoint identity|
+| R6 | #28 Slug in port file                | rust-llm-interface-gateway   | Pass 07 / GW-P7-L       | Slug-aware server discovery path               |
+| R7 | #29 Token count at ingest            | rust-llm-store-runtime       | Pass 02 / SR-P2-G       | Persist real token_count for deterministic use |
+| R8 | #35 Data-flow tree-sitter queries    | rust-llm-tree-extractor      | Pass 04 / TE-P4-F       | Extract assign/param/return flow edges         |
++----+--------------------------------------+------------------------------+-------------------------+-----------------------------------------------+
+```
+- Companion app boundary: Tauri remains an external consumer of these contracts; no new core crate is introduced by this bundle.
+
 ## Control-Flow Start and Primary Divergence
 - Control flow begins in `rust-llm-interface-gateway/src/main.rs`.
 - First divergence from existing parseltongue is immediate at dispatch:
@@ -183,13 +200,13 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
 +---------------------------+--------------------------------------------------+---------------------------------------------------------+
 | Crate                     | Evidence to collect                               | Probe/output artifact                                   |
 +---------------------------+--------------------------------------------------+---------------------------------------------------------+
-| interface-gateway         | mode parity/cancellation + source-read behavior    | request-lifecycle trace + source-read contract report   |
+| interface-gateway         | mode parity + route/port/slug/response-shape contracts | request-lifecycle trace + namespace/port/shutdown + XML-shape fixtures |
 | core-foundation           | slim schema invariants + key disambiguation       | schema determinism digest + key collision corpus        |
-| tree-extractor            | per-language capture completeness                 | fixture-to-capture diff report (12 languages)           |
+| tree-extractor            | capture completeness + data-flow edge extraction  | fixture-to-capture + assign/param/return edge diff report |
 | rust-semantics            | proc-macro/build-script success/degrade behavior  | RA workspace matrix with pass/fallback classifications  |
 | cross-boundaries          | precision/recall on known boundary fixtures       | boundary edge confusion matrix                          |
 | graph-reasoning           | rule correctness + runtime at scale               | golden-rule output + p50/p95 runtime report             |
-| store-runtime             | single-getter read contract + delta durability    | read-path parity trace + mutation/recovery checks       |
+| store-runtime             | single-getter + delta durability + token_count persistence | read-path parity + recovery checks + token_count parity digest |
 | test-harness              | path normalization + flake/wall-clock budgets     | canonical path fixture report + CI stability trend      |
 +---------------------------+--------------------------------------------------+---------------------------------------------------------+
 ```
@@ -199,6 +216,16 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
 - E57: G2 single-getter artifact set (handler-to-getter call-path map + result/error parity report).
 - E58: G3 source-read artifact set (detail-view fixtures for valid/missing/moved files + line-range outcomes).
 - E59: G4 path-normalization artifact set (`./x` vs `x` vs absolute fixture parity in coverage outputs).
+
+## Promoted Requirement Evidence Backlog (pending capture; not counted in current E totals)
+- E60: R1 route-prefix artifact set (mode namespace fixtures + wrong-prefix error contract).
+- E61: R2 auto-port artifact set (startup assignment + discovery file lifecycle traces).
+- E62: R3 shutdown-cli artifact set (CLI-to-endpoint shutdown handshake and cleanup report).
+- E63: R4 XML-tagged response artifact set (grouped-schema fixtures across list/detail/query responses).
+- E64: R5 project-slug URL artifact set (slug derivation and route mounting parity fixtures).
+- E65: R6 slug port-file artifact set (slug-aware discovery filename and lookup parity).
+- E66: R7 token-count ingest artifact set (`token_count` persistence and replay parity digest).
+- E67: R8 data-flow extraction artifact set (assign/param/return edge fixture truth set).
 
 ## Risk Hashing Snapshot Format (for each iteration)
 Use a compact hash to track movement across iterations:
@@ -368,6 +395,7 @@ E06: Snapshot load path restores data into mem via full deserialize + bulk inser
 | SR-P2-D | Snapshot compatibility probe                         | Version mismatch yields explicit fail or migration path        |
 | SR-P2-E | Transient parse-failure quarantine probe             | Single transient parse fail cannot hard-delete stable records  |
 | SR-P2-F | Single getter contract gate probe                    | All read-path callers resolve through one getter contract with result/error parity |
+| SR-P2-G | Token-count ingest contract probe                    | Ingest persists deterministic `token_count` per entity and replay preserves totals |
 +---------+-----------------------------------------------------+---------------------------------------------------------------+
 ```
 
@@ -552,6 +580,7 @@ E16: Tree-sitter prep research recommends changed_ranges + set_byte_range increm
 | TE-P4-C | Degrade-visibility probe                             | Partial parse paths always emit explicit failure/degrade tags  |
 | TE-P4-D | Determinism replay probe                             | Two identical runs produce identical extraction digest         |
 | TE-P4-E | Incremental-range probe                              | Range-bounded run equals full run on changed spans only       |
+| TE-P4-F | Data-flow extraction contract probe                  | assign/param/return edges are extracted with fixture-backed parity |
 +---------+-----------------------------------------------------+---------------------------------------------------------------+
 ```
 
@@ -561,7 +590,7 @@ STUB:
 - Add multi-language fixtures for const-object export, decorated_definition, shebang, CRLF, and malformed snippets.
 
 RED:
-- Assert TE-P4-A..E on current extractor; expect failures for blind-spot and range-bounded contracts.
+- Assert TE-P4-A..F on current extractor; expect failures for blind-spot and range-bounded contracts.
 
 GREEN:
 - Extend query patterns/capture normalization until TE-P4-A..E pass with deterministic outputs.
@@ -937,6 +966,12 @@ E44: Startup config includes idle-timeout/daemon controls, but timeout policy is
 | GW-P7-D | Fail-closed readiness probe                          | Backend init failure blocks data-dependent routes with explicit readiness error |
 | GW-P7-E | Cancellation/timeout contract probe                  | Deadline breach yields deterministic cancellation outcome and no partial-success report |
 | GW-P7-F | Filesystem source-read contract gate probe           | Detail-view path returns current disk lines for valid range and explicit errors for missing/moved files |
+| GW-P7-G | Route-prefix nesting contract probe                  | Mode namespace routes are stable and wrong-prefix guidance is deterministic |
+| GW-P7-H | Auto-port lifecycle contract probe                   | Startup allocates available port and writes discoverable port file consistently |
+| GW-P7-I | Shutdown CLI contract probe                          | CLI shutdown path reaches server stop endpoint and removes discovery file |
+| GW-P7-J | XML-tagged response contract probe                   | Response payloads expose deterministic semantic grouping keys for LLM use |
+| GW-P7-K | Project-slug URL contract probe                      | Routes include project slug with stable derivation from workspace identity |
+| GW-P7-L | Slug-aware port-file contract probe                  | Discovery file naming includes slug + mode and resolves target server deterministically |
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
 ```
 
@@ -944,9 +979,10 @@ E44: Startup config includes idle-timeout/daemon controls, but timeout policy is
 ```text
 STUB:
 - Add transport-parity fixtures and request envelope corpus with equivalent intent cases.
+- Add lifecycle fixtures for route-prefix, auto-port, shutdown, slug URL, and slug discovery filename behaviors.
 
 RED:
-- Execute GW-P7-A..F against baseline gateway wiring; expect failures in stdio hygiene and timeout contracts.
+- Execute GW-P7-A..L against baseline gateway wiring; expect failures in stdio hygiene and lifecycle-contract paths.
 
 GREEN:
 - Implement canonical envelope normalization, capability negotiation, and fail-closed readiness gates until probes pass.
@@ -1140,12 +1176,12 @@ After Pass 08:
 
 ## v01 Immediate Next Actions
 1. `rust-llm-core-foundation` (Pass 01): execute `CF-P1-F` first (attach E56), then `CF-P1-A..E`; store schema-determinism and key-collision artifacts.
-2. `rust-llm-store-runtime` (Pass 02): execute `SR-P2-F` first (attach E57), then `SR-P2-A..E`; store single-getter parity and consistency artifacts.
+2. `rust-llm-store-runtime` (Pass 02): execute `SR-P2-F` first (attach E57), then `SR-P2-A..E` plus `SR-P2-G`; store single-getter parity, consistency artifacts, and `#29` token-count parity (E66).
 3. `rust-llm-rust-semantics` (Pass 03): execute `RS-P3-A..E`; store capability/degrade and resource-envelope artifacts.
-4. `rust-llm-tree-extractor` (Pass 04): execute `TE-P4-A..E`; include crate-wise 80-89 queue capture for `#26` (.gitignore-respecting discovery) and `#23` (ingest debug-noise removal).
+4. `rust-llm-tree-extractor` (Pass 04): execute `TE-P4-A..F`; include crate-wise 80-89 queue capture for `#26` (.gitignore-respecting discovery) and `#23` (ingest debug-noise removal), plus `#35` data-flow extraction capture (E67).
 5. `rust-llm-cross-boundaries` (Pass 05): execute `CB-P5-A..E`; store confidence calibration and unresolved-link artifacts.
 6. `rust-llm-graph-reasoning` (Pass 06): execute `GR-P6-A..E`; store soundness/provenance/runtime-bound artifacts.
-7. `rust-llm-interface-gateway` (Pass 07): execute `GW-P7-F` first (attach E58), then `GW-P7-A..E`; include crate-wise 80-89 queue capture for `#6` (endpoint guards) and `#24` (watcher/runtime noise hygiene).
+7. `rust-llm-interface-gateway` (Pass 07): execute `GW-P7-F` first (attach E58), then `GW-P7-A..L`; include crate-wise 80-89 queue capture for `#6` (endpoint guards) and `#24` (watcher/runtime noise hygiene), plus promoted requirement captures `#7/#8/#10/#25/#27/#28` (E60..E65).
 8. `rust-llm-test-harness` (Pass 08): execute `TH-P8-F` first (attach E59), then `TH-P8-A..E`; include crate-wise 80-89 queue capture for `#19` (test exclusion coverage) and `#20` (zero-entity tagging).
 9. `rust-llm-store-runtime` hardening extension: capture crate-wise 80-89 queue item `#3` (export/import deterministic-lossless roundtrip) and attach parity digest artifacts.
 10. Re-score all 8 crates only after gate-linked `F` probes pass and artifacts are attached.

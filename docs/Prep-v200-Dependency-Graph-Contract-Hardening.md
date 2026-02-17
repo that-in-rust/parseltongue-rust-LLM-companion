@@ -35,6 +35,26 @@ Use the dependency graph to decide pass order, then harden one crate interface a
 4. Keep all dependency/interface diagrams in Mermaid.
 5. Treat performance or concurrency claims as untrusted until test-backed artifacts exist.
 
+## Lifecycle + companion requirement class (pre-PRD promotion rules)
+When a pre-PRD idea is promoted to a V200 requirement, encode it as a crate-linked contract with falsifiable probes before score changes.
+
+Required contract classes for the current promotion bundle:
+1. Routing/lifecycle contracts (`#7`, `#8`, `#10`, `#27`, `#28`):
+   - route namespace correctness
+   - auto-port/port-file discovery lifecycle
+   - graceful shutdown command and endpoint behavior
+   - slug-aware URL and slug-aware discovery file behavior
+2. Response-shape contract (`#25`):
+   - deterministic semantic grouping in response schemas.
+3. Ingest metric contract (`#29`):
+   - token count computed and persisted at ingest with deterministic replay.
+4. Extraction contract (`#35`):
+   - data-flow edges (`assign`, `param`, `return`) extracted with fixture-backed correctness.
+
+Companion app boundary rule:
+- Tauri desktop companion is treated as an external consumer of gateway/runtime contracts.
+- Do not add a new core crate or change dependency topology unless contract evidence proves the boundary is insufficient.
+
 ## Pass order policy
 Default order for V200:
 1. `rust-llm-core-foundation`
@@ -53,6 +73,7 @@ Deferred:
 - Never reduce Risk/Unclear from narrative confidence.
 - Reduce only when probe artifacts exist.
 - If new coupling is discovered, update graph first, then scores.
+- Promoted requirements must include source-trace references to existing research docs in pass evidence notes.
 
 ## Per-pass output contract
 Every pass must produce:

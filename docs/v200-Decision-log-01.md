@@ -19,3 +19,28 @@ Decision principle:
 Immediate scope impact:
 - V200 active scope is 8 crates (context-packer excluded).
 - Pass ledger/probe sequencing remains contiguous with no context-packer pass in V200.
+
+## 2026-02-17 — Promote lifecycle + companion readiness bundle to V200 requirements
+Decision:
+- Promote the following `PRD_v173` ideas to explicit V200 pre-PRD requirements:
+  - `#7` route prefix nesting
+  - `#8` auto port + port file lifecycle
+  - `#10` shutdown CLI command
+  - `#25` XML-tagged response categories
+  - `#27` project slug in URL path
+  - `#28` slug-aware port file naming
+  - `#29` token count at ingest
+  - `#35` data-flow tree-sitter queries (`assign` / `param` / `return`)
+
+Scope/architecture stance:
+- These are requirement upgrades, not topology changes.
+- V200 remains the same 8-crate core dependency graph.
+- Tauri app work is treated as a companion consumer of stable gateway contracts (external app track), not as a new core crate.
+
+Crate mapping:
+- `rust-llm-interface-gateway`: `#7`, `#8`, `#10`, `#25`, `#27`, `#28`
+- `rust-llm-store-runtime`: `#29`
+- `rust-llm-tree-extractor`: `#35`
+
+Decision principle:
+- Lifecycle contracts and context clarity are first-class product requirements when they improve deterministic operation, discoverability, and LLM usability without introducing new core crates.

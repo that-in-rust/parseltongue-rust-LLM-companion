@@ -5,6 +5,15 @@
 
 ---
 
+## Addendum: Companion app boundary for promoted V200 requirements
+- Tauri desktop work is accepted as a companion consumer track, not as a new core crate in the V200 dependency graph.
+- Promoted lifecycle requirements (`#7`, `#8`, `#10`, `#27`, `#28`) are implemented as gateway/runtime contracts that both CLI and companion app consume.
+- Promoted response and ingest requirements (`#25`, `#29`) are contract obligations on existing interfaces, not architecture expansion.
+- Promoted extraction requirement (`#35`) is parser/extractor enrichment feeding existing graph and reasoning layers.
+- Any move from companion boundary to core-topology change requires explicit evidence that current contracts cannot satisfy reliability or discoverability goals.
+
+---
+
 ## 1. CozoDB Architecture via Parseltongue Dogfooding
 
 We used parseltongue v1.7.2 (release binary) to ingest and analyze the CozoDB source code itself. Key findings:
