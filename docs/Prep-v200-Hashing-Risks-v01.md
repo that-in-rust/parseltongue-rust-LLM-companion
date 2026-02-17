@@ -5,7 +5,7 @@ Method reference: `docs/Prep-v200-Dependency-Graph-Contract-Hardening.md`
 
 ## Scope
 - Clean-room V200 only (no reuse from `pt*` crates).
-- 9-crate architecture:
+- 8-crate architecture:
   - `rust-llm-interface-gateway`
   - `rust-llm-core-foundation`
   - `rust-llm-tree-extractor`
@@ -13,8 +13,34 @@ Method reference: `docs/Prep-v200-Dependency-Graph-Contract-Hardening.md`
   - `rust-llm-cross-boundaries`
   - `rust-llm-graph-reasoning`
   - `rust-llm-store-runtime`
-  - `rust-llm-context-packer`
   - `rust-llm-test-harness`
+
+## V200 Non-Negotiable Hardening Gates (90+)
+```text
++----+--------------------------------------+---------------------------------------------------------------------+----------------+
+| ID | Gate                                 | Exact meaning                                                       | Pass link      |
++----+--------------------------------------+---------------------------------------------------------------------+----------------+
+| G1 | Slim types gate                      | Entity/storage schema stays canonical, minimal, and deterministic   | CF-P1-F        |
+| G2 | Single getter contract gate          | All read paths go through one storage getter contract               | SR-P2-F        |
+| G3 | Filesystem source-read contract gate | Detail view returns current disk lines with explicit error contract | GW-P7-F        |
+| G4 | Path normalization coverage gate     | Coverage treats ./path, path, and absolute path as one file        | TH-P8-F        |
++----+--------------------------------------+---------------------------------------------------------------------+----------------+
+```
+- Gate status controls score movement for linked crates in this ledger.
+
+## V200 High-Priority Hardening Queue (80-89, crate-wise)
+```text
++---------------------------+------------------------------+-----------------------------------------------------------------------+----------------------------------------------+
+| Crate                     | PRD v173 item(s)             | Exact meaning                                                          | Contract/probe linkage                        |
++---------------------------+------------------------------+-----------------------------------------------------------------------+----------------------------------------------+
+| rust-llm-test-harness     | #19, #20                     | Coverage distinguishes test-excluded and zero-entity files            | TH-P8 (coverage contract and fixture checks) |
+| rust-llm-tree-extractor   | #26, #23                     | File discovery respects .gitignore and ingest path removes debug noise| TE-P4 (extraction integrity + clean artifacts)|
+| rust-llm-interface-gateway| #6, #24                      | Endpoint mode guards are fail-fast and runtime watcher logs stay signal-only | GW-P7 (mode contract + runtime hygiene) |
+| rust-llm-store-runtime    | #3                           | Export/import roundtrip remains deterministic and lossless            | SR-P2 (snapshot/consistency and replay checks)|
++---------------------------+------------------------------+-----------------------------------------------------------------------+----------------------------------------------+
+```
+- Crates with no 80-89 queue items in this cycle: `rust-llm-core-foundation`, `rust-llm-rust-semantics`, `rust-llm-cross-boundaries`, `rust-llm-graph-reasoning`.
+- Execution rule: run this queue crate-wise after G1..G4 gate probes, without changing crate topology.
 
 ## Control-Flow Start and Primary Divergence
 - Control flow begins in `rust-llm-interface-gateway/src/main.rs`.
@@ -78,13 +104,6 @@ apply_delta_update_batch(DeltaUpdateRequest) -> DeltaUpdateReport
 load_store_snapshot_state(SnapshotLoadRequest) -> SnapshotLoadReport
 verify_store_consistency_state(ConsistencyCheckRequest) -> ConsistencyCheckReport"]
 
-    CP["rust-llm-context-packer
-rank_context_relevance_scores(ContextRankRequest) -> ContextRankReport
-estimate_payload_token_usage(TokenEstimateRequest) -> TokenEstimateReport
-apply_progressive_detail_tier(DetailTierRequest) -> DetailTierReport
-validate_context_budget_contract(BudgetContractRequest) -> BudgetContractReport
-pack_tagged_context_payload(ContextPackRequest) -> ContextPackResponse
-enforce_token_budget_limits(BudgetRequest) -> BudgetDecision"]
 
     TH["rust-llm-test-harness
 verify_fixture_contract_matrix(FixtureMatrixRequest) -> FixtureMatrixReport
@@ -97,13 +116,11 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
     GW -- ingest --> TE
     GW -- rust-only enrich --> RS
     GW -- query --> SR
-    GW -- response build --> CP
 
     TE --> CB
     RS --> CB
     CB --> GR
     GR --> SR
-    SR --> CP
 
     CF -. shared contracts .-> GW
     CF -. shared contracts .-> TE
@@ -111,7 +128,6 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
     CF -. shared contracts .-> CB
     CF -. shared contracts .-> GR
     CF -. shared contracts .-> SR
-    CF -. shared contracts .-> CP
     CF -. shared contracts .-> TH
 
     TH -. contract gates .-> GW
@@ -120,7 +136,6 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
     TH -. contract gates .-> CB
     TH -. contract gates .-> GR
     TH -. contract gates .-> SR
-    TH -. contract gates .-> CP
 ```
 
 ## Public Interface Snapshot (ELI5)
@@ -135,8 +150,7 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
 | 4  | rust-llm-cross-boundaries    | extract/match/score boundary links         | Syntax+semantic fact batches  | Boundary edges + confidence scores   |
 | 5  | rust-llm-graph-reasoning     | derive/score/explain reasoning outputs     | Facts + edges + constraints   | Derived findings and priorities      |
 | 6  | rust-llm-store-runtime       | commit/query/delta/snapshot/consistency    | Fact+edge batches / queries   | Persisted graph + bounded result set |
-| 7  | rust-llm-context-packer      | rank/pack/progressive context payloads     | Query slices + token limits   | Tagged/token-bounded LLM payload     |
-| 8  | rust-llm-test-harness        | fixture/ci/flake/perf contract gates       | Suite/probe definitions       | Pass/fail + risk probe artifacts     |
+| 7  | rust-llm-test-harness        | fixture/ci/flake/perf contract gates       | Suite/probe definitions       | Pass/fail + risk probe artifacts     |
 +----+------------------------------+--------------------------------------------+-------------------------------+--------------------------------------+
 ```
 
@@ -152,8 +166,7 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
 | 4  | rust-llm-cross-boundaries    | 4         | 4           | Heuristic linking quality and confidence calibration      |
 | 5  | rust-llm-graph-reasoning     | 4         | 3           | Rule correctness/scale tradeoffs in V200 scope           |
 | 6  | rust-llm-store-runtime       | 5         | 4           | Delta consistency, indexing, snapshot durability         |
-| 7  | rust-llm-context-packer      | 3         | 3           | Ranking quality under strict token ceilings              |
-| 8  | rust-llm-test-harness        | 3         | 3           | Fixture breadth vs CI time and anti-flakiness design     |
+| 7  | rust-llm-test-harness        | 3         | 3           | Fixture breadth vs CI time and anti-flakiness design     |
 +----+------------------------------+-----------+-------------+----------------------------------------------------------+
 ```
 
@@ -170,17 +183,22 @@ run_scale_risk_probes(ProbeRequest) -> ProbeReport"]
 +---------------------------+--------------------------------------------------+---------------------------------------------------------+
 | Crate                     | Evidence to collect                               | Probe/output artifact                                   |
 +---------------------------+--------------------------------------------------+---------------------------------------------------------+
-| interface-gateway         | mode parity (CLI/HTTP/MCP), cancellation model    | request-lifecycle trace + error mapping table           |
-| core-foundation           | key uniqueness + overload disambiguation          | key collision corpus + determinism report               |
+| interface-gateway         | mode parity/cancellation + source-read behavior    | request-lifecycle trace + source-read contract report   |
+| core-foundation           | slim schema invariants + key disambiguation       | schema determinism digest + key collision corpus        |
 | tree-extractor            | per-language capture completeness                 | fixture-to-capture diff report (12 languages)           |
 | rust-semantics            | proc-macro/build-script success/degrade behavior  | RA workspace matrix with pass/fallback classifications  |
 | cross-boundaries          | precision/recall on known boundary fixtures       | boundary edge confusion matrix                          |
 | graph-reasoning           | rule correctness + runtime at scale               | golden-rule output + p50/p95 runtime report             |
-| store-runtime             | delta correctness + crash durability              | mutation replay logs + recovery consistency checks      |
-| context-packer            | token budget faithfulness + relevance ranking     | budget packing audit + human relevance spot-check       |
-| test-harness              | flake rate + suite wall-clock budget             | CI stability trend and quarantine list                  |
+| store-runtime             | single-getter read contract + delta durability    | read-path parity trace + mutation/recovery checks       |
+| test-harness              | path normalization + flake/wall-clock budgets     | canonical path fixture report + CI stability trend      |
 +---------------------------+--------------------------------------------------+---------------------------------------------------------+
 ```
+
+## Gate Evidence Backlog (pending capture; not counted in current E totals)
+- E56: G1 slim-types artifact set (canonical schema snapshot + deterministic serialization digest).
+- E57: G2 single-getter artifact set (handler-to-getter call-path map + result/error parity report).
+- E58: G3 source-read artifact set (detail-view fixtures for valid/missing/moved files + line-range outcomes).
+- E59: G4 path-normalization artifact set (`./x` vs `x` vs absolute fixture parity in coverage outputs).
 
 ## Risk Hashing Snapshot Format (for each iteration)
 Use a compact hash to track movement across iterations:
@@ -189,6 +207,13 @@ Use a compact hash to track movement across iterations:
 - Iteration digest = sorted concatenation of all crate hashes.
 
 This gives a quick “did uncertainty actually go down?” signal across v01, v02, v03.
+## Hard Scoring Policy for Gate-Linked Crates
+- Do not reduce Risk/Unclear for gate-linked crates until the linked F-probe passes with artifact references.
+- Gate to probe mapping:
+  - G1 -> CF-P1-F
+  - G2 -> SR-P2-F
+  - G3 -> GW-P7-F
+  - G4 -> TH-P8-F
 ## Pass Ledger
 ### Pass 01: `rust-llm-core-foundation` (Dependency Graph Contract Hardening)
 Status: Contract freeze + hazard mapping complete. Probe execution pending.
@@ -207,13 +232,13 @@ Status: Contract freeze + hazard mapping complete. Probe execution pending.
 
 #### 2) Rubber-duck dependency walk (core-foundation blast radius)
 ```text
-- Upstream callers: gateway, tree-extractor, rust-semantics, cross-boundaries, graph-reasoning, store-runtime, context-packer, test-harness.
+- Upstream callers: gateway, tree-extractor, rust-semantics, cross-boundaries, graph-reasoning, store-runtime, test-harness.
 - Shared assumption across all callers: key is deterministic, parseable, overload-safe, and language-safe.
 - If key contract breaks:
   - store-runtime index joins fail or silently merge distinct entities
   - cross-boundaries can create false link unions
   - graph-reasoning results become non-reproducible across runs
-  - context-packer emits ambiguous references to LLMs
+  - downstream read-path consumers receive ambiguous entity identities
 ```
 
 #### 3) Top failure modes found
@@ -240,6 +265,18 @@ E02: Legacy key path had to add sanitize_entity_name_for_isgl1 for generic/delim
      Sources:
        - crates/parseltongue-core/src/isgl1_v2.rs (sanitize_entity_name_for_isgl1)
        - crates/pt01-folder-to-cozodb-streamer/src/isgl1_generator.rs (format_key)
+
+E54: Earlier key implementation explicitly encoded line ranges in key identity
+     (`{}:{}:{}:{}:{}-{}` with `entity.line_range.0` and `entity.line_range.1`),
+     proving prior LOC-coupled key behavior existed in production lineage.
+     Sources:
+       - commit 626caa40b, file: crates/pt01-folder-to-cozodb-streamer/src/isgl1_generator.rs
+       - commit 8b1ac707a, file: crates/pt01-folder-to-cozodb-streamer/src/isgl1_generator.rs
+
+E55: ISGL1 v2 migration commit replaced line-range keys with semantic_path + birth timestamp
+     (`{}:{}:{}:{}:T{}`), confirming concrete historical de-risking path for line-shift churn.
+     Source:
+       - commit 755678ad8, file: crates/pt01-folder-to-cozodb-streamer/src/isgl1_generator.rs
 ```
 
 #### 5) Probe set for next pass execution (core-foundation)
@@ -252,13 +289,14 @@ E02: Legacy key path had to add sanitize_entity_name_for_isgl1 for generic/delim
 | CF-P1-C | Build/parse roundtrip probe                   | parse(build(identity)) == canonical identity view            |
 | CF-P1-D | Delimiter-safety cross-language probe         | No escaping/sanitization needed for valid language symbols   |
 | CF-P1-E | External entity identity probe                | Stable keys for std/crate/third-party references             |
+| CF-P1-F | Slim types gate probe                         | Canonical entity/storage schema remains minimal and deterministic |
 +---------+----------------------------------------------+--------------------------------------------------------------+
 ```
 
 #### 6) Score update for this pass
 ```text
-- rust-llm-core-foundation remains Risk=4, Unclear=4.
-- Rationale: evidence quality improved (E=2) but executable probe outcomes are pending.
+- rust-llm-core-foundation remains Risk=4, Unclear=2.
+- Rationale: historical implementation evidence de-risks key-model ambiguity (line-range -> timestamp migration proven), but blast radius and overload-collision risk remain high without probe outcomes.
 ```
 ### Pass 02: `rust-llm-store-runtime` (Dependency Graph Contract Hardening)
 Status: Contract freeze + hazard mapping complete. Probe execution pending.
@@ -278,7 +316,7 @@ Status: Contract freeze + hazard mapping complete. Probe execution pending.
 
 #### 2) Rubber-duck dependency walk (store-runtime blast radius)
 ```text
-- Upstream callers: interface-gateway (ingest/query paths), graph-reasoning (derived fact commits), context-packer (slice reads), and watcher-driven delta paths.
+- Upstream callers: interface-gateway (ingest/query paths), graph-reasoning (derived fact commits), and watcher-driven delta paths.
 - Shared assumption across callers: writes are atomic, reads are bounded, deltas are idempotent, and snapshot loads are contract-safe.
 - If store contract breaks:
   - partial writes create entity/edge mismatch and corrupt downstream reasoning
@@ -329,6 +367,7 @@ E06: Snapshot load path restores data into mem via full deserialize + bulk inser
 | SR-P2-C | Idempotent delta replay probe                        | Replay(delta) twice => identical final state hash             |
 | SR-P2-D | Snapshot compatibility probe                         | Version mismatch yields explicit fail or migration path        |
 | SR-P2-E | Transient parse-failure quarantine probe             | Single transient parse fail cannot hard-delete stable records  |
+| SR-P2-F | Single getter contract gate probe                    | All read-path callers resolve through one getter contract with result/error parity |
 +---------+-----------------------------------------------------+---------------------------------------------------------------+
 ```
 
@@ -464,7 +503,7 @@ Error conditions:
   - store-runtime persists structurally incomplete graphs with silent holes
   - rust-semantics and cross-boundaries operate on missing entities/edges
   - graph-reasoning conclusions become skewed by extraction blind spots
-  - context-packer prioritization quality drops due to incomplete graph neighborhoods
+  - downstream reader quality drops due to incomplete graph neighborhoods
 ```
 
 #### 4) Top failure modes found
@@ -575,12 +614,11 @@ Error conditions:
 #### 3) Rubber-duck dependency walk (cross-boundaries blast radius)
 ```text
 - Upstream callers: tree-extractor (signals) and rust-semantics (Rust-side enrichments).
-- Downstream dependents: graph-reasoning, store-runtime, and context-packer.
+- Downstream dependents: graph-reasoning and store-runtime.
 - Shared assumption across callers: cross-language edges are calibrated, explainable, and uncertainty-tagged.
 - If cross-boundary contract breaks:
   - graph-reasoning propagates false positives across language boundaries
   - store-runtime persists noisy or missing boundary edges that skew analytics
-  - context-packer over-prioritizes irrelevant files or misses true polyglot hotspots
   - risk scoring appears improved while trustworthiness of derived links degrades
 ```
 
@@ -699,11 +737,10 @@ Error conditions:
 #### 3) Rubber-duck dependency walk (graph-reasoning blast radius)
 ```text
 - Upstream callers: tree-extractor, rust-semantics, and cross-boundaries (all feed facts/edges/signals).
-- Downstream dependents: store-runtime persistence, context-packer prioritization, and interface-gateway query surfaces.
+- Downstream dependents: store-runtime persistence and interface-gateway query surfaces.
 - Shared assumption across callers: reasoning outputs are reproducible, explainable, and confidence-calibrated.
 - If reasoning contract breaks:
   - store-runtime persists misleading findings that look authoritative
-  - context-packer prioritizes wrong entities under token pressure
   - gateway/API users see non-deterministic or contradictory policy/taint results
   - architecture risk scoring can appear improved while inference quality regresses
 ```
@@ -788,132 +825,8 @@ REFACTOR:
 - Rationale: evidence increased (E=7), but probe execution outcomes are pending.
 ```
 
-### Pass 07: `rust-llm-context-packer` (Dependency Graph Contract Hardening + Design101 TDD Lens)
-Status: Contract freeze + hazard mapping complete. Probe execution pending.
 
-#### 1) Contract freeze (v01)
-```text
-+------------------------------------------------------+---------------------------+-----------------------------------------------+
-| Public interface                                     | Input                     | Output                                        |
-+------------------------------------------------------+---------------------------+-----------------------------------------------+
-| rank_context_relevance_scores                        | ContextRankRequest        | ContextRankReport                             |
-| estimate_payload_token_usage                         | TokenEstimateRequest      | TokenEstimateReport                           |
-| apply_progressive_detail_tier                        | DetailTierRequest         | DetailTierReport                              |
-| validate_context_budget_contract                     | BudgetContractRequest     | BudgetContractReport                          |
-| pack_tagged_context_payload                          | ContextPackRequest        | ContextPackResponse                           |
-| enforce_token_budget_limits                          | BudgetRequest             | BudgetDecision                                |
-+------------------------------------------------------+---------------------------+-----------------------------------------------+
-```
-
-#### 2) Executable contract clauses (Design101)
-```text
-Preconditions:
-- Candidate entity set includes relevance signals and dependency metadata from upstream graph reasoning.
-- Token estimation policy and model budget profile are configured before packing.
-- Detail-tier policy (summary/standard/full) is provided for payload shaping.
-
-Postconditions:
-- Output payload never exceeds effective token ceiling and reports used-vs-budget.
-- Every included entity contains ranking rationale and detail tier annotation.
-- Same input ranking set and budget yields deterministic packed payload digest.
-
-Error conditions:
-- Missing focus/candidate context emits explicit contract error (not empty success payload).
-- Estimation uncertainty beyond threshold emits calibration warning metadata.
-- Unsupported detail tier or model profile fails fast with validation diagnostics.
-```
-
-#### 3) Rubber-duck dependency walk (context-packer blast radius)
-```text
-- Upstream callers: graph-reasoning (ranked findings) and store-runtime/query slices.
-- Downstream dependents: interface-gateway API/MCP responses and LLM client consumers.
-- Shared assumption across callers: packed context is budget-faithful, relevant, and explainable.
-- If context-packer contract breaks:
-  - gateway returns over-budget payloads that degrade model performance/cost
-  - critical entities are dropped while low-value entities consume token budget
-  - response quality appears stable but task success regresses due to context mismatch
-  - probe-based risk reduction in prior passes is obscured by poor context selection
-```
-
-#### 4) Top failure modes found
-```text
-+----+--------------------------------------------------+----------------------------------------------------------------+----------------------+
-| FM | Failure mode                                      | Why it matters                                                  | Evidence status      |
-+----+--------------------------------------------------+----------------------------------------------------------------+----------------------+
-| 01 | Heuristic token estimation drift                  | Budget guarantees fail when estimates diverge from real tokenizer| Confirmed legacy     |
-| 02 | Relevance ranking blind to full architecture      | Local caller/callee scoring can miss SCC/community-critical entities| Confirmed design gap |
-| 03 | Equal-score deterministic tie instability          | Non-stable ordering can change payload across runs             | Confirmed design gap |
-| 04 | Progressive disclosure not enforced               | Missing tier controls wastes context on low-value detail       | Confirmed design gap |
-| 05 | Snapshot-mode capability mismatch                  | Context endpoint unavailable under snapshots causes flow splits | Confirmed legacy     |
-+----+--------------------------------------------------+----------------------------------------------------------------+----------------------+
-```
-
-#### 5) Evidence captured this pass
-```text
-E30: Current smart-context handler ranks by fixed caller/callee/transitive weights and performs
-     greedy selection, but does not incorporate SCC/community/coreness-style architectural signals.
-     Source: crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/smart_context_token_budget_handler.rs
-
-E31: Token estimates in smart-context are heuristic (`base + key-length bonus`) rather than
-     measured against actual code payload/tokenizer output.
-     Source: crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/smart_context_token_budget_handler.rs
-
-E32: Smart-context sorting uses relevance score only; no explicit deterministic tiebreak key is
-     applied for equal-score entities.
-     Source: crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/smart_context_token_budget_handler.rs
-
-E33: Endpoint explicitly returns NOT_IMPLEMENTED in snapshot mode because code bodies are absent,
-     creating capability split across ingestion modes.
-     Source: crates/pt08-http-code-query-server/src/http_endpoint_handler_modules/smart_context_token_budget_handler.rs
-
-E34: Context optimization research recommends hybrid architectural ranking plus hierarchical token
-     budgeting and notes degradation beyond high context utilization.
-     Source: docs/Prep-V200-LLM-Context-Optimization-Research.md
-
-E35: Compiled research identifies progressive disclosure tiers and per-query token estimation as
-     high-leverage context optimization requirements.
-     Source: docs/Prep-V200-Compiled-Research-Best-Ideas.md
-
-E36: Core context interface defines generate/optimize/estimate contract, confirming context
-     packing as a first-class abstraction rather than an endpoint-only concern.
-     Source: crates/parseltongue-core/src/interfaces.rs
-```
-
-#### 6) Probe set for next pass execution (context-packer)
-```text
-+---------+-----------------------------------------------------+----------------------------------------------------------------+
-| Probe   | Intent                                               | Pass criterion                                                 |
-+---------+-----------------------------------------------------+----------------------------------------------------------------+
-| CP-P7-A | Token-estimation calibration probe                   | Estimated tokens remain within bounded error vs real tokenizer |
-| CP-P7-B | Architectural relevance retention probe              | Packed output preserves SCC/direct-dependency critical set      |
-| CP-P7-C | Determinism tie-break probe                          | Equal-score candidate ordering remains stable across reruns     |
-| CP-P7-D | Progressive-detail tier probe                        | summary/standard/full tiers produce expected bounded payloads   |
-| CP-P7-E | Model-budget profile probe                           | Budget enforcement honors model-specific ceilings and reports   |
-+---------+-----------------------------------------------------+----------------------------------------------------------------+
-```
-
-#### 7) STUB -> RED -> GREEN -> REFACTOR execution plan (Design101)
-```text
-STUB:
-- Add fixtures for token-heavy entities, equal-score candidates, and tiered output expectations.
-
-RED:
-- Execute CP-P7-A..E on baseline packer; expect failures in estimation calibration and tier behavior.
-
-GREEN:
-- Add tokenizer calibration, deterministic tie-breaks, and progressive-tier packing until probes pass.
-
-REFACTOR:
-- Consolidate ranking and packing stages into explicit strategy modules without changing verified outputs.
-```
-
-#### 8) Score update for this pass
-```text
-- rust-llm-context-packer remains Risk=3, Unclear=3.
-- Rationale: evidence increased (E=7), but probe execution outcomes are pending.
-```
-
-### Pass 08: `rust-llm-interface-gateway` (Dependency Graph Contract Hardening + Design101 TDD Lens)
+### Pass 07: `rust-llm-interface-gateway` (Dependency Graph Contract Hardening + Design101 TDD Lens)
 Status: Contract freeze + hazard mapping complete. Probe execution pending.
 
 #### 1) Contract freeze (v01)
@@ -952,7 +865,7 @@ Error conditions:
 #### 3) Rubber-duck dependency walk (interface-gateway blast radius)
 ```text
 - Upstream callers: CLI commands, HTTP clients, and planned MCP clients.
-- Downstream dependents: core-foundation contracts plus extractor/semantics/cross-boundary/reasoning/store/context flows.
+- Downstream dependents: core-foundation contracts plus extractor/semantics/cross-boundary/reasoning/store flows.
 - Shared assumption across callers: gateway behavior is transport-consistent, cancellable, and error-explicit.
 - If gateway contract breaks:
   - transport-specific divergences produce conflicting answers for the same task
@@ -1018,11 +931,12 @@ E44: Startup config includes idle-timeout/daemon controls, but timeout policy is
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
 | Probe   | Intent                                               | Pass criterion                                                 |
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
-| GW-P8-A | Cross-transport parity probe                         | Same semantic request (CLI/HTTP/MCP) yields identical result digest |
-| GW-P8-B | Stdio hygiene probe                                  | MCP stdio run emits protocol frames on stdout and logs on stderr only |
-| GW-P8-C | Mode/capability negotiation probe                    | /db and /mem capability deltas are machine-readable and stable |
-| GW-P8-D | Fail-closed readiness probe                          | Backend init failure blocks data-dependent routes with explicit readiness error |
-| GW-P8-E | Cancellation/timeout contract probe                  | Deadline breach yields deterministic cancellation outcome and no partial-success report |
+| GW-P7-A | Cross-transport parity probe                         | Same semantic request (CLI/HTTP/MCP) yields identical result digest |
+| GW-P7-B | Stdio hygiene probe                                  | MCP stdio run emits protocol frames on stdout and logs on stderr only |
+| GW-P7-C | Mode/capability negotiation probe                    | /db and /mem capability deltas are machine-readable and stable |
+| GW-P7-D | Fail-closed readiness probe                          | Backend init failure blocks data-dependent routes with explicit readiness error |
+| GW-P7-E | Cancellation/timeout contract probe                  | Deadline breach yields deterministic cancellation outcome and no partial-success report |
+| GW-P7-F | Filesystem source-read contract gate probe           | Detail-view path returns current disk lines for valid range and explicit errors for missing/moved files |
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
 ```
 
@@ -1032,7 +946,7 @@ STUB:
 - Add transport-parity fixtures and request envelope corpus with equivalent intent cases.
 
 RED:
-- Execute GW-P8-A..E against baseline gateway wiring; expect failures in stdio hygiene and timeout contracts.
+- Execute GW-P7-A..F against baseline gateway wiring; expect failures in stdio hygiene and timeout contracts.
 
 GREEN:
 - Implement canonical envelope normalization, capability negotiation, and fail-closed readiness gates until probes pass.
@@ -1047,7 +961,7 @@ REFACTOR:
 - Rationale: evidence increased (E=8), but probe execution outcomes are pending.
 ```
 
-### Pass 09: `rust-llm-test-harness` (Dependency Graph Contract Hardening + Design101 TDD Lens)
+### Pass 08: `rust-llm-test-harness` (Dependency Graph Contract Hardening + Design101 TDD Lens)
 Status: Contract freeze + hazard mapping complete. Probe execution pending.
 
 #### 1) Contract freeze (v01)
@@ -1084,7 +998,7 @@ Error conditions:
 
 #### 3) Rubber-duck dependency walk (test-harness blast radius)
 ```text
-- Upstream callers: every crate pass in this ledger (core, extractor, semantics, boundaries, reasoning, store, context, gateway).
+- Upstream callers: every crate pass in this ledger (core, extractor, semantics, boundaries, reasoning, store, gateway).
 - Downstream dependents: release gating, risk re-scoring, and stable-contract promotion decisions.
 - Shared assumption across callers: harness verdicts are executable, deterministic, and CI-enforced.
 - If test-harness contract breaks:
@@ -1157,11 +1071,12 @@ E53: CI workflow marks clippy as continue-on-error, so lint-quality regressions 
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
 | Probe   | Intent                                               | Pass criterion                                                 |
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
-| TH-P9-A | Fixture-contract executability probe                 | EXPECTED corpus is machine-validated with zero manual interpretation paths |
-| TH-P9-B | API-drift compile gate probe                         | Test suites fail-fast on interface signature drift with actionable diagnostics |
-| TH-P9-C | Cross-platform parity probe                          | Linux/macOS/Windows verdict digests match for identical fixture sets |
-| TH-P9-D | Flake-budget stability probe                         | Repeat runs stay within defined flake threshold window         |
-| TH-P9-E | Performance/concurrency budget probe                 | Contract+probe suites meet runtime budgets under parallel load |
+| TH-P8-A | Fixture-contract executability probe                 | EXPECTED corpus is machine-validated with zero manual interpretation paths |
+| TH-P8-B | API-drift compile gate probe                         | Test suites fail-fast on interface signature drift with actionable diagnostics |
+| TH-P8-C | Cross-platform parity probe                          | Linux/macOS/Windows verdict digests match for identical fixture sets |
+| TH-P8-D | Flake-budget stability probe                         | Repeat runs stay within defined flake threshold window         |
+| TH-P8-E | Performance/concurrency budget probe                 | Contract+probe suites meet runtime budgets under parallel load |
+| TH-P8-F | Path-normalization coverage gate probe               | Coverage treats ./path, path, and absolute path as one canonical file |
 +---------+-----------------------------------------------------+----------------------------------------------------------------+
 ```
 
@@ -1171,7 +1086,7 @@ STUB:
 - Add machine-readable fixture expectation schema and per-suite artifact manifest format.
 
 RED:
-- Execute TH-P9-A..E against current harness; expect failures in expectation executability and drift gates.
+- Execute TH-P8-A..F against current harness; expect failures in expectation executability and drift gates.
 
 GREEN:
 - Implement schema-backed expectations, deterministic assertions, and compile-drift checks until probes pass.
@@ -1195,12 +1110,11 @@ Baseline:
   rust-llm-tree-extractor:R4-U3-E0
   rust-llm-cross-boundaries:R4-U4-E0
   rust-llm-graph-reasoning:R4-U3-E0
-  rust-llm-context-packer:R3-U3-E0
   rust-llm-interface-gateway:R3-U2-E0
   rust-llm-test-harness:R3-U3-E0
 
 After Pass 01:
-  rust-llm-core-foundation:R4-U4-E2
+  rust-llm-core-foundation:R4-U2-E4
 
 After Pass 02:
   rust-llm-store-runtime:R5-U4-E4
@@ -1217,25 +1131,22 @@ After Pass 05:
 After Pass 06:
   rust-llm-graph-reasoning:R4-U3-E7
 
+
 After Pass 07:
-  rust-llm-context-packer:R3-U3-E7
-
-After Pass 08:
   rust-llm-interface-gateway:R3-U2-E8
-
-After Pass 09:
+After Pass 08:
   rust-llm-test-harness:R3-U3-E9
 ```
 
 ## v01 Immediate Next Actions
-1. Execute probe set CF-P1-A..E and attach artifacts.
-2. Execute probe set SR-P2-A..E and attach artifacts.
-3. Execute probe set RS-P3-A..E and attach artifacts.
-4. Execute probe set TE-P4-A..E and attach artifacts.
-5. Execute probe set CB-P5-A..E and attach artifacts.
-6. Execute probe set GR-P6-A..E and attach artifacts.
-7. Execute probe set CP-P7-A..E and attach artifacts.
-8. Execute probe set GW-P8-A..E and attach artifacts.
-9. Execute probe set TH-P9-A..E and attach artifacts.
-10. Re-score `rust-llm-core-foundation`, `rust-llm-store-runtime`, `rust-llm-rust-semantics`, `rust-llm-tree-extractor`, `rust-llm-cross-boundaries`, `rust-llm-graph-reasoning`, `rust-llm-context-packer`, `rust-llm-interface-gateway`, and `rust-llm-test-harness` after probe evidence.
+1. `rust-llm-core-foundation` (Pass 01): execute `CF-P1-F` first (attach E56), then `CF-P1-A..E`; store schema-determinism and key-collision artifacts.
+2. `rust-llm-store-runtime` (Pass 02): execute `SR-P2-F` first (attach E57), then `SR-P2-A..E`; store single-getter parity and consistency artifacts.
+3. `rust-llm-rust-semantics` (Pass 03): execute `RS-P3-A..E`; store capability/degrade and resource-envelope artifacts.
+4. `rust-llm-tree-extractor` (Pass 04): execute `TE-P4-A..E`; include crate-wise 80-89 queue capture for `#26` (.gitignore-respecting discovery) and `#23` (ingest debug-noise removal).
+5. `rust-llm-cross-boundaries` (Pass 05): execute `CB-P5-A..E`; store confidence calibration and unresolved-link artifacts.
+6. `rust-llm-graph-reasoning` (Pass 06): execute `GR-P6-A..E`; store soundness/provenance/runtime-bound artifacts.
+7. `rust-llm-interface-gateway` (Pass 07): execute `GW-P7-F` first (attach E58), then `GW-P7-A..E`; include crate-wise 80-89 queue capture for `#6` (endpoint guards) and `#24` (watcher/runtime noise hygiene).
+8. `rust-llm-test-harness` (Pass 08): execute `TH-P8-F` first (attach E59), then `TH-P8-A..E`; include crate-wise 80-89 queue capture for `#19` (test exclusion coverage) and `#20` (zero-entity tagging).
+9. `rust-llm-store-runtime` hardening extension: capture crate-wise 80-89 queue item `#3` (export/import deterministic-lossless roundtrip) and attach parity digest artifacts.
+10. Re-score all 8 crates only after gate-linked `F` probes pass and artifacts are attached.
 11. Produce v01->v02 transition digest with stable-contract promotions and unresolved-risk carryover list.

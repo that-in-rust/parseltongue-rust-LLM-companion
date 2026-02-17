@@ -43,9 +43,11 @@ Default order for V200:
 4. `rust-llm-tree-extractor`
 5. `rust-llm-cross-boundaries`
 6. `rust-llm-graph-reasoning`
-7. `rust-llm-context-packer`
-8. `rust-llm-interface-gateway`
-9. `rust-llm-test-harness`
+7. `rust-llm-interface-gateway`
+8. `rust-llm-test-harness`
+
+Deferred:
+- `rust-llm-context-packer` moved to `docs/v210-backlog.md` (out of V200 active pass scope).
 
 ## Evidence rule
 - Never reduce Risk/Unclear from narrative confidence.
