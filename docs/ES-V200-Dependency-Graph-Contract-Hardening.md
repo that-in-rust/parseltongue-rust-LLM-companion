@@ -1,4 +1,4 @@
-# Prep-v200-Dependency-Graph-Contract-Hardening
+# ES-V200-Dependency-Graph-Contract-Hardening
 Status: Living method doc
 Purpose: Define the reasoning method we will use on every V200 pass to reduce architecture risk through interface-level evidence.
 
@@ -88,7 +88,7 @@ Every pass must produce:
 
 ## Canonical location for pass execution
 All pass-by-pass execution artifacts are tracked in:
-- `docs/Prep-v200-Hashing-Risks-v01.md`
+- `docs/ES-V200-Hashing-Risks-v01.md`
 
 This method doc is stable and reusable. The hashing-risks doc is the evolving ledger.
 

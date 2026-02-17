@@ -1,7 +1,7 @@
-# Prep-v200-Hashing-Risks-v01
+# ES-V200-Hashing-Risks-v01
 Status: Draft v01
 Purpose: Make V200 clean-room crate risks measurable by documenting public interfaces, dependency edges, and a repeatable rubber-debug loop that reduces Risk/Unclear scores with evidence.
-Method reference: `docs/Prep-v200-Dependency-Graph-Contract-Hardening.md`
+Method reference: `docs/ES-V200-Dependency-Graph-Contract-Hardening.md`
 
 ## Scope
 - Clean-room V200 only (no reuse from `pt*` crates).
