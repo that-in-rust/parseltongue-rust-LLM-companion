@@ -16,8 +16,8 @@ Purpose: Curated high-signal document index for V200 requirement work.
 - `docs/Prep-V200-MCP-Protocol-Integration.md`
 - `docs/Prep-V200-Rust-Analyzer-API-Surface.md`
 - `docs/Prep-V200-Tree-Sitter-Query-Patterns.md`
-- `docs/v200-Decision-log-01.md`
-- `docs/v200-isgl1-ambiguity-risk-table.md`
+- `docs/Prep-V200-isgl1-ambiguity-risk-table.md`
+- `docs/ES-V200-Decision-log-01.md`
 - `docs/v210-backlog.md`
 
 ## Scope note
