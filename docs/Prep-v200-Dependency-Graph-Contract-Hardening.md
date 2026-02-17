@@ -25,6 +25,16 @@ Use the dependency graph to decide pass order, then harden one crate interface a
 8. Update graph/interfaces if coupling changed.
 9. Log unresolved questions to the next pass queue.
 
+## Design101 constraints (mandatory every pass)
+1. Express every frozen interface as an executable specification:
+   - preconditions
+   - postconditions
+   - error conditions
+2. Define probe work in STUB -> RED -> GREEN -> REFACTOR order before changing scores.
+3. Keep proposed function/crate/command names in four-word format.
+4. Keep all dependency/interface diagrams in Mermaid.
+5. Treat performance or concurrency claims as untrusted until test-backed artifacts exist.
+
 ## Pass order policy
 Default order for V200:
 1. `rust-llm-core-foundation`
@@ -45,8 +55,10 @@ Default order for V200:
 ## Per-pass output contract
 Every pass must produce:
 - Contract snapshot for one crate
+- Executable contract clauses (preconditions, postconditions, error conditions)
 - Failure mode table
 - Probe definitions
+- STUB -> RED -> GREEN -> REFACTOR execution intent
 - Probe outcomes
 - Updated Risk/Unclear deltas
 - Graph/interface deltas (if any)
