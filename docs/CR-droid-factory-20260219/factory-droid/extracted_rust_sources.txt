@@ -1,0 +1,360 @@
+     [/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/app/validator.rsasere/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/app/mod.rsApp struct does not support AnyArg::set, this is a bug!/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/args/arg_builder/flag.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/args/arg_builder/option.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/args/arg_builder/positional.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/args/arg_matcher.rs ' The argument '' cannot be used with 
+ <= /rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/sync/poison/once.rs
+ Found argument '' which wasn't expected, or isn't valid in this context/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/osstringext.rs
+!=assertion failed: self.char() == 'p' || self.char() == 'P'expected valid Perl class but got '|+,}\\x\u{\U{\A\z\b\Bminvalid range boundary, must be a literalunclosed character classinvalid hexadecimal digitunrecognized escape sequencedangling flag negation operatorduplicate flagunrecognized flagduplicate capture group nameempty capture group nameunclosed capture group nameunclosed groupunopened groupunclosed counted repetitionrepetition operator missing expressioninvalid Unicode character classbackreferences are not supported/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/ast/mod.rsexceeded the maximum number of capturing groups (invalid escape sequence found in character classinvalid character class range, the start must be <= the enddecimal literal emptydecimal literal invalidhexadecimal literal emptyhexadecimal literal is not a Unicode scalar valueincomplete escape sequence, reached end of pattern prematurelyflag negation operator repeatedexpected flag but got end of regexinvalid capture group characterexceed the maximum number of nested parentheses/brackets (invalid repetition count range, the start must be <= the endrepetition quantifier expects a valid decimallook-around, including look-ahead and look-behind, is not supported
+"/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.64/src/ser.rs  \"\\\f\n\r\t/Users/runner/work/1/s/ripgrep/crates/matcher/src/interpolate.rs/Users/runner/work/1/s/ripgrep/crates/printer/src/util.rsbinary_offsetstatslinesline_numberabsolute_offsetsubmatchesbegincontextelapsedsearches_with_matchbytes_searchedbytes_printedmatched_linesmatches/Users/runner/work/1/s/ripgrep/crates/printer/src/summary.rs/Users/runner/work/1/s/ripgrep/crates/printer/src/standard.rs[Omitted long context line][Omitted long matching line][Omitted long line with  matches] [... omitted end of long line] [...  more WARNING: stopped searching binary file after match (found  byte around offset )
+((((((($/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/strsim-0.8.0/src/lib.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/str/pattern.rscannot lock a buffered standard stream/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/termcolor-1.1.2/src/lib.rs
+(?:/|/.*/)assertion failed: self.bump().map_or(true, is_separator)assertion failed: bump == Some('!') || bump == Some('^')crates/globset/src/pathutil.rsinvalid use of **; must be one path componentunclosed character class; missing ']'invalid character rangeunopened alternate group; missing '{' (maybe escape '}' with '[}]'?)unclosed alternate group; missing '}' (maybe escape '{' with '[{]'?)nested alternate groups are not alloweddangling '\'crates/globset/src/lib.rs' > ' literals,  basenames,  extensions,  prefixes,  suffixes,  required extensions, globsetglob converted to regex: retokensGlobOptionsliteral_separatorTokensRecursivePrefixRecursiveSuffixRecursiveZeroOrMoreAlternatesfailed to spawn thread/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bstr-0.2.16/src/io.rsbuilt-in matching rules should always compilecrates/cli/src/decompress.rs-d-c--format=lzma-quncompresscrates/cli/src/escape.rsinvalid format for size '', which should be a sequence of digits followed by an optional 'K', 'M' or 'G' suffixinvalid integer found in size 'size too big in 'crates/cli/src/human.rsfound invalid UTF-8 in pattern at byte offset  (disable Unicode mode and use hex escape sequences to match arbitrary bytes in a pattern, e.g., '(?-u)\xFF')a Unicode replacement codepoint for invalid UTF-8crates/cli/src/pattern.rscommand error<stderr is empty>crates/cli/src/process.rsgrep_cli::processread_to_end cannot be called more than oncestderr reading thread does not panic^([0-9]+)([KMG])?$CommandErrorStderrcrates/matcher/src/interpolate.rsvalid UTF-8 capture namecrates/matcher/src/lib.rsBUG for NoError: an impossible error occurredregex errorcrates/pcre2/src/error.rs(?<!\w)(?:)(?!\w)path:fg:magentacrates/printer/src/color.rsline:fg:greenmatch:fg:redunrecognized output type ''. Choose from: path, line, column, match.unrecognized spec type ''. Choose from: fg, bg, style, none.unrecognized style attribute ''. Choose from: nobold, bold, nointense, intense, nounderline, underline.invalid color spec format: ''. Valid format is '(path|line|column|match):(fg|bg|style):(value)'.columnmatch
+*.agda*.lagda*.aidlamake*.adoc*.asc*.asciidocasm*.asm*.s*.Sasp*.aspx*.aspx.cs*.aspx.vb*.ascx*.ascx.cs*.ascx.vbats*.ats*.dats*.sats*.hats*.avdl*.avpr*.avscawk*.awkbazel*.bazel*.bzl*.BUILD*.bazelrcBUILDWORKSPACEbitbake*.bbappend*.bbclass*.conf*.incbrotlibuildstream*.bstbzip2*.bz2*.tbz2*.[chH]*.[chH].in*.catscabal*.cabal*.cborceylonclojure*.clj*.cljc*.cljs*.cljxcmake*.cmakeCMakeLists.txtcoffeescriptconfig*.cfg*.inicoq*.vcpp*.[ChH]*.inl*.[ChH].in*.cc.in*.[ch]pp.in*.[ch]xx.in*.hh.increolecrystalProjectfilecsharpcshtmlcss*.css*.scsscsv*.csvcython*.pyx*.pxi*.pxdd*.d*.dartdhall*.dhall*.patch*.diffdocker*Dockerfile*dvcDvcfile*.dvcebuildedn*.ednelispelixir*.eex*.exselm*.elmerb*.erberlang*.erl*.hrl*.fidl*.fishflatbuffers*.fbsfortran*.f*.F*.f77*.F77*.pfo*.f90*.F90*.f95*.F95fsharp*.fsx*.fsifutgap*.g*.gap*.tstgn*.gnigogradlegroovy*.tgzh*.h*.hpp*.hamlhaskell*.lhs*.cpphs*.c2hs*.hschbs*.hbshs*.htm*.html*.ejsidris*.idr*.lidr*.java*.jsp*.jspx*.propertiesjinja*.jinjajljs*.jsx*.vue*.jsoncomposer.lockjsonl*.jsonljuliajupyter*.ipynb*.jpynbk*.kkotlin*.kts*.lesslicenseCOPYINGCOPYING[.-]*COPYRIGHTCOPYRIGHT[.-]*EULA[.-]*licen[cs]elicen[cs]e.*LICEN[CS]ELICEN[CS]E[.-]*NOTICENOTICE[.-]*PATENTSPATENTS[.-]*UNLICEN[CS]EUNLICEN[CS]E[.-]*agpl[.-]*lgpl[.-]*AGPL-*[0-9]*APACHE-*[0-9]*BSD-*[0-9]*CC-BY-*GFDL-*[0-9]*GNU-*[0-9]*GPL-*[0-9]*LGPL-*[0-9]*MIT-*[0-9]*MPL-*[0-9]*OFL-*[0-9]**.lisp*.lsp*.scm*.lockpackage-lock.jsonlog*.loglua*.lualz4*.lz4*.lzmam4[Gg][Nn][Uu]makefile[Mm]akefile[Gg][Nn][Uu]makefile.am[Mm]akefile.am[Gg][Nn][Uu]makefile.in[Mm]akefile.in*.mak*.mako*.maoman*.[0-9lnpx]*.[0-9][cEFMmpSx]*.markdown*.mdown*.mkdnmatlab*.mmdmesonmeson.buildmeson_options.txt*.min.html*.min.css*.mintmkmkfilemsbuild*.vcxproj*.proj*.props*.targetsnim*.nim*.nimf*.nimsnix*.nixobjcppocaml*.mli*.mll*.mlyorg*.org*.org_archivepascal*.pas*.dpr*.lprpdf*.pdf*.perl*.plh*.plx*.tphp*.php*.php3*.php4*.php5*.phtmlpod*.podpostscript*.eps*.proto*.cdxml*.ps1*.psd1*.psm1puppet*.purspyqmake*.pro*.pri*.prfqml*.qmlr*.R*.r*.Rmd*.Rnwracket*.rkt*.rdocreadmeREADME**README*.red*.redsrobot*.robotrst*.rstconfig.ruGemfile.irbrc*.gemspec*.rbw*.sassscala*.scala*.sbtsh.login.logoutprofile.bash_loginbash_login.bash_logoutbash_logout.bash_profilebash_profile.bashrcbashrc.cshrc*.cshrc.kshrc*.kshrc.tcshrc.zshenvzshenv.zloginzloginzlogout.zprofile.zshrczshrc*.bash*.csh*.ksh*.tcsh*.zsh*.skim*.slim*.slimesmarty*.tplsml*.sml*.sigsoy*.soyspark*.spark*.specsql*.sql*.psqlstylus*.stylsv*.svhsvg*.svgswift*.swift*.def*.isystemd*.automount*.link*.mount*.path*.scope*.service*.slice*.swap*.timertaskpaper*.taskpapertcl*.tcltex*.tex*.ltx*.cls*.sty*.bib*.dtx*.instextile*.textiletfthrift*.tomlCargo.lockts*.tsx*.twigtxt*.txttyposcript*.typoscript*.valavbvcl*.vclverilog*.vhd*.vhdlvim*.vimvimscriptwebidl*.idl*.widl*.mediawiki*.wikixml*.xml*.xml.dist*.dtd*.xsl*.xslt*.xsd*.xjb*.rng*.sch*.xhtmlxz*.txz*.y*.yaml*.yml*.yang*.Zzig*.zigzsh*.zst*.zstdadding a default type should never fail<stdin><stdin> has no metadatacrates/ignore/src/walk.rsignoring  bytesignore::walkwhitelisting crates/ignore/src/lib.rspartial errorunrecognized file typeinvalid definitionline error parsing glob '': unrecognized file type: invalid definition (format is type:glob, e.g., html:*.html)IgnoreMatchGitignoreTypesHiddenactualis_whitelistis_only_dirglobs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lazy_static-1.4.0/src/inline_lazy.rs(?im)^\s*excludesfile\s*=\s*(.+)\s*$UnmatchedIgnoreMatcheddefwhichnegatedFileTypeDef^[\pL\pN]+$PartialWithLineNumberWithDepthUnrecognizedFileTypeInvalidDefinitionIgnoreWhitelistOFFERRORDEBUGTRACEattempted to set a logger after the logging system was already initialized/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/memchr-2.4.0/src/memmem/prefilter/fallback.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/memchr-2.4.0/src/memmem/rarebytes.rs743210/.-g
+/*.gitconfigXDG_CONFIG_HOME.configgit/configgit/ignore~crates/ignore/src/pathutil.rs..crates/ignore/src/types.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/base/encoding.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/memory/arena.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/memory/limiter.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/rewritable_units/element.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/rewritable_units/mutations.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/rewritable_units/text_encoder.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/rewritable_units/tokens/attributes.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/rewriter/handlers_dispatcher.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/rewriter/mod.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/selectors_vm/ast.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/selectors_vm/attribute_matcher.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/selectors_vm/compiler.rs
+/Users/administrator/Library/Services/buildkite-agent/builds/darwin-aarch64-15-1/bun/bun/vendor/lolhtml/src/selectors_vm/mod.rs
+/Users/ctate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/itoa-1.0.17/src/lib.rs
+/Users/ctate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149/src/de.rs
+/Users/ctate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149/src/error.rs
+/Users/ctate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149/src/read.rs
+/Users/ctate/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149/src/value/index.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/error.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/fmt.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/channel.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/context.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/array.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/at.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/list.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/zero.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/waker.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lazy_static-1.5.0/src/inline_lazy.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-pty-0.8.1/src/cmdbuilder.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-pty-0.8.1/src/unix.rs
+/Users/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shell-words-1.1.0/src/lib.rs
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/classes.rsbuilding the automaton failed because it required building more states that can be identified, where the maximum ID for the chosen representation is premultiplication of states requires the ability to represent at least a state ID of , but the chosen representation only permits a maximum state ID of premultiplication of states requires the ability to represent a state ID greater than what can fit on this platform's usize, which is /Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/packed/api.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/packed/pattern.rsassertion failed: self.by_id.len() <= u16::MAX as usizeassertion failed: patterns.len() >= 1/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/packed/rabinkarp.rsassertion failed: hash_len >= 1Rabin-Karp must be called with same patterns it was built with/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/prefilter.rsRareByteOffsetsLeftmostFirstLeftmostLongestConfigforceforce_teddy_fatforce_avxTeddyRabinKarprabinkarpsearch_kindminimum_lenby_idordermax_pattern_idtotal_pattern_bytesbucketshash_2powPackedRareByteOffsetRareBytesOnebyte1RareBytesTwooffsetsbyte2RareBytesThreebyte3StartBytesOneStartBytesTwoStartBytesThreelibrary/alloc/src/raw_vec.rscapacity overflowlibrary/alloc/src/ffi/c_str.rsa formatting trait implementation returned an errorlibrary/alloc/src/fmt.rslibrary/alloc/src/str.rslibrary/alloc/src/sync.rsswap_remove index (is ) should be < len (is insertion index (is ) should be <= len (is removal index (is ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+//Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/base64-0.13.0/src/encode.rsusize overflow when calculating b64 length/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-automata-0.1.10/src/sparse.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-automata-0.1.10/src/dfa.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-automata-0.1.10/src/dense.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-automata-0.1.10/src/byteorder.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bstr-0.2.16/src/unicode/grapheme.rsrust-regex-automata-sparse-dfa
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/app/usage.rs
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs-0.8.28/src/data.rsassertion failed: i < self.lenEUC-JPEUC-KRGBKIBM866ISO-2022-JPISO-8859-10ISO-8859-13ISO-8859-14ISO-8859-15ISO-8859-16ISO-8859-2ISO-8859-3ISO-8859-4ISO-8859-5ISO-8859-6ISO-8859-7ISO-8859-8ISO-8859-8-IKOI8-RKOI8-UShift_JISUTF-8gb18030macintoshreplacementwindows-1250windows-1251windows-1252windows-1253windows-1254windows-1255windows-1256windows-1257windows-1258windows-874x-mac-cyrillicx-user-definedl1l2l3l4l5l6l9866mackoigbkms932cp866utf-8cp819x-gbkcp1250cp1251latin1gb2312cp1252latin2cp1253latin3cp1254latin4cp1255csbig5latin5utf-16cp1256ibm866latin6cp1257cp1258greek8ibm819visualkoreaneuc-jpkoi8-rkoi8_reuc-krx-sjiskoi8-utis-620ksc5601gb_2312dos-874cn-big5chineselogicalcskoi8rcseuckrkoi8-ruiso885910iso8859-1iso885911iso8859-2iso8859-3iso885913iso8859-4iso885914iso8859-5iso885915iso8859-6iso8859-7iso8859-8iso-ir-58iso8859-9shift-jisshift_jisiso-ir-100iso8859-10iso-ir-110gb_2312-80iso-8859-1iso_8859-1iso-ir-101iso8859-11iso-8859-2iso_8859-2hz-gb-2312iso-8859-3iso_8859-3iso8859-13iso-8859-4iso_8859-4iso8859-14iso-ir-144iso-8859-5iso_8859-5iso8859-15iso-8859-6iso_8859-6iso-ir-126iso-8859-7iso_8859-7iso-ir-127iso-ir-157iso-8859-8iso_8859-8iso-ir-138iso-ir-148iso-8859-9iso_8859-9iso-ir-109iso-ir-149big5-hkscscsshiftjisiso-8859-10iso-8859-11csisolatin1csisolatin2iso-8859-13csisolatin3iso-8859-14csisolatin4iso-8859-15iso_8859-15csisolatin5iso-8859-16csisolatin6windows-949csisolatin9csiso88596ecsiso88598ecsmacintoshcsiso88596icsiso88598iwindows-31jx-mac-romaniso-2022-cniso-2022-jpcsiso2022jpiso-2022-krcsiso2022kriso-8859-6-eiso-8859-8-eiso-8859-6-iiso-8859-8-isun_eu_greekcsksc56011987ks_c_5601-1987ansi_x3.4-1968ks_c_5601-1989csiso58gb231280iso_8859-1:1987iso_8859-2:1987iso_8859-6:1987iso_8859-7:1987iso_8859-3:1988iso_8859-4:1988iso_8859-5:1988iso_8859-8:1988iso_8859-9:1989csisolatingreekx-mac-ukrainianiso-2022-cn-extunicode-1-1-utf-8csisolatincyrilliccseucpkdfmtjapanese/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs-0.8.28/src/lib.rsMust not use a decoder that has finished./Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs-0.8.28/src/iso_2022_jp.rsOutput buffer must have been too small.
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs-0.8.28/src/utf_8.rs
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/memchr-2.4.0/src/memmem/twoway.rsassertion failed: state_and_queue & STATE_MASK == RUNNING/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/once_cell-1.7.2/src/imp_std.rsPCRE2_NEWLINE_ANYCRLF is a legal value/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pcre2-0.2.9/src/bytes.rsJIT compilation failed: pcre2::bytesstart () must be <= subject.len() (used an invalid error code/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pcre2-0.2.9/src/error.rsbuffer size too smallexpected non-negative but got valid UTF-8PCRE2: error compiling pattern: PCRE2: error compiling pattern at offset PCRE2: error JIT compiling pattern: PCRE2: error matching: PCRE2: error getting info: PCRE2: error setting option: offset/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pcre2-0.2.9/src/ffi.rsa NUL in name table entryvalid UTF-8 for capture namecould not allocate compile contextfailed to allocate match contextfailed to allocate match data blockfailed to allocate JIT stackgot NULL ovector pointerovector should never be too small
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pcre2-0.2.9/src/pool.rsCompileJITOption/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/dfa.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/nfa.rscannot shuffle match states of premultiplied DFA must not be equal to states that are match states or follow match states should never have a failure transition back to the start state in leftmost searching/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/automaton.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/sync.rsStateIDOverflowmaxPremultiplyOverflowrequested_maxLayoutError/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/backtrack.rsBUG:  is too big to fit into u32/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/compile.rsassertion failed: self.compiled.uses_bytes()assertion failed: cls.is_all_ascii()assertion failed: !ranges.is_empty()at least one of the split holes must be filledinternal error: entered unreachable code: internal error: entered unreachable code: not all instructions were compiled! found uncompiled instruction: internal error: entered unreachable code: must be called on Split instruction, instead it was called on: internal error: entered unreachable code: must be called on a compiled instruction, instead it was called on: /Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/dfa.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/error.rsCompiled regex exceeds size limit of  bytes.CompiledTooBig__Nonexhaustive/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/exec.rsAC automaton too bigBUG: RegexSet cannot be used with findBUG: RegexSet cannot be used with capturesBUG: reverse match implies forward matchinternal error: entered unreachable code: expected literal, got internal error: entered unreachable code: expected literal or concat, got /Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/re_bytes.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/input.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/literal/imp.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/pikevm.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/pool.rsno group at index '/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/re_unicode.rsassertion failed: i < self.capacity()/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/sparse.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-1.5.4/src/utf8.rsUncompiledSplitSplit1Split2EmptyLookRangesregex: thread ID allocation space exhaustedMatchInstSplitgoto1goto2InstEmptyLookNotWordBoundaryWordBoundaryAsciiNotWordBoundaryAsciiInstRangesInstBytesattempt to join into collection with len > usize::MAX/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/str.rsUtf8Errorvalid_up_toerror_lenFromUtf8Errorbytes/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/ast/parse.rsexpected char at offset 
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/error.rsregex parse error:
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/unicode.rsassertion failed: start <= endScriptcfAgeScript_ExtensionsGrapheme_Cluster_BreakSentence_BreakWord_Break
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/utf8.rsinternal error: entered unreachable code: invalid encoded length: IntervalSetrangesClassUnicodeClassBytesGroupold_flagsConcatAlternationFlagsmulti_linedot_matches_new_lineswap_greedunicodeHirLiteralClassAnchorWordBoundaryRepetitionUnicodeBytessetStartLineEndLineStartTextEndTextUnicodeNegateAsciiAsciiNegatehirCaptureIndexCaptureNameindexNonCapturinggreedyZeroOrOneZeroOrMoreOneOrMoreRangeExactlyAtLeastBoundedHirInfobools/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/ops/function.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/escape.rsEmptyInvalidDigitPosOverflowNegOverflowParseIntError
+/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/same-file-1.0.6/src/unix.rsa Display implementation returned an error unexpectedly/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/string.rsdescription() is deprecated; use DisplayEOF while parsing a listEOF while parsing an objectEOF while parsing a stringEOF while parsing a valueexpected `:`expected `,` or `]`expected `,` or `}`expected identexpected valueinvalid escapeinvalid numbernumber out of rangeinvalid unicode code pointcontrol character (\u0000-\u001F) found while parsing a stringkey must be a stringlone leading surrogate in hex escapetrailing commatrailing charactersunexpected end of hex escaperecursion limit exceeded at line Error(, column: 0123456789abcdefuuuuuuuubtnufruuuuuuuuuuuuuuuuuu
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/chain.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/error.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/fmt.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/channel.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/context.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/array.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/at.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/list.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/zero.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/waker.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lazy_static-1.5.0/src/inline_lazy.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-pty-0.8.1/src/cmdbuilder.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-pty-0.8.1/src/unix.rs
+/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/shell-words-1.1.0/src/lib.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/cssparser-0.36.0/src/cow_rc_str.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/cssparser-0.36.0/src/macros.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/cssparser-0.36.0/src/nth.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/cssparser-0.36.0/src/parser.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/cssparser-0.36.0/src/tokenizer.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/ascii.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/data.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/euc_jp.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/gb18030.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/handles.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/iso_2022_jp.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/lib.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/shift_jis.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/single_byte.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/utf_8.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/encoding_rs-0.8.35/src/variant.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/hashbrown-0.16.1/src/raw/mod.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/mime-0.3.17/src/lib.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/mime-0.3.17/src/parse.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/phf-0.13.1/src/map.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/phf_shared-0.13.1/src/lib.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/selectors-0.33.0/builder.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/selectors-0.33.0/parser.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/servo_arc-0.4.3/lib.rs
+/opt/rust/registry/src/index.crates.io-1949cf8c6b5b557f/smallvec-1.15.1/src/lib.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/error.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/fmt.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/channel.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/context.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/array.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/at.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/list.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/flavors/zero.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-channel-0.5.15/src/waker.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lazy_static-1.5.0/src/inline_lazy.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-pty-0.8.1/src/cmdbuilder.rs
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-pty-0.8.1/src/unix.rs
+/rust/deps/addr2line-0.25.0/src/function.rs
+/rust/deps/addr2line-0.25.0/src/line.rs
+/rust/deps/addr2line-0.25.0/src/unit.rs
+/rust/deps/addr2line-0.25.1/src/function.rs
+/rust/deps/addr2line-0.25.1/src/line.rs
+/rust/deps/addr2line-0.25.1/src/unit.rs
+/rust/deps/gimli-0.32.0/src/read/abbrev.rs
+/rust/deps/gimli-0.32.0/src/read/index.rs
+/rust/deps/gimli-0.32.0/src/read/line.rs
+/rust/deps/gimli-0.32.0/src/read/value.rs
+/rust/deps/gimli-0.32.3/src/read/abbrev.rs
+/rust/deps/gimli-0.32.3/src/read/index.rs
+/rust/deps/gimli-0.32.3/src/read/line.rs
+/rust/deps/hashbrown-0.15.5/src/raw/mod.rs
+/rust/deps/hashbrown-0.16.1/src/raw/mod.rs
+/rust/deps/miniz_oxide-0.8.9/src/inflate/core.rs
+/rust/deps/miniz_oxide-0.8.9/src/inflate/output_buffer.rs
+/rust/deps/object-0.37.3/src/read/archive.rs
+/rust/deps/object-0.37.3/src/read/macho/section.rs
+/rust/deps/object-0.37.3/src/read/macho/segment.rs
+/rust/deps/object-0.37.3/src/read/macho/symbol.rs
+/rust/deps/rustc-demangle-0.1.23/src/legacy.rs::
+/rust/deps/rustc-demangle-0.1.23/src/v0.rs`fmt::Error`s should be impossible without a `fmt::Formatter`punycode{-}0internal error: entered unreachable code: str::from_utf8( was expected to have 1 char, but  chars were foundstri8i16i32i64isizeu8u16u32u64usizef32f64!_...{recursion limit reached}?> , ]::{closure#const ;  + unsafe " fn( = false{ {  }.llvm./rust/deps/rustc-demangle-0.1.23/src/lib.rs{size limit reached}`fmt::Error` from `SizeLimitedFmtAdapter` was discardedSizeLimitExhausted
+/rust/deps/rustc-demangle-0.1.26/src/legacy.rs
+/rust/deps/rustc-demangle-0.1.26/src/lib.rs
+/rust/deps/rustc-demangle-0.1.26/src/v0.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/alloc/src/collections/btree/map/entry.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/alloc/src/collections/btree/navigate.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/alloc/src/collections/btree/node.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/alloc/src/string.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/alloc/src/vec/mod.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/cell/once.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/io/borrowed_buf.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/num/wrapping.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/ops/function.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/slice/sort/stable/quicksort.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/str/pattern.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/core/src/time.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/std/src/io/mod.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/std/src/sync/once.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/std/src/sys/io/io_slice/iovec.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/std/src/sys/sync/once/futex.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/std/src/sys/thread_local/native/lazy.rs
+/rustc/01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf/library/std/src/thread/functions.rs
+/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/collections/btree/map.rsIgnore::add_parents called on non-root matchercrates/ignore/src/dir.rs.ignore.gitignoreinfo/exclude./ignore::dircommondir**/
+/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/cell.rsSystemTimetv_sectv_nsecassertion failed: tv_nsec >= 0 && tv_nsec < NSEC_PER_SEC as i64library/std/src/sys/unix/time.rsfatal runtime error: assertion failed: signal(libc::SIGPIPE, handler) != libc::SIG_ERR
+/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/io/borrowed_buf.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/collections/btree/navigate.rs()assertion failed: mid <= self.len()reentrant init/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/cell/once.rsoverflow in Duration::new/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/time.rs
+/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/slice/sort.rscalled `Option::unwrap()` on a `None` valueassertion failed: end >= start && end <= lenassertion failed: offset != 0 && offset <= lenfile system loop foundIO error for operation on : File system loop found:  points to an ancestor BUG: stack should be non-empty/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/walkdir-2.3.2/src/lib.rsBUG: deferred_dirs should be non-emptyBUG: cannot pop from empty stackBUG: list/path stacks out of syncBUG: called is_same_file_system without root deviceErrordepthinnerIoerrchild
+/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/str/mod.rs
+/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sys/unix/io.rsassertion failed: len > 0/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/textwrap-0.11.0/src/lib.rsFatal internal error. Please consider filing a bug report at https://github.com/clap-rs/clap/issues/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/app/help.rs{n} [env:  [default:  [aliases:  [possible values: FLAGS:
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/alloc/src/collections/btree/map/entry.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/alloc/src/collections/btree/navigate.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/alloc/src/collections/btree/node.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/alloc/src/slice.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/alloc/src/string.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/alloc/src/vec/mod.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/cell/once.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/char/methods.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/num/wrapping.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/ops/function.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/slice/sort/stable/quicksort.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/str/pattern.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/core/src/time.rs
+/rustc/c61a3a44d1a5bee35914cada6c788a05e0808f5b/library/std/src/thread/local.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/collections/btree/map/entry.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/collections/btree/navigate.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/collections/btree/node.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/str.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/string.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/alloc/src/vec/mod.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/cell/once.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/io/borrowed_buf.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/num/wrapping.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/ops/function.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/slice/sort/stable/quicksort.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/str/pattern.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/core/src/time.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/io/mod.rs
+/rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library/std/src/sync/once.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/boxed.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/boxed/convert.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/collections/btree/map/entry.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/collections/btree/navigate.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/collections/btree/node.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/raw_vec/mod.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/slice.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/string.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/alloc/src/vec/mod.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/cell/once.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/char/methods.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/io/borrowed_buf.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/iter/traits/iterator.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/num/mod.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/num/wrapping.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/ops/function.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/ptr/mod.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/slice/sort/stable/quicksort.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/str/pattern.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/time.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/wtf8.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/io/mod.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/sync/poison/once.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/sys/io/io_slice/iovec.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/sys/sync/once/futex.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/sys/sync/once/queue.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/sys/thread_local/native/lazy.rs
+/rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/std/src/thread/mod.rs
+;library/core/src/num/flt2dec/mod.rsassertion failed: buf[0] > b'0'0.NaNinfassertion failed: buf.len() >= maxlencannot parse integer from empty stringinvalid digit found in stringnumber too large to fit in target typenumber too small to fit in target typenumber would be zero for non-zero typeBorrowErrorBorrowMutErroralready borrowed: already mutably borrowed: "panicked at library/core/src/panicking.rsindex out of bounds: the len is  but the index is panic in a function that cannot unwindpanic in a destructor during cleanup== right` failed
+Did you mean to put '' after the subcommand ''?library/core/src/fmt/mod.rslibrary/core/src/num/dec2flt/decimal.rs
+For more information try USAGE:InvalidValueUnknownArgumentInvalidSubcommandUnrecognizedSubcommandEmptyValueValueValidationTooManyValuesTooFewValuesWrongNumberOfValuesMissingRequiredArgumentMissingSubcommandMissingArgumentOrSubcommandUnexpectedMultipleUsageInvalidUtf8HelpDisplayedParseSizeErrorinteger overflow when calculating buffer sizeInvalid UTF8/Users/runner/work/1/s/ripgrep/crates/ignore/src/dir.rs/Users/runner/work/1/s/ripgrep/crates/ignore/src/gitignore.rsinvalid sizeunrecognized output typeunrecognized spec typeunrecognized color nameunrecognized style attributeinvalid color specCountCountMatchesPathWithMatchQuietInvalidIntSearchUnavailableMismatchedLineTerminatorsmatcherUnknownEncodinglabelnanoshumanInvalidPatternErrorgrep-searcher configuration errorinvalid patternBinaryDetection/Users/runner/work/1/s/ripgrep/crates/ignore/src/walk.rsConvert/Users/runner/work/1/s/ripgrep/crates/cli/src/decompress.rs: error spawning command ' (falling back to uncompressed reader)grep_cli::decompressoutput kind  requires a file pathCountMatches should enable stats tracking
+InputEmptyOutputFullinput should be exhausted/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs_io-0.1.7/src/util.rssrc must be empty when last==truetranscoder has unconsumed bytes/rust/deps/gimli-0.28.0/src/read/abbrev.rsusize state ID type should always work/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/aho-corasick-0.7.18/src/ahocorasick.rsautomaton does not support overlapping searchesassertion failed: edge.height == self.node.height - 1crates/globset/src/glob.rs
+TryFromIntErrorOkErr/rust/deps/addr2line-0.21.0/src/lib.rs/rust/deps/addr2line-0.21.0/src/function.rslibrary/std/src/rt.rsfatal runtime error: initialization or cleanup bug
+USAGE:Could not decode tag nameunknown versionunknown authorunknown aboutunknown after-helpunknown before-help/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clap-2.33.3/src/app/parser.rsversionhclap_helpPrints help informationvclap_versionPrints version informationPrints this message or the help of the given subcommand(s)unexpected invalid UTF-8 code pointUSAGE:
+Unicode not allowed herepattern can match invalid UTF-8Unicode property not foundUnicode property value not foundUnicode-aware Perl class not found (make sure the unicode-perl feature is enabled)Unicode-aware case insensitivity matching is not available (make sure the unicode-case feature is enabled)empty character classes are not allowed/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/hir/mod.rsassertion failed: b > 0x7FClassUnicodeRangestartendClassBytesRange
+UnrecognizedOutTypeUnrecognizedSpecTypeUnrecognizedColorUnrecognizedStyleInvalidFormat/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bstr-0.2.16/src/utf8.rs
+attempt to calculate the remainder with a divisor of zero/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/core/src/num/mod.rs/rust/deps/gimli-0.28.0/src/read/dwarf.rs.debug_abbrev.debug_addr.debug_aranges.debug_cu_index.debug_info.debug_line.debug_line_str.debug_loc.debug_loclists.debug_ranges.debug_rnglists.debug_str.debug_str_offsets.debug_tu_index.debug_types.debug_abbrev.dwo.debug_info.dwo.debug_line.dwo.debug_loc.dwo.debug_loclists.dwo.debug_rnglists.dwo.debug_str.dwo.debug_str_offsets.dwo/rust/deps/object-0.32.1/src/read/macho/section.rs/rust/deps/object-0.32.1/src/read/macho/segment.rsInvalid AIX big archive member headerInvalid AIX big archive member name lengthInvalid AIX big archive member nameInvalid AIX big archive terminatorInvalid archive member size in AIX big archiveInvalid archive member headerInvalid archive member sizeArchive member size is too largeInvalid archive extended name offset/rust/deps/object-0.32.1/src/read/archive.rsInvalid archive extended name lengthInvalid archive terminator
+attempt to divide by zero/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/collections/btree/map/entry.rsassertion failed: idx < CAPACITY/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/collections/btree/node.rsassertion failed: edge.height == self.height - 1internal error: entered unreachable code: empty internal nodeassertion failed: self.height > 0assertion failed: src.len() == dst.len()assertion failed: old_right_len + count <= CAPACITYassertion failed: old_left_len >= countinternal error: entered unreachable codeassertion failed: old_left_len + count <= CAPACITYassertion failed: old_right_len >= countassertion failed: match track_edge_idx {
+attempted to begin a new map entry without completing the previous onelibrary/core/src/fmt/builders.rsattempted to finish a map with a partial entrylibrary/core/src/fmt/num.rs0000000000000000000000000000000000000000000000000000000000000000library/core/src/slice/memchr.rsrange start index  out of range for slice of length slice index starts at  but ends at attempted to index slice up to maximum usizeattempted to index str up to maximum usize
+attempted to use a condition variable with two mutexes/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sys/unix/locks/pthread_condvar.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/crossbeam-utils-0.8.5/src/sync/wait_group.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs-0.8.28/src/gb18030.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs-0.8.28/src/handles.rs
+binary file matches (found /Users/runner/work/1/s/ripgrep/crates/searcher/src/line_buffer.rs/Users/runner/work/1/s/ripgrep/crates/searcher/src/lines.rs/Users/runner/work/1/s/ripgrep/crates/searcher/src/searcher/core.rsassertion failed: self.after_context_left >= 1searcher core: will use slow line searchergrep_searcher::searcher::coresearcher core: will use fast line searcher/Users/runner/work/1/s/ripgrep/crates/searcher/src/searcher/glue.rsassertion failed: self.rdr.buffer()[self.core.pos()..].is_empty()grep_searcher::searcher/Users/runner/work/1/s/ripgrep/crates/searcher/src/searcher/mod.rsgeneric reader: searching via roll buffer strategygeneric reader: reading everything to heap for multilinegeneric reader: searching via multiline strategy: searching using generic reader: reading entire file on to heap for mulitline: searching via multiline strategyassertion failed: self.config.multi_lineDecodeReaderBytesBuilder: buffer of size  is too small/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding_rs_io-0.1.7/src/lib.rsinternal buffer should never be exhausted/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/mpmc/mod.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/mpmc/list.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/mpmc/zero.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/mpmc/array.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/mpmc/waker.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/mpmc/context.rs\0/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bstr-0.2.16/src/impls.rssubcommandThe subcommand whose help message to display The subcommand '' wasn't recognized
+called `Result::unwrap()` on an `Err` valuePoisonErrorLazy instance has previously been poisoned/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/once_cell-1.7.2/src/lib.rsRan out of thread IDs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thread_local-1.1.3/src/thread_id.rscannot access a Thread Local Storage value during or after destruction/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/thread/local.rsIndex out of bounds
+cd -u  env -i [] Commandprogramenvcwduidgidgroupspgrouplibrary/std/src/sys/unix/rand.rsunexpected random generation error: 
+crates/ignore/src/gitignore.rs
+crates/printer/src/json.rsoverflow when adding durationscrates/printer/src/util.rs
+crates/regex/src/crlf.rsassertion failed: self.start <= endcrates/regex/src/error.rsthe literal '' is not allowed in a regexline terminators must be ASCII, but 'literal prefixes detected: grep_regex::literalcrates/regex/src/literal.rsrequired literals found: (?-u:suffix literals foundprefix literals foundprefix/suffix literals found: dropping literals because one was whitespacerequired literal found: dropping literal because one was whitespaceextracted fast line regex: grep_regex::matchercrates/regex/src/matcher.rsfinal regex: 
+error:  (column ) through line /Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/hir/interval.rsassertion failed: !self.ranges[a].is_intersection_empty(&other.ranges[b])assertion failed: !self.ranges.is_empty()assertion failed: add_lower || add_upper/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/hir/literal/mod.rslimit_sizelimit_classComplete((?-u:[])(?m:^)(?m:$)(?:(?-u:\xtried to unwrap expr from HirFrame, got: /Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/regex-syntax-0.6.25/src/hir/translate.rstried to unwrap Unicode class from HirFrame, got: tried to unwrap byte class from HirFrame, got: tried to unwrap group from HirFrame, got: assertion failed: self.flags().unicode()0
+failed to generate unique thread ID: bitspace exhaustedRUST_BACKTRACEfile_typeis_diris_filepermissionscreatedfailed to write the buffered datalibrary/std/src/io/buffered/bufwriter.rslibrary/std/src/io/buffered/linewritershim.rspermission deniedconnection refusednetwork unreachableconnection abortednot connectedaddress in useaddress not availablenetwork downbroken pipeentity already existsoperation would blocknot a directoryis a directorydirectory not emptyread-only filesystem or storage mediumfilesystem loop or indirection limit (e.g. symlink loop)stale network file handleinvalid input parameterinvalid datatimed outwrite zeroseek on unseekable filefilesystem quota exceededfile too largeresource busyexecutable file busycross-device link or renametoo many linksargument list too longoperation interruptedunsupportedunexpected end of fileout of memoryother erroruncategorized errorOsmessageCustomerror (os error )library/std/src/io/stdio.rslibrary/std/src/thread/local.rsfailed printing to stdoutstderrlibrary/std/src/io/mod.rsadvancing io slices beyond their lengthadvancing IoSlice beyond its lengthlibrary/std/src/sys/unix/io.rsfdlibrary/std/src/os/fd/owned.rsBorrowedFdOwnedFdlibrary/std/src/panic.rslibrary/std/src/path.rs.stdinlibrary/std/src/sync/once.rslock count overflow in reentrant mutexlibrary/std/src/sync/remutex.rsfile name contained an unexpected NUL bytestack backtrace:
+failed to set up alternative stack guard page: library/std/src/sys/unix/stack_overflow.rsfailed to allocate an alternative stack: library/std/src/sys/unix/thread.rsfailed to join thread: assertion failed: page_size != 0failed to protect the guard page: failed to allocate a guard page: fatal runtime error: global allocator may not use TLS
+failed to write whole buffer/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/io/mod.rsformatter errorfatal runtime error: thread local panicked on drop
+fatal runtime error: failed to initiate panic, error library/std/src/../../backtrace/src/symbolize/mod.rs -       :PermissionsConnectionRefusedConnectionResetHostUnreachableNetworkUnreachableConnectionAbortedNotConnectedAddrInUseNetworkDownBrokenPipeAlreadyExistsWouldBlockNotADirectoryIsADirectoryDirectoryNotEmptyReadOnlyFilesystemFilesystemLoopStaleNetworkFileHandleInvalidInputInvalidDataWriteZeroStorageFullNotSeekableFilesystemQuotaExceededFileTooLargeResourceBusyExecutableFileBusyCrossesDevicesTooManyLinksInvalidFilenameArgumentListTooLongInterruptedUnsupportedUnexpectedEofOutOfMemoryOtherUncategorizedunexpected error during closedir: library/std/src/sys/unix/fs.rsstrerror_r failurelibrary/std/src/sys/unix/os.rslibrary/std/src/sys/unix/process/process_common.rs<string-with-nul>=/dev/null
+getting locations for simple captures is invalidsetting strip_crlf for simple captures is invalidsetting simple captures for regex is invalidcrates/regex/src/multi.rsassertion failed: byte <= 0x7Fcrates/regex/src/strip.rscrates/regex/src/util.rscrates/regex/src/word.rs)$(?:(?m:^)|\W)()(?:\W|(?m:$))word regex: assertion failed: start <= self.end/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bstr-0.2.16/src/ext_slice.rssrc end is before src startsrc is out of boundsLineTerminatorconfigured allocation limit () exceededcrates/searcher/src/line_buffer.rsassertion failed: amt <= self.buffer().len()assertion failed: additional > 0assertion failed: !self.free_buffer().is_empty()crates/searcher/src/lines.rs/Users/runner/work/1/s/ripgrep/crates/matcher/src/lib.rsassertion failed: m.0 <= m.1grep config error: no available searchersgrep config error: mismatched line terminators, matcher has  but searcher has grep config error: unknown encoding: BUG: unexpected variant foundcrates/searcher/src/searcher/mod.rsHash table capacity overflow/rust/deps/hashbrown-0.14.3/src/raw/mod.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thread_local-1.1.3/src/lib.rs/Users/runner/.cargo/registry/src/index.crates.io-6f17d22bba15001f/crossbeam-utils-0.8.5/src/thread.rsfailed to spawn scoped threadstream did not contain valid UTF-8rwlock write lock would result in deadlock/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sys/unix/locks/pthread_rwlock.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/sync/once.rs/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/std/src/thread/mod.rsUnclosedClassInvalidRangeUnopenedAlternatesUnclosedAlternatesDanglingEscapeRegexfatal runtime error: thread result panicked on drop
+library/alloc/src/alloc.rs
+library/alloc/src/boxed/convert.rs
+library/alloc/src/ffi/c_str.rs
+library/alloc/src/fmt.rs
+library/alloc/src/raw_vec/mod.rs
+library/alloc/src/rc.rs
+library/alloc/src/slice.rs
+library/alloc/src/str.rs
+library/alloc/src/string.rs
+library/alloc/src/sync.rs
+library/alloc/src/wtf8/mod.rs
+library/core/src/cell/lazy.rs
+library/core/src/char/methods.rs
+library/core/src/fmt/builders.rs
+library/core/src/fmt/mod.rs
+library/core/src/fmt/num.rs
+library/core/src/net/display_buffer.rs
+library/core/src/net/ip_addr.rs
+library/core/src/net/parser.rs
+library/core/src/net/socket_addr.rs
+library/core/src/num/bignum.rs
+library/core/src/num/dec2flt/decimal_seq.rs
+library/core/src/num/dec2flt/lemire.rs
+library/core/src/num/dec2flt/parse.rs
+library/core/src/num/dec2flt/parse.rsassertion failed: edelta >= 0library/core/src/num/diy_float.rs
+library/core/src/num/diy_float.rs
+library/core/src/num/flt2dec/mod.rs
+library/core/src/num/flt2dec/strategy/dragon.rs
+library/core/src/num/flt2dec/strategy/dragon.rsassertion failed: d.mant > 0
+library/core/src/num/flt2dec/strategy/grisu.rs
+library/core/src/num/flt2dec/strategy/grisu.rsassertion failed: !buf.is_empty()
+library/core/src/num/fmt.rs
+library/core/src/panicking.rs
+library/core/src/slice/index.rs
+library/core/src/slice/memchr.rs
+library/core/src/slice/sort/shared/smallsort.rs
+library/core/src/str/lossy.rs
+library/core/src/str/pattern.rs
+library/core/src/str/pattern.rslibrary/core/src/str/lossy.rs[...]begin <= end (`byte index  is not a char boundary; it is inside ) of ` is out of bounds of `library/core/src/str/mod.rslibrary/core/src/unicode/printable.rs
+library/core/src/time.rs
+library/core/src/unicode/printable.rs
+library/core/src/unicode/unicode_data.rs
+library/core/src/unicode/unicode_data.rslibrary/core/src/escape.rslibrary/core/src/num/bignum.rsassertion failed: noborrowassertion failed: digits < 40assertion failed: other > 0Z
+library/std/src/../../backtrace/src/backtrace/libunwind.rs
+library/std/src/../../backtrace/src/symbolize/gimli.rs
+library/std/src/../../backtrace/src/symbolize/gimli/elf.rs
+library/std/src/../../backtrace/src/symbolize/gimli/libs_dl_iterate_phdr.rs
+library/std/src/../../backtrace/src/symbolize/gimli/libs_macos.rs
+library/std/src/../../backtrace/src/symbolize/gimli/libs_macos.rsposix_spawn_file_actions_addchdir_np
+library/std/src/../../backtrace/src/symbolize/gimli/lru.rs
+library/std/src/../../backtrace/src/symbolize/gimli/macho.rs
+library/std/src/../../backtrace/src/symbolize/gimli/parse_running_mmaps_unix.rs
+library/std/src/../../backtrace/src/symbolize/gimli/stash.rs
+library/std/src/../../backtrace/src/symbolize/mod.rs
+library/std/src/alloc.rs
+library/std/src/backtrace.rs
+library/std/src/env.rs
+library/std/src/ffi/os_str.rs
+library/std/src/io/buffered/bufreader/buffer.rs
+library/std/src/io/buffered/bufwriter.rs
+library/std/src/io/buffered/linewritershim.rs
+library/std/src/io/mod.rs
+library/std/src/io/stdio.rs
+library/std/src/os/unix/net/addr.rs
+library/std/src/os/unix/net/ancillary.rs
+library/std/src/os/unix/process.rs
+library/std/src/panicking.rs
+library/std/src/panicking.rsBox<dyn Any><unnamed>' panicked at :
+library/std/src/path.rs
+library/std/src/process.rs
+library/std/src/rt.rs
+library/std/src/sync/lazy_lock.rs
+library/std/src/sync/once.rs
+library/std/src/sync/poison/once.rs
+library/std/src/sync/reentrant_lock.rs
+library/std/src/sys/args/unix.rs
+library/std/src/sys/env/common.rs
+library/std/src/sys/env/unix.rs
+library/std/src/sys/fd/unix.rs
+library/std/src/sys/fs/unix.rs
+library/std/src/sys/io/io_slice/iovec.rs
+library/std/src/sys/net/connection/socket/mod.rs
+library/std/src/sys/os_str/bytes.rs
+library/std/src/sys/pal/unix/kernel_copy.rs
+library/std/src/sys/pal/unix/mod.rs
+library/std/src/sys/pal/unix/os.rs
+library/std/src/sys/pal/unix/stack_overflow.rs
+library/std/src/sys/pal/unix/stack_overflow/thread_info.rs
+library/std/src/sys/pal/unix/sync/mutex.rs
+library/std/src/sys/pal/unix/time.rs
+library/std/src/sys/process/mod.rs
+library/std/src/sys/process/unix/common.rs
+library/std/src/sys/process/unix/common/cstring_array.rs
+library/std/src/sys/process/unix/unix.rs
+library/std/src/sys/random/apple.rs
+library/std/src/sys/random/linux.rs
+library/std/src/sys/sync/once/queue.rs
+library/std/src/sys/sync/rwlock/futex.rs
+library/std/src/sys/sync/rwlock/queue.rs
+library/std/src/sys/sync/thread_parking/darwin.rs
+library/std/src/sys/thread/unix.rs
+library/std/src/sys/thread_local/destructors/list.rs
+library/std/src/sys/unix/locks/pthread_mutex.rs
+library/std/src/sys/unix/process/process_unix.rsValidation on the CLOEXEC pipe failed: wait() should either return Ok or panicshort read on the CLOEXEC pipethe CLOEXEC pipe failed: nul byte found in provided datafailed to create dispatch semaphore for thread synchronizationlibrary/std/src/sys/unix/thread_parking/darwin.rsOnce instance has previously been poisonedassertion failed: state_and_queue.addr() & STATE_MASK == RUNNING
+library/std/src/sys_common/once/queue.rslibrary/std/src/../../backtrace/src/symbolize/gimli.rs
+library/std/src/thread/current.rs
+library/std/src/thread/id.rs
+library/std/src/thread/local.rs
+library/std/src/thread/mod.rs
+library/std/src/thread/scoped.rs
+library/std/src/thread/thread.rs
+library/std/src/time.rs
+src/commands.rs
+src/comment.rs
+src/connection.rs
+src/doctype.rs
+src/document_end.rs
+src/element.rs
+src/errors.rs
+src/lib.rs
+src/main.rs
+src/rewriter.rs
+src/rewriter_builder.rs
+src/selector.rs
+src/text_chunk.rs
+too many running threads in thread scopelibrary/std/src/thread/scoped.rsAccessErroruse of std::thread::current() is not possible after the thread's local data has been destroyedlibrary/std/src/thread/mod.rsfatal runtime error: an irrecoverable error occurred while synchronizing threads
+unexpected error during rwlock read lock: library/std/src/sys/unix/locks/pthread_rwlock.rsrwlock read lock would result in deadlockrwlock maximum reader count exceeded
+}assertion failed: new_left_len <= CAPACITY/rustc/07dca489ac2d933c78d3c5158e3f43beefeb02ce/library/alloc/src/vec/mod.rs/rust/deps/gimli-0.28.0/src/read/line.rs
