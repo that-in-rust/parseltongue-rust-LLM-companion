@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CR02" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CR03" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CR04/cachebro" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CR04/cozo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CR07/codex" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/competitor_research" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/competitor_research/oh-my-pi" vcs="Git" />
+  </component>
+</project>
