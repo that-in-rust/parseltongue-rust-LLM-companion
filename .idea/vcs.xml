@@ -7,6 +7,7 @@
     <mapping directory="$PROJECT_DIR$/CR04/cachebro" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/CR04/cozo" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/CR07/codex" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CR08/delegate" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/competitor_research" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/competitor_research/oh-my-pi" vcs="Git" />
   </component>
