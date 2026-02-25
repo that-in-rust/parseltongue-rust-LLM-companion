@@ -1,0 +1,13 @@
+src/commands.rs
+src/comment.rs
+src/connection.rs
+src/doctype.rs
+src/document_end.rs
+src/element.rs
+src/errors.rs
+src/lib.rs
+src/main.rs
+src/rewriter.rs
+src/rewriter_builder.rs
+src/selector.rs
+src/text_chunk.rs

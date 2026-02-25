@@ -1,0 +1,40 @@
+# This workflow is intended for future automated releases.
+# For v0.1, publish manually using `vsce publish`.
+# Uncomment the 'on' section and ensure secrets are configured before enabling.
+name: Release Extension
+
+# on:
+#   push:
+#     tags:
+#       - 'v*.*.*' # Trigger on tags like v0.1.0
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18" # Use Node 18 for vsce compatibility
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build # Runs prepublish implicitly via vsce, but explicit build is safer
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Publish to VS Code Marketplace
+        run: vsce publish -p $VSCE_PAT
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }} # Personal Access Token for Marketplace
+
+      - name: Publish to Open VSX Registry
+        run: npx ovsx publish -p $OVSX_PAT
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }} # Personal Access Token for Open VSX

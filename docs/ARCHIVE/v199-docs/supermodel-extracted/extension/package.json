@@ -1,0 +1,352 @@
+{
+  "name": "supermodel",
+  "displayName": "Supermodel",
+  "description": "Visualize and interact with your codebase structure.",
+  "icon": "media/icon.png",
+  "publisher": "supermodel",
+  "version": "0.1.162",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supermodel/vscode-extension.git"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Visualization",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onUri",
+    "onView:supermodel.graphViewer",
+    "onCommand:supermodel.processWorkspace",
+    "onCommand:supermodel.classify",
+    "onCommand:supermodel.setLLMApiKey"
+  ],
+  "main": "./out/extension/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Supermodel",
+      "properties": {
+        "supermodel.activeEnvironment": {
+          "type": "string",
+          "default": "production",
+          "enum": [
+            "local",
+            "production",
+            "staging",
+            "custom"
+          ],
+          "enumDescriptions": [
+            "Use local development server URLs.",
+            "Use production server URLs.",
+            "Use staging server URLs.",
+            "Use custom URLs defined below."
+          ],
+          "description": "Specifies the target backend environment for Supermodel API calls. Default is 'local'."
+        },
+        "supermodel.custom.apiBase": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "Custom base URL for the Supermodel API. Used if 'activeEnvironment' is 'custom'."
+        },
+        "supermodel.includeGlobs": {
+          "scope": "resource",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/*.{ts,tsx,js,jsx,mjs,cjs}",
+            "**/*.{py,pyi,pyw}",
+            "**/*.java",
+            "**/*.{rs}",
+            "**/*.{cpp,cxx,cc,c,h,hpp,hxx}",
+            "**/*.go",
+            "**/*.{rb,rake,gemspec}",
+            "**/*.swift",
+            "**/*.{kt,kts}",
+            "**/*.{scala,sc}",
+            "**/*.{hs,lhs}",
+            "**/*.{erl,hrl}",
+            "**/*.{ex,exs}",
+            "**/*.{html,htm,xhtml}",
+            "**/*.{json,jsonc}",
+            "**/*.sql",
+            "**/package.json",
+            "**/*.{yaml,yml}"
+          ],
+          "markdownDescription": "Glob patterns (using minimatch) relative to the workspace root to include when Supermodel scans for source files. Leave empty to use default patterns."
+        },
+        "supermodel.respectGitignore": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": true,
+          "description": "Exclude files ignored by .gitignore when creating the upload ZIP."
+        },
+        "supermodel.excludeGlobs": {
+          "scope": "resource",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/out/**",
+            "**/.git/**",
+            "**/bower_components/**",
+            "**/*.md",
+            "**/*.txt",
+            "**/*.env"
+          ],
+          "markdownDescription": "Glob patterns (using minimatch) relative to the workspace root to exclude when Supermodel scans for source files. Leave empty to use default patterns."
+        },
+        "supermodel.mockUpload": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a local stub instead of calling the /registry API (offline dev)."
+        },
+        "supermodel.developer.useMockGraphOnFetchFailure": {
+          "type": "boolean",
+          "default": false,
+          "description": "Developer Option: If fetching real graph data from the backend fails (e.g., due to timeout or server error), display mock graph data instead of an error. Default is false (show error)."
+        },
+        "supermodel.parserMode": {
+          "type": "string",
+          "default": "tree-sitter",
+          "enum": [
+            "tree-sitter",
+            "grep"
+          ],
+          "enumDescriptions": [
+            "Use Tree-sitter parser for improved accuracy and performance",
+            "Use grep-based parsing for basic text-based analysis"
+          ],
+          "description": "Specifies the parser mode to use for code analysis on the backend. Tree-sitter provides the most accurate parsing."
+        },
+        "supermodel.zipUpload.maxBodyLength": {
+          "type": "number",
+          "default": 52428800,
+          "minimum": 1048576,
+          "maximum": 524288000,
+          "description": "Maximum ZIP file upload size in bytes. Default is 50MB (52428800 bytes). Minimum 1MB, maximum 500MB. This setting controls the Axios maxBodyLength for ZIP uploads."
+        },
+        "supermodel.zipUpload.batchSize": {
+          "type": "number",
+          "default": 50,
+          "minimum": 10,
+          "maximum": 500,
+          "description": "Number of files to process per batch during ZIP creation. Lower values use less memory but may be slower. Default is 50 files per batch."
+        },
+        "supermodel.zipUpload.enableBatchProcessing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable batched processing for ZIP creation to handle large repositories better. Recommended for repositories with many files."
+        },
+        "supermodel.developer.skipWorkspaceProcessing": {
+          "type": "boolean",
+          "default": false,
+          "description": "Developer Option: Skip workspace processing and load mock data directly. Useful for UI development without waiting for backend processing."
+        },
+        "supermodel.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "none",
+            "error",
+            "warn",
+            "info",
+            "debug",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "No logging output",
+            "Only error messages",
+            "Warnings and errors",
+            "Informational messages, warnings, and errors (default)",
+            "Debug messages and above",
+            "Verbose logging with maximum detail"
+          ],
+          "description": "Controls the logging verbosity level for the Supermodel extension. Use 'Supermodel: Toggle Verbose Logging' command to quickly switch between INFO and VERBOSE."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "supermodel",
+          "title": "Supermodel",
+          "icon": "media/logo.svg"
+        }
+      ]
+    },
+    "views": {
+      "supermodel": [
+        {
+          "type": "webview",
+          "id": "supermodel.graphViewer",
+          "name": "Supermodel",
+          "contextualTitle": "Supermodel Graph Viewer",
+          "icon": "media/logo.svg",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "supermodel.toggleVerboseLogging",
+        "title": "Supermodel: Toggle Verbose Logging",
+        "category": "Supermodel"
+      },
+      {
+        "command": "supermodel.login",
+        "title": "Supermodel: Sign In",
+        "category": "Supermodel"
+      },
+      {
+        "command": "supermodel.logout",
+        "title": "Supermodel: Sign Out",
+        "category": "Supermodel"
+      },
+      {
+        "command": "supermodel.resetState",
+        "title": "Supermodel: Reset Stored State",
+        "category": "Supermodel"
+      },
+      {
+        "command": "supermodel.toggleUIDevMode",
+        "title": "Supermodel: Toggle UI Development Mode",
+        "category": "Supermodel"
+      },
+      {
+        "command": "supermodel.openDevControls",
+        "title": "Supermodel: Open Dev Controls",
+        "category": "Supermodel"
+      },
+      {
+        "command": "supermodel.togglePhysicsPanel",
+        "title": "Supermodel: Toggle Physics Panel (Dev)",
+        "category": "Supermodel"
+      }
+    ],
+    "authentication": [
+      {
+        "id": "supermodel",
+        "label": "Supermodel Account"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "supermodel.login"
+        },
+        {
+          "command": "supermodel.logout"
+        },
+        {
+          "command": "supermodel.resetState"
+        },
+        {
+          "command": "supermodel.toggleUIDevMode"
+        },
+        {
+          "command": "supermodel.openDevControls"
+        },
+        {
+          "command": "supermodel.togglePhysicsPanel"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "clean": "npx rimraf out",
+    "clean:all": "npx rimraf out src/lib/api-client-stage",
+    "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
+    "test": "jest --coverage",
+    "compile:tests": "tsc -p tsconfig.test.json",
+    "test:vscode": "npm run compile:tests && node ./out/test/test/runTest.js",
+    "test:all": "npm run test && npm run test:vscode",
+    "prepare-api-client": "npx ts-node ./build-tools/prepare-api-client.ts",
+    "build-extension": "npm run clean && node esbuild.mjs",
+    "build": "npm run prepare-api-client && npm run build-extension",
+    "vscode:prepublish": "npm run build",
+    "package:local": "npx ts-node ./build-tools/set-package-env.ts local && npm run prepare-api-client && npm run build-extension && npx vsce package --no-dependencies -o ./supermodel-local-$npm_package_version.vsix && npx ts-node ./build-tools/set-package-env.ts --revert",
+    "package": "npx ts-node ./build-tools/set-package-env.ts production && npm run prepare-api-client && npm run build-extension && npx vsce package --no-dependencies -o ./supermodel-production-$npm_package_version.vsix && npx ts-node ./build-tools/set-package-env.ts --revert"
+  },
+  "devDependencies": {
+    "@esbuild-plugins/tsconfig-paths": "^0.1.2",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/d3": "^7.4.3",
+    "@types/emscripten": "^1.40.1",
+    "@types/form-data": "^2.2.1",
+    "@types/fs-extra": "^11.0.4",
+    "@types/glob": "^8.1.0",
+    "@types/jest": "^29.5.14",
+    "@types/minimatch": "^5.1.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.18.1",
+    "@types/prop-types": "^15.7.14",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.4.2",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "cpx2": "^7.0.1",
+    "dotenv": "^16.4.5",
+    "esbuild-postcss": "^0.0.4",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.33.2",
+    "fs-extra": "^11.2.0",
+    "glob": "^11.0.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "mocha": "^11.2.2",
+    "neo4j-driver": "^5.21.0",
+    "openai": "^4.52.3",
+    "postcss": "^8.5.3",
+    "prettier": "^3.2.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "rimraf": "^6.0.1",
+    "tailwindcss": "^3.4.4",
+    "ts-jest": "^29.3.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "overrides": {},
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-toggle-group": "^1.1.10",
+    "@types/jszip": "^3.4.0",
+    "@xstate/react": "^4.0.3",
+    "axios": "^1.7.2",
+    "change-case": "^5.4.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "com.supermodel.code-graph": "file:./src/lib/api-client-stage",
+    "d3": "^7.9.0",
+    "debounce": "^2.1.0",
+    "esbuild": "^0.25.1",
+    "form-data": "^4.0.2",
+    "ignore": "^7.0.5",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.511.0",
+    "minimatch": "^10.0.3",
+    "rbush": "^4.0.1",
+    "tailwind-merge": "^3.3.1",
+    "uuid": "^10.0.0",
+    "xstate": "^5.11.0"
+  }
+}

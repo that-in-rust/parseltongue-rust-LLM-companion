@@ -1,0 +1,431 @@
+# CONTEXT DUMP: 2026-02-19 21:44:00
+# CR07 OpenAI Codex Competitive Research - Full Session Context
+# Repository: parseltongue-dependency-graph-generator
+# Branch: v173
+
+---
+
+## SESSION SUMMARY
+
+This session completed a 5-phase competitive research analysis of OpenAI Codex CLI (codex-rs) using Parseltongue v1.7.2 graph analysis, with comparison to Factory Droid (decompiled binary) and V200 contract implications.
+
+### Research Output: 5 documents, 3,720 lines
+
+1. CR-codex-graph-overview.md (334 lines) - Graph metrics, SCC, Leiden, PageRank, hotspots
+2. CR-codex-architecture.md (1,212 lines) - 44 crate map, call graphs, blast radius, sandbox/MCP diagrams
+3. CR-codex-vs-factory-droid.md (958 lines) - 8-axis comparison with ASCII diagrams, score matrix
+4. CR-codex-v200-implications.md (676 lines) - Contract-by-contract impact map, ByteRank replacement
+5. CR-codex-eli5-ascii-summary.md (175 lines) - ELI5 version with 6 key lines, scoreboard, 5 bullets
+6. CR07-codex-research-progress-tracker.md - TDD tracker with session state
+
+### Commit: 5340cb711
+```
+docs(CR07): OpenAI Codex competitive research — 5-phase graph analysis + V200 implications
+```
+
+---
+
+## PARSALTONGUE SERVER CONFIGURATION
+
+### Binary Location
+/Users/amuldotexe/Desktop/A01_20260131/parseltongue-v172
+
+### Database (Codex)
+Path: rocksdb:parseltongue20260219195022/analysis.db
+Location: CR07/codex/parseltongue20260219195022/analysis.db
+
+### Server
+Port: 7780
+Restart command:
+```bash
+cd /Users/amuldotexe/Desktop/A01_20260131/parseltongue-dependency-graph-generator/CR07/codex
+/Users/amuldotexe/Desktop/A01_20260131/parseltongue-v172 pt08-http-code-query-server \
+  --db "rocksdb:parseltongue20260219195022/analysis.db" \
+  --port 7780
+```
+
+### Endpoints Used (22 total)
+- /server-health-check-status
+- /codebase-statistics-overview-summary
+- /code-entities-list-all
+- /code-entities-search-fuzzy
+- /code-entity-detail-view/{key}
+- /blast-radius-impact-analysis
+- /circular-dependency-detection-scan
+- /complexity-hotspots-ranking-view
+- /semantic-cluster-grouping-list
+- /strongly-connected-components-analysis
+- /technical-debt-sqale-scoring
+- /kcore-decomposition-layering-analysis
+- /centrality-measures-entity-ranking (PageRank)
+- /coupling-cohesion-metrics-suite
+- /leiden-community-detection-clusters
+- /entropy-complexity-measurement-scores
+
+---
+
+## CODEX GRAPH METRICS
+
+### Raw Numbers
+- Total entities: 15,901
+- Dependency edges: 136,130
+- Languages detected: Rust (14,324), TypeScript (627), C (386), Python (326), JavaScript (238)
+- SCCs: 34,933 (all size-1 = zero circular dependencies)
+- Leiden communities: 9,887 (background task result)
+- Ingestion coverage: 60.96% (854/1,401 files parsed)
+- Parse errors: 554 files failed
+
+### God Objects (CBO > 500)
+1. codex-rs/core/src/codex.rs - CBO=1124, Grade F
+2. codex-rs/tui/src/chatwidget.rs - CBO=1075, Grade F
+3. codex-rs/app-server/src/codex_message_processor.rs - CBO=929, Grade F
+4. codex-rs/tui/src/app.rs - CBO=585, Grade F
+5. codex-rs/tui/src/bottom_pane/chat_composer.rs - CBO=544, Grade F
+
+### K-Core Decomposition
+Max coreness: 33
+Inner ring (coreness=33): SSE streaming, shell snapshots, model manager, test suites, MCP tools, protocol definitions
+
+### PageRank Leaders
+Top 3 dominated by unresolved Rust stdlib (expected):
+- rust:fn:new:unresolved-reference (0.01139)
+- rust:fn:Some:unresolved-reference (0.00887)
+- rust:fn:to_string:unresolved-reference (0.00788)
+
+### Leiden Communities
+- Community 8: 3,495 members (core Rust cluster)
+- Community 12: 3,247 members (stdlib methods)
+- Community 22: 2,835 members (built-ins)
+- Community 26: 520 members (collab tools test cluster - confirms multi-agent subsystem)
+
+---
+
+## CODEX ARCHITECTURE MAP
+
+### 44 Crates (codex-rs workspace)
+```
+codex-rs/
+├── core/              # Main agent loop (codex.rs - CBO=1124)
+├── tui/               # Ratatatui terminal UI (50 files)
+├── cli/               # CLI binary dispatcher
+├── app-server/        # HTTP JSON-RPC server
+├── app-server-protocol/  # Shared protocol types
+├── exec/              # Shell command execution engine
+├── exec-server/       # Exec server with sandbox escalation
+├── execpolicy/        # Command allowlist/policy (new)
+├── execpolicy-legacy/ # Policy engine (TOML-based)
+├── mcp-server/        # MCP server implementation
+├── rmcp-client/       # Remote MCP client with OAuth
+├── protocol/          # Shared protocol types
+├── network-proxy/     # Network egress proxy (207 entities)
+├── linux-sandbox/     # Linux seatbelt/bubblewrap
+├── windows-sandbox-rs/ # Windows AppContainer sandbox
+├── codex-api/         # REST API server
+├── codex-client/      # HTTP client for Codex backend
+├── hooks/             # Pre/post-turn hook system
+├── otel/              # OpenTelemetry observability
+├── config/            # Config loading/merging
+├── state/             # Conversation state management
+├── chatgpt/           # ChatGPT-compatible mode
+├── apply-patch/       # Patch application engine
+├── file-search/       # File search tool
+├── cloud-tasks/       # Cloud task execution
+├── lmstudio/          # LM Studio local model integration
+├── ollama/            # Ollama local model integration
+├── responses-api-proxy/ # Responses API proxy
+├── backend-client/    # Backend HTTP client
+├── debug-client/      # Debug CLI client
+└── vendor/bubblewrap  # Linux namespace sandbox (C)
+```
+
+### Tri-Platform Sandbox
+- macOS: Seatbelt profiles (deny-all + allowlist)
+- Linux: Landlock LSM + Seccomp BPF + bubblewrap namespace isolation (386 C entities)
+- Windows: ACL-based file path restrictions
+
+### MCP Integration
+- Server: Exposes tools to external MCP clients
+- Client: Consumes external MCP servers (Braintrust, Fireflies)
+- OAuth2 device flow for authentication
+- Approval protocol: sampling/createMessage for human-in-the-loop
+
+### Multi-Agent Support
+- 143 collab-related entities
+- spawn_agent function (6 entities)
+- Leiden Community 26 (520 members) = real subsystem
+- CollabAgentStatus, CollabTool, CollabToolCallStatus enums
+
+---
+
+## FACTORY DROID DECOMPILATION FINDINGS
+
+### Binary Analysis
+- Path: /Users/amuldotexe/.local/bin/droid
+- Size: 95.9 MB Mach-O arm64
+- Version: 1.0.71 CLI, Bun 1.3.8 runtime
+- Built: rustc 1.93.1 nightly on Buildkite CI
+- Architecture: Rust shell (~5%) + Bun runtime (~35%) + JS app (~25%) + ripgrep (~5%) + JSC (~35%)
+
+### Architecture
+```
+droid = Rust shell + embedded Bun 1.3.8 + bundled JS application
+```
+
+### 5-Phase Control Flow
+1. Bootstrap (auth check, model selection, session create)
+2. Mode Detection (standard vs AGI/mission mode)
+3. Mission Proposal (orchestrator creates plan)
+4. Artifact Creation (mission.md, features.json, services.yaml, AGENTS.md)
+5. Worker Dispatch + Review Loop (workers execute, return handoffs)
+
+### Tools (14 total, 9 identical to Codex)
+Identical: Read/Write/Edit/Bash, Glob/Grep, WebSearch/WebFetch, TodoWrite
+Droid-only: apply_patch, ProposeMission, RunNextWorker, Skill, store_agent_readiness_report, slack_post_message, browser tools (CDP)
+
+### ByteRank (100+ criteria, 11 categories)
+LLM-evaluated repository quality scoring. 8/11 categories replaceable by Parseltongue graph algorithms.
+
+### Directory Structure
+```
+.factory/
+├── droids/         # Custom agent configs
+├── skills/         # Reusable procedures (YAML + MD)
+├── commands/       # Custom slash commands
+├── library/        # Shared state files
+├── services.yaml   # Operational manifest
+└── init.sh         # Environment setup
+
+{missionDir}/
+├── mission.md
+├── features.json
+├── AGENTS.md
+└── handoffs/
+    ├── F1.json
+    ├── F2.json
+    └── F3.json
+```
+
+---
+
+## CODEX VS DROID COMPARISON (8 AXES)
+
+| Axis | Winner | Key Finding |
+|------|--------|-------------|
+| Sandboxing depth | CODEX 7-4 | 5 kernel layers vs 3 software layers |
+| MCP integration | CODEX 7-4 | Bidirectional (server+client) vs client-only |
+| Multi-agent architecture | DROID 4-7 | Structured orch/worker+handoffs vs flexible collab |
+| Multi-model backend | CODEX 7-4 | 4 providers + local (air-gapped) vs cloud-only |
+| Tool system design | TIE | 9/14 identical tools, same DNA |
+| Graph analyzability | CODEX 7-4 | 15,901 entities (open) vs 0 (opaque binary) |
+| State persistence | DROID 4-7 | Disk artifacts survive everything vs ephemeral |
+| Approval/safety | CODEX 7-4 | 7 protocol-level layers vs 3 session-level |
+
+**Final Score: Codex 7 | Droid 4 | Tie 1**
+
+---
+
+## V200 CONTRACT IMPLICATIONS
+
+### All 4 Gates Reinforced (No Changes Needed)
+- G1 (Slim Types): Codex entity keys have file discriminators — validates ||| delimiter
+- G2 (Single Getter): Codex's ToolOrchestrator::run() CBO=28 shows why single getter matters
+- G3 (FS Source-Read): Codex has 554 silent parse failures — validates explicit error contract
+- G4 (Path Normalization): Codex's 60.96% coverage likely suffers from path variant issues
+
+### R4 Expansion Required (XML-tagged responses)
+Based on Droid's handoff format, R4 should include:
+- provenance: { algorithm, parameters, timestamp }
+- confidence: { score, basis }
+- verification: { commands, expected }
+
+### New Implications (3)
+1. Structured Agent Response Format (from Droid handoffs)
+2. Multi-Project Concurrent Analysis (validated by research workflow)
+3. CBO Monitoring Threshold Alert (god_object rule validation)
+
+### get_context Killer Feature (V200 Moat)
+Neither competitor has ranked, token-budgeted context. V200's 8-signal ranking:
+- Blast Radius (0.30), SCC Membership (0.20), Leiden Community (0.10)
+- PageRank (0.10), CK Metrics (0.10), Cross-Language (0.10), K-Core (0.05), Entropy (0.05)
+
+### ByteRank Replacement (8/11 categories)
+- code_modularization → Leiden + CBO/LCOM/RFC/WMC
+- cyclomatic_complexity → Shannon entropy + branch count
+- dead_code_detection → Datalog dead_code(f)
+- tech_debt_tracking → SQALE scoring (CBO + LCOM + RFC + WMC)
+- test_coverage → untested_pub_fn(f) rule
+- dependency_health → SCC + PageRank + k-core
+- taint_analysis → taint Datalog rule
+- layer_violation → boundary violation rule
+
+### Phase 1 Datalog Rules Confirmed (5 rules)
+SCC / circular_dep, dead_code, god_object, reachable, unsafe_chain — all validated by real-world Codex findings.
+
+---
+
+## PRIORITY MATRIX (V200)
+
+### P0 — MUST SHIP
+- get_context MCP tool with 8 ranking signals
+- Deterministic quality scoring (ByteRank replacement)
+- R7 token count at ingest
+- R4 XML-tagged responses with provenance/confidence
+- Phase 1 Datalog rules (5 rules)
+- G1-G4 gates
+
+### P1 — SHOULD SHIP
+- MCP stdio transport
+- R8 data-flow edges
+- Multi-project slug support
+- Cross-language edge detection
+
+### P2 — NICE TO HAVE
+- Streamable HTTP MCP
+- Phase 2 Datalog rules
+- CBO monitoring threshold alerts
+- Agent handoff format documentation
+
+### P3 — DEFER
+- TypeLayouts, ClosureCaptures as separate endpoints
+- Duplicate detection, Naming consistency
+- context-packer (deferred to v210)
+
+---
+
+## RESEARCH DOCUMENT STRUCTURE
+
+### Phase 1: Graph Overview (CR-codex-graph-overview.md)
+- Codebase statistics (15,901 entities, 136,130 edges)
+- Language breakdown (Rust 14,324 / TS 627 / C 386 / Py 326 / JS 238)
+- Repo structure map (44 crates)
+- Top complexity hotspots (codex.rs CBO=1124)
+- PageRank central entities
+- K-core decomposition (max 33)
+- SCC analysis (zero circular deps)
+- Leiden communities (460 clusters, largest 16,748)
+- Key architectural subsystems (sandbox, MCP, tools, multi-agent)
+- Technical debt indicators (SQALE scoring)
+- Ingestion coverage gaps
+
+### Phase 2: Architecture Deep Dive (CR-codex-architecture.md)
+- Core entity map (15 subsystems)
+- Call graph ASCII trees (5 critical entities)
+- Blast radius analysis (ToolOrchestrator::run = 21.9%)
+- Coupling/cohesion metrics
+- Tri-platform sandbox ASCII diagrams
+- Tool execution pipeline flow
+- MCP integration (4 detailed diagrams)
+- Complexity hotspots (top 14 files)
+- Architecture risk map
+- Design patterns (4 identified)
+- Competitive recommendations
+
+### Phase 3: Codex vs Factory Droid (CR-codex-vs-factory-droid.md)
+- The numbers comparison table
+- Architecture philosophy ASCII
+- 8-axis comparison with diagrams
+- Task decomposition axis
+- Code quality metrics axis
+- Skill/recipe system axis
+- What each should steal (5 items each)
+- Where Parseltongue fits
+- V200 contract implications table
+- Three-body architecture ASCII
+- One-liner takeaways (10)
+
+### Phase 4: V200 Implications (CR-codex-v200-implications.md)
+- Contract-by-contract impact map
+- Non-negotiable gate validation
+- Promoted requirements validation
+- get_context competitor validation
+- ByteRank replacement (Datalog rules)
+- MCP integration strategy
+- Architecture anti-pattern warning (God Object)
+- Datalog rule priority confirmation
+- New implications (3)
+- Priority matrix
+
+### Phase 5: ELI5 ASCII Summary (CR-codex-eli5-ascii-summary.md)
+- 30-second overview
+- Key Line 1: Codex is a 40-crate Rust monster
+- Key Line 2: Triple-platform sandbox = superpower
+- Key Line 3: Droid = orchestrator + workers + receipts
+- Key Line 4: Same tools, different orchestration
+- Key Line 5: Neither has what Parseltongue has
+- Key Line 6: The scoreboard
+- What V200 should do (5 bullets)
+
+---
+
+## FILE LOCATIONS
+
+### Research Output (now in docs/)
+- docs/CR-codex-graph-overview.md
+- docs/CR-codex-architecture.md
+- docs/CR-codex-vs-factory-droid.md
+- docs/CR-codex-v200-implications.md
+- docs/CR-codex-eli5-ascii-summary.md
+- docs/CR07-codex-research-progress-tracker.md
+
+### Source Data
+- CR07/codex/ (cloned from https://github.com/openai/codex.git, v173 branch)
+- CR07/codex/parseltongue20260219195022/analysis.db (Parseltongue database)
+- CR05/factory-droid/ (decompiled binary artifacts, gitignored)
+
+### V200 PRD Docs
+- docs/ZAI-PRD-contracts-01.md
+- docs/ZAI-PRD-contracts-02-FINAL.md
+- docs/v200-docs/PRD-v200.md
+
+---
+
+## GIT STATUS
+
+Branch: v173
+Commit: 5340cb711
+Pushed: Yes, to origin/v173
+
+Files committed:
+- .gitignore (added CR07/)
+- docs/CR-codex-architecture.md
+- docs/CR-codex-eli5-ascii-summary.md
+- docs/CR-codex-graph-overview.md
+- docs/CR-codex-v200-implications.md
+- docs/CR-codex-vs-factory-droid.md
+- docs/CR07-codex-research-progress-tracker.md
+
+Total: 7 files changed, 3,720 insertions(+)
+
+---
+
+## ONE-LINER TAKEAWAYS
+
+1. All 4 non-negotiable gates (G1-G4) reinforced by competitor evidence — no changes needed
+2. R4 needs expansion with provenance/confidence/verification fields
+3. get_context is V200's moat — neither competitor has ranked, token-budgeted context
+4. 8 of 11 ByteRank categories replaceable by V200 graph algorithms — legitimate competitive claim
+5. Phase 1 Datalog rules (5) all confirmed by real-world Codex findings
+6. God Object warning is V200's poster child use case (codex.rs CBO=1124)
+7. V200 as MCP server serves BOTH Codex and Droid — neither can replace V200's role
+8. HTTP-first (Phase 1) is correct — entire research done via HTTP on port 7780
+9. Multi-project support is real workflow need — analyzing multiple repos simultaneously
+10. V200's 8-crate architecture is shallower than Codex's 44-crate DAG by design — monitor CBO
+
+---
+
+## TDD TRACKER SUMMARY
+
+Session: CR07 Codex Research
+Status: ALL PHASES COMPLETE
+Phases: 5 (all GREEN)
+Total Output: ~3,355 lines across 5 documents
+Entities Analyzed: 15,901
+Dependency Edges: 136,130
+Leiden Communities: 9,887
+God Objects Detected: 3 files with CBO > 500
+Circular Dependencies: 0 (Codex has clean DAG)
+
+---
+
+*Context dump generated: 2026-02-19 21:44:00*
+*Parseltongue v1.7.2 | Port 7780 | Database: rocksdb:parseltongue20260219195022/analysis.db*

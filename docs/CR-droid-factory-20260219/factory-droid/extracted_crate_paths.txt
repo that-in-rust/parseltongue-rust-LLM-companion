@@ -1,4 +1,0 @@
-crates/core/search.rselapsed_total: binary detection: rg::searchpreprocessor command could not start: 'preprocessor command failed: ': failed to pass subject filter: file type: , metadata: rg::subjectcrates/core/subject.rscrates/core/main.rsNo files were searched, which means ripgrep probably applied a filter you didn't expect.
-crates/ignore/src/gitignore.rs
-crates/printer/src/json.rsoverflow when adding durationscrates/printer/src/util.rs
-crates/regex/src/crlf.rsassertion failed: self.start <= endcrates/regex/src/error.rsthe literal '' is not allowed in a regexline terminators must be ASCII, but 'literal prefixes detected: grep_regex::literalcrates/regex/src/literal.rsrequired literals found: (?-u:suffix literals foundprefix literals foundprefix/suffix literals found: dropping literals because one was whitespacerequired literal found: dropping literal because one was whitespaceextracted fast line regex: grep_regex::matchercrates/regex/src/matcher.rsfinal regex: 

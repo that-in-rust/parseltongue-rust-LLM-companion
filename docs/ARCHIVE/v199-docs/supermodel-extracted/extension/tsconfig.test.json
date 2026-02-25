@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "outDir": "out/test",
+    "rootDir": "src",
+    "noEmit": false,
+    "sourceMap": true,
+    "declaration": false,
+    "composite": false,
+    "skipLibCheck": true
+  },
+  "include": ["src/test/**/*.ts"],
+  "exclude": ["node_modules", "src/webview", "src/extension"]
+}

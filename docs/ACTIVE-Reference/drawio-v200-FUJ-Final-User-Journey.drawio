@@ -1,0 +1,821 @@
+<mxfile host="65bd71144e">
+    <diagram name="01-Crate-Architecture" id="p1">
+        <mxGraphModel dx="1446" dy="685" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p1_ing" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="20" width="1080" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_ing_t" value="INGEST CONTROL FLOW" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="28" width="1056" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_gw" value="rust-llm-interface-gateway&#10;entry: MCP / HTTP / Tauri / CLI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="70" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_te" value="rust-llm-tree-extractor&#10;file walk + tree-sitter per file" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="180" y="220" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_rs" value="rust-llm-rust-semantics&#10;rust-analyzer, Rust files only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="390" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_cb" value="rust-llm-cross-boundaries&#10;HTTP/FFI/WASM detection, all langs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="398" y="386" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_sr" value="rust-llm-store-runtime&#10;single write path, all entities+edges" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="220" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_gw" target="p1_te" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_e2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_gw" target="p1_sr" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_e3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_te" target="p1_rs" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_e4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p1_te" target="p1_cb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_e5" value="writes" style="edgeStyle=orthogonalEdgeStyle;html=1;entryX=0.931;entryY=1.031;entryDx=0;entryDy=0;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryPerimeter=0;" parent="1" source="p1_rs" target="p1_sr" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="185" y="506"/>
+                            <mxPoint x="971" y="506"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="p1_e6" value="writes" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;dashed=1;" parent="1" source="p1_cb" target="p1_sr" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_qry" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="560" width="1080" height="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_qry_t" value="QUERY CONTROL FLOW" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="568" width="1056" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_gw2" value="rust-llm-interface-gateway&#10;receives MCP tools/call or HTTP GET" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="610" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_sr2" value="rust-llm-store-runtime&#10;single getter — all read paths" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="780" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_gr" value="rust-llm-graph-reasoning&#10;Datalog/Ascent: blast-radius, SCC, cycles" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="780" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_sr3" value="rust-llm-store-runtime&#10;reads entity()/edge() facts for Datalog" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="960" width="270" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_qe1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_gw2" target="p1_sr2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_qe2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_gw2" target="p1_gr" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_qe3" value="Datalog facts" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_gr" target="p1_sr3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_bo" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1150" y="20" width="710" height="840" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_bo_t" value="DEPENDENCY BUILD ORDER (compile-time)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#6a1aaf;" parent="1" vertex="1">
+                    <mxGeometry x="1162" y="28" width="686" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b1" value="rust-llm-core-foundation&#10;EntityKey, Entity, Edge, Error types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="70" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b2" value="rust-llm-store-runtime&#10;storage read/write contracts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="190" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b3" value="rust-llm-rust-semantics&#10;rust-analyzer enrichment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1175" y="310" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b4" value="rust-llm-tree-extractor&#10;tree-sitter extraction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1415" y="310" width="220" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b5" value="rust-llm-cross-boundaries&#10;boundary detection+scoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="430" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b6" value="rust-llm-graph-reasoning&#10;Datalog/Ascent rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="550" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b7" value="rust-llm-interface-gateway&#10;MCP+HTTP+Tauri+CLI entry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="670" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_b8" value="rust-llm-test-harness (internal) + rust-llm-context-packer (V210)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="750" width="300" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_b1" target="p1_b2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_b2" target="p1_b3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_b2" target="p1_b4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p1_b3" target="p1_b5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p1_b4" target="p1_b5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be6" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_b5" target="p1_b6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1_be7" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="p1_b6" target="p1_b7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="02-MCP-Journey-Overview" id="p2">
+        <mxGraphModel dx="1446" dy="685" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p2_l1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="20" width="1200" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l1_t" value="MCP CLIENT JOURNEY — L1 OVERVIEW" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#006EAF;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="28" width="1176" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ph1" value="PHASE 1: SETUP&#10;&lt; 1 min&#10;Install + configure" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="65" width="260" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ph2" value="PHASE 2: INGEST&#10;5–30 sec&#10;Parse codebase to graph" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="65" width="260" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ph3" value="PHASE 3: QUERY&#10;Ongoing&#10;Ask Claude anything" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="65" width="260" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" parent="1" source="p2_ph1" target="p2_ph2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_e2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" parent="1" source="p2_ph2" target="p2_ph3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l2s" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="220" width="1840" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l2s_t" value="L2 — PHASE 1: SETUP (Detailed)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#006EAF;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="228" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s1" value="1.1 Download&#10;Parseltongue&#10;binary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_se0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_s1" target="p2_s2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s2" value="1.2 Edit&#10;claude_desktop_&#10;config.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_se1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_s2" target="p2_s3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s3" value="1.3 Restart&#10;Claude Desktop" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_se2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_s3" target="p2_s4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s4" value="1.4 Claude spawns&#10;MCP server&#10;(stdio)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_se3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_s4" target="p2_s5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s5" value="1.5 initialize&#10;→ initialized&#10;(JSON-RPC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_se4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_s5" target="p2_s6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s6" value="1.6 tools/list&#10;→ 16 tools&#10;received" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1360" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_se5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_s6" target="p2_s7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_s7" value="1.7 READY&#10;User sees&#10;parseltongue tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1620" y="270" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l2i" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="470" width="1840" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l2i_t" value="L2 — PHASE 2: INGEST (Detailed)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="478" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i1" value="2.1 User types&#10;ingest command&#10;in Claude chat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ie0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_i1" target="p2_i2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i2" value="2.2 File walk&#10;language detect&#10;(12 langs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ie1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_i2" target="p2_i3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i3" value="2.3 tree-sitter&#10;extract entities&#10;per file" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ie2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_i3" target="p2_i4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i4" value="2.4 rust-analyzer&#10;enrich Rust&#10;files only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ie3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_i4" target="p2_i5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i5" value="2.5 Cross-lang&#10;boundary detect&#10;HTTP/FFI/WASM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ie4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_i5" target="p2_i6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i6" value="2.6 Emit&#10;shared_context&#10;+ pub_mod_ctx" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1360" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_ie5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_i6" target="p2_i7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_i7" value="2.7 Write all&#10;to store-runtime&#10;(single path)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1620" y="520" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l2q" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="720" width="1840" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_l2q_t" value="L2 — PHASE 3: QUERY (Detailed)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="728" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_q1" value="3.1 User asks&#10;natural language&#10;question" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="770" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_qe0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_q1" target="p2_q2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_q2" value="3.2 Claude&#10;selects which&#10;tool to call" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="365" y="770" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_qe1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_q2" target="p2_q3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_q3" value="3.3 tools/call&#10;JSON-RPC&#10;to parseltongue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="670" y="770" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_qe2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_q3" target="p2_q4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_q4" value="3.4 Store getter&#10;or Datalog rule&#10;fires" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="975" y="770" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_qe3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_q4" target="p2_q5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_q5" value="3.5 XML-tagged&#10;response sent&#10;back to Claude" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="770" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_qe4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="p2_q5" target="p2_q6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2_q6" value="3.6 Claude&#10;synthesizes&#10;answer for user" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="1585" y="770" width="260" height="120" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="03-MCP-Phase1-Setup-L3" id="p3">
+        <mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p3_hdr" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="20" width="1840" height="1300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_hdr_t" value="MCP PHASE 1: SETUP — L3 Implementation Detail" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#006EAF;" vertex="1" parent="1">
+                    <mxGeometry x="32" y="28" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_s1" value="STEP 1: User opens Claude Desktop&#10;&#10;Claude Desktop is already installed. User wants LLM to understand their Rust+React codebase.&#10;Goal: connect Parseltongue as an MCP server." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="70" width="700" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_s2" value="STEP 2: Edit claude_desktop_config.json&#10;&#10;{&#10;  &quot;mcpServers&quot;: {&#10;    &quot;parseltongue&quot;: {&#10;      &quot;command&quot;: &quot;/usr/local/bin/parseltongue-mcp&quot;,&#10;      &quot;args&quot;: [&quot;--workspace&quot;, &quot;/Users/dev/myapp&quot;]&#10;    }&#10;  }&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="200" width="700" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_s3" value="STEP 3: Restart Claude Desktop&#10;&#10;Claude Desktop reads config on startup.&#10;Stdio process spawned: parseltongue-mcp --workspace /Users/dev/myapp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="410" width="700" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_jrpc" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="520" width="1760" height="600" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_jrpc_t" value="JSON-RPC Initialization Sequence (stdio)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#6a1aaf;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="528" width="1736" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_init_req" value="→ SEND: initialize&#10;&#10;{&#10;  &quot;jsonrpc&quot;: &quot;2.0&quot;,&#10;  &quot;id&quot;: 1,&#10;  &quot;method&quot;: &quot;initialize&quot;,&#10;  &quot;params&quot;: {&#10;    &quot;protocolVersion&quot;: &quot;2024-11-05&quot;,&#10;    &quot;clientInfo&quot;: { &quot;name&quot;: &quot;Claude Desktop&quot; },&#10;    &quot;capabilities&quot;: { &quot;tools&quot;: {} }&#10;  }&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="590" width="500" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_init_res" value="← RECV: initialize response&#10;&#10;{&#10;  &quot;jsonrpc&quot;: &quot;2.0&quot;,&#10;  &quot;id&quot;: 1,&#10;  &quot;result&quot;: {&#10;    &quot;protocolVersion&quot;: &quot;2024-11-05&quot;,&#10;    &quot;serverInfo&quot;: {&#10;      &quot;name&quot;: &quot;parseltongue-mcp&quot;,&#10;      &quot;version&quot;: &quot;2.0.0&quot;&#10;    },&#10;    &quot;capabilities&quot;: { &quot;tools&quot;: {} }&#10;  }&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="620" y="590" width="500" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_tlist_req" value="→ SEND: tools/list&#10;&#10;{ &quot;jsonrpc&quot;:&quot;2.0&quot;, &quot;id&quot;:2,&#10;  &quot;method&quot;:&quot;tools/list&quot; }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="850" width="500" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_tlist_res" value="← RECV: 16 tools&#10;&#10;ingest_codebase_from_path&#10;list_all_code_entities&#10;search_entities_fuzzy_query&#10;get_entity_detail_view&#10;list_dependency_edges_all&#10;get_callers_reverse_graph&#10;get_callees_forward_graph&#10;analyze_blast_radius_impact&#10;detect_circular_dependencies&#10;rank_complexity_hotspots&#10;list_semantic_clusters&#10;list_cross_language_boundaries&#10;get_server_health_status&#10;get_codebase_statistics&#10;analyze_strongly_connected&#10;compute_graph_centrality" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="620" y="850" width="500" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_ready" value="READY STATE&#10;&#10;User sees parseltongue tools in Claude Desktop tool picker.&#10;Next: user types a command to ingest their codebase." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1160" y="590" width="580" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p3_init_req" target="p3_init_res" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_e2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p3_tlist_req" target="p3_tlist_res" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_e3" value="initialized notification first" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p3_init_res" target="p3_tlist_req" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_e4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p3_tlist_res" target="p3_ready" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3_note" value="GATE SUMMARY&#10;&#10;G1: Line numbers never in EntityKey&#10;G2: Single getter contract — all reads go through one fn&#10;G3: Source code always read live from disk&#10;G4: File paths normalized to project root&#10;R4: Responses use XML-tagged grouping for LLM parsing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1160" y="730" width="580" height="160" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="04-MCP-Phase2-Ingest-L3" id="p4">
+        <mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p4_hdr" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="20" width="1840" height="1340" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_hdr_t" value="MCP PHASE 2: INGEST — L3 + Design101 CONTRACT BLOCKS" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" vertex="1" parent="1">
+                    <mxGeometry x="32" y="28" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p1" value="User: ingest /Users/dev/myapp&#10;tools/call → ingest_codebase_from_path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="70" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p2" value="File Walk&#10;recursive dir scan → FileEntry{path, lang, bytes}&#10;.gitignore respected" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="180" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p1" target="p4_p2" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p3" value="tree-sitter Parse Per File&#10;language-specific .scm queries&#10;entity + edge extraction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="290" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p2" target="p4_p3" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p4" value="EntityKey Construction&#10;language|||kind|||scope|||name|||file|||disc&#10;(Gate G1: no line numbers)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="400" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p3" target="p4_p4" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p5" value="Visibility Detection&#10;tree-sitter node → is_public bool&#10;pub keyword / export keyword" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="510" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p4" target="p4_p5" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p6" value="Shared Context Edges&#10;any 2 entities same file → shared_context (conf 1.0)&#10;both public → public_module_context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="620" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p6" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p5" target="p4_p6" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p7" value="rust-analyzer Enrichment (Rust only)&#10;typed call edges: Direct/TraitMethod/DynDispatch/Closure&#10;trait impl resolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="730" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p7" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p6" target="p4_p7" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p8" value="Cross-Language Boundary Detection (all langs)&#10;HTTP: route+fetch signal matching&#10;FFI / WASM / PyO3 / queue patterns" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="840" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p8" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p7" target="p4_p8" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p9" value="Write to rust-llm-store-runtime&#10;single write path, no direct storage in pipeline&#10;all entities + edges committed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="950" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p9" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p8" target="p4_p9" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_p10" value="Ingest Complete Response&#10;846 entities, 5418 edges, 94.6% token savings&#10;Claude shows stats to user" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="1060" width="500" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_pe_p4_p10" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="p4_p9" target="p4_p10" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c1" value="CONTRACT: extract_entities_from_file&#10;CRATE: rust-llm-tree-extractor&#10;DATA IN:  FileBytes { path, lang, content }&#10;DATA OUT: ExtractionResult { entities: Vec&lt;Entity&gt;, edges: Vec&lt;Edge&gt; }&#10;─────────────────────────&#10;WHEN lang detected THEN query lang-specific .scm&#10;SHALL not hard-error on parse fail (skip file)&#10;SHALL emit shared_context for all entity pairs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="290" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c2" value="CONTRACT: build_entity_key_canonical&#10;CRATE: rust-llm-tree-extractor&#10;DATA IN:  KeyParts { lang, kind, scope, name, file, disc }&#10;DATA OUT: EntityKey (newtype String)&#10;─────────────────────────&#10;WHEN discriminator empty THEN key ends with |||&#10;SHALL normalize file to project-relative path (G4)&#10;SHALL never embed line numbers (G1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="440" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c3" value="CONTRACT: detect_entity_visibility_flag&#10;CRATE: rust-llm-tree-extractor&#10;DATA IN:  VisibilityNode (tree-sitter node ref)&#10;DATA OUT: bool (is_public)&#10;─────────────────────────&#10;WHEN Rust: pub keyword present THEN true&#10;WHEN TypeScript: export keyword THEN true&#10;Pure predicate — no side effects" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="590" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c4" value="CONTRACT: emit_shared_context_pair&#10;CRATE: rust-llm-tree-extractor&#10;DATA IN:  (Entity, Entity) same-file pair&#10;DATA OUT: Edge&lt;SharedContext&gt; { confidence: 1.0 }&#10;─────────────────────────&#10;WHEN both entities in same file THEN emit edge&#10;SHALL emit for ALL entity pairs (O(n²) per file)&#10;SHALL set confidence=1.0 always" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="670" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c5" value="CONTRACT: emit_public_module_context&#10;CRATE: rust-llm-tree-extractor&#10;DATA IN:  (Entity, Entity) where both.is_public&#10;DATA OUT: Option&lt;Edge&lt;PublicModuleContext&gt;&gt;&#10;─────────────────────────&#10;WHEN both entities public THEN emit pub_mod_ctx edge&#10;SHALL set import_feeds_fn=true when one is import kind&#10;WHEN either is private THEN returns None" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="750" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c6" value="CONTRACT: enrich_rust_entity_typed&#10;CRATE: rust-llm-rust-semantics&#10;DATA IN:  RustEnrichInput { entity_key, ra_db }&#10;DATA OUT: Vec&lt;TypedCallEdge&gt; { kind: Direct|TraitMethod|DynDispatch|Closure }&#10;─────────────────────────&#10;WHEN Rust file THEN load hir::Function from ra_db&#10;SHALL resolve all call sites via body_with_source_map&#10;SHALL NOT run on non-Rust files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="830" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c7" value="CONTRACT: resolve_trait_impl_target&#10;CRATE: rust-llm-rust-semantics&#10;DATA IN:  ImplBlock (hir::Impl)&#10;DATA OUT: Option&lt;ImplEdge { struct_key, trait_key }&gt;&#10;─────────────────────────&#10;WHEN impl Trait for Struct THEN emit Implements edge&#10;WHEN inherent impl (no trait) THEN returns None&#10;SHALL use ra_db.impl_trait() for resolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="940" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c8" value="CONTRACT: detect_http_boundary_edge&#10;CRATE: rust-llm-cross-boundaries&#10;DATA IN:  BoundaryCandidate { server: RouteSignal, client: FetchSignal }&#10;DATA OUT: Option&lt;Edge&lt;HttpBoundary&gt;&gt;&#10;─────────────────────────&#10;WHEN score &gt;= 0.80 THEN Some(Edge{uncertain:false})&#10;WHEN score 0.60-0.79 THEN Some(Edge{uncertain:true})&#10;WHEN score &lt; 0.40 THEN None (rejected)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="1050" width="1200" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4_c9" value="CONTRACT: score_boundary_confidence_signal&#10;CRATE: rust-llm-cross-boundaries&#10;DATA IN:  Vec&lt;ConfidenceSignal&gt;&#10;DATA OUT: f32 (0.0–1.0 clamped)&#10;─────────────────────────&#10;RoutePathMatch::Exact +0.40 | HttpMethodMatch +0.20&#10;HandlerNameSim +0.15 | FrameworkBonus +0.10&#10;MismatchedMethod -0.10 | SHALL clamp to [0,1]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="1160" width="1200" height="115" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="05-MCP-Phase3-Query-L3" id="p5">
+        <mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p5_hdr" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="20" width="1840" height="1340" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_hdr_t" value="MCP PHASE 3: QUERY — L3 + CONTRACT BLOCKS" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="32" y="28" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q1_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="70" width="1780" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q1_bg_t" value="QUERY 1: Search entities fuzzy — &quot;Find all auth-related functions&quot;" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="78" width="1756" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q1_call" value="TOOL: search_entities_fuzzy_query&#10;ARGS: { &quot;query&quot;: &quot;auth&quot; }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="110" width="500" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q1_resp" value="RESPONSE:&#10;5 entities returned: handle_auth_request (rust::fn), auth_middleware (rust::fn),&#10;fetchAuthData (ts::fn), AuthGuard (ts::component), useAuth (ts::fn)&#10;Ranked: exact &gt; prefix &gt; contains. Case-insensitive. Cross-language in one pass." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="110" width="560" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q1_ct" value="CONTRACT: get_entities_fuzzy_query&#10;CRATE: rust-llm-store-runtime&#10;IN:  FuzzyQueryInput { query: String, max_results: Option&lt;u32&gt; }&#10;OUT: Vec&lt;EntitySummary&gt;&#10;---&#10;WHEN query.len()&gt;=1 THEN trigram scan on entity name&#10;SHALL rank exact&gt;prefix&gt;contains, case-insensitive&#10;WHEN no matches THEN Vec::new() (never error)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1200" y="110" width="580" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q1_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p5_q1_call" target="p5_q1_resp" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q2_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="310" width="1780" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q2_bg_t" value="QUERY 2: Cross-language boundary — &quot;What React components call the Rust auth endpoint?&quot;" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="318" width="1756" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q2_call" value="TOOL: list_cross_language_boundaries + get_callers_reverse_graph&#10;ARGS: { &quot;min_confidence&quot;: 0.60 } → { &quot;key&quot;: &quot;ts|||fn|||...|||fetchAuthData|||...&quot; }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="350" width="500" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q2_resp" value="RESPONSE:&#10;Boundary: handle_auth_request (rust) → fetchAuthData (ts) via POST /api/auth, conf=0.90&#10;Callers of fetchAuthData: LoginForm (component), useAuth (fn)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="350" width="560" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q2_ct" value="CONTRACT: list_cross_language_all&#10;CRATE: rust-llm-store-runtime&#10;IN:  CrossLangQuery { min_confidence: f32 }&#10;OUT: Vec&lt;CrossLangEdge { from, to, kind, confidence, uncertain, metadata }&gt;&#10;---&#10;WHEN min_conf=0.60 THEN high+medium edges&#10;SHALL set uncertain=true for confidence in [0.60,0.80)&#10;SHALL NOT include same-language edges" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1200" y="350" width="580" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q2_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p5_q2_call" target="p5_q2_resp" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q3_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="550" width="1780" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q3_bg_t" value="QUERY 3: Blast radius — &quot;If I change handle_auth_request, what breaks?&quot;" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="558" width="1756" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q3_call" value="TOOL: analyze_blast_radius_impact&#10;ARGS: { &quot;key&quot;: &quot;rust|||fn|||...|||handle_auth_request|||...&quot;, &quot;hops&quot;: 3 }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="590" width="500" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q3_resp" value="RESPONSE:&#10;8 entities impacted: 3 Rust (auth_middleware, validate_user + root) + 5 TS (fetchAuthData, LoginForm, useAuth, Navbar, App)&#10;1 language crossing: POST /api/auth http_boundary at hop 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="590" width="560" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q3_ct" value="CONTRACT: analyze_blast_radius_hops&#10;CRATE: rust-llm-graph-reasoning (Ascent Datalog)&#10;IN:  BlastRadiusInput { root: EntityKey, max_hops: u32 }&#10;OUT: BlastRadiusResult { hops: Vec&lt;HopGroup&gt;, summary: ImpactSummary }&#10;---&#10;WHEN root has no edges THEN hops=[HopGroup{n:0}], total=1&#10;SHALL run Ascent reachable transitive closure&#10;SHALL annotate hops crossing language boundaries with CrossingKind" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1200" y="590" width="580" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q3_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p5_q3_call" target="p5_q3_resp" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q4_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="790" width="1780" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q4_bg_t" value="QUERY 4: Entity detail (live) — &quot;Show Rust type info for handle_auth_request&quot;" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="798" width="1756" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q4_call" value="TOOL: get_entity_detail_view&#10;ARGS: { &quot;key&quot;: &quot;rust|||fn|||backend::api::auth|||handle_auth_request|||backend/src/api/auth.rs|||&quot; }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="830" width="500" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q4_resp" value="RESPONSE:&#10;Source snippet (lines 45-67) read LIVE from disk (Gate G3)&#10;Typed edges: Direct→validate_user (conf 1.0), Direct→generate_token (conf 1.0)&#10;If file moved: Err(DetailError::FileMoved) — never stale cached source" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="830" width="560" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q4_ct" value="CONTRACT: get_entity_detail_live&#10;CRATE: rust-llm-store-runtime + rust-llm-interface-gateway&#10;IN:  EntityKey&#10;OUT: EntityDetail { entity, source_snippet, typed_edges, public_module_context }&#10;---&#10;WHEN file exists THEN source_snippet = live lines[start..end] (G3)&#10;SHALL NOT return cached source (always reads disk)&#10;FileMoved/PermissionDenied → explicit Err variants" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1200" y="830" width="580" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q4_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p5_q4_call" target="p5_q4_resp" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q5_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="1030" width="1780" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q5_bg_t" value="QUERY 5: Public module context — &quot;Full public API surface of handle_auth_request's file&quot;" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="1038" width="1756" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q5_call" value="TOOL: get_entity_detail_view → filter public_module_context edges&#10;ARGS: { &quot;key&quot;: &quot;rust|||fn|||...|||handle_auth_request|||backend/src/api/auth.rs|||&quot; }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="1070" width="500" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q5_resp" value="RESPONSE:&#10;4 public siblings: login_handler (fn), AuthRouter (struct),&#10;use axum::Json (import, feeds co-located pub fns), use AppError (import)&#10;3 private helpers: shared_context only, not in public surface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="1070" width="560" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q5_ct" value="CONTRACT: get_public_module_siblings&#10;CRATE: rust-llm-store-runtime&#10;IN:  EntityKey (anchor entity)&#10;OUT: Vec&lt;EntitySummary&gt; (public siblings in same file)&#10;---&#10;WHEN anchor is public THEN return pub_mod_ctx siblings&#10;WHEN anchor is private THEN Vec::new()&#10;SHALL NOT include anchor itself or private siblings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1200" y="1070" width="580" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5_q5_e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p5_q5_call" target="p5_q5_resp" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="06-Tauri-Journey" id="p6">
+        <mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p6_hdr" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="20" width="1840" height="1300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_hdr_t" value="TAURI APP JOURNEY — Visual CLI Launcher Philosophy" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" vertex="1" parent="1">
+                    <mxGeometry x="32" y="28" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_phi" value="TAURI PHILOSOPHY: Visual CLI launcher, NOT a replacement.&#10;Every UI action shows its CLI equivalent. Power users graduate to pure CLI within 7 days.&#10;The app teaches by example — it exists to remove the barrier to entry, not to replace the terminal." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="70" width="1760" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="170" width="1760" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l1_t" value="L1 — THREE-PHASE OVERVIEW" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="178" width="1736" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_open" value="PHASE 1: OPEN&#10;Double-click app, see UI&#10;&lt; 1 sec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="200" width="540" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_le0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" edge="1" source="p6_open" target="['p6_import']" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_import" value="PHASE 2: IMPORT&#10;Point at project, build graph&#10;5–30 sec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="670" y="200" width="540" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_le1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" edge="1" source="p6_import" target="['p6_explore']" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_explore" value="PHASE 3: EXPLORE&#10;Click, zoom, trace edges&#10;Ongoing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="1260" y="200" width="540" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l2o" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="340" width="1760" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l2o_t" value="L2/L3 — PHASE 1: OPEN" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="348" width="1736" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_o1" value="1.1 Double-click&#10;Parseltongue.app&#10;(Tauri runtime)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="390" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_oe0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_o1" target="p6_o2" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_o2" value="1.2 WebView init&#10;WKWebView (mac)&#10;WebView2 (win)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="370" y="390" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_oe1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_o2" target="p6_o3" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_o3" value="1.3 Rust backend&#10;starts as&#10;interface-gateway" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="390" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_oe2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_o3" target="p6_o4" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_o4" value="1.4 React loads&#10;from bundled&#10;assets (no net)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="950" y="390" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_oe3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_o4" target="p6_o5" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_o5" value="1.5 Tauri invoke:&#10;get_codebase_&#10;ingestion_status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="1240" y="390" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_oe4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_o5" target="p6_o6" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_o6" value="1.6 Empty state&#10;[Import Project]&#10;[Open Recent]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="1530" y="390" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l2i" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="590" width="1760" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l2i_t" value="L2/L3 — PHASE 2: IMPORT" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="598" width="1736" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_im1" value="2.1 User clicks&#10;[Import Project]&#10;folder picker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="640" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_ime0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_im1" target="p6_im2" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_im2" value="2.2 Tauri invoke:&#10;start_ingest_&#10;codebase" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="370" y="640" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_ime1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_im2" target="p6_im3" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_im3" value="2.3 Progress bar&#10;(streaming events&#10;via Tauri emit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="640" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_ime2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_im3" target="p6_im4" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_im4" value="2.4 Ingest done&#10;846 entities&#10;94% token savings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="950" y="640" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_ime3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_im4" target="p6_im5" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_im5" value="2.5 Dashboard&#10;appears with stats&#10;and graph preview" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="1240" y="640" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_ime4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_im5" target="p6_im6" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_im6" value="2.6 CLI shown:&#10;parseltongue-mcp&#10;--workspace PATH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="1530" y="640" width="260" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l2e" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="840" width="1760" height="430" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_l2e_t" value="L2/L3 — PHASE 3: EXPLORE (key screens)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="848" width="1736" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sc1" value="SEARCH&#10;Type 'auth'&#10;150ms results&#10;5 entities shown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="900" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sce0" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_sc1" target="p6_sc2" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sc2" value="RESULTS TABLE&#10;Lang | Kind | Name&#10;Token count col&#10;Click to expand" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="370" y="900" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sce1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_sc2" target="p6_sc3" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sc3" value="ENTITY DETAIL&#10;Source code panel&#10;Live from disk (G3)&#10;Typed edges list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="900" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sce2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_sc3" target="p6_sc4" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sc4" value="BLAST RADIUS&#10;Click [Blast Radius]&#10;Hop-by-hop graph&#10;Cross-lang crossings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="950" y="900" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sce3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_sc4" target="p6_sc5" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sc5" value="TYPE ALIGNMENT&#10;Rust struct vs&#10;TS interface diff&#10;Serialize risk flags" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="1240" y="900" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sce4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="p6_sc5" target="p6_sc6" parent="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_sc6" value="EXPORT + CLI&#10;JSON / Mermaid / DOT&#10;CLI equiv shown&#10;→ Graduate to CLI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="1530" y="900" width="260" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6_grad" value="GRADUATION MOMENT: By Day 7, power users switch to pure CLI.&#10;The Tauri app has done its job — it removed the intimidation barrier." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="1080" width="1760" height="60" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="07-Data-Type-Boundaries" id="p7">
+        <mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p7_hdr" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="20" width="1840" height="1320" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_hdr_t" value="DATA TYPE BOUNDARY REFERENCE — All structs crossing crate boundaries" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#6a1aaf;" vertex="1" parent="1">
+                    <mxGeometry x="32" y="28" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_ek" value="EntityKey (newtype — crosses ALL crate boundaries)&#10;&#10;struct EntityKey(String);&#10;Format: language|||kind|||scope|||name|||file_path|||discriminator&#10;&#10;Built by: build_entity_key_canonical()&#10;Validation: EntityKey::parse(s: &amp;str) -&gt; Result&lt;EntityKey, KeyError&gt;&#10;&#10;Gate G1: line numbers NEVER in key&#10;Gate G4: file_path always normalized to project-relative form" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="70" width="560" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="300" width="860" height="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b1_t" value="rust-llm-tree-extractor → rust-llm-store-runtime" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="308" width="836" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_entity" value="struct Entity {&#10;    key:         EntityKey,&#10;    kind:        EntityKind,  // fn|struct|impl|use|component|interface|..&#10;    language:    Language,    // Rust|TypeScript|JavaScript|Ruby|C|Cpp|..&#10;    file:        String,      // normalized relative path&#10;    start_line:  u32,         // 1-indexed&#10;    end_line:    u32,&#10;    is_public:   bool,&#10;    token_count: u32,&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="360" width="380" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_edge" value="struct Edge {&#10;    from:       EntityKey,&#10;    to:         EntityKey,&#10;    kind:       EdgeKind,     // calls|imports|shared_context|&#10;                              // public_module_context|implements|&#10;                              // http_boundary|ffi_boundary|..&#10;    confidence: f32,          // 1.0 structural; scored cross-lang&#10;    uncertain:  bool,         // true if conf in [0.60, 0.80)&#10;    metadata:   serde_json::Value,&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="490" y="360" width="380" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="950" y="300" width="880" height="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b2_t" value="rust-llm-rust-semantics → rust-llm-store-runtime" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="962" y="308" width="856" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_tce" value="struct TypedCallEdge {&#10;    from:       EntityKey,   // caller&#10;    to:         EntityKey,   // callee&#10;    kind:       TypedCallKind,&#10;                 // Direct | TraitMethod&#10;                 // DynDispatch | ClosureInvoke&#10;    confidence: f32,   // always 1.0 (ra resolved)&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="980" y="360" width="380" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_impl" value="struct ImplEdge {&#10;    impl_key:   EntityKey,  // impl block&#10;    struct_key: EntityKey,  // concrete type&#10;    trait_key:  EntityKey,  // trait being impl'd&#10;    kind:       EdgeKind,   // EdgeKind::Implements&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1390" y="360" width="380" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="820" width="860" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b3_t" value="rust-llm-store-runtime → rust-llm-graph-reasoning (Datalog base relations)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="62" y="828" width="836" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_dl" value="// Ascent Datalog relations (type-safe at compile time)&#10;&#10;relation entity(EntityKey, EntityKind, Language);&#10;relation edge(EntityKey, EntityKey, EdgeKind, f32);  // f32 = confidence&#10;&#10;// These are the ONLY facts graph-reasoning reads.&#10;// All Datalog rules operate on these two base relations only." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="870" width="780" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" vertex="1" parent="1">
+                    <mxGeometry x="950" y="820" width="880" height="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_b4_t" value="rust-llm-graph-reasoning → rust-llm-interface-gateway (query results)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="962" y="828" width="856" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_br" value="struct BlastRadiusResult {&#10;    hops:    Vec&lt;HopGroup&gt;,&#10;    summary: ImpactSummary,&#10;}&#10;&#10;struct HopGroup {&#10;    n:        u32,&#10;    entities: Vec&lt;EntitySummary&gt;,&#10;    crossing: Option&lt;CrossingKind&gt;,&#10;}&#10;&#10;struct ImpactSummary {&#10;    by_language:        HashMap&lt;Language, u32&gt;,&#10;    language_crossings: u32,&#10;    total:              u32,&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="980" y="870" width="380" height="390" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7_es" value="struct EntitySummary {&#10;    key:         EntityKey,&#10;    kind:        EntityKind,&#10;    lang:        Language,&#10;    token_count: u32,&#10;    is_public:   bool,&#10;    note: Option&lt;String&gt;,&#10;    // e.g. 'import feeds co-located fns'&#10;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="1390" y="870" width="380" height="200" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="08-References" id="p8">
+        <mxGraphModel dx="1446" dy="685" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="p8_hdr" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="20" width="1840" height="1300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_hdr_t" value="REFERENCES: Edge Types | EntityKey Format | Success Metrics" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#6a1aaf;" parent="1" vertex="1">
+                    <mxGeometry x="32" y="28" width="1816" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_et" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="70" width="580" height="800" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_et_t" value="EDGE TYPE REFERENCE — v2.0" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#1a7a1a;" parent="1" vertex="1">
+                    <mxGeometry x="62" y="78" width="556" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_et1" value="UNIVERSAL (all langs, tree-sitter)&#10;&#10;shared_context&#10;  Same file, conf=1.0&#10;  Any two co-located entities&#10;&#10;public_module_context&#10;  Same file + BOTH public&#10;  import+fn = import_feeds_fn&#10;  interface+fn = contract_bond&#10;&#10;calls&#10;  Function invocation&#10;&#10;imports&#10;  Module-level use/require/import&#10;&#10;contains&#10;  Module/class contains fn&#10;&#10;implements&#10;  Class/struct impl interface/trait" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="130" width="500" height="380" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_et2" value="RUST-ONLY (rust-analyzer enriched)&#10;&#10;typed::Direct&#10;  Direct fn call (fully resolved)&#10;&#10;typed::TraitMethod&#10;  Call through trait object&#10;&#10;typed::DynDispatch&#10;  dyn Trait dispatch&#10;&#10;typed::ClosureInvoke&#10;  Closure call&#10;&#10;dataflow::assign&#10;  Variable assignment flows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="550" width="500" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_et3" value="CROSS-LANGUAGE (confidence-scored)&#10;&#10;http_boundary   Rust route ↔ JS/TS fetch&#10;ffi_boundary    Rust extern 'C' ↔ C fn&#10;wasm_boundary   wasm_bindgen ↔ JS import&#10;pyo3_boundary   #[pyfunction] ↔ Python&#10;queue_boundary  producer ↔ consumer&#10;&#10;GRAPH-DERIVED (Datalog/Ascent)&#10;&#10;reachable       Transitive (N hops)&#10;scc_member      Belongs to SCC (cycle)&#10;layer_violation Crosses arch layer rule" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="800" width="500" height="240" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_ek" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="670" y="70" width="580" height="600" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_ek_t" value="ENTITYKEY FORMAT REFERENCE" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#006EAF;" parent="1" vertex="1">
+                    <mxGeometry x="682" y="78" width="556" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_ek1" value="FORMAT: language|||kind|||scope|||name|||file_path|||discriminator&#10;&#10;Rust function:&#10;  rust|||fn|||backend::api::auth|||handle_auth_request|||backend/src/api/auth.rs|||&#10;&#10;Rust struct:&#10;  rust|||struct|||backend::models|||User|||backend/src/models/user.rs|||&#10;&#10;TypeScript function:&#10;  ts|||fn|||frontend.api|||fetchAuthData|||frontend/src/api/auth.ts|||&#10;&#10;TypeScript component:&#10;  ts|||component|||frontend.components|||LoginForm|||frontend/src/components/LoginForm.tsx|||&#10;&#10;Overloaded Rust fn (discriminator = param types):&#10;  rust|||fn|||backend::db|||query|||backend/src/db.rs|||String,u32&#10;  rust|||fn|||backend::db|||query|||backend/src/db.rs|||String&#10;&#10;RULES:&#10;• Line numbers NEVER in key (Gate G1)&#10;• Path normalized to project root (Gate G4)&#10;• ./path == path == /abs/path (same key)&#10;• Discriminator: ParamTypes → Index → ContentHash" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=10;align=left;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="130" width="510" height="510" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_sm" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="70" width="540" height="800" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_sm_t" value="SUCCESS METRICS — Both Journeys" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontStyle=1;fontSize=13;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="1302" y="78" width="516" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_sm1" value="MCP JOURNEY METRICS&#10;&#10;User configures in &lt; 5 min&#10;Ingest 1000-file repo &lt; 30 sec&#10;Tool response latency &lt; 500ms&#10;Cross-lang boundary &gt;= 0.80 conf&#10;Blast radius 3 hops &lt; 200ms&#10;Token budget: 94%+ reduction&#10;Zero stdout contamination&#10;(logs only to stderr)&#10;&#10;TAURI JOURNEY METRICS&#10;&#10;App cold start &lt; 1 sec&#10;Dashboard &lt; 200ms after ingest&#10;Search results &lt; 150ms keystroke&#10;Blast radius graph &lt; 300ms render&#10;Source panel: always live (G3)&#10;Every UI action shows CLI equiv&#10;Power users → CLI within 7 days" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontSize=11;align=left;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="130" width="480" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8_conf" value="CONFIDENCE THRESHOLDS (cross-language boundary edges)&#10;&#10;&gt;= 0.80  HIGH    include by default, uncertain=false&#10;0.60-0.79 MEDIUM  include, uncertain=true marker&#10;0.40-0.59 LOW     opt-in only (user must request)&#10;&lt; 0.40   REJECT  not stored&#10;&#10;Signal table (score_boundary_confidence_signal):&#10;RoutePathMatch::Exact +0.40 | HttpMethodMatch +0.20&#10;HandlerNameSimilarity +0.15 | FrameworkBonus +0.10&#10;SameRepoBonus +0.05 | RoutePathMatch::Fuzzy +0.20&#10;MismatchedMethod -0.10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="670" y="710" width="580" height="240" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
