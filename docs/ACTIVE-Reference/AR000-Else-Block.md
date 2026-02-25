@@ -4,7 +4,7 @@
 ## GOVERNING THOUGHT
 
 V200 architecture is ~70% decided at the crate and protocol level.
-Implementation is blocked on 36 open questions that fall into 3 tiers.
+Implementation is blocked on 37 open questions that fall into 3 tiers.
 **Tier 1 must resolve before any crate code is written.**
 Tier 2 must resolve before TDD stubs are written for affected crates.
 Tier 3 can resolve during implementation without blocking it.
@@ -15,14 +15,14 @@ Tier 3 can resolve during implementation without blocking it.
 	                    ┌─────────────────┐
 	                    │  GOVERNING IDEA │
 	                    │  ~70% decided,  │
-	                    │  36 OQs remain  │
+	                    │  37 OQs remain  │
 	                    └────────┬────────┘
 	             ┌───────────────┼──────────────────┐
 	             ▼               ▼                  ▼
 	      ┌─────────────┐ ┌─────────────┐  ┌─────────────┐
 	      │  DECIDED    │ │  OPEN       │  │  OPEN       │
 	      │  4 clusters │ │  TIER 1     │  │  TIER 2+3   │
-	      │  binding    │ │  7 blockers │  │  29 OQs     │
+	      │  binding    │ │  8 blockers │  │  29 OQs     │
 	      │  now        │ │  arch-level │  │  impl-level │
 	      └─────────────┘ └─────────────┘  └─────────────┘
 ```
@@ -246,6 +246,42 @@ Recommended direction:
 - All higher-level analysis claims (blast radius, SCC, taint/dataflow enrichment) are valid only after this gate passes.
 
 Blocks: FUJ-v2 ingest contract, store schema for ingestion observability, success metrics credibility.
+
+---
+
+### OQ-X07 ★ External index sidecar adoption (codemogger) for Big-Rock-01
+
+Local research clone: `CR09/codemogger` (git: `glommer/codemogger`).
+
+What this gives us immediately (proven in code):
+- Incremental per-file ingestion with checksum tracking (`indexed_files.file_hash`, stale-file removal, changed-only reprocessing).
+- Multi-language AST chunking via tree-sitter WASM (Rust/TS/JS/C/C++/Go/Python/Ruby/etc.).
+- Fast local retrieval path (FTS + vector + hybrid RRF) with MCP tools (`index`, `search`, `reindex`).
+- Zero-server local runtime model (single SQLite file per project).
+
+Where it does **not** satisfy Big-Rock-01 as-is:
+- No hard terminal-class ledger for every discovered file (`docs | non_eligible_text | identifiable_tests | code_graph`).
+- Simplified ignore semantics and hidden-file skipping can create silent blind spots.
+- Identity key is line-range based (`file:start:end`) and is unstable under edits; not compatible with canonical EntityKey rules.
+- No graph edge model (calls/imports/boundaries), no truth-tiering (`verified/heuristic/rejected`), no conflict quarantine.
+
+Decision options:
+- (a) **Reference-only**: borrow patterns (hash ledger, stale removal, MCP ergonomics), reimplement inside V200 crates.
+- (b) **Sidecar federation**: ingest codemogger chunks as `evidence` records (search acceleration), never as canonical graph facts.
+- (c) **Replace ingestion core with codemogger**: fastest initial velocity but violates current canonical key + truth-contract requirements.
+
+Recommended direction:
+- Choose **(b)** now. Use codemogger as a non-canonical sidecar index for discovery UX and fallback retrieval.
+- Keep Parseltongue ingestion ledger + canonical graph as source of truth.
+- Add a mapping gate: sidecar records are only promoted if path/span maps unambiguously to canonical EntityKey and pass truth checks.
+
+Good candidate feature for AR000/FUJ-v2:
+- `Ingestion Explorer + Evidence Search`:
+  - Explorer view/API: complete per-run file accounting with bucket + reason.
+  - Evidence search tool: semantic lookup across sidecar chunks, returned with provenance tag `source=external_sidecar`.
+  - Promotion pipeline: explicit user/agent action to convert evidence into canonical graph facts after validation.
+
+Blocks: Big-Rock-01 contract closure, ingestion schema boundaries, FUJ-v2 ingest/query separation.
 
 ---
 
@@ -640,6 +676,7 @@ ALREADY RESOLVED (2026-02-25):
 MUST RESOLVE FIRST (blocks everything):
   OQ-X03  Data flow edges in or out?
   OQ-X06  Full-file ingest observability contract
+  OQ-X07  External sidecar adoption boundary (codemogger)
   OQ-I01  Double-storage of shared_context + pub_mod_ctx
   OQ-T01  Tauri: unit of management (process vs workspace)
 
