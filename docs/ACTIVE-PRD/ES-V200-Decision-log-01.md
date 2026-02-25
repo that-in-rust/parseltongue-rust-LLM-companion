@@ -2,6 +2,11 @@
 Status: Active — restructured 2026-02-22 using Minto Pyramid Principle
 Purpose: Record binding decisions and open questions for V200.
 
+
+
+
+
+
 ---
 
 ## GOVERNING THOUGHT
@@ -226,7 +231,7 @@ Blocks: rust-llm-tree-extractor TDD stub design, Edge Type Reference completenes
 
 ### OQ-X06 ★ Full-file ingest observability contract (coverage truth)
 
-Current docs define parsing behavior and endpoint outputs, but not a hard accountability rule for "what exactly was seen vs skipped vs parsed."  
+Current docs define parsing behavior and endpoint outputs, but not a hard accountability rule for "what exactly was seen vs skipped vs parsed."
 Without this, we cannot prove ingestion fidelity, and FUJ metrics can look healthy while blind spots exist.
 
 Decision needed:
