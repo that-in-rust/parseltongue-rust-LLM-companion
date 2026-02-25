@@ -106,3 +106,54 @@ Once BR01 is locked, FUJ can be simplified into:
 2. Ingest with observability proof
 3. Query only trusted facts
 4. Explain confidence on every answer
+
+---
+
+## Implementation Policy (V200): Build What Works First, Optimize Next
+**Status**: Accepted draft  
+**Date**: 2026-02-25  
+**Intent**: Ship dependable ingestion truth first, then optimize throughput safely.
+
+### Binding Policy Decisions
+**POL-D1: Correctness-first delivery.**  
+V200 implementation priority is:
+1. deterministic ingestion outputs
+2. explicit provenance + truth grades
+3. conflict visibility
+4. zero silent drops
+
+Performance optimization is not phase-1 gating unless it threatens usability.
+
+**POL-D2: Keep performance hooks from day 1 (do not defer these).**  
+The following are mandatory in initial implementation:
+1. batch writes
+2. content-hash skip for unchanged files
+3. parallel file processing where safe
+4. per-phase timing telemetry (`discover`, `parse`, `evidence`, `merge`, `write`)
+
+These keep optimization optional later, not painful rewrites.
+
+**POL-D3: Do not defer contract stability.**  
+These contracts are frozen early:
+1. canonical entity key format
+2. ingestion ledger schema
+3. provenance schema
+4. truth-grade model (`verified`, `heuristic`, `rejected`)
+
+Changing these late is considered high-risk and requires explicit migration plan.
+
+**POL-D4: One command, one run ledger, explicit phase states.**  
+User executes one ingest flow; internally pipeline may have multiple lanes.  
+Each file must record phase outcome:
+1. `discovered`
+2. `parsed`
+3. `evidenced`
+4. `merged`
+5. `written`
+6. terminal state (`completed` | `failed` | `skipped`) with reason
+
+### Acceptance Criteria For This Policy
+1. A failed run can answer: exactly what was missed, where, and why.
+2. Same input + same tool versions => same output graph and ledger.
+3. Post-MVP optimization can be done without changing query contracts.
+4. Time-to-ready and throughput are measurable from built-in telemetry.

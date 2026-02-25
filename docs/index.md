@@ -1,6 +1,6 @@
 # docs-index
 Status: Active
-Generated: 2026-02-25 12:21:59 IST
+Generated: 2026-02-25 14:56:34 IST
 Command: `tree docs`
 
 ## Docs Tree Snapshot
@@ -8,7 +8,8 @@ Command: `tree docs`
 docs
 |-- ACTIVE-PRD
 |   |-- ES-V200-Decision-log-01.md
-|   `-- Parseltongue-Journal-20260220.txt
+|   |-- Parseltongue-Journal-20260220.txt
+|   `-- v200-arch-patterns-01.md
 |-- ACTIVE-Reference
 |   |-- AR000-Else-Block.md
 |   |-- AR001-CONSOLIDATED_FEATURE_PMF_JOURNEY_MATRIX.md
@@ -403,7 +404,9 @@ docs
 |   |   |-- v173_backlog.md
 |   |   `-- v199-architecture-opinion-analysis.md
 |   `-- v210-docs
-`-- index.md
+|-- index.md
+`-- v210-Reference
+    `-- V210-Codemogger-Fuzzy-Candidate-Use-Case.md
 
-27 directories, 372 files
+28 directories, 374 files
 ```
