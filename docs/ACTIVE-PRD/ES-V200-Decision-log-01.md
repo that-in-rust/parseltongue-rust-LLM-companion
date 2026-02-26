@@ -294,43 +294,86 @@ Use capability markers (`full`, `partial`, `heuristic`) instead of pretending ce
 
 ---
 
-## Big-Rock-04: Tiered Language Depth for Rust Migration
+## Big-Rock-04: Tauri App Operator Surface
 **Status**: Drafted for decision close  
 **Date**: 2026-02-26  
-**Intent**: Build the deepest truthful graph for languages that matter for Rust rewrite journeys.
+**Intent**: Build Tauri as a clean operator UI to manage and monitor Parseltongue ingestion/processes.
 
 ### Scope Lock (Original Statement — Unchanged)
 - BR04: Tauri App as a UI to manage and monitor parseltongue ingestion across your system
 
 ### Additive Note
-This section adds language-depth contracts needed for migration-grade truth.  
-It does not remove BR04 (Tauri) scope, which remains separately defined in BR06 below.
+The section below operationalizes BR04 only.  
+No language-depth work is included in BR04.
+
+### Why This Big Rock Exists
+If runtime operations are fragile, product trust collapses regardless of graph quality.  
+Tauri should reduce friction, not become a second product to maintain.
+
+### Binding Decisions (Current Draft)
+**BR04-D1: Tauri is instance manager only.**  
+No graph explorer scope in V200 Tauri.
+
+**BR04-D2: Three core actions only.**
+1. Start/Stop HTTP server per workspace
+2. Write MCP config entry
+3. Show exact CLI commands for ingest/serve
+
+**BR04-D3: Ingestion monitoring is first-class in Tauri.**
+1. current run state
+2. coverage totals from BR01
+3. parse/degrade error summaries
+4. process port and lifecycle status
+
+**BR04-D4: Every UI action has a CLI equivalent.**  
+Power users can graduate from UI to terminal without hidden logic.
+
+**BR04-D5: Tauri must never become an analysis engine.**  
+All heavy graph logic stays in gateway/store/reasoning crates.
+
+### Acceptance Criteria For Big-Rock-04
+1. A new workspace can be launched, connected, and queried without manual log hunting.
+2. Process crash/death is detected and reflected in UI state.
+3. MCP config write path is deterministic and auditable.
+4. Users can copy/paste CLI commands from Tauri and reproduce behavior exactly.
+5. No graph algorithm logic lives in Tauri client layer.
+
+---
+
+## Proposed Big-Rock-05: Tiered Language Depth for Rust Migration
+**Status**: Drafted for decision close  
+**Date**: 2026-02-26  
+**Intent**: Build the deepest truthful graph for languages that matter for Rust rewrite journeys.
+
+### Scope Note
+Original BR05 was open/blank.  
+This is a proposed fill for BR05 focused on migration-grade language capability depth.
 
 ### Why This Big Rock Exists
 Your end goal is Rust migration, not generic language vanity coverage.  
 So capability depth must follow migration value, not feature count.
 
 ### Binding Decisions (Current Draft)
-**BR04-D1: Tiered depth is mandatory and explicit.**
+**BR05-D1: Tiered depth is mandatory and explicit.**
 1. Tier 1: Rust (`.rs`) — full semantic depth + highest confidence
 2. Tier 2: TypeScript, JavaScript, C, C++, Ruby, Rails — medium-to-high depth where tooling supports it
 3. Tier 3: remaining supported languages — structural extraction + explicit capability limits
 
-**BR04-D2: Dataflow is capability-scored per language.**
+**BR05-D2: Dataflow is capability-scored per language.**
 1. Rust: full target in V200
 2. Tier 2: partial where symbol resolution works
 3. Tier 3: heuristic only, default hidden unless opted in
 
-**BR04-D3: Migration-focused outputs are required.**
+**BR05-D3: Migration-focused outputs are required.**
 1. cross-language boundary map (HTTP/FFI/WASM/PyO3/Ruby FFI)
 2. API contract mismatch report across Rust and non-Rust nodes
 3. blast-radius + public-module-context to estimate rewrite impact
 4. capability report so users know exactly what to trust per language
 
-**BR04-D4: No language gets fake precision.**
+**BR05-D4: No language gets fake precision.**
 When tooling cannot prove semantics, output must remain heuristic and visibly marked.
 
-### Acceptance Criteria For Big-Rock-04
+### Acceptance Criteria For Big-Rock-05
 1. Every language in ingest has a declared capability tier in output metadata.
 2. Tier 2 languages produce useful migration-grade relationship edges with confidence.
 3. Tier 3 languages never appear as high-confidence semantic truth by accident.
@@ -339,81 +382,44 @@ When tooling cannot prove semantics, output must remain heuristic and visibly ma
 
 ---
 
-## Proposed Big-Rock-05: External Evidence Federation (Truthful-by-Construction)
+## Proposed Big-Rock-06: External Evidence Federation (Truthful-by-Construction)
 **Status**: Drafted for decision close  
 **Date**: 2026-02-26  
 **Intent**: Ingest strong external analyzer signals without corrupting canonical graph truth.
 
 ### Scope Note
-Original BR05 was open/blank.  
-This is a proposed fill for BR05 based on AR references and can be renamed or replaced.
+This is additive after BR01-BR05 and can be sequenced after core ingestion/query contracts.
 
 ### Why This Big Rock Exists
 There is rich value in external analyzers (Semgrep, CodeQL, Brakeman, clang tooling),  
 but blind merge of their output into core edges creates false confidence.
 
 ### Binding Decisions (Current Draft)
-**BR05-D1: External findings enter as evidence, not canonical truth.**
+**BR06-D1: External findings enter as evidence, not canonical truth.**
 Default representation is `evidence` relation with provenance fields.
 
-**BR05-D2: Canonical promotion is gated.**
+**BR06-D2: Canonical promotion is gated.**
 Promote evidence to first-class edge only if:
 1. entity mapping is exact
 2. replay tests pass on pinned corpus
 3. conflict checks pass
 
-**BR05-D3: Mapping contract is explicit.**
+**BR06-D3: Mapping contract is explicit.**
 Minimum mapping tuple:
 1. `path`
 2. `start_line:start_col`
 3. `end_line:end_col`
 4. `rule_id/check_id`
 
-**BR05-D4: Conflicts are quarantined, not auto-resolved.**
+**BR06-D4: Conflicts are quarantined, not auto-resolved.**
 Ambiguous or contradictory evidence must be query-visible as conflict state.
 
-### Acceptance Criteria For Big-Rock-05
+### Acceptance Criteria For Big-Rock-06
 1. 100% external findings keep tool/version/rule provenance.
 2. No external finding becomes canonical without passing promotion gate.
 3. Ambiguous mappings are visible as `ambiguous`/`unmapped`, not silently dropped.
 4. Query layer can filter by `canonical_only` vs `canonical_plus_evidence`.
 5. FUJ includes one evidence-to-canonical promotion example.
-
----
-
-## Big-Rock-06: Operator Surface (Tauri + CLI + MCP)
-**Status**: Drafted for decision close  
-**Date**: 2026-02-26  
-**Intent**: Make Parseltongue operationally boring: easy to start, inspect, and recover.
-
-### Why This Big Rock Exists
-If runtime operations are fragile, product trust collapses regardless of graph quality.  
-Tauri should reduce friction, not become a second product to maintain.
-
-### Binding Decisions (Current Draft)
-**BR06-D1: Tauri is instance manager only.**  
-No graph explorer scope in V200 Tauri.
-
-**BR06-D2: Three core actions only.**
-1. Start/Stop HTTP server per workspace
-2. Write MCP config entry
-3. Show exact CLI commands for ingest/serve
-
-**BR06-D3: Every UI action has a CLI equivalent.**  
-Power users can graduate from UI to terminal without hidden logic.
-
-**BR06-D4: Ops pane must show ingestion truth and runtime telemetry.**
-1. current run state
-2. coverage totals from BR01
-3. last errors and degrade reasons
-4. port and process lifecycle status
-
-### Acceptance Criteria For Big-Rock-06
-1. A new workspace can be launched, connected, and queried without manual log hunting.
-2. Process crash/death is detected and reflected in UI state.
-3. MCP config write path is deterministic and auditable.
-4. Users can copy/paste CLI commands from Tauri and reproduce behavior exactly.
-5. No graph algorithm logic lives in Tauri client layer.
 
 ---
 
