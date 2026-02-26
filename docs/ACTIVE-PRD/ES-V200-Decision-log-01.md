@@ -2,6 +2,48 @@
 Status: Active — restructured 2026-02-22 using Minto Pyramid Principle
 Purpose: Record binding decisions and open questions for V200.
 
+
+
+List of Big Rocks
+- BR01: Ingestion (Accuracy-First) that includes
+  - segregating files and entities into 4 categories : 
+    - docs
+    - non-eligible-text (languages or extensions we do not support)
+    - identifiable-tests (test files or entities)
+    - code-graph (source code files)
+  - enriching via tree-sitter, LSPs and common sense
+    - basic metadata for entities, files and edges via tree-sitter
+    - entities with meta-data from LSPs like Rust-Analyzer and others wherver possible
+    - dependency edges with meta-data from LSPs like Rust-Analyzer and others wherver possible
+    - dependency edges with new relationships that we can creatively infer
+      - 2 functions in the same file are likely to be related by common context sharing
+      - 2 statements in the same file at public interface level are likely to be related by common context sharing
+- BR02: Query-First Graph Design
+  - Following list of ideas
+    - FIND ENTITIES
+      - GET /code-entities-list-all                                  → all entities (data.total_count, data.entities[])
+      - GET /code-entities-list-all?entity_type=function             → filter by type
+      - GET /code-entities-search-fuzzy?q=PATTERN                    → fuzzy name search (data.total_count, data.entities[])
+      - GET /code-entity-detail-view?key=ENTITY_KEY                  → full source code of one entity
+    - TRACE DEPENDENCIES
+      - GET /dependency-edges-list-all                               → all edges (from_key, to_key, edge_type)
+      - GET /reverse-callers-query-graph?entity=ENTITY_KEY           → who calls this entity
+      - GET /forward-callees-query-graph?entity=ENTITY_KEY           → what does this entity call
+      - GET /blast-radius-impact-analysis?entity=ENTITY_KEY&hops=N   → transitive impact (default hops=2)
+    - ANALYZE ARCHITECTURE
+      - GET /circular-dependency-detection-scan                      → circular dependency cycles
+      - GET /complexity-hotspots-ranking-view?top=N                  → most coupled entities (default top=10)
+      - GET /semantic-cluster-grouping-list                           → module groupings
+      - GET /strongly-connected-components-analysis                   → Tarjan SCC cycle detection
+      - GET /technical-debt-sqale-scoring                             → ISO 25010 SQALE debt scores
+  GET /kcore-decomposition-layering-analysis                    → core/mid/peripheral layers
+  GET /centrality-measures-entity-ranking?method=pagerank       → entity importance (method: pagerank|betweenness)
+  GET /entropy-complexity-measurement-scores                    → Shannon entropy per entity
+  GET /coupling-cohesion-metrics-suite                          → CK metrics: CBO, LCOM, RFC, WMC
+  GET /leiden-community-detection-clusters                      → Leiden community detection
+
+
+
 ---
 
 ## Big-Rock-01: Ingestion Truth Loop (Accuracy-First)
