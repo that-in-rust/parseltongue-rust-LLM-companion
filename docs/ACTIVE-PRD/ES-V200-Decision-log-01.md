@@ -36,12 +36,14 @@ List of Big Rocks
       - GET /semantic-cluster-grouping-list                           → module groupings
       - GET /strongly-connected-components-analysis                   → Tarjan SCC cycle detection
       - GET /technical-debt-sqale-scoring                             → ISO 25010 SQALE debt scores
-  GET /kcore-decomposition-layering-analysis                    → core/mid/peripheral layers
-  GET /centrality-measures-entity-ranking?method=pagerank       → entity importance (method: pagerank|betweenness)
-  GET /entropy-complexity-measurement-scores                    → Shannon entropy per entity
-  GET /coupling-cohesion-metrics-suite                          → CK metrics: CBO, LCOM, RFC, WMC
-  GET /leiden-community-detection-clusters                      → Leiden community detection
-
+      - GET /kcore-decomposition-layering-analysis                    → core/mid/peripheral layers
+      - GET /centrality-measures-entity-ranking?method=pagerank       → entity importance (method: pagerank|betweenness)
+      - GET /entropy-complexity-measurement-scores                    → Shannon entropy per entity
+      - GET /coupling-cohesion-metrics-suite                          → CK metrics: CBO, LCOM, RFC, WMC
+      - GET /leiden-community-detection-clusters                      → Leiden community detection
+- BR03: Bi-Directional Workflow reference where LLM queries the above list of APIs to generate insights
+- BR04: Tauri App UI to manage & monitor parseltongue ingestion across your system
+- BR05: 
 
 
 ---
