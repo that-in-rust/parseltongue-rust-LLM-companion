@@ -60,18 +60,18 @@ No original BR01-BR04 scope is reduced, replaced, or deprecated by these section
 
 ### Scope Lock (Original Statement — Unchanged)
 - BR01: Ingestion (Accuracy-First) that includes
-- segregating files and entities into 4 categories:
-- `docs`
-- `non-eligible-text (languages or extensions we do not support)`
-- `identifiable-tests (test files or entities)`
-- `code-graph (source code files)`
-- enriching via tree-sitter, LSPs and common sense
-- basic metadata for entities, files and edges via tree-sitter
-- entities with meta-data from LSPs like Rust-Analyzer and others wherever possible
-- dependency edges with meta-data from LSPs like Rust-Analyzer and others wherever possible
-- dependency edges with new relationships that we can creatively infer
-- 2 functions in the same file are likely to be related by common context sharing
-- 2 statements in the same file at public interface level are likely to be related by common context sharing
+  - segregating files and entities into 4 categories:
+    - `docs`
+    - `non-eligible-text (languages or extensions we do not support)`
+    - `identifiable-tests (test files or entities)`
+    - `code-graph (source code files)`
+  - enriching via tree-sitter, LSPs and common sense
+    - basic metadata for entities, files and edges via tree-sitter
+    - entities with meta-data from LSPs like Rust-Analyzer and others wherever possible
+      - dependency edges with meta-data from LSPs like Rust-Analyzer and others wherever possible
+      - dependency edges with new relationships that we can creatively infer
+      - 2 functions in the same file are likely to be related by common context sharing
+      - 2 statements in the same file at public interface level are likely to be related by common context sharing
 
 ### Why This Big Rock Exists
 We agreed the core product risk is not query UX or algorithm count.  
