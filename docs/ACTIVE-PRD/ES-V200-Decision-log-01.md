@@ -41,8 +41,9 @@ List of Big Rocks
       - GET /entropy-complexity-measurement-scores                    → Shannon entropy per entity
       - GET /coupling-cohesion-metrics-suite                          → CK metrics: CBO, LCOM, RFC, WMC
       - GET /leiden-community-detection-clusters                      → Leiden community detection
+    - Explore Arxiv and other common sense things knowing you have a code-graph heavily enriched with useful information
 - BR03: Bi-Directional Workflow reference where LLM queries the above list of APIs to generate insights
-- BR04: Tauri App UI to manage & monitor parseltongue ingestion across your system
+- BR04: Tauri App as a UI to manage & monitor parseltongue ingestion across your system
 - BR05: 
 
 
