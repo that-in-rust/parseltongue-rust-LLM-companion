@@ -267,6 +267,9 @@ One query contract, two adapters.
 6. `OQ-BR02-6`: What is our formal "LSP for LLMs" contract for V200?
    - Candidate architecture under evaluation: `MCP transport layer + precise symbol/graph truth layer + metadata-first span retrieval (file_path/start_line/end_line)`.
    - Required decision: which part is mandatory in V200 core vs optional sidecar integration.
+7. `OQ-BR02-7`: Should V200 include a control-flow layer for statement-order reasoning inside entities (not only dependency edges)?
+   - Candidate edge set: `NEXT`, `BRANCH`, `LOOP`, `RETURN`, `THROW`.
+   - Required decision: whether control-flow is V200 core scope or deferred after dependency-graph baseline.
 
 ---
 
