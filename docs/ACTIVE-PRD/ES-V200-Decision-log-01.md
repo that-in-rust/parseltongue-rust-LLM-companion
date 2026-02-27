@@ -271,6 +271,9 @@ One query contract, two adapters.
    - Candidate edge set: `NEXT`, `BRANCH`, `LOOP`, `RETURN`, `THROW`.
    - Required decision: whether control-flow is V200 core scope or deferred after dependency-graph baseline.
 8. `OQ-BR02-8`: Do we adopt a SCIP-like transmission contract for cross-tool interoperability while keeping Parseltongue storage/query runtime independent?
+9. `OQ-BR02-9`: Do we integrate CocoIndex-style semantic search as a sidecar candidate generator tied to Parseltongue canonical entity keys?
+   - Candidate stance: sidecar for discovery (`top_k spans`), not canonical truth replacement.
+   - Required decision: V200 mandatory vs optional integration milestone.
 
 ### External Precedent Addendum (SCIP, sourcegraph/scip)
 **Status**: Added for BR02 decision support  
@@ -292,6 +295,41 @@ Candidate carry-forwards for V200:
 3. Add typed relationship semantics to query surface and trust/provenance outputs.
 4. Add enclosing-range metadata to improve selective context assembly for LLM workflows.
 5. Add ingest quality gates equivalent to lint/canonicalize/snapshot checks before accepting index data as trusted.
+
+### External Precedent Addendum (CocoIndex-style sidecar retrieval)
+**Status**: Added for BR02/BR07 decision support  
+**Date**: 2026-02-27
+
+Summary:
+1. A lightweight semantic MCP search layer can produce `file_path/start_line/end_line` candidates fast.
+2. This is strong for direct discovery and natural-language recall.
+3. It is not sufficient alone for dependency-truth reasoning (no canonical graph contract by default).
+
+Carry-forward for V200:
+1. Use sidecar search to generate top candidate spans.
+2. Resolve those spans to canonical Parseltongue entity keys.
+3. Expand via dependency graph and trust-grade filters before LLM output.
+
+### Indexing Time Expectations (planning ranges; verify with benchmark probes)
+Assumptions:
+1. Medium/high-end developer machine.
+2. AST/chunking + embeddings + local SQLite/vector store.
+3. Embedding provider latency dominates when remote API is used.
+
+Cold index (first run):
+1. ~100k LOC: ~2-8 minutes
+2. ~500k LOC: ~10-45 minutes
+3. ~1M+ LOC: ~20-90 minutes
+
+Incremental index (typical daily edits):
+1. <100 changed files: ~3-60 seconds
+2. ~100-500 changed files: ~1-5 minutes
+3. Full refactor/branch switch: can approach cold-index range
+
+Candidate V200 SLO targets to evaluate:
+1. Incremental update p95 under 60 seconds for <100 changed files.
+2. Cold index under 30 minutes for ~500k LOC with local embeddings.
+3. Explicit degrade messaging when embedding provider latency exceeds SLO envelope.
 
 ---
 
