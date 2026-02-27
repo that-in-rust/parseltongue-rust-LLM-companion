@@ -257,6 +257,14 @@ One query contract, two adapters.
 4. Entity detail returns live source or explicit file error, never stale body.
 5. Endpoints are stable enough for FUJ and Tauri integration without per-release rewiring.
 
+### Open Questions To Close Next (BR02)
+1. `OQ-BR02-1`: What is the canonical retrieval strategy for V200 candidate generation before graph expansion?
+   - Baseline flow under discussion: `top_k search candidates -> entity span resolution (file_path + start_line + end_line) -> dependency graph expansion -> selective source read -> LLM judgment`.
+2. `OQ-BR02-2`: Do we require a dedicated search service/indexer, or is filesystem search (`rg`/BM25/fuzzy rerank) sufficient for V200 scope?
+3. `OQ-BR02-3`: Where does cosine/vector similarity add measurable value versus lexical/fuzzy search for real user tasks?
+4. `OQ-BR02-4`: What is the minimum metadata we store persistently (`entity key + span + edge + hash`) while keeping source bodies on disk only?
+5. `OQ-BR02-5`: For large codebases, what is the acceptable indexing latency budget before graph+search utility is considered not worth the cost?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
