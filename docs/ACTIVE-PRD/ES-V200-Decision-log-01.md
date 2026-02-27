@@ -270,6 +270,28 @@ One query contract, two adapters.
 7. `OQ-BR02-7`: Should V200 include a control-flow layer for statement-order reasoning inside entities (not only dependency edges)?
    - Candidate edge set: `NEXT`, `BRANCH`, `LOOP`, `RETURN`, `THROW`.
    - Required decision: whether control-flow is V200 core scope or deferred after dependency-graph baseline.
+8. `OQ-BR02-8`: Do we adopt a SCIP-like transmission contract for cross-tool interoperability while keeping Parseltongue storage/query runtime independent?
+
+### External Precedent Addendum (SCIP, sourcegraph/scip)
+**Status**: Added for BR02 decision support  
+**Date**: 2026-02-27
+
+Key takeaways from SCIP codebase review:
+1. SCIP is designed as a **transmission format**, not a query storage engine.
+2. Source text is optional in index payloads; consumers are expected to read source from filesystem by root + relative path.
+3. Path/range contracts are strict and explicit (canonical relative paths, half-open ranges, position encoding).
+4. Symbol identity uses a formal grammar with canonical formatting/parsing to reduce ambiguity.
+5. Relationship semantics are typed (`is_reference`, `is_implementation`, `is_type_definition`, `is_definition`) instead of one generic edge.
+6. `enclosing_range` is used to provide local AST context around occurrences (useful for context slicing and call hierarchy-like UX).
+7. Streaming, document-granular parsing is a first-class design choice for large codebases.
+8. Quality gates (`lint`, `stats`, `snapshot`, `test`) are part of protocol health, not optional tooling.
+
+Candidate carry-forwards for V200:
+1. Keep Parseltongue source retrieval filesystem-first by default (no full source body persistence required in core graph store).
+2. Freeze a canonical symbol format + parser/formatter contract and validate at ingest time.
+3. Add typed relationship semantics to query surface and trust/provenance outputs.
+4. Add enclosing-range metadata to improve selective context assembly for LLM workflows.
+5. Add ingest quality gates equivalent to lint/canonicalize/snapshot checks before accepting index data as trusted.
 
 ---
 
