@@ -1,6 +1,6 @@
 # AR053: Internet Synthesis for Graph + Dependency Workflows
 Date: 2026-02-27
-Status: Draft reference (web-verified)
+Status: Draft reference (web-verified, analysis basis v02)
 
 ## Scope
 This note maps external research and industry practices to Parseltongue workflows defined in:
@@ -16,6 +16,50 @@ This aligns with AR048's three-layer model:
 1. Compiler/semantic truth
 2. LLM judgment
 3. Fast graph algorithms
+
+## Analysis Basis Update (v02, 2026-02-27)
+
+### Verified competitive signals (GitHub + marketplace + code-level checks)
+1. Metadata-first retrieval is now a recurring implementation pattern.
+2. Strong examples return `filePath/startLine/endLine` first, then fetch full content later.
+3. Roo-Code demonstrates a mature integration of indexing plus conversation/session handling.
+4. Codemogger and mcp-code-indexer demonstrate modular indexer patterns with line-span keys.
+5. MCP is now a serious interoperability layer, not just an experiment.
+
+### Measured traction snapshot (2026-02-27)
+1. `cline/cline`: 58,439 stars.
+2. `RooCodeInc/Roo-Code`: 22,429 stars.
+3. `glommer/codemogger`: 148 stars.
+4. `zxfgds/mcp-code-indexer`: 36 stars.
+5. `ViperJuice/Code-Index-MCP`: 38 stars.
+
+### Marketplace correction snapshot (2026-02-27)
+1. Roo Code: 1,299,593 installs, 4.83 rating.
+2. Cline: 3,182,210 installs, 4.33 rating.
+3. Conclusion: Roo is not literally 5.0/5.0; it is higher-rated, while Cline still has larger install base.
+
+### Claim corrections that affect strategy
+1. Bloop is influential but currently archived; cite as precedent, not forward-moving primary platform.
+2. “Vector-only wins” is inaccurate; high-performing systems are hybrid (lexical + semantic + structural/graph).
+3. Metadata-first does not imply “store all code in DB”; pointer-first designs can keep filesystem as source of truth.
+
+### Updated basis for Parseltongue V200
+1. Keep graph/dependency traversal as canonical truth lane.
+2. Keep fuzzy/semantic retrieval as discovery lane.
+3. Enforce explicit provenance and truth-grade in mixed outputs.
+4. Keep code bytes on disk; store minimal metadata and edges for retrieval and reasoning.
+5. Ensure stale-span protection with hash/version checks before line reads.
+
+### Minimal metadata-first contract (no full source storage)
+1. Required fields: `entity_key`, `file_path`, `start_line`, `end_line`, `symbol_name`, `kind`, `content_hash`.
+2. Required edge fields: `from_entity`, `to_entity`, `edge_type`, `confidence`, `provenance`.
+3. Required API flow: `search_candidates` -> `expand_graph` -> `read_source_spans` -> `llm_summarize`.
+4. Required truth fields in responses: `match_source`, `truth_grade`, `confidence`.
+
+### Why this basis is stable
+1. It preserves performance and token discipline (pointer-first, selective reads).
+2. It preserves correctness (graph truth and typed edges).
+3. It preserves optionality (you can swap retrieval engines without changing contracts).
 
 ## External Evidence (What the Internet Shows)
 
@@ -143,4 +187,21 @@ Recommended upgrade:
   - https://cpg.joern.io/
 - GraphRAG poisoning risk
   - https://arxiv.org/abs/2508.04276
-
+- MCP specification (official)
+  - https://modelcontextprotocol.io/introduction
+  - https://github.com/modelcontextprotocol/modelcontextprotocol
+- OpenAI MCP documentation
+  - https://platform.openai.com/docs/mcp
+- Anthropic MCP announcement
+  - https://www.anthropic.com/news/model-context-protocol
+- Roo-Code repository (line-span payload and parser chunks)
+  - https://github.com/RooCodeInc/Roo-Code
+- Codemogger repository (chunk key + line-span schema)
+  - https://github.com/glommer/codemogger
+- mcp-code-indexer repository (line-span chunk model)
+  - https://github.com/zxfgds/mcp-code-indexer
+- VS Marketplace listings (Roo and Cline metrics)
+  - https://marketplace.visualstudio.com/items?itemName=RooVeterinaryInc.roo-cline
+  - https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev
+- Bloop repository status (archived)
+  - https://github.com/BloopAI/bloop
