@@ -221,6 +221,12 @@ If file moved or unreadable, return explicit error contract (never stale cached 
 Transport differs; business semantics do not differ.  
 One query contract, two adapters.
 
+**BR02-D7: Source retrieval is pointer-based, not body-cached.**
+1. Canonical graph storage keeps source addresses (`file_path`, `line_start`, `line_end`, optional `revision/hash`), not full code bodies.
+2. `/code-entity-detail-view` resolves source on-demand from local filesystem for current workspace state.
+3. If a pinned revision/hash is requested, retrieval may use `git show REV:PATH` semantics for deterministic historical reads.
+4. If source moved, changed, or is unreadable, return explicit stale/missing-source contract (never silently return old cached text).
+
 ### Canonical Endpoint Pack (V200)
 1. Find Entities
 2. `GET /code-entities-list-all`
@@ -498,6 +504,11 @@ Each file must record phase outcome:
 4. `merged`
 5. `written`
 6. terminal state (`completed` | `failed` | `skipped`) with reason
+
+**POL-D5: No full source-body persistence in V200 graph core.**
+1. Store canonical entity/edge facts and source addresses only.
+2. Resolve code text at read time from filesystem (and optionally pinned VCS revision when requested).
+3. This keeps graph storage focused on truth relationships while preserving deterministic source access.
 
 ### Acceptance Criteria For This Policy
 1. A failed run can answer: exactly what was missed, where, and why.
