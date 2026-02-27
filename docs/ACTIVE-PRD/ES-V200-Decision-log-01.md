@@ -264,6 +264,9 @@ One query contract, two adapters.
 3. `OQ-BR02-3`: Where does cosine/vector similarity add measurable value versus lexical/fuzzy search for real user tasks?
 4. `OQ-BR02-4`: What is the minimum metadata we store persistently (`entity key + span + edge + hash`) while keeping source bodies on disk only?
 5. `OQ-BR02-5`: For large codebases, what is the acceptable indexing latency budget before graph+search utility is considered not worth the cost?
+6. `OQ-BR02-6`: What is our formal "LSP for LLMs" contract for V200?
+   - Candidate architecture under evaluation: `MCP transport layer + precise symbol/graph truth layer + metadata-first span retrieval (file_path/start_line/end_line)`.
+   - Required decision: which part is mandatory in V200 core vs optional sidecar integration.
 
 ---
 
