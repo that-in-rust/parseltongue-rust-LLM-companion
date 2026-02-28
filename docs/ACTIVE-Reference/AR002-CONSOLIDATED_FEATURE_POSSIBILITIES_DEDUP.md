@@ -879,7 +879,7 @@ Total canonical features: 278
 - User outcome: reduced context switching and broader adoption across the engineering org.
 - Build value: integration depth increases retention and practical utility of core analysis.
 - Aliases merged: GitHub Action
-- Filenames: docs/pre154/RELEASE-CHECKLIST-v1.5.0.md; docs/pre154/RELEASE-PROGRESS-v1.5.0.md; docs/pre175/FINAL_FEATURE_EXTRACTION_MASTER_TABLE.md; docs/unclassified/RELEASE_CHECKLISTS_COMPILATION.md; docs/v199-docs/Priortization-v173.md; docs/v199-docs/THESIS-supermodel-competitive-analysis.md; docs/v199-docs/unstructured-CR-context-20260214.md; docs/v200-docs/CR-factory-droid-202601.md; docs/v200-docs/Prep-V200-Competitive-Deep-Dive.md; docs/v200-docs/Prep-V200-Max-Adoption-Architecture-Strategy.md
+- Filenames: docs/pre154/RELEASE-CHECKLIST-v1.5.0.md; docs/pre154/RELEASE-PROGRESS-v1.5.0.md; docs/pre175/FINAL_FEATURE_EXTRACTION_MASTER_TABLE.md; docs/unclassified/RELEASE_CHECKLISTS_COMPILATION.md; docs/v199-docs/Priortization-v173.md; docs/ACTIVE-Reference/THESIS-supermodel-competitive-analysis.md; docs/v199-docs/unstructured-CR-context-20260214.md; docs/v200-docs/CR-factory-droid-202601.md; docs/v200-docs/Prep-V200-Competitive-Deep-Dive.md; docs/v200-docs/Prep-V200-Max-Adoption-Architecture-Strategy.md
 
 ### 98. GitLab CI Integration
 - Journey trigger: insights must appear inside existing CI, IDE, and collaboration workflows.
@@ -1887,7 +1887,7 @@ Total canonical features: 278
 - User outcome: fresher graph state, fewer stalls, and predictable query behavior under load.
 - Build value: raises the quality floor so every downstream intelligence feature stays trustworthy.
 - Aliases merged: R Support
-- Filenames: docs/CONSOLIDATED_FEATURE_POSSIBILITIES_DEDUP.md; docs/PRD-research-20260131v1/PRD-candidates-20260131.md; docs/PRD-research-20260131v1/PRD-v142-Parseltongue.md; docs/pre154/v151-primary-PRD.md; docs/pre154/v152-DATABASE-ALTERNATIVES-RESEARCH.md; docs/pre175/FINAL_FEATURE_EXTRACTION_MASTER_TABLE.md; docs/pre175/v156-PRD-final.md; docs/v199-docs/CR-v173-01.md; docs/v199-docs/CR-v173-03.md; docs/v199-docs/PRD_v173.md; docs/v199-docs/THESIS-supermodel-competitive-analysis.md; docs/v199-docs/THESIS-taint-analysis-for-parseltongue.md; docs/v199-docs/unstructured-CR-context-20260214.md; docs/v200-docs/Prep-V200-Competitive-Deep-Dive.md; docs/v200-docs/Prep-V200-Compiled-Research-Best-Ideas.md; docs/v200-docs/Prep-V200-MCP-Protocol-Integration.md; docs/v200-docs/Prep-V200-Rust-Analyzer-API-Surface.md; docs/v200-docs/Research-Extraction-Tools-Per-Language.md
+- Filenames: docs/CONSOLIDATED_FEATURE_POSSIBILITIES_DEDUP.md; docs/PRD-research-20260131v1/PRD-candidates-20260131.md; docs/PRD-research-20260131v1/PRD-v142-Parseltongue.md; docs/pre154/v151-primary-PRD.md; docs/pre154/v152-DATABASE-ALTERNATIVES-RESEARCH.md; docs/pre175/FINAL_FEATURE_EXTRACTION_MASTER_TABLE.md; docs/pre175/v156-PRD-final.md; docs/v199-docs/CR-v173-01.md; docs/v199-docs/CR-v173-03.md; docs/v199-docs/PRD_v173.md; docs/ACTIVE-Reference/THESIS-supermodel-competitive-analysis.md; docs/v199-docs/THESIS-taint-analysis-for-parseltongue.md; docs/v199-docs/unstructured-CR-context-20260214.md; docs/v200-docs/Prep-V200-Competitive-Deep-Dive.md; docs/v200-docs/Prep-V200-Compiled-Research-Best-Ideas.md; docs/v200-docs/Prep-V200-MCP-Protocol-Integration.md; docs/v200-docs/Prep-V200-Rust-Analyzer-API-Surface.md; docs/v200-docs/Research-Extraction-Tools-Per-Language.md
 
 ### 210. Random Walk Probability Impact
 - Journey trigger: you need evidence before making architectural or refactoring decisions.
@@ -1977,7 +1977,7 @@ Total canonical features: 278
 - User outcome: fresher graph state, fewer stalls, and predictable query behavior under load.
 - Build value: raises the quality floor so every downstream intelligence feature stays trustworthy.
 - Aliases merged: Rust-Analyzer Semantic Enrichment
-- Filenames: docs/v199-docs/THESIS-supermodel-competitive-analysis.md; docs/v200-docs/ES-V200-Decision-log-01.md; docs/v200-docs/v200-FUJ-Final-User-Journey.md
+- Filenames: docs/ACTIVE-Reference/THESIS-supermodel-competitive-analysis.md; docs/v200-docs/ES-V200-Decision-log-01.md; docs/v200-docs/v200-FUJ-Final-User-Journey.md
 
 ### 220. SARIF Architecture Recovery
 - Journey trigger: you need to communicate architecture or impact to humans, not just machines.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dependency Map CLI Tools"
+  short_description: "Map code dependencies without a DB"
+  default_prompt: "Use $dependency-map-cli-tools to map this repo and return file:start:end pointers plus a rough dependency graph."

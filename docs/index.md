@@ -221,11 +221,11 @@ docs
 |   |-- v199-docs
 |   |   |-- RESEARCH-isgl1v3-exhaustive-graph-identity.md
 |   |   |-- RESEARCH-v173-pt04-storage-architecture.md
-|   |   |-- THESIS-supermodel-competitive-analysis.md
+|   |   |-- THESIS-supermodel-competitive-analysis.md (moved to /docs/ACTIVE-Reference/THESIS-supermodel-competitive-analysis.md)
 |   |   |-- THESIS-taint-analysis-for-parseltongue.md
 |   |   |-- session-context-dump-20260216.txt
 |   |   |-- session-context-knowledge-dump.txt
-|   |   |-- supermodel-extracted
+|   |   |-- supermodel-extracted (moved to /competitor-research/supermodel/extracted)
 |   |   |   `-- extension
 |   |   |       |-- CLAUDE.md
 |   |   |       |-- KEYBOARD_SHORTCUTS.md
