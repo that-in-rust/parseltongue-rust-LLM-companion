@@ -440,6 +440,47 @@ Open questions to close from this addendum:
 3. `OQ-BR07-3`: What p95 latency budget must sidecar retrieval meet (local vs remote Turso mode) to remain default-enabled?
 4. `OQ-BR07-4`: What freshness SLO and hash mismatch behavior are mandatory before returning sidecar-derived candidates?
 
+### External Research Addendum (Lucene/ES Data-Flow Limits + Architecture Rubber-Duck)
+**Status**: Added for BR02/BR03/BR07 decision support  
+**Date**: 2026-02-28  
+**Source Notes**:
+1. `docs/ACTIVE-Reference/06-LUCENE-ES-FOR-DATA-FLOW-ANALYSIS.md`
+2. `docs/ACTIVE-Reference/07-ARCHITECTURE-RUBBER-DUCK-DEBUG.md`
+
+Thesis (integration direction):
+1. Search systems are strong for retrieval, weak for program analysis.
+2. Graph systems are required for dependency/data/control-flow reasoning.
+3. Parseltongue should explicitly separate:
+   - Retrieval layer (candidate generation/ranking)
+   - Analysis layer (graph traversal, blast radius, semantic relationships)
+4. Product moat should be "context extraction intelligence" (what minimal context an LLM needs for a task), not just storage choice.
+
+Options under evaluation:
+1. `OPT-V200-RETRIEVAL-A` — In-core lexical retrieval upgrade:
+   - Add BM25 + Jaccard + RRF fusion locally in Rust.
+   - Keep optional vectors as sidecar.
+   - Strength: low infra complexity, deterministic local behavior.
+2. `OPT-V200-RETRIEVAL-B` — Sidecar semantic retrieval:
+   - Use CocoIndex/Turso-style chunk retrieval for top-N spans.
+   - Resolve to canonical `entity_key` before graph analysis.
+   - Strength: strong natural-language discovery and fast adoption.
+3. `OPT-V200-RETRIEVAL-C` — Intelligent context server path:
+   - Multi-depth extraction (tree-sitter always, semantic depth where available).
+   - Rule-based context extraction with optional LLM fallback for novel tasks.
+   - Strength: highest differentiation if evaluated and tuned well.
+4. `OPT-V200-INTERFACE-D` — Dual interface mode:
+   - Context injection for zero-friction workflows.
+   - MCP/HTTP explicit tools for deterministic operator control.
+
+Open questions to close from this addendum:
+1. `OQ-BR02-15`: Do we implement BM25/Jaccard/RRF in-core for V200 baseline, or require sidecar retrieval from day one?
+2. `OQ-BR02-16`: Which retrieval+analysis split is mandatory in V200 API contracts (and which is implementation detail)?
+3. `OQ-BR03-1`: Should "context extraction intelligence" be a formal BR03 scope item with acceptance tests per task type?
+4. `OQ-BR03-2`: Do we add task-intent classes (e.g., signature change, field add, trait impl) that drive deterministic context rules?
+5. `OQ-BR07-5`: Which freshness model is V200 default — static snapshots, watch+incremental, or hybrid with explicit stale markers?
+6. `OQ-BR07-6`: What benchmark suite is required to validate the token-compression claim (e.g., equivalent accuracy at lower context budget)?
+7. `OQ-BR07-7`: What is V200 success threshold for first-pass correctness improvement (compile/test pass rate) versus naive file-reading workflows?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
