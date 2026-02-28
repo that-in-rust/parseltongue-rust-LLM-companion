@@ -331,6 +331,115 @@ Candidate V200 SLO targets to evaluate:
 2. Cold index under 30 minutes for ~500k LOC with local embeddings.
 3. Explicit degrade messaging when embedding provider latency exceeds SLO envelope.
 
+### External Research Addendum (Entity Search + Context Retrieval)
+**Status**: Added for BR02/BR07 decision support  
+**Date**: 2026-02-28  
+**Source Note**: `/Users/amuldotexe/Desktop/notebook-gh/Notes2026/deep-research-entity-search-context-202602280026.md`
+
+Key carry-forwards from the 2026-02-28 research note:
+1. Entity boundary extraction is tractable with Tree-sitter/LSP spans and should remain metadata-first (`file_path`, `line_start`, `line_end`, entity type/name/signature/docstring).
+2. Pure vector similarity is insufficient for V200-quality retrieval; candidate ranking should be multi-signal.
+3. Dependency-graph proximity should be a first-class rerank signal after initial candidate generation.
+4. Context payload should stay compact: top entity packet + a small related-neighborhood, never whole-file default.
+5. Indexing economics must be tiered by repository size and usage pattern (one-off vs repeated multi-session use).
+6. Incremental updates (Merkle/hash-based changed-file detection) are mandatory if any semantic sidecar index is adopted.
+
+Proposed V200 retrieval contract extension:
+1. Stage A (`retrieve`): lexical-first (`rg`/BM25/fuzzy) plus optional semantic sidecar to produce top-N candidate spans.
+2. Stage B (`resolve`): map each span to canonical Parseltongue entity key.
+3. Stage C (`rerank`): combine weighted signals:
+   - lexical overlap
+   - semantic similarity (when enabled)
+   - graph proximity (call/import/type edges)
+   - entity-type intent match
+   - reference/popularity score
+4. Stage D (`assemble`): return top-3 entity packets and max 3-5 related entities with explicit confidence + provenance.
+
+Proposed response packet baseline (for BR02 APIs and MCP parity):
+1. `entity_key`
+2. `entity_name`
+3. `entity_type`
+4. `file_path`
+5. `line_start`
+6. `line_end`
+7. `why_ranked` (signal contribution summary)
+8. `confidence`
+9. `truth_grade`
+10. `related_entities[]` (bounded list)
+
+Open questions to close from this addendum:
+1. `OQ-BR02-10`: What are the default rerank weights and how are they calibrated against a benchmark query set?
+2. `OQ-BR02-11`: Is semantic/vector search V200 core or an optional sidecar behind capability flags?
+3. `OQ-BR02-12`: What is the default neighborhood expansion budget (`top_k` + `hops` + token cap) for LLM context assembly?
+4. `OQ-BR07-1`: What repo-size threshold triggers semantic indexing recommendation vs lexical-only mode?
+5. `OQ-BR07-2`: Which incremental index freshness SLO is required to keep reranking trustworthy after code changes?
+
+### External Research Addendum (CocoIndex Engine vs Codemogger Turso Storage)
+**Status**: Added for BR02/BR07 decision support  
+**Date**: 2026-02-28  
+**Source Notes**:
+1. `/Users/amuldotexe/Downloads/cocoindex-io-cocoindex-code-8a5edab282632443.txt`
+2. `/Users/amuldotexe/Downloads/glommer-codemogger-8a5edab282632443.txt`
+
+Decision clarification:
+1. CocoIndex is an indexing/transformation engine runtime, not an RLM and not a canonical graph truth system by itself.
+2. In the observed `cocoindex-code` implementation, search rows include `file_path`, `start_line`, `end_line`, `embedding`, and cosine score in SQLite/sqlite-vec.
+3. In the observed codemogger implementation, storage uses Turso/libSQL-flavored SQLite with chunk rows including `chunk_key`, `file_path`, `start_line`, `end_line`, `embedding`, and `file_hash`.
+
+Comparative framing for V200:
+1. CocoIndex-sidecar method strengths:
+   - fast path to semantic candidate spans (`file_path:start_line:end_line`)
+   - local-first workflow (simple developer setup)
+   - clear fit as non-canonical retriever before graph resolution
+2. CocoIndex-sidecar method risks:
+   - Python/runtime integration boundary with Rust core
+   - pre-release dependency surface in current ecosystem examples
+   - requires explicit staleness/consistency checks before graph trust
+3. Codemogger/Turso-style method strengths:
+   - persistent SQL layer with chunk-level metadata, hashes, and strong incremental mechanics
+   - easier team/remote sharing if Turso sync/deployment is used
+   - single query surface for FTS + vector + metadata filters
+4. Codemogger/Turso-style method risks:
+   - more infra and product surface area for V200 core scope
+   - remote DB dependence can increase latency and operational complexity
+   - temptation to drift into body-caching/data-warehouse behavior
+
+Primary-key compatibility decision:
+1. Both approaches can store Parseltongue canonical identity (`language|||kind|||scope|||name|||file_path|||discriminator`) as metadata.
+2. Required addition for either store:
+   - `entity_key` (canonical)
+   - `file_hash` (staleness guard)
+   - optional `entity_version_hash` (deterministic revision pin)
+3. For chunk-to-entity mapping, prefer explicit mapping table:
+   - `chunk_key -> entity_key` (many-to-one baseline, many-to-many allowed for overlap)
+
+Recommended V200 call (current draft):
+1. Keep Parseltongue graph store as canonical truth layer.
+2. Adopt semantic retrieval as optional sidecar first (CocoIndex-style), returning spans only.
+3. Resolve spans to canonical entity keys before any graph reasoning output.
+4. Defer Turso-backed shared retrieval store to post-V200 unless collaboration scale requires it immediately.
+5. Never bypass BR01 truth-grade/provenance contracts regardless of retrieval backend.
+
+Metadata-only storage refinement (accepted direction for evaluation):
+1. If Turso/libSQL retrieval index is used, store pointer metadata and ranking features, not full source bodies.
+2. Minimum pointer schema:
+   - `entity_key`
+   - `chunk_key`
+   - `file_path`
+   - `start_line`
+   - `end_line`
+   - `file_hash` (or VCS blob hash)
+   - retrieval features (`embedding`, `fts_terms`, `score_aux`)
+3. Source text is resolved on-demand from filesystem or pinned VCS revision using stored pointers.
+4. If hash mismatch is detected at read time, mark candidate stale, trigger reindex for that file/chunk, and degrade confidence until refreshed.
+5. `verified` truth-grade answers must not be emitted from stale pointer rows.
+
+Open questions to close from this addendum:
+1. `OQ-BR02-13`: Do we ship V200 with local-only semantic sidecar by default and Turso as explicit opt-in?
+2. `OQ-BR02-14`: What is the canonical schema for `chunk_key -> entity_key` mapping and overlap handling?
+3. `OQ-BR07-3`: What p95 latency budget must sidecar retrieval meet (local vs remote Turso mode) to remain default-enabled?
+4. `OQ-BR07-4`: What freshness SLO and hash mismatch behavior are mandatory before returning sidecar-derived candidates?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
