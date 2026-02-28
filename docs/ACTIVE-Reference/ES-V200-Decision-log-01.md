@@ -481,6 +481,34 @@ Open questions to close from this addendum:
 6. `OQ-BR07-6`: What benchmark suite is required to validate the token-compression claim (e.g., equivalent accuracy at lower context budget)?
 7. `OQ-BR07-7`: What is V200 success threshold for first-pass correctness improvement (compile/test pass rate) versus naive file-reading workflows?
 
+### External Research Addendum (Rust-Analyzer Idiomatic Pattern Pack)
+**Status**: Added for BR01/BR02/BR03/BR07 decision support  
+**Date**: 2026-03-01  
+**Source Folder Copied**: `docs/ACTIVE-Reference/rust-analyzer/`
+
+Per-file insight items (one per copied file):
+1. `01-hir-ty-patterns.md`: Cycle-safe incremental query design is a hard requirement for semantic depth; V200 option is to formalize cycle-recovery metadata in query provenance. `OQ-RA-01`: Which query families require explicit cycle fallback in V200 core?
+2. `02-hir-def-patterns.md`: Interned definition identities map directly to Parseltongue key-stability goals; option is to enforce canonical key derivation from definition-loc tuples. `OQ-RA-02`: Which loc fields are mandatory for deterministic key derivation across tools?
+3. `03-syntax-parser-patterns.md`: Typed wrappers over untyped trees reduce parser ambiguity; option is a strict typed AST adapter boundary before graph writes. `OQ-RA-03`: Should untyped parse results ever be query-visible outside diagnostics?
+4. `04-ide-features-patterns.md`: Snapshot + cancellation patterns should shape MCP/HTTP consistency semantics; option is immutable analysis snapshots per request. `OQ-RA-04`: What is the snapshot isolation contract across concurrent requests?
+5. `05-ide-assists-patterns.md`: Structured assist handlers are a template for future write-actions; option is to define mutation-intent handlers as typed contracts, even if V200 stays read-first. `OQ-RA-05`: Do we reserve an assists-style contract in V200 for V217+ safe edits?
+6. `06-ide-completion-patterns.md`: Two-phase speculative completion suggests retrieval should support hypothesis-first ranking; option is staged candidate expansion before expensive reads. `OQ-RA-06`: Which query intents justify speculative candidate generation in V200?
+7. `07-ide-db-patterns.md`: Symbol index + configurable query builders align with retrieval configurability; option is explicit retrieval profiles (`fast`, `balanced`, `deep`). `OQ-RA-07`: What are the default profile thresholds and tuning knobs?
+8. `08-hir-facade-expand-patterns.md`: Bidirectional source mapping is essential for line-span trust; option is mandatory syntax<->entity backpointers in all queryable facts. `OQ-RA-08`: Is reverse mapping coverage a release gate for V200?
+9. `09-lsp-server-patterns.md`: Event-loop dispatcher + typed routing informs protocol adapter design; option is one internal command bus for MCP/HTTP parity. `OQ-RA-09`: Do we standardize one dispatcher model before adding new endpoints?
+10. `10-vfs-base-db-patterns.md`: Path canonicalization and bounded file IDs are critical for stable hashes/keys; option is path normalization policy as a first-class ingest contract. `OQ-RA-10`: What is the canonical normalization spec across macOS/Linux path edge cases?
+11. `11-project-model-patterns.md`: Workspace discovery fallback logic should be deterministic and observable; option is ordered project-root resolution with ledger traces. `OQ-RA-11`: Which root-discovery precedence order is frozen for V200?
+12. `12-token-tree-macro-patterns.md`: Macro/token-tree span compression indicates macro-aware spans need dedicated storage shapes; option is macro-expansion provenance edges separate from regular call edges. `OQ-RA-12`: What macro-derived facts qualify as `verified` versus `heuristic`?
+13. `13-utility-crates-patterns.md`: Invariant-oriented utility patterns suggest stronger type-level guarantees in core contracts; option is non-empty and constrained wrappers in API schemas. `OQ-RA-13`: Which response fields should be modeled as non-empty by type, not convention?
+14. `14-lib-arena-lsp-patterns.md`: Arena/sparse-map patterns support custom high-performance graph memory layouts; option is to benchmark arena-based in-memory indices for hot traversal paths. `OQ-RA-14`: Which graph queries warrant arena specialization in V200 timeframe?
+15. `15-ide-diagnostics-patterns.md`: Diagnostics taxonomies map cleanly to truth-grade/degrade reasons; option is a strict diagnostic-code namespace for ingest/query errors. `OQ-RA-15`: What minimum diagnostic code set is mandatory for V200 operator trust?
+16. `16-proc-macro-server-patterns.md`: Versioned external process protocols inform sidecar capability negotiation; option is explicit sidecar capability/version handshake before use. `OQ-RA-16`: Which capability mismatches should hard-fail versus soft-degrade?
+17. `17-test-infrastructure-patterns.md`: Fixture mini-DSL and minimal-core stubs are strong evaluation primitives; option is a standardized fixture harness for retrieval+graph regressions. `OQ-RA-17`: Which benchmark fixture corpus becomes the canonical V200 quality gate?
+18. `18-xtask-codegen-patterns.md`: Tooling/codegen pipelines can prevent contract drift; option is automated generation/validation for endpoint schemas and key contracts. `OQ-RA-18`: Which contracts are code-generated versus handwritten in V200?
+19. `19-cross-cutting-architecture-patterns.md`: Layered DB traits and cache budgets align with BR07 performance governance; option is explicit cache-capacity policy with telemetry per layer. `OQ-RA-19`: What cache budgets are fixed defaults for medium/large repos?
+20. `20-ssr-span-cfg-patterns.md`: Two-phase matching and span-focused workflows reinforce metadata-first retrieval; option is enforce span-first context assembly before full entity reads. `OQ-RA-20`: Which tasks may bypass span-first and read full entities immediately?
+21. `ANALYSIS_STATE.md`: Meta-analysis tracking should become a recurring quality ledger; option is a decision-log companion state file with readiness scoring per architecture option. `OQ-RA-21`: Do we formalize a readiness scorecard for BR decisions before implementation starts?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
