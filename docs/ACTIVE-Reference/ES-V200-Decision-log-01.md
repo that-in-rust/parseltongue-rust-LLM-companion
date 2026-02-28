@@ -509,6 +509,44 @@ Per-file insight items (one per copied file):
 20. `20-ssr-span-cfg-patterns.md`: Two-phase matching and span-focused workflows reinforce metadata-first retrieval; option is enforce span-first context assembly before full entity reads. `OQ-RA-20`: Which tasks may bypass span-first and read full entities immediately?
 21. `ANALYSIS_STATE.md`: Meta-analysis tracking should become a recurring quality ledger; option is a decision-log companion state file with readiness scoring per architecture option. `OQ-RA-21`: Do we formalize a readiness scorecard for BR decisions before implementation starts?
 
+### External Research Addendum (Three-Layer Retrieval-to-Graph Context Loop)
+**Status**: Added for BR02/BR03 decision support  
+**Date**: 2026-03-01
+
+Decision thesis:
+1. V200 query flow should be a strict 3-layer contract:
+   - Layer 1 (`search`): find top candidate spans from lexical/fuzzy (and optional semantic sidecar) search.
+   - Layer 2 (`wrap`): map each span to canonical entity key, then recover enclosing interface entity + local control/data-flow clues.
+   - Layer 3 (`expand`): pull related entities from dependency graph and assemble a token-budgeted context packet (default `<10k` tokens).
+2. The LLM should never receive whole-file default context when a span/entity packet is available.
+3. Returned packet should prioritize "high-context-per-token":
+   - direct entity span
+   - why this entity was selected
+   - direct callers/callees + critical type/impl links
+   - minimal code excerpts required for a decision
+
+Three creative examples (operator-visible workflow):
+1. Example A — "Bug from vague symptom text"
+   - User prompt: "Why does login expire immediately after deploy?"
+   - Layer 1 finds spans matching symptom terms (`expire`, `ttl`, `clock skew`, `jwt`) across config + auth code.
+   - Layer 2 wraps to canonical entity keys (for example: token validation fn, env config loader), and identifies the exact branch where TTL is interpreted.
+   - Layer 3 returns compact packet: validator entity + config entity + one test entity + nearest callers, with control-flow branch evidence and confidence.
+2. Example B — "Intent-first feature change"
+   - User prompt: "Add dry-run mode to deploy command."
+   - Layer 1 finds spans in CLI parsing, deploy orchestration, and side-effecting execution calls.
+   - Layer 2 maps to enclosing interface entities and marks write-path vs read-path control flow.
+   - Layer 3 returns under-10k packet containing parse->plan->execute chain, affected interfaces, and blast radius of entities likely to break.
+3. Example C — "Cross-cutting rename without reading whole repo"
+   - User prompt: "Rename customer_tier to subscription_plan safely."
+   - Layer 1 finds textual spans in API schema, validation, persistence, and analytics usage.
+   - Layer 2 resolves each span to owning entities and classifies role (`definition`, `read`, `write`, `serialization`).
+   - Layer 3 returns a migration packet with ordered related entities (schema first, adapters second, call-sites third) plus confidence and stale-hash warnings.
+
+Open questions introduced:
+1. `OQ-BR02-17`: What is the default top-k span count per query before wrap+graph expansion?
+2. `OQ-BR02-18`: Which control/data-flow signals are mandatory in V200 context packets vs optional enrichments?
+3. `OQ-BR03-3`: What is the strict token budgeting policy for context packets (`entity core`, `graph neighbors`, `evidence`) under `<10k` tokens?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
