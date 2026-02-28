@@ -547,6 +547,68 @@ Open questions introduced:
 2. `OQ-BR02-18`: Which control/data-flow signals are mandatory in V200 context packets vs optional enrichments?
 3. `OQ-BR03-3`: What is the strict token budgeting policy for context packets (`entity core`, `graph neighbors`, `evidence`) under `<10k` tokens?
 
+### External Research Addendum (Rubber-Duck 3-Layer Context Compressor Thesis)
+**Status**: Added for BR02/BR03/BR07 decision support  
+**Date**: 2026-03-01
+
+Carry-forward thesis:
+1. Parseltongue should be framed as a semantic context compressor, not as a raw code retrieval dump system.
+2. The 3-layer flow remains mandatory:
+   - `Layer 1 (search)`: free-form query -> semantic anchors (non-keyword identifiers) -> top candidate spans/entities.
+   - `Layer 2 (anchor)`: bind candidate to canonical entity + containment context (`module`, `signature`, `file_path:start_line:end_line`).
+   - `Layer 3 (expand)`: typed graph traversal with budget controls to return only high-context neighbors.
+3. High-density context defaults:
+   - signatures over bodies
+   - typed relationships over raw text
+   - focused call/data-flow slices over full graphs
+4. Whole-file reads are fallback behavior only, never default.
+
+Retrieval and expansion priority contract (candidate draft):
+1. Priority P1 (always include when available):
+   - `calls`
+   - `uses_type`
+   - `implements`
+2. Priority P2 (include if budget allows):
+   - `called_by`
+   - `contains`
+   - `same_module`
+3. Priority P3 (deep context, intent-gated):
+   - `transitive_calls`
+   - `trait_hierarchy`
+   - `control_flow`/`data_flow` slices
+
+Proposed rerank and confidence model:
+1. Candidate score is weighted multi-signal, not pure fuzzy or pure cosine:
+   - `score = w_lexical + w_semantic + w_graph_proximity + w_entity_type_intent + w_freshness`
+2. Freshness is first-class:
+   - stale hashes reduce score and confidence
+   - stale-only sets cannot produce `verified` answers
+3. Missing-confidence behavior:
+   - return top spans + uncertainty markers + next-query suggestions
+   - do not force a deterministic-looking answer
+
+Token budget policy (draft baseline):
+1. Target context packet under `10k` tokens, with expected practical range `500-4k`.
+2. Suggested split:
+   - `entity anchor + signature`: 5-15%
+   - `P1 relationships`: 40-50%
+   - `P2 relationships`: 20-30%
+   - `P3 relationships`: 10-20%
+   - `format/provenance overhead`: 5-10%
+3. Stop expansion on either budget exhaustion or relevance-threshold drop.
+
+V216/V200 architecture direction reinforced:
+1. rust-analyzer already computes most needed structure (`ItemTree`, `DefMap`, trait impl maps).
+2. V200/v216 core work is extraction + canonicalization + persistence + query contract, not re-implementing compiler semantics.
+3. Control-flow/data-flow should start as selective slices tied to anchor intent, not full-program IR ambitions.
+
+Open questions introduced:
+1. `OQ-BR02-19`: What is the anchor-extraction algorithm for "non-keyword semantic tokens" from natural-language and code-fragment queries?
+2. `OQ-BR02-20`: What are the initial production weights for multi-signal scoring, and how are they calibrated against benchmark tasks?
+3. `OQ-BR03-4`: Which edge types are mandatory in P1 for each intent class (`bug`, `refactor`, `explain`, `migrate`)?
+4. `OQ-BR07-8`: What freshness SLO is required before semantic candidates are allowed into default response packets?
+5. `OQ-BR07-9`: What minimum information-density KPI do we enforce (for example, compression ratio and task success lift)?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
