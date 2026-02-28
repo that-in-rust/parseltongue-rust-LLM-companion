@@ -56,6 +56,28 @@ If hash mismatch is detected:
 3. degrade confidence until refreshed
 4. block `verified` truth-grade from stale rows
 
+### Rust Analyzer Superset Mapping
+Assessment:
+1. Rust Analyzer inputs are a practical superset of our read-pointer format.
+2. RA carries richer identity/range context (file identity + typed symbol context + ranges), which can be projected to our compact read key.
+
+Canonical layers:
+1. Stable identity layer:
+   - `language|||kind|||scope|||name|||file_path|||discriminator`
+2. Read-pointer layer (for code fetch):
+   - `file_path|||entity_key|||start_line|||end_line`
+
+Projection contract:
+1. Resolve RA symbol/definition to canonical `entity_key`.
+2. Convert RA range/offsets to line-based span.
+3. Emit read pointer exactly as:
+   - `filepath|||entity|||StartLine|||EndLine`
+4. Use full entity span for default code read; keep narrower selection ranges optional for focused context.
+
+Example:
+1. `entity_key = rust|||fn|||auth::service|||authenticate_user|||src/auth/service.rs|||sig_v3`
+2. `read_pointer = src/auth/service.rs|||rust|||fn|||auth::service|||authenticate_user|||src/auth/service.rs|||sig_v3|||40|||96`
+
 ### Options Under Evaluation
 **Option PK-A: Local sidecar-first**
 1. Keep graph canonical in Parseltongue.
