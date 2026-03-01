@@ -2,9 +2,38 @@
 
 # Big Rocks
 
-- Big-Rock-01: the primary-key
+
+
+
+
+
+- Big-Rock-01: the scope and dependencies
+    - language Rust 21
+    - rust-analyzer
+    - more options
+        - rust compiler
     - 
 
+
+- Big-Rock-02: the primary-key
+    - language|||kind|||scope|||name|||file_path|||discriminator
+    - language: rust
+    - kind: fn
+    - scope: auth::service
+    - name: authenticate_user
+    - file_path: src/auth/service.rs
+    - discriminator: sig_v3
+
+- Big-Rock-03: code-graph-building
+    - parse folder names
+    - folders become entities of type folder,  
+    - rust-ecosystem files
+        - rust code
+        - rust config
+            - toml
+            - 
+        - rust tests
+    - non-rust files
 
 
 
