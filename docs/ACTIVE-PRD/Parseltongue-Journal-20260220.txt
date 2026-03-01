@@ -8,6 +8,20 @@ it is overwhelming what needs to be done
 
 Not sure
 
+# Parseltongue
+
+>  Now understanding this workflow - The LLM comes and asks you: "Tell me about suppose authentication."First thing you would do is probablySearch for non-keywords in the codebase which are 
+   similar to the given keyword. You might come up with, say, two or three options due to cosine similarity or something.Ideally, if you had LLMs checking this, this would have been better, but 
+   because they cannot, because it might be too much, I don't know. Maybe you will give them some similar words and ask them which ones they are looking for.You will say, yeah, these 3, 4 look 
+   like good search options. Then, for each of them, you run 1 by 1 to find them in the code base. When you find them in the code base, they might not be at the interface level or a public 
+   interface level, which is captured by any entity, because the entity is only public interfaces, right? Only if a function is exposed publicly shall you be able to look at it. It will be an 
+   entity; otherwise it won't be an entity.So what you would do hence is, in each of them, one by one, you will find the encapsulating public entity, the public function or whatever, which is 
+   having this keyword in the code.And then you will try to find the top 3 or 4 connected entities to this. You will also mention this is under this line of the tree, which is to say that, under
+    this big folder, then big folder, then big folder, under this, this is there.Now, because you will do it for all the four keywords there, or code search results, you will give it to the lm 
+   again as an option, saying that these are the four options that we have. Each of them, giving them a cluster of entities that they can look atLLM will then choose which one they are more 
+   interested in. The one they are more interested in, you will do a deep dive analysis and come back with actual code and as much information as possible.--- try to create the meta-pattern of 
+   this kind of workflow - do not write - just deeply think and tell me if this makes sense
+
 ### Rust Analyzer Superset Mapping
 Assessment:
 1. Rust Analyzer inputs are a practical superset of our read-pointer format.
@@ -114,3 +128,7 @@ Handling rules:
 3. Mixed files stay `code-graph` at file level; only test nodes are marked `test-entity`.
 4. Tests are visible and queryable with explicit filter flags, but excluded from default blast-radius unless requested.
 5. Comments/docstrings can improve retrieval ranking, but cannot create verified edges without parser/LSP evidence.
+
+
+===
+
