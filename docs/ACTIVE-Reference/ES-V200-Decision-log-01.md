@@ -2,6 +2,38 @@
 Status: Active — restructured 2026-02-22 using Minto Pyramid Principle
 Purpose: Record binding decisions and open questions for V200.
 
+## Top-of-Stack Decision Focus (2026-03-01)
+**Status**: Priority stack for BR02/BR03 execution order  
+**Intent**: Lock the pipeline `LLM -> SearchLayer -> CodeGraph -> HighROILLMContext -> LLM` as the default architecture focus.
+
+Top-of-stack architecture priorities:
+1. **Intent Router First**  
+   Route each query into intent classes (`bug`, `refactor`, `explain`, `safety`, `migrate`) before retrieval policy is selected.
+2. **Dual-Lane Search**  
+   Run lexical/symbol and semantic retrieval in parallel, then fuse with graph-aware reranking.
+3. **Mandatory Entity Wrap Gate**  
+   No raw span can be returned without resolving to canonical wrapping entity and key.
+4. **Typed Expansion Profiles**  
+   Expansion edge priorities must vary by intent (calls/called_by/impl/type/cfg/dataflow).
+5. **High-ROI Context Compiler**  
+   Emit packetized context (anchor, key neighbors, minimal flow slices, risk hints), not file dumps.
+6. **Proof-Carrying Context**  
+   Every packet item must include provenance (`file:start:end`, source tool, hash freshness, confidence).
+7. **Counterfactual Impact Mode**  
+   First-class query mode for “what breaks if X changes,” driven by blast radius + typed edges + flow slices.
+8. **Ambiguity Loop by Default**  
+   If top candidates are close, return disambiguation payload instead of forced single answer.
+9. **Freshness-Aware Trust Gate**  
+   Stale/hash-mismatch evidence degrades confidence and triggers selective re-compute before `verified` output.
+10. **Rustc Deep-Mode Trigger**  
+   Escalate to rustc-sidecar only for high-risk intents; keep fast path lightweight for routine queries.
+
+Top-of-stack open questions:
+1. `OQ-BR02-24`: What are the intent taxonomy and routing rules that become V200 defaults?
+2. `OQ-BR02-25`: What is the exact fusion strategy for dual-lane search (RRF/weighted sum/learned rerank)?
+3. `OQ-BR03-6`: What minimal proof payload is required for a response to be considered actionable?
+4. `OQ-BR07-11`: What p95 latency and freshness SLO define acceptable fast-mode vs rustc deep-mode switching?
+
 List of Big Rocks
 - BR01: Ingestion (Accuracy-First) that includes
   - segregating files and entities into 4 categories : 
@@ -608,6 +640,55 @@ Open questions introduced:
 3. `OQ-BR03-4`: Which edge types are mandatory in P1 for each intent class (`bug`, `refactor`, `explain`, `migrate`)?
 4. `OQ-BR07-8`: What freshness SLO is required before semantic candidates are allowed into default response packets?
 5. `OQ-BR07-9`: What minimum information-density KPI do we enforce (for example, compression ratio and task success lift)?
+
+### External Research Addendum (V216 Semantic Context Compressor Thesis, V2 Upgrades)
+**Status**: Added for BR02/BR03/BR07 decision support  
+**Date**: 2026-03-01  
+**Source Note**: `docs/ACTIVE-Reference/14-V216-SEMANTIC-CONTEXT-COMPRESSOR-THESIS.md`
+
+Key decisions/options extracted:
+1. Retrieval ranking should be query-intent aware, not one global static formula.
+2. The V2 rerank formula is promoted as candidate baseline:
+   - `score = lexical + semantic + graph_proximity + entity_type_intent + freshness`
+3. V200 should ship confidence-gated search outcomes:
+   - High confidence (`>=0.80`): auto-proceed to Layer 2 anchor.
+   - Medium confidence (`>=0.50` and margin gate): proceed with explicit uncertainty marker.
+   - Low confidence (`<0.50` or weak margin): return candidate set + clarification/follow-up suggestions.
+4. Token packing should be staged with explicit value-per-token prioritization:
+   - Stage 1: anchor packet
+   - Stage 2: essential neighbors
+   - Stage 3: contextual neighbors
+   - Stage 4: optional deep edges
+5. Progressive disclosure must be a first-class response mode:
+   - default compact packet
+   - on-demand expansion of call/data-flow slices
+6. Rust-analyzer extraction remains the architecture center:
+   - `ItemTree` for signatures/containment
+   - `DefMap`/`PerNs` for scope/visibility
+   - trait/inherent impl maps for type capability edges
+7. Explicit non-goals remain valid for V200:
+   - full type inference persistence
+   - full macro pipeline recreation
+   - full LSP server/event-loop reimplementation
+
+Proposed V200 contract extensions from this thesis:
+1. Introduce a typed retrieval outcome enum:
+   - `resolved_high_confidence`
+   - `resolved_medium_confidence`
+   - `ambiguous_candidates`
+   - `no_confident_match`
+2. Introduce margin-aware ambiguity contract:
+   - include `top_score`, `second_score`, and `score_gap`
+   - include per-candidate `why_ranked` explanation
+3. Introduce value-per-token telemetry:
+   - response stores selected packet items and dropped items with reason (`budget`, `low_relevance`, `stale`)
+
+Open questions introduced:
+1. `OQ-BR02-21`: What are V200 default high/medium/low confidence thresholds and score-gap margins?
+2. `OQ-BR02-22`: Should intent-aware rerank profiles (`bug`, `explain`, `refactor`, `migrate`) be part of V200 core or behind feature flag?
+3. `OQ-BR02-23`: What exact schema do we use for `why_ranked` and ambiguity payloads to keep MCP/HTTP parity?
+4. `OQ-BR03-5`: Which deterministic evidence is minimum-required before medium-confidence responses can be used for LLM action suggestions?
+5. `OQ-BR07-10`: What value-per-token KPI should gate regressions in context packing quality?
 
 ---
 
