@@ -570,6 +570,78 @@ Graph Algorithms + Compiler Information = Superpower
 
    The compiler gives you the TRUE graph. The algorithms reveal its HIDDEN structure.
 
+**Moment-To-Moment UX Blueprint (Primary Segment: OSS Rust Contributors, Large Repos)**
+
+You’re right. The value is in the *felt flow*, not just architecture.  
+Here is the concrete user experience.
+
+### 1) Core “Ask → Navigate → Decide → Deep Dive” Experience
+
+| Moment | User Sees | User Does | Tool Does (Behind the scenes) | User Feels |
+|---|---|---|---|---|
+| 0 | Chat box + current branch + repo scope | Types: “How does authentication work?” | Intent classify (`explain-architecture`) | “It understands my goal” |
+| 1 | “I interpreted your intent as: Explain architecture (84%). Change?” | Accepts or edits intent | Query decomposition into semantic anchors | “I’m in control” |
+| 2 | 3-5 **Option Cards** (not raw hits) | Scans cards | Search + entity-wrap + graph clustering | “I can compare quickly” |
+| 3 | Each card shows breadcrumb path, anchor entity, top neighbors, confidence, token cost | Clicks one card | Prepares high-ROI context packet | “Low risk to try” |
+| 4 | “Preview context (900 tokens): signature map + call slice + type links” | Clicks “Deep dive” or “Compare” | Expands chosen cluster by intent profile | “I only read what matters” |
+| 5 | Deep view: execution path, data movement, related tests, likely invariants | Asks follow-up | Pulls selective code spans + verified graph facts | “This is trustworthy” |
+| 6 | Action bar: “Generate patch plan / Run blast radius / Review checklist” | Picks next action | Switches mode from explain to change/risk | “Momentum, no context reset” |
+| 7 | Final answer includes exact files/lines + confidence + unknowns | Proceeds to edit/review | Persists session memory for thread | “I can act immediately” |
+
+---
+
+### 2) What the Option Card Must Show (Critical)
+
+For each candidate cluster, user sees:
+
+1. **Title**: `auth::service::authenticate_user`  
+2. **Breadcrumb**: `crates/auth/src/service.rs`  
+3. **Why this card exists**: lexical/semantic/graph reasons  
+4. **Top related entities**: 3-4 named neighbors  
+5. **Risk badge**: low/medium/high change impact  
+6. **Confidence score**  
+7. **Token budget estimate** (`~700`, `~1400`)  
+8. **Freshness badge** (up-to-date vs stale)
+
+This removes the “black box search” feeling.
+
+---
+
+### 3) Segment x Workflow (Detailed Experience)
+
+| Segment | First 30 seconds | Next 2 minutes | Success moment |
+|---|---|---|---|
+| New OSS contributor | Gets “read order” card: where to start, what to ignore | Guided deep dive with glossary + key entities + tests | Opens first PR without reading entire repo |
+| Repeat contributor | Gets task-focused cards tied to issue/keyword | Chooses one cluster, receives patch plan + blast radius | Makes correct change with fewer review cycles |
+| Maintainer/reviewer | Drops PR diff, gets changed-entity map | Gets hidden impact edges + control/data-flow warnings | Catches non-obvious regressions quickly |
+
+---
+
+### 4) High-Quality “Feel” Targets (PMF Level)
+
+1. User reaches a trustworthy target cluster in <60s.  
+2. User gets actionable context (not docs dump) in <120s.  
+3. User always sees **why** result was chosen.  
+4. User can pivot intent without restarting from scratch.  
+5. User sees uncertainty explicitly instead of false precision.
+
+---
+
+### 5) Product Behavior in Ambiguity (Important)
+
+When confidence is low, user sees:
+
+1. “Top candidates are close; pick one:”  
+2. 2-3 disambiguation prompts (“Auth login path or token validation path?”)  
+3. Side-by-side mini previews
+
+So the tool feels honest, not hallucinated.
+
+---
+
+If you want, I can now write this exact moment-to-moment UX spec into the top section of [ES-V200-Decision-log-01.md](/Users/amuldotexe/Desktop/parseltongue-rust-LLM-companion/docs/ACTIVE-Reference/ES-V200-Decision-log-01.md) as a formal “User Experience Contract” and push.
+
+
 
 # Parseltongue
 
