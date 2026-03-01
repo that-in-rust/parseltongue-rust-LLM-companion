@@ -8,6 +8,139 @@ it is overwhelming what needs to be done
 
 Not sure
 
+# Code Search Workflow
+
+Use **intent-specific workflow variants**, not one universal flow. For OSS Rust in large repos, this is a strong segment x workflow map:
+
+| Segment | Workflow Variant | How LLM Navigates | Output |
+|---|---|---|---|
+| New contributor | `Map-first onboarding` | Query -> crate/module map -> key public APIs -> “read order” path | 30-min learning route |
+| Returning contributor | `Task-first patch path` | Issue text -> candidate entities -> enclosing owners -> minimal edit set | patch plan with files/lines |
+| Core maintainer | `Blast-radius before edit` | Proposed change -> callers/callees/trait impls/SCC neighbors | risk-ranked impact report |
+| Reviewer | `PR truth-check` | Diff -> changed entities -> dependency + control-flow slices | review checklist + hidden break risks |
+| Bug fixer | `Symptom-to-path` | Error/log tokens -> likely execution paths -> dataflow checkpoints | top 3 root-cause hypotheses |
+| API migrator | `Signature migration graph` | Old API refs -> wrapper/adapters -> downstream breakpoints | ordered migration sequence |
+| Unsafe code owner | `Soundness audit mode` | `unsafe` blocks -> aliasing/lifetime neighbors -> call paths | invariant map + violation candidates |
+| Perf contributor | `Hotpath context mode` | perf clue -> hot functions -> transitive callee chain + alloc points | optimization targets with confidence |
+
+Top 3 to build first for your segment:
+1. `Blast-radius before edit` (maintainers feel this pain daily)  
+2. `PR truth-check` (review is the bottleneck in large OSS)  
+3. `Task-first patch path` (contributor throughput)
+
+Key creative variations on your current pipeline:
+1. **Auto-route by intent** before retrieval (`bug`, `refactor`, `review`, `migrate`, `unsafe`, `perf`).  
+2. **Two-pass choice model**: machine picks when confidence is high; ask user/LLM only when ambiguous.  
+3. **Cluster cards, not raw results**: each option card includes scope path, key entities, risk, confidence, estimated tokens.  
+4. **Depth budget profiles**: `skim`, `balanced`, `deep`, `proof` modes.  
+5. **Counterfactual card** for every deep dive: “if we change X, what likely breaks first?”
+
+If you want, I can turn this into a formal “Segment x Workflow Operating Model” section at the top of the V200 decision log.
+
+===
+
+
+   The Meta-Pattern: Iterative Refinement Through Disambiguation
+
+     ┌─────────────────────────────────────────────────────────────────┐
+     │                    PHASE 1: SEARCH                              │
+     │   "authentication" → [auth, login, authenticate, oauth]        │
+     │   (fuzzy keyword → 3-4 semantic candidates)                     │
+     └─────────────────────────────────────────────────────────────────┘
+                                   ↓
+     ┌─────────────────────────────────────────────────────────────────┐
+     │                    PHASE 2: ANCHOR                              │
+     │   For each candidate:                                           │
+     │   - Find where it appears in code                               │
+     │   - Bubble up to ENCAPSULATING PUBLIC ENTITY                    │
+     │   - (private impl → public function that calls it)              │
+     └─────────────────────────────────────────────────────────────────┘
+                                   ↓
+     ┌─────────────────────────────────────────────────────────────────┐
+     │                    PHASE 3: CLUSTER                             │
+     │   For each anchored entity:                                     │
+     │   - Top 3-4 connected entities (callers/callees/impls)         │
+     │   - Module path (crate::module::submodule::entity)             │
+     │   - Signature snippet                                           │
+     └─────────────────────────────────────────────────────────────────┘
+                                   ↓
+     ┌─────────────────────────────────────────────────────────────────┐
+     │                    PHASE 4: DISAMBIGUATE                        │
+     │   Present N clusters to LLM:                                    │
+     │   "Which of these are you interested in?"                       │
+     │   LLM chooses based on context clues in clusters               │
+     └─────────────────────────────────────────────────────────────────┘
+                                   ↓
+     ┌─────────────────────────────────────────────────────────────────┐
+     │                    PHASE 5: DEEP DIVE                           │
+     │   For chosen cluster:                                           │
+     │   - Full code                                                   │
+     │   - Complete relationship graph                                 │
+     │   - Type information                                            │
+     │   - Control flow highlights                                     │
+     └─────────────────────────────────────────────────────────────────┘
+
+   ──────────────────────────────────────────
+
+   Key Insight: The "Encapsulating Public Entity" Pattern
+
+   This is the crucial observation:
+
+     User searches: "validate_credentials"
+     Found in: src/auth/internal/validator.rs:47 (PRIVATE function)
+
+     Instead of returning the private function directly:
+       → Bubble up to: pub fn login() at src/auth/mod.rs:23
+       → This is the PUBLIC interface that contains the search hit
+
+   Why this matters:
+   1. Public interfaces are stable - less likely to change than internals
+   2. Public interfaces are the API boundary - what you actually interact with
+   3. LLMs get context through the public contract, not lost in implementation details
+   4. Private code is accessed through its public interface in real usage
+
+   ──────────────────────────────────────────
+
+   The Pattern in Abstract Terms
+
+   Phase            │ Input       │ Output              │ Key Operation                
+   -----------------+-------------+---------------------+------------------------------
+   **Search**       │ Fuzzy query │ Semantic candidates │ Cosine/embedding similarity
+   **Anchor**       │ Candidates  │ Public entities     │ Bubble-up to public interface
+   **Cluster**      │ Entity      │ Context packet      │ Graph expansion (3-4 hops)
+   **Disambiguate** │ N packets   │ 1 chosen packet     │ LLM selects based on context
+   **Deep Dive**    │ 1 packet    │ Full context        │ Complete analysis
+
+   ──────────────────────────────────────────
+
+   What Makes This Pattern Smart
+
+   1. Progressive disclosure - Don't dump everything at once
+   2. Structured ambiguity - When uncertain, present options WITH context
+   3. Public-first - Surface through APIs, not implementation
+   4. Clustered context - Enough to choose, not so much it overwhelms
+   5. Human-in-the-loop (or LLM-in-the-loop) - Let the chooser decide
+
+   ──────────────────────────────────────────
+
+   One Refinement to Consider
+
+   The Cluster phase could use different "expansion profiles" based on query intent:
+
+   Query Type                   │ Cluster By                   
+   -----------------------------+------------------------------
+   "How does X work?"           │ Callees (down the call graph)
+   "Where is X used?"           │ Callers (up the call graph)
+   "What implements X?"         │ Trait implementations
+   "What breaks if I change X?" │ Both callers AND callees
+
+   This would make the disambiguation clusters more meaningful for the specific question.
+
+   ──────────────────────────────────────────
+
+   Bottom line: Yes, this pattern is exactly right. It's a conversation, not a search. Search → Anchor → Cluster → Choose → Deep Dive
+
+
 # Parseltongue
 
 >  Now understanding this workflow - The LLM comes and asks you: "Tell me about suppose authentication."First thing you would do is probablySearch for non-keywords in the codebase which are 
