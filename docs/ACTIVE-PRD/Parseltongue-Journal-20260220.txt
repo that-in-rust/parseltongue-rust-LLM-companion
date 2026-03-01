@@ -210,6 +210,367 @@ So the tool feels honest, not hallucinated.
 
 If you want, I can now write this exact moment-to-moment UX spec into the top section of [ES-V200-Decision-log-01.md](/Users/amuldotexe/Desktop/parseltongue-rust-LLM-companion/docs/ACTIVE-Reference/ES-V200-Decision-log-01.md) as a formal “User Experience Contract” and push.
 
+----
+
+Graph Algorithms + Compiler Information = Superpower
+
+   Let me map each algorithm to what compiler information enables it:
+
+   ──────────────────────────────────────────
+
+   The Key Insight: Compiler Gives You EDGES
+
+     Without compiler:         With compiler:
+     ─────────────────         ───────────────
+     "Maybe this calls that"   "This DEFINITELY calls that"
+     Text similarity           Semantic relationship
+     Guesswork                 Ground truth
+
+   The graph algorithms need a graph. The compiler GIVES you the real graph.
+
+   ──────────────────────────────────────────
+
+   Algorithm-by-Algorithm Analysis
+
+   1. Circular Dependency Detection
+
+     Compiler provides edges:
+     ├── use statements (module level)
+     ├── function calls (code level)
+     ├── trait bounds (type level)
+     └── generic instantiations (param level)
+
+     What you can detect:
+     ├── Module cycles: A uses B uses A
+     ├── Call cycles: f() → g() → h() → f()
+     ├── Trait cycles: T1: T2, T2: T1
+     └── Type cycles: struct A { b: B }, struct B { a: A }
+
+   Why it matters for LLMs:
+   •  "This code has circular dependencies" → warn before refactoring
+   •  "Breaking this cycle requires changing these 3 modules"
+
+   ──────────────────────────────────────────
+
+   2. Complexity Hotspots Ranking
+
+     Compiler provides:
+     ├── Call graph depth (who calls deep call chains)
+     ├── Fan-out (how many functions does this call)
+     ├── Fan-in (how many callers depend on this)
+     ├── Type complexity (generics, traits, lifetimes)
+     └── Trait bound chains (T: A + B + C where A: D)
+
+     Hotspot = High fan-in + High fan-out + Complex types
+
+   Example output:
+
+     Top 3 Hotspots:
+     1. process_request()
+        - 47 callers (fan-in)
+        - calls 23 functions (fan-out)
+        - 4 generic params, 6 trait bounds
+
+     2. authenticate()
+        - 31 callers
+        - calls 15 functions
+        - 3 lifetime params
+
+   Why it matters for LLMs:
+   •  "Be careful changing this - it's a hotspot"
+   •  "This function touches many parts of the system"
+
+   ──────────────────────────────────────────
+
+   3. Semantic Cluster Grouping
+
+     Compiler provides:
+     ├── Module tree (actual hierarchy)
+     ├── Trait implementations (group by capability)
+     ├── Type relationships (group by data)
+     └── Call density (group by interaction)
+
+     Clusters emerge from:
+     ├── "All functions that implement Auth trait"
+     ├── "All types that contain User"
+     ├── "All functions in call chain from main()"
+
+   Example:
+
+     Cluster: Authentication
+     ├── login()
+     ├── logout()
+     ├── refresh_token()
+     ├── validate_session()
+     └── [All implement SessionHandler trait]
+
+     Cluster: User Management
+     ├── create_user()
+     ├── delete_user()
+     ├── update_profile()
+     └── [All operate on User type]
+
+   Why it matters for LLMs:
+   •  "You asked about auth - here's the WHOLE auth cluster"
+   •  "These 5 functions are semantically related"
+
+   ──────────────────────────────────────────
+
+   4. Strongly Connected Components (Tarjan SCC)
+
+     Compiler provides:
+     ├── Call graph edges
+     ├── Trait impl edges
+     ├── Type dependency edges
+
+     SCC = set of nodes where every node reaches every other
+
+     What SCCs reveal:
+     ├── Mutual recursion groups
+     ├── Tightly coupled modules
+     ├── Potential refactoring boundaries
+
+   Example:
+
+     SCC #1: {parse, tokenize, lex}
+       → These 3 are mutually recursive
+
+     SCC #2: {validate, sanitize, normalize}
+       → These 3 call each other in cycles
+
+     Isolated: {format_output}
+       → No cycles, easy to extract
+
+   Why it matters for LLMs:
+   •  "These functions must be understood together"
+   •  "This SCC is a natural module boundary"
+
+   ──────────────────────────────────────────
+
+   5. Technical Debt (SQALE Scoring)
+
+     Compiler provides ACTUAL metrics:
+     ├── Cyclomatic complexity (from MIR branches)
+     ├── Cognitive complexity (nested control flow)
+     ├── Coupling (CBO - types used)
+     ├── Cohesion (LCOM - field usage)
+     └── Documentation coverage (doc comments)
+
+     SQALE = sum of remediation effort
+
+   Example:
+
+     Function: process_request()
+     ├── Cyclomatic: 23 (high - many branches)
+     ├── Nesting depth: 5 (medium)
+     ├── Coupling: 12 types (high)
+     ├── Debt score: 4.2 hours to clean up
+
+     Function: format_date()
+     ├── Cyclomatic: 2 (low)
+     ├── Nesting depth: 1 (low)
+     ├── Coupling: 2 types (low)
+     ├── Debt score: 0.1 hours
+
+   Why it matters for LLMs:
+   •  "This function is debt-heavy - suggest refactoring"
+   •  "Prioritize cleaning high-debt areas"
+
+   ──────────────────────────────────────────
+
+   6. k-Core Decomposition (Layering)
+
+     Compiler provides call graph:
+     ├── k=1: Peripheral (called by 1 or none)
+     ├── k=2: Bridge (connects periphery to core)
+     ├── k=3+: Core (highly interconnected)
+
+     k-core = subgraph where every node has ≥k connections
+
+   Example:
+
+     k=3 Core:
+     ├── dispatch_request()
+     ├── route_handler()
+     ├── middleware_chain()
+     └── [These are the "engine" - most connected]
+
+     k=2 Bridge:
+     ├── auth_middleware()
+     ├── logging_middleware()
+     └── [Connect core to periphery]
+
+     k=1 Periphery:
+     ├── health_check()
+     ├── metrics_endpoint()
+     └── [Leaf functions - easy to change]
+
+   Why it matters for LLMs:
+   •  "Core functions are critical - changes ripple everywhere"
+   •  "Peripheral functions are safe to modify"
+
+   ──────────────────────────────────────────
+
+   7. Centrality Measures (PageRank/Betweenness)
+
+     Compiler provides call graph weights:
+     ├── Call frequency (static analysis of call sites)
+     ├── Type usage frequency
+     ├── Trait implementation count
+
+     PageRank: "Which functions are most important?"
+     Betweenness: "Which functions are on the most paths?"
+
+   Example:
+
+     PageRank Top 3:
+     1. handle_request() - 0.15 (entry point, many call chains)
+     2. authenticate() - 0.12 (security critical, many dependents)
+     3. database_query() - 0.09 (data layer, widely used)
+
+     Betweenness Top 3:
+     1. middleware() - 0.23 (on path between entry and handlers)
+     2. router() - 0.19 (on path between URL and handlers)
+     3. serializer() - 0.14 (on path between data and response)
+
+   Why it matters for LLMs:
+   •  "These are the most important functions to understand"
+   •  "Bugs in high-centrality functions cause widespread issues"
+
+   ──────────────────────────────────────────
+
+   8. Entropy Complexity
+
+     Compiler provides:
+     ├── Type variety per function
+     ├── Call target variety (for dynamic dispatch)
+     ├── Control flow entropy (branch distribution)
+
+     High entropy = unpredictable, complex
+     Low entropy = predictable, simple
+
+   Example:
+
+     Function: handle_websocket()
+     ├── Handles 12 different message types
+     ├── Type entropy: 3.58 bits (high)
+     ├── "Complex - many code paths"
+
+     Function: add_numbers()
+     ├── Handles 1 type pair (i32, i32) → i32
+     ├── Type entropy: 0 bits (zero)
+     ├── "Simple - single code path"
+
+   Why it matters for LLMs:
+   •  "High entropy = needs more test cases"
+   •  "This function is hard to reason about"
+
+   ──────────────────────────────────────────
+
+   9. Coupling/Cohesion (CK Metrics)
+
+     Compiler provides PRECISE counts:
+
+     CBO (Coupling Between Objects):
+       → Count of distinct types used
+       → From type inference, not text search
+
+     LCOM (Lack of Cohesion of Methods):
+       → Do methods use the same fields?
+       → From field access analysis
+
+     RFC (Response For Class):
+       → Count of methods that can be called
+       → From call graph
+
+     WMC (Weighted Methods per Class):
+       → Sum of method complexities
+       → From MIR cyclomatic
+
+   Example:
+
+     Struct: UserService
+     ├── CBO: 8 (uses 8 other types) - highly coupled
+     ├── LCOM: 0.7 (methods don't share fields) - low cohesion
+     ├── RFC: 45 (can trigger 45 method calls) - high response
+     ├── WMC: 34 (total complexity) - complex class
+
+     Diagnosis: "God class - consider splitting"
+
+   Why it matters for LLMs:
+   •  "This struct is doing too much"
+   •  "These metrics suggest refactoring opportunities"
+
+   ──────────────────────────────────────────
+
+   10. Leiden Community Detection
+
+     Compiler provides edge weights:
+     ├── Call frequency
+     ├── Type sharing (both use same types)
+     ├── Module proximity
+     ├── Trait co-implementation
+
+     Leiden finds: "Natural groupings that minimize cross-group edges"
+
+   Example:
+
+     Community A (auth): 23 functions
+     ├── High internal calls (89%)
+     ├── Low external calls (11%)
+     └── Cohesive "auth" concept
+
+     Community B (database): 18 functions
+     ├── High internal calls (92%)
+     ├── Low external calls (8%)
+     └── Cohesive "data access" concept
+
+     Cross-community edges:
+     ├── auth → database: 2 (validate_credentials, log_audit)
+     └── [These are the "seams" between modules]
+
+   Why it matters for LLMs:
+   •  "Here's how the codebase naturally clusters"
+   •  "These communities match domain boundaries"
+
+   ──────────────────────────────────────────
+
+   The Combined Power
+
+   When you run ALL these algorithms on compiler-derived graphs:
+
+     You can answer:
+     ├── "What's the architecture?" → Leiden + k-core
+     ├── "Where's the technical debt?" → SQALE + Complexity
+     ├── "What's critical?" → PageRank + Centrality
+     ├── "What's fragile?" → SCC + Cycles + Coupling
+     ├── "What should I refactor first?" → Debt + Centrality + k-core
+     └── "What's easy to change?" → Periphery + Low coupling
+
+   ──────────────────────────────────────────
+
+   For the LLM Navigation Workflow
+
+   In your 5-phase workflow:
+
+   Phase            │ Graph Algorithm Role                                        
+   -----------------+-------------------------------------------------------------
+   **Search**       │ -
+   **Anchor**       │ Find entity in graph
+   **Cluster**      │ **Leiden communities** - what group is this in?
+   **Disambiguate** │ Show **centrality** - which is more important?
+   **Deep Dive**    │ Show **SCC**, **coupling**, **complexity** for chosen entity
+
+   ──────────────────────────────────────────
+
+   Bottom Line
+
+   Graph algorithms without compiler info: Guessing from text
+   Graph algorithms with compiler info: Mathematical precision on real structure
+
+   The compiler gives you the TRUE graph. The algorithms reveal its HIDDEN structure.
+
+
 # Parseltongue
 
 >  Now understanding this workflow - The LLM comes and asks you: "Tell me about suppose authentication."First thing you would do is probablySearch for non-keywords in the codebase which are 
