@@ -690,6 +690,38 @@ Open questions introduced:
 4. `OQ-BR03-5`: Which deterministic evidence is minimum-required before medium-confidence responses can be used for LLM action suggestions?
 5. `OQ-BR07-10`: What value-per-token KPI should gate regressions in context packing quality?
 
+### External Research Addendum (rustc Release-Cadence Risk Assessment for V200)
+**Status**: Added for BR01/BR03 decision support  
+**Date**: 2026-03-02  
+**Intent**: Resolve: "If Parseltongue is a static tool and we stay on rustc-relevant versions, how serious is API break risk?"
+
+Release-tag evidence used (not `main` churn):
+1. `1.90.0 -> 1.91.0`: `rustc_public` exported-signature removals = `3`
+2. `1.91.1 -> 1.92.0`: removals = `1`
+3. `1.92.0 -> 1.93.0`: removals = `10`
+4. `1.93.0 -> 1.93.1`: removals = `0`
+5. Removals are concentrated (Pareto-like), not uniform; majority observed in `compiler/rustc_public/src/ty.rs`.
+
+Assessment (decision-quality summary):
+1. This is **not** "everything breaks every release."
+2. This is also **not** "zero risk."
+3. Patch releases are usually low-risk; minor releases carry most compatibility movement.
+4. A static binary does not imply static compiler-internal API compatibility over time.
+
+Decision direction (draft to execute):
+1. **Version-coupled support policy**: support `N` and `N-1` stable toolchains only; reject unknown versions explicitly.
+2. **Adapter boundary mandate**: isolate rustc-facing extraction behind one compatibility adapter so graph/query contracts stay stable.
+3. **Risk tiering for planning**:
+   - pinned exact stable version: low operational risk
+   - `N/N-1` stable coverage: medium recurring adapter work
+   - nightly tracking: high risk (not default for V200)
+4. **Graceful degradation contract**: if rustc capability mismatch occurs, downgrade to parsable subset + explicit `partial` capability marker, never silent success.
+
+Open questions introduced:
+1. `OQ-BR01-18`: What exact V200 toolchain matrix do we publish (`N` only vs `N/N-1`)?
+2. `OQ-BR03-7`: What is the minimum adapter conformance test suite required before certifying a new rustc minor version?
+3. `OQ-BR07-12`: What SLA do we commit for new stable rustc support after release day (for example, `<7 days`)?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
