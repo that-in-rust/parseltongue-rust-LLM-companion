@@ -1,11 +1,14 @@
 # V216 - PRD - Parseltongue reborn as a Rust LLM companion
 
-# User Segment x Diffeerentiation
+# User Segment x Diferentiation
 
 - Rust Open Source Library
     - Maintainers
     - Contributors
 
+
+
+# Core flow for 216
 
 
 
