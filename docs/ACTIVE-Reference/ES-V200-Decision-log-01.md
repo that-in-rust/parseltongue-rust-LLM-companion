@@ -722,6 +722,89 @@ Open questions introduced:
 2. `OQ-BR03-7`: What is the minimum adapter conformance test suite required before certifying a new rustc minor version?
 3. `OQ-BR07-12`: What SLA do we commit for new stable rustc support after release day (for example, `<7 days`)?
 
+### External Research Addendum (Context-Query-Converge Score Architecture + Profile Variations)
+**Status**: Added for BR02/BR03/BR07 decision support  
+**Date**: 2026-03-02  
+**Intent**: Consolidate recent research journals/thesis notes into one executable scoring model for the single endpoint workflow.
+
+Single-endpoint contract direction:
+1. Keep one user-facing endpoint: `POST /context-query-converge`.
+2. Keep one state machine for all clients (human CLI + agents):
+   - `resolved`
+   - `disambiguate`
+   - `no_match`
+3. Keep progressive disclosure as the default UX:
+   - quick graph computation first
+   - option-card disambiguation when needed
+   - deep dive only for selected/auto-resolved cluster
+
+Why this direction is reinforced:
+1. The thesis/workflow notes prioritize ranked option cards + scoped deep dives over up-front intent questionnaires and over full deep-dive-on-all candidates.
+2. Research synthesis indicates combined structural representations outperform single-mode retrieval.
+3. Build/buy guidance supports centrality/community/impact algorithms now, while deferring heavy GNN-first architectures.
+
+Unified score model (draft baseline):
+1. `score(candidate)` should be a weighted multi-signal composition:
+   - `search_fusion` (`exact_symbol` + `fuzzy` + `RRF`)
+   - `anchor_quality` (public-interface anchor quality)
+   - `structural_relevance` (call/type/control/data-flow proximity)
+   - `centrality_importance` (PageRank, betweenness, k-core)
+   - `community_fit` (Leiden/module cohesion)
+   - `impact_relevance` (blast radius / influence propagation)
+   - `temporal_relevance` (recent changes/version-locality, when available)
+   - `freshness`
+   - `provenance_confidence`
+2. Apply hard penalties:
+   - stale hash / stale index
+   - weak or missing provenance
+   - token-overflow pressure
+   - low margin ambiguity
+3. Use margin-aware finalization:
+   - auto-resolve only when confidence and score-gap gates are satisfied
+   - otherwise return compact `disambiguate` payload with 2-4 labeled clusters
+
+Algorithm priority for V200 implementation:
+1. **P0 (ship first):**
+   - exact symbol lookup + trigram fuzzy + `RRF`
+   - BFS anchoring to nearest public interface
+   - ego-network (`k`-hop) cluster extraction
+   - PageRank + betweenness for ranking
+   - influence/BFS blast-radius expansion
+   - token-budget context selector (value-per-token)
+   - freshness + provenance gating before `resolved`
+2. **P1 (next iteration):**
+   - Leiden community detection for option-card grouping
+   - k-core as dense-core signal
+   - shortest-path distance as proximity feature
+   - lightweight temporal recency signal (change-aware scoring)
+3. **P2 (defer):**
+   - GNN-based rankers as default scoring path
+   - full CPG-first mandatory pipeline for all queries
+
+Profile-driven weight shifts (same endpoint, different policy):
+1. `balanced`: even blend of search + anchor + structure + importance.
+2. `auto_fast`: high exact/anchor weights with strict auto-resolve gap.
+3. `safe_strict`: high freshness/provenance/impact, conservative auto-resolve.
+4. `debug_error`: boost control/data-flow and local blast radius around error seeds.
+5. `refactor_impact`: maximize reverse-callers + impact propagation + core-density cues.
+6. `learn_codebase`: maximize community coverage and representative central nodes.
+7. `pr_review`: add recency/change-locality and dependency-risk emphasis.
+8. `symbol_direct`: near-direct resolution when exact canonical symbol exists.
+9. `compare_two`: preserve top-2 clusters when margin is narrow.
+10. `agent_json`: deterministic ordering + explicit score breakdown + provenance fields.
+
+Draft guardrails:
+1. Do not claim "zero hallucination"; claim evidence-backed confidence.
+2. No `resolved` outcome without freshness/provenance gates passing.
+3. Always emit `why_ranked` fields for top candidates in `disambiguate`.
+4. Default option-card count remains `2-4` for decision speed.
+
+Open questions introduced:
+1. `OQ-BR02-26`: What default weight vector should V200 ship for `balanced` profile?
+2. `OQ-BR02-27`: What exact auto-resolve thresholds (`top_score`, `score_gap`, freshness floor) should gate `auto_fast`?
+3. `OQ-BR03-8`: What minimum structural evidence bundle is required per profile before returning `resolved`?
+4. `OQ-BR07-13`: What p95 latency budget per phase is acceptable while preserving 2-4 candidate disambiguation quality?
+
 ---
 
 ## Big-Rock-03: Compiler Truth + LLM Judgment Loop
