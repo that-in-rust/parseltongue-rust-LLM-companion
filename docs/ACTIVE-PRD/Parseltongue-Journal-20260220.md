@@ -8,9 +8,285 @@ it is overwhelming what needs to be done
 
 Not sure
 
+# bookmarks
+
+- https://x.com/mfranz_on/status/2021364017147818434
+- 
+# some good ideas
 
 
 
+⛬  Let me think creatively about more dimensions of variation:
+
+   ──────────────────────────────────────────
+
+   DIMENSION 1: TRAVERSAL DIRECTION
+
+   Top-Down (Entry Point → Implementation)
+
+     USER: "authentication"
+           ↓
+     Start from main.rs → find auth route → trace down to implementation
+
+   Use case: Understanding how a feature works from outside-in
+
+   Bottom-Up (Implementation → Usage)
+
+     USER: "auth::login"
+           ↓
+     Start from function → find all callers → trace up to entry points
+
+   Use case: Impact analysis, "who uses this?"
+
+   Bidirectional (Both simultaneously)
+
+     USER: "auth::login"
+           ↓
+     ↓ Trace DOWN (what it calls)
+     ↑ Trace UP (who calls it)
+     → Merge at entity
+
+   Use case: Full picture in one query
+
+   ──────────────────────────────────────────
+
+   DIMENSION 2: WHO DRIVES
+
+   User-Driven (Current approach)
+
+     System presents → User picks → System deep dives
+
+   LLM-Driven (Autonomous)
+
+     System presents → LLM picks best cluster → Returns full answer
+
+   Trade-off: Faster, but LLM might pick wrong
+
+   Collaborative (Both)
+
+     System presents → LLM recommends [1] with reasoning → User confirms or overrides
+
+   ──────────────────────────────────────────
+
+   DIMENSION 3: TEMPORAL VARIATIONS
+
+   Snapshot (Current state)
+
+     Query code as it is NOW
+
+   Time-Travel (Git history)
+
+     USER: "authentication @ 3-months-ago"
+           ↓
+     Query code as it was 3 months ago, compare with now
+
+   Evolution View
+
+     USER: "authentication evolution"
+           ↓
+     Show how auth changed over last 20 commits
+
+   ──────────────────────────────────────────
+
+   DIMENSION 4: PROACTIVE VARIATIONS
+
+   Reactive (Current)
+
+     User asks → System answers
+
+   Predictive Pre-fetch
+
+     User asks about "login" → System ALSO pre-computes:
+       - password_reset (related)
+       - session_management (related)
+       - auth_middleware (caller)
+     Cache results silently
+
+   Next query is instant
+
+   Code Smell Radar
+
+     User asks about "auth" → System returns:
+       - Context for auth
+       - WARNING: High complexity in auth::login (score: 47)
+       - WARNING: No tests for auth::session
+
+   ──────────────────────────────────────────
+
+   DIMENSION 5: OUTPUT FORMAT VARIATIONS
+
+   Text Summary (Current)
+
+     [1] API HANDLER LAYER - login_route
+
+   Code Slice
+
+     Return minimal executable code path:
+     fn main() → route() → auth::login() → return
+
+   Graph Visualization
+
+     Return DOT graph for rendering:
+     digraph {
+       login_route → auth::login → session::create
+     }
+
+   Diff Preview
+
+     "Here's what would change if you modified auth::login:
+      - 3 callers affected
+      - 12 test files need updates"
+
+   ──────────────────────────────────────────
+
+   DIMENSION 6: SESSION VARIATIONS
+
+   Stateless (Current)
+
+     Each query is independent
+
+   Session Memory
+
+     Query 1: "auth"
+     Query 2: "show me the tests" ← System knows "tests for auth"
+     Query 3: "complexity?" ← System knows "complexity of auth"
+
+   Breadcrumb Trail
+
+     auth → login_route → session → (back) → login_route → (back) → auth
+
+   ──────────────────────────────────────────
+
+   DIMENSION 7: CONSTRAINT VARIATIONS
+
+   Token-Bounded
+
+     "Give me auth context in 500 tokens max"
+     → System compresses aggressively
+
+   Time-Bounded
+
+     "Give me answer in 100ms max"
+     → System returns partial results with progress indicator
+
+   Depth-Bounded
+
+     "Depth = 2" (only 2 hops in call graph)
+     vs "Depth = 5" (full transitive closure)
+
+   ──────────────────────────────────────────
+
+   DIMENSION 8: SPECIALIZED VARIATIONS
+
+   Test-Guided
+
+     USER: "auth failing test"
+           ↓
+     Start from failing test → trace code path → highlight likely culprits
+
+   Security-Focused
+
+     USER: "auth security"
+           ↓
+     Find: input validation, encryption, SQL queries, external calls
+     Flag: potential vulnerabilities
+
+   Refactoring-Ready
+
+     USER: "auth refactor"
+           ↓
+     Return: complexity scores, test coverage, blast radius, suggested safe order
+
+   ──────────────────────────────────────────
+
+   THE META-VARIATION: COMPOSABLE PIPELINE
+
+   Instead of fixed workflow, let user/LLM compose:
+
+     QUERY: "auth"
+     │
+     ├─ RETRIEVE: RRF(symbol, fuzzy, git) → 4 candidates
+     │
+     ├─ ANCHOR: BFS(public) → 2 clusters
+     │
+     ├─ ENRICH:
+     │   ├─ complexity_score()
+     │   ├─ test_coverage()
+     │   ├─ recent_changes()
+     │   └─ blast_radius()
+     │
+     ├─ FILTER: complexity > 30 AND coverage < 50%
+     │
+     ├─ RANK: BY blast_radius DESC
+     │
+     └─ OUTPUT: top 2 in 1000 tokens
+
+   Each step is a CPU-only operation. User/LLM can modify the pipeline.
+
+   ──────────────────────────────────────────
+
+   WHICH VARIATION WINS?
+
+   Your core thesis still holds:
+
+   Criterion             │ Winner                        
+   ----------------------+-------------------------------
+   Lowest cognitive load │ Progressive (your approach)
+   Fastest               │ Predictive pre-fetch
+   Most accurate         │ Test-guided
+   Most flexible         │ Composable pipeline
+   Best for LLMs         │ Session memory + your approach
+
+   My recommendation: Start with your 5-phase progressive approach, then add:
+   1. Session memory (remembers context across queries)
+   2. Predictive pre-fetch (silently cache related entities)
+   3. Composable hints (let LLM hint at depth/format constraints)
+
+
+
+# some ideas
+
+Great prompt. Keep the **same single API** and create **workflow profiles** on top of it.
+
+Use one endpoint:
+`POST /context-query-converge`
+
+Then vary behavior by `profile`.
+
+| Profile | What user sees | Best for | Tradeoff |
+|---|---|---|---|
+| `balanced` | 2-4 labeled clusters, then pick | Default use | One extra step |
+| `auto_fast` | Auto-resolve if score gap is high | Experienced users | Wrong auto-pick risk if threshold too low |
+| `safe_strict` | Always disambiguate, never auto-resolve | High-stakes edits | Slightly slower |
+| `debug_error` | Starts from compiler/test error, then cluster | Bug fixing | Needs logs/errors input |
+| `refactor_impact` | Shows “what breaks” cluster first | API changes | More graph compute |
+| `learn_codebase` | Shows architecture/module cluster summaries first | New contributors | Less immediate code detail |
+| `pr_review` | Biases to changed files + callers/callees | Reviewers | Can miss older hidden coupling |
+| `symbol_direct` | If exact symbol hit, jump to deep dive | Power users | Less guidance |
+| `compare_two` | Returns side-by-side clusters for top 2 | Ambiguous queries | More tokens upfront |
+| `agent_json` | Strict JSON state machine (`resolved/disambiguate/no_match`) | LLM/automation | Human readability lower |
+
+Concrete examples:
+
+1. `pt q "authentication" --profile auto_fast`  
+Returns deep dive immediately if top cluster is clearly dominant.
+
+2. `pt q "authentication" --profile safe_strict`  
+Always shows:
+- API handler cluster
+- Auth abstraction cluster  
+Then asks for choice.
+
+3. `pt q --from-error build.log --profile debug_error`  
+Extracts symbols from error, anchors to public entity, returns minimal fix context first.
+
+4. `pt q "rename AuthProvider.login" --profile refactor_impact`  
+Starts with blast radius + affected impls + tests before code dump.
+
+5. `pt q "auth" --profile learn_codebase`  
+Shows module map + key interfaces + 1-hop neighbors before deep code.
+
+If you want, I can draft the exact `profile` enum + default thresholds (auto-resolve gap, candidate count, token budgets).
 
 
 
