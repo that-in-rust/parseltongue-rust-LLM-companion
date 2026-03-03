@@ -1,0 +1,362 @@
+CODE UNDERSTANDING THESIS - FULL CONTEXT DUMP
+==============================================
+DATE: 2026-03-03 08:09
+SESSION CONTEXT - RAW DUMP
+
+==================================
+USER REQUESTS IN ORDER:
+==================================
+
+1. User invoked brainstorming skill via /superpowers:brainstorm command
+2. User wanted research on code-understanding domain using ghcli
+3. User provided MASSIVE context about Parseltongue v2.0.0 including:
+   - Rust Compiler Tool Ecosystem analysis (45+ tools)
+   - Moment-to-Moment UX Blueprint
+   - UX Blueprint to Compiler Data Mapping
+   - Graph algorithms for code analysis
+   - Integration patterns
+   - Entity classification model
+
+4. User wanted THOROUGH research, not minimal
+5. User wanted INSURMOUNTABLE thesis, not minimalist
+6. User wanted 20 parallel agents for exhaustive research
+7. User wanted Minto pyramid ASCII summary
+8. User wanted files copied to parseltongue repo
+
+==================================
+KEY USER CONSTRAINTS:
+==================================
+
+- DO NOT read from local repo (except design files)
+- Use ONLY ghcli for GitHub research
+- DO PLANNING FIRST before research
+- Use Plan agent first, THEN general-purpose (sequentially)
+- Make it INSURMOUNTABLE, not minimalist
+- Think of graphs as INDEPENDENT domain
+- Cross-domain alpha from bio, social, fraud, knowledge graphs
+
+==================================
+PARSERLTONGUE V2.0.0 CONTEXT:
+==================================
+
+PURPOSE: Rust LLM companion tool for OSS contributors on large repos
+
+5 INTEGRATION PATTERNS:
+1. Direct rustc_private (30+ tools) - Nightly-only, breaks frequently
+2. rustc_plugin Framework (Flowistry, Aquascope, Paralegal, Argus) - Brown University
+3. Charon/LLBC Decoupling (Aeneas, Hax) - Decouples from compiler
+4. Stable MIR / rustc_public - Official effort, not ready
+5. No Compiler Dependency (cargo-scan, Polonius) - Uses cargo crate
+
+7-MOMENT UX BLUEPRINT:
+0. Intent Classification - "How does authentication work?"
+1. Intent Confirmation - "I interpreted your intent as X (84%). Change?"
+2. Option Cards Presented - 3-5 cards, NOT raw search results
+3. Card Details Viewed - breadcrumb, neighbors, risk, confidence
+4. Context Preview - signature map + call slice
+5. Deep Dive - execution path, data movement, tests
+6. Action Bar - "Generate patch plan / Run blast radius"
+7. Final Answer - exact files/lines + confidence + unknowns
+
+OPTION CARD REQUIREMENTS:
+- Title
+- Breadcrumb (where it lives)
+- Why this card exists (lexical/semantic/graph reasons)
+- Top related entities (3-4 neighbors)
+- Risk badge (low/medium/high)
+- Confidence score
+- Token budget estimate
+- Freshness badge
+
+ENTITY CLASSIFICATION:
+- code-graph (parseable source)
+- identifiable-tests
+- docs
+- non-eligible-text
+
+READ POINTER FORMAT:
+file_path|||entity_key|||start_line|||end_line
+
+==================================
+RESEARCH FINDINGS:
+==================================
+
+MAIN CONCLUSION:
+Production tools use <10% of available graph algorithms.
+Parseltongue wins by using the other 90%.
+
+KEY STATS:
+- 200+ graph algorithms catalogued
+- 45+ Rust compiler tools analyzed
+- 30+ GNN architectures documented
+- 30+ competitor tools analyzed
+- 35+ cross-domain transfer patterns
+
+ALGORITHM CATEGORIES:
+1. Centrality (25+ measures): PageRank, Betweenness, Closeness, Eigenvector, k-Core
+2. Community Detection (30+ algorithms): Leiden, Louvain, Infomap, Label Propagation
+3. Traversal (15+): BFS, DFS, A*, Dijkstra, Bidirectional
+4. Shortest Path (20+): Dijkstra variants, Floyd-Warshall, Johnson
+5. Subgraph Mining (20+): gSpan, FSG, motif detection
+6. Graph Matching (15+): VF2, Ullmann, graph edit distance
+7. GNN (30+): GCN, GAT, GraphSAGE, GIN, Graphormer
+8. Temporal (15+): TGN, TGAT, EvolveGCN
+9. Multi-layer (10+): multiplex, heterogeneous graphs
+10. Embedding (25+): Node2vec, DeepWalk, LINE
+
+WHITE SPACE OPPORTUNITIES:
+- Leiden community detection (no Rust implementation)
+- k-Core decomposition for complexity hotspots
+- Temporal code graphs for evolution tracking
+- Multi-layer graphs (syntax + control + data + types)
+
+BUILD VS BUY DECISIONS:
+- petgraph: BUY (3,773 stars, Apache licensed)
+- CFG construction: BUILD (tree-sitter)
+- Leiden: BUILD (no alternative)
+- CPG full: DEFER (wait for cpg-rs)
+- GNN: DEFER (research stage)
+
+COMPETITIVE MOAT:
+6-layer pyramid:
+1. Core graph technology (2-3 years)
+2. Integration depth (1-2 years)
+3. Algorithm advantage (6-18 months)
+4. Data & insights (compounds)
+5. Ecosystem (2-3 years)
+6. Brand (2+ years)
+
+==================================
+FILES CREATED:
+==================================
+
+NOTES2026 REPO:
+/Users/amuldotexe/Desktop/notebook-gh/Notes2026/parseltongue-code-understanding-thesis-2026/
+
+PARSERLTONGUE REPO:
+/Users/amuldotexe/Desktop/parseltongue-rust-LLM-companion/docs/ACTIVE-PRD/
+
+FILES:
+- 2026-03-02-code-understanding-domain-thesis.md (35KB minimal thesis)
+- 2026-03-02-code-understanding-domain-thesis-design.md (6KB design)
+- 2026-03-02-research-implementation-plan.md (27KB plan)
+- 2026-03-02-research-journal.md (16KB journal)
+- 2026-03-02-exhaustive-research-journal.md (22KB tracking)
+
+ENCYCLOPEDIA/:
+- 01-centrality-algorithms.md (16KB) - 25+ measures with Rust impl
+- 02-community-detection.md (17KB) - 30+ algorithms, Leiden deep dive
+- 03-traversal-search.md (15KB) - 17 traversal algorithms
+- 07-gnn-architectures.md (11KB) - 30+ GNN architectures
+
+CROSS-DOMAIN/:
+- 12-social-network-transfer.md (26KB) - 18 patterns
+- 13-fraud-detection-transfer.md (25KB) - 17 patterns
+
+IMPLEMENTATION/:
+- 16-petgraph-ecosystem.md - Complete petgraph API mapping
+- 17-performance-optimization.md (31KB) - 10 optimization categories
+
+STRATEGY/:
+- 18-competitive-landscape.md - 30+ tools analyzed
+- 19-moat-building.md (20KB) - 6-layer moat strategy
+- 20-research-agenda.md - 12-month plan
+
+TOTAL: 320KB, 16 files
+
+==================================
+KEY REPOS ANALYZED:
+==================================
+
+GRAPH LIBRARIES:
+- petgraph/petgraph (3,773 stars) - de facto Rust graph library
+- neo4j-labs/graph (431 stars)
+- graphalgs (30 stars)
+
+CODE ANALYSIS:
+- joernio/joern (2,966 stars) - CPG leader, Scala
+- ast-grep/ast-grep (12,685 stars) - structural code search
+- rust-lang/rust-analyzer (16,104 stars) - official Rust LSP
+- willcrichton/flowistry (3,028 stars) - rustc_plugin pattern
+- cognitive-engineering-lab/aquascope (2,992 stars)
+
+DEPENDENCY ANALYSIS:
+- guppy-rs/guppy (258 stars)
+- cargo-semver-checks
+- cargo-depgraph (213 stars)
+
+==================================
+PRIORITY ACTION ITEMS:
+==================================
+
+P0 (BUILD NOW):
+1. Add petgraph dependency
+2. Design graph schema
+3. Build CFG from tree-sitter
+4. Implement PageRank
+5. Build context selector
+
+P1 (BUILD NEXT):
+6. Betweenness centrality
+7. PDG construction
+8. Leiden algorithm
+9. k-Core decomposition
+10. Visualization layer
+
+P2 (NICE TO HAVE):
+11. Temporal graph tracking
+12. Multi-layer graphs
+13. GNN experimentation
+14. Cross-language support
+
+==================================
+CROSS-DOMAIN ALPHA:
+==================================
+
+FROM BIOINFORMATICS:
+- Diffusion-based ranking for code importance
+- Protein interaction network patterns
+- Drug discovery patterns
+
+FROM SOCIAL NETWORKS:
+- Influence maximization → change propagation
+- Information cascades → pattern adoption
+- Community detection → module boundaries
+- Structural holes → integration points
+
+FROM FRAUD DETECTION:
+- FRAUDAR for dense subgraph detection
+- EigenTrust for code trustworthiness
+- Cycle detection for circular dependencies
+- Anomaly detection for bug patterns
+
+FROM KNOWLEDGE GRAPHS:
+- Entity resolution for type inference
+- Relation extraction for dependencies
+- Multi-hop reasoning for impact analysis
+
+==================================
+COMPETITOR ANALYSIS SUMMARY:
+==================================
+
+JOERN (2,966 stars):
+- Most mature CPG
+- Multi-language
+- No LLM integration
+- Rust support is beta
+
+CODEQL (GitHub):
+- GitHub integration
+- Free for OSS
+- Proprietary license
+- Limited to security
+
+FLOWISTRY (3,028 stars):
+- True Rust compiler integration
+- Nightly only
+- Research project
+- Limited scope
+
+RUST-ANALYZER (16,104 stars):
+- Official Rust LSP
+- No advanced graph algorithms
+- INTEGRATION OPPORTUNITY, not competition
+
+AST-GREP (12,685 stars):
+- Very popular
+- Fast (tree-sitter)
+- No semantic analysis
+- NO GRAPH ALGORITHMS = our opportunity
+
+SEMGREP (10,000+ stars):
+- Security focused
+- Limited graph capabilities
+- No inter-procedural
+
+==================================
+TECHNICAL DETAILS:
+==================================
+
+petgraph DATA STRUCTURES:
+- Graph<N, E> - Directed, O(1) node access
+- UnGraph<N, E> - Undirected
+- GraphMap<N, E> - Hash-based, O(1) edge lookup
+- CSR - Compressed Sparse Row, most memory efficient
+- MatrixGraph - O(1) edge lookup, O(V^2) memory
+
+petgraph ALGORITHMS (BUILT-IN):
+- bfs_search, dfs_search
+- dijkstra, astar, bellman_ford
+- connected_components, kosaraju_scc
+- is_cyclic_directed, toposort
+- min_spanning_tree
+
+petgraph MISSING:
+- PageRank
+- Betweenness centrality
+- Community detection (Leiden, Louvain)
+- k-Core decomposition
+- Graph matching
+- Subgraph mining
+
+==================================
+GIT COMMITS MADE:
+==================================
+
+1. Notes2026 repo:
+   Commit: fc5e9ebd
+   "Add Code-Understanding Domain Thesis for Parseltongue v2.0.0"
+   4 files, 2379 lines
+
+2. Notes2026 repo:
+   Commit: cf9d4379
+   "Add Insurmountable Code-Understanding Domain Thesis (320KB)"
+   13 files, 8130 lines
+
+==================================
+NEXT STEPS USER MIGHT WANT:
+==================================
+
+1. Commit and push to parseltongue-rust-LLM-companion repo
+2. Start implementing P0 algorithms
+3. Create algorithm implementations in Rust
+4. Build CFG construction from tree-sitter
+5. Design the graph schema
+6. Set up testing infrastructure
+
+==================================
+AGENT IDS FOR RESUMPTION:
+==================================
+
+tdd-task-progress-context-retainer: a79b2e97e50021549
+Plan agent: afa8907b1a3dd32e2
+general-purpose: ad02765781da27926
+
+==================================
+TASK IDS FROM PARALLEL AGENTS:
+==================================
+
+A1 Centrality: a9ce6e1f3df65d751 (rate limited)
+A2 Community: a07ad2c4171fccbea (rate limited)
+A3 Traversal: a80be806918b5322f (rate limited)
+A4 Shortest Path: aaf11e3a896055b1c (rate limited)
+A5 Subgraph Mining: a90adbab0865a86c4 (rate limited)
+A6 Graph Matching: a46045ac372e362d9 (timed out)
+A7 GNN: a4d9425dde839ba61 (rate limited)
+A8 Temporal: ae21fea62bd8ce90d (rate limited)
+A9 Multi-layer: a46dcb41ec318782c (rate limited)
+A10 Embedding: ad8e96ebf336340e4 (rate limited)
+A11 Bio: a79b8bc604205c301 (rate limited)
+A12 Social: a9959b4415b34a881 (COMPLETED - created file)
+A13 Fraud: a2d97d502c6cb761a (COMPLETED - created file)
+A14 Knowledge Graph: a7458c409d12f289b (rate limited)
+A15 Rust Patterns: a0ff51c3d5cbc5384 (rate limited)
+A16 petgraph: a3546ee355173c087 (rate limited)
+A17 Performance: abc203944dc3940be (COMPLETED - created file)
+A18 Competitive: a05ab746f66d7b127 (rate limited)
+A19 Moat: af5ff1d4293fff5f9 (rate limited)
+A20 Research Agenda: af1c63e6020c813ad (rate limited)
+
+==================================
+END OF CONTEXT DUMP
+==================================
