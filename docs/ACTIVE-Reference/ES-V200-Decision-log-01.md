@@ -707,6 +707,7 @@ Assessment (decision-quality summary):
 2. This is also **not** "zero risk."
 3. Patch releases are usually low-risk; minor releases carry most compatibility movement.
 4. A static binary does not imply static compiler-internal API compatibility over time.
+5. **Pinned-version clarifier**: while the toolchain and adapter are pinned (no upgrade in progress), APIs are operationally stable for that running version; brittleness is primarily an **upgrade-time** risk, not a runtime-query risk.
 
 Decision direction (draft to execute):
 1. **Version-coupled support policy**: support `N` and `N-1` stable toolchains only; reject unknown versions explicitly.
@@ -716,6 +717,7 @@ Decision direction (draft to execute):
    - `N/N-1` stable coverage: medium recurring adapter work
    - nightly tracking: high risk (not default for V200)
 4. **Graceful degradation contract**: if rustc capability mismatch occurs, downgrade to parsable subset + explicit `partial` capability marker, never silent success.
+5. **Strategic positioning note**: retaining a real rustc deep mode is also a deliberate capability signal — proving Parseltongue can operate at true compiler depth, not only at syntax/LSP depth.
 
 Open questions introduced:
 1. `OQ-BR01-18`: What exact V200 toolchain matrix do we publish (`N` only vs `N/N-1`)?
