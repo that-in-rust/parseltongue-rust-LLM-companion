@@ -7,7 +7,7 @@ description: Write production-quality Rust code using layered architecture (L1 C
 
 ## Overview
 
-Use this skill when implementing Rust code. It distills 180+ curated idioms into a layered reference organized by when to use each pattern, the context it applies in, and the anti-patterns to avoid.
+Use this skill when implementing Rust code. It distills 125+ curated idioms into a layered reference organized by when to use each pattern, the context it applies in, and the anti-patterns to avoid.
 
 Core thesis: ~20% of Rust patterns enable writing 99% of production code with minimal bugs. Following these patterns achieves an average of 1.6 compile attempts vs 4.9 without them (67% faster development).
 
@@ -259,6 +259,19 @@ pub enum StateMessage<T> {
     },
 }
 ```
+
+## Anti-Patterns to Avoid
+
+- Mixing L3 dependencies into L1 core modules (breaks layering).
+- Returning `anyhow::Error` from library public APIs (use `thiserror` enums).
+- Using `.unwrap()` or `.expect()` in production code paths.
+- Holding locks across `.await` points (deadlock risk).
+- Blocking the async runtime with synchronous I/O (use `spawn_blocking`).
+- Over-cloning when borrowing or `Arc` sharing suffices.
+- Monomorphization bloat from excessive generic instantiation on cold paths.
+- Panicking in proc-macros instead of emitting `compile_error!` with spans.
+- Skipping `cargo clippy` and `cargo fmt` in CI gates.
+- Letting Rust panics cross FFI boundaries (use `catch_unwind`).
 
 ## LLM Response Contract
 

@@ -94,7 +94,7 @@ All three skills reference each other appropriately:
 | Skill | Lines | Sections | Examples | Diagrams |
 |-------|-------|----------|----------|----------|
 | ai-native-spec-writing | 203 | 18 | 4 code | - |
-| idiomatic-rust-coding | 279 | 27 | 8 code | - |
+| idiomatic-rust-coding | 292 | 28 | 8 code | - |
 | idiom-catalog (ref) | 200 | 13 categories | 125 idioms | - |
 | context-engineering-agents | 229 | 16 | 4 code | - |
 
