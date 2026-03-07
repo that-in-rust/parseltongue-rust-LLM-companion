@@ -191,13 +191,13 @@ When writing specs with this skill, deliver:
 
 - Ambiguous specifications ("As a user, I want better performance").
 - Unsubstantiated performance claims (no test to verify).
-- God objects with 20+ fields.
-- Oversimplified models that will not handle real code.
-- Layer violations (L3 async code in L1 core).
+- Requirements without IDs (breaks traceability).
+- Mixing spec writing with implementation details.
+- Skipping the TDD cycle (writing code before tests).
 
 ## Resources
 
-- Source: `agents-used-202512/notes01-agent.md` (Parts I-VIII, X)
-- Source: `agents-used-202512/rust-coder-01.md` (Layers 1-9)
+- Source: `agent-room-of-requirements/agents-used-202512/notes01-agent.md` (Parts I-VIII, X)
+- Source: `agent-room-of-requirements/agents-used-202512/rust-coder-01.md` (Layers 1-9)
 - Related skill: `idiomatic-rust-coding` (for implementation patterns)
 - Related skill: `context-engineering-agents` (for agent design patterns)

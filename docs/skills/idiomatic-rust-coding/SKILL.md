@@ -273,7 +273,7 @@ When implementing with this skill, ensure:
 ## Resources
 
 - Full idiom catalog: `references/idiom-catalog.md`
-- Source: `agents-used-202512/rust-coder-01.md` (Sections A.1-A.184)
-- Source: `agents-used-202512/notes01-agent.md` (Parts VI, VII)
+- Source: `agent-room-of-requirements/agents-used-202512/rust-coder-01.md` (Sections A.1-A.184)
+- Source: `agent-room-of-requirements/agents-used-202512/notes01-agent.md` (Parts VI, VII)
 - Related skill: `ai-native-spec-writing` (for requirements and naming)
 - Related skill: `context-engineering-agents` (for agent design patterns)
