@@ -227,4 +227,3 @@ When designing agent systems with this skill, deliver:
 - Source: `agent-room-of-requirements/agents-used-202512/notes01-agent.md` (Part IX: Agent Design Patterns for 2026)
 - Related skill: `ai-native-spec-writing` (for requirements and naming)
 - Related skill: `idiomatic-rust-coding` (for implementation patterns)
-- Related skill: `dependency-map-cli-tools` (example of Pattern 1 in practice)

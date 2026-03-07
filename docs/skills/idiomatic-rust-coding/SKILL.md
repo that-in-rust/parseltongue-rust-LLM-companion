@@ -1,6 +1,6 @@
 ---
 name: idiomatic-rust-coding
-description: Write production-quality Rust code using layered architecture (L1 Core / L2 Standard / L3 External), 180+ curated idioms, structured error handling, concurrency patterns, and performance optimization. Covers the vital 20% of Rust patterns that enable 99% of production code with compile-first success.
+description: Write production-quality Rust code using layered architecture (L1 Core / L2 Standard / L3 External), 125+ curated idioms, structured error handling, concurrency patterns, and performance optimization. Covers the vital 20% of Rust patterns that enable 99% of production code with compile-first success.
 ---
 
 # Idiomatic Rust Coding

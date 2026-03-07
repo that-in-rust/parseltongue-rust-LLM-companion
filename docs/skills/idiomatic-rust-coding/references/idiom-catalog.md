@@ -1,7 +1,7 @@
 # Idiomatic Rust Idiom Catalog
 
-> 184 curated idioms organized by category. Each entry specifies when to use, context, and anti-patterns to avoid.
-> Source: `agents-used-202512/rust-coder-01.md`
+> 125 curated idioms indexed by category from a source catalog of 184. Each entry specifies when to use and anti-patterns to avoid. The full source contains additional idioms in the A.1-A.184 range.
+> Source: `agent-room-of-requirements/agents-used-202512/rust-coder-01.md`
 
 ---
 
@@ -197,4 +197,4 @@
 
 ---
 
-*Catalog version: 1.0 -- 184 idioms indexed from rust-coder-01.md*
+*Catalog version: 1.0 -- 125 idioms indexed from rust-coder-01.md (source contains 184 total)*

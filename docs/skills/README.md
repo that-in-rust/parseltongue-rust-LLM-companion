@@ -24,7 +24,7 @@ Source: `agents-used-202512/notes01-agent.md` (Parts I-VIII, X)
 
 Covers:
 - Layered architecture (L1 Core / L2 Standard / L3 External)
-- 184 curated idioms organized by category
+- 125+ curated idioms organized by category
 - Error handling strategies (thiserror vs anyhow)
 - Concurrency patterns and async safety
 - Performance optimization techniques
@@ -32,7 +32,7 @@ Covers:
 - Macro hygiene and proc-macro best practices
 - CI quality gates and supply-chain security
 
-Companion: `references/idiom-catalog.md` - complete index of 184 idioms
+Companion: `references/idiom-catalog.md` - index of 125 idioms (from 184 in source)
 
 Source: `agents-used-202512/rust-coder-01.md` (Sections A.1-A.184)
 
@@ -76,8 +76,7 @@ Use the context-engineering-agents skill to design...
 
 ### Companion References
 
-- **idiomatic-rust-coding**: See `references/idiom-catalog.md` for the complete 184-idiom index
-- **dependency-map-cli-tools**: See `references/internet-precedents.md` for CLI tool precedents
+- **idiomatic-rust-coding**: See `references/idiom-catalog.md` for the complete 125-idiom index
 
 ---
 
@@ -94,12 +93,12 @@ All three skills reference each other appropriately:
 
 | Skill | Lines | Sections | Examples | Diagrams |
 |-------|-------|----------|----------|----------|
-| ai-native-spec-writing | 203 | 8 | 4 code | - |
-| idiomatic-rust-coding | 279 | 12 | 8 code | - |
-| idiom-catalog (ref) | 450+ | 30 categories | 184 idioms | - |
-| context-engineering-agents | 442 | 10 + future | 4 code | 9 mermaid |
+| ai-native-spec-writing | 203 | 18 | 4 code | - |
+| idiomatic-rust-coding | 279 | 27 | 8 code | - |
+| idiom-catalog (ref) | 200 | 13 categories | 125 idioms | - |
+| context-engineering-agents | 229 | 16 | 4 code | - |
 
-**Total new content**: 1,000+ lines capturing 400+ hours of LLM-assisted development research.
+**Total new content**: 900+ lines capturing 400+ hours of LLM-assisted development research.
 
 ---
 
@@ -116,7 +115,7 @@ All skills are derived from two authoritative reference documents:
 
 2. **rust-coder-01.md** (3,681 lines)
    - Layered architecture patterns
-   - 184 curated Rust idioms
+   - 125 curated Rust idioms (from 184 in source)
    - Design patterns for production systems
    - Advanced patterns (GATs, unsafe, FFI, macros)
    - CI/quality/testing best practices
