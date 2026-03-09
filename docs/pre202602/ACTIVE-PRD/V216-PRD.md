@@ -8,19 +8,15 @@
 
 
 
-# Core flow for 216
-
-
-
 # Big Rocks
 
 
 - Big-Rock-01: the scope and dependencies
     - language Rust 21
-    - rust-analyzer
     - more options
         - rust compiler
-    - 
+        - treesitter for
+            - C C++ Javascript Typescript Python Java Go
 
 
 - Big-Rock-02: the primary-key
