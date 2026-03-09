@@ -5,9 +5,7 @@
 ║                                                                             ║
 ╠═════════════════════════════════════════════════════════════════════════════╣
 ║                                                                             ║
-║                                                                             ║
-║   📦 Latest Release: v1.7.2 (2026-02-12) → WORKS                            ║
-║                                                                             ║
+║   📦 Latest Stable: v1.7.2 (2026-02-12) → WORKS                             ║
 ║                                                                             ║
 ║   ✅ What Works:                                                            ║
 ║      • Parse codebase with TreeSitter (12 languages)                       ║
@@ -15,7 +13,6 @@
 ║      • Query via HTTP API (26 endpoints)                                   ║
 ║      • Blast radius, reverse callers, centrality, etc.                     ║
 ║      • Incremental reindexing via file watcher                             ║
-║                                                                             ║
 ║                                                                             ║
 ║   ⚠️  Known Limitations (being addressed in v2.0):                          ║
 ║      • Search is O(n) full-scan, not indexed                               ║
@@ -33,7 +30,7 @@
 ╚═════════════════════════════════════════════════════════════════════════════╝
 ```
 
-**Release Notes**: [v1.7.2](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/releases/tag/v1.7.2)
+**Download the latest stable binary**: [v1.7.2](https://github.com/that-in-rust/parseltongue-dependency-graph-generator/releases/tag/v1.7.2)
 
 # Parseltongue
 
