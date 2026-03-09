@@ -46,10 +46,6 @@ parseltongue pt08-http-code-query-server --db "rocksdb:mycode.db"
 curl http://localhost:7777/codebase-statistics-overview-summary
 ```
 
-**12 languages** | **26 HTTP endpoints** | **670 tests** | **2.92x parallel ingestion**
-
-Rust, Python, JavaScript, TypeScript, Go, Java, C, C++, Ruby, PHP, C#, Swift
-
 ---
 
 ## LLM Agent System Prompt
