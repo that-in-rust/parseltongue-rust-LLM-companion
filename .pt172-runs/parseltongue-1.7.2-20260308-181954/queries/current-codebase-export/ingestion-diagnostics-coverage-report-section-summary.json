@@ -1,0 +1,1 @@
+{"success":true,"endpoint":"/ingestion-diagnostics-coverage-report","data":{"summary":{"test_entities_count":1337,"total_files_with_coverage":309,"avg_raw_coverage_pct":70.79455575360052,"avg_effective_coverage_pct":84.55158902738347,"ignored_files_count":9386}},"tokens":100}
