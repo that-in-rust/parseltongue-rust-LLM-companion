@@ -3,7 +3,9 @@
 ║                           🚧 WORK IN PROGRESS 🚧                            ║
 ╠═════════════════════════════════════════════════════════════════════════════╣
 ║                                                                             ║
+║                                                                             ║
 ║   📦 Latest Release: v1.7.2 (2026-02-12) → WORKS                            ║
+║                                                                             ║
 ║                                                                             ║
 ║   ✅ What Works:                                                            ║
 ║      • Parse codebase with TreeSitter (12 languages)                       ║
@@ -11,6 +13,7 @@
 ║      • Query via HTTP API (26 endpoints)                                   ║
 ║      • Blast radius, reverse callers, centrality, etc.                     ║
 ║      • Incremental reindexing via file watcher                             ║
+║                                                                             ║
 ║                                                                             ║
 ║   ⚠️  Known Limitations (being addressed in v2.0):                          ║
 ║      • Search is O(n) full-scan, not indexed                               ║
@@ -23,8 +26,7 @@
 ║      Author is currently busy on other open source projects.               ║
 ║                                                                             ║
 ║   💭 Honest Note: Upon review, we found architectural improvements needed. ║
-║      v2.0 will address these with a CozoDB-first approach.                 ║
-║      v1.7.2 proves the concept works.                                      ║
+║      v2.0 will address these. v1.7.2 proves the concept works.             ║
 ║                                                                             ║
 ╚═════════════════════════════════════════════════════════════════════════════╝
 ```
