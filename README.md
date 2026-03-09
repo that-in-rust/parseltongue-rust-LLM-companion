@@ -1,3 +1,36 @@
+```
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                           🚧 WORK IN PROGRESS 🚧                            ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║                                                                             ║
+║   📦 Latest Release: v1.7.2 (2026-02-12) → WORKS                            ║
+║                                                                             ║
+║   ✅ What Works:                                                            ║
+║      • Parse codebase with TreeSitter (12 languages)                       ║
+║      • Build dependency graph in CozoDB                                    ║
+║      • Query via HTTP API (26 endpoints)                                   ║
+║      • Blast radius, reverse callers, centrality, etc.                     ║
+║      • Incremental reindexing via file watcher                             ║
+║                                                                             ║
+║   ⚠️  Known Limitations (being addressed in v2.0):                          ║
+║      • Search is O(n) full-scan, not indexed                               ║
+║      • Graph algorithms run in Rust, not in CozoDB native                  ║
+║      • No secondary indices for reverse lookups                            ║
+║      • Unresolved import references mixed with production code             ║
+║      • Schema richer than product (temporal fields underutilized)          ║
+║                                                                             ║
+║   🗓️  v2.0 Work: Starting May 2026                                          ║
+║      Author is currently busy on other open source projects.               ║
+║                                                                             ║
+║   💭 Honest Note: Upon review, we found architectural improvements needed. ║
+║      v2.0 will address these with a CozoDB-first approach.                 ║
+║      v1.7.2 proves the concept works.                                      ║
+║                                                                             ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Release Notes**: [v1.7.2](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/releases/tag/v1.7.2)
+
 # Parseltongue
 
 
