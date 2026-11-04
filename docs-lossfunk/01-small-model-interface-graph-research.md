@@ -2,6 +2,8 @@
 
 Research brief, 30 October 2026. Status: hypotheses and experiment design, not measured results.
 
+**Scope update:** The subsequent [learned graph compiler thesis](02-learned-graph-compiler-thesis.md) narrows the product to constructing and reasoning over Rust public-interface dependency graphs. The implementation language and deployment platform are open. Establish graph quality on CPU below a measured 4 GB application budget first; sub-100 MB inference is a later compression objective. This earlier brief is retained as research history, including its original parser-guided recommendation.
+
 ## Premise Check
 
 **Working question:** Can a small, locally runnable model improve the accuracy of a Rust interface dependency graph under a 100 MB runtime memory constraint, compared with a reproducible Tree-sitter-based baseline?
