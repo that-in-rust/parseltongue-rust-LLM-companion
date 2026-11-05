@@ -1,5 +1,7 @@
 # Can a tiny learned model pick the right Rust binding?
 
+**Real-crate follow-up:** [Putting these weights inside a pretrained 17.45 MB MiniLM](pretrained/README.md) met the CPU memory target but recovered no accepted bindings on five held-out crates.
+
 **Result, November 5, 2026:** yes on familiar syntax, unevenly on withheld syntax, and **yes under 100 MB on CPU**. A trained 64-weight ranker followed by the original exact ONNX lookup produced 115 correct public return-type edges, one false edge and 64 abstentions across 180 held-out files. A simple deterministic matcher picked the right module more often. Do not use the model's score as verification.
 
 ## One example

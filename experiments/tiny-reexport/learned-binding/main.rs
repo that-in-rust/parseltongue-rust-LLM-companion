@@ -4,6 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use syn::{Item, ReturnType, Type, UseTree};
 use tiny_reexport::{facts::Facts, model};
+#[path = "pretrained/scan.rs"]
+mod pretrained;
 
 struct Candidate {
     module: String,
@@ -12,6 +14,7 @@ struct Candidate {
     address: usize,
 }
 
+#[derive(Clone)]
 struct Scope {
     imports: Vec<Vec<String>>,
     function: String,
@@ -172,8 +175,12 @@ impl Example {
 
     // Describe both candidates identically. No resolver, labels, module spellings,
     // body tokens, or source positions enter the learned feature vector.
-    fn extract_candidate_context_features(&self, candidate: &Candidate) -> BTreeSet<String> {
+    fn extract_candidate_context_features(
+        &self,
+        candidate: &Candidate,
+    ) -> (BTreeSet<String>, Vec<String>) {
         let mut out = BTreeSet::new();
+        let mut words = Vec::new();
         let ret = &self.query.returns;
         let normalize = |s: &str| -> &str {
             if s == candidate.module {
@@ -204,6 +211,8 @@ impl Example {
             let mut norm = vec!["^"];
             norm.extend(tokens.iter().map(|t| normalize(t)));
             norm.push("$");
+            words.push(kind.to_owned());
+            words.extend(norm[1..norm.len() - 1].iter().map(|s| (*s).to_owned()));
             for n in 1..=6 {
                 for window in norm.windows(n) {
                     out.insert(format!("{kind}:{}", window.join(" ")));
@@ -217,7 +226,7 @@ impl Example {
         for u in &self.parent_imports {
             add("outer", u);
         }
-        out
+        (out, words)
     }
 
     // Deliberately small, non-learned control: qualified returns and explicit
@@ -265,6 +274,9 @@ fn main() -> Result<()> {
     let mode = args
         .next()
         .context("features FILE... | predict WEIGHTS FILE...")?;
+    if mode == "real" {
+        return pretrained::run_real_crate_scan(args.collect());
+    }
     ensure!(
         matches!(mode.as_str(), "features" | "predict"),
         "unknown mode"
@@ -288,11 +300,11 @@ fn main() -> Result<()> {
         input.take(65537).read_to_string(&mut text)?;
         ensure!(text.len() <= 65536, "source exceeds 64 KiB");
         let ex = Example::parse_binding_source_file(&text).with_context(|| path.clone())?;
-        let feats: Vec<_> = ex
+        let (feats, tokens): (Vec<_>, Vec<_>) = ex
             .candidates
             .iter()
             .map(|c| ex.extract_candidate_context_features(c))
-            .collect();
+            .unzip();
         let names: Vec<_> = ex.candidates.iter().map(|c| &c.module).collect();
         let result: Value = if let Some(s) = &mut session {
             let scores: Vec<f64> = feats
@@ -312,7 +324,7 @@ fn main() -> Result<()> {
                 "status":if target.is_some() {"model_proposed"} else {"unresolved"},
                 "target":target,"score":confidence})
         } else {
-            json!({"candidates":names,"features":feats,"simple":ex.match_simple_explicit_binding()})
+            json!({"candidates":names,"features":feats,"tokens":tokens,"simple":ex.match_simple_explicit_binding()})
         };
         println!("{}", serde_json::to_string(&result)?);
         count += 1;
