@@ -1,5 +1,7 @@
 # Can a small pretrained model recover real Rust return-type bindings?
 
+For the short version with a real example, see [Which `Sender`? What a tiny model learned about Rust bindings](2026-11-05-minilm-rust-binding-observations.md).
+
 **Yes to putting the weights inside a small model; no to trusting it to add edges from this experiment.** The [ready-to-run checkpoint](model/binding.onnx) is 17,454,319 bytes. When a return type could denote either of two same-named crate-local declarations, the fused model added **zero accepted bindings** on five held-out crate releases. A same-module rule alone found **56** rust-analyzer-confirmed bindings. This is a test of one dependency-graph edge (`signature -> return-type declaration`), not a whole-crate graph generator.
 
 ## What is inside the file?
