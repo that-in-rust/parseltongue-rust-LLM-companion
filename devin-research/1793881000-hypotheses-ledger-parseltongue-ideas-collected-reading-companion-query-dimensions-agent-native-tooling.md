@@ -89,3 +89,9 @@ Flow: `GET /codebase-statistics-overview-summary` → `GET /centrality-measures-
 - When an idea arrives (screenshot, note, other model's output): store the image under `images/<timestamp>-ideas-NN-<slug>.png`, add H-entries here with status and the cheapest test. One screenshot → one section, so the source is traceable.
 - When a design note adopts a hypothesis, change its status to `adopted` and point to the note. When a measurement kills one, mark `rejected` and keep the row.
 - Open hypotheses with the cheapest tests: **H-02** (communities vs modules, 1 day), **H-09** (entry-point recall, half a day), **H-16 test-guided** (path from failing test, 1 day), **H-23** (token accounting on a real agent session, 1 day). These four decide most of the product shape.
+
+## H. Added 2026-11-05 (later)
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-32 | **Resolver builds, LLM steers.** "LLM + search tool" beats the parser for *navigating* the multi-level graph (choosing what matters), and loses to it for *constructing* the graph (exhaustive, exact, cheap to rebuild). The LLM adds graph content only as tagged proposals in the residual (L6 meaning, no-cargo fallback, dyn/cfg/proc-macro hints). | supported | See thesis `1793882149-thesis-resolver-builds-llm-steers-…md` §2–4: 65 % of call edges are receiver-type lookups, 44 % of references leave the workspace, Cassini 77.6 % F1 still uses a resolver, learned-binding 0 vs rule 56, rust-analyzer 29 s / 0.02 % unknown. | §5 of that thesis: 20 public items in one crate, grep/read agent vs rust-analyzer edges — F1 and tokens. |
