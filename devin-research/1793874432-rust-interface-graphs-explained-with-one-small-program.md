@@ -94,6 +94,8 @@ An inactive definition is not a nonexistent definition. Nor is it one whose targ
 
 ## Could we put the computation inside the model?
 
+Follow-up: [the runnable experiment and CPU measurements](../experiments/tiny-reexport/README.md) now test the bounded re-export proposal below.
+
 **Yes for a bounded operation.** [Qwenputer](https://github.com/divagr18/qwenputer) adds a RISC-V CPU to Qwen3.5-4B using 11 layers whose weights are set by a compiler, not learned from examples. Its mutable memory lives in the model's DeltaNet state. The distinction matters: a machine can execute an exact lookup without having learned either Rust or the contents of your repository. The [published checkpoint](https://huggingface.co/divagr1925/Qwen3.5-4B-Qwenputer) is a precedent for the mechanism, not a sub-100 MB CPU implementation of rust-analyzer.
 
 Consider a hypothetical crate that re-exports `Circle` as `Round` and has a public function returning `Round`. Give an executor a table of scope-qualified IDs and *one active configuration*. Now there is a useful piece of Rust analysis small enough to specify precisely:
