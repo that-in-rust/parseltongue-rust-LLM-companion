@@ -1,0 +1,114 @@
+[
+  {
+    "function": "id",
+    "site": [
+      "src/runtime/task_hooks.rs",
+      70,
+      37
+    ],
+    "fused": 1,
+    "lexical": 1,
+    "encoder": null,
+    "margins": [
+      -2.8969943523406982,
+      -0.4554634094238281,
+      -3.3524577617645264
+    ]
+  },
+  {
+    "function": "downgrade_map",
+    "site": [
+      "src/sync/rwlock/write_guard.rs",
+      142,
+      60
+    ],
+    "fused": 1,
+    "lexical": null,
+    "encoder": null,
+    "margins": [
+      -1.1813220977783203,
+      -0.2157013714313507,
+      -1.3970234394073486
+    ]
+  },
+  {
+    "function": "try_downgrade_map",
+    "site": [
+      "src/sync/rwlock/write_guard.rs",
+      286,
+      71
+    ],
+    "fused": 1,
+    "lexical": null,
+    "encoder": null,
+    "margins": [
+      -1.1813220977783203,
+      -0.2157013714313507,
+      -1.3970234394073486
+    ]
+  },
+  {
+    "function": "downgrade",
+    "site": [
+      "src/sync/rwlock/write_guard.rs",
+      375,
+      30
+    ],
+    "fused": 1,
+    "lexical": null,
+    "encoder": null,
+    "margins": [
+      -1.1813220977783203,
+      -0.2157013714313507,
+      -1.3970234394073486
+    ]
+  },
+  {
+    "function": "join_next_with_id",
+    "site": [
+      "src/task/join_set.rs",
+      315,
+      64
+    ],
+    "fused": 1,
+    "lexical": null,
+    "encoder": null,
+    "margins": [
+      -1.1813220977783203,
+      -0.3075026869773865,
+      -1.4888248443603516
+    ]
+  },
+  {
+    "function": "try_join_next_with_id",
+    "site": [
+      "src/task/join_set.rs",
+      351,
+      62
+    ],
+    "fused": 1,
+    "lexical": null,
+    "encoder": null,
+    "margins": [
+      -1.1813220977783203,
+      -0.3075026869773865,
+      -1.4888248443603516
+    ]
+  },
+  {
+    "function": "poll_join_next_with_id",
+    "site": [
+      "src/task/join_set.rs",
+      558,
+      29
+    ],
+    "fused": 1,
+    "lexical": null,
+    "encoder": null,
+    "margins": [
+      -1.1813220977783203,
+      -0.3075026869773865,
+      -1.4888248443603516
+    ]
+  }
+]

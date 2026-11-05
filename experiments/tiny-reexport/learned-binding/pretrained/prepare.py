@@ -17,9 +17,9 @@ CRATES = {
 }
 
 
-def prepare_real_crate_sources(work):
+def prepare_real_crate_sources(work, releases=CRATES):
     checksums = {}
-    for release in CRATES:
+    for release in releases:
         name, version = release.rsplit("-", 1)
         registry = Path.home() / ".cargo/registry"
         archives = sorted(registry.glob(f"cache/*/{release}.crate"))
@@ -29,7 +29,7 @@ def prepare_real_crate_sources(work):
         # Extract from the actual release archive rather than a mutable clone.
         archive = archives[0]
         checksums[release] = hashlib.sha256(archive.read_bytes()).hexdigest()
-        if checksums[release] != CRATES[release]:
+        if checksums[release] != releases[release]:
             raise ValueError(f"Unexpected archive checksum: {release}")
         subprocess.run(["tar", "-xzf", archive, "-C", work], check=True)
         crate = work / release
