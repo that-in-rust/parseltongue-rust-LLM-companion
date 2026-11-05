@@ -1,5 +1,7 @@
 # What a utility map can teach a Rust interface graph
 
+Reading note: this is an ArcGIS analogy. The requested **arXiv** investigation is [Training a tiny Rust public-interface graph generator](1793858420-arxiv-training-and-evaluating-a-tiny-rust-interface-graph-generator.md).
+
 **Decision, 2026-11-05.** Build one source-backed graph of Rust public contracts. Give a maintainer two ways to read it: from a contract to what it depends on, and from a changed type or trait back to the contracts that expose it. Borrow ArcGIS's distinction between a recorded feature, a validated connection, and a diagram. Do not add ArcGIS as a dependency or make a visualizer the product.
 
 ## What to keep from Devin
