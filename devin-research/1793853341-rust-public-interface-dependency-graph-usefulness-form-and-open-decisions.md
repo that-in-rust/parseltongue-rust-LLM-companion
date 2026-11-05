@@ -136,3 +136,44 @@ Ordered by impact. Each entry gives the question, the options, and my recommenda
 6. Only then quantize and distill toward 135M parameters and below 100 MB.
 
 **Kill criterion:** if the model does not beat baseline (b) on either the building or the non-building slice at acceptable cost, ship the improved deterministic pipeline (b) plus compiler import. In that case the graph contract is the product, and the model is not.
+
+---
+
+## 5. Prior art, and why this works for Rust specifically
+
+All of this is from general knowledge, written without lookups. Verify names, dates and feature claims before citing them.
+
+### Has anyone built this for Rust?
+Pieces, yes. The whole thing, no.
+
+| Prior work | What it is | Gap relative to this project |
+|---|---|---|
+| **rustdoc JSON** (RFC 2963, nightly since ~2020) | The compiler emits the public API as structured data: items, visibility, re-exports, impls, generics. No other mainstream language has a compiler-emitted public-interface dataset like this. | Per crate, requires a build, no call edges. |
+| **cargo-semver-checks** (Predrag Gruevski), **cargo-public-api** | Query rustdoc JSON as a graph (via Trustfall) to detect breaking API changes. Closest existing "public interface dependency graph for Rust"; proves the graph is machine-checkable. | Per crate, no call edges, build required. |
+| **Präzi** (Hejderup et al., ~2018–2022) | Call graphs for the whole crates.io ecosystem from MIR/LLVM, replacing package-level dependency networks with call-level ones. Closest academic precedent for cross-crate call edges. | Build required, offline batch, not agent-facing. |
+| **cargo-modules**, **cargo-depgraph** | Module trees and crate graphs. | Structure only. |
+| **cargo-call-stack** | Call graph from LLVM IR for embedded stack-usage analysis. | Build required, no public-contract notion. |
+| **cargo-geiger** | Unsafe surface counting. | Not a graph. |
+| **rust-analyzer SCIP/LSIF**, earlier RLS **save-analysis** (removed 2023), a Kythe Rust indexer on top of it | Compiler-grade cross-references. | References, not contracts; needs a working project; heavy at scale. |
+| **Charon/Aeneas, Rudra, MirChecker, Kani, Prusti** | Analyses and verification on MIR. | All require a successful build. |
+
+Nothing known to me trains a model to produce this graph for Rust. The model bet is genuinely open.
+
+### Why it works for Rust and not for other languages
+The graph needs three properties: node identity is decidable, edges are decidable, and the public boundary is real. Rust is the only widely used language with all three.
+
+1. **Visibility is lexical and decidable.** `pub`, `pub(crate)`, `pub(in path)`, private by default. Python has no privacy. JS exports are static but values are mutable. C has headers plus `static`, nothing in between. Java has modifiers but reflection bypasses them.
+2. **Name resolution is static and closed.** No `getattr`, `eval`, monkeypatching, reflection or classloaders. `use` is static, paths are explicit. In Python/JS/Ruby/Java-with-Spring the call graph is undecidable in practice; the 2024 call-graph-vs-LLM study cited in docs-lossfunk fails largely for this reason. For Rust the answer exists; the only question is who computes it.
+3. **Trait coherence (the orphan rule).** For any type `T` and trait `Tr` there is at most one impl, and it lives in `T`'s crate or `Tr`'s crate. `IMPLEMENTS` edges are therefore enumerable and local. Go's structural interfaces need a global search to know what implements what. Python's duck typing has no answer. Haskell is close but tolerates orphan instances.
+4. **No inheritance, explicit dispatch.** Dynamic dispatch is spelled `dyn`; generic calls are monomorphised and resolvable per instantiation. No virtual-override hierarchies that make C++/Java call graphs over-approximate.
+5. **Types are fully explicit at every boundary.** Every type in a signature is a real dependency. TypeScript erases types and leaks `any`; C uses `void*`.
+6. **The crate is a real unit.** Cargo gives a versioned DAG with features and semver discipline, and the ecosystem favours many small crates, so the cross-crate public boundary is where the information lives. C/C++ textual `#include` has no boundary.
+
+### Why this matters for the small-model bet
+Because Rust's rules are local (a file, its `use` lines and the crate's module tree determine most resolutions), a per-file model can learn to resolve names. That is what makes distillation feasible for Rust and hopeless for Python.
+
+### Where Rust is hard
+`macro_rules!` and proc macros (the one hole in static resolution, though expansion is deterministic and rustdoc sees the expanded result), `cfg`/feature matrices (several valid graphs), and trait-object fan-out. These are the three research problems; everything else is engineering.
+
+### Second-best language
+Go: static, capitalisation visibility, real packages. It falls short on structural interfaces. Useful sanity check: if the design only works for Rust, it should be because of coherence and lexical visibility, not for incidental reasons.
