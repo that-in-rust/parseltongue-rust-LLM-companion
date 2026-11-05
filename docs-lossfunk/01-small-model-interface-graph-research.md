@@ -1,74 +1,33 @@
-# Small Models for Rust Interface Dependency Graphs
+# Can a tiny local model build a better Rust public-interface dependency graph?
 
-Research brief, 30 October 2026. Status: hypotheses and experiment design, not measured results.
+Lossfunk Batch 9 research brief. Proposed experiment, not a model card or a benchmark result.
 
-**Scope update:** The subsequent [learned graph compiler thesis](02-learned-graph-compiler-thesis.md) narrows the product to constructing and reasoning over Rust public-interface dependency graphs. The implementation language and deployment platform are open. Establish graph quality on CPU below a measured 4 GB application budget first; sub-100 MB inference is a later compression objective. This earlier brief is retained as research history, including its original parser-guided recommendation.
+**The artifact we want is a map a Rust systems programmer can hand to another programmer or a code harness.** It says which contracts a downstream crate can name, what each contract depends on, and where in the source to check. The post-trained local model has one job: build and refine that map on code it has not seen during post-training.
 
-## Premise Check
+The [existing CLI](../README.md) gives us both a distribution path and a serious control. It already indexes code with Tree-sitter and serves dependency queries. The question is not whether a small model can print plausible edges. It is whether the model produces a more accurate *whole graph* than that pipeline on new large Rust OSS repositories, at a cost that makes it reasonable to ship.
 
-**Working question:** Can a small, locally runnable model improve the accuracy of a Rust interface dependency graph under a 100 MB runtime memory constraint, compared with a reproducible Tree-sitter-based baseline?
+## What the application commits us to
 
-The most promising initial experiment is a small **candidate-edge classifier**, paired with deterministic syntax extraction and candidate generation. It predicts whether a particular source occurrence resolves to a particular target and can abstain. This is a narrower and more testable problem than generating an entire repository graph in one response.
-
-The idea is plausible, but the claim that a small model will outperform Tree-sitter is not established. Tree-sitter provides syntax trees; a graph system adds extraction, scope handling and resolution. The fair comparison is against a specified **Tree-sitter graph pipeline**, plus a Rust-aware semantic baseline. A model could improve one class of errors while degrading another. No model card cited here demonstrates this exact task under the proposed RAM limit.
-
-The [residency announcement](https://x.com/paraschopra/status/2115054527883964702) describes Parseltongue as producing a compact code map and proposes a model under 100 MB of RAM that maps Rust more accurately than parser tools. The stated 5% map-size figure and accuracy goal are claims and objectives, not benchmarks independently verified in this brief.
-
-**Lossfunk context:** The visible `#parseltongue-public-interface-dependency-graph` channel contained its creation and join event but no substantive project messages when inspected. The visible `#residency-batch-9` messages concerned scheduling and offers to brainstorm; they did not provide a technical experiment specification. This is not a claim about all Slack history or threads. The announcement and the user's requests provide the project direction.
-
-## What Exactly Is the Graph?
-
-Define two related projections and measure them separately:
-
-1. **Public API graph:** Rust items externally reachable from a crate, including effective visibility and re-exports. Edges may include signature type references and public re-export relationships.
-2. **Callable dependency graph:** directly addressable functions and methods, including private ones when needed to understand execution, with source-backed call edges. A public API node can call private implementation nodes.
-
-Do not call every syntactically `pub` declaration externally accessible. Ancestor visibility, `pub(crate)`, `pub(in ...)`, public re-exports, trait items, `cfg` and build configuration all matter. The [Rust visibility reference](https://doc.rust-lang.org/reference/visibility-and-privacy.html) and [use-declaration reference](https://doc.rust-lang.org/reference/items/use-declarations.html) describe these rules. The previous product discussion also included private top-level functions and direct members; a public-only graph would be a product scope change, not a mere implementation detail.
-
-Represent each edge as `(source symbol, relation, target symbol, source occurrence, configuration, provenance, status)`. Relations should begin with `calls`, `signature_type`, and `reexports`, evaluated independently. Status is `resolved`, `ambiguous`, `external`, or `unresolved`. Static call edges are lexical and may represent dynamic dispatch candidates; they are not proof of runtime execution.
-
-## Expert Lenses
-
-| Lens | Core concern |
+| Commitment | What would count |
 |---|---|
-| Rust semantics | Can the target be identified through imports, receiver types, traits, macros and conditional compilation? |
-| Small-model training | Can a constrained model learn the hard disambiguation cases from clean labels and focused context? |
-| Systems engineering | Does the entire deployed process meet the memory, latency, determinism and reproducibility contract? |
-| Agent workflow | Does the resulting map reduce wrong navigation and useful-context cost on real tasks? |
-| Skeptical evaluation | Are we comparing against a weak straw man or learning the evaluator's mistakes? |
+| Corpus | Select the top 50 OSS Rust libraries under a published, dated ranking rule; pin repository commits and record license, owner, workspace and configurations. Do not count multiple crates from one workspace as independent examples. |
+| Training target | Generate reference graphs with the application's proposed teacher, **Codex 5.6 xhigh**. Record actual available model ID, settings, prompt, source revision and evidence per assertion. A teacher answer is a training label, not a fact or a blind test answer. |
+| Student | Post-train an open-weight CPU-local model that discovers declarations and emits typed dependency assertions. The preferred deployment target is **under 100 MB peak inference RAM**, not merely a small download. |
+| Independent test | Reserve *additional* Rust OSS repositories outside the 50, including cross-crate systems workspaces. Freeze the test before tuning and independently adjudicate a stratified sample including missed edges. |
+| Release | Open weights on Hugging Face, redistributable dataset plus generation/training/evaluation code, and a Parseltongue CLI that actually consumes the generator. Clearly label a negative result rather than advertising an improvement. |
 
-## Candidate Approaches
+## What the model predicts
 
-| Approach | What the model does | Main benefit | Principal risk |
-|---|---|---|---|
-| Conventional parser plus resolver | No model. Tree-sitter finds syntax; rules resolve scopes and imports. | Deterministic, measurable baseline. | Resolution rules may be incomplete. |
-| A. Parser-guided edge adjudicator | Chooses a candidate target or abstains for each occurrence. | Bounded output, easy evidence checks, efficient supervision. | Candidate recall caps final recall. |
-| B. Compiler-apprentice | Distills a Rust-aware index into a model operating on local context. | Learns difficult name and type resolution patterns. | Copies teacher errors and inherits build-configuration blind spots. |
-| C. Graph cartographer | Builds per-file interface summaries, then links bounded summaries across files. | Fits large repositories through hierarchical processing. | Early summary omissions compound downstream. |
-| D. Error-correcting auditor | Examines disagreements and suspicious edges from multiple analyzers. | Focuses scarce model compute on likely mistakes. | Disagreements miss shared blind spots; hard to define unbiased coverage. |
+The unit is not a summary paragraph. It is a declaration or a claim such as "the public result type of this function refers to that definition." For each claim, attach the source range, build configuration, relation kind, proposed target and evidence state. Effective external exposure, including re-exports, matters more than counting occurrences of `pub`. See the [visibility rules](https://doc.rust-lang.org/reference/visibility-and-privacy.html).
 
-These are conceptual blends with compiler apprenticeship, cartography and error-correcting systems. They are design proposals, not established results. The preferred sequence is A as the main experiment, B for labels, C as a later context strategy, and D as an ablation.
+Separate three views: public signatures and exposed types; source-backed implementation relations, including private witnesses; and a compact export intended for a human or agent. A private helper can explain a path but does not become part of a crate's public API. A possible dispatch target is not a proven runtime call.
 
-## Chosen Thesis
+## A fair contest
 
-Use deterministic tools to establish **what exists and where**, then train a small model to improve **which candidate is the intended relationship**. Maintain byte-level source accounting and graph identity independently from the model. The model returns candidate IDs and evidence, never invented paths or source offsets. An unresolved answer is a valid result.
-
-This can be tested without deciding today whether a model must ultimately replace every parser component. Keep a model-only extraction arm in the benchmark; it can win if the evidence supports it.
-
-### Proposed data flow
-
-```mermaid
-flowchart TB
-    Source["Rust source and build configuration"]
-    Parse["Tree-sitter spans and declarations"]
-    Candidates["Bounded symbol candidates"]
-    Model["Small model: candidate or abstain"]
-    Verify["Validate IDs and source evidence"]
-    Graph["Revisioned graph and byte ledger"]
-    Source --> Parse --> Candidates --> Model --> Verify --> Graph
-```
-
-The unchanged byte ledger tracks comments, interface-owned source and unknown source, preserving exact source snapshots. The model does not decide whether bytes exist, fabricate byte offsets, or silently turn uncertain observations into facts. This builds on the local [PRD](../docs/research004/prd-v20260710.md) and [architecture](../docs/research004/Arch-v202607210.md); those are proposals and contain a broader current-state capture design, not evidence that the model works.
+1. Freeze the released Parseltongue extractor, grammar, options and edge adapter. Report which relations it does not represent; do not silently relabel every `Uses` as a public signature dependency.
+2. Include a deterministic scope/import resolver and a Rust-aware build-configured reference. Compare like with like on available inputs; disclose when macro expansion or a successful build was available to only one arm.
+3. Train a source-to-record student. Let a second student request bounded source and graph neighborhoods before emitting corrections. Give both an explicit unknown outcome.
+4. Compare both with a parser-supplied candidate classifier. Report candidate recall separately: a perfect ranker cannot emit a declaration that parsing never proposed. A hybrid win is useful but not evidence for independent model construction.
 
 ## Hugging Face Precedents
 
@@ -89,14 +48,16 @@ The LoRA adapter alone is not the deployed model: base weights, adapter, runtime
 
 ### What does 100 MB mean?
 
-Pre-register both readings rather than silently switching between them:
+Pre-register two measurements. Only the first is the application's preferred sub-100 MB target:
 
 - **Model-process cap:** peak resident memory of a fresh inference process including model, tokenizer, buffers, context and runtime; parser/DB processes measured separately.
-- **End-to-end cap:** peak memory attributable to the complete local pipeline, including parser, candidate index, model and database. Measure overlapping processes as well as device memory; report shared/mapped pages and measurement method.
+- **End-to-end footprint:** peak memory attributable to the complete local pipeline, including parser, candidate index, model and database. Measure overlapping processes as well as device memory; report shared/mapped pages and measurement method.
 
-Report MB versus MiB explicitly, hardware, OS, context length, batch size, thread count, model format, cold/warm state and peak measurement. Weights-only numbers are feasibility estimates. No candidate above has demonstrated either cap for this task in the evidence inspected.
+Report MB versus MiB explicitly, hardware, OS, context length, batch size, thread count, model format, cold/warm state and peak measurement. Weights-only numbers are feasibility estimates. The evidence above does not demonstrate the inference target on this task.
 
 ## Evidence and Verification
+
+The [signature-extraction study](https://docs.google.com/document/d/10ZGBTTTMrLplfdDnNcRlkZpvLSgXD5_zoEcZpwpwyy0/edit) explains why identifying a declaration and resolving its types need separate scores. The [Google Docs source register](02-learned-graph-compiler-thesis.md#google-docs-research-sources) links the rest of the project research.
 
 ### The baseline must resolve symbols
 
@@ -127,109 +88,16 @@ The target is `alpha::run` via the alias, not whichever `run` appears first. A T
 | Does a content hash establish entity identity? | No. Local [ISGL1-v2 matching](../crates/parseltongue-core/src/isgl1_v2.rs) uses content and positional heuristics; edits and duplicates make matching ambiguous. |
 | Can the model prove complete source coverage? | No. Exact byte accounting must be independently enforced by the capture system. |
 
-## Experimental Design
+## Score the product, not just the selected edges
 
-### 1. Define a frozen target
+| Question | Measurement and failure mode |
+|---|---|
+| Can it find the public surface? | Precision and recall of externally reachable definitions and exposure paths, per repository/configuration. An alias and its definition must not be counted as two independent definitions. |
+| Does it tell the truth about dependencies? | Exact typed-edge precision, recall and F1 by relation; separately count wrong confident targets, abstentions, false paths and missing nodes. Macro-average across repositories and show hard cases. |
+| Does the graph save investigation work? | On blind downstream-impact and flow-navigation tasks, compare graph-assisted versus baseline source lookup with the same harness, prompts and token accounting. Verify final answers and source citations, not just tool usage. |
+| Is it compact? | Tokenize the full canonical public export and the same in-scope Rust sources with a named tokenizer. Report the ratio per repository, what was omitted, and task accuracy. **About 5%** is the application hypothesis, not the cost of one query. |
+| Will it run locally? | Measure cold and warm peak RSS of a fresh CPU inference worker at the largest supported window, alongside end-to-end application peak, time, threads and working-set limits. A quantized weight floor is not a RAM result. |
 
-- Pin Rust edition, toolchain, target triple, feature set, `cfg` and workspace dependencies. Model build-specific graphs explicitly.
-- Start with direct calls between addressable functions and methods. Evaluate public reachability and signature-type edges as separate tasks.
-- Use source spans and qualified target identifiers, preserving uncertain and external cases.
-- Establish a reviewed annotation guide with examples of direct calls, trait calls, macros, function pointers, aliases and incomplete code.
+Train first on declarations and exposure paths, then on linking, then on corrections using retrieved evidence. Preserve unresolved labels, duplicate-name negatives, failed builds, re-exports through private modules, feature-specific traits and cross-crate edges in the corpus. Freeze family-level train/validation/test splits before deriving windows; never tune thresholds on the final holdout.
 
-### 2. Create an independently reviewed dataset
-
-- Select permissively usable repositories with diverse owners, sizes and domain styles; record license, commit, toolchain and build status.
-- Split by repository and near-duplicate cluster, not individual lines. Hold out complete projects and, separately, newer revisions. Audit model pretraining leakage where possible; acknowledge unknown contamination.
-- Generate candidate labels with rust-analyzer/SCIP and deterministic parsing, then have reviewers adjudicate a stratified sample and analyzer disagreements. Track inter-reviewer agreement and unresolved adjudications.
-- Sample negatives deliberately: same-name decoys, wrong modules, wrong methods, misleading aliases, missing candidates and external calls. A random-negative-only test would inflate performance.
-- Include incomplete files and compile-failing repos in a separately labeled slice; compiler-derived labels may be unavailable there.
-- Keep generated/synthetic examples and real hand-reviewed examples distinct. Synthetic code must not leak templates into the held-out test.
-
-### 3. Compare five arms
-
-1. Existing Parseltongue, pinned version and documented settings.
-2. Tree-sitter plus a reasonable deterministic scope/import resolver.
-3. Rust-analyzer-derived graph with explicit reference-to-call conversion.
-4. Model-only structured extraction, subject to the same input and budget constraints.
-5. Tree-sitter candidates plus trained small-model adjudication, with and without abstention.
-
-Measure candidate generation recall independently. The hybrid cannot recover a target it never receives. Provide the same allowed evidence to comparable arms and report separate build-aware and source-only tracks.
-
-### 4. Report accuracy and usefulness
-
-- Exact edge precision, recall and F1, micro and macro by repository and edge kind.
-- False edges per 1,000 opportunities; unresolved/abstention rate; precision at fixed coverage and coverage at fixed precision.
-- Candidate recall at K; classification accuracy conditional on target being in the set; end-to-end edge accuracy.
-- Public API node precision/recall, visibility and re-export accuracy separately.
-- Call-site span accuracy, source-evidence validity, invalid target IDs and malformed output rate.
-- Forward and reverse query agreement, plus retrieval usefulness on a small human-reviewed set of real investigation tasks.
-- Confidence calibration, with an explicitly held-out calibration set. Confidence is not proof.
-- Results by Rust construct and by buildable versus incomplete code, including counts and uncertainty intervals clustered by repository.
-- Full index time, per-edit time, peak RAM, disk use, CPU/GPU consumption and graph output size. Measure the post's 5% claim with a specified numerator, denominator, corpus and serialization.
-
-Do not treat an LLM judge as sole truth. Do not count an ambiguous or missing ground-truth case as a model error without specifying the policy. Avoid publishing a single aggregate that hides severe false-positive rates.
-
-### 5. Train in stages
-
-1. Reproduce baseline graph and inspect the largest error categories before spending on training.
-2. Convert reviewed candidate choices to compact supervised examples. Inputs contain call occurrence, bounded enclosing context, imports and candidate signatures with stable local IDs. Outputs select an ID or `ABSTAIN`.
-3. Establish no-training heuristics and a code encoder classifier as controls. Fine-tune a 135M model with supervised learning; compare full fine-tuning and adapters if resources permit.
-4. Use larger models only as auxiliary teachers; verify their predictions against source and independent labels. Preserve label provenance.
-5. Quantize candidate students and re-evaluate each actual artifact for accuracy and peak memory; calibrate abstention after quantization.
-6. Run full-repository evaluation, including incremental edits and comment-only changes. Confirm source accounting and graph identity stay correct.
-
-Example training record, illustrative rather than an existing format:
-
-```json
-{"source":"crate::app::start","call":"execute()","context":"use alpha::run as execute;","candidates":[{"id":"c0","symbol":"crate::alpha::run"},{"id":"c1","symbol":"crate::beta::run"}],"label":"c0","label_source":"reviewed","config":"linux-default"}
-```
-
-No probabilities or performance numbers in this document are measured model outcomes.
-
-### Decision gates
-
-Proposed gates to agree before training, not promises:
-
-- **G0:** A versioned fixture dataset and independent adjudication exist.
-- **G1:** Every arm emits comparable evidence and respects build configuration.
-- **G2:** The hybrid improves held-out edge precision/recall over both deterministic Tree-sitter baselines, with repository-level uncertainty reported and no unacceptable false-edge regression.
-- **G3:** The improvement persists on unseen repositories, difficult cases, and post-quantization weights.
-- **G4:** Measured peak memory meets the chosen interpretation of 100 MB; the end-to-end budget is separately disclosed.
-- **G5:** Users complete real navigation tasks with better outcomes or lower total cost, not merely a higher synthetic score.
-
-If G2 fails, analyze candidate recall and label quality before scaling the model. If G4 fails, try a smaller encoder/student, shorter inputs, dynamic loading or a revised budget. If G5 fails, reconsider whether the graph addresses the user's job.
-
-## Structured Challenge
-
-**Skeptic:** A 135M model may just memorize common naming patterns and confidently select a wrong target. Rust-analyzer already resolves complex Rust semantics; a model may add cost without exceeding it.
-
-**Response:** Treat the model as an uncertain candidate adjudicator, compare against a capable deterministic resolver and Rust-aware reference, test repository-held-out cases, and publish precision versus coverage. The model earns its place only through measured net improvement.
-
-**Skeptic:** A parser-generated candidate list may omit the correct target. The model cannot fix missing candidates.
-
-**Response:** Measure candidate recall separately, include `NONE_OF_THE_ABOVE`, and compare wider context and compiler-derived candidates. Do not report conditional classifier accuracy as graph recall.
-
-**Skeptic:** Compiler-derived training labels may reward imitation of compiler limitations, and references are not calls.
-
-**Response:** Use compiler output as weak supervision, validate reference-to-call conversion, hand-adjudicate disagreements and sample points, and keep unresolved labels out of definitive training targets.
-
-**Skeptic:** A compact file does not imply an under-100 MB application.
-
-**Response:** Measure process and end-to-end peak memory independently, including KV cache and parser/index overhead. Publish actual workload and hardware.
-
-## Final Synthesis
-
-The strongest research bet is a **small, source-grounded resolver for difficult Rust dependency edges**. Tree-sitter supplies reproducible syntax and spans; compiler-aware tools supply a strong baseline and imperfect supervision; the student learns a constrained choice with abstention. A model-only mapper remains an experimental arm, not a foregone conclusion.
-
-The valuable outcome is an auditable graph that improves real navigation without inventing relationships. The experiment must establish whether that improvement exists, what it costs, and where it breaks.
-
-## Open Questions
-
-1. Does the 100 MB limit apply to inference alone or the complete Parseltongue process?
-2. Is the first deliverable externally reachable public API, all direct callables, or both as separate projections?
-3. Are trait dispatch targets represented as one static target, a set of possible implementations, or a distinct relation?
-4. Which Rust repositories and hardware define the first held-out benchmark?
-5. What minimum improvement and maximum false-edge rate would justify a model dependency?
-6. Are build artifacts and dependencies available during indexing, or must the model work from source alone?
-7. Which training corpora, licenses and compute budget are available for the residency?
-8. What user task will validate the 5% map claim and overall usefulness?
+**Decision rule:** claim a graph-quality win only when the predeclared held-out metric improves over the frozen CLI without trading away the agreed false-edge budget. Report the stronger semantic baseline even if it wins. Publish model RAM and graph/source token ratio as separate results, including misses. The [construction thesis](02-learned-graph-compiler-thesis.md) specifies the action loop; the [five timelines](03-five-product-timelines-and-ramifications.md) describe how to put the same graph to work.

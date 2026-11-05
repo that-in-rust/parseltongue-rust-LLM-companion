@@ -1,8 +1,8 @@
-# Parseltongue as a Learned Graph Compiler for Rust
+# Constructing the Rust public-interface dependency graph
 
 Status: research thesis and four design options. No model accuracy, memory fit, or implementation result is claimed by this document.
 
-Product follow-up: [Five Product Futures for a Rust Interface Graph Model](03-five-product-timelines-and-ramifications.md) compares five user segments, product shapes, conditional timelines, and the experiments needed to choose among them.
+**Product:** A reusable, source-linked public-interface dependency graph (PIDG) of a large Rust OSS workspace. A maintainer should be able to start from an exported contract, follow its type or implementation dependencies, reverse the question, and know when to open source. No PR or chat session is required. The [five adoption timelines](03-five-product-timelines-and-ramifications.md) exercise the same artifact.
 
 ## Premise Check
 
@@ -14,7 +14,7 @@ This is a specialized model-plus-program system. Training examples, output forma
 
 Rust is the analyzed language. The application could be implemented in Rust, Python, C++, another language, or a combination. A macOS-only prototype is acceptable. Choose implementation and platform to test the thesis effectively, rather than treating either as the innovation.
 
-The current preference is **quality first on CPU, with a measured application memory ceiling of 4 GB for a declared repository workload**. Sub-100 MB model inference remains an attractive compression research goal. A database or model file below a budget does not demonstrate peak application RAM below that budget. Training and benchmark-oracle processes have separate budgets and must be disclosed.
+The Lossfunk application prefers a post-trained open-weight model running locally on CPU with **less than 100 MB of inference RAM**. Measure peak resident memory of the inference worker and also report total application memory as a separate figure. Larger models, including an experimental 4 GB setup, are research comparators, not substitutes for the target. The proposed 5% graph/source token ratio is a separate hypothesis.
 
 The main research bet is that the **model constructs the graph**. Its role must not silently shrink to ranking edges in a graph already supplied by a parser. Parser-assisted and compiler-assisted systems remain valuable comparison arms.
 
@@ -272,6 +272,20 @@ This revises the earlier research004 simplification that always attributes neste
 
 ## Evidence and Verification
 
+### Google Docs research sources
+
+These are project research notes, not independent benchmarks or evidence that the proposed model already works. Links preserve the documents' existing Google Drive permissions. One copy per distinct document is listed.
+
+| Source | How it informs the design |
+|---|---|
+| [Enriching ISG for LLM Code Reasoning](https://docs.google.com/document/d/1CKlPh-Sd9kuS_61gwql81C9JTPLMu2B69IqJ6drD6-s/edit) | Separates a stable public-contract graph from volatile syntax; puts a review assistant downstream of the graph. |
+| [Enriching ISG for Better Reasoning](https://docs.google.com/document/d/16kOkMjqiaQU55Rk_50-dURShoPNx3WXmpCkmXDSLIDU/edit) | Distinguishes signature facts from proposed control-flow, data-flow, and effect summaries. |
+| [Rust Analyzer API for Signatures](https://docs.google.com/document/d/10ZGBTTTMrLplfdDnNcRlkZpvLSgXD5_zoEcZpwpwyy0/edit) | Distinguishes declarations from resolved types and trait information; motivates a build-aware comparator. |
+| [Graph-Native Rust Compilation: A Deep Dive](https://docs.google.com/document/d/17j5wxOD-scBZu9TAHRR9xbWX2Chp17DdA2JihAopEHc/edit) | Separates an entity, its interface, and its implementation. That distinction does not require replacing the compiler. |
+| [Graph-Native Rust Compiler Revolution](https://docs.google.com/document/d/16dOlg_w75DjtMw-7ZdOX6J25DwqXVEHrNirs-N-q11s/edit) | Explores content-based identity; useful contrast with durable symbol IDs and separate signature hashes. |
+| [Rust-Analyzer with CozoDB?](https://docs.google.com/document/d/1fC0J7a1ZYBQC6SrGxf0YQ-Rw7L-YIjkaK4GS8D-bp_Y/edit) | Historical study of ephemeral analysis state versus persistent facts; not a recommendation to adopt Cozo. |
+| [AI Codebase Navigation Tools](https://docs.google.com/document/d/1SgpSdCa3SEGhppECVQ1BpOwhXcTAaNsTqpqE17yU0fA/edit) | Product research on how agents navigate code. It motivates measuring answers and evidence retrieved, not just graph size. |
+
 ### Can the graph be comprehensive for every Rust codebase?
 
 A common representation can be designed to express known, conditional, ambiguous, external, and unknown relationships. A guarantee of perfect semantic extraction from every arbitrary repository is not defensible.
@@ -328,7 +342,7 @@ The earlier ten-model shortlist was a starting point, not an exhaustive current 
 
 Use CPU inference with bounded windows and one active model session initially. Compare native executable routines with a constrained interpreter for Option 3. Embedded inference frameworks such as [Candle](https://github.com/huggingface/candle) demonstrate an implementation route; the implementation language remains open.
 
-Do not claim sub-4 GB fit from nominal parameter count. Measure peak application RAM, tokenizer, active source, graph cache, buffers, context state, and mapped weights with a declared repository size and runtime. Report training and oracle costs separately. Unbounded repositories require disk-backed state and bounded working sets, not a promise that every graph fits in fixed RAM.
+Measure actual peak inference RAM after loading weights and processing the maximum supported source window; count tokenizer, runtime, buffers and context. Independently measure peak application RAM, including active graph neighborhoods. Stream or page repository data. Report a miss on either resource measure as such, even if nominal checkpoint size looks favorable.
 
 ### Structured challenge
 
@@ -365,6 +379,12 @@ Do not claim sub-4 GB fit from nominal parameter count. Measure peak application
 | Does the existing Parseltongue already have the proposed model loop? | No. It currently provides parser-based extraction and graph infrastructure. |
 
 ## Evaluation and Experimental Sequence
+
+### Dataset and output contract
+
+The application proposes 50 top OSS Rust libraries and teacher-generated PIDGs (teacher named in the application: Codex 5.6 xhigh). Freeze a dated selection criterion, source SHAs, build manifests, generation recipe and label provenance. Teacher output is not a semantic oracle. Normalize independent build-aware evidence, audit disagreements and sample both accepted claims and unreported ones. Hold whole unrelated repositories out in addition to the 50; keep forks and related workspaces together.
+
+Publish three artifacts: the vetted open-weight generator on Hugging Face; a license-aware corpus with generation, training and evaluation code; and an updated Parseltongue that can index with the generator, query its graph and expose uncertain evidence. A benchmark script is not a substitute for the third artifact.
 
 ### Define the task before training
 
@@ -405,7 +425,7 @@ Measure CPU wall time, indexing/update latency, graph storage, and peak applicat
 
 ### Where the experiments can change the conclusion
 
-If the model misses ordinary public declarations, improve the representation or training before celebrating sophisticated reasoning. If native graph operations do all the semantic work, acknowledge the model's actual role. If compiler-aware tooling remains more accurate and cheaper, the learned construction thesis has failed for that operating point. If the 4 GB limit is met only on toy files, report the repository boundary instead of generalizing.
+If the model misses ordinary public declarations, improve the representation or training before celebrating sophisticated reasoning. If native graph operations do all the semantic work, acknowledge the model's actual role. If compiler-aware tooling remains more accurate and cheaper, the learned construction thesis has failed for that operating point. If the preferred sub-100 MB inference target is met only on toy windows, publish the boundary instead of generalizing.
 
 ## Relationship to Current Parseltongue
 
@@ -415,7 +435,7 @@ The existing [query extractor](../crates/parseltongue-core/src/query_extractor.r
 
 Keep the new construction engine behind an extraction boundary so model-led and deterministic results can be compared in the same application. No backend migration is required to test the idea. The separate [research004 architecture](../docs/research004/Arch-v202607210.md) proposes Turso, but the current workspace is not already that rewrite.
 
-The earlier [Lossfunk brief](01-small-model-interface-graph-research.md) favored parser-guided edge adjudication. This document deliberately advances a different leading hypothesis: learned graph construction with executable support and external graph memory. It also updates the immediate budget preference to 4 GB first.
+The [Lossfunk experiment brief](01-small-model-interface-graph-research.md) now distinguishes a graph constructor from a candidate ranker. The former tests the application; the latter tests whether a useful improvement can be gained with less learning. Keep those claims separate.
 
 ## Final Synthesis
 
@@ -434,4 +454,4 @@ Option 2 is the lead design because it directly combines building the graph with
 5. Can graph-state inputs improve unseen-repository accuracy at equal total compute?
 6. Can learned executable recipes generalize safely enough to amortize inference?
 7. Does recurrent graph refinement outperform a simpler trained transducer?
-8. After graph quality is established below 4 GB, which capability can be distilled toward sub-100 MB inference without unacceptable false edges?
+8. At what measured CPU memory and accuracy does the smallest student remain useful on unfamiliar workspaces?
