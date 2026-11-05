@@ -1,0 +1,9 @@
+[package]
+name = "public-interface-semver-consumer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+semver = { path = "../work/semver" }
+
+[workspace]
