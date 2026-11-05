@@ -1,0 +1,91 @@
+# Hypotheses ledger: Parseltongue ideas collected 2026-11-05 (reading companion, query dimensions, composable pipeline, failure zones, agent-native tooling)
+
+*Branch `research/tiny-rust-code-mapper`. This is a running ledger: every idea the user shares (screenshots, notes, other models' output) is recorded here as a numbered, falsifiable hypothesis with its source, current status and the cheapest test. Earlier design notes in this folder (`1793879701-…` seven-event protocol, `1793864191-…` measurements, `1793873685-…` rust-analyzer limits) are the evidence base; this file does not repeat them, it points at them. Add new entries at the end; never renumber.*
+
+**Status vocabulary:** `adopted` (already in a design note), `supported` (evidence for, not yet designed), `open` (no evidence either way), `contested` (evidence against or conflicts with another hypothesis), `rejected` (with the reason).
+
+Source images for this batch: `images/1793881000-ideas-01…12-*.png` (12 new; the four 5-phase diagrams were already stored as `images/1793879701-five-phase-flow-*.png`).
+
+---
+
+## A. Product framing — "Code Reading Companion" (`ideas-01`)
+
+The screenshot is a product-design draft: a macOS Tauri desktop app; drag in a Rust folder, 5–30 s indexing, SQLite for entities and edges, Python for graph metrics, local HTTP API serving the same packets to the GUI and to an LLM; source read from disk via `file:line:line` pointers, not stored; "the LLM is a reading companion, not the primary interface"; ~100 ms navigation, ~2 s LLM answers; "edge quality caps explanation depth — show 3 possible targets instead of confidently picking one".
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-01 | Parseltongue should be a **reading environment, not a query tool**: the mental model is "two hours reading this codebase", an instrumented book. | open | Conflicts with the newer aim (`1793879701-…`): *grep replacement for agents, zero LLM inside*. Both can share one store; they cannot share one UX. Decide which is the product and which is the by-product. | Ask 5 target users which they would pay for; or ship the CLI/MCP first (cheaper) and watch whether humans ask for a GUI. |
+| H-02 | The graph should **replace folder-browsing with concept-browsing** ("4 major subsystems", not 30 folders). | supported | Needs community detection over the item graph (Louvain/Leiden on `CALLS`+`SIGNATURE_USES`, CPU, seconds at 500k nodes). Rust modules already *are* a concept hierarchy; measure how often detected communities differ from the module tree before building a second one. | On 5 crates: Leiden communities vs module tree, adjusted mutual information. If AMI > 0.8, modules suffice. |
+| H-03 | **Source is read from disk on demand**, the store keeps only pointers + content hash; show a "stale" indicator when the hash differs. | adopted | Same as `src_hash` + span in the record schema (`1793864191-…` §6). | — |
+| H-04 | **Latency budgets**: ≤ 100 ms for navigation queries, ≤ 2 s for anything involving an LLM. | supported | BFS/PPR/trie on a loaded graph are ms-scale (`1793879701-…` §3). Indexing 5–30 s is realistic for ≤ 50k LOC with rust-analyzer (29 s / 42k LOC measured); not for 10 M LOC (hours cold). | Measure p95 of each MCP tool on the cloned `rust-analyzer` repo (593k LOC). |
+| H-05 | **Show uncertainty instead of picking**: when the resolver has 3 possible targets, show 3. | adopted | `MAY_CALL` + implementer hints; `confidence`/`substrate` on every record. The product-design draft attributes the ambiguity to tree-sitter; with rust-analyzer the ambiguity shrinks to `dyn`/generic fan-out and cfg (`1793873685-…`). | — |
+| H-06 | **Reading history is a first-class feature**: "where was I", "what have I read", "what's left". | open | Cheap (a log of item ids viewed + timestamps); unknown whether agents or humans use it. Overlaps H-28 session memory. | Add to the MCP as `history()`; count calls in real agent sessions. |
+| H-07 | The LLM companion should **form questions for the reader** ("you've read `Consumer` but not `ConsumerGroup`"), not summarise. | open | Pure L6; requires H-06. Only meaningful in the GUI product. | — |
+| H-08 | Non-goals: not an IDE, not CI, not code review, not refactoring, not "vibe coding". | adopted | Consistent with the grep-replacement framing. | — |
+
+## B. Eight dimensions of query variation (`ideas-02` … `ideas-08`)
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-09 | **Traversal direction** is a first-class parameter: top-down (entry point → implementation), bottom-up (implementation → callers → entry points), bidirectional (merge at the entity). | adopted | `impact(id, direction, depth)` and `path(a, b)` in the MCP surface; anchor BFS is bottom-up (`1793879701-…` event 3). Top-down needs an **entry-point set**: `main`, `#[test]`, `pub` items of the root crate, `extern "C"`, handlers registered via macros (the last is a cfg/macro limit). | Compute entry-point set on 5 crates; check recall against a hand list. |
+| H-10 | **Who drives**: user-driven (system presents → user picks), LLM-driven (LLM picks → full answer), collaborative (LLM recommends with reasoning → user confirms). | open | The seven-event protocol is user/LLM-driven at event 6. "LLM-driven" collapses events 5–7 into one round-trip: cheaper when the top cluster is unambiguous (RRF margin large), risky otherwise. | Make auto-pick conditional on RRF margin; log how often the agent later backtracks. |
+| H-11 | **Temporal**: snapshot (now), time-travel (`@ 3-months-ago`), evolution (how X changed over 20 commits). | supported | Immutable content-addressed snapshots + `diff(v1, v2, lens)` were proposed in the thesis; building the graph at an old commit = index the checkout (29 s / 42k LOC, cacheable). Evolution = sequence of diffs, CPU-only. | Index 5 tags of one crate; time it; emit `diff(public)` between consecutive tags and compare with cargo-semver-checks' verdicts (ground truth for the public lens). |
+| H-12 | **Proactive**: predictive pre-fetch (pre-compute related clusters, cache silently) and a "code smell radar" (complexity, no tests) attached to every answer. | open / contested | Pre-fetch is cheap and invisible; fine. The smell radar adds unrequested tokens to every response, against the budget discipline; make it a lens (`radar=true`) not a default. Complexity (cyclomatic from node kinds, cf. rust-code-analysis) and test presence (`#[test]` callers of the item) are both CPU-only and exact-ish. | Add as opt-in fields; measure whether agents turn it on. |
+| H-13 | **Output format** variants: text summary, code slice (minimal executable path), DOT graph, diff preview ("3 callers affected, 12 test files need updates"). | supported | All derivable from the same records. Code slice ≈ `path(a,b)` + bodies; DOT ≈ ego network; diff preview ≈ `impact` + test-caller count. One record stream, N renderers (`1793879701-…` decision 8). | Implement renderers as pure functions over records; snapshot-test them. |
+| H-14 | **Session**: stateless vs session memory ("show me the tests" resolves to "tests for auth") vs breadcrumb trail (`auth → login_route → session → back …`). | open | Session memory is where ambiguity creeps back in (which "auth"?). Breadcrumbs are cheap and exact (a stack of ids). Session memory should be *explicit*: the tool returns a `context_id`, the agent passes it back; no implicit state. | Build the breadcrumb stack first; add `context_id` resolution of bare words only against items already in the trail. |
+| H-15 | **Constraints** as parameters: token-bounded (`max_tokens=500` → compress), time-bounded (`max_ms=100` → partial + progress), depth-bounded (`depth=2` vs 5). | adopted (token, depth) / open (time) | Token and depth budgets are already in every proposed tool. Time-bounding needs anytime algorithms (PPR with early stop; BFS by frontier) and a `partial: true` flag. | Implement `max_ms` on `impact`; verify monotone result growth with time. |
+| H-16 | **Specialised lenses**: test-guided (start from a failing test → path → likely culprits), security-focused (input validation, crypto, SQL, external calls), refactoring-ready (complexity, coverage, blast radius, safe order). | open | Test-guided = `path(test_fn, *)` ∩ recent-change set: exact and CPU-only; strongest of the three. Security lens needs a taxonomy of sinks (`unsafe`, FFI, `std::process`, `sqlx::query`, …) — a markdown rule file, not a model. Refactor order = topological sort of the blast radius. | Test-guided first: on 5 crates with a recent fix commit, does `path(failing_test, changed_items)` rank the fixed item top-3? |
+
+## C. Composable pipeline and "which variation wins" (`ideas-09`)
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-17 | Instead of a fixed workflow, expose **composable CPU-only stages**: `RETRIEVE → ANCHOR → ENRICH{complexity, coverage, recent_changes, blast_radius} → FILTER → RANK → OUTPUT(top k, budget)`, which the user/LLM can rearrange. | supported | This is a query language over the record stream — exactly what cargo-semver-checks does with Trustfall over rustdoc JSON (`1793864191-…` §5.5) and what Clarity's Snapshot × Anchor × Lens × Render grammar does. Risk: LLMs compose pipelines badly without examples → ship the fixed seven-event flow as the default pipeline plus a cookbook. | Express the seven-event flow *as* a pipeline in this grammar; if it round-trips cleanly, the grammar is adequate. |
+| H-18 | Scorecard from the source: lowest cognitive load → progressive (5-phase); fastest → predictive pre-fetch; most accurate → test-guided; most flexible → composable; best for LLMs → session memory + progressive. Recommendation: start progressive, then add session memory, pre-fetch, composable hints. | open | Plausible ordering; no measurements behind it. "Best for LLMs" should be decided by task success per token on a fixed benchmark, not by intuition. | The held-out-repo benchmark proposed in `1793853341-…` (agent completes task; compile+tests pass; tokens used). |
+
+## D. Spec failure zones (`ideas-10`)
+
+Shreyas-style review of a "FUJ" (feature/user journey) doc for the Tauri product: five zones — missing zero/error/loading states, scale and perf gaps unspecified, cross-document contradictions, error states unspecified, open questions unordered. Specific gaps: zero entities after ingest; ingest fails halfway (JSON-RPC error code? partial data?); file-watcher vs ingest race; `ContentHash` trigger cost on a 10k-line file; stale `start_line/end_line` after edits.
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-19 | Every flow needs **zero, error and loading states** specified, including what the MCP returns and what the agent is told. | adopted (as a rule) | The seven-event note already specifies `none`/quit at event 6 and the "substrate: tree-sitter" banner; it does not yet specify 0-hit search, partial index, or index-in-progress responses. | Add a "protocol states" table to `1793879701-…`: `no_hits`, `index_stale`, `index_partial(crates_done/total)`, `crate_unloadable(reason)`. |
+| H-20 | **Ingest is transactional per crate**: a crate's records land atomically or not at all; partial workspaces are reported as `index_partial`. | supported | Per-crate indexing is also what rust-analyzer's architecture implies and what 10 M LOC requires (`1793873685-…` §4.7). | — |
+| H-21 | **Spans must be hash-validated, not line-validated**: a record is "fresh" iff the file's content hash matches; otherwise the body is re-read by searching for the item's name near the old span, or the record is marked stale. | adopted | `src_hash` in the schema; this hypothesis adds the *repair* rule. | Edit a file above an item; confirm the tool reports `stale` and re-anchors on next index. |
+| H-22 | **Watcher vs indexer race**: last-writer-wins on content hash; the indexer re-queues the file if the hash changed during indexing. | open | Standard; rust-analyzer's salsa handles it by cancellation. | — |
+
+## E. Agent-native tooling: tokens spent on I/O (`ideas-11`)
+
+The screenshot compares a lint-fix cycle: today ~2,400 tokens across 10 steps (~60 % on reading files and parsing human-readable errors) vs an "agent-native" flow where the agent emits **structured AST operations**, the tool validates them in-process (0 tokens), applies them and returns `{lint: pass, types: pass, tests: [...]}` — ~530 tokens, 4.5×.
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-23 | Most agent tokens on large codebases are **I/O overhead**, not reasoning; structured in/out cuts them 3–5×. | supported | Consistent with the thesis' literature (CodePlan, Agentless, RIG) and with the seven-event budget (≤ 32k tokens for a full question in 10 M LOC). The specific 4.5× is a worked example, not a measurement. | Instrument one real agent session on the `rust-analyzer` repo: count tokens by category (read file / tool call / error text / reasoning). |
+| H-24 | Agents should **edit via AST operations** (`replace_fn_body(id, …)`, `add_use(path)`), validated in-process, instead of writing text files. | contested | Conflicts with the read-only grep-replacement aim and with H-08 (not an IDE/refactoring tool). Also hard: rust-analyzer's own assists/SSR are the state of the art and still text-based at the edge. Keep as a *separate* hypothesis for a later product. | — |
+| H-25 | **Structured verification results** (`{lint, types, tests}` as JSON) instead of human-readable error text save tokens and prevent mis-parsing. | supported | `cargo check --message-format=json` already exists; wrapping it costs little and composes with the diff-preview output (H-13). | Add `verify(crate) → json` as an MCP tool; compare tokens vs raw `cargo check` output on 10 errors. |
+
+## F. The v2.0 sequence diagram: "app is slow, find the root cause" (`ideas-12`)
+
+Flow: `GET /codebase-statistics-overview-summary` → `GET /centrality-measures-entity-importance` (top-5: `main`, `request_handler`, `db_pool`, …) → `GET /blast-radius-impact-analysis?entity=request_handler&hops=2` (47 entities) → `GET /coupling-cohesion-metrics` (efferent 23, afferent 31, cohesion 0.42) → `GET /hierarchical-module-boundary-detection` (spans 3 natural modules) → "God object; split into auth, caching, data".
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-26 | **Graph metrics (centrality, coupling, cohesion, community boundaries) are useful agent primitives** for architecture questions. | supported | All CPU-only and standard (PageRank, Ca/Ce, LCOM-style cohesion, Leiden). This is the "ENRICH" stage of H-17 and the "radar" of H-12. | Compute on 5 crates; have the user check whether the top-5 central items are the ones they'd name. |
+| H-27 | But **"slow" is a runtime property; structural metrics are a proxy**. The diagram's conclusion (God object ⇒ slow) is a plausible refactoring finding, not a root cause. | adopted (as a caveat) | The tool must label metric-based conclusions as *structural*, and offer the hook for runtime evidence (profiles, flamegraphs) as a future lens (L5+). | — |
+| H-28 | The 26 kebab-case REST endpoints of v2.0 should collapse into **~8 budgeted MCP tools plus the composable pipeline** (H-17). | adopted | Thesis proposal: `find_items, describe_item, surface, impact, implementors, path, diff, …`. Metrics become ENRICH stages, not endpoints. | — |
+
+## G. Cross-cutting hypotheses raised by this batch
+
+| # | Hypothesis | Status | Evidence / conflict | Cheapest test |
+|---|---|---|---|---|
+| H-29 | **Two products share one store**: (a) CPU-only grep-replacement MCP/CLI for agents (no LLM inside), (b) a reading-companion GUI for humans with an embedded LLM. The store, the record schema and the pipeline grammar are common; the LLM lives only in (b). | supported | Resolves the H-01 conflict without choosing yet. Cost: two front ends. | Build (a) first; (b) consumes the same HTTP/MCP surface — which the product-design draft already proposes ("a local HTTP API serves structured packets to both the Tauri frontend and the LLM"). |
+| H-30 | **Every heuristic output (ranking, clusters, metrics, smells) must be labelled as such**; only L1–L4 records from rust-analyzer are "exact". | adopted | `1793879701-…` §6; product draft: "the reading companion earns trust by showing uncertainty". | — |
+| H-31 | **Token budgets belong to the caller**, defaults are small, expansion is explicit (`expand(cluster_id)`). | adopted | Decision 2 in `1793879701-…`; H-15. | — |
+
+---
+
+## How to use this ledger
+
+- When an idea arrives (screenshot, note, other model's output): store the image under `images/<timestamp>-ideas-NN-<slug>.png`, add H-entries here with status and the cheapest test. One screenshot → one section, so the source is traceable.
+- When a design note adopts a hypothesis, change its status to `adopted` and point to the note. When a measurement kills one, mark `rejected` and keep the row.
+- Open hypotheses with the cheapest tests: **H-02** (communities vs modules, 1 day), **H-09** (entry-point recall, half a day), **H-16 test-guided** (path from failing test, 1 day), **H-23** (token accounting on a real agent session, 1 day). These four decide most of the product shape.
