@@ -1,0 +1,183 @@
+{
+  "platform": "macOS-15.3.1-arm64-arm-64bit",
+  "rust_analyzer": "rust-analyzer 1.93.1 (01f6ddf7 2026-02-11)",
+  "train": 192,
+  "unique_train_feature_pairs": 6,
+  "test": 180,
+  "model_bytes": 2737,
+  "model_sha256": "938bf6aa68bef5b2a8655888b5c283db1675b26ddf3b5d8fb756d18f4451254b",
+  "groups": {
+    "test/qualified": {
+      "n": 24,
+      "correct_link": 24,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 24,
+      "simple_abstain": 0,
+      "first_right": 12,
+      "feature_input_seen_in_train": 24,
+      "pairs_both_right": 12
+    },
+    "test/rename_pair": {
+      "n": 24,
+      "correct_link": 24,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 24,
+      "simple_abstain": 0,
+      "first_right": 12,
+      "feature_input_seen_in_train": 24,
+      "pairs_both_right": 12
+    },
+    "test/plain_import": {
+      "n": 24,
+      "correct_link": 24,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 24,
+      "simple_abstain": 0,
+      "first_right": 12,
+      "feature_input_seen_in_train": 24,
+      "pairs_both_right": 12
+    },
+    "novel/grouped": {
+      "n": 16,
+      "correct_link": 0,
+      "wrong_link": 0,
+      "abstain": 16,
+      "correct_abstain": 0,
+      "simple_right": 0,
+      "simple_abstain": 16,
+      "first_right": 8,
+      "feature_input_seen_in_train": 0,
+      "pairs_both_right": 0
+    },
+    "novel/module_alias": {
+      "n": 16,
+      "correct_link": 0,
+      "wrong_link": 0,
+      "abstain": 16,
+      "correct_abstain": 0,
+      "simple_right": 16,
+      "simple_abstain": 0,
+      "first_right": 8,
+      "feature_input_seen_in_train": 0,
+      "pairs_both_right": 0
+    },
+    "novel/glob": {
+      "n": 16,
+      "correct_link": 8,
+      "wrong_link": 0,
+      "abstain": 8,
+      "correct_abstain": 0,
+      "simple_right": 16,
+      "simple_abstain": 0,
+      "first_right": 8,
+      "feature_input_seen_in_train": 0,
+      "pairs_both_right": 4
+    },
+    "novel/shadow": {
+      "n": 16,
+      "correct_link": 16,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 16,
+      "simple_abstain": 0,
+      "first_right": 8,
+      "feature_input_seen_in_train": 0,
+      "pairs_both_right": 8
+    },
+    "novel/reexport": {
+      "n": 16,
+      "correct_link": 16,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 16,
+      "simple_abstain": 0,
+      "first_right": 8,
+      "feature_input_seen_in_train": 16,
+      "pairs_both_right": 8
+    },
+    "novel/alias_chain": {
+      "n": 16,
+      "correct_link": 0,
+      "wrong_link": 0,
+      "abstain": 16,
+      "correct_abstain": 0,
+      "simple_right": 0,
+      "simple_abstain": 16,
+      "first_right": 8,
+      "feature_input_seen_in_train": 0,
+      "pairs_both_right": 0
+    },
+    "missing/unbound": {
+      "n": 8,
+      "correct_link": 0,
+      "wrong_link": 0,
+      "abstain": 8,
+      "correct_abstain": 8,
+      "simple_right": 0,
+      "simple_abstain": 8,
+      "first_right": 0,
+      "feature_input_seen_in_train": 0,
+      "pairs_both_right": 4
+    },
+    "manual/missing_prefix": {
+      "n": 1,
+      "correct_link": 0,
+      "wrong_link": 1,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 0,
+      "simple_abstain": 1,
+      "first_right": 0,
+      "feature_input_seen_in_train": 0
+    },
+    "manual/module_over_decoy": {
+      "n": 1,
+      "correct_link": 1,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 1,
+      "simple_abstain": 0,
+      "first_right": 1,
+      "feature_input_seen_in_train": 0
+    },
+    "manual/qualified_over_import": {
+      "n": 1,
+      "correct_link": 1,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 1,
+      "simple_abstain": 0,
+      "first_right": 0,
+      "feature_input_seen_in_train": 0
+    },
+    "manual/return_alias": {
+      "n": 1,
+      "correct_link": 1,
+      "wrong_link": 0,
+      "abstain": 0,
+      "correct_abstain": 0,
+      "simple_right": 1,
+      "simple_abstain": 0,
+      "first_right": 1,
+      "feature_input_seen_in_train": 1
+    }
+  },
+  "max_rss_bytes": [
+    23576576,
+    23707648,
+    23707648,
+    23707648,
+    23609344
+  ],
+  "peak_budget_bytes": 100000000
+}

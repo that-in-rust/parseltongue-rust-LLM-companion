@@ -1,10 +1,7 @@
-mod facts;
-mod model;
-
 use anyhow::{ensure, Result};
-use facts::Facts;
 use serde_json::json;
 use std::io::Read;
+use tiny_reexport::{facts::Facts, model};
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();

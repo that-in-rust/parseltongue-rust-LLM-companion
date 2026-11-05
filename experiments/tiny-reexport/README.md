@@ -1,5 +1,7 @@
 # One Rust re-export, two executors
 
+Follow-up: [learned binding selection against rust-analyzer](learned-binding/README.md) tests which of two modules a return type refers to before running the fixed lookup.
+
 **Result (2026-11-05):** both paths emitted the same return-type graph. The fixed-weight ONNX model executed the alias lookup on CPU in a single Rust process below **24 MB peak RSS** on both fixtures. Native Rust was faster and smaller. This is an isolated experiment, not a change to the production Parseltongue indexer.
 
 ```rust
