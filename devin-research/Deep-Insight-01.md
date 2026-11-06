@@ -13,7 +13,7 @@ Part 4   2026-11-05/06  Training-time shortcuts for the H-46 student: levers, sc
                       (verbatim copy of Deep-Insight-02.md, kept there too)
 Part 5   2026-11-06   Product summary (four timelines + recommendation) and ELI5 walkthrough of the CODEMAP
                       (appended upstream as b55d7451e; §10 summarises Part 3, §11 is the plain-language version of Part 2)
-Part 6   2026-11-06   The one big thing: structure as a shared, checkable object between developer, LLM and compiler
+Part 6   2026-11-06   Proposal 01 — the one big thing: structure as a shared, checkable object between developer, LLM and compiler
                       (verbatim copy of Deep-Insight-04.md: synthesis, simulated reception by Devin and by GLM-5.3, where they disagree)
 ```
 
@@ -1088,7 +1088,9 @@ that matches the plan does not prove the program is safe.
 
 ---
 
-# Part 6 — 2026-11-06 — The one big thing: structure as a shared, checkable object (verbatim copy of Deep-Insight-04.md)
+# Part 6 — 2026-11-06 — Proposal 01: the one big thing, structure as a shared, checkable object (verbatim copy of Deep-Insight-04.md)
+
+*Everything in this Part is the **first proposal** (Proposal 01) for the product, not a settled design.*
 
 *Devin's synthesis of Parts 1–5 against the founder's statement, plus GLM-5.3's independent reception simulation and the agree/disagree table. Kept in Deep-Insight-04.md too.*
 
@@ -1352,3 +1354,81 @@ What survives both reads, in one paragraph: the product is **one map in three te
 ```
 
 Neither read changes the storage rule from Part 2 and the MISP note: exact facts, shared vocabulary and opinions (including everything in §4, §6 and §7 of this document) stay in separate layers with their creator named. This section's verdicts are Devin's opinion about GLM-5.3's opinion; the measured facts are the ones with numbers attached in Parts 1–2.
+
+### 9. ELI5 ASCII of Proposal 01, and how the Sikos cybersecurity-knowledge-graph paper fits
+
+*Added 2026-11-06 after the founder asked for a plain-language picture of this document and for the link to Sikos, L. F., "Cybersecurity knowledge graphs", Knowledge and Information Systems (2023), https://link.springer.com/article/10.1007/s10115-023-01860-3 — the paper behind ledger entries H-47…H-59.*
+
+```text
+DEEP-INSIGHT 04 IN ONE PICTURE
+
+   a building has three drawings.  software has only the building.
+
+        BLUEPRINT              AS-BUILT DRAWING             INSPECTOR
+        what we agreed         what actually stands         diffs the two, writes the report
+             │                        │                          │
+             ▼                        ▼                          ▼
+        INTENDED map             AS-IS map                   verify
+        (LLM drafts a            (compiler / tree-sitter     achieved / missing /
+         graph patch,             extracts it; every edge     unexpected / unresolved
+         human approves)          says WHO found it)
+
+   the one big thing:  ONE map, THREE tenses, SAME ids.
+        agent READS it   →  find "where do retries get decided"   ·   impact(RetryPolicy)
+        agent WRITES it  →  "add trait RetryPolicy; Client → trait instead of → FixedBackoff"
+        CLI   DIFFS  it  →  after the edit: 2 of 3 done, 1 missing, 1 edge you didn't ask for
+
+   WHY "BROKEN CODE" MATTERS
+        the moment you most need the map is halfway through a refactor — and that is exactly when
+        the code doesn't compile and rust-analyzer's answers degrade.
+        file graph + public skeleton (mod / use / pub fn / pub struct / static / cfg / doc comment)
+        need NO type-checker → they stay up.  only "resolved" edges fade — and the map SAYS they faded:
+
+             ┌──────────────────────────────────────────────┐
+             │ 1,204 files · 9,318 pub items                │
+             │ 97 % exact  ·  3 % unresolved (proc-macro)   │   ← this banner is the product's honesty
+             │ while broken:  9 more edges unresolved       │
+             └──────────────────────────────────────────────┘
+
+   TWO LEVELS = what the agent sees first
+        level 1   file ↔ file            (mod, use, include!, cfg gates)
+        level 2   each file's PUBLIC face (signatures, re-exports, globals, cfg, doc comment)
+                  ← comments / imports / globals are FIELDS on each item's record, not new boxes on the graph
+        level 3+  bodies, calls, flow     (there, hidden, opens on request)
+
+   WHO BELIEVES IT, AND WHEN
+        maintainer     "stale index + proc macros"       → re-extract in seconds, macros on
+        RA contributor "that's our index in a wrapper"   → queries LSP can't do: diff two snapshots, verify a plan
+        HN             "'works on broken code' = lies"   → the banner above, on a repo that doesn't build
+        CTO/security   "false 'no dependents'"           → coverage envelope on every answer, zero egress
+        newcomer       "where do I even start"           → 10-item tour, zero config, or gone in 90 s
+
+   HOW IT DIES         nobody writes the INTENDED map (UML, ArchUnit, design docs all died this way)
+   HOW WE HEDGE        the agent drafts it, the human only clicks approve
+   CHEAP SIGNAL        do two maintainers make a SECOND proposal, unprompted?
+
+
+HOW THE SIKOS PAPER (KAIS 2023, "Cybersecurity knowledge graphs") FITS
+
+   the paper is NOT about code.  it is about a field that already solved OUR storage problem:
+   many sources, different trust, facts mixed with guesses, shared across teams, never trusted blindly.
+
+        cyber-threat world                         our Rust map
+        ───────────────────────────────────        ─────────────────────────────────────────
+        IOC observed by a sensor  (hard fact)      edge found by the compiler       (exact)
+        analyst's attribution     (opinion)        LLM's "this is the retry loop"   (L6 meaning)
+        STIX / MISP taxonomy      (shared words)   our node/edge kinds, tags        (vocabulary)
+        confidence + provenance on every object    exact | projected | proposed | unresolved + creator
+        sighting: "I saw this too / this is wrong" agent or human confirms / denies an edge
+        warninglist: known false positives         "this edge is a macro artefact, ignore"
+        first-seen / last-seen                     when did this edge appear / disappear across commits
+        feeds between orgs, each with trust level  map shared across devices / agents / CI, provenance kept
+
+   the lesson we took (H-47…H-59):   FACT  ≠  VOCABULARY  ≠  OPINION  — three layers, never written into
+   each other, any query can peel one off.   that rule is what lets the INTENDED map (an opinion about the
+   future) and the LLM's annotations sit next to compiler facts without poisoning them — which is exactly
+   the objection every persona above raises ("will it lie to me?").
+
+   so:   DI-04 says WHAT the object is (one map, three tenses).
+         Sikos/MISP says HOW to store it so humans, LLMs and compilers can all write into it and still trust it.
+```
