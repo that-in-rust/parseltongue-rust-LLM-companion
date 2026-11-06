@@ -345,6 +345,84 @@ Realistic plan: (1) ship the compiler-derived graph with no model; (2) ship infe
 
 ---
 
+## 13. ELI5 ASCII — the whole thesis on one page
+
+*Added 2026-11-06, after the GLM-5.3 second opinion. Everything below is restated from §§1–12; where it says "shown" there is a measurement in this folder, where it says "bet" there is not.*
+
+```text
+THE PROBLEM
+
+   an AI agent lands in 10 million lines of Rust and has one tool: grep.
+   ┌─────────────────────────────────────────────────────────┐
+   │ grep "Store"  →  4,812 lines, 300 files, 90,000 tokens   │   it reads, guesses, edits, breaks something far away.
+   └─────────────────────────────────────────────────────────┘
+   the LSP (rust-analyzer) knows everything exactly — but only answers "where is THIS defined?" one cursor at a time.
+
+
+THE THESIS IN ONE LINE
+   Rust is the one language where the compiler can draw the whole map exactly —
+   so draw it once, keep it versioned, and hand the agent the right 3,000-token piece of it.
+
+
+WHY RUST, AND ONLY RUST
+   names are static · visibility is in the source (pub) · one impl per trait+type · no reflection, no eval
+   ⇒  rustdoc / rust-analyzer give a public-interface graph that is a FACT, not a guess
+   ⇒  you can score any approximation (LLM, small model) against truth.  No other mainstream language lets you.
+
+
+WHAT WE BUILD
+
+   source ──rust-analyzer──►  record stream  ──►  store everything      ──►  show the contract
+                              L1 crates                                      file / module map
+                              L2 items (fn, struct, trait…)                  public-interface map
+                              L3 resolved paths, visibility, cfg             (deeper levels on demand)
+                              L4 calls, constructs, reads/writes, unsafe
+                              L5 flow, locks, Send/Sync        ◄ partly exact
+                              L6 meaning: "this is the retry loop"  ◄ an LLM writes this; it is an opinion, labelled as such
+
+   every record:  id = crate@version::path::Item · substrate · cfg · confidence · creator
+
+
+HOW THE AGENT USES IT  (seven events, CPU only, no LLM inside the tool)
+
+   agent: "where do retries get decided"  (7 words)
+       │
+       ▼  trie + trigram + BM25 → 4 candidate entities (not keywords)
+       ▼  for each: public anchor, paths, blast radius, a ≤800-token cluster
+   agent picks one ──► tool returns a bounded neighbourhood under a token budget
+                       + grounded example queries: impact · implementors · path · who_constructs · what_can_panic · unsafe_surface · diff
+   resolver BUILDS (exact)   ·   Parseltongue CURATES (bounded, cheap)   ·   the LLM STEERS (chooses, explains)
+
+
+THE TRICK THAT MAKES SPEC = CODE
+   write the plan as a compiling `todo!()` skeleton  →  the spec and the code are the same formalism
+   Murphy's 1995 "reflexion model" (planned vs actual: converged / diverged / absent / unplanned)
+   becomes a semver diff — the architecture check is a diff of two public-interface graphs.
+
+
+WHERE THE MODEL FITS (and doesn't)
+   big LLM:    never builds L1–L4; it steers, writes L6, PROPOSES residual edges (dyn / cfg / proc-macro) that a validator judges.
+   small model (H-46): trained on rust-analyzer's own output; a FALLBACK where RA can't start (snippet, diff, no Cargo.toml).
+   evidence so far: frontier models asked to draw edges omitted 6 of 14 — and an omitted edge looks like independence.
+
+
+HONESTY IS A STORAGE RULE, NOT A PROMISE
+   ┌────────── LLM meaning / model proposals / agent sightings ──────┐  annotations: own id, creator, confidence
+   ┌────────── heuristics: ranking, clusters, PageRank ──────────────┐  labelled heuristic
+   ┌────────── compiler facts ───────────────────────────────────────┐  exact, actionable
+   layers never written into each other; any query can lift one off.
+
+
+WHAT WE HAVE ACTUALLY SHOWN              WHAT IS STILL A BET
+   rustdoc graph of a real crate, reproducible   that agents answer better / cheaper with it than with grep   (RQ1 — unrun)
+   RA: 42k LOC in 29 s / 2.3 GB, ~0 unknowns     serving p95 < 100 ms at 10 M LOC                              (unmeasured)
+   65 % of calls need receiver types → no        that a 500 MB student reaches ≥90 % of RA's graph             (unrun)
+     parser-only shortcut                        how often agents even hit code RA can't load                   (unmeasured)
+   LLMs omit edges, don't invent them
+
+   second opinion (GLM-5.3, 2026-11-06): the positioning is right; run RQ1 and the no-training fallback before funding the model.
+```
+
 ## References
 
 Format: authors, year, title, venue or arXiv id, URL. "Verified" means resolved by API/DOI on 2026-11-05.
