@@ -1,147 +1,127 @@
-# Deep Insight 05 — Proposal 01, restructured top-down (Minto pyramid)
+# Deep Insight 05 — The thesis
 
-*2026-11-06. A re-ordering of Deep-Insight-04 (Proposal 01, §0–§10) by the Minto pyramid principle: answer first, then three mutually exclusive and collectively exhaustive key lines, each resting on grouped evidence. No new claims; every leaf cites the DI-04 section it comes from. DI-04 stays as written. Later revisions are appended as new sections here or as a new Part of the collected Deep-Insight-01.*
+*2026-11-06. Proposal 01 stated top-down: the answer first, then the three reasons it is the answer, then the evidence under each. Nothing here is hedged by attribution; what is measured is marked measured, what is a bet is marked bet.*
 
 ---
 
-## Introduction (S-C-Q-A)
+## The answer
 
-**Situation.** Coding agents are now doing cross-cutting changes to large Rust codebases. Their only structural instrument is grep; rust-analyzer knows the exact structure but answers one cursor at a time, and its answers degrade exactly when a refactor has broken the build. (DI-04 §1, §2)
-
-**Complication.** Nothing holds the *intended* structure of the code, nothing diffs intended against actual, and no tool admits what it could not resolve. So agents re-derive the architecture from grep on every task, make plans no one can check, and return "no dependents" when they mean "could not see". (DI-04 §1, §2, §6 personas a/d/h)
-
-**Question.** What is the one thing to build, and why would anyone adopt it over rust-analyzer, Serena, Aider's repo map or Cursor's index?
-
-**Answer — the governing thought:**
-
-> **Build the structure of a Rust codebase as one open, provenance-carrying map in three tenses — as-is, intended, as-built — that an agent reads to navigate, writes to plan, and the CLI diffs to verify; publish the compiler-exact corpus and per-crate feed first, because that is the part nobody has and the part that outlives any tool or model.**
+**A Rust codebase's structure — what connects to what — should exist as one open map in three tenses: what the code is, what we intend it to be, and what it became after the change. The agent reads the map to navigate, writes to it to plan, and the tool diffs it to verify. Every edge says how it was found and whether it was resolved, so the map stays usable and honest while the code is mid-refactor and does not compile. The compiler-exact corpus and the per-crate graph feed are published first, because they are the part no one has and the part that outlives any tool or model.**
 
 ```text
-                              ┌──────────────────────────────────────────────────────┐
-                              │  ONE OPEN MAP, THREE TENSES, PROVENANCE ON EVERY EDGE │
-                              │  read to navigate · write to plan · diff to verify    │
-                              │  corpus + feed first, tool second, model last         │
-                              └──────────────────────────────────────────────────────┘
-                 ┌────────────────────────────┼──────────────────────────────┐
-   ┌─────────────┴─────────────┐  ┌────────────┴────────────┐   ┌─────────────┴──────────────┐
-   │ 1  WHAT IT IS              │  │ 2  WHY IT IS CREDIBLE    │   │ 3  WHAT TO DO FIRST         │
-   │ a shared, checkable object │  │ Rust makes it exact;     │   │ three cheap signals;        │
-   │ with three tenses, two     │  │ the broken moment is the │   │ ship find · impact · verify;│
-   │ visible levels, and a      │  │ real one; openness       │   │ publish corpus + feed       │
-   │ storage rule that keeps    │  │ answers the hard         │   │ before any model claim;     │
-   │ facts and opinions apart   │  │ personas; evidence exists│   │ and what not to do          │
-   └───────────────────────────┘  └─────────────────────────┘   └────────────────────────────┘
+                 ┌────────────────────────────────────────────────────────────────┐
+                 │   ONE OPEN MAP · THREE TENSES · PROVENANCE ON EVERY EDGE        │
+                 │   agent reads it to navigate · writes it to plan · tool diffs it │
+                 │   corpus and feed first · tool second · model last               │
+                 └────────────────────────────────────────────────────────────────┘
+                   ┌───────────────────────┼────────────────────────────┐
+     ┌─────────────┴────────────┐  ┌────────┴──────────┐   ┌─────────────┴────────────┐
+     │ 1  the object is new     │  │ 2  Rust makes it   │   │ 3  the order of work is  │
+     │    and nothing else is   │  │    exact, and the  │   │    corpus → three tools  │
+     │    the product           │  │    broken moment   │   │    → model, gated by     │
+     │                          │  │    is the real one │   │    three cheap signals   │
+     └──────────────────────────┘  └───────────────────┘   └──────────────────────────┘
 ```
 
 ---
 
-## Key line 1 — WHAT IT IS: a shared, checkable object, not a tool
+## 1. The object is new, and nothing else is the product
 
-### 1.1 One map, three tenses, same ids
-- AS-IS: what the source establishes today (extracted). INTENDED: a graph patch the LLM drafts and a human approves. AS-BUILT: re-extracted after the edit. The loop `propose → build → re-extract → compare → report` is the product; one-way "LLM reads a graph" is Sourcegraph-for-agents, one-way "LLM writes a plan" is an ADR generator. (DI-04 §1)
-- Analogy that holds: blueprint, as-built drawing, building inspector. Software keeps only the building. (DI-04 §1, §9)
-- "Bidirectional" is earned only by the proposal loop; LLM-asks/tool-answers is every MCP server. (DI-04 §7, GLM §2)
+### 1.1 Three tenses on one vocabulary
+- **As-is**: the graph the source establishes today. **Intended**: a graph patch — add this trait, flip these dependencies — drafted by the agent, approved by a human. **As-built**: the graph re-extracted after the edit.
+- The product is the loop: *propose → build → re-extract → compare → report*. The report has four columns: achieved, missing, unexpected, unresolved.
+- Every discipline that builds physical things keeps a blueprint, an as-built drawing, and an inspector who diffs them. Software keeps only the building. Agents inherit that poverty and re-derive the architecture from grep on every task.
+- A tool where the LLM only reads a graph is a code search engine. A tool where the LLM only writes a plan is a design-doc generator. The round trip is the only thing that is not already shipping.
 
-### 1.2 Two visible levels; deeper levels on request
-- Level 1 file ↔ file (`mod`, `use`, `include!`, cfg gates) — tree-sitter, always available. Level 2 the public face of each file: signatures, re-exports, `pub static/const`, `#[cfg]`, doc comment, item-level macro names. Level 3+ (bodies, calls, flow) kept, hidden, opened on expansion. (DI-04 §3)
-- Comments, imports and globals are **fields of the item/module record**, not new node kinds — imports are evidence on `USE` edges, statics are items, doc-comment nodes invite identity churn. The founder's requirement is met by the record. (DI-04 §7 ADOPT, §9)
-- Membership test for level 2: *could this line change what another file is allowed to write?* (DI-04 §3)
+### 1.2 Two levels are visible; the rest opens on demand
+- **Level 1** — file to file: module declarations, imports, include paths, cfg gates. Readable by a syntax parser; never unavailable.
+- **Level 2** — the public face of each file: every public signature, re-export, static and constant, cfg and feature gate, the doc comment, item-level macro names. The test for membership: *could this line change what another file is allowed to write?*
+- Comments, imports and globals are fields on the item record, not nodes. Imports are evidence on dependency edges; statics are items; a doc comment is the contract's prose attached to the item it documents.
+- Bodies, calls, data flow, lock order, Send/Sync boundaries, and the semantic layer ("this is the retry loop") are kept and shown on expansion. They are not the default view.
 
-### 1.3 The storage rule that makes it trustworthy
-- Every edge carries `exact | projected | proposed | unresolved`, plus creator, extractor version, cfg context. An unresolved result is never shown as absence. (DI-04 §2, Part 2 §5)
-- Three layers never written into each other — compiler facts ≠ shared vocabulary ≠ opinions (LLM meaning, proposals, sightings) — taken from Sikos's cybersecurity knowledge graphs and MISP: provenance and confidence per object, sightings, warninglists, first/last-seen, feeds with trust levels (H-47…H-59). This is what lets an opinion about the future (the intended map) sit next to compiler facts without poisoning them. (DI-04 §9)
+### 1.3 Honesty is a storage rule, not a promise
+- Every edge carries one of `exact · projected · proposed · unresolved`, the creator, the extractor version and the build context. An unresolved edge is never displayed as absence.
+- Three layers are never written into each other: compiler facts, shared vocabulary (node and edge kinds, tags), and opinions (the intended map, semantic annotations, model proposals, human or agent sightings). Any query can peel a layer off.
+- This is the same structure the cyber-threat-intelligence field settled on for knowledge graphs fed by many sources of unequal trust: provenance and confidence on every object, sightings to confirm or deny, warninglists for known false positives, first-seen and last-seen, feeds with distribution levels. It is what lets an opinion about the future sit next to a compiler fact without poisoning it.
 
-### 1.4 Under full openness the object has four parts, and the tool is the smallest
-- Apache-2.0/MIT CLI + extractor; versioned record schema; **public feed of compiler-exact graphs per crate@version** (docs.rs, but the graph); **open training corpus** with repo-disjoint, post-cutoff held-outs; open weights with card + eval + recipe; a leaderboard. (DI-04 §10.1, §10.5)
-- The feed shrinks "Reach": the model no longer memorises std and 100 crates — it downloads the facts and learns only how to connect them. (DI-04 §10.1)
-- The model is one leaderboard row, not the product. (DI-04 §10.2)
+### 1.4 Open means the asset is the corpus, not the binary
+- Four published artefacts: the Apache/MIT tool and its versioned record schema; **a public feed of compiler-exact graphs for every crate version** — docs.rs, but the graph; **the training corpus** with repository-disjoint splits and held-out repositories newer than any base model's cutoff; and open weights with the card, the eval harness and the recipe.
+- The feed changes what a fallback model must know. It no longer memorises the standard library and a hundred crates; it downloads the facts and learns only how to connect them — binding, chaining, abstaining. That is the small, defensible part.
+- The model is one row on a leaderboard the project owns. If a rule beats it, the leaderboard says so and the project is still the benchmark everyone cites.
 
 ---
 
-## Key line 2 — WHY IT IS CREDIBLE: Rust, the broken moment, openness, and evidence
+## 2. Rust makes the map exact, and the broken moment is the real one
 
 ### 2.1 Rust is the one mainstream language where the map is a fact
-- Static names, `pub` in source, one impl per trait+type, no reflection → rust-analyzer/rustdoc produce an exact public-interface graph; any approximation can be scored against truth. (thesis §13; DI-04 §1)
-- Measured: tree-sitter 0.07 s and rust-analyzer 29 s / 2.3 GB on 42k LOC, ~0 unknown expressions with proc macros on; warm `cargo check` 0.69 s. (Part 1–2; DI-04 §2)
+- Names are static, visibility is written in the source, each trait is implemented once per type, there is no reflection and no eval. The compiler's resolver produces the public-interface graph exactly, so every approximation — a large model, a small model, a heuristic — can be scored against truth. No other mainstream language allows this.
+- Measured on a 42k-line, eleven-crate workspace: syntax parse 0.07 s; full rust-analyzer analysis 29 s at 2.3 GB; near-zero unknown expressions with proc macros enabled; warm incremental `cargo check` 0.69 s.
+- Measured on two large public Rust codebases: 65 % of call sites are method calls, and only a quarter of their receivers can be typed from the enclosing function alone. There is no parser-only shortcut to the resolved graph. The resolver builds; nothing else can.
 
-### 2.2 "Works for broken code" is the hinge because the refactor is when the code is broken
-- Halfway through extracting a trait, 40 files fail to type-check and RA's types go `{unknown}` across the blast radius; the intended map is the only stable thing in the room. (DI-04 §2)
-- Level 1 and the public skeleton need no type-checker, so they stay up; only resolution degrades, and the banner says by how much. (DI-04 §2, §9)
-- Narrowed after GLM: syntactic indexing on broken files is not the claim (Aider, Cursor, Serena do that); the claim is the intended map plus provenance degradation on the *same diffable map*. The model is not part of the hinge; evidence against it (0 vs 56 bindings; 10/19 edges) stands. (DI-04 §7 HOLD/ADOPT)
+### 2.2 The code is broken exactly when the map is needed most
+- The tool is for cross-cutting change. Halfway through extracting a trait, forty files fail to type-check and the resolver's answers degrade across the whole blast radius. The intended map is the only stable thing in the room.
+- Level 1 and the public skeleton need no type-checker, so they stay up on a file that does not compile. Only resolution degrades — and the banner says by how much: "97 % exact, 3 % unresolved; while broken, 9 more edges unresolved."
+- The claim is not that a syntax parser can index broken files; several tools do that. The claim is that the intended map and the degradation of the actual map live on the same diffable object, so `verify` still answers mid-refactor. No fallback model is required for this; the model is a later rung for keeping resolved edges alive when the resolver cannot.
 
 ### 2.3 The absolute claim is false; the combination claim is true and has one killer piece
-- Each piece exists somewhere: cargo-modules (file graph), cargo-public-api / cargo-semver-checks (public surface), Serena (LSP over MCP), Aider repo map (ranked graph in a token budget), RA non-Cargo projects. (GLM §2; DI-04 §7)
-- Nobody ships exact Rust edges + budgeted agent queries + current/proposed distinction + per-edge provenance. The before/intended/after conformance report exists nowhere. Under openness, add: nobody publishes the compiler-exact Rust graph corpus or a per-crate graph feed. (DI-04 §7, §10.8)
+- Each piece exists somewhere: module graphs, public-API diffs, LSP-over-MCP symbol navigation, ranked repo maps within a token budget, resolver support for non-Cargo projects.
+- No one ships exact Rust edges plus budgeted agent queries plus the current/intended distinction plus per-edge provenance. The before/intended/after conformance report exists nowhere. The compiler-exact Rust graph corpus and the per-crate graph feed exist nowhere. Those absences are verifiable and cheap to fill.
 
-### 2.4 Openness answers the hardest personas; engineering answers the rest
-- Dissolved by openness: RA contributor (licence-compatible, `codemap` export offered upstream), CTO (single static binary, zero egress, auditable), ML researcher (citable repo-disjoint data), HN ("weekend project" → "nice benchmark"). (DI-04 §10.3)
-- Not touched by openness: the 300k-LOC maintainer (proc macros, re-extract latency), the harness builder (their own logs), the newcomer (`where do I even start`). Only a clean run, sub-second incremental re-extract and a three-arm A/B convert them. (DI-04 §4, §6, §10.3)
-- New personas created by openness: crate authors (licence passthrough, correction channel) and contributors (documented schema and plugin points before v1). (DI-04 §10.3)
+### 2.4 Who is convinced by what
+- **Convinced by openness alone**: the rust-analyzer contributor (licence-compatible, exporter offered upstream), the CTO (single static binary, no egress, auditable), the ML researcher (citable repository-disjoint data), the skeptic who calls it a weekend project (the artefact is runnable and the guesses have a public scorecard).
+- **Convinced only by engineering**: the maintainer of a 300k-line workspace (proc macros on, re-extract in seconds, one `impact` answer that grep gets wrong), the harness builder (an A/B in their own logs), the newcomer (one command, `where do I even start`, that works on broken work-in-progress with no configuration).
+- **Created by openness**: the crate author who finds their crate in the feed (licence passed through, a correction channel) and the contributor who wants to add a query or an edge kind (schema and plugin points documented before the first release).
 
-### 2.5 The honest negatives are already in the record
-- Frontier models omitted 6 of 14 signature dependencies; source-only agents found 10/19 local edges; the learned-binding experiment accepted 0 bindings where a rule accepted 56; 65 % of calls are method calls whose receivers need other items' return types. (Parts 1–3; DI-04 §6 persona g)
-- Therefore: no model in the demo, no model in v1, H-46 stays a ladder with a stop rule. (DI-04 §5, §7)
-
----
-
-## Key line 3 — WHAT TO DO FIRST: three signals, three tools, corpus before model
-
-### 3.1 Run the three cheapest signals before writing more documents
-```text
- 1. three-arm pilot: baseline agent · +map (no model) · +map+model, 3 unseen repos, equal token budget
-       arm 1 ≈ arm 2 on correctness → navigation is a feature, not a product         ~1 week, $0 training
- 2. intent authoring: on real disputed work, do two maintainers produce a SECOND graph patch unprompted?
-       no → Timeline B collapses to navigator + reviewer                              one design cycle
- 3. H-46 ladder rung 2 (10 M tokens; ~2 h Mac or 1.5 min H100): held-out curve vs the 56-binding rule
-       flat or below → keep rules, stop training                                      one afternoon
-```
-(DI-04 §8; GLM §5)
-
-### 3.2 Ship three tools, not a protocol
-- `find` (the seven-event retrieval is its internals), `impact`, `verify` (achieved / missing / unexpected / unresolved). Advisory report only; no merge gating until seeded-mismatch recall is measured. (DI-04 §7; GLM §6)
-- The 90-second demo: banner with provenance at 0:00; `find` → `propose` → agent edits → build breaks → `verify` still answers with the unresolved count → fix → `verify` green → `report` with a reproducibility line (`pt verify --at <sha> --extractor v0.3`). (DI-04 §5, §10.6; GLM §4)
-- Technical prerequisites, none of which need the model: L1+L2 extraction on non-compiling files; stable item identity across rename/move (Part 2 §5, unsolved); a graph-patch format the LLM emits and the CLI diffs; incremental re-extract fast enough to run on every save. (DI-04 §5)
-
-### 3.3 Publish the corpus and the feed before any model claim
-- They are the cheapest verifiable "nobody has this"; they are the paper the ML persona asked for; they neutralise GLM death mode #2 (the model is optional once the benchmark is the deliverable) and reclassify "RA ships agent mode" as mission success. (DI-04 §10.2, §10.8)
-- Requirements: permissive-only sources with per-record repo/commit/licence/extractor-version; signed feeds with MISP-style distribution levels and warninglists; RA version pinned per release with a conformance suite in CI; `last_seen` so staleness is shown, never hidden. (DI-04 §10.4, §10.5)
-- CHECK before publishing: Z.ai terms on redistributing GLM-written L6 labels; keep that layer separately licensed until verified. (DI-04 §10.4)
-
-### 3.4 What not to do
-- Do not lead with the model or the 100 MB gate (a leaderboard column, not a product requirement). (DI-04 §7, §10.8)
-- Do not make comments/imports/globals graph nodes. (DI-04 §7)
-- Do not claim "neither rust-analyzer nor any MCP can do this"; say "nobody ships the combination". (DI-04 §7)
-- Do not delete history to look tidy: one canonical page (thesis §13 / this document) plus the collected DI-01 as changelog. (DI-04 §7 HOLD)
-- Do not treat anything in GLM's or Devin's reception tables as market evidence; they are attributed opinions in the opinion layer. (DI-04 §6 preamble, §8)
+### 2.5 The negatives are already on the record and shape the order of work
+- Frontier models asked to draw signature dependencies omitted six of fourteen; agents working from source alone found ten of nineteen local edges; a learned binding model accepted zero bindings where a rule accepted fifty-six. An omitted edge looks like independence, which is the most dangerous output a structural tool can produce.
+- Therefore no model is in the demo and no model is in version one. The model is a ladder with a stop rule, run after the corpus exists.
 
 ---
 
-## Residual risk that no key line removes
-**Nobody authors the intended map.** UML, ArchUnit tests and design docs were all rejected as ceremony; openness does not change that. The only mitigation is that the agent drafts the patch from the PR text and the human merely approves; signal 3.1-2 is the test. If it fails, the product is a navigator plus reviewer — a utility, not a company — and the corpus/feed/benchmark are still worth having. (DI-04 §7, §10.8; GLM §5)
+## 3. The order of work: corpus, three tools, then the model — gated by three signals
+
+### 3.1 Three signals, each cheap, each able to kill a branch of the thesis
+```text
+ 1. three-arm pilot on three unseen repositories, equal token budget:
+      baseline agent · agent + map without model · agent + map + model
+      if the first two arms tie on correctness, navigation is a feature, not a product      ~1 week, no training
+ 2. intent authoring on real disputed work:
+      do two maintainers produce a SECOND graph patch unprompted?
+      if not, the planning tense collapses and the product is a navigator plus a reviewer   one design cycle
+ 3. model ladder, second rung (10 M tokens, an afternoon):
+      held-out curve against the rule baseline; flat or below → keep rules, stop training   one afternoon, < $1
+```
+
+### 3.2 Three tools, not a protocol
+- `find` — seven words in, four candidate entities out, each with its public anchor, paths, blast radius and a bounded neighbourhood under a token budget. The retrieval protocol is its internals, not its interface.
+- `impact` — callers, implementors, constructors, cfg-gated call sites, with file and line, and the coverage envelope printed on every answer.
+- `verify` — the intended patch against the as-built graph: achieved, missing, unexpected, unresolved. Advisory only; it blocks no merge until its recall on seeded mismatches is measured.
+
+### 3.3 The ninety-second proof
+```text
+  0:00  map      banner: crates, files, public items; % exact; % unresolved and why; extractor + resolver version; feed crates loaded
+  0:10  find     "where do retries get decided"  →  four candidates; picks one; neighbourhood under budget; blast radius
+  0:25  propose  "make retry policy pluggable behind a trait"  →  graph patch on screen; human approves
+  0:40  edit     halfway, the crate does not compile
+  0:50  verify   still answers: intended 3 · achieved 2 · missing 1 · unexpected 1 · 9 edges unresolved while broken
+  1:10  fix      build green; verify: 3 of 3, nothing unexpected
+  1:25  report   before / intended / after, with a reproducibility line anyone can re-run at that commit and extractor version
+```
+- Prerequisites, none of which need a model: level-1 and level-2 extraction on non-compiling files; stable item identity across rename and move; a patch format the agent emits and the tool diffs; incremental re-extraction fast enough to run on every save. Identity and re-extraction latency are where the demo dies first.
+
+### 3.4 Publish the corpus and the feed before any product or model claim
+- Permissive-licence sources only, with repository, commit, licence and extractor version on every record. Signed feeds with distribution levels and warninglists. The resolver version pinned per release, with a conformance suite in CI. A last-seen stamp on every edge so staleness is shown, never hidden.
+- Semantic labels written by a large model live in their own layer with their own licence, checked before publication.
+
+### 3.5 What is deliberately not done
+- No model-first story. No memory gate as a product requirement — it is a leaderboard column.
+- No comment, import or global as a graph node.
+- No claim that nothing else can do any of this; the claim is that nobody ships the combination, and nobody publishes the corpus or the feed.
+- No deletion of earlier research to look tidy: one canonical page, and the collected record as the changelog.
+- No reception table treated as market evidence; the market evidence is the three signals.
 
 ---
 
-## Appendix A — where each DI-04 section landed in the pyramid
+## The one risk the thesis does not remove
 
-```text
- DI-04 §0 founder's statement        → Introduction (Situation / Question)
- DI-04 §1 one big thing              → Governing thought; 1.1
- DI-04 §2 broken code is the hinge   → 2.2
- DI-04 §3 two levels                 → 1.2
- DI-04 §4 Devin's reception          → 2.4 (grouped by argument, not by persona)
- DI-04 §5 90-second demo             → 3.2
- DI-04 §6 GLM-5.3 verbatim           → 2.3, 2.4, 2.5, 3.1 (as attributed opinion); full text stays in DI-04
- DI-04 §7 agree / disagree table     → 1.2, 2.2, 2.3, 3.4
- DI-04 §8 three cheapest signals     → 3.1
- DI-04 §9 ELI5 + Sikos               → 1.1, 1.3
- DI-04 §10 full openness             → 1.4, 2.4, 3.3, Residual risk
-```
-
-## Appendix B — the pyramid as a reading order for different readers
-
-```text
- 30 seconds   Introduction → governing thought
- 3 minutes    + the three key-line headings and 3.1
- 15 minutes   + every numbered leaf
- the evidence  DI-04 (verbatim GLM review, full tables) → collected DI-01 Parts 1–5 → thesis §13 → ledger H-1…H-59
-```
+**Nobody writes the intended map.** Every earlier form of architectural intent — diagrams, architecture tests, design documents — was rejected as ceremony. Openness does not change that. The only mitigation is that the agent drafts the patch from the work already described in the pull request and the human merely approves. Signal 2 is the test. If it fails, the product is a navigator and a reviewer — a utility, not a company — and the corpus, the feed and the benchmark are still worth having built.
