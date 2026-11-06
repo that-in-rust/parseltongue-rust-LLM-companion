@@ -339,10 +339,13 @@ Embedded databases with graph capability exist and should sit behind the same tr
  option                 what it is                                              embedded how            licence       status
  ─────────────────────  ──────────────────────────────────────────────────────  ──────────────────────  ────────────  ──────────────────────────
  SQLite + FTS5          relational; k-hop by recursive CTE; trigram + FTS       in-process, one file    public domain the default; nobody asks why
- SurrealDB              multi-model document-graph; RELATE edges and record     in-process via the      BSL 1.1 →     active (v3, 33k stars);
-                        links; graph traversal (->edge->node) and full-text     Rust SDK: in-memory,    Apache-2.0    not OSI-approved today —
-                        in SurrealQL; vector index                              RocksDB or SurrealKV    on a timer    fine as a dependency of an
-                                                                                engine, no server                     Apache/MIT tool, worth saying
+ SurrealDB              multi-model document-graph; RELATE edges and record     in-process via the      BSL 1.1 →     active (4.0 on crates.io,
+                                                                                                                      33k stars);
+                        links; graph traversal (->edge->node) and full-text     Rust SDK: in-memory     Apache-2.0    not OSI-approved today —
+                        in SurrealQL; vector index                              or SurrealKV engine     on a timer    fine as a dependency of an
+                                                                                (kv-mem · kv-surrealkv;               Apache/MIT tool, worth saying
+                                                                                RocksDB engine dropped),
+                                                                                no server
  DuckDB + DuckPGQ       columnar SQL + SQL/PGQ graph pattern matching           in-process              MIT           active
  LadybugDB (Kùzu fork)  property graph, Cypher, vector + full-text              in-process              MIT           Kùzu archived Oct 2025;
                                                                                                                       fork active
