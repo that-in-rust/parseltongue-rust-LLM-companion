@@ -197,15 +197,60 @@ Retain cold-start latency, low memory, offline operation, and usefulness on part
 
 The [semver experiment](../experiments/public-interface-semver/README.md) gives a concrete warning: source-only agents identified all seven exported nominal types and thirteen public inherent methods in that assignment, but found only ten of nineteen scored local field/signature dependencies. That is evidence of omissions in a narrow experiment, not a general model accuracy estimate.
 
-## 7. Product options and recommendation
+## 7. Four product timelines and recommendation
 
-| Option | Value | Limitation |
-| --- | --- | --- |
-| Read-only navigation map | Faster grounded orientation and dependency lookup | Does not capture architectural intent |
-| Navigation plus design workspace | Propose contract changes and verify implementation against intent | Requires stable mapping, proposal semantics, and useful comparison |
-| Autonomous architecture generator | Attempts end-to-end design selection and implementation | Adds an unvalidated architecture-quality problem and much greater trust burden |
+The choice is not "tiny model versus CLI." It is which repeated job makes their combination valuable. All four paths retain file dependencies, interface dependencies, source mappings, and separate current/proposed maps. They are conditional scenarios, not market forecasts or a plan to build four products simultaneously.
 
-Recommend the second as the product direction, with navigation as its first usable increment. This keeps both current and future maps in view without making autonomous design quality a prerequisite for usefulness.
+### 7.1 Timeline A: the local navigator
+
+**Combination: tiny model + CLI + MCP.** Help a coding agent navigate unfamiliar Rust code. The model contributes bounded graph records or missing-binding proposals; the host manages source evidence, queries, and updates.
+
+In week one, compare real navigation tasks with and without the graph and learned additions. In month one, package useful navigation. In the first quarter, look for repeat use on unfamiliar repositories. If this works, Parseltongue could become a routinely installed Rust companion over the following year.
+
+The main risk is fewer tokens but worse answers. Users abandon it if checking the map costs more effort than exploring the source. Daily use can be low-ceremony, but the builder inherits installation support, extraction edge cases, and freshness problems. A meaningful success signal is voluntary return usage with preserved or improved task correctness.
+
+### 7.2 Timeline B: the design workspace
+
+**Combination: current map + proposed map + implementation verification.** Start with a real refactoring, such as separating storage from parsing. The coding LLM proposes interface and dependency changes; the maintainer approves them before implementation.
+
+In week one, compare alternatives for one disputed boundary. In month one, complete a before/intended/after cycle. In the first quarter, test repeated use across cross-cutting changes. Over a year, accepted proposals and their implementation outcomes could become useful design history.
+
+The main risk is another document nobody maintains. The decisive signal is a maintainer voluntarily creating a second proposal. This path costs more attention before coding, but may reduce late-stage disagreements and rewrites. The tool must allow evidence from implementation to improve the design, not merely label every deviation as disobedience.
+
+### 7.3 Timeline C: the intent-aware reviewer
+
+**Combination: graph deltas + CLI/CI + a small learned assistant.** Start after a change exists. Show changed contracts, new dependencies, affected consumers, and discrepancies from approved intent. When no approved intent exists, provide a descriptive change report rather than invent an authoritative plan.
+
+In week one, replay real PRs and deliberately seeded mismatches. In month one, produce advisory reports with evidence links. In the first quarter, test reviewer retention and introduce only narrowly scoped, validated checks. Over a year, this could become a reliable change-review companion.
+
+The main risk is another noisy review bot, or false reassurance from an incomplete graph. A small model may improve coverage or rank findings, but its conclusions should not automatically block merges. Success means reviewers repeatedly act on useful findings; failure means notification fatigue and repeated manual corrections.
+
+### 7.4 Timeline D: the reusable graph component
+
+**Combination: specialized model + runtime + SDK, with a reference CLI.** Make the graph generator reusable inside other coding tools. Model artifacts, evaluation data, and a stable record format become distribution assets.
+
+In week one, freeze a narrow task, record schema, and memory boundary. In month one, test generalization on fresh crates. In the first quarter, work with independent tool builders on their own workloads. Over a year, retained integrations could make the component useful infrastructure rather than a one-off demonstration.
+
+The main risk is months of research without integration demand. This is the most model-centered path and the highest-uncertainty starting point under current evidence. The builder spends more time on data, runtimes, licenses, and compatibility; an external integration that becomes worse when the component is removed is a stronger signal than downloads alone.
+
+### 7.5 Cross-timeline comparison
+
+| Path | Strongest opportunity | Critical uncertainty | Reversibility |
+| --- | --- | --- | --- |
+| A: Navigator | Frequent daily use | Does it improve actual coding tasks? | High: graph and runtime support the other paths |
+| B: Design workspace | Closest to the full CODEMAP thesis | Will teams record intent before implementation? | Medium-high if proposal records stay portable |
+| C: Reviewer | Concrete, inspectable review value | Can useful findings outweigh noise? | High for the graph/diff core; lower for CI-specific work |
+| D: Graph component | Reuse across agent products | Does learned capability generalize and earn integrations? | Medium: data and runtime remain useful, bespoke training may not |
+
+### 7.6 Decision filter
+
+Recommend **A with one small B/C loop**, not four simultaneous products: navigate the current map, propose one structural change, implement it, and inspect whether the resulting map matches the proposal. Navigation is the first usable increment; current-to-future design remains the product direction.
+
+Evaluate three configurations on comparable tasks: the normal coding agent, the agent plus graph tooling, and the same tooling with the tiny model enabled. This separates the graph's value from the model's incremental value. Keep candidate retrieval and validation comparable between the latter two configurations.
+
+Move toward B when maintainers repeatedly plan with the map, toward C when they repeatedly use its review report, and toward D when independent tool builders retain the component. If learned additions disappoint, narrow the learned task and report the result; a tool-only success does not validate the model hypothesis.
+
+The sub-100 MB CPU target remains explicit, but model-process memory must not be confused with whole-application memory. The detailed evidence, scenarios, failure branches, and pilot gates are in [Deep Insight 03](Deep-Insight-03.md).
 
 ## 8. First experiment and success criteria
 
@@ -225,7 +270,266 @@ No weighted aggregate should conceal a loss of correctness behind token savings.
 
 The strongest early signal is not praise for a diagram. It is repeated use on real changes because the map makes the correct next action easier and the resulting change easier to review.
 
-## 9. Sources, decisions, and open questions
+## 9. ELI5: a map, a plan, and a check
+
+**Parseltongue helps an agent see how Rust code connects,
+plan a change, and check whether the code followed the plan.**
+
+Think of a large codebase as a workshop with many labeled
+drawers. The map shows which drawers matter and which parts
+fit together. It does not replace opening a drawer when you
+need to inspect the actual part.
+
+This is a proposed product, not a claim that every part is
+already built. The tiny model helps with a narrow map task;
+it does not need to be a general-purpose coding assistant.
+
+### 9.1 Two levels: where things live and what connects
+
+The file view tells you where to look. The interface view
+tells you which named contracts create the connection.
+
+```text
+FILE VIEW
+
++------------------------+
+| checkout.rs            |
++------------------------+
+            |
+            | depends on
+            v
++------------------------+
+| order.rs               |
++------------------------+
+
+INTERFACE VIEW
+
++------------------------+
+| Checkout::submit       |
++------------------------+
+            |
+            | takes a parameter of type
+            v
++------------------------+
+| Order                  |
++------------------------+
+
+SOURCE MAPPING
+
+checkout.rs
+  +-- Checkout::submit(order: &Order)
+
+order.rs
+  +-- Order
+```
+
+An interface is a contract another part of the system can
+use. Here the signature tells us that submitting needs an
+Order. It does not tell us which methods submit calls.
+
+Some contracts are visible only inside a crate or module.
+The map labels that scope instead of calling all of them
+externally public. Private code can still create important
+connections underneath the simple view.
+
+### 9.2 Two directions: follow a need or find its users
+
+The same arrow supports two different questions. Reading
+it backward does not create a new kind of dependency.
+
+```text
+Checkout::submit --parameter_type--> Order
+
+FORWARD: start at Checkout::submit
+  "Which types does this signature need?"
+  Answer: Order
+
+BACKWARD: start at Order
+  "Which signatures mention this type?"
+  Answer here: Checkout::submit
+
+ZOOM IN: follow the source mapping
+  "Show me the declaration and its evidence."
+```
+
+For a larger repository, the answer may be incomplete.
+The tool must say whether results were cut off, analysis
+failed, or some source was outside its supported scope.
+
+### 9.3 The small model and the tool have different jobs
+
+The model proposes answers to small graph questions.
+Ordinary code manages files, records, checks, and queries.
+The coding agent uses the result to do the larger task.
+
+```text
++------------------------+
+| CLI + graph engine     |
++------------------------+
+            |
+            | asks a bounded question
+            v
++------------------------+
+| Tiny local model       |
++------------------------+
+            |
+            | proposes graph records
+            v
++------------------------+
+| Evidence checks        |
++------------------------+
+            |
+            | keeps claim status explicit
+            v
++------------------------+
+| Queryable CODEMAP      |
++------------------------+
+            |
+            | supplies a small neighborhood
+            v
++------------------------+
+| Your coding agent      |
++------------------------+
+```
+
+This shows the learned path. Source-backed records can
+also enter the map without going through the model.
+Evidence checks may leave a proposal unverified; they
+cannot magically make every answer true.
+
+The small model's memory is only part of the bill. Files,
+graph storage, runtime buffers, and any resolver processes
+must be measured too. A small download is not proof of a
+small whole-application memory footprint.
+
+### 9.4 A plan is not the same thing as reality
+
+Suppose checkout currently knows about one database.
+We want it to use a shared storage contract instead.
+
+```text
+BEFORE: what the old code shows
+
+  Checkout --depends_on--> PostgresStore
+
+INTENDED: what we agree to build
+
+  Checkout      --depends_on--> OrderStore
+  PostgresStore --implements--> OrderStore
+
+AFTER: what the changed code actually shows
+
+  Extract again. Do not copy the intended arrows.
+```
+
+OrderStore is a proposed trait in this example. The goal
+is to support another backend, not simply to add boxes.
+For a single-backend product, the extra trait might be
+unnecessary. The goal determines whether it is useful.
+
+```text
++------------------------+
+| Before map             |
++------------------------+
+            |
+            | discuss a scoped change
+            v
++------------------------+
+| Approved intended map  |
++------------------------+
+            |
+            | implement and re-extract
+            v
++------------------------+
+| Actual after map       |
++------------------------+
+            |
+            | compare with before and intent
+            v
++------------------------+
+| Change report          |
++------------------------+
+
+The report separates:
+  Achieved       The intended change is present.
+  Missing        The intended change is absent.
+  Unexpected     Something else changed in scope.
+  Unverifiable   Available evidence cannot decide.
+```
+
+Only classify something as missing when the supported
+analysis can establish that absence. An unknown is not
+a failure or a success. Tests and code review still
+check behavior the map does not describe.
+
+### 9.5 Four products can use the same foundation
+
+These are four starting jobs, not four required apps.
+
+```text
+CODEMAP + small model + host tool
+  |
+  +-- A. NAVIGATOR
+  |     "Help me find the right code."
+  |
+  +-- B. DESIGN WORKSPACE
+  |     "Help me plan different connections."
+  |
+  +-- C. REVIEW COMPANION
+  |     "Show whether the change matches the plan."
+  |
+  +-- D. REUSABLE COMPONENT
+        "Let my coding tool build this map too."
+```
+
+A gets daily navigation feedback. B tests whether teams
+will plan with the map. C tests whether reviewers find
+the changes clearer. D tests whether other builders
+need the model and runtime inside their own products.
+
+### 9.6 Start with one complete, small loop
+
+The recommendation is A plus one small piece of B and C.
+Do not build a whole design environment to test the idea.
+
+```text
+1. Find the relevant code.        [A: navigate]
+                |
+                v
+2. Agree on one graph change.     [B: plan]
+                |
+                v
+3. Implement and extract again.   [ordinary coding]
+                |
+                v
+4. Compare intent with reality.   [C: review]
+```
+
+Test the model separately from the map. Compare the same
+agent using normal tools, the graph tool without learned
+additions, and the graph tool with the model enabled.
+
+If the map helps but the model does not, that is useful
+learning. It is not proof that the model succeeded.
+
+### 9.7 Legend and reading notes
+
+```text
+Box              A component or named code item.
+Labeled arrow    The specific relationship or action shown.
+Source mapping   Where to inspect the underlying code.
+Observed         Supported by evidence for this snapshot.
+Hypothesized     A claim about today that needs checking.
+Intended         A choice about tomorrow, not today's fact.
+```
+
+The diagrams are simplified teaching examples. An arrow
+does not imply a runtime call unless it says so. A graph
+that matches the plan does not prove the program is safe.
+
+**See the connections. Agree on the change. Check the code.**
+
+## 10. Sources, decisions, and open questions
 
 Repository evidence:
 
