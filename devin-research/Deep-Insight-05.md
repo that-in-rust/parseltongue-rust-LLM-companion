@@ -308,3 +308,129 @@ If a behaviour is not in this table, the system does not do it.
 **Nobody writes the future half of the map.** Every earlier form of architectural intent — diagrams, architecture tests, design documents — was rejected as ceremony, and openness does not change human nature. The mitigation is that writing the future is one `propose` call the agent makes anyway while planning, and the extractor can lift it from the agent's own draft. Signal 2 is the test. If it fails, the product is a navigator — a utility, not a company — and the corpus, the feed and the benchmark are still worth having built.
 
 The second risk, named rather than removed: the extractor may not reach the bar. Signal 3 tests it for less than a dollar. A proposal that can be killed for a dollar in an afternoon is a proposal worth making.
+
+---
+
+## Broad ideas — seven threads, and where I land on each
+
+*Appended after the thesis. These are the loose ends that decide whether the thesis is buildable. Each thread: what the question is, what is actually known, and a position to argue with.*
+
+### B1. The graph has to live somewhere
+
+The thesis says "store." It does not say in what. The requirement is narrower than it sounds:
+
+```text
+   must                                      need not
+   ─────────────────────────────────────    ──────────────────────────────────
+   two levels, file and public interface     deep graph algorithms at write time
+   append-only, per-snapshot records          multi-writer concurrency
+   identity lookups in microseconds           a query language the agent sees
+   k-hop neighbourhoods, k ≤ 3, bounded       distributed anything
+   one file on disk, zero services            a daemon
+```
+
+Position: **the store is a format first and a database second.** Records are content-addressed and append-only; the on-disk truth is a log of records plus a snapshot index. The database is a *view* over that log, rebuildable at any time. That decision is what lets the backend be swapped without migrating anyone's map.
+
+For the first backend, SQLite with recursive CTEs covers every query in the three verbs: two tables (`item`, `edge`) plus a `snapshot` table, k-hop by recursive CTE with a budget cut, trigram and FTS5 for search. It is embedded, one file, in every language's standard toolkit, and nobody will ask why.
+
+Embedded graph-native options exist and should sit behind the same trait, not in front of it. Kùzu — embedded property graph, Cypher, vector and full-text built in — was the obvious candidate and was archived in October 2025; a community fork (LadybugDB) is active. CozoDB is embedded, Datalog, relational-graph-vector, and has been quiet since late 2024. DuckDB with the DuckPGQ extension gives SQL/PGQ graph pattern matching over columnar storage and is actively developed. Each is worth a benchmark on the one query that matters — blast radius at depth 3 over a 10k-item crate under a token budget — and none is worth a dependency before that number exists.
+
+### B2. Shrink a big model down, or grow a small one up?
+
+The question is whether the small model should start as a *distilled and quantised* big model rather than a small model trained from scratch, because the big model already carries an approximate understanding of Rust that a from-scratch model would have to re-learn.
+
+Yes — with one correction about what "shrink" can mean.
+
+- **Quantisation alone does not get there.** Four-bit weights make a model four times smaller than sixteen-bit, not fifty times. A 7B model at four bits is still ~4 GB. Quantisation is the last step, never the strategy.
+- **Pruning plus distillation does work, but by a factor of two to four per stage, not fifty.** The published pattern is depth- and width-pruning a parent model and distilling the pruned child on a small fraction of the parent's original training tokens; small production models of 1–3B parameters have been made this way from 8B parents. The child keeps most of the parent's capability at a fraction of the cost of training it from nothing.
+- **Logit distillation from a large teacher is cheap and composable.** The large model's distribution over our corpus becomes a soft target alongside the compiler's hard labels. The compiler says *what* the edge is; the big model's distribution says *how a Rust-literate reader hesitates*, which is exactly what abstention needs.
+
+So the realistic path is not "take a 70B model and nuff it down to 100 MB." It is: **start from the smallest existing code-pretrained model with the Rust prior already in it — the 0.5B–1.5B class — distil onto our compiler-labelled corpus with the big model's logits as a second teacher, then quantise.** That lands at roughly 300 MB to 1 GB on disk. Training from scratch is only cheaper if the task is narrow enough to be an encoder with heads, which is the binding-selection shape, not the extraction shape.
+
+The position, bluntly: a model with the Rust prior and 1 GB beats a model without it at 100 MB, for this task, every time. Which forces B3.
+
+### B3. Where the CPU stops being enough
+
+Two facts settle most of the argument.
+
+First, token generation is memory-bandwidth-bound: each generated token reads every weight once. Tokens per second is, to a first approximation, memory bandwidth divided by model bytes. Second, *prefill* — reading the source into the model — is compute-bound, and an extractor spends almost all of its time in prefill, because it reads thousands of tokens of Rust and emits a few hundred tokens of records.
+
+```text
+   model on disk    laptop CPU ≈ 60 GB/s        Apple-class unified ≈ 200–400 GB/s    consumer GPU ≈ 500–1000 GB/s
+   ─────────────    ─────────────────────────   ──────────────────────────────────    ─────────────────────────────
+   100 MB           bandwidth says 600 tok/s;   fine                                  overkill
+                    compute caps it lower
+   500 MB           ~100 tok/s                  ~500 tok/s                            1,000+ tok/s, and batching
+   1 GB             ~50 tok/s                   ~250 tok/s                            1,000+ tok/s, and batching
+   1 GB, prefill    a 4k-token file takes        seconds                               well under a second
+                    tens of seconds
+```
+
+These are envelope numbers, not measurements; the measurement is a one-afternoon job once a candidate model exists. But the shape is not in doubt:
+
+- Up to ~100 MB, a CPU is fine for generation and a GPU buys little. This is the encoder-with-heads regime.
+- At 500 MB to 1 GB — the regime B2 says the extractor lives in — a CPU still *works* for the interactive verbs, because `find` and `impact` do not run the extractor at all; they read the store. The extractor runs on save and on `propose`. That is where a CPU is slow and a GPU is fast.
+- Whole-workspace extraction — a million lines — is a batch job. On a CPU it is lunch; on a 1 GB-VRAM GPU it is minutes.
+
+Position: **lean into the GPU for extraction, keep the CPU as the floor for the verbs.** A 1 GB VRAM budget is the right target: it fits a 1.5B-parameter model at four bits with headroom for activations, it exists on every laptop with a discrete GPU and on every Apple machine via unified memory, and it does not exclude anyone — the CPU path produces the same records, just slower. The earlier 100 MB peak-RSS gate stays as the gate for the *verbs and the index*, not for the extractor.
+
+### B4. The CLI stores both levels, and the database is not the API
+
+The agent never sees the database. It sees three verbs. The store exposes one internal trait:
+
+```text
+   put(records) → snapshot id
+   get(id) → record
+   neighbours(id, kinds, depth, budget) → bounded subgraph
+   search(text) → candidate ids
+   proposals(region) → open proposals
+```
+
+Both levels are the same tables: a level-1 edge is `uses`/`declares_mod` between file-scoped items; a level-2 edge is `signature_uses`/`implements`/`reexports` between public items. The level is a filter, not a schema.
+
+### B5. Search: what FFF gets right, and what it does not do
+
+FFF (dmtrKovalenko/fff) is a Rust file-search engine built for AI agents and editors — fuzzy path matching with frecency and git signals, ranked for "the file the user means," and shipped as an SDK across languages. It is the right reference for the *file-level* half of `find`: it has solved ranking files the way humans and agents actually name them, and it is fast.
+
+What it does not do is the item level. Our hit is an item, not a file: `auth::session::create#fn`, with its public anchor, its folder chain and its blast radius. Position: **adopt FFF — or its ranking ideas — for the file retriever, and keep our own item retriever**: symbol trie for exact and prefix, trigram for typos, BM25 over sub-tokens of name, path and first doc line, fused by reciprocal rank. Both feed the same candidate list. The important property is that every candidate is a real id from the index, so nothing can be invented; FFF has the same property at file granularity, which is why it belongs.
+
+### B6. Queryable means "zero in," and the workflow is already written
+
+The workflow is seven events. It is the inside of `find`, restated here so this document stands alone:
+
+```text
+   1  the agent asks in ≤ 7 words                  "where do retries get decided"
+   2  four closest entities                         real ids from trie + trigram + BM25, fused
+   3  for each: the encapsulating PUBLIC interface  BFS upward until visibility ≥ crate boundary;
+      + folder chain + blast radius 1                record the via chain
+   4  curtail each to ≤ 3,000 tokens                (default: 80-token headlines; expand on demand)
+   5  show the four, ask which to open
+   6  the agent picks one · says none (page 2) · quits
+   7  deep dive ≤ 20,000 tokens                     bounded subgraph to depth 3, full source of the anchor
+                                                    and its top callers, control-flow and data-flow highlights,
+                                                    cfg context, open proposals in the region, and
+                                                    grounded example queries for the next step
+```
+
+"Zero in" is event 3. A hit inside a private function is worthless until the agent knows the public thing that encloses it and what breaks if it changes. That is the one answer grep cannot give and the one answer the agent asks for next anyway. Position: **the encapsulating public interface, the folder chain and blast radius 1 are returned with every hit, always, before anything else.** This is the core of what a codebase MCP should be, and it is cheap once the two levels exist.
+
+### B7. A conversation, not a query
+
+The agent and the tool talk. Three things follow.
+
+- **The session has state.** Candidates shown, cluster chosen, budget spent, proposals open. Event 6 is meaningless without it.
+- **The tool may ask back.** "Did you mean the trait or the impl?" "I abstained on nine receivers in this crate — the feed has signatures for `tokio@1.38`; fetch?" "Three open proposals touch this region; show them?" A tool that can ask is a tool that can stay honest under a budget instead of guessing.
+- **One wire format, two carriers.** JSON lines over stdin/stdout for any orchestrator; an MCP adapter over the same messages for editors. The verbs are the vocabulary; the session is the grammar; the dispatcher is the speaker.
+
+What the conversation is *not*: the tool does not plan, does not write code, does not decide what the future should be. It answers, it asks when it must, and it records what the LLM or the human decides. The authority matrix above is the whole contract, and the conversation never exceeds it.
+
+### The decisions these seven force
+
+```text
+   store         record log is truth · SQLite view first · graph-native backends behind a trait, after one benchmark
+   model         start from a 0.5–1.5B code model · distil on the compiler corpus with big-model logits · quantise last
+   hardware      1 GB VRAM target for extraction · CPU floor for the verbs · 100 MB RSS gate for index + verbs only
+   search        FFF-class file retriever + own item retriever · every candidate is a real id
+   zero-in       public anchor + folder chain + blast radius 1 on every hit, always
+   conversation  stateful session · the tool may ask · JSON lines + MCP adapter over the same messages
+```
