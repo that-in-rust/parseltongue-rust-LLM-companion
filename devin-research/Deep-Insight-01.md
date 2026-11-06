@@ -2570,7 +2570,30 @@ Position: **the store is a format first and a database second.** Records are con
 
 For the first backend, SQLite with recursive CTEs covers every query in the three verbs: two tables (`item`, `edge`) plus a `snapshot` table, k-hop by recursive CTE with a budget cut, trigram and FTS5 for search. It is embedded, one file, in every language's standard toolkit, and nobody will ask why.
 
-Embedded graph-native options exist and should sit behind the same trait, not in front of it. Kùzu — embedded property graph, Cypher, vector and full-text built in — was the obvious candidate and was archived in October 2025; a community fork (LadybugDB) is active. CozoDB is embedded, Datalog, relational-graph-vector, and has been quiet since late 2024. DuckDB with the DuckPGQ extension gives SQL/PGQ graph pattern matching over columnar storage and is actively developed. Each is worth a benchmark on the one query that matters — blast radius at depth 3 over a 10k-item crate under a token budget — and none is worth a dependency before that number exists.
+Embedded databases with graph capability exist and should sit behind the same trait, not in front of it. The field, as of November 2026:
+
+```text
+ option                 what it is                                              embedded how            licence       status
+ ─────────────────────  ──────────────────────────────────────────────────────  ──────────────────────  ────────────  ──────────────────────────
+ SQLite + FTS5          relational; k-hop by recursive CTE; trigram + FTS       in-process, one file    public domain the default; nobody asks why
+ SurrealDB              multi-model document-graph; RELATE edges and record     in-process via the      BSL 1.1 →     active (v3, 33k stars);
+                        links; graph traversal (->edge->node) and full-text     Rust SDK: in-memory,    Apache-2.0    not OSI-approved today —
+                        in SurrealQL; vector index                              RocksDB or SurrealKV    on a timer    fine as a dependency of an
+                                                                                engine, no server                     Apache/MIT tool, worth saying
+ DuckDB + DuckPGQ       columnar SQL + SQL/PGQ graph pattern matching           in-process              MIT           active
+ LadybugDB (Kùzu fork)  property graph, Cypher, vector + full-text              in-process              MIT           Kùzu archived Oct 2025;
+                                                                                                                      fork active
+ Oxigraph               RDF triple store, SPARQL — our records are triples      in-process, Rust        Apache-2.0    active; RDF feels foreign
+                        already (src, kind, dst)                                                                      to most contributors
+ HelixDB                graph + vector + full-text OLTP, Rust                   server-first; embed      Apache-2.0    active, young
+                                                                                story to be checked
+ CozoDB                 Datalog, relational-graph-vector, Rust                  in-process              MPL-2.0       quiet since late 2024
+ IndraDB                graph database, Rust                                    in-process              MPL-2.0       quiet since mid-2025
+ ArcadeDB · Cayley      multi-model (Java) · graph (Go)                         embeddable in their     Apache-2.0    wrong language for a Rust
+                                                                                own runtimes                          CLI; listed for completeness
+```
+
+SurrealDB is the strongest second candidate after SQLite: it is Rust, it embeds without a server, its graph edges are first-class records (an edge table with its own fields is exactly our Edge entity), and it carries full-text and vector indexes in the same engine, which would let `find`'s retrievers live in one place. Two things to say plainly: the licence is Business Source, not open source — acceptable for a dependency, not for anything we would ask contributors to fork — and its query planner's behaviour on bounded k-hop traversals under a token budget is the thing to measure, not assume. Each option is worth exactly one benchmark — blast radius at depth 3 over a 10k-item crate under a token budget — and none is worth a dependency before that number exists.
 
 #### B2. Shrink a big model down, or grow a small one up?
 
@@ -2664,7 +2687,7 @@ What the conversation is *not*: the tool does not plan, does not write code, doe
 #### The decisions these seven force
 
 ```text
-   store         record log is truth · SQLite view first · graph-native backends behind a trait, after one benchmark
+   store         record log is truth · SQLite view first · SurrealDB the second candidate · graph-native backends behind a trait, after one benchmark
    model         start from a 0.5–1.5B code model · distil on the compiler corpus with big-model logits · quantise last
    hardware      1 GB VRAM target for extraction · CPU floor for the verbs · 100 MB RSS gate for index + verbs only
    search        FFF-class file retriever + own item retriever · every candidate is a real id
