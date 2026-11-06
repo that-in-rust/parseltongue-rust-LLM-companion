@@ -1432,3 +1432,150 @@ HOW THE SIKOS PAPER (KAIS 2023, "Cybersecurity knowledge graphs") FITS
    so:   DI-04 says WHAT the object is (one map, three tenses).
          Sikos/MISP says HOW to store it so humans, LLMs and compilers can all write into it and still trust it.
 ```
+
+### 10. Proposal 01 under full openness: open-source tool, open weights, open training data
+
+*Added 2026-11-06 after the founder set the context: Parseltongue is a fully open-source tool, the fallback model ships with open weights, and the training data is published. This section re-derives §1–§9 under that assumption. It appends; it does not replace. Items marked CHECK are not verified.*
+
+#### 10.1 What openness changes in the one big thing
+
+The sentence does not change. What changes is **who can write into the map and who can audit the writer**:
+
+```text
+   CLOSED (implicit in §1–§9)                     OPEN (this section)
+   ─────────────────────────────────────────      ──────────────────────────────────────────────────────
+   one vendor extracts, stores, diffs             anyone can read the extractor; every "exact" edge is
+                                                  reproducible by running the same binary on the same commit
+   provenance = "trust our label"                 provenance = "run it yourself" — the honesty layer becomes
+                                                  checkable, not asserted
+   the fallback model is a black box              open weights + open data + open eval → the "does it lie?"
+                                                  question has a public answer per release
+   the map of std/crates.io is private to the     the map of every crate version can be a PUBLIC FEED,
+   tool                                           built once, downloaded by everyone (MISP feeds, H-59)
+```
+
+The last line is the genuinely new idea that openness unlocks. Reach (Part 1 §8) assumed the model must *memorise* std and the top crates' signatures because the resolver cannot run. Under openness the facts are **downloaded, not memorised**: a public, versioned, compiler-exact interface graph per crate@version — think docs.rs, but the graph instead of the HTML. The model then needs only the *algorithm* (binding, chaining, abstention), which is what §Q1 of the 100 MB discussion said is the small, defensible part. Reach shrinks from "model knows the ecosystem" to "model + feed".
+
+#### 10.2 The asset moves from the binary to the corpus
+
+```text
+   what is easy to copy            an MCP server over rust-analyzer   (GLM's HN persona: "a weekend project")
+   what is hard to copy            the first open corpus of compiler-exact Rust interface graphs,
+                                   repo-disjoint splits, post-cutoff held-outs, abstention labels, int4 scores,
+                                   and a public leaderboard that anyone can submit a model to
+   what compounds                  every published crate graph in the feed; every sighting/warninglist entry
+                                   a user contributes (MISP H-51/H-53); every held-out repo added after a
+                                   model's cutoff
+```
+
+This flips GLM's death mode #2 ("the tiny model never earns its seat"): in the open setting the model is **one entry on a leaderboard the project owns**, not the product. If the rule baseline (56 bindings) wins, the leaderboard says so and the project is still the benchmark everyone cites. The dataset is the paper the ML persona asked for, published before any model claim.
+
+#### 10.3 Reception, re-run under openness
+
+```text
+ persona                 §4/§6 objection                        what openness does to it
+ ──────────────────────  ─────────────────────────────────────  ─────────────────────────────────────────────────────
+ rust-analyzer contrib.  "reshipping our index; attribution?"   dissolves if licence-compatible (RA is MIT/Apache-2.0) and
+                                                                 the `codemap` exporter is offered upstream as a PR; the
+                                                                 remaining objection is semantic drift — answered by the
+                                                                 open conformance test suite pinned to an RA version
+ CTO, 40-person team     "egress, vendor, audit"                 dissolves: single static binary, no network, source
+                                                                 auditable; the new objection is "who maintains it in
+                                                                 3 years?" (see 10.4)
+ security engineer       "false assurance; build-script ACE"     stronger: the coverage envelope is code they can read;
+                                                                 the no-build mode is a documented flag they can diff
+ HN top comment          "weekend project + confident guesses"   the artefact is runnable; the guesses have a public
+                                                                 scorecard with abstention rate; the comment becomes
+                                                                 "nice benchmark" — which is the win
+ ML researcher           "distillation ceiling, contamination"   converts: repo-disjoint, post-cutoff held-outs, int4
+                                                                 scores all published; the dataset is citable
+ maintainer, 300k LOC    "will choke on my macros, go stale"     unchanged — openness does not fix proc macros or
+                                                                 re-extract latency; still converted only by a clean run
+ agent-harness builder   "why is yours the one that matters?"    slightly better: no auth, no vendor; still converted
+                                                                 only by their own logs (three-arm pilot)
+ newcomer in Cursor      "where do I start"                      unchanged — openness is invisible to them
+ NEW: crate author       (not in §4/§6)                          "my crate's graph is in a public feed — is the licence
+                                                                 respected, can I correct it?" → feed carries the
+                                                                 crate's licence + a sighting channel for corrections
+ NEW: contributor        (not in §4/§6)                          "can I add a query / an edge kind / a language?" →
+                                                                 the record schema and plugin points must be documented
+                                                                 before the first release or the project gets forks
+```
+
+Net: two of the three hardest personas (RA contributor, CTO) are mostly answered by openness itself; the maintainer and harness builder are not — they are answered only by engineering.
+
+#### 10.4 New risks that openness creates
+
+```text
+ risk                                     why it is real                                   mitigation
+ ───────────────────────────────────────  ───────────────────────────────────────────────  ────────────────────────────────────────
+ dataset licence poisoning                 training records derived from GPL / no-licence    licence filter at ingest (permissive
+                                           repos cannot be redistributed as open data        only); per-record provenance carries
+                                                                                              repo, commit, licence, extractor version
+ LLM-produced labels (L6 meaning) may       Z.ai Coding Plan / API terms on redistributing    CHECK the terms before publishing any
+   not be redistributable                  outputs or using them to train other models       GLM-written label; keep L6 labels in a
+                                           are not verified here                              separate, separately licensed layer
+ "open weights" ≠ "open model"             weights without data + eval + training recipe      publish all four; a model card that
+                                           is the industry's usual half-measure               lists held-out repos by name
+ upstream absorption                       rust-analyzer could add `codemap` export +         this is a WIN for the mission and a
+                                           agent queries; the tool becomes a thin layer       loss only for a business; the asset
+                                                                                              (corpus, feed, benchmark) survives it
+ maintainership                            tracking RA/rustc churn is a permanent cost;        pin RA version per release; conformance
+                                           an abandoned extractor silently produces stale      suite in CI; the feed's `last_seen`
+                                           "exact" edges — the worst failure in Part 2 §5      shows staleness instead of hiding it
+ public feed trust                         a poisoned or stale crate graph in the feed is       feeds are signed per extractor version;
+                                           false completeness at ecosystem scale               MISP-style distribution levels and
+                                                                                              warninglists (H-53/H-59)
+ no revenue                                a community project does not fund the three-arm    the pilot and rung-2 ladder cost < $50
+                                           pilot or the maintainer                             of compute; the maintainer is the cost
+```
+
+#### 10.5 What is explicitly open in each layer
+
+```text
+   layer                                  licence / artefact                                         why this layer
+   ─────────────────────────────────────  ─────────────────────────────────────────────────────────  ───────────────────────────
+   CLI + extractor + query engine         Apache-2.0 OR MIT (matches rustc / RA)                      drop-in for the ecosystem
+   record schema (Part 2 §2.1) + ids      versioned spec file in the repo; semver'd                   forks and plugins need it
+   exact graphs of crates.io versions     public feed, per-crate licence passed through                the Reach fix (10.1)
+   training corpus (RA-labelled)          permissive-only sources; CC-BY-4.0 or ODC-BY on the labels   the asset (10.2)
+   L6 meaning labels (LLM-written)        separate layer; licence depends on CHECK in 10.4             opinion ≠ fact (Sikos rule)
+   fallback model weights                 open weights + model card + eval harness + recipe           "open model", not half
+   benchmark + leaderboard                repo-disjoint, post-cutoff held-outs, int4 scores            the thing that outlives us
+```
+
+#### 10.6 The demo under openness (delta to §5 / GLM §4)
+
+Two frames change:
+
+```text
+  0:00  pt map .   → banner now also prints:  extractor v0.3 (rust-analyzer 2026-10-27) · std + 38 crate graphs from feed
+  1:25  pt report  → the PR description ends with a reproducibility line:
+                     "re-run: pt verify --at <sha> --extractor v0.3 → identical report"  (anyone can check it)
+```
+
+#### 10.7 ELI5 ASCII
+
+```text
+   CLOSED:   "trust us, this edge is exact."                 OPEN:   "here is the binary, the commit, the RA version. run it."
+
+   CLOSED:   the model must MEMORISE std + 100 crates.       OPEN:   the graphs of std + every crate are a public download;
+                                                                     the model only learns HOW to connect, not WHAT exists.
+
+   CLOSED:   the product is the tool.                        OPEN:   the product is the CORPUS + the FEED + the BENCHMARK;
+                                                                     the tool is how you use them; the model is one leaderboard row.
+
+   who stops objecting:   RA contributors (we are upstream-friendly) · CTOs (no egress, auditable) · ML researchers (citable data)
+   who does not care:     the maintainer with proc macros · the newcomer · the harness builder — only engineering converts them
+   new people to answer:  crate authors ("that's my crate in your feed") · contributors ("where is the schema?")
+
+   new things to get right:   licences on every training record · Z.ai label terms (CHECK) · signed feeds · an RA-version pin
+```
+
+#### 10.8 What changes in §7's verdicts
+
+- GLM death mode #2 (model never earns its seat) → **neutralised**: the benchmark is the deliverable; the model is optional.
+- GLM "rust-analyzer ships agent mode and you die" → **reclassified** as mission success; only the corpus/feed/benchmark need to outlive the tool.
+- GLM "cut the 100 MB gate" → stands; under openness the gate is a leaderboard *column*, not a product requirement.
+- GLM death mode #3 (nobody authors intent) → **unchanged**; openness does not make anyone write a blueprint.
+- §7 "nobody ships the combination" → add: *and nobody publishes the compiler-exact Rust graph corpus or a per-crate graph feed* — that absence is verifiable and, unlike the product claim, cheap to fill first.
