@@ -61,3 +61,39 @@ Everything else in the stack (rust-analyzer-backed store, search tool, seven-eve
 - Tok/s and RSS of SmolLM2-135M and Qwen2.5-Coder-0.5B on the Mac mini under MLX, int8, 2k prefill + 500 decode (10 minutes).
 - rust-analyzer cold vs with a pre-built std/deps cache on the same workspace (the fair RAM baseline).
 - The H-46 pilot for X.
+
+## 8. So what is the differentiation, really? (positioning, in the Shreyas Doshi register)
+
+**The seductive-but-wrong one-liner:** *"Parseltongue gives you a dependency map when your LSP fails."*
+
+It is seductive because it is true, measurable, and nobody else says it. It is wrong as the *headline* because it positions the product by its fallback. For the users who matter — agents inside 10 M-LOC systems code — the LSP usually does **not** fail. rust-analyzer loads. The agent's problem is not absence of a resolver; it is that the resolver hands it a keyhole (one cursor question at a time) onto 500 k items. Lead with the fallback and you have told the customer your product is for the day things are broken.
+
+**The insight most people miss:** an LSP and a dependency map are not the same product at different quality levels. They are different *shapes* of the same facts.
+
+```text
+                       LSP (rust-analyzer)                     Parseltongue
+   unit of question    a cursor position                       a concept, an item, a change
+   unit of answer      one definition / one list of refs        a bounded neighbourhood, with a token budget
+   who it is for       a human with an editor open              an agent with a context window
+   what it cannot say  "blast radius", "path from test to       — these are its first-class queries
+                        panic", "the 4 things closest to X"
+   honesty             implicit (everything is exact)           explicit per edge: exact / model / heuristic
+```
+
+**The three layers of the differentiation, in order of weight:**
+
+1. **Shape (the headline, 70 %).** The dependency map delivered as an agent-shaped, token-budgeted, queryable graph — neighbourhoods, blast radius, `via` chains, paths, clusters — over the *same exact facts* the compiler has. True on every day the LSP works, which is most days. This is grep-replacement and the seven-event protocol.
+2. **Reach (the insurance, 20 %).** Where no resolver can start — a snippet in a chat, a diff, a tree without `Cargo.toml`, Bazel/Buck, a partial CI checkout, dependencies that will not fetch — the rust-analyzer-trained student draws ~X % of the same map anyway, in ~2.5 s on a desktop GPU, with no setup and a quarter of the RAM (§3–§5 above). The product never has to answer "cannot analyse".
+3. **Honesty (the trust, 10 % of the pitch, 100 % of the adoption).** Every edge carries its provenance: resolver = exact, student/model = confidence < 1, ranking/clustering = heuristic. An LLM-built graph cannot offer this; an LSP does not need to. For an agent that will act on the map without a human in the loop, this is the property that decides whether it is used at all.
+
+**Failure modes of getting the order wrong:**
+
+- Lead with Reach → you are "an LSP for broken projects"; compared on accuracy against rust-analyzer and you lose by construction.
+- Lead with Honesty → you are a research artefact; nobody buys provenance.
+- Lead with Shape without Reach → the first time an agent pastes a snippet and gets "run cargo first", the story breaks.
+
+**The positioning statement that holds all three:**
+
+> *The dependency map of your code, in the pieces an agent can actually use — exact where the compiler can see, honest where it cannot, and still there when your LSP will not start.*
+
+**The one-sentence test of whether we have built it:** an agent that has never seen the repository asks one seven-word question and, three tool calls later, is editing the right function with its blast radius in context — and can tell you which parts of that context were proven and which were guessed.
