@@ -11,6 +11,8 @@ Part 3   2026-11-06   Four futures for a tiny-model Rust CODEMAP companion
                       (timeline-traverser exercise, committed as 894dbe0ab as Deep-Insight-03.md, kept there too)
 Part 4   2026-11-05/06  Training-time shortcuts for the H-46 student: levers, scaling ladder, ELI5 ASCII
                       (verbatim copy of Deep-Insight-02.md, kept there too)
+Part 5   2026-11-06   Product summary (four timelines + recommendation) and ELI5 walkthrough of the CODEMAP
+                      (appended upstream as b55d7451e; §10 summarises Part 3, §11 is the plain-language version of Part 2)
 ```
 
 ---
