@@ -2778,3 +2778,53 @@ What flips: on a Mac mini the cold map is an overnight batch job, not a tie — 
 rust-analyzer is memory-bound on the same machine. At ten million lines it needs the 64 GB configuration or per-crate sharding to run at all; the model needs 1–2 GB wherever it runs.
 
 Practical: the GPU path is llama.cpp over Metal or MLX. The Neural Engine is not usable for this through open tooling today; ignore the TOPS figure. The deployment shape this suggests is the obvious one — the mini holds the store and runs extraction on every push; laptops and agents read. Confidence as above. The B3 afternoon measurement on this hardware is literally: extract the 42k-line workspace on the mini and put the wall-clock next to 29 seconds.
+
+##### B8.2 Why reading is not free, and the four ways to make it so
+
+*The natural objection to B8: "we read ten million lines and output five percent of it — why is inference slow at all?" The answer is the single most useful fact about putting a model in the loop.*
+
+In a transformer, reading costs exactly as much compute per token as writing. The intuition that reading is cheap comes from grep, where a byte costs about ten operations. For a 0.5B-parameter model a token costs about a billion multiply-adds, because every input token is pushed through every weight.
+
+```text
+   grep           reads 10 M lines        ~10 ops per byte                  → about a second
+   0.5B model     reads 100 M tokens      ~1e9 ops per token (2 × params)   → 1e17 ops — the prefill number in B8
+                                           100-TFLOPS GPU ≈ 10 min · Mac mini ≈ 5 h · laptop CPU ≈ a day
+
+   output         ~20 M record tokens — a fifth of the input, not a twentieth; records are verbose —
+                  costs the SAME ops per token, plus a second tax: tokens come out one at a time, and each one
+                  re-reads the weights. Decode is bandwidth-bound unless batched. That is why a fifth of the
+                  tokens shows up as 20–60 minutes.
+```
+
+The slowness is not a flaw in the estimate. It is the price of a neural network on every token. Which points directly at the four ways to make it cheap — all of them design decisions, none of them hardware.
+
+```text
+ 1  DON'T DECODE — CLASSIFY        an encoder, not a generator. One forward pass per file; records are read off
+                                   tagged spans and their pairings. Output cost → ~0. The cold map becomes prefill
+                                   only. This is the binding-helper shape, scaled up to extraction.
+
+ 2  DON'T READ BODIES FOR L1 / L2  mod · use · pub signatures · cfg · doc comments are ~30 % of a crate's tokens.
+                                   The two visible levels need no bodies. 100 M → ~30 M tokens. Bodies are read
+                                   lazily, per region, on expansion.
+
+ 3  CASCADE — RULES FIRST          `use a::b::C;` and `pub fn f(x: T) -> U` are regular grammar. A deterministic
+                                   scanner of our own handles them and the model sees only the ambiguous sites —
+                                   method receivers, macro output, glob imports, trait dispatch. Another 3–5× fewer
+                                   model tokens, and the model's task gets narrower, which is the same thing as
+                                   easier to train.
+
+ 4  SHORT HANDLES, NOT PATHS       records refer to items by index id, not by the full
+                                   `crate::module::path::Name#kind` string. Output tokens ÷ 3–5.
+```
+
+Applied together:
+
+```text
+   L1 + L2 map of 10 M lines   ≈ 10–20 M model tokens · encoder pass · no decode
+                                 discrete GPU ≈ 2 min · Mac mini ≈ 1 h · CPU ≈ a few hours
+   L3+ (bodies, calls, flow)    stays the overnight job — and is done lazily, per region the agent actually opens
+```
+
+One caveat, stated so it is not mistaken for a reversal. Point 3 puts a deterministic pass in front of the model. That is not tree-sitter and not rust-analyzer; it is our own scanner over Rust tokens for the parts of the language where there is nothing to learn. The model earns its place on the 65 % of call sites that are method calls, not on `use` lines. A model that is asked to re-derive `use std::collections::HashMap;` is being paid to do grep's job at a billion times the cost.
+
+The corollary for B2 and B3: once the model only sees the hard sites, the token count drops by an order of magnitude and the argument for the bigger model with the Rust prior gets stronger, not weaker — the same budget buys a better reader of fewer tokens.
