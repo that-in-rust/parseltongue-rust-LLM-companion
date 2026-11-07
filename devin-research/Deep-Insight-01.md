@@ -2993,3 +2993,156 @@ Nothing changes in the entity model; this section is why it looks the way it doe
 - Sikos, L. F. "Cybersecurity knowledge graphs." *Knowledge and Information Systems* 65, 3511–3531 (2023). https://doi.org/10.1007/s10115-023-01860-3 — open access; PDF in this repository.
 - arXiv: 2406.12276 · 2408.03910 · 2410.14684 · 2503.09089 · 2503.22424 · 2505.14394 · 2505.16901 · 2507.14791 · 2510.04905 (survey) · 2603.24837 · 2607.25431 · 2608.01927 · 2608.29606 · 2611.07286.
 - STIX 2.1 specification (OASIS); MISP project documentation; W3C PROV-O; Dong et al., "Knowledge Vault" (KDD 2014); Kythe, Glean, SCIP documentation; Joern; in-toto, SLSA, Sigstore. Industry entries are from working knowledge of the systems, not re-verified for this section except STIX's Sighting and Opinion definitions.
+
+##### B9.1 The 2 GB GPU, and the Linux kernel as the yardstick
+
+*Two anchors added to B9. First: the model size for a post-trained extractor of file-level and public-interface-level dependencies that must run really fast on a 2 GB GPU. Second: the Linux kernel, pulled and counted, as the real "very large codebase" the earlier ten-million-line scenario stood in for.*
+
+**The 2 GB answer: a 100–150M-parameter encoder at int8 (~150 MB) if the post-trained model tags spans; a 0.5B-class decoder at 4–8-bit (300–500 MB) if it must generate records. Nothing above ~0.5B is "really fast" on a 2 GB card.**
+
+The budget is smaller than it looks:
+
+```text
+ 2 GB VRAM card (GTX 1050 / MX-class laptop GPU ≈ 2–4 TFLOPS FP16, 100–200 GB/s)
+   − CUDA / driver context                         ~300–500 MB   the tax nobody budgets for
+   − runtime, tokenizer, buffers                    ~100 MB
+   = usable for weights + activations / KV cache    ~1.3–1.5 GB
+
+ model                  weights     activations / KV (4k ctx)          fits?    L1/L2 speed on this card
+ ─────────────────────  ──────────  ────────────────────────────────   ──────   ─────────────────────────────────────
+ encoder 30M   int8      30 MB      ~100 MB at batch 32                 yes      ~40k tok/s   overkill; weaker binding
+ encoder 125M  int8     125 MB      ~300 MB at batch 32                 yes      ~10k tok/s   ← the sweet spot
+ encoder 400M  int8     400 MB      ~600 MB at batch 16                 yes      ~3k tok/s
+ decoder 0.5B  Q8       500 MB      KV ~12 KB/tok → 50 MB/seq, batch 8  yes      prefill ~3k tok/s · decode 300–500 tok/s
+ decoder 1.5B  Q4      ~900 MB      KV ~28 KB/tok → 110 MB/seq, batch 2 barely   prefill ~1k tok/s · decode ~150 tok/s — not fast
+ decoder 3B    Q4      ~1.8 GB      —                                   no
+```
+
+What "really fast" buys at the sweet spot, for the two visible levels only — bodies skipped (~30 % of tokens remain), rules handling `use`, `mod` and plain signatures so the model sees 10–20 % of the source:
+
+```text
+ 42k-line workspace    ~400k tokens → 60–120k model tokens → ~10 s on the 125M encoder    (rust-analyzer: 29 s, 2.3 GB)
+ one edited file       ~5k tokens → well under a second
+ 10 M lines            ~1 h as a batch
+ peak memory           < 1 GB total, constant with codebase size
+```
+
+Two caveats. Post-training a *decoder* to emit records is the natural thing to do with an existing code LLM, and 0.5B is the ceiling at which it stays fast on 2 GB; the encoder route is faster and smaller but means training heads for span-tagging and pairing rather than prompting. And a 2 GB card is bandwidth-poor, so decode-heavy designs degrade first — the B8.2 rules (classify, do not decode; short handles) matter more here than on a large GPU.
+
+**The yardstick.** torvalds/linux at `d48723711` (2026-11-06), shallow clone, counted with tokei 12.1.2:
+
+```text
+ language          code lines    comments     blanks     files
+ C                 20,146,151   2,998,278  3,887,502    37,763
+ C header           8,713,020   1,661,436    803,525    27,281
+ Device Tree        1,829,191      96,190    301,905     6,642
+ Rust                 132,651      16,341     18,201       568     rust/ tree 131k; the rest in drivers/ and samples/
+ all languages     33,386,417   4,999,539  5,465,271    90,959     43.9 M lines including comments and blanks
+
+ C + headers + Rust source    1.49 GB  ≈ 370–430 M tokens  ≈ 39 bytes per line  ≈ 10–11 tokens per line
+ public-face proxies          27,307 header files · 39,432 EXPORT_SYMBOL* · 5,669 Rust pub items
+```
+
+Three things the count settles:
+
+1. **The ten-million-line scenario was calibrated correctly.** 10–11 tokens per line measured; "10 M lines ≈ 100 M tokens" holds. The kernel is about four times that scenario — ~38 M lines of C, headers and Rust, ~400 M tokens. Every cold-map figure in B8 and B8.1 multiplies by four; per-edit and session-start figures do not move, which is the point of B8.
+2. **If the kernel were Rust** — it is not; Parseltongue is Rust-only, and the kernel's actual Rust is 133k lines, which rust-analyzer handles in about a minute — the two-level map with the cascade puts 40–80 M tokens through the model: **125M encoder on a 2 GB card ≈ 1–2 h · discrete GPU ≈ 5 min · Mac mini ≈ 20–40 min.** The full body-level map with a 0.5B generative model: discrete GPU 2–5 h, Mac mini 30 h or more, 2 GB card not viable.
+3. **The public face is tiny relative to the body.** 27k headers and 39k exported symbols against 29 M lines: the level-2 layer is a fraction of a percent of the items by count. That is why the two visible levels are cheap to extract and to hold in memory, and why bodies must be read lazily or not at all.
+
+#### B11. Five shapes the product could take — traversed as timelines
+
+*The thesis fixes what the map is. It does not fix what the product around it looks like, and for a very large codebase that choice decides whether anyone ever runs the extractor. This section does not argue by preference; it runs five plausible product shapes forward in time and compares them. Assumptions are stated. Likelihoods are judgments.*
+
+##### Decision frame
+
+- **Fork in the road:** given one map (extracted + proposed, two visible levels, provenance on every edge) and the extractor that produces it, which *product shape* do we build first for mapping very large Rust codebases?
+- **Desired outcome:** an agent working on a large Rust workspace reaches for Parseltongue instead of grep within its first session, and keeps reaching for it; the corpus, feed and benchmark exist regardless.
+- **Hard constraints:** open source, open weights, open data; no compiler, rust-analyzer or tree-sitter at runtime; the tool never authors the future half of the map; a 500 MB–1 GB extractor that wants a GPU for whole-workspace work; one or two people building.
+- **Time horizon:** week 1 · month 1 · quarter 1 · year 1.
+- **What counts as failure:** the extractor is built and nobody runs it on a large codebase; or it runs, and the agent's outcomes do not change.
+
+##### Timeline A — The CLI navigator: map lazily, answer fast
+
+- **Opening move:** ship one binary. `parseltongue map .` extracts level 1 and level 2 only, rules first, model on the ambiguous sites; bodies are extracted on first expansion of a region and cached. `find`, `impact`, `propose` read the store.
+- **Week 1:** on a 42k-line workspace the two-level map takes seconds; the agent's first `find` returns four anchors with blast radius. On a 2 M-line workspace it takes a few minutes on a laptop GPU, overnight on CPU. Early users with large workspaces ask for a progress bar and a way to map one crate at a time.
+- **Month 1:** per-crate mapping lands; the level-3 cache grows only where agents actually look, which turns out to be a few percent of the tree. The feed supplies external signatures so the extractor never reads `target/`. The first complaint is staleness after a `git pull` that touched 400 files — re-extraction on save handles edits; bulk changes need a batch pass.
+- **Quarter 1:** a watch mode re-extracts changed files in the background. The three-arm pilot runs on this shape. If the agent-plus-map arm wins on tokens and localization, the product has a reason to exist; if it does not, this shape has cost the least to find out.
+- **Long-term shape:** a utility every Rust agent harness shells out to. Low ceiling as a company, high floor as a project.
+- **Likelihood of reaching quarter 1 intact:** high — it is the smallest shape that exercises the whole thesis.
+- **Stress points:** "why is my first map taking an hour" on a CPU-only machine; identity churn across renames breaking the level-3 cache.
+- **Inflection points:** whether lazy level-3 extraction covers what agents open (if agents open everything, laziness buys nothing); whether watch mode stays under a second per file.
+
+##### Timeline B — The always-on map server: one box owns the map, everyone reads
+
+- **Opening move:** the map lives on a machine that does not sleep — a Mac mini, a CI runner, a workstation. It extracts the whole workspace once, re-extracts on every push, and serves `find` / `impact` / `propose` over a socket. Laptops and agents run a thin client.
+- **Week 1:** the full map of a 5 M-line workspace is built overnight on the box. Every developer's first query the next morning is instant. Nobody's laptop has a model on it.
+- **Month 1:** proposals from many agents land in one map; sightings accumulate; the authority matrix earns its keep because there are now several LLMs and humans writing into the same store. Someone asks who may withdraw whose proposal.
+- **Quarter 1:** the map is on the critical path of the team's agent workflow. Downtime of the box is downtime of the agents. Access control, backup and a second box appear on the roadmap, and the project is now operating a service.
+- **Long-term shape:** an internal platform; the obvious hosted-product path if one ever wanted it. The furthest from "one binary", the closest to how large organisations actually use shared code intelligence.
+- **Likelihood of reaching quarter 1 intact:** medium — the engineering is modest; the operational commitment is the risk.
+- **Stress points:** operating a service with one or two people; the cold map of a 10 M-line workspace taking a night even on a GPU; the box becoming a single point of failure.
+- **Inflection points:** whether a team exists to adopt it (it needs more than one user to be worth running); whether multi-writer semantics are designed before the second writer appears.
+
+##### Timeline C — Feed first: publish the graphs, let others build the tool
+
+- **Opening move:** run the teacher on every crate version on crates.io, publish signed per-crate graphs as a public feed, and publish the compiler-labelled corpus and benchmark. Ship the record schema and a reference reader. Build the extractor and the verbs second.
+- **Week 1:** the feed is a static site and an index. People fetch `tokio@1.38` as a graph and look at it. The first external issue is a licence question from a crate author; the second is a request for a different serialisation.
+- **Month 1:** two external projects consume the feed for their own purposes — one for documentation, one for an unrelated agent tool. Neither is Parseltongue. The corpus gets cited. The extractor is still unbuilt.
+- **Quarter 1:** the first open model trained on the corpus appears on the leaderboard — possibly not ours. The product that reads the map has a feed to lean on from day one and never has to extract `std`.
+- **Long-term shape:** the project becomes the data layer of the Rust agent ecosystem. The tool may or may not be the one most people use, and by the thesis's own statement that is mission success.
+- **Likelihood of reaching quarter 1 intact:** high — the inputs are deterministic and the work is batch; nothing depends on a model being good.
+- **Stress points:** licence filtering and takedown handling; teacher versions drifting; the long quiet period in which there is data and no demo.
+- **Inflection points:** whether anyone other than us consumes the feed in month 1 (if nobody does, the "durable asset" claim weakens); whether the leaderboard's first row is a rule-based extractor — which is fine, and will feel bad.
+
+##### Timeline D — Editor-embedded: the map lives where the code is edited
+
+- **Opening move:** an MCP server plus editor extension. The map is extracted for open files and their level-1 neighbourhood first, the rest of the workspace in the background. The agent inside the editor sees `find` / `impact` / `propose` as tools; the human sees the map's proposed edges inline.
+- **Week 1:** a newcomer in an AI editor types "where do I even start" and gets a ten-item tour of a workspace that does not currently build. This is the demo that converts in ninety seconds, and it converts people who never read a thesis.
+- **Month 1:** background extraction of a large workspace competes with the editor and rust-analyzer for the same machine. The model moves to a GPU or is throttled; on a 2 GB card the encoder route is the only one that stays responsive. Proposed edges drawn in the gutter get noticed, and get authored, because the authoring is one click away from the code.
+- **Quarter 1:** two or three editors supported, each with its own quirks; the MCP surface is stable, the extensions are a maintenance tax. Signal 2 — do people keep writing proposals — gets its best possible test here, because this is the only shape where authoring is cheap for humans.
+- **Long-term shape:** the way most individuals meet the product; the shape that competes most directly with the editor's own code intelligence.
+- **Likelihood of reaching quarter 1 intact:** medium — the UI work is open-ended and competes with the core.
+- **Stress points:** three editors, three bug trackers; the extractor and rust-analyzer fighting for memory on a laptop; the temptation to replace rust-analyzer's job rather than complement it.
+- **Inflection points:** whether the proposed-edges gutter is used by anyone twice; whether background extraction can be made invisible on a laptop.
+
+##### Timeline E — Benchmark first: a research project with a leaderboard, no product yet
+
+- **Opening move:** publish the corpus, the held-out repositories, the scoring harness and the leaderboard, with a rule-based extractor as row one. Train the ladder in public. Do not ship a product until a model clears the bar on the leaderboard.
+- **Week 1:** the harness scores the rule extractor against the compiler on twenty unseen repositories. The number is public and probably unflattering for method calls.
+- **Month 1:** rung two of the ladder is trained and scored; the result either beats the rules at a fixed wrong-edge budget or it does not. Either way the question "if the tiny model works" has a number, which is more than it has today.
+- **Quarter 1:** if a model clears the bar, every other timeline starts from a proven extractor and the product debate is purely about shape. If none does, the project pivots to the rule extractor plus feed as the runtime — still useful, no longer the bet.
+- **Long-term shape:** an open benchmark the field uses, with or without our product. The least product, the most truth.
+- **Likelihood of reaching quarter 1 intact:** high — but with the real possibility that the result ends the model bet.
+- **Stress points:** months with nothing an agent can run; the first leaderboard being won by rules; funding patience.
+- **Inflection points:** rung two's score; whether external teams submit rows.
+
+##### Cross-timeline analysis
+
+```text
+ path                upside                          downside                      reversible?   regret risk          who has to cooperate
+ ──────────────────  ──────────────────────────────  ────────────────────────────  ───────────   ───────────────────  ──────────────────────────────
+ A  CLI navigator    smallest full test of the       low ceiling; CPU users wait   fully         low — cheap to learn  one harness author willing to
+                     thesis; one binary; pilot-ready  an hour for the first map                   it's "just a utility" shell out to it
+ B  map server       instant for everyone; multi-    operating a service with      mostly        medium — effort sunk  a team with a box and a reason
+                     writer map is where the entity  two people; single point of                 into ops, not product to share one map
+                     model proves itself              failure; needs a team
+ C  feed first       deterministic; durable; others  no demo for a quarter;        fully         low — the asset       crate authors (licences);
+                     can build on it; no model risk   licence work; quiet                         outlives mistakes     one external consumer
+ D  editor-embedded  converts non-readers in 90 s;   open-ended UI; three editors; mostly        medium — UI time is   editor vendors' MCP surfaces;
+                     only shape where humans author  fights RA for laptop memory                 never recovered       a GPU in the laptop
+                     proposals cheaply
+ E  benchmark first  answers "does the model work"   nothing to run for months;    fully         low — truth is never  external teams to submit rows
+                     before anything is built on it  may end the model bet early                 regretted; patience is
+```
+
+Variance: C and E are low-variance — their outputs exist whatever the model does. A is low-variance in cost and medium in outcome. B and D are high-variance: large upside if a team or editor adopts, large sunk cost if not.
+
+The hidden coupling: **A, B and D all need the same store and the same three verbs; C and E produce what every other path consumes.** The shapes are not rivals — they are an order.
+
+##### Decision filter
+
+- **Strongest if everything goes normally:** C then A. Publish the feed and corpus while the extractor is being built (C is batch work and does not block on model quality), ship the CLI navigator the moment the two-level map is fast on a 42k-line workspace, and run the three-arm pilot on A. Everything in B and D is a thin layer over A's store and verbs — add B when a team asks for it, D when the pilot shows agents use the map.
+- **Safest if things go badly:** C and E. If the model never clears the bar, the feed, corpus and leaderboard are still the thing nobody else has, and the rule extractor plus feed is still a usable runtime behind the same verbs. No other path degrades this gracefully.
+- **The experiment that collapses uncertainty fastest:** rung two of the training ladder scored on the public harness — one afternoon, under a dollar — run before the shape debate consumes another week. Its result decides whether A's extractor is a model or a rule set; nothing about the store, the verbs, the feed or the entity model waits on it.
+
+Said in one line: **build the data first, the utility second, the service and the editor only when someone asks — and let a one-afternoon measurement, not a preference, decide what sits inside the extractor.**
