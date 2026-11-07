@@ -2865,3 +2865,131 @@ The prediction:
 One tension, stated: a 100 MB peak-RSS gate admits only the ~30M class. If meaningful classification needs 100M or more, the gate for the extractor should be about 400 MB; the 100 MB gate can stand for the index and the verbs, which never run the model.
 
 Confidence: medium on the tiers, low on the exact crossovers. The second rung of the training ladder — ten million tokens, one afternoon — run at 30M and at 125M, turns this prediction into a measurement.
+
+#### B10. What a cybersecurity paper knows about code maps that the code-map literature does not
+
+*Deep research on Sikos, "Cybersecurity knowledge graphs", Knowledge and Information Systems 65 (2023), open access, in the repository as `deep-insight-sikos-2023-cybersecurity-knowledge-graphs-KAIS.pdf`. Read against the arXiv literature on graphs for LLM agents over repositories (2024–2026) and against the industry systems that already run the pattern in production. Where a precedent was read from its abstract only, it says so.*
+
+##### The claim
+
+The paper is a survey of knowledge graphs for threat intelligence. It contains no code, no compiler and no LLM. Its contribution to Parseltongue is one pattern, stated in §1 and used in §7, that the entire code-graph-for-agents literature lacks: **a graph assembled from many sources of unequal trust, where every statement carries its source, where agreement between independent sources is the measure of correctness, and where the graph is designed to be queried with some sources switched off.** The code-graph papers have graphs. None of them has a trust model. That gap is the product.
+
+##### What the paper actually says
+
+Four kinds of knowledge graph (§1): **Type I** — a graph of the thing itself (the network, the attack paths). **Type II** — a graph of intelligence about the thing (threat data, behaviour). **Type III** — a graph that is a vocabulary (an ontology of concepts, device types, vulnerability properties). **Type IV** — *multiple, uniquely identified graphs — named graphs — connected to each other, each capturing data from a different source, for amalgamation and dimensionality reduction.* The paper writes a Type IV graph formally as `KGₙ {s p o t}`: every triple lives in a named graph that is its source, with time.
+
+Data fusion (§7): sources of different kinds and trust — scanners, intrusion detectors, firewall rules, routing messages, public datasets — are aggregated into one graph. Two things are said that matter here. *"The base score in this case has been confirmed by two independent sources … such matches indicate high likeliness of information correctness and trustworthiness."* And: *"The above representation also allows provenance or other metadata to be captured for each statement, making it possible to weight … information for incomplete, non-matching, or contradictory statements."* Federated queries then find entities that satisfy conditions across several sources at once.
+
+Reasoning (§4) and learning (§5): provenance graphs where a node's score grows with the number of alerts on the paths through it; attack graphs with probabilities on paths; a-priori labels with confidence propagated over a weighted graph to score unlabelled nodes. All of it runs over the same fused graph without writing into the source layers.
+
+Translated once:
+
+```text
+   Sikos                                   Parseltongue
+   ─────────────────────────────────────   ──────────────────────────────────────────────────────────
+   Type I   graph of the thing             extracted items and edges — the code's structure
+   Type II  intelligence about the thing   annotations · proposals — what someone says about or wants of it
+   Type III vocabulary                     the versioned node/edge kinds and tags — never written by a model
+   Type IV  named graph per source          one named graph per actor and revision: extractor@rev, binder@rev,
+                                           feed publisher, agent-LLM, human — connected by shared identities
+   per-statement provenance + time         creator · confidence · input digest · schema version · first/last seen
+   two independent sources agree           a proposed edge matched by a later extracted edge = realized;
+                                           two extractor revisions agreeing = raised confidence
+   query with sources switched off          "answer without the model layer" is a filter, not a rebuild
+   alerts raise a node's score on a path    failing tests / panics raise the score of the items on their call paths
+   a-priori labels propagated with conf.    unsafe · RustSec · untested seeds propagated to a risk lens on pub items
+```
+
+##### What the code-graph literature has, and what it lacks
+
+Every paper below builds a graph over a repository so an LLM can navigate it. Read together they settle two questions the thesis depends on, and leave one open.
+
+```text
+ work                                      year  graph it builds                           has trust model?     read from
+ ────────────────────────────────────────  ────  ────────────────────────────────────────  ───────────────────  ─────────
+ CodeNav  (arXiv 2406.12276)               2024  indexed code blocks, search + import       no                   abstract
+ CodexGraph  (2408.03910)                  2024  code graph in a graph DB; agent writes     no                   abstract
+                                                 graph queries
+ RepoGraph  (2410.14684)                   2024  repository-level line/def graph, plug-in   no                   abstract
+ LocAgent  (2503.09089)                    2025  directed heterogeneous graph — files,      no; fine-tuned 32B   abstract
+                                                 classes, functions; imports, calls,        reaches SOTA at ~86 %
+                                                 inheritance                                lower cost
+ Iterative code-graph search (2503.22424)  2025  graph searched breadth/depth under LLM     no                   abstract
+                                                 control
+ KG-based repo-level codegen (2505.14394)  2025  repository as a knowledge graph for        no                   abstract
+                                                 retrieval
+ Code Graph Model, CGM  (2505.16901)       2025  graph fed into an open LLM directly        no                   abstract
+ RepoScope  (2507.14791)                   2025  call-chain-aware multi-view context        no                   abstract
+ Partial dependency graph  (2608.01927)    2026  on-demand partial graph, not a static      no                   abstract
+                                                 global one
+ codebadger  (2603.24837)                  2026  Joern code property graph behind MCP       no                   abstract
+                                                 tools for slicing
+ CodeNib  (2607.25431)                     2026  lexical + dense + structural views of one  PARTLY — one manifest  abstract
+                                                 commit behind one manifest                 per commit; views can
+                                                                                            be checked against a
+                                                                                            rebuild or live server;
+                                                                                            "execution status is
+                                                                                            not correctness"
+ How should agents see code? (2611.07286)  2026  AST · call graph · module deps · docs ·    no (evaluation)      abstract
+                                                 hybrid, as queryable maps
+```
+
+Settled, by their numbers: **a map helps when localization is the bottleneck, and the help is mostly tokens.** The 2026 evaluation of five map workflows against a raw-tool baseline: fault localization recall@10 up from 0.717 to 0.757–0.829 with 25–39 % fewer tokens; repository-level repair resolution roughly unchanged (44.3–50.6 % against 49.0 %) with 17–26 % fewer tokens; benefits "task-dependent rather than universal." LocAgent: a graph plus a fine-tuned open 32B model matched proprietary agents at about 86 % lower cost and lifted issue resolution 12 % at Pass@10. CodeNib: handing an agent graph-derived candidates and then retiring them resolved 79 of 200 SWE-bench Verified tasks against 56 for a repository map and 66 for on-demand exploration. This is the evidence for the three verbs and for the token budget inside `find`; it is also the reason the thesis does not promise correctness gains on authoring.
+
+Settled, by their absence: **nobody carries provenance or confidence on the edges.** Twelve systems, one graph each, one source each, no statement of who produced an edge or how sure they were, no way to answer with a source excluded. Only CodeNib names the problem — an incremental index "can complete every update without error and still return the wrong graph half the time" — and its answer is a per-commit manifest and a check against a rebuild, which is a provenance mechanism for one source. The multi-source case — compiler, model, feed, agent, human writing into one map — is not in the literature at all.
+
+Open: whether the trust model changes agent outcomes, not only agent honesty. No paper has tested a map with confidence against the same map without it. That is a fourth cheap signal, and it is ours to run.
+
+##### The industry already runs the pattern — in a different field
+
+The trust layer does not need inventing. It needs porting.
+
+```text
+ precedent                        what it standardised                                  what we take
+ ───────────────────────────────  ───────────────────────────────────────────────────  ─────────────────────────────────
+ STIX 2.1 (OASIS)                 confidence on every object; Sighting as a separate     sighting record · opinion record ·
+                                  relationship ("an intelligence assertion that          confidence as a first-class field
+                                  something was seen"); Opinion object with a five-
+                                  point agree/disagree scale
+ MISP (open-source CTI platform)  sightings · proposals (ShadowAttribute) · warning-     warninglists for derive/prelude
+                                  lists of known false positives · taxonomies as        noise · machine tags as the only
+                                  machine tags · galaxies · feeds with distribution     classification · signed feeds with
+                                  levels · first_seen / last_seen · to_ids flag          distribution · first/last seen ·
+                                                                                        "actionable" flag
+ W3C PROV-O                       entity · activity · agent; wasGeneratedBy,            the shape of the provenance record:
+                                  wasAttributedTo, wasDerivedFrom                        record ← activity(model@rev, input
+                                                                                        digest) ← agent
+ Knowledge Vault (Google, 2014)   web-scale facts from many extractors; per-fact        confidence from extractor agreement
+                                  confidence from extractor agreement plus prior;       plus a prior from the feed; facts
+                                  facts never deleted, only scored                      never deleted
+ Kythe · Glean · SCIP             a schema of code facts that many indexers write        one record schema, many writers;
+ (Google · Meta · Sourcegraph)    into one store; cross-references served from facts     the extractor is a writer like any
+                                  not from a live analyzer                               other
+ Joern code property graph        one graph that merges AST, control flow and data       levels as overlays on shared ids,
+                                  flow on shared nodes                                   not separate graphs
+ in-toto · SLSA · Sigstore        signed attestations about how an artifact was          a feed entry is a signed attestation
+                                  produced, verifiable by anyone                         of a crate's graph by a named
+                                                                                        publisher with a named teacher
+```
+
+STIX and MISP are the paper's own field, and they are the proof that the pattern survives contact with adversarial, incomplete, contradictory data at scale across organisations that do not trust each other. That is a harder environment than a codebase. If per-statement provenance, sightings, warninglists and distribution levels work for indicators of compromise shared between governments, they work for edges shared between a compiler, a model and an agent.
+
+##### Why the code-graph field missed it
+
+Each system has one source — a parser, a compiler, an embedding — and one author. When there is one source there is nothing to disagree with, so provenance looks like bureaucracy. The moment there are two sources it becomes the whole question: *which edge do I believe?* Parseltongue has six writers by design — extractor, binder, ranker, labeller, feed, agent, human — and the first paper to address that situation squarely is a cybersecurity survey, because cybersecurity has had many sources from the beginning.
+
+The paper's single most transferable sentence is the one about two independent sources confirming a score. It is the mechanism behind `realized`: the agent proposed the edge, the extractor later found it, two independent actors agree, the record is now the most trustworthy kind in the map. It is also the mechanism for raising confidence without a compiler at runtime: two extractor revisions, or an extractor and the feed, agreeing on an edge is Sikos's "high likeliness of correctness" — and their disagreement is exactly what `abstained` is for.
+
+##### What this adds to the thesis
+
+Nothing changes in the entity model; this section is why it looks the way it does. Three things sharpen:
+
+1. **Named graph per actor and revision is the storage primitive**, not a tag on a record. It is what makes "answer without the model layer" a filter and what lets a model revision be retired without touching anyone else's records.
+2. **Agreement is the confidence function.** Extracted-matches-proposed, extractor-matches-feed, revision-matches-revision — each is a sighting by an independent actor. Confidence is computed from sightings, never asserted by one writer.
+3. **The fourth cheap signal**: the same three-repository pilot, with the provenance and abstention fields shown to the agent in one arm and hidden in the other. If the arm that can see them makes fewer edits on unresolved edges, the trust layer earns its place in the output, not only in the store.
+
+##### Sources
+
+- Sikos, L. F. "Cybersecurity knowledge graphs." *Knowledge and Information Systems* 65, 3511–3531 (2023). https://doi.org/10.1007/s10115-023-01860-3 — open access; PDF in this repository.
+- arXiv: 2406.12276 · 2408.03910 · 2410.14684 · 2503.09089 · 2503.22424 · 2505.14394 · 2505.16901 · 2507.14791 · 2510.04905 (survey) · 2603.24837 · 2607.25431 · 2608.01927 · 2608.29606 · 2611.07286.
+- STIX 2.1 specification (OASIS); MISP project documentation; W3C PROV-O; Dong et al., "Knowledge Vault" (KDD 2014); Kythe, Glean, SCIP documentation; Joern; in-toto, SLSA, Sigstore. Industry entries are from working knowledge of the systems, not re-verified for this section except STIX's Sighting and Opinion definitions.
