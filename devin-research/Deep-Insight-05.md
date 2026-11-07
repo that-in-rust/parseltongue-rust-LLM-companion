@@ -468,3 +468,48 @@ What the conversation is *not*: the tool does not plan, does not write code, doe
    zero-in       public anchor + folder chain + blast radius 1 on every hit, always
    conversation  stateful session · the tool may ask · JSON lines + MCP adapter over the same messages
 ```
+
+### B8. The 10-million-line prediction — tiny model on a GPU versus rust-analyzer
+
+*A prediction, not a measurement. Inputs: one measured point for rust-analyzer (42k lines, eleven crates: 29 s cold, 2.3 GB); the bandwidth and compute rules from B3; a 500 MB extractor (≈ 0.5B parameters at 8-bit, or 1B at 4-bit) running on one consumer GPU with 1 GB of VRAM budget. Ten million lines ≈ 100 million tokens of Rust.*
+
+The question people ask is "which one maps the codebase faster." That is one race out of three, and the least important one.
+
+```text
+                              rust-analyzer                             tiny model on one consumer GPU
+ ───────────────────────────  ───────────────────────────────────────  ───────────────────────────────────────────────
+ 1  FULL COLD MAP             ~1–2 h if it fits in one process;         prefill: 2 × 0.5e9 × 1e8 ≈ 1e17 FLOPs → ~10 min
+    (once per corpus,         realistically sharded per crate across    decode: ~20 M record tokens, batched → ~20–60 min
+     once per clone)          many cores; tens of GB resident; a 10 M-  total ~30–70 min; scales linearly with more GPUs
+                              line single workspace is outside its      ─────────────────────────────────────────────
+                              design envelope                           VERDICT  tie, to 2× faster.  not the win.
+
+ 2  RE-MAP AFTER ONE EDIT     salsa is incremental, but a cross-crate    only the changed file is re-read: a 500-line file
+    (a thousand times a day)  "all references" re-type-checks every     is ~5k tokens → ~1 s.  every other verb reads the
+                              body that could see the change →          persisted store → milliseconds
+                              seconds to minutes at this scale          ─────────────────────────────────────────────
+                                                                        VERDICT  model wins, 10–100×.  this is the win.
+
+ 3  SESSION START             no persisted index: the whole workspace    the store is on disk; nothing to load; mmap
+    (every editor / agent     is re-derived every start → tens of        the records and answer
+     launch)                  minutes at 10 M lines                      ─────────────────────────────────────────────
+                                                                        VERDICT  model wins by the entire cold-map time
+
+    MEMORY                    tens of GB RAM                             ~1 GB VRAM + a store on disk
+    BROKEN / NO CARGO /       degrades, or will not load                 reads it
+    SNIPPET / DRAFT
+    CORRECTNESS               exact                                      lossy; abstains; scored by the compiler off-line
+```
+
+**The prediction in one line: for a one-shot full map of ten million lines the tiny model on a GPU is roughly as fast as rust-analyzer — within a factor of two either way — and that race does not matter. The costs that dominate a codebase this size are the per-edit re-map and the per-session reload, and there a model plus a persisted record store wins by one to two orders of magnitude, because it touches one file and never re-derives.**
+
+The architectural reason, stated once: rust-analyzer *computes* the graph on demand from source, every session, and must re-compute whatever a change could invalidate. Parseltongue *stores* the graph as records and re-extracts only the file whose digest changed. One is a function; the other is a database with a function in front of it. At 42k lines the difference is a 29-second annoyance. At ten million it is the product.
+
+Two things would break the prediction:
+
+1. **If a changed file forces re-extraction of its dependants** — because the model needs their bodies to re-bind receivers — then per-edit cost grows with blast radius and regime 2 collapses toward rust-analyzer's. The feed (external signatures fetched, not inferred), the level-2 records of local items (already in the store), and abstention (say so, do not re-read) are the three mechanisms that keep the unit of work at one file. If they fail, so does the prediction.
+2. **If rust-analyzer ships a persisted on-disk index**, regime 3 closes and only regimes 2 and memory remain. That is a plausible development and would be good for everyone; the proposal should not depend on it never happening.
+
+On a CPU, for completeness: regime 1 becomes one to two days (prefill is compute-bound and a laptop CPU is roughly two orders of magnitude short of a GPU), regime 2 becomes 10–30 s per changed file, regime 3 is unchanged. The verbs never run the model, so a CPU-only user keeps every advantage except extraction speed. That is why B3 says lean into the GPU for extraction and keep the CPU as the floor for everything else.
+
+Confidence: medium on the shape of the three regimes; low on every number until the one-afternoon measurement in B3 exists. The cheapest way to raise it: extract one 42k-line workspace with a 0.5B code model on one GPU and put the wall-clock next to the 29 seconds.
