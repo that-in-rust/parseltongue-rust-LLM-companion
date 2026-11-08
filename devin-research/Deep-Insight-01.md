@@ -3138,6 +3138,112 @@ Two corollaries drive the design:
 
 In one line: **reading 400 M tokens is expensive because a model spends 250 million operations understanding each one, and 400 M × 250 M is 1e17 — a day for a laptop, half an hour for a desktop GPU, a second for grep, which understands nothing.**
 
+##### B9.7 A 2 MB model, and the three ways to a one-minute map
+
+**If the model were 2 MB.** At int8 that is ~2 million parameters → ~4 million operations per token. Same arithmetic as B9.6, new constant:
+
+```text
+ everything by model, 400 M tokens, 2 MB model
+   compute          400 M × 4 M = 1.6e15 ops
+   8 GB Air, GPU    ~1.2e12 ops/s sustained          → ~1,300 s ≈ 22 min
+   8 GB Air, CPU    4 cores ≈ 4e11 int8 ops/s        → ~70 min — no GPU needed at this size
+   desktop GPU      under a minute of compute; the run is then bound by reading and tokenising 1.49 GB (~3–5 min)
+ with the shortcuts  skip bodies (120 M tok) → ~7 min on the Air · + rules → ~2 min
+ memory              negligible; the store's page cache dominates
+
+ the ladder, Air, all 400 M tokens    grep ~1 s · rule scanner ~1–2 min · 2 MB model ~20 min · 125M ~1 day · 0.5B ~4–5 days
+```
+
+A 2 MB model is 60× cheaper than the 125M one, and a day becomes ~20 minutes — linear, as B9.6 says. The catch is what 2 million parameters can learn: the size of a classic sequence tagger. It can learn local, syntax-shaped decisions — "this token is a type name", "this `pub fn` ends here", "this `use` path maps to that item" — so it can *be* the rule scanner, learned rather than hand-written and more tolerant of odd formatting and macros than regexes. It cannot do what the 125M model is for: pick a receiver's type from context, resolve a glob import, choose between candidate targets. Our own 17 MB encoder-with-heads, eight times this size, learned zero accepted bindings. So: **a 2 MB model yields L1 + L2 in ~20 minutes for a kernel-sized codebase on a laptop, with `abstained` on everything that needs judgment — a learned scanner, not an extractor.** That is a fine first rung: the cascade's front stage, with the 125M model reserved for the 10–20 % it abstains on.
+
+**The one-minute question.** One minute on an 8 GB Air is ~7e13 GPU operations (plus ~2e13 on CPU). Divide by cost per token:
+
+```text
+ model     ops/token    tokens the Air can push through in 60 s    share of a 400 M-token codebase
+ 125M       250 M        ~280k                                      0.07 %
+ 30M         60 M        ~1.2 M                                     0.3 %
+ 2 MB         4 M        ~17 M                                      4 %
+```
+
+No model — not even a 2 MB one — can read a kernel-sized codebase in a minute on this laptop. Every one-minute method is a way of making the model read at most 4 % of the tokens. There are exactly three such ways, and they compose.
+
+```text
+ METHOD 1   FETCH, DON'T COMPUTE                                                        ~1 min, network-bound
+            The graph was already extracted by someone with time: the teacher/CI for public crates (the feed), the
+            team's always-on box for private code (B11, timeline B). The laptop downloads signed records, verifies
+            file digests against its checkout, and the map exists. Any file whose digest does not match falls through
+            to method 3. L1+L2 for a kernel-sized tree ≈ 5–10 M records ≈ a few hundred MB compressed.
+            The tiny model's role at map time: none. It runs later, lazily, on what the feed lacks.
+
+ METHOD 2   THE MODEL READS HEADLINES, NOT TEXT                                         ~1 min, compute-bound
+            A deterministic scanner (CPU, ~400 MB/s on 4 cores → 1.49 GB in ~4 s) reduces the source to the lines
+            that can carry L1/L2 facts: `mod` / `use` / `include!` / `cfg` lines and `pub …` signature lines with
+            their doc comment. In Rust that is ~2–4 % of tokens ≈ 8–17 M tokens. A 2–5 MB tagger (span tags +
+            pairing) reads exactly those → 17 M × 4 M ops ≈ 60 s on the Air's GPU.
+            Everything that needs judgment — glob imports, macro output, re-export chains — is written as
+            `abstained`, not resolved, and resolved on demand when `find` / `impact` first touches that region, by
+            the 125M model over a few thousand tokens (≈ 1 s each). The one-minute map is honest and complete at
+            L1/L2; it is not finished resolving, and the coverage banner says so.
+
+ METHOD 3   CONTENT-ADDRESSED CACHE — sccache for graphs                                ~1 min after the first time
+            Extraction results are keyed by (file content digest, model revision, schema version). Same bytes
+            anywhere → same records, fetched rather than recomputed. For a public tree a shared cache hits ~100 %;
+            for private code it hits on everything unchanged since the last map and on all vendored or dependency
+            code. The model runs only on misses: after a `git pull` touching 400 files, 400 × 5k tokens = 2 M tokens
+            → ~10 s on the 125M model, under a second each on the 2 MB tagger.
+            The first-ever map of a private tree is not a minute — it is B9.3's afternoon. Every map after it is.
+```
+
+```text
+                      first map, public code    first map, private code     every later map
+ 1 FETCH              yes — the whole answer     partial (deps, std)         same
+ 2 HEADLINES          fills the gaps             yes — the whole answer      unchanged files skip it
+ 3 CACHE              method 1 at file level     builds as you go            yes — the whole answer
+ the model's job      none at map time           2 MB tagger on ~4 % of      2 MB tagger / 125M on misses only
+                                                 tokens; 125M lazily
+```
+
+The uncomfortable corollary: a one-minute first map of a *private*, kernel-sized Rust codebase on an Air is possible only through method 2, and only because it defers judgment. A product that promised a minute and then quietly guessed at the abstained sites to look complete would be the exact failure the thesis exists to prevent. The banner — "L1/L2 complete · 6 % of sites abstained, resolving on demand" — is what makes the minute legitimate.
+
+##### B9.8 What a 30-minute base map opens up
+
+Thirty minutes on the Air ≈ 2.2e15 GPU operations (plus ~0.7e15 on CPU). In tokens:
+
+```text
+ model     ops/token    tokens in 30 min    share of 400 M
+ 125M       250 M        ~9 M                 2 %
+ 30M         60 M        ~36 M                9 %
+ 2 MB         4 M        ~540 M               135 % — the whole codebase, bodies included, with headroom
+```
+
+The first thing that opens is categorical: **at thirty minutes a tiny model can read every token, not just headlines.** Three ways to spend the budget; they are not exclusive.
+
+```text
+ SPEND A   2 MB tagger over ALL 400 M tokens (~22 min) + the remainder: 125M on the ~2 M hardest tokens
+           → L1 + L2 everywhere, AND an L3 SKELETON everywhere: every call site, construction, field access, await
+             and unsafe block recorded as a span with an unresolved target. Nothing skipped, nothing guessed.
+ SPEND B   30M model over all ~36 M L1/L2-relevant tokens (~30 min)
+           → far fewer abstentions in the base map (glob imports, re-export chains, macro items resolved); the
+             banner moves from "~6 % abstained" to "~1–2 %". No L3.
+ SPEND C   two different tiny models over the same L1/L2 sites (2 MB tagger + 30M binder, ~25 min)
+           → CONFIDENCE FROM AGREEMENT: where both produce the same edge, confidence rises; where they differ,
+             `abstained`. Sikos' "two independent sources" (B10), running on a laptop with no compiler.
+```
+
+What those unlock:
+
+1. **`impact` works at body level on day one.** With the L3 skeleton, "who calls this?" answers syntactically at once — "47 call sites name `retry_policy`: 41 resolved, 6 pending" — and the 125M model resolves the pending ones lazily, ~1 s each, as the agent touches them. Blast radius stops being an L1/L2 approximation.
+2. **Identity across renames and moves** becomes tractable: body skeletons (the shape of calls and constructions inside a function) give a second fingerprint besides the name, so a moved function keeps its id and the level-3 cache survives refactors — the demo's first death mode.
+3. **The cache is fully seeded**, so every later map — after a pull, after a branch switch — takes seconds, and the one-minute promise of B9.7 holds for everything afterwards, private code included.
+4. **Confidence without a compiler.** The map carries graded trust at runtime, not only "extracted / abstained" — the first time the provenance layer does something the agent can feel: it can skip low-confidence edges under a token budget.
+5. **Drafts map at full depth.** The agent's proposed code passes through the warm pipeline in seconds, so `propose` can accept a 2,000-line sketch and return its edges, not only its signatures.
+6. **No Mac mini needed for individuals.** "Start the map, get coffee" is acceptable for a kernel-sized tree; for real large Rust workspaces (one to three million lines) the same pipeline is 2–5 minutes — session-start territory for an agent harness.
+7. **Two extractor revisions in one run** give the leaderboard a free signal: disagreement sites are exactly the training examples the next rung needs.
+
+Recommended split: **A plus a slice of C** — the 2 MB model over everything (~22 min), then the remaining ~8 min for the 30M/125M model on the sites the tagger flagged ambiguous, recording agreement where both ran. Skeleton, seeded cache and graded confidence in one pass; B's extra resolution arrives lazily afterwards for free.
+
+Thirty minutes does not make the tiny model smarter; it makes it *complete*. At one minute the map is honest but deferred; at thirty it is honest and whole, and everything after that is seconds.
+
 #### B10. What a cybersecurity paper knows about code maps that the code-map literature does not
 
 *Deep research on Sikos, "Cybersecurity knowledge graphs", Knowledge and Information Systems 65 (2023), open access, in the repository as `deep-insight-sikos-2023-cybersecurity-knowledge-graphs-KAIS.pdf`. Read against the arXiv literature on graphs for LLM agents over repositories (2024–2026) and against the industry systems that already run the pattern in production. Where a precedent was read from its abstract only, it says so.*
