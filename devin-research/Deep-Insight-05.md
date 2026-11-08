@@ -629,6 +629,61 @@ One tension, stated: a 100 MB peak-RSS gate admits only the ~30M class. If meani
 
 Confidence: medium on the tiers, low on the exact crossovers. The second rung of the training ladder — ten million tokens, one afternoon — run at 30M and at 125M, turns this prediction into a measurement.
 
+#### B9.1 The 2 GB GPU, and the Linux kernel as the yardstick
+
+*Two anchors added to B9. First: the model size for a post-trained extractor of file-level and public-interface-level dependencies that must run really fast on a 2 GB GPU. Second: the Linux kernel, pulled and counted, as the real "very large codebase" the earlier ten-million-line scenario stood in for.*
+
+**The 2 GB answer: a 100–150M-parameter encoder at int8 (~150 MB) if the post-trained model tags spans; a 0.5B-class decoder at 4–8-bit (300–500 MB) if it must generate records. Nothing above ~0.5B is "really fast" on a 2 GB card.**
+
+The budget is smaller than it looks:
+
+```text
+ 2 GB VRAM card (GTX 1050 / MX-class laptop GPU ≈ 2–4 TFLOPS FP16, 100–200 GB/s)
+   − CUDA / driver context                         ~300–500 MB   the tax nobody budgets for
+   − runtime, tokenizer, buffers                    ~100 MB
+   = usable for weights + activations / KV cache    ~1.3–1.5 GB
+
+ model                  weights     activations / KV (4k ctx)          fits?    L1/L2 speed on this card
+ ─────────────────────  ──────────  ────────────────────────────────   ──────   ─────────────────────────────────────
+ encoder 30M   int8      30 MB      ~100 MB at batch 32                 yes      ~40k tok/s   overkill; weaker binding
+ encoder 125M  int8     125 MB      ~300 MB at batch 32                 yes      ~10k tok/s   ← the sweet spot
+ encoder 400M  int8     400 MB      ~600 MB at batch 16                 yes      ~3k tok/s
+ decoder 0.5B  Q8       500 MB      KV ~12 KB/tok → 50 MB/seq, batch 8  yes      prefill ~3k tok/s · decode 300–500 tok/s
+ decoder 1.5B  Q4      ~900 MB      KV ~28 KB/tok → 110 MB/seq, batch 2 barely   prefill ~1k tok/s · decode ~150 tok/s — not fast
+ decoder 3B    Q4      ~1.8 GB      —                                   no
+```
+
+What "really fast" buys at the sweet spot, for the two visible levels only — bodies skipped (~30 % of tokens remain), rules handling `use`, `mod` and plain signatures so the model sees 10–20 % of the source:
+
+```text
+ 42k-line workspace    ~400k tokens → 60–120k model tokens → ~10 s on the 125M encoder    (rust-analyzer: 29 s, 2.3 GB)
+ one edited file       ~5k tokens → well under a second
+ 10 M lines            ~1 h as a batch
+ peak memory           < 1 GB total, constant with codebase size
+```
+
+Two caveats. Post-training a *decoder* to emit records is the natural thing to do with an existing code LLM, and 0.5B is the ceiling at which it stays fast on 2 GB; the encoder route is faster and smaller but means training heads for span-tagging and pairing rather than prompting. And a 2 GB card is bandwidth-poor, so decode-heavy designs degrade first — the B8.2 rules (classify, do not decode; short handles) matter more here than on a large GPU.
+
+**The yardstick.** torvalds/linux at `d48723711` (2026-11-06), shallow clone, counted with tokei 12.1.2:
+
+```text
+ language          code lines    comments     blanks     files
+ C                 20,146,151   2,998,278  3,887,502    37,763
+ C header           8,713,020   1,661,436    803,525    27,281
+ Device Tree        1,829,191      96,190    301,905     6,642
+ Rust                 132,651      16,341     18,201       568     rust/ tree 131k; the rest in drivers/ and samples/
+ all languages     33,386,417   4,999,539  5,465,271    90,959     43.9 M lines including comments and blanks
+
+ C + headers + Rust source    1.49 GB  ≈ 370–430 M tokens  ≈ 39 bytes per line  ≈ 10–11 tokens per line
+ public-face proxies          27,307 header files · 39,432 EXPORT_SYMBOL* · 5,669 Rust pub items
+```
+
+Three things the count settles:
+
+1. **The ten-million-line scenario was calibrated correctly.** 10–11 tokens per line measured; "10 M lines ≈ 100 M tokens" holds. The kernel is about four times that scenario — ~38 M lines of C, headers and Rust, ~400 M tokens. Every cold-map figure in B8 and B8.1 multiplies by four; per-edit and session-start figures do not move, which is the point of B8.
+2. **If the kernel were Rust** — it is not; Parseltongue is Rust-only, and the kernel's actual Rust is 133k lines, which rust-analyzer handles in about a minute — the two-level map with the cascade puts 40–80 M tokens through the model: **125M encoder on a 2 GB card ≈ 1–2 h · discrete GPU ≈ 5 min · Mac mini ≈ 20–40 min.** The full body-level map with a 0.5B generative model: discrete GPU 2–5 h, Mac mini 30 h or more, 2 GB card not viable.
+3. **The public face is tiny relative to the body.** 27k headers and 39k exported symbols against 29 M lines: the level-2 layer is a fraction of a percent of the items by count. That is why the two visible levels are cheap to extract and to hold in memory, and why bodies must be read lazily or not at all.
+
 #### B9.2 B9.1 explained slowly, in nine steps
 
 *The same material as B9.1, walked through for a reader who does not carry the arithmetic in their head.*
@@ -973,61 +1028,6 @@ Nothing changes in the entity model; this section is why it looks the way it doe
 - Sikos, L. F. "Cybersecurity knowledge graphs." *Knowledge and Information Systems* 65, 3511–3531 (2023). https://doi.org/10.1007/s10115-023-01860-3 — open access; PDF in this repository.
 - arXiv: 2406.12276 · 2408.03910 · 2410.14684 · 2503.09089 · 2503.22424 · 2505.14394 · 2505.16901 · 2507.14791 · 2510.04905 (survey) · 2603.24837 · 2607.25431 · 2608.01927 · 2608.29606 · 2611.07286.
 - STIX 2.1 specification (OASIS); MISP project documentation; W3C PROV-O; Dong et al., "Knowledge Vault" (KDD 2014); Kythe, Glean, SCIP documentation; Joern; in-toto, SLSA, Sigstore. Industry entries are from working knowledge of the systems, not re-verified for this section except STIX's Sighting and Opinion definitions.
-
-#### B9.1 The 2 GB GPU, and the Linux kernel as the yardstick
-
-*Two anchors added to B9. First: the model size for a post-trained extractor of file-level and public-interface-level dependencies that must run really fast on a 2 GB GPU. Second: the Linux kernel, pulled and counted, as the real "very large codebase" the earlier ten-million-line scenario stood in for.*
-
-**The 2 GB answer: a 100–150M-parameter encoder at int8 (~150 MB) if the post-trained model tags spans; a 0.5B-class decoder at 4–8-bit (300–500 MB) if it must generate records. Nothing above ~0.5B is "really fast" on a 2 GB card.**
-
-The budget is smaller than it looks:
-
-```text
- 2 GB VRAM card (GTX 1050 / MX-class laptop GPU ≈ 2–4 TFLOPS FP16, 100–200 GB/s)
-   − CUDA / driver context                         ~300–500 MB   the tax nobody budgets for
-   − runtime, tokenizer, buffers                    ~100 MB
-   = usable for weights + activations / KV cache    ~1.3–1.5 GB
-
- model                  weights     activations / KV (4k ctx)          fits?    L1/L2 speed on this card
- ─────────────────────  ──────────  ────────────────────────────────   ──────   ─────────────────────────────────────
- encoder 30M   int8      30 MB      ~100 MB at batch 32                 yes      ~40k tok/s   overkill; weaker binding
- encoder 125M  int8     125 MB      ~300 MB at batch 32                 yes      ~10k tok/s   ← the sweet spot
- encoder 400M  int8     400 MB      ~600 MB at batch 16                 yes      ~3k tok/s
- decoder 0.5B  Q8       500 MB      KV ~12 KB/tok → 50 MB/seq, batch 8  yes      prefill ~3k tok/s · decode 300–500 tok/s
- decoder 1.5B  Q4      ~900 MB      KV ~28 KB/tok → 110 MB/seq, batch 2 barely   prefill ~1k tok/s · decode ~150 tok/s — not fast
- decoder 3B    Q4      ~1.8 GB      —                                   no
-```
-
-What "really fast" buys at the sweet spot, for the two visible levels only — bodies skipped (~30 % of tokens remain), rules handling `use`, `mod` and plain signatures so the model sees 10–20 % of the source:
-
-```text
- 42k-line workspace    ~400k tokens → 60–120k model tokens → ~10 s on the 125M encoder    (rust-analyzer: 29 s, 2.3 GB)
- one edited file       ~5k tokens → well under a second
- 10 M lines            ~1 h as a batch
- peak memory           < 1 GB total, constant with codebase size
-```
-
-Two caveats. Post-training a *decoder* to emit records is the natural thing to do with an existing code LLM, and 0.5B is the ceiling at which it stays fast on 2 GB; the encoder route is faster and smaller but means training heads for span-tagging and pairing rather than prompting. And a 2 GB card is bandwidth-poor, so decode-heavy designs degrade first — the B8.2 rules (classify, do not decode; short handles) matter more here than on a large GPU.
-
-**The yardstick.** torvalds/linux at `d48723711` (2026-11-06), shallow clone, counted with tokei 12.1.2:
-
-```text
- language          code lines    comments     blanks     files
- C                 20,146,151   2,998,278  3,887,502    37,763
- C header           8,713,020   1,661,436    803,525    27,281
- Device Tree        1,829,191      96,190    301,905     6,642
- Rust                 132,651      16,341     18,201       568     rust/ tree 131k; the rest in drivers/ and samples/
- all languages     33,386,417   4,999,539  5,465,271    90,959     43.9 M lines including comments and blanks
-
- C + headers + Rust source    1.49 GB  ≈ 370–430 M tokens  ≈ 39 bytes per line  ≈ 10–11 tokens per line
- public-face proxies          27,307 header files · 39,432 EXPORT_SYMBOL* · 5,669 Rust pub items
-```
-
-Three things the count settles:
-
-1. **The ten-million-line scenario was calibrated correctly.** 10–11 tokens per line measured; "10 M lines ≈ 100 M tokens" holds. The kernel is about four times that scenario — ~38 M lines of C, headers and Rust, ~400 M tokens. Every cold-map figure in B8 and B8.1 multiplies by four; per-edit and session-start figures do not move, which is the point of B8.
-2. **If the kernel were Rust** — it is not; Parseltongue is Rust-only, and the kernel's actual Rust is 133k lines, which rust-analyzer handles in about a minute — the two-level map with the cascade puts 40–80 M tokens through the model: **125M encoder on a 2 GB card ≈ 1–2 h · discrete GPU ≈ 5 min · Mac mini ≈ 20–40 min.** The full body-level map with a 0.5B generative model: discrete GPU 2–5 h, Mac mini 30 h or more, 2 GB card not viable.
-3. **The public face is tiny relative to the body.** 27k headers and 39k exported symbols against 29 M lines: the level-2 layer is a fraction of a percent of the items by count. That is why the two visible levels are cheap to extract and to hold in memory, and why bodies must be read lazily or not at all.
 
 ### B11. Five shapes the product could take — traversed as timelines
 
