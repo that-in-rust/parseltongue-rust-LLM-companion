@@ -1747,3 +1747,40 @@ By the map's own definition — where an unresolved site is a *correct* `abstain
 Two caveats survive the reframing. The recipe still matters more than the size: 100 × 40 still memorises, and held-out L3 precision will look like 98 % on the 100 and fall on repository 101 unless the input is candidates with signatures (B) and the data is breadth-first and distilled (D); the map does not change that, it makes the failure visible as coverage rather than as wrong edges — provided abstention is trained in (C). And `macro_generates` plus effective visibility through re-export chains are the L2 records most likely to sit at `abstained`, because proc-macro output is not in the text; the map allows that, so it costs coverage, not precision.
 
 The honest claim, with the map as the target: **≥ 98 % precision, coverage printed** — achievable at 100 MB. The rung-two precision-versus-coverage plot is still the one-afternoon test that turns the claim into a number.
+
+### B16. Span-first: index the public spans, derive the graph later
+
+*A tiny tagger cuts source into spans of public items and writes them into one embedded table before any edge exists; edges are derived afterwards by SQL joins, by a model on the ambiguous rows, and by the agent reading spans. The full statement is Deep Insight 07; this is the short form and why it belongs here.*
+
+**What changes**
+
+```text
+ usual order     text ──model──► edges ──► store ──► views
+ span-first      text ──tiny tagger──► spans (kind · name · path · visibility · file · range · text · digest)
+                 ──► one table ──► edges derived at query time or in the background
+```
+
+The span is the primitive; items are rows; edges are views. The leaf records of the multi-level map become spans, and the roll-ups compute unchanged. What flips is the order of work: index first, analyse later.
+
+**Why it is possible and cheap**
+
+- Public items are ~1 % of lines: a kernel-sized Rust tree is ~3 M spans and 100–300 MB of text; one file.
+- Segmentation is a 2–5 MB tagger's job — boundaries, kind, name — no binding, no judgment. Kernel-size on an 8 GB laptop in ~20 minutes; a real workspace in seconds.
+- Identity is the span digest: unchanged items are the same row across commits; a move is the same digest at a new path; an update is a row replace.
+
+**What the analysis becomes**
+
+- A `use crate::policy::RetryPolicy` and a span named `RetryPolicy` under `policy/` join into a candidate edge in one SQL statement — exact when the name is unique in scope, `inferred` with a confidence otherwise. That join is the binder's candidate list, so the model runs only on the rows the join could not settle.
+- Full-text search over span text makes `find` grounded: the agent gets the actual signature and doc comment.
+- The agent reads spans directly when that beats computing an edge — the default path, with the graph as acceleration.
+- `impact` and roll-ups materialise from the edge table as needed.
+
+**What it does not change**
+
+- The method-call problem: receivers still need typing; L3 still needs the model, still lazily.
+- Private glue: anchors need the path from a private hit to its public parent, so private items stay as light rows (kind, name, file, range, no text).
+- False positives from name joins are stored as `inferred`, never `extracted`.
+
+**Why it belongs in this thesis**
+
+It is the cheapest form of the floor product: exact at the span level, on CPU, in minutes, with the model spent only where joins stop. It also makes the three-arm pilot cheaper — the middle arm can be spans alone, before a single edge exists.
