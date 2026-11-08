@@ -1393,3 +1393,90 @@ The hidden coupling: **A, B and D all need the same store and the same three ver
 - **The experiment that collapses uncertainty fastest:** rung two of the training ladder scored on the public harness — one afternoon, under a dollar — run before the shape debate consumes another week. Its result decides whether A's extractor is a model or a rule set; nothing about the store, the verbs, the feed or the entity model waits on it.
 
 Said in one line: **build the data first, the utility second, the service and the editor only when someone asks — and let a one-afternoon measurement, not a preference, decide what sits inside the extractor.**
+
+### B12. Replacing LSP with a tiny model and a CLI
+
+*Three questions, answered in order: what the model should talk to while it finds dependencies; which deterministic, non-LSP tools can search code and where each belongs; and what "replace LSP" means request by request.*
+
+#### B12.1 Who the extractor talks to — and why it is not FFF, and Cargo is not enough
+
+**Does the model need to ask FFF many questions to find dependencies?** No — wrong oracle. FFF answers "which *file* does this name mean" (fuzzy path match plus frecency). Dependencies are discovered by *reading source*, and the question the extractor keeps asking is "where is item `X` defined, and what is its signature?" — a lookup into the store and the feed, not a file search.
+
+```text
+ model reads a file ──"candidates for `Sender`?"──►  index (trie + feed)  ──►  [tokio::sync::mpsc::Sender,
+                    ◄── picks one, or abstains ───                               std::sync::mpsc::Sender, crate::bus::Sender]
+ FFF sits one layer up: inside `find`, turning the agent's words into candidate FILES. The extractor never calls it.
+```
+
+The binder is chatty — a few lookups per ambiguous site — against an in-process index at microseconds each, so it is free. Chattiness toward a subprocess would not be.
+
+**Is Cargo enough?** Cargo gives the *crate* graph — which crates, versions, features, cfg — exact and cheap through `cargo metadata`, no build. That is level 0, above L1, and a deterministic input the extractor reads before touching any file. It gives nothing below that: no file-to-file, no item-to-item, no signatures. And it needs a manifest, so it is absent for snippets, drafts and un-manifested code.
+
+**Is rust-analyzer's problem "no agentic interface"?** Partly. Precisely:
+
+```text
+ RA HAS      LSP (agents can drive it) · `rust-analyzer scip`, a batch export of the whole definition/reference graph ·
+             near-exact answers
+ RA LACKS    a persisted store (re-derives every session) · budgeted, neighbourhood-shaped answers (LSP is one cursor,
+             one question) · a provenance/abstention vocabulary · any slot for proposed structure · operation without
+             a loadable workspace · a footprint that fits small machines
+```
+
+"No agentic interface" is the visible symptom. The cause is that rust-analyzer is a *function* that must be re-run inside a loaded workspace, and agents need a *database* they can query cheaply, write intent into, and trust by degrees. Two consequences: `rust-analyzer scip` is how the teacher labels the corpus — it already exports the graph we want learned, so the teacher pipeline is mostly plumbing; and the product's differentiation is not "RA behind MCP" (that exists) but the store, the budgeted verbs, the proposed layer, and running where RA cannot.
+
+#### B12.2 Deterministic, non-LSP code search — what exists and where it belongs
+
+```text
+ layer                   tool(s)                                 how it works                            exact?   place in Parseltongue
+ ──────────────────────  ──────────────────────────────────────  ──────────────────────────────────────  ───────  ────────────────────────────────
+ FILES by name           FFF · fzf · skim                        fuzzy path + frecency / git signals     n/a      the file retriever inside `find`
+ TEXT / regex            ripgrep · ugrep · git grep              SIMD regex over bytes, gitignore-aware  exact    the floor; ~1 s over the kernel;
+                                                                                                                  lines, not entities
+ TRIGRAM INDEX           Zoekt · Hound · Livegrep                prebuilt trigram index → instant regex  exact    the idea (our own trigram index);
+                                                                 over very large repos                            not the daemons
+ STRUCTURAL / AST        ast-grep · Comby · Semgrep (OSS)        patterns with holes matched on the      exact    excellent, but ast-grep is built on
+                                                                 syntax tree (`fn $N($$$) -> Result<$T>`)          tree-sitter → dev tool, not runtime,
+                                                                                                                  unless that rule is relaxed
+ SYMBOL INDEX, untyped   universal-ctags · GNU GLOBAL · cscope   regex-ish definitions table             mostly   what our rule scanner produces itself
+ SYMBOL INDEX, typed     SCIP via `rust-analyzer scip` · Kythe · exact def/ref graph exported as a file, exact    OFF-LINE — the teacher's labelling
+                         Glean                                   queried without the analyzer                     format
+ SEMANTIC QUERY          CodeQL (Rust supported) · Joern         code property graph + query language;   exact    needs an extractor/build pass →
+                                                                 build-shaped, slow                               teacher/judge material at most
+ RUST-SPECIFIC           cargo metadata · cargo tree ·           crate graph · module tree · public API  exact    cargo metadata at runtime (level 0);
+                         cargo-modules · rustdoc JSON ·          dump · semver diff                               the rest need a build → teacher side
+                         cargo-public-api · cargo-semver-checks
+```
+
+The runtime search stack is therefore: a ripgrep-class regex engine, an FFF-class file ranker, and our own trie / trigram / BM25 over the *records*. The first two find text and files; the third finds *entities* — `crate::mod::Item#kind` with a public anchor and a blast radius — which none of the others do. ast-grep is the one tool worth missing: structural patterns are how one would check a proposed edge ("does any `impl RetryPolicy for $T` exist yet?") without a model; the same few patterns can be written against the scanner's own spans.
+
+In one line: ripgrep finds lines, FFF finds files, SCIP finds symbols off-line, Cargo finds crates — and the gap all of them leave, a persisted entity graph with public anchors and provenance queryable under a token budget, is the product.
+
+#### B12.3 Replacing LSP, request by request
+
+The deterministic tools above are inputs, not the replacement. **The replacement for LSP is the store the tiny model fills plus the CLI verbs that read it.**
+
+```text
+ LSP request an agent makes        Parseltongue equivalent                           data produced by          gap versus LSP
+ ────────────────────────────────  ────────────────────────────────────────────────  ────────────────────────  ─────────────────────────────
+ textDocument/definition           `find <name>` → item record + span                 scanner (plain cases) ·   none for L2 items; method
+                                                                                      model (binding)           targets carry confidence
+ textDocument/references           `impact <item>` → callers, users, implementors     model (L3 calls) · store  lossy where abstained — and the
+                                                                                                                coverage banner says so
+ workspace/symbol                  `find` over trie / trigram / BM25                  store / index             better: ranked, budgeted
+ documentSymbol (outline)          `find --file f` → the L2 face of the file           scanner                   none
+ hover (type, signature, docs)     the item record: signature text · doc · cfg        scanner + model           no inferred types of locals
+ implementation / typeDefinition   `impact --kind implements`                          model + store             confidence-graded
+ callHierarchy, incoming/outgoing  `impact --depth 2`, bounded by token budget         model + store             budgeted, not exhaustive
+ rename                            out of scope — the agent edits; `impact` says where  —                        LSP's rename is exact; ours is
+                                                                                                                a list to act on
+ diagnostics / type errors         NOT REPLACED — the compiler's job; `cargo check`    rustc, when the agent     the one thing LSP does that we
+                                   stays the agent's separate tool                     chooses to run it         never claim
+ what LSP cannot do                proposed edges · provenance · abstention ·          LLM / human · store       —
+                                   persisted store · snippets, drafts, broken code
+```
+
+Three points about the replacement, stated plainly:
+
+1. **It is a different contract.** LSP is exact-or-nothing from one cursor inside a loaded workspace. Ours is complete-with-confidence from a persisted store, anywhere. For an agent planning a cross-cutting change the second is more useful; for "is this exact type right" the first still wins — which is why `cargo check` stays a separate tool the agent runs when it wants the compiler's verdict, not something Parseltongue wraps.
+2. **The tiny model is the only non-deterministic part, and it sits at write time, not query time.** Every verb is a deterministic read of records. The agent converses with the CLI; the model converses with the index while filling the store. That separation is what makes answers reproducible and auditable even though a model produced the edges.
+3. **The replacement is complete at L1/L2 from the scanner alone** — definition, outline, symbols, hover-as-signature. The model upgrades references and call hierarchy from "syntactic mentions" to "resolved edges with confidence." The LSP replacement is shippable before the model clears the bar; the model raises its ceiling.
