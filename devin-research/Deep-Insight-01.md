@@ -4760,3 +4760,67 @@ Each stage is a pass; its f_p is what it reads. Encoders throughout, so WRITE = 
 ```
 
 The one number that would change the table most is η at tiny sizes: a 3 M model at η = 0.2 is as slow as a 15 M model at η = 1.0. Batching and fused kernels are therefore worth more than any architectural choice for stage 1.
+
+### 9. Structure
+
+Parseltongue is one CLI with two entities inside it. The first is the thing we build; the second is the thing the agent uses.
+
+```text
+ parseltongue
+ ├── multi-level-code-map        the entity we create — our key job
+ │     one table set in Turso: file · span · name · field · edge
+ │     levels L0 crate · L1 folder, file · L2 public-interface item · L3 body (lazy)
+ │     statuses extracted · abstained · inferred · proposed · realized · stale
+ └── multi-level-query-engine    the entity the agent-LLM talks to
+       find · impact · status · propose — bounded, confidence-bearing answers over the map
+```
+
+**Dispatcher.** One binary, one verb per call. It routes a verb to exactly one CPU tool. CPU tools never call each other; they communicate only through the table.
+
+**CPU tools and the tiny models they call.** The unit of work is a CPU tool. A tiny model is something a CPU tool calls, like a function: a batch of texts in, a batch of labels with confidence out, nothing else. A model never touches the table.
+
+```text
+ entity   CPU tool              what it does                                                        calls
+ MAP      CPU-tool-01 INGEST    walk tree · digest · write file rows                                 —
+ MAP      CPU-tool-02 SPAN      read file text in chunks → span rows (start, end, kind, name, vis)   tinyLLM01 spanner    2–5 MB
+                                low-confidence rows → rewrite them                                   tinyLLM02 clarifier  ~100 MB
+ MAP      CPU-tool-03 TEXT      copy span text and doc into columns · name tokens · FTS              —
+ MAP      CPU-tool-04 FIELD     read span text → field rows (generics, bounds, flags, cfg, impl…)    tinyLLM03 fielder    30–100 MB
+ MAP      CPU-tool-05 JOIN      SQL: use-paths × names → unique = edge(extracted) · else candidates  —
+ MAP      CPU-tool-06 BIND      candidate lists → edge(inferred | abstained)                         tinyLLM04 binder     ~100 MB
+ QUERY    CPU-tool-07 FIND      trie / FTS / BM25 over span + field → ranked rows + span text        tinyLLM05 ranker (optional)
+ QUERY    CPU-tool-08 IMPACT    BFS over edge with depth, kind filter, confidence range              —
+ QUERY    CPU-tool-09 PROPOSE   validate and write edge(status=proposed, creator=agent)              — never a model
+ QUERY    CPU-tool-10 STATUS    counts per status and level · coverage banner · stale rows           —
+```
+
+**Contract.** Every CPU tool is rows in, rows out, idempotent, and resumable from the status column. Every model call is batch in, labels and confidence out. Three things follow: a model can be replaced by a deterministic stub with the same signature, so every stage is testable without a model; only CPU-tools 02, 04, 06 and optionally 07 ever need a GPU; and the table is the only shared state, so tools can run on different machines against the same file or against shards merged by digest.
+
+### 10. Constraints and success criteria
+
+**Success criterion.** A Linux-sized codebase — about 400 million tokens, 1.5 GB of source, used as the yardstick for "very large" — becomes a multi-level code map in 30 minutes. "Map" here means L0, L1 and L2 complete with every unresolved site stored as `abstained`, the coverage banner telling the truth, and L3 available lazily per region in seconds. Measured on the hardware named in the run; the Mac mini and desktop GPU meet it by the equation in §8, the 8 GB Air does not yet.
+
+**Fixed constraints.**
+- Code is saved first, by a CPU tool, into a Turso table; nothing reads the working tree after that.
+- Every judgment is a tiny model's output; the CPU tool only moves bytes and runs SQL.
+- No tree-sitter, rust-analyzer or Cargo build at runtime. rust-analyzer and rustc are off-line teacher and judge.
+- One SQLite-compatible file; the schema stays portable to stock SQLite.
+- The tool never writes `proposed`; an LLM or human never writes `extracted`.
+- Public items are the unit; private items are light rows.
+- Fully open: Apache/MIT tool, open weights, open training data, reproducible evaluation.
+- Claims are precision with coverage printed beside it; no number is called measured until it is.
+
+### 11. Open questions
+
+Decisions deliberately deferred. Each is independent of the structure above.
+
+- How a CPU tool calls its model: linked into the process (ONNX/safetensors, one binary) · sidecar executable over stdin/stdout · both.
+- Where models run: inside the CLI call · background worker processes draining queues · a warm local server.
+- Who schedules the stages: the CLI inline · a daemon · the agent calling each verb.
+- How the agent talks to Parseltongue: subcommands with JSON output · MCP · both.
+- What a query returns: raw rows · a token-budgeted page · span text verbatim.
+- Model sizes per stage and the grey-span gate threshold (§3).
+- Whether the binder is distilled from a Rust-adapted 4B teacher.
+- Turso versus stock SQLite versus a graph-native store, after a benchmark.
+- Span identity under rename and move.
+- Whether the file layer adopts AgentFS's schema when an agent runs sandboxed.
