@@ -629,6 +629,223 @@ One tension, stated: a 100 MB peak-RSS gate admits only the ~30M class. If meani
 
 Confidence: medium on the tiers, low on the exact crossovers. The second rung of the training ladder — ten million tokens, one afternoon — run at 30M and at 125M, turns this prediction into a measurement.
 
+#### B9.2 B9.1 explained slowly, in nine steps
+
+*The same material as B9.1, walked through for a reader who does not carry the arithmetic in their head.*
+
+**Step 1 — what the model has to do.** Read Rust text, output records: "file A uses file B", "`pub fn foo(x: T) -> U` lives in module m". Levels 1 and 2 only — no function bodies. Two ways a model can do that:
+
+```text
+ ENCODER  reads the text once and paints a label on each token ("this is a type name", "this pairs with that
+          import"). Records are read off the labels. One pass, nothing generated. A highlighter.
+ DECODER  reads the text, then WRITES the records out token by token, the way a chat model types. Hundreds of
+          extra steps per file.
+```
+
+**Step 2 — why the GPU's 2 GB is really ~1.4 GB.** Before any model loads, the GPU driver reserves 300–500 MB just to exist. Add ~100 MB for the runtime, tokenizer and scratch buffers. What remains for the model is 1.3–1.5 GB. A model that "fits in 2 GB" on paper does not.
+
+**Step 3 — how much a model weighs.** At 8-bit, one parameter is one byte: 125M parameters = 125 MB, 0.5B = 500 MB; at 4-bit, half. Weights are half the story — the model also needs working memory while it runs:
+
+```text
+ encoder   activations — scratch proportional to (batch × text length); ~300 MB at 32 files at once
+ decoder   the KV cache — it must remember every token read so far to write the next one; ~12 KB per token for a
+           0.5B model → a 4k-token file holds ~50 MB in flight; eight files at once = 400 MB. This is what pushes
+           decoders out of 2 GB first.
+```
+
+**Step 4 — how fast the card is.** A 2 GB card does 2–4 trillion operations a second. Reading one token through a model costs 2 × parameters operations:
+
+```text
+ 125M encoder   2 × 125M = 250M ops/token  → ~3 trillion ÷ 250M ≈ 10,000 tokens/s
+ 0.5B decoder   2 × 500M = 1B ops/token    → ~3,000 tokens/s reading (prefill)
+                writing is one token per step, and each step re-reads all 500 MB of weights from memory;
+                the card moves ~150 GB/s → 150 ÷ 0.5 ≈ 300 tokens/s writing
+```
+
+That last line is why "really fast" ends at 0.5B on this card: writing is bandwidth-bound, and the card is bandwidth-poor.
+
+**Step 5 — steps 2–4 together are the table.** 30M encoder: fits trivially, 40k tok/s, too small to learn type-like decisions. 125M: fits, 10k tok/s, large enough to be useful — the sweet spot. 400M: fits, three times slower. 0.5B decoder: fits with eight files in flight, reads fast, writes slowly. 1.5B at 4-bit: 900 MB of weights plus KV — two files in flight, 150 tok/s writing — "fits" but is not fast. 3B: does not fit.
+
+**Step 6 — how much text the model actually sees.** A 42k-line workspace is ~400k tokens, but:
+
+```text
+ 100 %   all tokens
+  30 %   after dropping function bodies — levels 1–2 do not need them
+ 10–20 % after a rule scanner handles `use …;`, `mod …;` and plain signatures — regular grammar, nothing to learn
+```
+
+The model sees 60–120k tokens; at 10k tok/s that is ~10 s. rust-analyzer on the same workspace: 29 s and 2.3 GB. One edited file ≈ 5k tokens → under a second. Memory stays under 1 GB regardless of codebase size, because the model is the same size and the store lives on disk.
+
+**Step 7 — the two caveats in plain words.** (a) Post-training an existing code LLM yields a decoder — the natural path — and 0.5B is as large as it can be and still feel fast on 2 GB; the encoder path is faster and smaller but must be trained differently (tag spans, pair them). (b) Because the card is bandwidth-poor, anything that writes a lot hurts most; "classify instead of generate" and "short ids instead of long paths" matter more on a cheap card than on a large GPU.
+
+**Step 8 — the Linux kernel as a ruler.** 20.1 M lines of C, 8.7 M of headers, 133k of Rust; 33.4 M code lines, 43.9 M with comments and blanks. The C/H/Rust source is 1.49 GB ≈ 400 M tokens → 10–11 tokens per line. The earlier assumption "10 M lines ≈ 100 M tokens" is confirmed; the kernel is ~4× that scenario, so every cold-map time multiplies by four while per-edit and start-up times do not change.
+
+**Step 9 — what the kernel teaches about the two levels.** The kernel's public face is 27k header files and 39k exported symbols against 29 M lines of body — a fraction of a percent by volume. That is why levels 1–2 are cheap to extract and hold in memory, and why bodies must be read lazily, only for the region an agent opens. (Parseltongue is Rust-only; the kernel's actual Rust is 133k lines, which rust-analyzer handles in about a minute. "If the kernel were Rust" is a thought experiment: L1+L2 ≈ 1–2 h on a 2 GB card, ~5 min on a desktop GPU, 20–40 min on a Mac mini.)
+
+In one line: **a 125M highlighter-style model fits a 2 GB card with room to spare and maps a 42k-line workspace in ~10 s because it looks only at the 10–20 % of tokens that need judgment; the kernel confirms the token arithmetic and shows the public interface is tiny next to the bodies.**
+
+#### B9.3 The first map of a kernel-sized codebase on an 8 GB MacBook Air — step by step
+
+*Hardware: MacBook Air, 8 GB unified memory, M1/M2/M3 base (7–10 GPU cores ≈ 2.5–4 TFLOPS peak, 68–100 GB/s, fanless). Codebase: 38 M lines ≈ 400 M tokens, treated as Rust. Two visible levels, rules-first cascade, bodies lazy. Envelope math.*
+
+```text
+ STEP 0  what the machine really gives you
+         8 GB unified; macOS takes ~2.5–3 GB → ~5 GB for us. The GPU shares that memory — no VRAM wall.
+         Fanless: after ~10 min of sustained GPU load it throttles to ~1–1.5 TFLOPS effective. Plug it in; keep it
+         awake. rust-analyzer on a codebase this size needs tens of GB → it cannot run here at all.
+
+ STEP 1  read + hash every file                                                        CPU      ~3–5 min
+         1.49 GB of text; content digests + tokenising on 4 performance cores ≈ 100 MB/s.
+         Output: a File record per file (path @ digest) and the Snapshot id.  RAM: streaming, < 500 MB.
+
+ STEP 2  rule scanner — the regular-grammar parts of L1/L2                              CPU      ~2–5 min
+         `mod`, `use`, `include!`, `cfg`, plain `pub fn/struct/trait/enum` signatures, doc comments.
+         ~100 MB/s per core. Produces most L1 edges and most L2 items directly, plus a list of AMBIGUOUS SITES
+         (glob imports, macro-generated items, trait-dispatch signatures, re-export chains).
+         Bodies are skipped — 70 % of tokens never leave the disk.
+
+ STEP 3  the model pass — ambiguous sites only                                          GPU      THE LONG STEP
+         40–80 M tokens reach the model (10–20 % of source).
+         125M encoder, int8: 250 MFLOP/token at ~1.2 TFLOPS sustained → ~4–5k tok/s
+           → 40 M tok ≈ 2.5 h · 80 M tok ≈ 4.5–5 h                                            ≈ 3–5 h
+         (0.5B generative model instead: prefill 4× slower ≈ 10–18 h, plus writing ~15 M record tokens at
+           ~1–2k tok/s batched ≈ 3–4 h → about a day. On this machine the encoder route is not a nicety.)
+         RAM: model 125 MB + activations ~300 MB. Batch files so the GPU never idles.
+
+ STEP 4  write records to the store                                                     CPU      ~2–3 min
+         ~5–10 M items and edges at L1/L2. Batched inserts ≈ 200–500k rows/s. Disk: a few GB. RAM: 1–2 GB cache.
+
+ STEP 5  build indexes — trie, trigram, BM25 over names, paths, first doc lines           CPU      ~5–10 min
+
+ STEP 6  fetch external crate graphs from the feed (std + dependencies)                 network  ~1–5 min
+         Nothing under `target/` or the cargo registry is ever read by the model.
+
+ STEP 7  coverage banner — files scanned · % extracted ≥ 0.9 · % abstained · model and feed revisions   instant
+         The map is queryable. L3 is not built; it extracts lazily, per region an agent opens.
+
+ TOTAL first L1+L2 map on an 8 GB Air     ≈ 3.5–5.5 h with the 125M encoder — an afternoon, plugged in
+                                           ≈ 1 day with a 0.5B generative model
+ peak RAM, whole pipeline                  ~2–3 GB — fits beside macOS; rust-analyzer cannot start on this hardware
+
+ for scale    Mac mini M4 Pro ≈ 20–40 min · 2 GB discrete card ≈ 1–2 h · desktop GPU ≈ 5 min
+ afterwards   one edited file ≈ 1–2 s on the Air; session start = 0 — the store is on disk
+```
+
+Three honest notes. Step 3 dominates; the only levers are the cascade (how many tokens reach the model) and encoder-versus-decoder — not the chip. Thermal throttling is why the estimate is 3–5 h and not the 1.5 h the peak figure would promise; cooling genuinely matters on a fanless machine. And a Rust codebase of kernel size does not exist; the largest real Rust workspaces (the compiler, Servo — one to three million lines) would take 15–45 min on the same Air.
+
+#### B9.4 L1 and L2, defined — and which steps run on the CPU
+
+**The two levels the agent sees by default:**
+
+```text
+ L1   FILE ↔ FILE             which file depends on which. Evidence: `mod foo;`, `use crate::a::b::C;`, `include!()`,
+                              `#[cfg(...)]` gates. Answers: if I touch this file, which files can notice?
+ L2   PUBLIC FACE of a file   every item another file is allowed to use: `pub fn` / `pub struct` / `pub trait` /
+                              `pub enum` signatures, `pub use` re-exports, `pub static` / `const`, cfg and feature
+                              gates, the doc comment. Answers: what does this file promise to the rest of the code?
+ L3+  not default             what happens inside bodies: calls, constructions, field reads and writes, awaits,
+                              panics, unsafe. Extracted lazily, only for a region an agent opens.
+```
+
+The membership test for L2 is one question: *could this line change what another file is allowed to write?* Comments, imports and globals are fields on these records, not separate nodes.
+
+**Who does the work, step by step:**
+
+```text
+ step 1   read + hash files                 CPU       I/O and hashing
+ step 2   rule scanner                       CPU       regular-grammar matching over tokens. This alone yields MOST of
+                                                       L1 and MOST of L2 — `mod`, `use`, plain `pub fn` signatures
+                                                       need no model
+ step 3   the model, on ambiguous sites      GPU       glob imports, macro-generated items, re-export chains,
+                                                       trait-dispatch signatures; later, method receivers in L3.
+                                                       Runs on CPU too, 5–10× slower on an Air
+ step 4   write store                        CPU
+ step 5   build indexes                      CPU
+ step 6   feed fetch                         network
+ step 7   find / impact / propose, forever   CPU       they read the store; they never run the model
+```
+
+L1 and L2 are therefore mostly CPU work — the deterministic scanner produces perhaps 80–90 % of their records — and the GPU is used for the slice the rules cannot decide. The GPU-heavy part of the product is L3, which is exactly the part built lazily.
+
+One consequence, stated plainly: if the model never clears the quality bar, L1 and L2 still exist from the scanner alone, on CPU, with `abstained` marked where the rules gave up. The model improves the map; it is not what makes the map exist.
+
+#### B9.5 The simulation when everything is done by the model
+
+*No rule scanner, no body-skipping: the model reads every token of a kernel-sized Rust codebase (400 M tokens) and produces L1, L2 and L3 itself. Hardware: the 8 GB MacBook Air of B9.3 (≈ 1.2 TFLOPS sustained, 68–100 GB/s). Envelope math.*
+
+```text
+ STEP 1  read + hash + tokenise 1.49 GB                                   CPU     ~3–5 min
+
+ STEP 2  the model reads EVERYTHING — 400 M tokens                        GPU
+         cost per token = 2 × parameters
+         ┌──────────────────────────────┬──────────────────────┬─────────────────────────────────────────┐
+         │ model                        │ reading (prefill)    │ writing records (decoder only)          │
+         ├──────────────────────────────┼──────────────────────┼─────────────────────────────────────────┤
+         │ 125M encoder, int8           │ 1e17 FLOPs ≈ 23 h    │ none — records read off tagged spans    │
+         │ 0.5B decoder, Q8             │ 4e17 FLOPs ≈ 4 days  │ ~80 M record tokens (L1+L2+L3) at       │
+         │                              │                      │ ~1.5k tok/s batched ≈ 15 h              │
+         │ 1.5B decoder, Q4             │ ≈ 12 days            │ ≈ 2 days                                │
+         └──────────────────────────────┴──────────────────────┴─────────────────────────────────────────┘
+         RAM is fine throughout (model ≤ 1 GB, KV/activations ≤ 1 GB; unified memory has no VRAM wall).
+         Over days the run WILL be interrupted — plugged in, kept awake, cooled — so extraction must checkpoint
+         per file; the append-only store makes it resumable for free.
+
+ STEP 3  write store — ~10× more records than L1+L2 (every call, construction, field access)   CPU   ~20–30 min
+ STEP 4  indexes                                                                                 CPU   ~15–30 min
+ STEP 5  feed fetch, coverage banner                                                                   minutes
+
+ TOTAL, everything by model, 8 GB Air       125M encoder ≈ 1 day · 0.5B decoder ≈ 4.5–5 days · 1.5B ≈ 2 weeks
+
+ same job elsewhere                          encoder 125M      decoder 0.5B
+   2 GB discrete card                        ≈ 14 h            ≈ 3 days
+   Mac mini M4 Pro                           ≈ 5–6 h           ≈ 28–30 h
+   desktop GPU (4090 class)                  ≈ 30 min          ≈ 3–4 h
+
+ the two shortcuts, for contrast (Air, encoder)   skip bodies → 120 M tokens ≈ 7 h · + rules on L1/L2 → 3–5 h
+```
+
+What the simulation says:
+
+1. **Reading is the bill, not writing.** Even the encoder, which writes nothing, needs a day on the Air: 400 M tokens × 250 MFLOP = 1e17 operations, and the Air sustains ~1e12 per second. No output format changes that number; only reading fewer tokens does.
+2. **A decoder makes reading 4× worse and then adds a writing phase** that is bandwidth-bound — each written token re-reads all the weights, and the Air moves ~100 GB/s ÷ 0.5 GB ≈ 200 tok/s per stream. That is the difference between overnight and most of a week.
+3. **Memory is never the problem on this machine; time is.** The 8 GB limit does not bite below 1.5B parameters. rust-analyzer could not start at all on this codebase size.
+4. **After the first map, everything is fast regardless:** an edited 5k-token file ≈ 1 s (encoder) or ≈ 10 s (decoder); `find` and `impact` read the store in milliseconds; session start is zero.
+
+"Everything by model" is feasible on a MacBook Air for a kernel-sized Rust codebase — once, overnight, with the encoder — and it is a week with a generative model. The cascade and body-skipping are not what make it possible; they turn a day into an afternoon.
+
+#### B9.6 Why reading 400 million tokens is expensive
+
+A model does not *read* a token; it *computes* it. Every token, trivial or subtle, is pushed through every weight in the network. There is no skimming.
+
+```text
+ what one token costs, by reader
+   grep                        ~10 operations        compare bytes, move on
+   regex / rule scanner        ~100
+   tokenizer                   ~1,000
+   125M-parameter model        ~250,000,000          every token × every weight, through every layer, plus attention
+   0.5B model                  ~1,000,000,000
+   frontier model              ~1,000,000,000,000
+
+ for 400 M tokens
+   grep     400 M × 10      = 4 billion ops                      → about a second on a laptop
+   125M     400 M × 250 M   = 100,000,000,000,000,000 ops (1e17)
+            a laptop GPU sustains ~1e12 ops/s                    → 100,000 s ≈ 28 h
+            the whole answer is 1e17 ÷ 1e12
+```
+
+Three intuitions:
+
+1. **The weights are the understanding, and all of them are consulted for every token.** A 125M model is 125 million numbers; a token's meaning is produced by multiplying its vector through all of them, layer by layer. A translator who must consult every one of 125 million dictionary entries for every word — that is the arithmetic, literally. Humans skim; a transformer has a fixed cost per token whether the token is `;` or a subtle trait bound.
+2. **It is not slow — it is a lot.** 1e17 operations is a hundred million billion. The laptop does a trillion a second and still needs a day. A human reading 400 M tokens (~300 M words) at 250 words a minute would need 2.3 years; the model is ~800× faster than a person. 400 M tokens is simply enormous — 1.5 GB of text, the entire Linux kernel.
+3. **Why it feels wrong: chat.** In a chat the model reads a few thousand tokens — 4k × 250 M = 1e12, one second. Scale 4k to 400 M, a factor of 100,000, and one second becomes 28 hours. Linear, without mercy.
+
+Two corollaries drive the design:
+
+- **The only way to make it cheaper is to send fewer tokens through the model.** Not a better format, not a shorter output — fewer tokens. Skipping bodies (−70 %) and the rules-first scanner (−80 % of the remainder) route `;` and `use std::fmt;` to the 100-operation reader and save the 250-million-operation reader for sites that need judgment. Same map, ~20× less compute.
+- **Hardware moves the constant, not the shape.** A desktop GPU is ~50× the Air → 30 minutes. Still 1e17 operations; it does more of them per second.
+
+In one line: **reading 400 M tokens is expensive because a model spends 250 million operations understanding each one, and 400 M × 250 M is 1e17 — a day for a laptop, half an hour for a desktop GPU, a second for grep, which understands nothing.**
+
 ### B10. What a cybersecurity paper knows about code maps that the code-map literature does not
 
 *Deep research on Sikos, "Cybersecurity knowledge graphs", Knowledge and Information Systems 65 (2023), open access, in the repository as `deep-insight-sikos-2023-cybersecurity-knowledge-graphs-KAIS.pdf`. Read against the arXiv literature on graphs for LLM agents over repositories (2024–2026) and against the industry systems that already run the pattern in production. Where a precedent was read from its abstract only, it says so.*
