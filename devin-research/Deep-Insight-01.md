@@ -4688,3 +4688,75 @@ Each stage reads rows and writes rows or columns; every stage is resumable and s
 Not in scope: a verification or diff product; tool-authored future structure; replacing compiler diagnostics or rename; eager L3 for a whole tree; claiming any number above as measured.
 
 The one risk: boundary accuracy on broken code. If the taggers cannot cut half-written items reliably, every stage above them inherits the error. It is also the cheapest thing to test — take compiling commits, break them, score the three cutters separately on clean and broken input.
+
+### 8. The time-to-map equation
+
+*The full form, as derived earlier in this research and carried here unchanged, then instantiated for the span-first pipeline. Every symbol is listed. Values marked "estimate" are envelopes from published throughput figures; the equation is built so each can be replaced by a measurement without changing shape.*
+
+#### 8.1 The equation
+
+```text
+ y  =  T_io  +  Σ over passes p of [ READ_p + WRITE_p ]  +  T_store  +  T_index  +  T_feed
+
+ READ_p   =  N · (1 − h) · f_p · r_ctx(L) · 2 · P_act,p
+             ─────────────────────────────────────────          prefill: every token the pass reads goes through
+                       η_pre(P_act,p) · C_dev                    every active weight — compute-bound
+
+ WRITE_p  =  N · (1 − h) · f_p · o_p · b_p · P_tot,p
+             ──────────────────────────────────────────────────────────────────────────────
+             min( η_dec · B_dev · batch_p ,  η_pre · C_dev / (2 · P_act,p) · b_p · P_tot,p )
+                                                                decode (decoders only): every output token
+                                                                re-reads all weights from memory, batched
+                                                                until compute-bound; zero for encoders
+
+ N_eff for the next pass  =  N · f_p · a_p                      a_p = abstention rate of pass p — what it hands upward
+```
+
+#### 8.2 The variables
+
+```text
+ N          input tokens in the corpus              Linux-sized tree ≈ 400 M; a 3 M-line workspace ≈ 30 M; a crate ≈ 0.5 M
+ h          cache / feed hit rate                    0 on the first map; 0.9+ on the second (content-addressed rows)
+ f_p        routing fraction                        share of tokens pass p's model actually reads — THE lever
+ P_act,p    active parameters per token             the compute cost; equals P_tot except for mixture-of-experts
+ P_tot,p    total parameters                        memory and decode bandwidth
+ b_p        bytes per weight                        int8 1 · int4 0.5 · fp16 2 — matters for WRITE and memory, barely for READ
+ o_p        output ratio                            output tokens per input token; 0 for encoders, 0.1–0.3 for decoders
+ L, r_ctx   context length and its multiplier       ≈ 1.0 at ≤ 4k tokens, ≈ 1.3 at 20k for transformers; 1 for state-space models
+ C_dev      sustained compute, FLOP/s               estimate: M1 Air ~1.1e12 · M2 Air ~1.7e12 · M4 Pro mini ~1e13 · desktop GPU ~5e13
+ B_dev      memory bandwidth, achieved              ~80 % of nominal: 68 · 100 · 120 · 273 GB/s across the Apple range
+ η_pre/dec  utilisation                             tiny models cannot fill a GPU: ~1.0 at 7B · ~0.6 at 125M · ~0.2 at 2–5M unless batched and fused
+ batch_p    decode batching                         1 … 32 parallel sequences; WRITE only
+ k, a_p     number of passes and abstention rates   cascades shrink N per pass; a ≈ 0.02–0.20
+ T_io       read and hash the tree                  ~5 min for 1.49 GB on four cores
+ T_store    write rows                              seconds to minutes at 200–500k rows/s
+ T_index    FTS and name indexes                    minutes
+ T_feed     consult the public feed, if any         network-bound; zero off-line
+```
+
+#### 8.3 Two facts the equation settles
+
+- Quantisation does not speed up READ. Q4, Q8 and F16 prefill run within a few percent of each other on every chip measured, because prefill is compute-bound; quantisation acts on WRITE and on memory. An encoder cascade has no WRITE term, so for this pipeline int8 is a memory decision, not a time decision.
+- Routing fraction and caching dominate. Halving P_act halves READ once; cutting f_p from 1.0 to 0.05 cuts it twenty times; h = 0.9 on the second map cuts everything by ten. After the first map, y is dominated by T_io + T_index, not by any model.
+
+#### 8.4 Instantiated for the span-first pipeline
+
+Each stage is a pass; its f_p is what it reads. Encoders throughout, so WRITE = 0 everywhere.
+
+```text
+ stage   pass model            reads                               f_p       P_act      READ on an 8 GB Air (N = 400 M, h = 0)
+ 0       — (CPU tool)          whole tree, bytes only              —         —          T_io ≈ 5 min
+ 1       2–5 MB tagger         every token                         1.0       3 M        2.4e15 / (0.2–0.7 · 1.7e12) ≈ 35–100 min; batched and fused ≈ 20–25 min
+ 2       — (CPU tool)          span rows                           —         —          T_store + T_index ≈ 5–10 min
+ 3       100 MB clarifier      grey spans only                     0.02–0.05 100 M      1.6–4e15 / (0.6 · 1.7e12) ≈ 25–65 min
+ 4       30–100 MB field heads span text only (signatures + docs)  0.10–0.20 30–100 M   30M: ≈ 1–1.5 h · 100M: ≈ 3–5 h  (background; Mac mini ÷ 6)
+ 5       100 MB binder         ambiguous sites + candidates        ~0.01–0.03 100 M     ≈ 15–45 min for L2; L3 lazy, per region, seconds
+ 6       labeller              on demand                           —         —          not on the critical path
+
+ first usable table (stages 0–2)      ≈ 25–40 min on an Air · ≈ 10–15 min on a Mac mini · minutes on a desktop GPU
+ fully bound L1/L2 (through stage 5)  ≈ 2–3 h on an Air · ≈ 45 min on a Mac mini · ≈ 10 min on a desktop GPU
+ second map (h ≈ 0.9)                 ≈ T_io + T_index ≈ 10–15 min regardless of hardware
+ any real workspace (N ≤ 30 M)        every line above ÷ 13 — the whole pipeline inside 15 minutes on an Air
+```
+
+The one number that would change the table most is η at tiny sizes: a 3 M model at η = 0.2 is as slow as a 15 M model at η = 1.0. Batching and fused kernels are therefore worth more than any architectural choice for stage 1.
