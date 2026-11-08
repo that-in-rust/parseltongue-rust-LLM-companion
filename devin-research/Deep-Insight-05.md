@@ -1658,3 +1658,92 @@ A proposed edge sits in the same picture: if the agent plans `pub struct Exponen
 ```
 
 The levels are views over one set of records, not separate graphs. That is the whole design: the tiny model and the scanner write leaf records once; folders and files are sums; the agent descends only as far as its question requires.
+
+### B14. Can a 100 MB model reach 98 % of what the deterministic tools give? — five timelines
+
+*The question as asked: take a 100 MB model, train it on the top-100 Rust repositories and their compiler-labelled outputs, forty epochs, and ask whether it reaches 98 % of what rust-analyzer gives. Two answers, because the target matters: against "everything LSP returns" the answer is no, for structural reasons; against the multi-level code map (Deep Insight 06) the answer is yes on precision, with coverage as the honest second number. Simulated as timelines; assumptions stated; likelihoods are judgments.*
+
+#### Decision frame
+
+- **Fork:** train a 100 MB (≈ 100M-parameter, int8) model on ~100 repositories × teacher labels × 40 epochs, and rely on it to replace deterministic answers at 98 %.
+- **Win:** ≥ 98 % agreement with the compiler on *held-out* repositories — never the 100 — at every level of the map.
+- **Constraints:** 100 MB; input is source text (plus whatever context we choose to add); output is records.
+- **Assumptions:** the top-100 Rust repositories are ~15–25 M lines ≈ 200 M tokens; 40 epochs ≈ 8 B training tokens (~80 tokens per parameter — ample compute, but forty passes over the *same* text); teacher labels are near-perfect and unlimited, since any crate that compiles yields them.
+- **Failure:** 98 % on the training repositories, 80 % on the next one — memorisation.
+
+#### Timeline A — Train exactly as described: text in, edges out
+
+- **Week 1:** L1 and L2 converge fast — `mod`, `use`, `pub fn` are regular grammar; 99 %+ by epoch three.
+- **Month 1:** held-out method-call resolution plateaus at ~70–85 %. Receivers need types that live in *other* crates' signatures; the model has only seen them for the 100 repositories' dependencies. Epochs 10–40 raise training accuracy, not held-out accuracy. The model begins to "know" that `.send()` is `tokio::mpsc` because it was, four hundred times.
+- **Quarter 1:** shipped as-is, it emits *confident wrong edges* — the worst failure a structural tool can have. Abstention is bolted on afterwards and does not fit.
+- **Likelihood of 98 % everywhere:** very low. **Stress:** a leaderboard that is excellent on the 100 and collapses on repository 101.
+
+#### Timeline B — Same model; it classifies among retrieved candidates
+
+- **Opening move:** change the task. For each ambiguous site the index and the feed supply the k candidate targets *with their signatures*; the model picks one or abstains. Closed-set classification, not open generation.
+- **Month 1:** held-out method resolution rises to ~90–95 %, because the missing information is now in the input. Cross-crate resolution works for crates the model never saw — the feed carries their signatures.
+- **Quarter 1:** the residue is the genuinely hard set: generic dispatch, identically named trait methods on blanket impls, macro-generated items. 98 % is in sight per edge kind.
+- **Likelihood:** medium-high. **Inflection:** retrieval quality — if the right target is not among the k, the model cannot choose it.
+
+#### Timeline C — Encoder with heads, in a cascade, abstention as a first-class output
+
+- **Opening move:** rules → 2–5 MB tagger → 100 MB encoder-binder over B's candidates, trained with an explicit "none of these / insufficient context" class; scored as precision *at a coverage*.
+- **Month 1:** precision on resolved edges ≥ 98 % at ~85–90 % coverage; the remainder are `abstained` with spans. The only timeline where 98 % is literally reached — as a precision figure with coverage printed beside it.
+- **Quarter 1:** coverage climbs as the feed fills and the tagger improves: L1/L2 ~99 %; L3 precision 98 % at ~90 %.
+- **Likelihood:** high for the precision target; coverage is the open question. **Stress:** users who want one number, not two.
+
+#### Timeline D — Change the data recipe: 2,000 repositories × 2 epochs, distilled
+
+- **Opening move:** the same compute as 100 × 40, spent on breadth: thousands of crates from the feed, two or three epochs, rename and alias augmentation, logits from a large code model as a soft teacher beside the compiler's hard labels.
+- **Month 1:** the held-out gap nearly closes — generalisation rather than memorisation. Pruning and distilling a 0.5B code model down to 100M beats training 100M from scratch; the published pruning-plus-distillation results transfer (fewer tokens, better scores).
+- **Likelihood:** high as an improvement on any of A–C. This is the training recipe, not a product path.
+
+#### Timeline E — Chase 98 % on everything LSP returns: local types, generic instantiations, macro-expanded items
+
+- **Month 1:** the model is re-implementing type inference from text. Local types depend on return types of calls in other crates, under generics, after macro expansion that is not in the text at all.
+- **Quarter 1:** it works on the 100 repositories and nowhere else. Stop. These are the compiler's answers; `cargo check` remains the agent's separate tool.
+- **Likelihood of 98 %:** near nil at 100 MB; low at any size without compiler-shaped machinery.
+
+#### Cross-timeline analysis
+
+```text
+ path                           held-out L1/L2   held-out method calls             confident-wrong risk   reversible   regret
+ A  text → edges, 100 × 40       99 %             70–85 %, memorises                HIGH                   yes          high — fine until repo 101
+ B  classify among candidates    99 %             90–95 %                           medium                 yes          low
+ C  cascade + abstention         99 %             98 % precision @ 85–90 % coverage LOW — it abstains      yes          low — the honest 98
+ D  breadth + distillation       +                +3–8 points on any of the above   —                      yes          none — it is the recipe
+ E  everything, incl. types      —                no                                HIGH                   —            high
+```
+
+Why it may work: Rust names are static; signatures carry the types; `use` paths qualify most items; roughly three quarters of edges are syntactic; candidates are retrievable exactly; labels are free and perfect. Why it may not: about 65 % of call sites are method calls and only about a quarter of their receivers are typeable from the enclosing function; proc-macro output is not in the text; generics and blanket impls need global reasoning; forty epochs over a hundred repositories memorises; and a 17 MB encoder attempt learned zero accepted bindings — size was not the only reason, task framing was.
+
+#### Decision filter
+
+- **Strongest if things go normally:** C, built on B's input, trained D's way — 98 % precision with coverage printed beside it; L1/L2 at 99 %.
+- **Safest if things go badly:** C — abstention turns failure into coverage rather than wrong edges, and the scanner alone still yields L1/L2.
+- **Fastest collapse of uncertainty:** rung two of the training ladder — 10 M tokens, held-out repositories, a **precision-versus-coverage curve** for a 30M and a 100M binder with candidates in the input. One afternoon, under a dollar of GPU. If the curve reaches 98 % precision above 80 % coverage, the thesis holds; if it cannot reach 98 % at any coverage, the model is a tagger and the resolver stays rule-plus-feed.
+
+#### The reframing: the output is the multi-level code map
+
+Against the map as defined in Deep Insight 06 — L0–L3 records with typed edges, roll-ups, and `abstained` as a legitimate output — timeline E disappears and the 98 % becomes well-defined:
+
+```text
+ level / record                      what the model must get right                   98 % reachable?       how
+ L0  crates                          —                                                100 %                 cargo metadata; no model
+ L1a folders                         —                                                = L1b                 roll-up
+ L1b file edges                      mod / use / include / cfg; glob and macro imports 99 %+                 scanner; model on globs
+ L2  item nodes and fields           kind, visibility, signature, doc, cfg, span       99 %+                 scanner; model only for macro items
+ L2  item edges                      bind the types named in signatures               98–99 %               candidates from index/feed → classify;
+     (signature_uses, implements,                                                                            these names are almost always
+      field_type, reexports …)                                                                               `use`-qualified — an easy closed set
+ L3  calls / constructs / reads      resolve receivers; dyn and generic dispatch       98 % PRECISION at     abstention carries the rest; coverage
+     (the bulk of the map by count)                                                   ~85–90 % coverage     climbs with the feed and the binder
+ roll-ups · confidence ranges ·      arithmetic over leaves                            100 %                 deterministic
+ status · abstained placeholders
+```
+
+By the map's own definition — where an unresolved site is a *correct* `abstained` record, not a miss — **a 100 MB binder can reach ≥ 98 % precision on every extracted record, with L0–L2 near 99 % and L3 coverage as the honest second number (~85–90 % at first, rising).** What it cannot do is make L3 *recall* 98 % on day one; by edge count L3 dominates, so overall agreement with the compiler begins near 90–93 % recall at ≥ 98 % precision. That is a usable map, and the coverage banner says exactly where it stopped.
+
+Two caveats survive the reframing. The recipe still matters more than the size: 100 × 40 still memorises, and held-out L3 precision will look like 98 % on the 100 and fall on repository 101 unless the input is candidates with signatures (B) and the data is breadth-first and distilled (D); the map does not change that, it makes the failure visible as coverage rather than as wrong edges — provided abstention is trained in (C). And `macro_generates` plus effective visibility through re-export chains are the L2 records most likely to sit at `abstained`, because proc-macro output is not in the text; the map allows that, so it costs coverage, not precision.
+
+The honest claim, with the map as the target: **≥ 98 % precision, coverage printed** — achievable at 100 MB. The rung-two precision-versus-coverage plot is still the one-afternoon test that turns the claim into a number.
