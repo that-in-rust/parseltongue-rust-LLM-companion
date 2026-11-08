@@ -263,3 +263,76 @@ Parseltongue sits between them. Its records are derived (spans, edges), so the i
 ### 10.5 What changes in this document
 
 Stage 0 and stage 2 of the pipeline (§9.3) read: "files live on disk, or in AgentFS tables when sandboxed; the tool records path and digest, copies span text and doc into columns, and never duplicates whole files unless the deployment is a sandbox." Everything else stands.
+
+---
+
+## 11. Has anyone built this already? — three code-graph MCP tools, run hands-on
+
+*Installed and run on 2026-11-08 against one real Rust crate, `cargo-modules` (87 Rust files, ~7,000 code lines). Ground truth by grep for comparison: 222 `fn` (89 `pub fn`), 52 `pub struct/enum/trait`, 146 `use` lines, 19 `impl … for …`, 37 `mod x;` declarations. Vertical sections; numbers are what the tools' own stores contained.*
+
+### 11.1 mcp-codebase-index 0.7.1 (Python, regex, "zero-dependency")
+
+```text
+ index time        0.1 s
+ store             in-memory dataclasses (functions, classes, imports, dependency_graph dicts); no database
+ nodes             360 functions · 382 "classes" (structs/enums/traits/impls lumped) · imports · line ranges · parameters
+ edges             9 file-import edges (against 146 use lines) · 23 symbol-level edges (by name match)
+ missing           visibility · cfg · confidence · provenance · any folder level · any roll-up
+ state             the MCP server itself fails to start against current mcp/pydantic releases; the library indexes fine
+```
+
+A regex scanner with a dependency dict. Not a map.
+
+### 11.2 CodeGraphContext (Python, tree-sitter → embedded KuzuDB, Cypher)
+
+```text
+ index time        20 s (17 s serialising to Kuzu)
+ nodes             Function 362 · Struct 100 · Enum 39 · Trait 26 · Module 109 · File 133 · Directory 82 · Parameter 547
+ containment       Directory→Directory 79 · Directory→File 126 · File→Function 362   (a tree, not a dependency map)
+ edges             CALLS 285 (227 same-file, 58 cross-file) with confidence_label EXTRACTED | INFERRED and a
+                   resolution_tier 1–7 · HEURISTIC_CALLS 81 labelled AMBIGUOUS · IMPORTS 275 File→Module
+ Rust specifics    IMPLEMENTS 0 (ground truth 19); trait impls landed as INHERITS 24, ten of them Enum→"ExternalClass"
+                   visibility = NULL on all 362 functions · Module nodes carry no path, so IMPORTS never reach a file
+ folder/file deps  MODULE_DEPENDS_ON 0 · no File→File relation of any kind
+ schema            54 tables, most for other stacks (GradleModule, MavenModule, DbTable, RedisKeyPattern, Datasource)
+```
+
+Has the right instinct — a confidence label on every call edge and an explicit AMBIGUOUS relation — but Rust is a second-class language in it: no visibility, no trait implementation, no file-level dependency.
+
+### 11.3 code-graph-mcp 0.189 (Rust, tree-sitter → SQLite with FTS5 + sqlite-vec)
+
+```text
+ index time        0.14 s (release build)
+ store             one SQLite file (.code-graph/index.db); files table with blake3 hash; nodes with signature,
+                   doc_comment, code_content, return_type, param_types, is_test; FTS5 over names/context
+ nodes             1,211: function 362 · struct 192 (tests included) · module 149 · interface 99 · enum 91 · trait 7 ·
+                   constant 7 · plus markdown headings h1–h4
+ edges             972: references 394 · calls 281 · imports 244 · implements 53
+ confidence        a column on every edge — extracted | inferred | ambiguous:
+                   calls 187 / 78 / 16 · references 159 / 108 / 127 · imports and implements all extracted
+ file level        `deps src/analyzer.rs` → depends on 4 files (with symbol counts and depth), depended on by 7
+ folder level      `map` → modules by directory with symbol counts, entry points, and "src → src/item (8 imports)"
+ honesty           README section "What the graph does not see": `Type::method()` through a module path yields no
+                   edge; a receiver call with a shared method name is dropped rather than fanned out; dispatch by
+                   string has no edge
+ missing           visibility · cfg · proposed/future records · stored abstention for dropped calls · a stated
+                   roll-up rule (file and folder views are computed per query from the edge table)
+```
+
+This is the closest existing thing: typed nodes, typed edges, a confidence vocabulary almost identical to ours (`extracted | inferred | ambiguous` against our `extracted | inferred | abstained`), content hashes, FTS, a file view and a folder view derived from leaf edges, in one SQLite file, by a Rust binary. It is a strong proof that the index-over-tree, confidence-on-edges, SQLite pattern works and is wanted.
+
+### 11.4 What none of them do
+
+- **The public face as the unit.** No tool stores visibility at all; `pub` versus private is invisible in every store. The L2 contract — "what another file may depend on" — does not exist as a record anywhere.
+- **Rust semantics beyond syntax.** Trait implementation is wrong or absent (0 of 19 in one, 53 with tests in another); re-exports, cfg, generics and bounds are not recorded; macro-generated items are not represented.
+- **A roll-up rule.** File and folder views are query-time conveniences, not defined aggregates with weight, kinds, cfg union and a confidence range. Two tools give the same question different answers depending on which view you ask.
+- **Stored abstention.** Ambiguous receiver calls are dropped (code-graph-mcp) or placed in a side relation (CodeGraphContext); none writes "I saw a site here and could not resolve it" as a first-class record with its span.
+- **Proposed records.** No tool has a place for structure that an agent intends but has not written; every record describes the tree as it is.
+- **Operation on broken code.** All three parse with tree-sitter or regex over the working tree; none has a story for drafts, snippets or half-written items.
+- **A model anywhere in the loop.** Resolution is by name, with uniqueness as the only tie-breaker. The hard 65 % — method calls whose receiver type lives elsewhere — is where all three stop.
+
+### 11.5 Honest verdict
+
+Yes, parts of this exist, and one of them (code-graph-mcp) is well built: the span-ish node with signature and doc, the content-hashed file table, the confidence column, FTS, and file and folder views over a single SQLite file are all there and running in 0.14 seconds on this crate. Nobody should claim those pieces as new.
+
+What does not exist is the thing the thesis is actually about: a Rust-specific map whose unit is the public interface, whose upper levels are defined by a roll-up rule rather than computed ad hoc, whose unresolved sites are stored as records, whose future can be written down beside its present, and whose resolver is a small model over candidates rather than a name match. The three tools are evidence for the storage shape and against the sufficiency of name-based resolution — which is the gap the tiny model is meant to fill.
