@@ -210,3 +210,56 @@ The 100 MB "dumbed-down heavy" model is the right one here: it reads `impl<T> Tr
 C is the frame; A's specialists are its queue workers; B is how the workers are packaged once there is a leaderboard worth winning. The fifteen-minute target for a Linux-sized tree is met by C on a Mac mini for the *table*; the fully bound map follows behind it, row by row, visibly. On any real Rust workspace the whole pipeline — table and bindings — finishes within the fifteen minutes on an Air.
 
 The principle, stated once: **the tiny model makes every decision; the tool only moves bytes; the table is the contract between them.**
+
+---
+
+## 10. Files in the database, or an index over the tree? — what the codebase tools actually do
+
+*Checked 2026-11-06 against the tools' own repositories and documentation. The question: should source files themselves live in the database (as AgentFS does), or should the database hold only derived records while files stay on disk (as nearly every codebase-MCP tool does)? Vertical sections.*
+
+### 10.1 AgentFS — the one tool that puts files in the database
+
+AgentFS (tursodatabase/agentfs, MIT, beta, written and announced by Turso co-founder Pekka Enberg) stores an agent's entire state in one SQLite/Turso file: a POSIX-like filesystem as tables (`fs_inode`, `fs_dentry`, `fs_data` in 4 KB chunks, `fs_symlink`), a `tool_calls` log, and a key-value store; SDKs for TypeScript, Python and Rust; a FUSE/NFS mount; and `just-bash`, a shell where `cat README.md` reads from the database and the agent cannot reach the host. The stated reasons are auditability (SQL over the agent's history), reproducibility (`cp agent.db snapshot.db`), and portability (one file). It stores bytes, not structure: no spans, no symbols, no edges, no search beyond paths. It is a file layer, not a code index.
+
+### 10.2 What the codebase-MCP and context tools do instead
+
+```text
+ Aider repo map          files on disk · tree-sitter tags cached in SQLite (diskcache) · ranked map built per request
+ Serena                  files on disk · language servers (LSP) · a symbol index file under .serena/
+ CodeGraphContext        files on disk · tree-sitter → embedded KuzuDB graph · Cypher / MCP
+ code-graph-mcp          files on disk · SQLite index with FTS5 (+ vectors in binaries) under .code-graph/
+ mcp-codebase-index      files on disk · structural index · git-aware incremental reindex
+ GitNexus · Tessera ·    files on disk · a local index directory · graph or chunk queries
+ Codebase Memory
+ Claude Context (Zilliz) files on disk · AST/chunk → embeddings in a REMOTE vector database (Milvus / Zilliz Cloud)
+ Cursor                  files on disk · chunks → remote embeddings, paths obfuscated, Merkle-tree sync (vendor docs)
+ Sourcegraph             server holds a COPY of the repositories · Zoekt trigram index · SCIP symbol index
+ CodeMap (devalade)      files on disk · rust-analyzer-derived graph in Turso/libSQL · MCP
+```
+
+The pattern is uniform: **locally, nobody puts file contents in the database.** The working tree stays the source of truth; the database holds derived records — tags, symbols, chunks, embeddings, edges — keyed by path and content hash, with git or a Merkle tree deciding what to reindex. Only server-side systems (Sourcegraph, Cursor's backend) hold a copy of the code, because they must serve it to clients that do not have the tree.
+
+### 10.3 Why they do it that way — and whether AgentFS is "wrong"
+
+Neither is wrong; they answer different questions. The index-over-tree tools answer *"what is in this repository right now?"* for a developer who already has the files; copying the bytes into a database buys them nothing and costs disk, sync and a second source of truth. AgentFS answers *"what did this agent do, and can I replay it?"* for an operator who does not trust the agent; there the copy is the point — the database is the sandbox and the audit log.
+
+Parseltongue sits between them. Its records are derived (spans, edges), so the index-over-tree pattern fits; but its map must survive broken code, drafts the agent has not written to disk, and snapshots the agent reasons about — and those are exactly the cases where there is no clean working tree to point at. That is the argument for holding at least the *span text* in the database (DI-07's whole thesis) and, optionally, the file bytes too.
+
+### 10.4 Pros and cons
+
+**Files in the database (AgentFS style)**
+- For: one file is the whole state — code, map, proposals, tool-call log — copyable as a snapshot; the agent's drafts and the real tree live in the same store, so a proposed edge can point at text that exists nowhere on disk; FUSE mount gives the deterministic tool and the agent a normal path view with no second copy; SQL over history for free; MVCC writers in Turso let spanners write while agents read.
+- Against: a second source of truth unless the mount *is* the tree (sync bugs are the classic failure); 1.5 GB of a kernel-sized tree duplicated per snapshot unless chunks are content-addressed and shared; every tool that expects files on disk (cargo, git, rustfmt) needs the mount or an export; 4 KB chunk reads are slower than the page cache for bulk scans; beta software underneath.
+
+**Index over the tree (everyone else)**
+- For: no duplication; git is the history; the working tree is unambiguous truth; every existing tool works unchanged; the index can be deleted and rebuilt at any time; smaller, simpler, the pattern every user already understands.
+- Against: nothing to point at for code that is not on disk (drafts, proposals, pasted snippets); snapshots must be reconstructed from git plus index state; broken files are whatever the editor left, with no audit of how they got there; the agent's reads and writes leave no trail.
+
+**The middle path — what DI-07 actually proposes**
+- Store the *span text* and metadata in the database (small: signatures and docs, ten to twenty percent of the corpus); keep the working tree as the source of file bytes; record file digests so staleness is detectable; let proposals carry their own text because their items exist nowhere else.
+- Optionally adopt AgentFS's schema for the file layer when the product runs an agent in a sandbox — the same database file then holds code, map and audit log, and `cp map.db snapshot.db` is the snapshot mechanism the entity model asked for.
+- Never make the database the only copy of the code for a developer's own checkout.
+
+### 10.5 What changes in this document
+
+Stage 0 and stage 2 of the pipeline (§9.3) read: "files live on disk, or in AgentFS tables when sandboxed; the tool records path and digest, copies span text and doc into columns, and never duplicates whole files unless the deployment is a sandbox." Everything else stands.
