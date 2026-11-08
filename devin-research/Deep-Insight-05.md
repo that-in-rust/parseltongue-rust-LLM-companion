@@ -1480,3 +1480,181 @@ Three points about the replacement, stated plainly:
 1. **It is a different contract.** LSP is exact-or-nothing from one cursor inside a loaded workspace. Ours is complete-with-confidence from a persisted store, anywhere. For an agent planning a cross-cutting change the second is more useful; for "is this exact type right" the first still wins — which is why `cargo check` stays a separate tool the agent runs when it wants the compiler's verdict, not something Parseltongue wraps.
 2. **The tiny model is the only non-deterministic part, and it sits at write time, not query time.** Every verb is a deterministic read of records. The agent converses with the CLI; the model converses with the index while filling the store. That separation is what makes answers reproducible and auditable even though a model produced the edges.
 3. **The replacement is complete at L1/L2 from the scanner alone** — definition, outline, symbols, hover-as-signature. The model upgrades references and call hierarchy from "syntactic mentions" to "resolved edges with confidence." The LSP replacement is shippable before the model clears the bar; the model raises its ceiling.
+
+### B13. The multi-level code map, defined
+
+*What the tiny model and the CLI build together. One map, three nested levels — folder, file, public interface — where every node has a kind and metadata, every dependency is an edge with a kind, and an edge at an upper level is the roll-up of edges below it. Crate (from `cargo metadata`) sits above as level 0 context; bodies (L3) sit below and are extracted lazily. This section fixes the vocabulary; §5 fixes identity and authority.*
+
+#### B13.1 The three levels and how they nest
+
+```text
+ level  node          what it is                                  edge "A → B" means                              derived by
+ ─────  ────────────  ──────────────────────────────────────────  ──────────────────────────────────────────────  ───────────────────────
+ L0     Crate         a Cargo package@version                     A declares a dependency on B (features, cfg)   cargo metadata (no build)
+ L1a    Folder        a directory under the crate root            some file in A depends on some file in B       ROLL-UP of L1b
+ L1b    File          one .rs file (content-digested)             A names B: `mod`, `use`, `include!`, cfg,       scanner; model for
+                                                                  or an item in A uses an item in B               ambiguous imports
+ L2     Item          one public (or crate-visible) item          A's signature or face refers to B               scanner (plain) ·
+                                                                                                                  model (binding)
+ L3     Item (body)   the same items, their bodies                A's body calls / constructs / reads B           model, lazily
+```
+
+The roll-up rule, which is what makes it one map rather than three:
+
+```text
+ an edge  A → B  exists at level n   ⇔   at least one edge  a → b  exists at level n+1 with a ⊂ A and b ⊂ B
+ weight(A → B)      = number of contributing lower edges
+ kinds(A → B)       = the set of lower kinds that contributed  (e.g. {uses, signature_uses, calls})
+ cfg(A → B)         = union of lower cfgs
+ confidence(A → B)  = [min, max] of lower confidences — a range, never an average
+ status(A → B)      = extracted if any contributor is extracted; proposed if all contributors are proposed
+```
+
+So `impact` at folder level is not a separate analysis; it is the same records summed. Expanding a folder edge shows the file edges that made it; expanding a file edge shows the item edges; expanding an item edge shows the span.
+
+#### B13.2 Node kinds and their metadata
+
+Every node carries the same base record; each level adds its own kind and fields.
+
+```text
+ BASE (all levels)   id (per §5) · kind · display name · crate · cfg · creator (scanner@rev | model@rev | feed@publisher |
+                     llm | human) · confidence · status (extracted | abstained | inferred | proposed | realized | stale) ·
+                     first_seen / last_seen snapshot · tags (machine tags, e.g. role:entry-point — annotations, not identity)
+
+ CRATE  (L0)   kind ∈ { lib, bin, proc-macro, workspace-member, external, std }
+               fields: name, version, edition, features enabled, source (path | registry | git), licence
+
+ FOLDER (L1a)  kind ∈ { crate-root, src, module-dir (has mod.rs or <name>.rs), tests, examples, benches, bin, build, generated }
+               fields: path, file count, item count by kind (rolled up), lines, languages present, owning module path
+
+ FILE   (L1b)  kind ∈ { lib-root (lib.rs), bin-root (main.rs), module (foo.rs / foo/mod.rs), inline-only (no items),
+                        test, bench, example, build-script, included (pulled in by include!), generated }
+               fields: path, content digest, module path it defines, lines, tokens, pub item count, cfg gates at file top,
+                       doc comment (//! first line), has_unsafe, has_macros_defined, extraction coverage (% of sites resolved)
+
+ ITEM   (L2)   kind ∈ { fn, struct, enum, union, trait, type-alias, const, static, macro (macro_rules / proc), impl,
+                        assoc-fn, assoc-const, assoc-type, field, variant, extern-fn, extern-static, mod (inline) }
+               fields: path (crate::module::Name), visibility declared (pub | pub(crate) | pub(super) | pub(in path) | private)
+                       and visibility effective (after re-exports, if known), signature text (normalised), generics and
+                       bounds, flags {async, unsafe, const, extern-abi}, attributes of interest (derive list, cfg, deprecated,
+                       must_use, inline, repr), doc comment (first line + full), span (file, line range), body digest (L3),
+                       size (lines), for impl: trait + self type; for field: type; for variant: payload shape
+```
+
+The L2 membership test is one question: *could this line change what another file is allowed to write?* Comments, imports and globals are fields on these records, not nodes: a doc comment is the item's `doc`, an import is the evidence span on a `uses` edge, a static is an item of kind `static`.
+
+#### B13.3 Edge kinds and their metadata
+
+```text
+ BASE (all edges)   id = hash(src, dst, kind, cfg) · kind · src id · dst id · cfg · evidence span(s) · creator · confidence ·
+                    status · weight (1 for leaf edges; count for roll-ups) · via (collapsed private path, if the edge is
+                    projected through non-public items) · first_seen / last_seen
+
+ L0  crate         depends_on (normal | dev | build) · enables_feature
+ L1  file / folder declares_mod        `mod foo;` in A declares the module whose file is B
+                   uses                `use` in A names an item that lives in B   (evidence: the use path)
+                   includes            `include!` / `include_str!` of B
+                   cfg_gates           A's inclusion of B is behind a cfg
+                   tests               A is a test file exercising B
+                   depends_on          roll-up: any L2/L3 edge from an item in A to an item in B (weight, kinds, cfg range)
+ L2  item face     signature_uses      a type in A's signature is B
+                   parameter           A takes B as a parameter type             (specialisation of signature_uses)
+                   returns             A returns B                                (specialisation of signature_uses)
+                   field_type          a field of A has type B
+                   implements          A (an impl) implements trait B for a self type
+                   trait_bound         A's generics are bounded by trait B
+                   associated_type     A's associated type resolves to B
+                   reexports           `pub use` in A re-exports B under a new path
+                   derives             A derives B (Debug, Clone, serde::Serialize …)
+                   macro_generates     item A was produced by macro B   (status often abstained without expansion)
+ L3  item body     calls · may_call (dyn / generic dispatch; candidates ranked) · constructs · reads_field · writes_field ·
+                   awaits · panics_via · unsafe_uses · influences (data flow sketch)
+ any level         proposed_* — any of the above with status proposed, authored by an LLM or human (§5); the tool never
+                   creates one
+```
+
+The vocabulary is versioned by schema release; a model may not invent a kind. Where the extractor sees a site but cannot name the target it writes an edge to a placeholder target with status `abstained` and the span — so absence is never silent, and the roll-up shows "File A → 3 unresolved sites" rather than nothing.
+
+#### B13.4 Who produces what
+
+```text
+                              scanner (deterministic, CPU)             tiny model (CPU / GPU)                LLM / human
+ L0  crates                   cargo metadata                            —                                     —
+ L1  folders                  roll-up                                   —                                     —
+ L1  files   declares_mod,    all plain cases                           glob imports (`use a::*`), imports     —
+             uses, includes,                                            through macros or cfg'd re-export
+             cfg_gates                                                  chains → inferred with confidence
+ L2  items   nodes + fields   every item with a parseable signature;    items produced by macros; effective
+                              doc, cfg, attrs, span, digest              visibility through re-export chains
+ L2  edges   signature_uses,  when the type path is fully qualified or  when the name must be bound among
+             returns, field,  resolves by a plain `use`                  candidates (binder); trait_bound and
+             implements…                                                 associated_type resolution
+ L3  bodies                   call-site SPANS (where a call happens)    targets: receiver typing, method
+                                                                         resolution, may_call ranking, abstention
+ proposed    —                —                                          all of it
+ annotations —                —                                          labeller model (opinion layer) · LLM · human
+```
+
+The scanner alone yields L0, L1 and most of L2 — a complete, honest map with `abstained` where the rules stop. The model raises the ceiling: fewer abstentions at L1/L2, and the whole of L3.
+
+#### B13.5 A worked example
+
+A small crate, `retry`:
+
+```text
+ retry/
+   Cargo.toml
+   src/lib.rs            pub mod policy;  pub mod client;  pub use client::Client;
+   src/policy/mod.rs     pub trait RetryPolicy { fn next_delay(&self, attempt: u32) -> Option<Duration>; }
+                         mod fixed;  pub use fixed::FixedBackoff;
+   src/policy/fixed.rs   pub struct FixedBackoff { pub delay: Duration }
+                         impl RetryPolicy for FixedBackoff { … }
+   src/client/mod.rs     use crate::policy::RetryPolicy;
+                         pub struct Client { policy: Box<dyn RetryPolicy> }
+                         impl Client { pub fn send(&self, req: Request) -> Result<Response, Error> { … self.policy.next_delay(n) … } }
+```
+
+The three levels, as the map holds them:
+
+```text
+ L2  ITEM EDGES (leaf records)
+   client::Client#struct            ──field_type──►      policy::RetryPolicy#trait        (Box<dyn RetryPolicy>)       scanner  1.00
+   client::Client::send#assoc-fn    ──parameter──►       Request#struct                                                 scanner  1.00
+   client::Client::send#assoc-fn    ──returns──►         Response#struct · Error#enum                                   scanner  1.00
+   policy::fixed::<Impl#1>#impl     ──implements──►      policy::RetryPolicy#trait  (for FixedBackoff)                  scanner  1.00
+   policy::mod.rs                   ──reexports──►       policy::fixed::FixedBackoff#struct  (as policy::FixedBackoff)   scanner  1.00
+   lib.rs                           ──reexports──►       client::Client#struct               (as retry::Client)          scanner  1.00
+   client::Client::send#assoc-fn    ──may_call──►        policy::RetryPolicy::next_delay#assoc-fn    (dyn dispatch)      model    0.93  [L3]
+                                      candidates: FixedBackoff::next_delay (sole implementor in workspace)
+
+ L1b FILE EDGES (roll-up + direct)
+   src/lib.rs          ──declares_mod──►  src/policy/mod.rs · src/client/mod.rs                         weight 2
+   src/lib.rs          ──reexports──►     src/client/mod.rs                                             weight 1
+   src/client/mod.rs   ──uses──►          src/policy/mod.rs           (evidence: use crate::policy::RetryPolicy)
+   src/client/mod.rs   ──depends_on──►    src/policy/mod.rs           weight 2  kinds {field_type, may_call}  conf [0.93, 1.00]
+   src/policy/mod.rs   ──declares_mod──►  src/policy/fixed.rs
+   src/policy/fixed.rs ──depends_on──►    src/policy/mod.rs           weight 1  kinds {implements}
+
+ L1a FOLDER EDGES (roll-up)
+   src/client/  ──depends_on──►  src/policy/      weight 3  kinds {uses, field_type, may_call}  conf [0.93, 1.00]
+   src/         ──contains──►    src/policy/ · src/client/
+
+ L0  retry  ──depends_on──►  (none external)
+```
+
+What the agent sees, in order, under a budget: the folder view (two folders, one edge, ~60 tokens); expanding it, the file view (five files, six edges, ~250 tokens); expanding `client/mod.rs → policy/mod.rs`, the item edges that made it, with the one model-produced `may_call` marked by its confidence and its candidate list. `impact RetryPolicy` reads upward from the trait: one implementor, one field type, one dyn call site — and the coverage banner reports that nothing in this crate was abstained.
+
+A proposed edge sits in the same picture: if the agent plans `pub struct ExponentialBackoff` implementing `RetryPolicy`, `propose` writes `policy::ExponentialBackoff#struct ──implements (proposed, author: agent-LLM)──► RetryPolicy#trait`, it rolls up as a dashed `fixed.rs`-sibling edge into `src/policy/`, and it becomes `realized` the first time the extractor finds the real impl.
+
+#### B13.6 What each level is for
+
+```text
+ level    question it answers fastest                           typical size for a 300k-line workspace    default token cost
+ L0       what crates, features, cfg am I in?                    30–80 crates                              ~200
+ L1a      which parts of the tree touch each other?              100–400 folders, ~1–3k edges             ~500 (top-k by weight)
+ L1b      if I change this file, which files can notice?         1–5k files, ~10–50k edges                ~1k (neighbourhood)
+ L2       what does this file / item promise to the rest?        10–50k pub items, ~50–200k edges         ~3k (one anchor + radius 1)
+ L3       who actually calls / constructs / reads this?          ~100k–1M sites                           ≤ 20k (one deep dive)
+```
+
+The levels are views over one set of records, not separate graphs. That is the whole design: the tiny model and the scanner write leaf records once; folders and files are sums; the agent descends only as far as its question requires.
