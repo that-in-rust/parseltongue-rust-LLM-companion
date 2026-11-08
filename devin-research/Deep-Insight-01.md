@@ -3244,6 +3244,167 @@ Recommended split: **A plus a slice of C** — the 2 MB model over everything (~
 
 Thirty minutes does not make the tiny model smarter; it makes it *complete*. At one minute the map is honest but deferred; at thirty it is honest and whole, and everything after that is seconds.
 
+##### B9.9 Time-to-map as an equation — and every candidate model on Hugging Face plugged into it
+
+*The question: write y, the wall-clock time to build the first code map, as a function of the variables that actually move it — quantisation (int8 / int4 / int2), model origin (a large model pruned and distilled down versus a small model trained up), parameter count, model type, number of passes — then put real models into it. Device constants come from measured llama.cpp numbers on Apple Silicon; model facts from Hugging Face model cards fetched 2026-11-06; everything else is envelope math and says so.*
+
+###### The equation
+
+```text
+ y  =  T_io  +  Σ over passes p of  [  READ_p  +  WRITE_p  ]  +  T_store  +  T_index  +  T_feed
+
+ READ_p   =  N · (1 − h) · f_p · r_ctx(L)  ·  2 · P_act,p
+             ─────────────────────────────────────────────          prefill: every routed token × every active weight
+                        η_pre(P_act,p) · C_dev
+
+ WRITE_p  =  N · (1 − h) · f_p · o_p  ·  b_p · P_tot,p                decode (decoders only): every output token re-reads
+             ──────────────────────────────────────────              all the weights from memory, batched until compute-bound
+                 min( η_dec · B_dev · batch_p ,  η_pre · C_dev / (2·P_act,p) · b_p · P_tot,p )
+
+ N_eff for the NEXT pass  =  N · f_p · a_p          a_p = abstention rate of pass p — what it hands upward
+```
+
+The variables, what moves them, and how much they matter for a kernel-sized Rust corpus on an 8 GB Air:
+
+```text
+ #   variable                       meaning                                        range here                      effect on y
+ ──  ─────────────────────────────  ─────────────────────────────────────────────  ──────────────────────────────  ─────────────────────────
+  1  N          corpus tokens        measured 10–11 tok/line; kernel = 400 M        4 M (42k lines) … 400 M         linear
+  2  f_p        routing fraction     share of tokens pass p's model actually reads  1.0 all · 0.3 no bodies ·       linear — THE lever
+                                                                                    0.10–0.20 with rules in front
+  3  P_act      active params/token  the compute cost; MoE: active ≪ total          2 M … 4 B                       linear in READ
+  4  P_tot      total params         memory and decode bandwidth                    = P_act except MoE              linear in WRITE, memory
+  5  b          bytes per weight     fp16 2 · int8 1 · int4 0.5 · int2/ternary ¼   int8 · int4 · int2               WRITE and memory only —
+     (int8 / int4 / int2)            measured: Q4 prefill ≈ Q8 ≈ F16 prefill        (int2 needs special kernels)     prefill does NOT speed up
+  6  arch       model type           encoder (o=0) · decoder · SSM (no KV, linear   encoder · decoder · SSM · MoE   decides whether WRITE exists;
+                                     in L) · MoE (P_act < P_tot) · enc-dec                                          SSM: r_ctx = 1 at any L
+  7  o_p        output ratio         decoder output tokens per input token           0 enc · 0.1–0.3 dec ·           linear in WRITE; short ids
+                                                                                    0.3–0.5 verbose JSON (Cassini)   cut it 3–5×
+  8  L, r_ctx   context length       attention overhead per token grows with L       1.0 at ≤ 4k · ~1.3 at 20k      multiplies READ (transformers)
+  9  C_dev      sustained compute    FLOP/s the device really delivers (prefill)     M1 Air 1.1e12 · M2 Air 1.7e12 · inverse
+                                                                                    M4 Air 2.2e12 · M4 Pro mini 6e12
+ 10  B_dev      memory bandwidth     GB/s, ~80 % achieved                            68 · 100 · 120 · 273            inverse (WRITE)
+ 11  η_pre/dec  utilisation          tiny models cannot fill a GPU: launch overhead  7B 1.0 · 125M ~0.6 · 2 M ~0.2   inverse — bites tiny models
+ 12  batch      decode batching      parallel sequences until compute-bound          1 … 32                          WRITE only
+ 13  k, a_p     passes & abstention  how many models run and what each hands up      1 … 3 · a = 0.02–0.20           Σ; cascades shrink N per pass
+ 14  h          cache / feed hits    share of files whose records already exist      0 first map · 0.9+ later        linear — the other lever
+ 15  origin     nerfed-down vs       pruned+distilled from big vs trained small      see below                        acts through a_p (quality),
+                small-from-scratch                                                                                   not through FLOPs
+ 16  T_io, T_store, T_index          read+hash 1.49 GB · write ~5–50 M records · index   ~5 + 3–30 + 5–30 min        floor ≈ 15 min on an Air
+```
+
+###### The device constants, measured not guessed
+
+From ggml-org/llama.cpp discussion #4167 (LLaMA-7B, pp512 / tg128; 7B ≈ 1.34e10 FLOP per token):
+
+```text
+ chip        BW GB/s  GPU cores  F16 PP t/s  Q8 PP   Q4 PP   Q8 TG   Q4 TG   → effective prefill FLOP/s   → effective decode GB/s
+ M1            68      7–8         —          108–117 108–118  7.9     14.2     1.5e12                        53 (Q8) · 54 (Q4)
+ M2           100      8–10        201        147–181 146–180  12.2    21.9     2.0–2.7e12                    82 · 83
+ M4           120      10          230        224     221      13.5    24.1     3.1e12                        90 · 92
+ M4 Pro       273      16–20       381–464    367–450 364–440  30.5    50.7     5.1–6.2e12                    205 · 193
+```
+
+Two facts this table settles for the equation. **Quantisation does not speed up prefill** — Q4, Q8 and F16 prefill are within a few percent of each other on every chip, because prefill is compute-bound and the weights are dequantised on the way in. **Quantisation does speed up decode** almost exactly in proportion to bytes — Q4 TG ≈ 1.8× Q8 TG — because decode is bandwidth-bound. So variable 5 lives entirely in WRITE and in memory. A fanless Air sustains roughly 0.7 of the Mac-mini figure for the same chip after ten minutes; the C_dev values above apply that.
+
+###### The models, fetched from Hugging Face today
+
+```text
+ model (HF id)                          params  type            licence         notes                                   2·P FLOP/tok
+ ────────────────────────────────────── ─────── ─────────────── ─────────────── ─────────────────────────────────────── ────────────
+ from-scratch tagger (hypothetical)       2–5 M  encoder/CRF     —               the learned rule scanner (B9.7)          4e6–1e7
+ Salesforce/codet5-small                   60 M  enc-dec         Apache-2.0      encoder half usable alone                1.2e8
+ microsoft/codebert-base                  125 M  encoder         MIT             code-pretrained, 512 ctx                 2.5e8
+ microsoft/unixcoder-base                 125 M  encoder         Apache-2.0      code + AST pretraining                   2.5e8
+ state-spaces/mamba-130m-hf               129 M  SSM decoder     Apache-2.0      linear in L, no KV; whole-file context   2.6e8
+ HuggingFaceTB/SmolLM2-135M               135 M  decoder         Apache-2.0      general; deep-thin                        2.7e8
+ answerdotai/ModernBERT-base              150 M  encoder         Apache-2.0      8k ctx, code in pretraining mix          3.0e8
+ bigcode/tiny_starcoder_py                164 M  decoder         OpenRAIL-M      Python only                              3.3e8
+ HuggingFaceTB/SmolLM2-360M               362 M  decoder         Apache-2.0                                                7.2e8
+ answerdotai/ModernBERT-large             396 M  encoder         Apache-2.0      8k ctx                                   7.9e8
+ Qwen/Qwen2.5-Coder-0.5B                  494 M  decoder         Apache-2.0      strongest code prior at this size        1.0e9
+ Qwen/Qwen3-0.6B                          752 M  decoder         Apache-2.0      (0.44 B non-embedding)                   1.2e9
+ microsoft/bitnet-b1.58-2B-4T             ~2 B   ternary decoder MIT             native 1.58-bit; CPU kernels (bitnet.cpp) 4e9 (adds)
+ meta-llama/Llama-3.2-1B                  1.24 B decoder         Llama 3.2       PRUNED + DISTILLED from 8B               2.5e9
+ deepseek-ai/deepseek-coder-1.3b-base     1.3 B  decoder         DeepSeek        code-pretrained                          2.7e9
+ Qwen/Qwen2.5-Coder-1.5B                  1.54 B decoder         Apache-2.0                                                3.1e9
+ google/codegemma-2b                      2.5 B  decoder         Gemma                                                     5e9
+ bigcode/starcoder2-3b                    3.0 B  decoder         OpenRAIL-M                                                6e9
+ ibm-granite/granite-3b-code-base-2k      3.5 B  decoder         Apache-2.0                                                7e9
+ LatentForce-ai/Cassini-1.0               4.0 B  decoder (LoRA)  Apache-2.0      Qwen3-4B, LoRA r=1, 20,480 ctx; emits    8e9
+                                                                                 imports/defs/refs/calls/type-assignments
+                                                                                 as JSON; 77.6 % F1 on Py/JS/TS at $0.17
+                                                                                 vs 17–43× costlier frontier models
+ JetBrains/Mellum-4b-base                 4.0 B  decoder         Apache-2.0      code completion                          8e9
+ nvidia/Minitron-4B-Base                  4 B    decoder         NVIDIA open     PRUNED + DISTILLED from Nemotron-15B     8e9
+ Tesslate/Tessa-Rust-T1-7B                7.6 B  decoder         Apache-2.0      Rust-tuned; far outside the budget       1.5e10
+```
+
+Cassini is the one model on the list trained for exactly this task. It is the existence proof — a small LLM can emit per-file dependency facts well enough to be cheaper than frontier models — and it is 4 billion parameters with 20k context and verbose JSON output (o ≈ 0.3–0.5). On an 8 GB Air that is weeks for a kernel-sized corpus. It proves the task; it does not fit the device.
+
+###### Four passes of the equation on an 8 GB M2 Air (C_dev 1.7e12 sustained, B_dev 80 GB/s achieved), N = 400 M
+
+```text
+ PASS 1  one model reads everything   (f = 1, h = 0, int8, o = 0.2 for decoders, short handles)
+   model                 η     READ          WRITE         y (+15 min floor)
+   tagger 3 M            0.2   ~1.5 h        —             ~1.7 h          utilisation, not FLOPs, is the limit at this size
+   codet5-small enc 60M  0.5   16 h          —             16 h
+   CodeBERT/UniXcoder    0.6   27 h          —             ~1.1 d
+   Mamba-130m            0.6   28 h          —             ~1.2 d          same cost as the encoder, but sees whole files
+   SmolLM2-135M          0.6   29 h          ~7 h          ~1.5 d
+   ModernBERT-base       0.6   33 h          —             ~1.4 d
+   ModernBERT-large      0.7   75 h          —             ~3.1 d
+   Qwen2.5-Coder-0.5B    0.7   93 h          ~18 h         ~4.6 d
+   Llama-3.2-1B          0.8   8.5 d         ~1.9 d        ~10 d
+   Qwen2.5-Coder-1.5B    0.8   10.6 d        ~2.4 d        ~13 d
+   Cassini-1.0 (4B, 20k ctx, o≈0.4, int4) 0.8   ~36 d    ~10 d         ~46 d
+   → under 30 min: nothing reads everything except a ≤ ~2 M model at near-perfect utilisation.
+
+ PASS 2  skip bodies + rules in front   (f = 0.15; same models)
+   tagger 3 M            ~15 min  → the 30-minute map          CodeBERT / UniXcoder / Mamba-130m   ~4 h
+   ModernBERT-base       ~5 h                                  Qwen2.5-Coder-0.5B                  ~17 h
+   Llama-3.2-1B          ~1.6 d                                Cassini-1.0                         ~7 d
+   → f is worth 6.7× by itself; it is the single biggest term after N.
+
+ PASS 3  cascade   (tagger f=1 · 125M encoder on the tagger's abstentions a=0.03 → f=0.03 · 0.5B decoder on its
+                    abstentions a=0.15 → f=0.0045)
+   tagger 3 M everything          ~1.5 h  (→ ~25 min if η reaches 0.7 through batching and fused kernels)
+   + UniXcoder-class on 12 M tok  ~50 min
+   + Qwen2.5-Coder-0.5B on 1.8 M tok, o=0.2   ~30 min read + ~5 min write
+   y ≈ 3 h today, ≈ 1.7 h with a well-utilised tagger — L1 + L2 + L3 skeleton + real binding where it matters.
+   → the cascade turns parameter count from a linear cost into a cost on 3 % and 0.45 % of the corpus.
+
+ PASS 4  second map / public code   (h = 0.9 from the content-addressed cache or the feed; cascade of pass 3)
+   y ≈ 15 min floor + 10 % of pass 3 ≈ 25–35 min — regardless of which models sit in the cascade.
+   → after the first map, the equation is dominated by T_io + T_index, not by the model.
+```
+
+###### What the variables say about the two design questions asked
+
+**int8 vs int4 vs int2.** Measured: prefill unchanged; decode 1.8× per halving; memory halves. Quality: int8 is effectively lossless; int4 costs small models more than large ones (a 0.5B model loses measurably, a 7B barely) and is the practical floor for sub-1B decoders; int2 only works with codebook methods (QuIP#, AQLM) or natively trained ternary weights (BitNet b1.58) and has no mainstream Metal kernels — on an Air today int2 is a memory story, not a speed story. For this product's shape — encoders and cascades, almost no decode — **quantisation is the least important variable in the equation**: it changes WRITE, and the design has made WRITE small.
+
+**Nerfed-down big model vs small model trained up.** The evidence favours pruning-plus-distillation whenever a parent exists at 2–4× the target size: Minitron derived 8B and 4B models from a 15B parent with up to 40× fewer training tokens and up to 16 points better MMLU than same-size models trained from scratch; Llama-3.2-1B/3B were produced the same way. MobileLLM shows that below 1B the *architecture* (deep and thin, embedding sharing) adds 2.7–4.3 points at 125M/350M over prior same-size models. Below ~10M parameters there is nothing to prune down to, and the model is a tagger trained from scratch. So the rule is: **≥ 100M — start from a pretrained or pruned-and-distilled code model (UniXcoder, ModernBERT, Qwen2.5-Coder-0.5B) and post-train; ≤ 10M — train from scratch; in between, distil from the 125M.** Origin changes a_p — how much the pass hands upward — and therefore the size of every later term, which is why it matters even though it never appears in the FLOP count.
+
+###### Sensitivity, ranked
+
+```text
+ 1  f   routing fraction            6–10×     rules and body-skipping; the only lever that beats hardware
+ 2  P_act                           linear    pick the smallest model that clears the bar for ITS pass
+ 3  h   cache / feed                up to 10× every map after the first; the feed for public code
+ 4  η   utilisation at tiny sizes   3–5×      a 3 M model at η 0.2 is as slow as a 15 M model at η 1.0 — batch and fuse
+ 5  arch (encoder vs decoder, o)    1.2–2×    removes WRITE entirely; SSM removes r_ctx
+ 6  C_dev                           1.5–4×    M1 Air → M4 Pro mini
+ 7  b   int8 / int4 / int2          ≤ 1.8× on WRITE only; nil on READ
+ 8  L, r_ctx                        ≤ 1.3×    keep windows ≤ 4k unless the architecture is linear
+```
+
+###### Sources
+
+- ggml-org/llama.cpp, discussion 4167, "Performance of llama.cpp on Apple Silicon M-series" (table rows for M1, M2, M4, M4 Pro, commit 8e672ef).
+- Hugging Face model cards fetched 2026-11-06: LatentForce-ai/Cassini-1.0 (base Qwen/Qwen3-4B, LoRA r=1 α=2, 20,480 ctx, 77.6 % F1, $0.17 total inference cost vs $3.03–$7.57 for frontier models); microsoft/codebert-base; microsoft/unixcoder-base; Salesforce/codet5-small; answerdotai/ModernBERT-base and -large; HuggingFaceTB/SmolLM2-135M and -360M; Qwen/Qwen2.5-Coder-0.5B and -1.5B; Qwen/Qwen3-0.6B; state-spaces/mamba-130m-hf; microsoft/bitnet-b1.58-2B-4T; meta-llama/Llama-3.2-1B; deepseek-ai/deepseek-coder-1.3b-base; google/codegemma-2b; bigcode/starcoder2-3b; bigcode/tiny_starcoder_py; ibm-granite/granite-3b-code-base-2k; JetBrains/Mellum-4b-base; nvidia/Minitron-4B-Base; Tesslate/Tessa-Rust-T1-7B. A Hugging Face search for "call graph", "code dependency", "static analysis" and "rust code model" surfaced no other purpose-built extraction models.
+- arXiv 2407.14679 (Minitron: pruning + distillation), 2402.14905 (MobileLLM), 2312.00752 (Mamba), 2402.04396 (QuIP#), 2401.06118 (AQLM), 2504.12285 (BitNet b1.58 2B4T).
+- Utilisation factors η, the Air's 0.7 thermal factor, abstention rates a_p and output ratios o_p are estimates, not measurements; the equation is built so that each can be replaced by a measured value without changing its shape.
+
 #### B10. What a cybersecurity paper knows about code maps that the code-map literature does not
 
 *Deep research on Sikos, "Cybersecurity knowledge graphs", Knowledge and Information Systems 65 (2023), open access, in the repository as `deep-insight-sikos-2023-cybersecurity-knowledge-graphs-KAIS.pdf`. Read against the arXiv literature on graphs for LLM agents over repositories (2024–2026) and against the industry systems that already run the pattern in production. Where a precedent was read from its abstract only, it says so.*
