@@ -48,14 +48,14 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-a
  cpu-tool-propose-future-rows      validate and write hld-future-dependency-edges rows for the agent/human
  cpu-tool-status-coverage-banner   per-level coverage, stale rows, pending L3
 
- TINY MODELS (only where grammar cannot decide; text in → labels + confidence out; never touch the table)
- tiny-model-grey-span-clarifier    grey spans only (recovery rule conf < 1); fix boundary/kind/visibility
- tiny-model-candidate-edge-binder  ~100 MB; site + candidates → one target or abstain; gated behind the measured join rate
- tiny-model-macro-item-guesser     macro invocation at item position → which item(s) it defines
- tiny-model-result-rank-scorer     optional; reranks find results
+ TINY LLMS (only where grammar cannot decide; text in → labels + confidence out; never touch the table; see DI-08 "When a tiny LLM is called")
+ tiny-llm-span-clarifier           grey spans only (parse error + recovery rule conf < 1); fix boundary/kind/visibility
+ tiny-llm-edge-binder              site + several candidates → one target or abstain; only after the CPU resolver fails
+ tiny-llm-macro-guesser            macro invocation at item position → which item(s) it defines; status inferred
+ tiny-llm-result-ranker            optional; reranks find results beyond the agent's budget
 
  RETIRED 2026-11-09 (DI-07 §16: boundaries, fields and sites come from the parser) — do not reuse the names
- tiny-model-span-boundary-tagger · tiny-model-field-detail-tagger · tiny-model-body-site-tagger
+ tiny-llm-span-boundary-tagger · tiny-llm-field-detail-tagger · tiny-llm-body-site-tagger
  cpu-tool-span-cutting-driver · cpu-tool-text-copy-indexer · cpu-tool-field-extraction-driver
 
  LEVELS

@@ -53,7 +53,7 @@ Decision (evidence: DI-07 §16): one parse per file with `ra_ap_syntax` (pinned 
                                                                                                                                  blake3 crate (file + span digests)                   ✔ as is
  1     ONE PARSE PER FILE: module-level items → byte range, kind, name,     cpu-tool-syntax-tree-walker                          ra-ap-rustc_lexer (= rustc's own lexer)              ✔ as is
        visibility, conf 1.0; nested items kept under a parent id; tree      → span-reference-text-table                          ra_ap_parser + ra_ap_syntax (lossless tree, ranges)  ✔ as is, pinned
-       dropped after the file. Files whose parse reports errors →           → tiny-model-grey-span-clarifier (grey rows only,    syn 2 (oracle in tests; fallback parser)             ✔ as is
+       dropped after the file. Files whose parse reports errors →           → tiny-llm-span-clarifier (grey rows only,    syn 2 (oracle in tests; fallback parser)             ✔ as is
        indentation-recovery re-cut; those spans conf < 1 = grey               background)                                        rust-analyzer ITEM_RECOVERY_SET / error_block        ○ pattern
                                                                                                                                  experiments/spancut (indentation recovery rule)      ✔ ours
  2     same pass: params, returns, generics, bounds, struct fields, trait   cpu-tool-syntax-tree-walker (no model)               rustdoc JSON (which fields a public item has)        ○ schema idea
@@ -67,8 +67,8 @@ Decision (evidence: DI-07 §16): one parse per file with `ra_ap_syntax` (pinned 
        several → candidates, none → unresolved; JOIN RATE published —       → edge-evidence-record-table                         github/stack-graphs (name resolution w/o compiler)   ○ pattern
        the number that decides how much binding is needed                                                                       rust-analyzer hir-def nameres                        ○ offline teacher only
  5     only candidate rows go to the binder (CPU resolver first); macro     cpu-tool-bind-resolve-edges                          rust-analyzer (labels to train the binder)           ✔ offline teacher
-       invocations at item position go to the guesser; background after    → tiny-model-candidate-edge-binder                   cargo-expand (macro truth for offline labels)        ✔ offline teacher
-       the first map; abstain when evidence is missing                     → tiny-model-macro-item-guesser                      Qwen2.5-Coder small / Cassini-class encoders         ○ teacher / base
+       invocations at item position go to the guesser; background after    → tiny-llm-edge-binder                   cargo-expand (macro truth for offline labels)        ✔ offline teacher
+       the first map; abstain when evidence is missing                     → tiny-llm-macro-guesser                      Qwen2.5-Coder small / Cassini-class encoders         ○ teacher / base
                                                                             → edge-evidence-record-table
  6     public→public edges collapsed through private chains → HLD rows;     cpu-tool-hld-table-builder                           cargo-modules dependency graph                       ○ pattern
        roll-ups by trigger                                                  → hld-current-dependency-edges,                      RustPräzi (ecosystem call graph)                     ○ pattern
@@ -96,22 +96,66 @@ Decision (evidence: DI-07 §16): one parse per file with `ra_ap_syntax` (pinned 
        score the two surviving tiny models — never at runtime
 ```
 
+### Legend for the inspiration column
+
+```text
+ ✔ as is           a crate or tool we take unchanged. At runtime this is always a LIBRARY linked into the Parseltongue binary
+                   (ra_ap_syntax, ra-ap-rustc_lexer, turso, blake3, ignore, SQLite FTS5) — never a server, build loop or compiler.
+                   Example: ra_ap_syntax parses the file; we call it, we do not re-implement it.
+ ✔ as is, pinned   same, but version-locked; bumped only when the §16 oracle suite stays green (ra_ap_* releases weekly, 0.0.x API).
+ ✔ offline teacher a tool we RUN, never ship: it produces labels or ground truth for training/evaluation on our machines.
+                   Example: rust-analyzer resolves a call site so the binder has a correct answer to learn from.
+ ✔ ours            Parseltongue code, written and tested in this repo. Example: the indentation-recovery rule from experiments/spancut.
+ ✔ external        the thing on the other side of the CLI; we talk to it, we do not contain it. Example: Claude Code / Codex as ext-llm-coding-agent.
+ ✔ dev tool        used by humans/agents while developing Parseltongue; not part of the shipped runtime. Example: codebase-memory-mcp.
+ ○ pattern         an IDEA we copy, no code dependency. We read how the project does it and write our own version.
+                   Example: AgentFS stores files as rows in SQLite → our file-source-text-table does the same; no AgentFS crate is linked.
+ ○ id format       a naming/encoding convention we adopt for compatibility. Example: SCIP symbol strings as the shape of our item ids.
+ ○ schema idea     field names and shapes borrowed from a spec. Example: rustdoc JSON tells us which fields a public item has.
+ —                 nothing external; plain Parseltongue logic or a by-definition view.
+```
+
 Reading rule for the inspiration column: anything ✔ at runtime is a *library* (parser, lexer, DB, FTS, hashing, walker) — never a server, a build loop, or a compiler. Everything that needs a compiler or a whole-program database is ✔ only in the offline lanes.
 
 ### Names changed by this revision (first draft → this version)
 
 ```text
  new       cpu-tool-syntax-tree-walker        one ra_ap_syntax pass per file → span, field, name-token and pending L3 rows (steps 1–3)
- new       tiny-model-macro-item-guesser      macro invocation at item position → which item(s) it defines; status inferred
- retired   tiny-model-span-boundary-tagger    boundaries come from the parser (DI-07 §16: 376/376 on real files)
- retired   tiny-model-field-detail-tagger     fields come from the tree
- retired   tiny-model-body-site-tagger        sites come from the tree
+ new       tiny-llm-macro-guesser      macro invocation at item position → which item(s) it defines; status inferred
+ retired   tiny-llm-span-boundary-tagger    boundaries come from the parser (DI-07 §16: 376/376 on real files)
+ retired   tiny-llm-field-detail-tagger     fields come from the tree
+ retired   tiny-llm-body-site-tagger        sites come from the tree
  retired   cpu-tool-span-cutting-driver       folded into the walker
  retired   cpu-tool-text-copy-indexer         folded into the walker
  retired   cpu-tool-field-extraction-driver   folded into the walker
- kept      tiny-model-grey-span-clarifier     now only for spans the recovery rule marks conf < 1
- kept      tiny-model-candidate-edge-binder   now gated behind the measured join rate
+ kept      tiny-llm-span-clarifier     now only for spans the recovery rule marks conf < 1
+ kept      tiny-llm-edge-binder   now gated behind the measured join rate
 ```
+
+### When a tiny LLM is called — and when it is not
+
+```text
+ name                     called when                                   input                              output                      if it abstains                  share of work
+ ──────────────────────── ───────────────────────────────────────────── ────────────────────────────────── ─────────────────────────── ─────────────────────────────── ─────────────────
+ tiny-llm-span-clarifier  a file's parse reported errors AND the         the grey span's bytes plus the     confirmed/moved end byte,   span stays grey (conf ≤ 0.3);   ≈ 1 span per
+                          recovery rule produced a span with conf < 1    lines around it                    kind, name, visibility,     its edges stay abstained;       broken file;
+                          (step 1). Never on a file that parses clean.                                      new confidence              counted in the banner           0.01–0.5 % of spans
+ tiny-llm-edge-binder     a site/field name joined to SEVERAL candidate  the site's span text, the          one target span id + conf,  row stays pending with its      measured next:
+                          spans and the CPU resolver (use trees, field   candidate signatures, the          or abstain                  candidate list; never a         1 − join rate
+                          types, receiver types) could not pick one      enclosing item's use tree                                      guessed edge
+                          (step 5). Never on unique joins.
+ tiny-llm-macro-guesser   a macro invocation sits at item position       the invocation bytes + the         zero or more proposed       span stays kind macro_call;     ≈ share of
+                          (`foo! { … }` / `foo!(…);` at module or impl   macro_rules!/proc-macro span       items (kind, name, vis)     no items claimed; counted       item-position
+                          level) and is not in the known-macro table     if found by name                   with status inferred        in the banner                   macro calls
+ tiny-llm-result-ranker   optional; only when `find` returns more rows   query + candidate rows             reordered rows              CPU BM25 order is used          0 at first map
+                          than the agent's budget
+ NOT called              any span, field, name token, use tree or body site on a file that parses clean — the parser is exact there (§16: 376/376);
+                         any unique name join; any HLD derivation or roll-up; anything in the future/delta tables
+```
+
+Rules that hold for all four: text in, labels + confidence out; never write a table (a CPU tool writes the row with the label); always allowed to abstain; every output carries status `inferred` so hld-delta-dependency-view and the human reviewer can see which rows came from a model.
+
+Name note: the four-word rule forces two-word descriptors; "grey" and "candidate" moved from the names into the "called when" column.
 
 Roles in one line each:
 - **ext-llm-coding-agent** — reads the product, writes intent and code; never writes facts.
@@ -143,7 +187,7 @@ Roles in one line each:
  0  d3 stored verbatim (the file is broken; bytes don't care)
  1  parse reports 1 error; the ra_ap tree alone would nest every later item inside the open fn → recovery re-cut fires:
     `pub fn g` first on its line at column 0 ends the open item → fn f [..]  conf 0.3 (grey); g, S clean conf 1.0
-    grey row queued → tiny-model-grey-span-clarifier later confirms/adjusts f's end
+    grey row queued → tiny-llm-span-clarifier later confirms/adjusts f's end
  2–3 fields and sites for g and S exact; f's sites written but flagged from a grey span
  4–6 edges from g and S flow normally; HLD rows involving f carry conf ≤ 0.3 and status abstained
  7  banner shows 1 grey span in this file; nothing is lost, nothing is silently wrong
@@ -154,7 +198,7 @@ Roles in one line each:
 ```text
  1  kernel/platform.rs: `kernel::impl_device_context_deref!(unsafe { Device });` at item position → span kind macro_call conf 0.9
     (a parser knows it is a macro call; it does not know it DEFINES a Deref impl)
- 5  tiny-model-macro-item-guesser reads the span + the macro's own span (found by name) → proposes "impl Deref for Device", inferred 0.7
+ 5  tiny-llm-macro-guesser reads the span + the macro's own span (found by name) → proposes "impl Deref for Device", inferred 0.7
  3–4 elsewhere, site `ctx.lock()` → candidates: Mutex::lock, SpinLock::lock, RwLock::lock → no receiver type visible at the site
  5  binder: use-tree (`use crate::sync::SpinLock`) + field decl `ctx: SpinLock<…>` → SpinLock::lock inferred 0.85;
     if evidence is missing it ABSTAINS → row stays pending, counted in the banner, never guessed silently
