@@ -20,6 +20,7 @@ This document is the single, self-contained description of the pipeline. It is w
  §11 the open question
  §12 fields           once spans are known: why fields, what is done with them, how a public-interface signature is built
  §13 parked ideas     explorations not yet part of the design: public-only tiers, the six axes of a span (+ ELI5), virtual spans
+ §14 coverage         the byte-coverage invariant: spans + classified gaps = file length, measured on 3,370 files; TDD log
 ```
 
 Conventions used throughout:
@@ -677,3 +678,75 @@ Proposed four-word name, if adopted: `span-kind-axis-taxonomy`; each axis would 
    doc-tests, conflict regions                                           ──►  TAG only
    locals, closures, let bindings                                        ──►  not a box at all; their calls belong to the enclosing box
 ```
+
+## 14. The byte-coverage invariant — did we look at everything? (TDD log)
+
+**Plain words.** A table of spans is only trustworthy if every byte of every file is inside some span or inside a gap we can name (whitespace, a comment, crate docs, an inner attribute, a parse error). If a single byte is in neither, something that could be an item — or a call into one — is invisible, and the agent would be told "no dependency" when the truth is "we did not look". So the check is an *identity*, not a percentage: for every file, item bytes + classified gap bytes = file length, with no overlaps and no gap of kind "other". The ingest tool enforces it per file; a file that fails it is reported in the banner, never silently mapped.
+
+### 14.1 The rule
+
+```text
+ for each file:
+   items   = module-level item spans from the one parser pass            (byte ranges, sorted)
+   gaps    = every byte between items, classified by the parser's own token/node kind:
+             whitespace · comment · doc (//! crate docs) · frontmatter (#! shebang, --- cargo-script header) · inner_attr (#![…]) · error
+   invariant 1   items ∪ gaps tile [0, len) exactly: sorted, contiguous, non-overlapping, sum = len
+   invariant 2   no gap has kind "other" — every byte outside an item has a name
+   reporting     error-gap bytes > 0  → the file appears in the banner as "has unparsed region"
+                 doc-gap bytes        → crate/module-level docs; interface text for the module header row
+```
+
+Nested items (a fn inside a fn) are inside their parent's bytes, so they are covered by the parent; the parent chain (§12, parent_id) is what makes them addressable. Members of impls and traits likewise sit inside the impl/trait item bytes.
+
+### 14.2 Measured result
+
+```text
+ corpus                              files   identity failures   bytes        inside items   whitespace   comment   doc        frontmatter   inner_attr   error    other
+ ─────────────────────────────────── ─────── ─────────────────── ──────────── ────────────── ──────────── ───────── ────────── ───────────── ──────────── ──────── ─────
+ all .rs on the VM (rust-analyzer,    3,370   0                   31,752,951   97.83 %        89,408       192,670   373,641    247           28,796       3,365    0
+ rustc, linux/rust, cargo-modules…)
+ the 125-file oracle sample           125     0                   1,102,039    97.79 %        3,042        6,971     12,930     0             1,098        306      0
+```
+
+Every one of the 3,370 files tiles exactly (per-row column sum re-checked independently: 0 failures). The 3,365 error bytes are in 120 files, all of them rust-analyzer's own parser *error fixtures* (`test_data/parser/err/…`) and rust-code-analysis's Jinja templates (`enums/templates/*.rs`, not Rust) — i.e. files that are supposed to be broken. No production file has an unparsed region. "other" is zero everywhere.
+
+### 14.3 TDD log — STUB → RED → GREEN → REFACTOR
+
+Crate: `experiments/spancut/coverage` (library + `coverage <file-list> [base-dir]` binary + `examples/dump.rs`).
+
+```text
+ STUB      cover_file(&str) -> Coverage { file_len, items: Vec<Item>, gaps: Vec<Gap{start,end,kind}> }
+           covered_bytes · is_identity · gap_bytes_by_kind — all todo!(). cargo check green.
+ RED       8 tests, all failing on todo!():
+           test_sum_equals_file_length · test_empty_file_identity_holds · test_gap_whitespace_comment_classified
+           test_inner_attr_gap_classified · test_error_region_gap_flagged · test_nested_items_not_module_level
+           test_items_sorted_non_overlapping · test_gap_bytes_sum_matches
+ GREEN 1   walk the root node's children: Item nodes → items; ATTR → inner_attr; ERROR → error; WHITESPACE/COMMENT tokens → their kind;
+           anything else → other. 7/8 green. test_inner_attr_gap_classified RED: the inner attr was found but "other" bytes appeared.
+           First corpus run: identity 3,370/3,370, but 373,785 bytes (1.2 %) of kind OTHER in 1,060 files — exactly the failure the
+           invariant exists to catch. examples/dump.rs showed them: `//!` doc comments are DOC_COMMENT *nodes* in this parser version,
+           not COMMENT tokens. → new kind Doc. RED test added: test_module_docs_not_other. 9/9 green; other = 144 bytes in 3 files.
+ GREEN 2   the 144 bytes: SHEBANG and FRONTMATTER tokens (cargo-script headers in parser fixtures). → kind Frontmatter;
+           RED test test_frontmatter_shebang_classified; 10/10 green; other = 0 in 3,370 files.
+ GREEN 3   a reporting bug the identity did NOT catch: after `cargo fmt` rewrapped a line, the by-kind report omitted Frontmatter while
+           the identity still held (it sums the real gaps, the report sums a list of kinds). Caught only by eye in the per-file output
+           (len 109 ≠ 14 reported). → RED test test_by_kind_covers_every_gap (sum of reported kinds == sum of gaps on a file containing
+           every kind); fixed; 11/11 green. Second guard added to the binary run: per-row column sum re-checked with awk → 0 failures.
+           Also: the 125-file list mixed relative and absolute paths; only 100 were read. Fixed (absolute paths bypass the base dir).
+ REFACTOR  cargo fmt · cargo clippy --all-targets -D warnings clean · 11/11 · corpus re-run identical.
+```
+
+Lessons recorded: (1) a 100 % identity can still hide a classification hole — the "other" bucket must be asserted zero, not merely reported; (2) a report derived from a *list of kinds* can silently drop a kind; the test must compare it to the ground sum; (3) parser-version detail (doc comments as nodes) is exactly why the parser is pinned and this check re-runs on every bump.
+
+### 14.4 What this settles about the six axes (§13.2)
+
+```text
+ axis 1  grammar kind      REQUIRED for coverage — the identity is defined over item kinds + gap kinds. Measured complete: other = 0.
+ axis 5  parse status      REQUIRED — error gaps are the only bytes without an item; they must reach the banner. Measured: 120 fixture files.
+ axis 2  nesting           not a coverage question — nested bytes are inside the parent; needed for paths and effective visibility (§12).
+ axis 3  reachability      not a coverage question — a label on rows; needed for the product (what is public), computable from parents.
+ axis 4  origin            not a coverage question — derive/macro/cfg labels; virtual spans point back into covered bytes.
+ axis 6  identity in time  not a coverage question — digests over covered bytes; follows from 1 + 5.
+```
+
+So: coverage needs axes 1 and 5 and is now measured; axes 2 and 3 are needed for correctness of the product and are computable from the parent chain; 4 and 6 are labels that can be added without touching coverage.
