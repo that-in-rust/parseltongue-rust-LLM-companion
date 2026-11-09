@@ -673,3 +673,19 @@ Measured in one process (no spawn cost) over every `.rs` file on the VM: 3,370 f
 - **10 M lines ≈ 310 MB of source → ~13 s on one core for the complete syntax tree of every file, ~5 s on four.** An 8 GB Air's cores are not slower than this VM's. The §14 budget that gave stages 1–3 most of the 30 minutes was built on "a model reads every token"; with a parser the whole of stage 1 + the deterministic part of stage 3 is tens of seconds, and the bound is the database write, not the parse.
 - Memory: a lossless tree is roughly 5–10× the source bytes; parse file-by-file and drop the tree after writing rows, never hold the forest. Peak per thread ≈ largest file × 10 (a few MB).
 - **The solve.** Pick up the parser: `ra_ap_syntax`, pinned, as a library (not the server). Run our indentation-recovery rule only on files whose parse reports errors (the broken ≤ 2 %), either as a pre-pass that re-cuts item boundaries or ported into the tree walk. Byte ranges from the tree go straight into `span-reference-text-table`; the tree also yields signature fields, use trees and body call *sites* (L3 pending rows) in the same pass. The tiny models no longer cut spans or read fields; they bind names to targets (stage 5) — the one step a parser cannot do without a whole-program analysis database — and judge grey/macro cases.
+
+### §16 conclusion — the decision, as stated to the user (stored verbatim for reference)
+Measured in one process over every `.rs` file on the VM — 3,370 files, 31 MB, 1.01 M lines:
+
+```text
+ parser                                  1 thread              4 threads
+ ra_ap_syntax  (full lossless tree)      1.28 s   789 klines/s  0.63 s
+ ra_ap_syntax + walk every node          1.44 s                 0.69 s
+ syn           (full AST, no recovery)   1.95 s   517 klines/s  0.79 s
+ our 140-line cutter (boundaries only)   2.05 s                 0.97 s   (naive lexer, unoptimised — the parser beats it)
+ reading the 31 MB from disk             0.06 s
+```
+- **10 M lines ≈ 310 MB → ~13 s on one core for the complete syntax tree of every file, ~5 s on four.** An Air's cores are no slower than this VM's. Memory is fine if we parse file-by-file and drop each tree after writing its rows (a tree is ~5–10× the file's bytes).
+- **The solve, one line:** pick up the parser — `ra_ap_syntax`, pinned, as a library (not the rust-analyzer server) — and keep our indentation-recovery rule only for the ≤ 2 % of files whose parse reports errors. One pass gives byte-exact spans, signature fields, use trees and body call *sites* (the L3 pending rows) for all 10 M lines in well under a minute. Stages 1–3 of DI-07 stop being model work and stop being a time budget at all.
+- What that leaves for the tiny models is the thing no parser can do: **binding** a name at a call/field site to the item it refers to across files (stage 5), plus grey spans and macro-defined items. That is where rust-analyzer's *analysis database* would have been needed — the part we do not run. So the real question moves from "how to cut spans" to **"how good is pure name-join on a 10 M-line tree before any model"** — the next thing to measure.
+- Status of earlier claims: §2/§9 "tinyLLM01 reads every token" — withdrawn (checkpoint 5). §14 time budget for stages 1–3 — superseded by checkpoint 8. "No rust-analyzer at runtime" — refined to "no rust-analyzer server/analysis database at runtime; its parser as a pinned library is allowed" (checkpoint 7). Evidence: `experiments/spancut/` (cutter, oracle, `rasyn`, `bench`, `compare.py`, `mutate.py`).
