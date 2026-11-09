@@ -689,3 +689,39 @@ Measured in one process over every `.rs` file on the VM — 3,370 files, 31 MB, 
 - **The solve, one line:** pick up the parser — `ra_ap_syntax`, pinned, as a library (not the rust-analyzer server) — and keep our indentation-recovery rule only for the ≤ 2 % of files whose parse reports errors. One pass gives byte-exact spans, signature fields, use trees and body call *sites* (the L3 pending rows) for all 10 M lines in well under a minute. Stages 1–3 of DI-07 stop being model work and stop being a time budget at all.
 - What that leaves for the tiny models is the thing no parser can do: **binding** a name at a call/field site to the item it refers to across files (stage 5), plus grey spans and macro-defined items. That is where rust-analyzer's *analysis database* would have been needed — the part we do not run. So the real question moves from "how to cut spans" to **"how good is pure name-join on a 10 M-line tree before any model"** — the next thing to measure.
 - Status of earlier claims: §2/§9 "tinyLLM01 reads every token" — withdrawn (checkpoint 5). §14 time budget for stages 1–3 — superseded by checkpoint 8. "No rust-analyzer at runtime" — refined to "no rust-analyzer server/analysis database at runtime; its parser as a pinned library is allowed" (checkpoint 7). Evidence: `experiments/spancut/` (cutter, oracle, `rasyn`, `bench`, `compare.py`, `mutate.py`).
+
+### §16 ELI5 — rustc crate or rust-analyzer crate: which is more reliable?
+```text
+ THREE WAYS TO READ RUST, ELI5
+
+ 1. THE LEXER — the machine that chops text into words
+    rustc's lexer  ══════════════▶  the SAME box, relabelled "ra-ap-rustc_lexer", shipped weekly
+    there is only one chopper. everybody uses it. take it.   ✔
+
+ 2. THE PARSER — the machine that builds the tree from the words
+
+    rustc_parse        ra_ap_syntax          syn
+    ┌───────────┐      ┌───────────┐         ┌───────────┐
+    │ THE LAW   │      │ THE IDE   │         │ THE MACRO │
+    │           │      │           │         │           │
+    │ lives in  │      │ lives on  │         │ lives on  │
+    │ nightly   │      │ crates.io │         │ crates.io │
+    │ only      │      │ 0.0.x     │         │ 2.x       │
+    └───────────┘      └───────────┘         └───────────┘
+    good code    ✔     good code    ✔        good code    ✔       ← all three agree, byte for byte (checkpoint 7)
+    broken code  ✔*    broken code  ✔✔       broken code  ✘       * recovers to print errors, not to give you a tree
+    can we use   ✘     can we use   ✔        can we use   ✔       rustc_parse needs the compiler's innards + nightly
+    API stable   ✘✘    API stable   ✘        API stable   ✔✔      pin RA; bump every few months
+
+ 3. WHAT "RELIABLE" MEANS HERE
+    the crate is not what we trust ─────────▶  our oracle test is:  376 items byte-exact + 5 kinds of broken files
+                                               run it on every version bump; if it stays green, the bump is safe
+
+ 4. THE PICK
+    lexer   = rustc's own (via ra-ap-rustc_lexer)
+    parser  = ra_ap_syntax, pinned                  ← trees for good AND broken files
+    spare   = syn, if we ever want zero RA code     ← covers the parseable 98 %
+    never   = rustc_parse at runtime
+```
+- Why not `rustc_parse`: it is `rustc_private` — no crates.io, nightly only, breaks every few weeks, needs the compiler's `SourceMap`/`Session` globals to hand back a span, its AST is not lossless and its recovery exists to print diagnostics, not to return a usable tree. Nobody embeds it.
+- Why `ra_ap_syntax` on valid code is as trustworthy as rustc: same grammar, tested against rustc's parser test suite and by parsing rust-lang/rust itself; and our own 376/376 oracle agreement.
