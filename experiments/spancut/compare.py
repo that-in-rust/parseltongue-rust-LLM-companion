@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare spancut vs syn truth on files. Usage: compare.py <filelist>  → summary + mismatch examples."""
 import subprocess, sys, collections
-TRUTH='/home/ubuntu/spanbench/truth/target/release/truth'; CUT='/home/ubuntu/spanbench/spancut/target/release/spancut'
+TRUTH='/home/ubuntu/spanbench/truth/target/release/truth'; CUT=__import__('os').environ.get('CUT','/home/ubuntu/spanbench/spancut/target/release/spancut')
 KMAP={'macro':'macro','extern_block':'externblock','extern_crate':'externcrate','trait_alias':'trait'}
 def run(b,f):
     try: return subprocess.run([b,f],capture_output=True,text=True,timeout=60).stdout

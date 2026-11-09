@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mutation runs: break real files, measure how many UNAFFECTED truth items the cutter still cuts exactly, and whether the damage is grey."""
 import subprocess, sys, random, collections, os
-TRUTH='/home/ubuntu/spanbench/truth/target/release/truth'; CUT='/home/ubuntu/spanbench/spancut/target/release/spancut'
+TRUTH='/home/ubuntu/spanbench/truth/target/release/truth'; CUT=os.environ.get('CUT','/home/ubuntu/spanbench/spancut/target/release/spancut')
 random.seed(7)
 def run(b,f): return subprocess.run([b,f],capture_output=True,text=True,timeout=60).stdout
 def lc_to_off(src,lc):
@@ -44,19 +44,19 @@ for f in files:
         unaffected=[(k,nm,s,e) for k,nm,s,e in items if e<=a or s>=b]
         affected=[(k,nm,s,e) for k,nm,s,e in items if not (e<=a or s>=b)]
         cutmap={(s):(k,nm,e,c) for k,nm,s,e,c in cuts}
-        ok=0
+        ok=0; st_clean=[0]
         for k,nm,s,e in unaffected:
             c=cutmap.get(adj(s))
-            if c and c[2]==adj_end(e) and c[3]>=0.9: ok+=1
-        st=stats[kind]; st['files']+=1; st['unaffected']+=len(unaffected); st['unaffected_exact']+=ok
+            if c and c[2]==adj_end(e): ok+=1; st_clean[0]+= 1 if c[3]>=0.9 else 0
+        st=stats[kind]; st['files']+=1; st['unaffected']+=len(unaffected); st['unaffected_exact']+=ok; st['unaffected_clean']+=st_clean[0]
         # damage region: is there a grey/error span overlapping it?
         grey=[x for x in cuts if x[4]<0.5 and not (x[3]<=a or x[2]>=b+shift)]
         st['damage_flagged_grey']+= 1 if grey or kind=='truncate_mid_item' and any(x[4]<0.5 for x in cuts) else 0
         st['grey_spans_total']+=sum(1 for x in cuts if x[4]<0.5)
         if ok<len(unaffected) and len(examples[kind])<3:
-            miss=[(k,nm) for k,nm,s,e in unaffected if not (cutmap.get(adj(s)) and cutmap[adj(s)][2]==adj_end(e) and cutmap[adj(s)][3]>=0.9)]
+            miss=[(k,nm) for k,nm,s,e in unaffected if not (cutmap.get(adj(s)) and cutmap[adj(s)][2]==adj_end(e))]
             examples[kind].append(f'{os.path.basename(f)} @{a}: lost {len(unaffected)-ok}/{len(unaffected)} e.g. {miss[:3]}')
 for k in KINDS:
     st=stats[k]; u=st['unaffected'] or 1
-    print(f"{k:24s} files {st['files']:3d}  unaffected items kept exact {st['unaffected_exact']}/{st['unaffected']} = {100*st['unaffected_exact']/u:.1f} %   damage flagged grey {st['damage_flagged_grey']}/{st['files']}   grey spans total {st['grey_spans_total']}")
+    print(f"{k:24s} files {st['files']:3d}  boundary-exact {st['unaffected_exact']}/{st['unaffected']} = {100*st['unaffected_exact']/u:.1f} %  of which clean {st['unaffected_clean']}   damage flagged grey {st['damage_flagged_grey']}/{st['files']}   grey spans total {st['grey_spans_total']}")
     for e in examples[k]: print('     ',e)
