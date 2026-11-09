@@ -388,3 +388,68 @@ Nothing at module level runs. A Rust file is a set of declarations resolved over
 - `mod foo;` only declares the file; items inside `foo` still need `pub` and a `use` to be visible, wherever the `mod` line sits.
 - Two `use` lines bringing the same name into one scope are an error, not an override — there is no shadowing by position at module level.
 - Glob imports (`use x::*`) resolve against whatever `x` exports at compile time; the join cannot enumerate them without the target's span rows — a `use *` edge is `inferred` until the target file is indexed.
+
+## 14. Row-count envelope, measured
+
+*How many rows each table holds for a 10 M-line Rust tree, from densities measured on six Rust trees (2026-11-09), scaled. Low / medium / high are the minimum, middle and maximum of five trees; cargo-semver-checks is shown but excluded from the ranges as fixture-heavy (99 public types per 1,000 lines). Counts are grep proxies over non-blank, non-comment lines; good to about ±2× at the ends, which is what an envelope is for.*
+
+### 14.1 Measured densities, per 1,000 code lines
+
+```text
+ tree                      lines   fn   pub fn  pub types  impl  use   mod   macro  doc   .method(  path(   .field  unsafe{  files
+ cargo-modules             4k      55   22      14         11    36    9     0      29    242       197     125     0        9.7
+ flowistry                 3.9k    33   16      10         9     52    6     0.5    70    308       140     115     0.8      8.8
+ rust-code-analysis        25k     40   11      4          9     19    2.5   0.8    39    105       111     68      0.2      3.2
+ rust-analyzer             435k    76   17      8.5        18    15    2.6   2.7    30    215       186     69      0.8      2.0
+ linux/rust                104k    73   26      10         38    17    3.8   3.5    334   189       312     114     23       4.0
+ cargo-semver-checks (x)   29k     97   55      99         21    13    2.5   1.7    44    99        197     41      0.3      23
+```
+
+Two densities swing everything: `impl` blocks (9 per 1,000 lines in rust-analyzer, 38 in the kernel's Rust — trait-heavy code roughly doubles the public span count) and call sites (210–610 per 1,000 lines — the reason L3 is lazy).
+
+### 14.2 Rows for a 10 M-line tree
+
+```text
+ table / level                                        low      medium   high     driver
+ file                                                 20k      40k      100k     2–10 files per 1k lines
+ span — public items (fn, types, impl, const, macro)  250k     480k     820k     pub fn 11–26 · pub types 4–14 · impl 9–38
+ span — public members (fields, variants, assoc)      120k     400k     700k     3–5 per public type (assumed, not measured)
+ span — private light rows                            320k     590k     800k     fn − pub fn, private types
+ span total                                           0.7 M    1.5 M    2.3 M
+ name (tokens of name + path)                         2 M      7 M      14 M     3–6 tokens per span
+ field (stage-4 output)                               1 M      4 M      9 M      3–6 fields per public span
+ L1 evidence (use + mod rows)                         150k     200k     450k     use 13–36 · mod 2.5–9
+ L1 file → file edges (distinct pairs)                80k      120k     250k     ~60 % of use lines intra-tree and distinct
+ L1 folder → folder edges                             5k       10k      20k
+ L2 item → item edges                                 0.4 M    1.0 M    2.0 M    2–4 type refs per pub fn + implements + reexports
+ HLD_current rows (L2 edges + edgeless nodes)         0.5 M    1.2 M    2.3 M
+ L3 call sites (method + path)                        2.1 M    3.9 M    6.1 M    210–610 per 1k lines
+ L3 field reads / writes                              0.4 M    0.7 M    1.25 M
+ L3 await · unsafe · ? · panics                       0.1 M    0.15 M   0.4 M    kernel-style code: unsafe 23 per 1k
+ L3 total, if ever fully resolved                     2.6 M    4.8 M    7.8 M    10–15 % expected to sit as abstained
+```
+
+### 14.3 Bytes
+
+```text
+ file text                       ≈ 350 MB      10 M lines × ~35 bytes; the same at every estimate
+ span text + doc                 0.1 / 0.3 / 0.5 GB     ≈ 300 bytes per public span including doc; kernel-style doc density doubles it
+ name + field                    0.1 / 0.4 / 0.9 GB
+ L2 edges + HLD tables           0.1 / 0.2 / 0.4 GB
+ FTS over span text              ≈ 1–1.5 × span text
+ one file, L0–L2                 ≈ 0.8 / 1.4 / 2.4 GB
+ L3 fully eager, additional      + 0.3 / 0.5 / 0.9 GB
+```
+
+Scale: the Linux-sized yardstick (33 M lines) is ×3.3; rust-analyzer itself (435k lines) is ÷23 — about 20k–100k HLD rows and a database under 100 MB.
+
+### 14.4 What the numbers settle
+
+- HLD_current at 0.5–2.3 M rows is comfortable for recursive CTEs on a laptop; the three-table HLD design (§12) does not need a graph engine at this size.
+- L3 at 3–8 M call sites is the volume of the map and the reason it is resolved lazily; eager L3 adds roughly a third to the database and most of the model time.
+- The file text (350 MB) is a fixed cost that dwarfs nothing else — storing it in the same file (§2) is affordable; the span text is a fraction of it.
+- The widest uncertainty is members per public type and fields per span, both assumed; the first measurement to take when the spanner exists.
+
+### 14.5 Caveats
+
+Grep proxies: a `fn` inside a macro body or string literal is counted; calls under `#[cfg(test)]` are included; comment lines are excluded but doc lines are counted separately; path-call counts include function definitions (a few percent). The five-tree range is narrow for fn and use density and wide for impl and doc density; the envelope reflects that.
