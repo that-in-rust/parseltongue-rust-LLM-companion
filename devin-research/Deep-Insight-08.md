@@ -18,6 +18,7 @@ This document is the single, self-contained description of the pipeline. It is w
  §9  three journeys  one ordinary item, one broken file, one macro plus an ambiguous name, walked through every step
  §10 the names       every four-word name used here, plus names retired and not to be reused
  §11 the open question
+ §12 fields           once spans are known: why fields, what is done with them, how a public-interface signature is built
 ```
 
 Conventions used throughout:
@@ -417,3 +418,122 @@ Every four-word name used in this document, grouped. Retired names are listed so
 ## 11. The open question
 
 Everything above the binder is measured or follows from the parser. The one number nobody has measured yet is the **join rate** (step 4): on a real 10 M-line tree, what share of names join to exactly one target through use trees and paths alone? If it is high, tiny-llm-edge-binder is a small background worker; if it is low, binding becomes the long pole and the tiny LLM strategy must be re-examined. That measurement comes next.
+
+## 12. Once spans are known — why fields, what is done with them, how a public-interface signature is built
+
+A span (§1) is a box around an item: file, start byte, end byte, kind, name, visibility. That is enough to say *where* `send` is. It is not enough to say *what `send` depends on*, *what it looks like to a caller*, or *whether "retry policy" typed into `find` should land on it*. Fields and names exist for those three jobs. Everything in this section comes from the same parser pass as the span; no model is involved.
+
+### 12.1 One item, three layers
+
+```rust
+/// Sends one request with retries.
+#[cfg(feature = "http")]
+pub async fn send<T: Into<Request>>(&self, req: T, policy: &RetryPolicy) -> Result<Response, Error> { … }
+```
+
+```text
+ layer    what it is                                  stored in                       example
+ ──────── ─────────────────────────────────────────── ─────────────────────────────── ─────────────────────────────────────────────────────────
+ span     the box: where the item is and what kind    span-reference-text-table       client.rs [1180..2630) fn send pub
+ fields   the typed parts inside the signature        field-signature-detail-table    param policy: &RetryPolicy · return Result<Response, Error>
+ names    the searchable words in span and fields     name-token-index-table          send · retry · policy · retry_policy · response · error
+```
+
+Legend: *span* = the box · *fields* = the typed parts inside the box · *names* = the words in those parts, tokenised.
+
+### 12.2 Why fields, once the span is known
+
+```text
+ job                              what the span alone cannot do                     what fields make possible
+ ──────────────────────────────── ───────────────────────────────────────────────── ──────────────────────────────────────────────────────────
+ 1  dependencies (the product)    a box has no idea that `send` mentions            every type NAME in a field is a dependency waiting to be
+                                  RetryPolicy, Request, Response, Error             joined to its span (step 4) → the uses_type edges of HLD
+ 2  the public interface          the box's text is 1,450 bytes including the body; a signature string built from fields only — no body, no
+                                  the agent must not read bodies to use an item      comments — is what the HLD row shows to the agent
+ 3  search                        `find retry policy` does not match the bytes       name tokens: RetryPolicy → retry · policy · retry_policy
+                                  "RetryPolicy" by substring                         → BM25 search lands on this span
+ 4  filtering and roll-ups        two cfg variants of `send` are two boxes with     attribute rows (cfg, derive, test) and flag rows (async,
+                                  the same name                                      unsafe, const) let impact questions filter precisely
+ 5  change detection              a body edit changes the span digest               a signature digest built from fields only stays the same
+                                                                                     → callers' HLD rows are NOT marked stale by a body edit
+```
+
+### 12.3 What the walker writes for `send`
+
+```text
+ field-signature-detail-table rows for span #41 (fn send)
+ kind        ordinal  text                              type_names                    notes
+ ─────────── ──────── ───────────────────────────────── ───────────────────────────── ──────────────────────────────────────────────
+ doc         —        Sends one request with retries.   —                             first line is what `find` shows
+ attribute   —        cfg(feature = "http")             —                             used to filter and to tell cfg twins apart
+ flag        —        pub · async                       —
+ generic     1        T: Into<Request>                  Into, Request                 the bound names a type → candidate edge
+ param       1        self: &Self                       —                             marks a method; Self resolves to the impl's type
+ param       2        req: T                            T (generic, not a target)
+ param       3        policy: &RetryPolicy              RetryPolicy                   → candidate edge send → RetryPolicy
+ return      —        Result<Response, Error>           Result, Response, Error       → three candidate edges
+
+ name-token-index-table rows (span #41 and its fields)
+ token          source
+ ────────────── ────────────────────────────────────
+ send           item name
+ client         module path crate::http::Client
+ http           module path
+ retry          RetryPolicy, split at the case change
+ policy         RetryPolicy
+ retry_policy   RetryPolicy, snake form
+ request        Request
+ response       Response
+ error          Error
+```
+
+Rules the walker follows:
+- a field row stores the *name* of a type, never its target span — resolving names is step 4's job, so step 2 stays exact and model-free;
+- `Self`, generics (`T`) and lifetimes are recorded but are not dependency candidates;
+- every struct field, enum variant, trait item and impl item gets the same treatment, so `pub struct Config { pub retries: u8, policy: RetryPolicy }` yields field rows `retries: u8 (pub)` and `policy: RetryPolicy (priv)` — the private one is still evidence for an edge Config → RetryPolicy;
+- `use` lines are also field rows (`use crate::retry::RetryPolicy` → path row), because they are what step 4 joins on.
+
+### 12.4 How the public-interface signature is built from fields
+
+The HLD row's "signature" column is not copied from the source; it is *assembled* from field rows, in a fixed order, so that two items with the same interface produce the same string and digest regardless of formatting, comments, or body.
+
+```text
+ assembly order            take from fields                                       for `send`
+ ───────────────────────── ────────────────────────────────────────────────────── ───────────────────────────────────────────────────────────
+ 1  visibility             flag rows                                              pub
+ 2  qualifiers             flag rows, canonical order const · async · unsafe      async
+ 3  kind + name            span                                                   fn send
+ 4  generics               generic rows in ordinal order, bounds kept             <T: Into<Request>>
+ 5  parameters             param rows in ordinal order, `name: type`              (&self, req: T, policy: &RetryPolicy)
+ 6  return                 return row                                             -> Result<Response, Error>
+ 7  where / cfg            attribute rows that change the interface               #[cfg(feature = "http")]
+ 8  (dropped)              doc, body, comments, whitespace, derive-only attrs     —
+
+ result   pub async fn send<T: Into<Request>>(&self, req: T, policy: &RetryPolicy) -> Result<Response, Error>  #[cfg(feature = "http")]
+ digest   blake3 of that string = the signature digest stored on the HLD node
+```
+
+For other kinds the same order applies with the kind's own parts:
+
+```text
+ struct   pub struct Config { pub retries: u8 }                 public fields only; private fields are evidence, not interface
+ enum     pub enum Mode { Fast, Safe(u8) }                      all variants (variants are public if the enum is)
+ trait    pub trait Retry { fn next_delay(&self) -> Duration; } required and provided item signatures, bodies dropped
+ impl     impl Retry for Backoff                                the impl header; its items are their own spans with their own signatures
+ type     pub type Res<T> = Result<T, Error>;                   the alias and its target
+ const    pub const MAX: u8 = 3;                                name and type; the value is dropped from the signature
+ use      pub use retry::RetryPolicy;                           re-export: the path, because it is interface for callers
+```
+
+### 12.5 What the signature then does
+
+```text
+ the agent asks `find send`           → cpu-tool-find-search-query returns the signature string, the doc first line and the file — not the body
+ the HLD row for send → RetryPolicy   → node01 = send's signature digest, node02 = RetryPolicy's; the edge type uses_type came from the param row
+ the agent edits send's BODY          → span digest changes, signature digest does not → callers' rows stay valid, only send's own L3 rows re-run
+ the agent changes a PARAM type       → signature digest changes → every HLD row with send as node01 or node02 is re-derived and the delta
+                                        shows the change against the intended signature in hld-future-dependency-edges
+ the human reviews a to_build row     → sees the intended signature string beside the current one, same assembly order, so the diff is readable
+```
+
+One line: **the span says where an item is; the fields say what it is made of; the signature built from the fields is what every other item, the agent, and the human see of it — and the only part whose change should ripple through the map.**
