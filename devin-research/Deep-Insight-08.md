@@ -19,7 +19,7 @@ This document is the single, self-contained description of the pipeline. It is w
  §10 the names       every four-word name used here, plus names retired and not to be reused
  §11 the open question
  §12 fields           once spans are known: why fields, what is done with them, how a public-interface signature is built
- §13 parked ideas     explorations not yet part of the design: public-only tiers, the six axes of a span, virtual spans
+ §13 parked ideas     explorations not yet part of the design: public-only tiers, the six axes of a span (+ ELI5), virtual spans
 ```
 
 Conventions used throughout:
@@ -629,3 +629,51 @@ Two consequences, if this view is adopted:
 Proposed four-word name, if adopted: `span-kind-axis-taxonomy`; each axis would become a column of span-reference-text-table.
 
 **Deciding question.** Which axes does the agent actually ask about? Reachability (axis 3) and parse status (axis 5) are needed for the product's correctness; origin (axis 4) matters for cfg twins and derives; the rest can wait until a `find` or impact question needs them.
+
+### 13.3 ELI5 — the six questions every span answers
+
+```text
+ A SPAN IS A BOX DRAWN AROUND A PIECE OF CODE.  Every box answers SIX questions.  Same box, six labels.
+
+                 ┌──────────────────────────────────────────────────────┐
+                 │  /// Sends one request.                              │
+                 │  #[cfg(feature = "http")]                            │
+                 │  pub async fn send(&self, req: Request) -> Response  │
+                 │  { … body … }                                        │
+                 └──────────────────────────────────────────────────────┘
+                   file client.rs · bytes 1180..2630
+
+ 1  WHAT IS IT?            ──►  fn      (or struct, enum, trait, impl, const, static, mod, use, macro, extern block, module header…)
+                                the parser tells us this for free.  "a fn" / "a struct" / "a macro call we can't see inside"
+
+ 2  WHERE DOES IT SIT?     ──►  inside `impl Client`   (a member)
+                                top of the file = module-level · inside an impl or trait = member · a field or variant = child of a type
+                                · a fn hiding inside another fn's body = nested.  Members of a public type are boxes too: Client::send
+
+ 3  WHO CAN SEE IT?        ──►  everyone  (pub, and every folder on the way up is pub too)
+                                pub seen from the crate root · pub(crate) · pub(super) · private · pub but #[doc(hidden)] · re-exported
+                                by `pub use` under another name · exported to C with extern "C".   ⚠ `pub` inside a private mod = NOT public
+
+ 4  WHERE DID IT COME FROM? ──► typed by a human
+                                or made by a macro `foo! { }` · or made by #[derive(Clone)] (an impl with NO text of its own) · or one of
+                                two #[cfg] twins with the same name · or test-only · or a generated file (bindgen) · or a doc-test inside ///
+
+ 5  HOW SURE IS THE BOX?   ──►  sure (conf 1.0)
+                                clean parse · grey (we guessed the end by indentation) · error region (garbage) · cut off at end of file
+                                · inside <<<<<<< ======= >>>>>>> conflict markers (two versions of the truth, map neither)
+
+ 6  IS IT THE SAME BOX AS YESTERDAY? ──► yes, it just moved down 3 lines
+                                same bytes moved (same digest, new offsets) · body edited (box digest changes, signature digest does not)
+                                · signature edited · renamed · private → pub (same box, new tier) · a cfg twin appeared
+
+ THREE BOXES WITH NO BYTES OF THEIR OWN  ("virtual" spans — rows that point at the box that caused them)
+   #[derive(Clone)] on Config   ──►  impl Clone for Config          made by CPU, from the known-macro table
+   pub use a::b::X;             ──►  X is ALSO reachable here        made by CPU, once step 4 knows which X
+   foo! { … } at item position  ──►  whatever foo makes             made by tiny-llm-macro-guesser
+
+ HOW MUCH WE STORE DEPENDS ON LABELS 2–4, NOT ON LABEL 1
+   public & reachable (and its public members, re-exports, extern "C")  ──►  FULL:  box + fields + names + docs + signature + body sites
+   private, test-only, nested                                            ──►  LIGHT: box + body sites only (so chains can be collapsed)
+   doc-tests, conflict regions                                           ──►  TAG only
+   locals, closures, let bindings                                        ──►  not a box at all; their calls belong to the enclosing box
+```
