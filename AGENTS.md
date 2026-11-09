@@ -6,14 +6,16 @@ Every component, artefact, table, tool, model, role and view named in this repos
 
 Why: a four-word name is unambiguous in prose, greppable, and reads as a sentence fragment; two-word names collide and one-word names drift.
 
-The external coding agent (Claude Code, Codex, Cursor, …) is `ext-coding-agent-llm`; `ext-coding-agent` is its accepted short form in prose.
+The four words must describe what the thing IS (its contents, scope, kind) — never a claim about it ("product"), a role suffix ("role"), or filler ("driver", "table" where the kind is already clear). Bad: `hld-current-product-table`. Good: `hld-current-dependency-edges`.
+
+The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-agent`; `ext-coding-agent` is its accepted short form in prose.
 
 ## Nomenclature (keep in sync with devin-research/Deep-Insight-08.md)
 
 ```text
  ROLES
- ext-coding-agent-llm              the external coding agent (Claude, Codex…) that uses Parseltongue; writes intent, never facts
- human-architect-reviewer-role     the person; writes intent, reviews rows
+ ext-llm-coding-agent              the external coding agent (Claude, Codex…) that uses Parseltongue; writes intent, never facts
+ human-architect-intent-author     the person; writes intent, reviews rows
  parseltongue-cli-dispatcher-binary one binary; routes one verb to one CPU tool; the only thing the agent calls
  offline-teacher-rust-analyzer     rust-analyzer/rustc labelling training data off-line; never at runtime
  offline-judge-heldout-evaluation  scoring the tiny models on held-out repositories
@@ -28,12 +30,12 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-coding-agent
  name-token-index-table            sub-tokens of names and paths, for joins and BM25
  field-signature-detail-table      per-span fields: params, return, generics, bounds, flags, derives, impl trait/self
  edge-evidence-record-table        every L2/L3 edge with status, confidence, evidence span, snapshot
- hld-current-product-table         THE PRODUCT: public item → public item rows, extraction-only
- hld-future-intent-table           intended rows; written only by ext-coding-agent-llm or human-architect-reviewer-role
- hld-delta-derived-view            full outer join of the two; nobody writes it: to_build · to_remove · realized · unplanned
+ hld-current-dependency-edges      the product: current public item → public item rows, extraction-only
+ hld-future-dependency-edges       intended rows; written only by ext-llm-coding-agent or human-architect-intent-author
+ hld-delta-dependency-view         full outer join of the two; nobody writes it: to_build · to_remove · realized · unplanned
  hld-file-level-rollup             file → file counters maintained on write
  hld-folder-level-rollup           folder → folder counters maintained on write
- agent-memory-prose-table          what the agent learned about the map; agent-written; the only table with prose
+ agent-learned-notes-table         what the agent learned about the map; agent-written; the only table with prose
 
  CPU TOOLS (decide nothing; move bytes, run SQL)
  cpu-tool-ingest-source-files      walk tree · digest · write file-source-text-table
@@ -42,10 +44,10 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-coding-agent
  cpu-tool-field-extraction-driver  feed span text to the field tagger; write field rows
  cpu-tool-name-join-edges          SQL: use-paths × names → extracted edges or candidate lists
  cpu-tool-bind-resolve-edges       feed candidates to the binder; feed bodies to the site tagger; write inferred/abstained
- cpu-tool-hld-table-builder        derive hld-current-product-table and the roll-ups from edge + span (DI-07 §12.6)
+ cpu-tool-hld-table-builder        derive hld-current-dependency-edges and the roll-ups from edge + span (DI-07 §12.6)
  cpu-tool-find-search-query        trie / FTS / BM25 → ranked rows + span text
  cpu-tool-impact-graph-walk        recursive CTE over edges: callers, callees, blast radius, cycles
- cpu-tool-propose-future-rows      validate and write hld-future-intent-table rows for the agent/human
+ cpu-tool-propose-future-rows      validate and write hld-future-dependency-edges rows for the agent/human
  cpu-tool-status-coverage-banner   per-level coverage, stale rows, pending L3
 
  TINY MODELS (batch of text in → labels + confidence out; never touch the table)
