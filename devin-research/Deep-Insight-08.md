@@ -1,25 +1,131 @@
-# Deep Insight 08
+# Deep Insight 08 — Parseltongue end to end: what is built, by whom, in what order
 
-*Every named thing carries a four-word hyphenated name that describes its contents.*
+## 0. How to read this document
 
-1. **hld-current-dependency-edges is the product.**
+Parseltongue is a command-line tool that turns a large Rust codebase into a small set of database tables an AI coding agent can query: *which public item depends on which*, *where is X*, *what breaks if X changes*, *what is planned but not yet built*. It does this on an ordinary laptop (the design target is an 8 GB MacBook Air, first map of a 10 M-line tree in under 30 minutes) without running the compiler or an IDE server.
+
+This document is the single, self-contained description of the pipeline. It is written to be read top to bottom:
+
+```text
+ §1  glossary        every term used below, defined once, in the order it first appears
+ §2  the thesis      what the product is (one table) and what everything else exists for
+ §3  the decision    the one engineering choice the pipeline rests on, and the measurements behind it
+ §4  the journey     the fifteen steps in one line each
+ §5  the table       the same fifteen steps with owners, outputs, borrowed ideas, and where the tiny LLMs sit
+ §6  the roles       who is allowed to write what
+ §7  the tiny LLMs   when each is called, when it is not, what it sees and returns
+ §8  the cost        training data, build time, and the 30-minute / 8 GB budget
+ §9  three journeys  one ordinary item, one broken file, one macro plus an ambiguous name, walked through every step
+ §10 the names       every four-word name used here, plus names retired and not to be reused
+ §11 the open question
+```
+
+Conventions used throughout:
+
+```text
+ four-word names    every named thing (table, tool, model, role) has a four-word hyphenated name that says what it is:
+                    hld-current-dependency-edges, cpu-tool-syntax-tree-walker, tiny-llm-edge-binder, ext-llm-coding-agent
+ M                  a number marked M was measured in this project (parser throughput, oracle agreement). Every other number
+                    is an estimate and says so
+ →                  "produces" or "becomes"
+ ✔ / ○ / —          in the inspiration columns: a thing we use as code / an idea we copy / nothing external (full legend in §5)
+```
+
+## 1. Glossary
+
+Terms in the order they appear. Each is defined once here and then used without further explanation.
+
+```text
+ working tree             the checked-out source folder on disk, exactly as the developer has it — including half-edited, broken files
+ file row                 one file's bytes stored UNCHANGED (no newline, whitespace or encoding normalisation) plus a digest, in the database
+ digest                   a content hash. Same bytes → same digest. Used to skip unchanged files and to detect stale rows
+ database                 one Turso / SQLite-compatible file holding every table below. No server process
+ span                     one item of source (a fn, struct, impl, trait, const, use, mod, macro call…) addressed by (file, start byte, end byte).
+                          Line and column are computed from the bytes when a human needs them; they are never stored as identity
+ kind · name · visibility what a span is (fn, struct…), what it is called, and pub / pub(crate) / private
+ module-level item        an item directly inside a file or a mod block, as opposed to one nested inside a function body
+ parse error              the parser could not read the file as valid Rust (missing brace, half-typed line). The file is still stored and cut
+ recovery rule            our extra rule for files with parse errors: an item keyword, doc comment or attribute that starts its own line at the
+                          column of the currently open item ends that item. It is a heuristic about indentation, not grammar
+ grey                     a span produced by the recovery rule. It carries confidence < 1 (typically 0.3) and is re-examined by a tiny LLM later
+ confidence               a number 0–1 on every span and edge saying how sure extraction is. 1.0 = read directly from a clean parse
+ levels L0–L3             L0 crate · L1 folder and file · L2 public item (the product) · L3 body-level evidence (calls, field uses, awaits…)
+ fields                   the parts of a signature: parameters, return type, generics, bounds, struct fields, trait items, attributes, docs
+ use tree                 a `use a::b::{c, d};` line — the path information that lets a name be joined to the item it refers to
+ body site                one place inside a function body where something happens: a call, a method call, a constructor, a field read or
+                          write, an .await, an unsafe block, a panic!/? exit. Each is an L3 evidence row
+ pending                  status of a body site that has been found but whose target is not yet known
+ name join                matching a name at a site or in a signature to span rows through use trees and paths, in SQL
+ extracted · candidates · unresolved   the three outcomes of a name join: exactly one target / several possible targets / none
+ join rate                the share of names that joined to exactly one target. The one number that decides how much model work remains
+ CPU resolver             deterministic rules that try to pick one candidate from several (receiver type, field type, use tree) before any model
+ inferred                 status of a target chosen by a tiny LLM; always carries the model's confidence
+ abstained                status of a row where neither the resolver nor the model had enough evidence; it stays visible and counted
+ edge                     "item A depends on item B", with a type: calls · uses_type · implements · reexports · contains
+ evidence row             an L2 or L3 fact behind an edge, with its span, byte range, status and confidence
+ HLD                      the public-interface dependency graph: public item → public item edges, with private chains collapsed away
+ collapsing private chains  if public A calls private helper h, and h calls public B, HLD gets A → B; the helper rows remain as evidence
+ roll-up                  file → file and folder → folder counters derived from HLD rows by database trigger, so they are never stale
+ first map                the first run over a tree, from empty tables to a usable HLD. The 30-minute target applies to it
+ background               work that runs after the first map is usable, without blocking it
+ banner                   the published coverage summary: per-level coverage, parser errors, grey spans, join rate, backlog
+ ext-llm-coding-agent     the external coding agent (Claude Code, Codex, Aider…) that talks to Parseltongue through one CLI
+ human-architect-intent-author  the person who writes intended structure and reviews rows
+ CPU tool                 a deterministic Parseltongue program: moves bytes, runs the parser, runs SQL, derives tables. Decides nothing
+ tiny LLM                 a small model (tens of MB) that reads text and returns labels with confidence for the cases grammar cannot decide
+ known-macro table        a hand-written list of common macros (std, kernel) and the items each one defines, consulted before any model
+ offline teacher · offline judge   rust-analyzer, rustc, cargo-expand used on our machines to label training data and score the models.
+                          They never run on the user's machine
+ intent                   a row describing what SHOULD exist: a new item, a new edge, an edge to retire
+ delta                    the computed difference between what exists and what is intended
+```
+
+## 2. The thesis
+
+1. **hld-current-dependency-edges is the product.** One table of current public item → public item dependencies, derived from source, never hand-written.
 2. **It is read on every task and rebuilt only where the tree changed.**
    - One row = a public item depending on a public item: node01 (signature, file, folder, kind, span id) · node02 (same) · edge type · status · confidence [min, max] · evidence count · snapshot. No bodies, no private items — those are evidence behind a row, in edge-evidence-record-table and span-reference-text-table.
    - Raw code is not in the row. It lives once in span-reference-text-table, keyed by digest, where full-text search also lives; search starts there and lands in HLD rows by one join.
-   - **Written only by extraction** — cpu-tool-hld-table-builder deriving from edge and span rows that the parser pass (cpu-tool-syntax-tree-walker) and the two remaining tiny models produced. Never by ext-llm-coding-agent, never by human-architect-intent-author.
+   - **Written only by extraction** — cpu-tool-hld-table-builder deriving from edge and span rows that the parser pass (cpu-tool-syntax-tree-walker) and the tiny LLMs produced. Never by ext-llm-coding-agent, never by human-architect-intent-author.
    - **hld-future-dependency-edges** holds the intended design. Written only by ext-llm-coding-agent or human-architect-intent-author through cpu-tool-propose-future-rows, which validates and never authors. Same row shape, status `proposed`, plus creator and reason.
    - **hld-delta-dependency-view** is the gap: a full outer join of the two. Nobody writes it. States: to_build · to_remove · realized · unplanned.
    - **hld-file-level-rollup** and **hld-folder-level-rollup** are counters (weight, kinds, confidence range) updated by trigger on every HLD row — the folder map is never stale relative to the item map.
    - **agent-learned-notes-table** is the only place prose is allowed: what ext-llm-coding-agent learned about the map, keyed to span ids. Agent-written; never read by extraction.
 
-## End-to-end workflow, with roles
+Everything else in this document — the CPU tools, the parser, the tiny LLMs, the future and delta tables — exists to create, keep current, query and extend that one table.
 
-### The journey in one line per step
+## 3. The one design decision
+
+**Each file is parsed exactly once, with rust-analyzer's parser used as a pinned library (`ra_ap_syntax` + `ra_ap_parser`, on top of rustc's own lexer `ra-ap-rustc_lexer`). From that one parse come the spans, the fields, the names, the use trees and the body sites. No model reads ordinary source. The rust-analyzer server, its analysis database, the compiler and the Cargo build loop are not run.**
+
+Why this is safe to rely on — the measurements (M):
 
 ```text
- 0   codebase  →  files           the working tree is walked; every .rs file's bytes are stored unchanged as one row in Turso, with a digest;
+ agreement on valid code     376 / 376 module-level items on 125 real files (rust-analyzer, cargo-modules, flowistry, linux/rust)
+                             byte-identical in start, end, kind, name and visibility to the `syn` parser used as oracle
+ throughput                  789 k lines per second per core for a full lossless syntax tree; 1 M lines in 1.3 s on one core
+                             → a 10 M-line tree parses in ≈ 13 s on one core, ≈ 5 s on four
+ broken files                a grammar-only parser nests every later item inside an unterminated fn, or lets a stray `{` swallow the rest
+                             of the file. With the recovery rule, 98–100 % of untouched items stay exact and the damage is marked grey
+```
+
+What follows from it:
+
+```text
+ steps 1–3 need no model      boundaries, fields and sites are read from the tree, exactly
+ the only model-shaped work   deciding between several candidate targets for a name (step 5), repairing grey spans, and guessing what a
+                              macro call defines — and even binding is done by SQL name-join first and measured before any model runs
+ the 30 minutes               are spent on disk and database, not on reading tokens
+```
+
+## 4. The journey in one line per step
+
+Legend: `X → Y` = X is turned into Y. Steps 0–7 are the first map; 8–14 are the daily loop with the agent.
+
+```text
+ 0   codebase  →  files           the working tree is walked; every .rs file's bytes are stored unchanged as one file row, with a digest;
                                   a file whose digest did not change is skipped
- 1   file      →  spans           each file is parsed once (ra_ap_syntax); every module-level item becomes a span row: byte start, byte end, kind,
+ 1   file      →  spans           each file is parsed once; every module-level item becomes a span row: byte start, byte end, kind,
                                   name, visibility; a file with parse errors is re-cut by the recovery rule and its doubtful spans are marked grey
  2   span      →  fields + names  from the same tree: params, return, generics, bounds, struct fields, trait items, use trees, cfg/attrs, docs;
                                   names are split into tokens and indexed for full-text search
@@ -27,8 +133,8 @@
                                   a body becomes a pending L3 row pointing at its byte range — found, not yet resolved
  4   name      →  target          each site/field name is joined to span rows through use trees and paths: one match = extracted edge,
                                   several = candidate list, none = unresolved; the join rate is published
- 5   candidates →  one target     the CPU resolver tries first; only still-ambiguous candidates go to the tiny binder; macro invocations at item
-                                  position go to the macro guesser; no evidence = abstain, never guess
+ 5   candidates →  one target     the CPU resolver tries first; only still-ambiguous candidates go to tiny-llm-edge-binder; macro invocations at
+                                  item position go to tiny-llm-macro-guesser; no evidence = abstain, never guess
  6   edges     →  HLD             public → public edges are derived by collapsing private chains; file and folder roll-ups update by trigger
  7   tables    →  banner          coverage per level, parser-error count, grey-span count, join rate and unresolved backlog are published
  ─── first map done; everything below is the daily loop
@@ -41,8 +147,21 @@
  14  human reviews                rows of intent against rows of fact
 ```
 
+## 5. The workflow table
 
-Decision (measured in the span-cutter experiment — 376/376 items byte-identical to the syn oracle on 125 real files; 789 k lines/s per core): one parse per file with `ra_ap_syntax` (pinned library, not the rust-analyzer server) does the cutting; models leave steps 1–3 entirely; the only model-shaped step left is binding (step 5), and even there pure name-join is measured first.
+Legend for the columns:
+
+```text
+ step                                   the same numbering as §4
+ what happens                           the work, in full
+ who does it → writes                   the four-word name of the tool, model or person, and the table(s) it writes. "→ tiny-llm-…" under a
+                                        CPU tool means the tool hands rows to that model and writes the model's answer back
+ inspiration (use)                      crates and projects whose code or ideas this step uses, each tagged with how (legend after the table)
+ tiny LLM in this step · when           which model, if any, is involved in this step and the exact condition that triggers it
+ tiny-LLM estimate … · in the 30 min?   the volume of work and time on an 8 GB Air for a 10 M-line tree (40k files, 1.5 M spans, 1.0 M L2 edges,
+                                        3.9 M L3 call sites — medium estimates), and whether the step is on the first-map critical path (IN) or
+                                        runs afterwards (BACKGROUND). Only parser throughput and the oracle are M; the rest are estimates
+```
 
 ```text
  step  what happens                                           who does it → writes                         inspiration (use)                              tiny LLM in this step · when            tiny-LLM estimate, 10 M lines, 8 GB Air · in the 30 min?
@@ -53,7 +172,7 @@ Decision (measured in the span-cutter experiment — 376/376 items byte-identica
  1     ONE PARSE PER FILE: module-level items → byte range,   cpu-tool-syntax-tree-walker                  ra-ap-rustc_lexer (✔ as is)                    tiny-llm-span-clarifier · only on a     ≤ 2 % of 40k files broken → 1–2k grey spans × ~300 tokens
        kind, name, visibility, conf 1.0; nested items under   → span-reference-text-table                  ra_ap_parser + ra_ap_syntax (✔ as is, pinned)  file whose parse reported errors AND   ≈ 0.5 M tokens; 30–100 M model ≈ 1–2 min GPU / 5 min CPU ·
        a parent id; tree dropped per file. Parse errors →     → tiny-llm-span-clarifier (grey rows,        syn 2: oracle in tests, fallback (✔ as is)     the recovery rule left conf < 1;        BACKGROUND. First map ships them grey. Parse itself:
-       indentation-recovery re-cut; those spans conf < 1       background)                                 rust-analyzer resync set (○ pattern)           never on a clean file                   ≈ 13 s/core measured, ≈ 1 min with row writing · IN
+       recovery rule re-cuts; those spans conf < 1 = grey      background)                                 rust-analyzer resync set (○ pattern)           never on a clean file                   ≈ 13 s/core (M), ≈ 1 min with row writing · IN
                                                                                                            our indentation recovery rule (✔ ours)
  2     same pass: params, returns, generics, bounds, struct    cpu-tool-syntax-tree-walker (no model)       rustdoc JSON (○ schema idea)                   none — fields come from the tree        0 model time. Rows: 1.5 M spans, 4 M fields, 7 M name
        fields, trait items, use trees, cfg/attrs, docs;        → field-signature-detail-table               SQLite FTS5 / Turso FTS (✔ as is)                                                      tokens; DB write + FTS ≈ 5–10 min (shared with 6) · IN
@@ -63,7 +182,7 @@ Decision (measured in the span-cutter experiment — 376/376 items byte-identica
        panic!/? → PENDING L3 rows with byte ranges              (status pending)                            rust-code-analysis, cargo-geiger (○ pattern)
  4     names joined to spans via use trees + paths: unique →  cpu-tool-name-join-edges                     SCIP symbol strings (○ id format)              none — pure SQL; publishes the JOIN     0 model time. Indexed joins over 1.0 M L2 edges ≈ 2–5 min ·
        extracted, several → candidates, none → unresolved;     → edge-evidence-record-table                 stack-graphs (○ pattern)                       RATE, the number that sizes step 5      IN. Join rate is the one unmeasured input to every
-       join rate published                                                                                 rust-analyzer nameres (offline teacher only)                                           estimate below.
+       join rate published                                                                                 rust-analyzer nameres (✔ offline teacher)                                              estimate below.
  5     CPU resolver first (use trees, field/receiver types);   cpu-tool-bind-resolve-edges                  rust-analyzer resolution as labels             tiny-llm-edge-binder · only rows with   at 20 % ambiguous: L2 200k rows × 400 tokens ≈ 80 M tokens,
        only still-ambiguous candidates → binder; macro         → tiny-llm-edge-binder                       (✔ offline teacher)                            SEVERAL candidates after the CPU        100 M model ≈ 15–45 min GPU; L3 0.8 M rows ≈ 1.5 h by region.
        invocations at item position → guesser; abstain when    → tiny-llm-macro-guesser                     cargo-expand as labels (✔ offline teacher)     resolver fails                          Guesser: 5–15k macro calls ≈ 1–5 min.
@@ -74,8 +193,8 @@ Decision (measured in the span-cutter experiment — 376/376 items byte-identica
                                                                hld-file/folder-level-rollup                SQL recursive CTEs (✔ as is)
  7     coverage per level + parser-error count + grey-span     cpu-tool-status-coverage-banner              —                                              none                                    seconds · IN. Banner shows what the background models still
        count + join rate + unresolved backlog published        → per-level-coverage-banner                                                                                                        owe: grey spans, candidate rows, macro calls
- ───── first map: CPU critical path ≈ 10–20 min for 10 M lines (read 1–5 · parse 1 · DB/FTS 5–10 · join 2–5) → headroom for the ×3.3 Linux-sized tree; zero tiny-LLM time inside it.
-       Then, in background: clarifier 1–5 min · guesser 1–5 min · binder L2 15–45 min · binder L3 ≈ 1.5 h by region. Only parser throughput and the oracle are measured; model numbers are estimates.
+ ───── first map: CPU critical path ≈ 10–20 min for 10 M lines (read 1–5 · parse 1 · DB/FTS 5–10 · join 2–5) → headroom for a 33 M-line Linux-sized tree (×3.3); zero tiny-LLM time inside it.
+       Then, in background: clarifier 1–5 min · guesser 1–5 min · binder L2 15–45 min · binder L3 ≈ 1.5 h by region.
  8     agent asks: where is X · what breaks if X changes        ext-llm-coding-agent                         Aider repo-map (○ pattern)                     tiny-llm-result-ranker · optional, only 20–50 rows × 100 tokens ≈ 2k tokens per query → ms · n/a
        answered from the tables                                cpu-tool-find-search-query,                  codebase-memory-mcp (○ pattern; ✔ dev tool)    when find returns more rows than the
                                                                cpu-tool-impact-graph-walk                   Flowistry: which way to walk (○ pattern)       agent's budget
@@ -94,7 +213,7 @@ Decision (measured in the span-cutter experiment — 376/376 items byte-identica
        and offline-judge-heldout-evaluation (syn oracle, expect-test) train and score the tiny LLMs — never at runtime
 ```
 
-### Legend for the inspiration column
+Legend for the inspiration column:
 
 ```text
  ✔ as is           a crate or tool we take unchanged. At runtime this is always a LIBRARY linked into the Parseltongue binary
@@ -103,34 +222,37 @@ Decision (measured in the span-cutter experiment — 376/376 items byte-identica
  ✔ as is, pinned   same, but version-locked; bumped only when the syn-oracle test suite stays green (ra_ap_* releases weekly, 0.0.x API).
  ✔ offline teacher a tool we RUN, never ship: it produces labels or ground truth for training/evaluation on our machines.
                    Example: rust-analyzer resolves a call site so the binder has a correct answer to learn from.
- ✔ ours            Parseltongue code, written and tested in this repo. Example: the indentation-recovery rule from the span-cutter experiment.
+ ✔ ours            Parseltongue code, written and tested in this project. Example: the indentation recovery rule.
  ✔ external        the thing on the other side of the CLI; we talk to it, we do not contain it. Example: Claude Code / Codex as ext-llm-coding-agent.
  ✔ dev tool        used by humans/agents while developing Parseltongue; not part of the shipped runtime. Example: codebase-memory-mcp.
  ○ pattern         an IDEA we copy, no code dependency. We read how the project does it and write our own version.
-                   Example: AgentFS stores files as rows in SQLite → our file-source-text-table does the same; no AgentFS crate is linked.
+                   Example: agentfs stores files as rows in SQLite → our file-source-text-table does the same; no agentfs crate is linked.
  ○ id format       a naming/encoding convention we adopt for compatibility. Example: SCIP symbol strings as the shape of our item ids.
  ○ schema idea     field names and shapes borrowed from a spec. Example: rustdoc JSON tells us which fields a public item has.
+ ○ teacher/base    a larger model used only to produce training labels, or as the starting weights a tiny LLM is distilled from.
  —                 nothing external; plain Parseltongue logic or a by-definition view.
 ```
 
-Reading rule for the inspiration column: anything ✔ at runtime is a *library* (parser, lexer, DB, FTS, hashing, walker) — never a server, a build loop, or a compiler. Everything that needs a compiler or a whole-program database is ✔ only in the offline lanes.
+Reading rule: anything ✔ at runtime is a *library* (parser, lexer, database, full-text search, hashing, directory walker) — never a server, a build loop, or a compiler. Everything that needs a compiler or a whole-program database is ✔ only in the offline lanes.
 
-### Names changed by this revision (first draft → this version)
+## 6. The roles — who may write what
 
 ```text
- new       cpu-tool-syntax-tree-walker        one ra_ap_syntax pass per file → span, field, name-token and pending L3 rows (steps 1–3)
- new       tiny-llm-macro-guesser      macro invocation at item position → which item(s) it defines; status inferred
- retired   tiny-llm-span-boundary-tagger    boundaries come from the parser (376/376 on real files)
- retired   tiny-llm-field-detail-tagger     fields come from the tree
- retired   tiny-llm-body-site-tagger        sites come from the tree
- retired   cpu-tool-span-cutting-driver       folded into the walker
- retired   cpu-tool-text-copy-indexer         folded into the walker
- retired   cpu-tool-field-extraction-driver   folded into the walker
- kept      tiny-llm-span-clarifier     now only for spans the recovery rule marks conf < 1
- kept      tiny-llm-edge-binder   now gated behind the measured join rate
+ role                               reads                                   writes                                             never
+ ────────────────────────────────── ─────────────────────────────────────── ────────────────────────────────────────────────── ───────────────────────────────────
+ ext-llm-coding-agent               every table, through one CLI            hld-future-dependency-edges (via the propose tool), facts: no span, edge or HLD row
+                                                                            agent-learned-notes-table, the working tree
+ human-architect-intent-author      every table; the delta in review        hld-future-dependency-edges (via the propose tool)  facts
+ CPU tools                          files, trees, tables                    every extraction table and the HLD                 a judgment: they decide nothing
+ tiny LLMs                          text handed to them by a CPU tool       nothing — they return labels + confidence; a CPU    a table, a file
+                                                                            tool writes the row
+ offline teacher · offline judge    corpora on our machines                 training labels, evaluation scores                 anything on the user's machine
+ hld-delta-dependency-view          hld-current + hld-future                nothing — it is a view, computed on read            —
 ```
 
-### When a tiny LLM is called — and when it is not
+## 7. The tiny LLMs — when each is called, and when it is not
+
+Legend: *called when* is the exact trigger; *input* is the text a CPU tool hands over; *output* is what comes back (always with a confidence); *if it abstains* is what the table shows when the model declines; *share of work* is the fraction of the tree the model ever sees.
 
 ```text
  name                     called when                                   input                              output                      if it abstains                  share of work
@@ -138,53 +260,57 @@ Reading rule for the inspiration column: anything ✔ at runtime is a *library* 
  tiny-llm-span-clarifier  a file's parse reported errors AND the         the grey span's bytes plus the     confirmed/moved end byte,   span stays grey (conf ≤ 0.3);   ≈ 1 span per
                           recovery rule produced a span with conf < 1    lines around it                    kind, name, visibility,     its edges stay abstained;       broken file;
                           (step 1). Never on a file that parses clean.                                      new confidence              counted in the banner           0.01–0.5 % of spans
- tiny-llm-edge-binder     a site/field name joined to SEVERAL candidate  the site's span text, the          one target span id + conf,  row stays pending with its      measured next:
-                          spans and the CPU resolver (use trees, field   candidate signatures, the          or abstain                  candidate list; never a         1 − join rate
+ tiny-llm-edge-binder     a site/field name joined to SEVERAL candidate  the site's span text, the          one target span id + conf,  row stays pending with its      1 − join rate;
+                          spans and the CPU resolver (use trees, field   candidate signatures, the          or abstain                  candidate list; never a         measured next
                           types, receiver types) could not pick one      enclosing item's use tree                                      guessed edge
                           (step 5). Never on unique joins.
- tiny-llm-macro-guesser   a macro invocation sits at item position       the invocation bytes + the         zero or more proposed       span stays kind macro_call;     ≈ share of
-                          (`foo! { … }` / `foo!(…);` at module or impl   macro_rules!/proc-macro span       items (kind, name, vis)     no items claimed; counted       item-position
-                          level) and is not in the known-macro table     if found by name                   with status inferred        in the banner                   macro calls
+ tiny-llm-macro-guesser   a macro invocation sits at item position       the invocation bytes + the         zero or more proposed       span stays kind macro_call;     1–3 % of public
+                          (`foo! { … }` / `foo!(…);` at module or impl   macro_rules!/proc-macro span       items (kind, name, vis)     no items claimed; counted       spans, minus the
+                          level) and is not in the known-macro table     if found by name                   with status inferred        in the banner                   known-macro table
  tiny-llm-result-ranker   optional; only when `find` returns more rows   query + candidate rows             reordered rows              CPU BM25 order is used          0 at first map
                           than the agent's budget
- NOT called              any span, field, name token, use tree or body site on a file that parses clean — the parser is exact there (376/376 measured);
+ NOT called              any span, field, name token, use tree or body site on a file that parses clean — the parser is exact there (M: 376/376);
                          any unique name join; any HLD derivation or roll-up; anything in the future/delta tables
 ```
 
-### Training data, processing time and the 30-minute / 8 GB Air budget, per tiny LLM
+Rules that hold for all four: text in, labels + confidence out; never write a table (a CPU tool writes the row with the label); always allowed to abstain; every output carries status `inferred` so hld-delta-dependency-view and the human reviewer can see which rows came from a model.
 
-Numbers below are for a 10 M-line tree, medium estimate (40k files · 1.5 M spans · 1.0 M L2 edges · 3.9 M L3 call sites); the Linux-sized yardstick (33 M lines) is ×3.3. **M** = measured in the span-cutter experiment; everything else is an estimate from the cost rule (encoder cost ≈ 2 · params · tokens; Air ≈ 1.1–1.7e12 FLOP/s GPU, ≈ 4e11 FLOP/s CPU). Training is always offline on a desktop GPU or rented box — never on the Air, never at runtime.
+Name note: the four-word rule leaves two words for the descriptor, so "grey" and "candidate" live in the *called when* column rather than in the names.
+
+## 8. The cost — training data, build time, and the 30-minute / 8 GB budget
+
+Legend: *training INPUT* is what the model sees during training; *training OUTPUT / label* is the correct answer and who produces it; *how much data · time to build* is the size of the training set and how long it takes to generate; *runtime volume · time* is the work on a 10 M-line tree (medium estimates: 40k files, 1.5 M spans, 1.0 M L2 edges, 3.9 M L3 call sites; a 33 M-line Linux-sized tree is ×3.3) and the time on an 8 GB Air; *where it sits* says whether the work is inside the first-map 30 minutes or after. Cost rule used for every estimate: encoder cost ≈ 2 · parameters · tokens; Air ≈ 1.1–1.7e12 FLOP/s GPU, ≈ 4e11 FLOP/s CPU. Training always happens offline on a desktop GPU or a rented box — never on the Air, never at runtime.
 
 ```text
  name                     training INPUT dataset (what the model sees)           training OUTPUT / label set (who produces it)          how much data · time to build it               runtime volume on the 10 M-line tree · time on the Air          where it sits in the 30 min
  ──────────────────────── ────────────────────────────────────────────────────── ────────────────────────────────────────────────────── ────────────────────────────────────────────── ─────────────────────────────────────────────────────────────── ─────────────────────────────
  tiny-llm-span-clarifier  grey span bytes + ~20 lines of context, taken from     the TRUE item boundaries, kind, name, visibility of     synthetic: 1 M-line parseable corpus ×         ≤ 2 % of 40k files have parse errors ≈ 800 files × 1–2 grey     NOT in the 30 min. First map
-                          DELIBERATELY BROKEN copies of parseable files          the same file BEFORE it was broken — from syn /         5 mutation kinds × several sites per file      spans ≈ 1–2k spans × ~300 tokens ≈ 0.5 M tokens.                 writes them grey (conf ≤ 0.3);
-                          (delete `}`, truncate, half-typed item,     ra_ap_syntax on the unbroken file. Fully automatic,    → 0.5–1 M labelled examples; generation        30–100 M model → ~1e14 FLOP → 1–2 min GPU / ~5 min CPU.          clarifier runs in background
-                          delete `;`, stray `{`) + the recovery rule's own       no human, no compiler run. (M: the oracle exists        ≈ minutes (parser at 789 klines/s, M).         Per broken file: milliseconds.                                     and flips rows to extracted.
-                          grey span as the "question"                            today, 376/376.)                                       Training: ~3e8 tokens × 3 epochs on a 30–100 M
+                          DELIBERATELY BROKEN copies of parseable files          the same file BEFORE it was broken — from syn /         5 breakage kinds × several sites per file      spans ≈ 1–2k spans × ~300 tokens ≈ 0.5 M tokens.                 writes them grey (conf ≤ 0.3);
+                          (delete `}`, truncate mid-item, insert a half-typed    ra_ap_syntax on the unbroken file. Fully automatic,    → 0.5–1 M labelled examples; generation        30–100 M model → ~1e14 FLOP → 1–2 min GPU / ~5 min CPU.          clarifier runs in background
+                          item, delete `;`, insert a stray `{`) + the recovery   no human, no compiler run. (M: the oracle exists        ≈ minutes (parser at 789 k lines/s, M).        Per broken file: milliseconds.                                     and flips rows to extracted.
+                          rule's own grey span as the "question"                 today, 376/376.)                                       Training: ~3e8 tokens × 3 epochs on a 30–100 M
                                                                                                                                         encoder ≈ 2–6e17 FLOP ≈ 1–3 h desktop GPU.
- tiny-llm-edge-binder     a call/field site's text + the enclosing item's use    the ONE span the name resolves to — from the           real: every ambiguous site in the open-source  L2: 1.0 M edges × (1 − join rate). At 20 % ambiguous (to be      NOT in the 30 min. First map
-                          tree + the 2–8 candidate spans' signatures, from REAL  offline teacher (rust-analyzer go-to-definition /      corpus (this VM: 3,370 files, 1 M lines →      measured, step 4) ≈ 200k rows × ~400 tokens ≈ 80 M tokens;        publishes unique joins
-                          files in the corpus, only where name-join returned     rustc HIR), run once per corpus on a desktop. Human    ≈ 400k call sites, ~80k ambiguous). Teacher    100 M model → 1.6e16 FLOP ≈ 15–45 min on the Air GPU.            (extracted) and candidate
-                          several candidates                                     correction rows from step 14 are added over time.      pass: RA load + per-site resolve ≈ 1 h per     L3: 3.9 M sites, ~0.8 M ambiguous ≈ 320 M tokens → 6e16 ≈ 1.5 h  lists; binder drains L2 then
-                                                                                                                                        1 M lines (estimate). Training: 100 M encoder, background; per region on demand: seconds.                       L3 in the background (the
+ tiny-llm-edge-binder     a call/field site's text + the enclosing item's use    the ONE span the name resolves to — from the           real: every ambiguous site in a 1 M-line       L2: 1.0 M edges × (1 − join rate). At 20 % ambiguous (to be      NOT in the 30 min. First map
+                          tree + the 2–8 candidate spans' signatures, from REAL  offline teacher (rust-analyzer go-to-definition /      open-source corpus (≈ 400k call sites,         measured, step 4) ≈ 200k rows × ~400 tokens ≈ 80 M tokens;        publishes unique joins
+                          files in the corpus, only where name-join returned     rustc HIR), run once per corpus on a desktop. Human    ~80k ambiguous). Teacher pass: rust-analyzer   100 M model → 1.6e16 FLOP ≈ 15–45 min on the Air GPU.            (extracted) and candidate
+                          several candidates                                     correction rows from step 14 are added over time.      load + per-site resolve ≈ 1 h per 1 M lines    L3: 3.9 M sites, ~0.8 M ambiguous ≈ 320 M tokens → 6e16 ≈ 1.5 h  lists; binder drains L2 then
+                                                                                                                                        (estimate). Training: 100 M encoder,           background; per region on demand: seconds.                       L3 in the background (the
                                                                                                                                         ~1.6e8 tokens × 3 epochs ≈ 3e17 ≈ 2 h GPU.                                                                      "L3 drain").
  tiny-llm-macro-guesser   an item-position macro invocation's bytes + the        the items the macro actually produces (kind, name,     real: top ~1,000 crates.io crates + kernel     1–3 % of 480k public spans are item-position macro calls ≈        NOT in the 30 min. First map
                           macro_rules!/proc-macro definition's bytes when it is  visibility, impl-of) — from cargo-expand (offline       Rust; cargo-expand needs a BUILD → 1–5 min     5–15k × ~500 tokens ≈ 2.5–7.5 M tokens; 100 M model → ~1e15      stores the span as kind
-                          in the tree, from real crates                          teacher) on crates that compile, diffed against the    per crate, 1–3 CPU-days total, parallel;       FLOP ≈ 1 min GPU / ~5 min CPU. Known-macro table (hand-written    macro_call; guesser adds
-                                                                                 un-expanded tree. Automatic for compiling crates.      ≈ 50–200k examples. Training ≈ 1 h GPU.        for std/kernel macros) removes most of these before the model.    inferred items in background.
+                          in the tree, from real crates                          teacher) on crates that compile, diffed against the    per crate, 1–3 CPU-days total, parallel;       FLOP ≈ 1 min GPU / ~5 min CPU. The known-macro table removes      macro_call; guesser adds
+                                                                                 un-expanded tree. Automatic for compiling crates.      ≈ 50–200k examples. Training ≈ 1 h GPU.        most of these before the model.                                   inferred items in background.
  tiny-llm-result-ranker   a `find` query + the 20–50 candidate rows (names,       the row the agent actually used — from                 starts empty; grows with use; thousands of     per query: ~20 rows × 100 tokens ≈ 2k tokens → milliseconds.      not part of the map at all;
                           signatures, doc first line, BM25 score)                agent-learned-notes-table and step-14 review clicks.   examples before it is worth training.                                                                           per-query, optional.
 ```
 
-How the 30 minutes are spent, given the above (10 M lines; Linux-sized ×3.3 still fits):
+How the 30 minutes are spent (10 M lines; a 33 M-line tree still fits):
 
 ```text
  inside the 30 min — CPU only, zero tiny-LLM time on the critical path
    step 0  read 350 MB + digests                                ≈ 1–5 min   (disk-bound)
-   step 1–3 one ra_ap_syntax pass, rows out                      ≈ 1 min    (M: 789 klines/s/core → 13 s/core; 4 cores ≈ 5 s parse, the rest is row writing)
-   step 2/6 DB write + FTS + roll-up triggers                    ≈ 5–10 min (1.5 M spans, 7 M name tokens, 1.0 M edges ≈ 1 GB)
+   step 1–3 one parser pass, rows out                           ≈ 1 min    (M: 789 k lines/s/core → 13 s/core; 4 cores ≈ 5 s parse, the rest is row writing)
+   step 2/6 DB write + FTS + roll-up triggers                    ≈ 5–10 min (1.5 M spans, 7 M name tokens, 1.0 M edges ≈ 1 GB on disk)
    step 4  name-join SQL                                         ≈ 2–5 min  (indexed joins over use trees × names)
    step 7  banner                                                seconds
    total                                                         ≈ 10–20 min → headroom for the ×3.3 Linux-sized tree
@@ -193,59 +319,101 @@ How the 30 minutes are spent, given the above (10 M lines; Linux-sized ×3.3 sti
  second map (edit loop)   only changed files re-enter; per file: parse ms, join ms, binder seconds
 ```
 
-What changed versus the first budget: the 2–5 MB "every token" tagger (20–25 min of the 30) is gone — the parser does that work in ~1 minute — so the critical path is now disk + database, and every tiny LLM is a background worker whose cost is proportional to the *ambiguous* fraction, not to the tree.
+Why no model sits on the critical path: a model that reads every token of a 10 M-line tree costs minutes to hours on an Air no matter how small it is, while the parser reads the same tokens in about a minute and is exact on valid code. So the tiny LLMs are background workers whose cost scales with the *ambiguous* fraction of the tree (grey spans, unresolved names, unknown macros), not with the tree itself.
 
-Rules that hold for all four: text in, labels + confidence out; never write a table (a CPU tool writes the row with the label); always allowed to abstain; every output carries status `inferred` so hld-delta-dependency-view and the human reviewer can see which rows came from a model.
+## 9. Three journeys through the workflow
 
-Name note: the four-word rule forces two-word descriptors; "grey" and "candidate" moved from the names into the "called when" column.
+Legend for the notation: `d1, d2…` = file digests · `#41` = a span id · `[bytes 1180..2630)` = byte start inclusive, end exclusive · `conf` = confidence · `pub`/`priv` = visibility · statuses as defined in §1 (extracted, candidates, unresolved, pending, inferred, abstained; grey for spans; proposed / to_build / realized in the future and delta tables).
 
-Roles in one line each:
-- **ext-llm-coding-agent** — reads the product, writes intent and code; never writes facts.
-- **human-architect-intent-author** — writes intent, reviews rows; never writes facts.
-- **CPU tools** — move bytes, run the parser, run SQL, derive tables; decide nothing.
-- **tiny models** — make the judgments grammar cannot: grey boundaries, macro-defined items, ambiguous binding; see text, return labels; never touch a table.
-- **offline teacher and judge** — rust-analyzer/rustc/cargo-expand label, syn-oracle scores; absent at runtime.
-
-### Three journeys through the workflow
-
-**Journey A — the ordinary case (≈ 98 % of items): `pub fn send` calls `RetryPolicy::next_delay` through a private helper.** Measured path.
+**Journey A — the ordinary case (≈ 98 % of files): `pub fn send` calls `RetryPolicy::next_delay` through a private helper.** Every step here is the measured path.
 ```text
- 0  http/client.rs → bytes, digest d1
+ 0  http/client.rs → file row, digest d1
  1  tree → span #41 [bytes 1180..2630) fn send pub conf 1.0; span #44 fn backoff priv (parent: module)
  2  fields: send(req: Request) -> Response; use crate::retry::RetryPolicy; doc "Sends one request…"
- 3  sites: send → backoff() [byte 1402]; backoff → self.policy.next_delay() [byte 2210]      status pending
+ 3  sites: send → backoff() [byte 1402]; backoff → self.policy.next_delay() [byte 2210]      both status pending
  4  Request, Response, RetryPolicy: one span each in the tree → extracted, conf 1.0
-    next_delay: TWO spans named next_delay (RetryPolicy::, Backoff::) → candidates
- 5  binder sees receiver type RetryPolicy from the use + field → RetryPolicy::next_delay, inferred 0.9
- 6  send → RetryPolicy::next_delay  may_call  inferred [0.9]  evidence: 2 L3 rows through private backoff
- 7  banner: L2 100 %, L3 1 of 2 sites bound at first map, rest draining
- 8  agent: "what breaks if RetryPolicy changes?" → walk → send, and its callers
- 9  agent writes future row: send → Metrics::record (calls, proposed)       → delta: to_build
- 11 agent edits send's body; 12 client.rs d1→d2, steps 1–6 for that file only; 13 realized; 14 human sees intent = fact
+    next_delay: TWO spans named next_delay (RetryPolicy::next_delay, Backoff::next_delay) → candidates
+ 5  CPU resolver sees the receiver type RetryPolicy from the use tree + the field declaration → RetryPolicy::next_delay, extracted;
+    had the type not been visible, tiny-llm-edge-binder would have been asked and its answer written as inferred
+ 6  HLD row: send → RetryPolicy::next_delay   calls   extracted   conf 1.0   evidence: 2 L3 rows, private backoff collapsed
+ 7  banner: L2 100 % for this file; L3 2 of 2 sites bound
+ 8  agent: "what breaks if RetryPolicy changes?" → graph walk → send, and send's callers
+ 9  agent writes an intent row: send → Metrics::record (calls, proposed)       → delta shows it as to_build
+ 11 agent edits send's body; 12 client.rs d1 → d2, steps 1–6 for that one file; 13 the delta row flips to realized; 14 human sees intent = fact
 ```
 
-**Journey B — the broken file: a `}` deleted while the agent is mid-edit.** Measured path (oracle and mutation runs).
+**Journey B — the broken file: a `}` deleted while the agent is mid-edit.** Measured path (oracle and breakage runs).
 ```text
- 0  d3 stored verbatim (the file is broken; bytes don't care)
- 1  parse reports 1 error; the ra_ap tree alone would nest every later item inside the open fn → recovery re-cut fires:
-    `pub fn g` first on its line at column 0 ends the open item → fn f [..]  conf 0.3 (grey); g, S clean conf 1.0
-    grey row queued → tiny-llm-span-clarifier later confirms/adjusts f's end
- 2–3 fields and sites for g and S exact; f's sites written but flagged from a grey span
- 4–6 edges from g and S flow normally; HLD rows involving f carry conf ≤ 0.3 and status abstained
+ 0  file row stored verbatim, digest d3 (the file is broken; bytes don't care)
+ 1  parse reports 1 error; the tree alone would nest every later item inside the open fn → the recovery rule fires:
+    `pub fn g` first on its line at column 0 ends the open item → fn f [..] conf 0.3 (grey); g and S clean, conf 1.0
+    the grey row is queued → tiny-llm-span-clarifier later confirms or moves f's end
+ 2–3 fields and sites for g and S exact; f's fields and sites are written but inherit f's grey confidence
+ 4–6 edges from g and S flow normally; edges touching f carry conf ≤ 0.3 and are shown with it in HLD
  7  banner shows 1 grey span in this file; nothing is lost, nothing is silently wrong
- 12 next save fixes the brace → d4 → f re-cut clean → its rows flip to extracted
+ 12 next save fixes the brace → d4 → f re-cut clean → its rows become conf 1.0, extracted
 ```
 
-**Journey C — what a parser cannot see: an item made by a macro, and a name with no unique target.** Design for the unmeasured slice.
+**Journey C — what a parser cannot see: an item made by a macro, and a name with no unique target.** This is the design for the unmeasured slice.
 ```text
- 1  kernel/platform.rs: `kernel::impl_device_context_deref!(unsafe { Device });` at item position → span kind macro_call conf 0.9
-    (a parser knows it is a macro call; it does not know it DEFINES a Deref impl)
- 5  tiny-llm-macro-guesser reads the span + the macro's own span (found by name) → proposes "impl Deref for Device", inferred 0.7
- 3–4 elsewhere, site `ctx.lock()` → candidates: Mutex::lock, SpinLock::lock, RwLock::lock → no receiver type visible at the site
- 5  binder: use-tree (`use crate::sync::SpinLock`) + field decl `ctx: SpinLock<…>` → SpinLock::lock inferred 0.85;
-    if evidence is missing it ABSTAINS → row stays pending, counted in the banner, never guessed silently
- 6  HLD gains Device → Deref (inferred) and Driver::probe → SpinLock::lock (inferred); both carry their confidence into the delta
- 14 the human sees exactly which rows are inferred and can confirm or correct — that correction becomes training data for the judge
+ 1  kernel/platform.rs: `kernel::impl_device_context_deref!(unsafe { Device });` at item position → span kind macro_call, conf 0.9
+    (a parser knows it is a macro call; it does not know it DEFINES a Deref impl). Not in the known-macro table → queued for the guesser
+ 5  tiny-llm-macro-guesser reads the invocation + the macro's own definition span (found by name) → proposes "impl Deref for Device", inferred 0.7
+ 3–4 elsewhere, site `ctx.lock()` → candidates: Mutex::lock, SpinLock::lock, RwLock::lock — no receiver type visible at the site
+ 5  CPU resolver: use tree has `use crate::sync::SpinLock` and the field is declared `ctx: SpinLock<…>` → SpinLock::lock, extracted.
+    If neither were visible, tiny-llm-edge-binder would decide (inferred, with its confidence) or ABSTAIN → the row stays pending with its
+    candidate list, counted in the banner, never guessed silently
+ 6  HLD gains Device → Deref (inferred 0.7) and Driver::probe → SpinLock::lock (extracted); each carries its status into the delta
+ 14 the human sees exactly which rows are inferred and can confirm or correct — every correction becomes a training row for the binder
 ```
 
-Open question carried forward (replaces "span boundaries on broken code"): **how good is pure name-join (step 4) before any model?** That is the next measurement.
+## 10. The names
+
+Every four-word name used in this document, grouped. Retired names are listed so they are not reused.
+
+```text
+ ROLES
+ ext-llm-coding-agent              the external coding agent (Claude Code, Codex, Aider…); writes intent and code, never facts
+ human-architect-intent-author     the person; writes intent, reviews rows
+ offline-teacher-rust-analyzer     rust-analyzer / rustc / cargo-expand producing training labels on our machines; never at runtime
+ offline-judge-heldout-evaluation  the syn oracle and held-out repositories scoring the tiny LLMs
+
+ TABLES AND VIEWS (one Turso / SQLite-compatible file)
+ file-source-text-table            file rows: path, folder, digest, bytes
+ span-reference-text-table         one row per span: id, kind, name, visibility, byte range, parent, confidence, doc, cfg
+ name-token-index-table            tokens of names and paths, for joins and full-text search
+ field-signature-detail-table      per-span fields: params, return, generics, bounds, struct fields, trait items, attributes
+ edge-evidence-record-table        every L2/L3 evidence row with status, confidence, span, byte range, snapshot
+ hld-current-dependency-edges      THE PRODUCT: current public item → public item rows, extraction-only
+ hld-future-dependency-edges       intended rows; written only by the agent or the human through the propose tool
+ hld-delta-dependency-view         full outer join of current and future; nobody writes it: to_build · to_remove · realized · unplanned
+ hld-file-level-rollup             file → file counters maintained by trigger
+ hld-folder-level-rollup           folder → folder counters maintained by trigger
+ agent-learned-notes-table         what the agent learned about the map; the only table with prose
+ per-level-coverage-banner         the published coverage summary
+
+ CPU TOOLS (decide nothing)
+ cpu-tool-ingest-source-files      walk the tree · store bytes verbatim · digest · skip unchanged
+ cpu-tool-syntax-tree-walker       one parser pass per file → span, field, name-token and pending L3 rows; recovery rule on error files
+ cpu-tool-name-join-edges          SQL join of names to spans → extracted / candidates / unresolved; publishes the join rate
+ cpu-tool-bind-resolve-edges       CPU resolver first; hands ambiguous rows to the binder and macro calls to the guesser; writes their answers
+ cpu-tool-hld-table-builder        derives hld-current-dependency-edges and the roll-ups from evidence rows
+ cpu-tool-find-search-query        full-text / BM25 search → ranked rows with span text
+ cpu-tool-impact-graph-walk        recursive SQL over edges: callers, callees, blast radius, cycles
+ cpu-tool-propose-future-rows      validates and writes hld-future-dependency-edges rows for the agent or human
+ cpu-tool-status-coverage-banner   writes per-level-coverage-banner
+
+ TINY LLMS (only where grammar cannot decide; text in → labels + confidence out; never write a table)
+ tiny-llm-span-clarifier           grey spans on files with parse errors → confirmed boundary, kind, name, visibility
+ tiny-llm-edge-binder              a site with several candidate targets, after the CPU resolver failed → one target or abstain
+ tiny-llm-macro-guesser            a macro call at item position, not in the known-macro table → the items it defines, inferred
+ tiny-llm-result-ranker            optional; reorders find results beyond the agent's budget
+
+ RETIRED — do not reuse
+ tiny-llm-span-boundary-tagger · tiny-llm-field-detail-tagger · tiny-llm-body-site-tagger      boundaries, fields and sites come from the parser
+ cpu-tool-span-cutting-driver · cpu-tool-text-copy-indexer · cpu-tool-field-extraction-driver   folded into cpu-tool-syntax-tree-walker
+```
+
+## 11. The open question
+
+Everything above the binder is measured or follows from the parser. The one number nobody has measured yet is the **join rate** (step 4): on a real 10 M-line tree, what share of names join to exactly one target through use trees and paths alone? If it is high, tiny-llm-edge-binder is a small background worker; if it is low, binding becomes the long pole and the tiny LLM strategy must be re-examined. That measurement comes next.
