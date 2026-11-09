@@ -200,7 +200,20 @@ Parseltongue is one CLI with two entities inside it. The first is the thing we b
 
 ## 10. Constraints and success criteria
 
-**Success criterion.** A Linux-sized codebase — about 400 million tokens, 1.5 GB of source, used as the yardstick for "very large" — becomes a multi-level code map in 30 minutes. "Map" here means L0, L1 and L2 complete with every unresolved site stored as `abstained`, the coverage banner telling the truth, and L3 available lazily per region in seconds. Measured on the hardware named in the run; the Mac mini and desktop GPU meet it by the equation in §8, the 8 GB Air does not yet.
+**Success criterion.** A Linux-sized codebase — about 400 million tokens, 1.5 GB of source, the yardstick for "very large" — becomes a multi-level code map in 30 minutes **on an 8 GB MacBook Air**. The Air is the hard target, not a nice-to-have; the design must get there. "Map" means L0, L1 and L2 complete with every unresolved site stored as `abstained`, the coverage banner telling the truth, and L3 available lazily per region in seconds. Faster hardware is a bonus, never the assumption.
+
+**What the Air target forces.** Thirty minutes of Air GPU is ≈ 2.2e15 operations (plus ≈ 0.7e15 on CPU), against 400 M tokens. By the equation in §8 that budget is met only if all four hold:
+
+```text
+ a  tinyLLM01 reads everything at ≤ ~5 M ops/token  →  ≤ 2–3 M parameters, and η ≥ 0.7 through batching and fused kernels
+    (3 M params × 400 M tokens = 2.4e15 ops ≈ 20 min at η 0.7; at η 0.2 it is 70 min and the target is missed)
+ b  the heavy models — tinyLLM02 clarifier, 03 fielder, 04 binder — read ≤ 2–3 % of the text inside the window;
+    everything else they do is background work after minute 30, flipping abstained → extracted while the agent works
+ c  T_io + T_store + T_index ≤ 10 min: hash and insert 1.49 GB, write ~3 M span rows, build FTS and name indexes
+ d  the second map is cache-bound: h ≥ 0.9 by content digest, so re-mapping costs T_io + T_index, not model time
+```
+
+If (a) fails on real hardware, the fallback that keeps the criterion is a deterministic first cut for spans with tinyLLM01 demoted to the grey rows — a loss of the "model owns every judgment" purity at stage 1 only, recorded here so it is a conscious trade, not a drift.
 
 **Fixed constraints.**
 - Code is saved first, by a CPU tool, into a Turso table; nothing reads the working tree after that.
