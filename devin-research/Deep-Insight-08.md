@@ -153,6 +153,50 @@ Reading rule for the inspiration column: anything ✔ at runtime is a *library* 
                          any unique name join; any HLD derivation or roll-up; anything in the future/delta tables
 ```
 
+### Training data, processing time and the 30-minute / 8 GB Air budget, per tiny LLM
+
+Numbers below are for the DI-07 §14 10 M-line tree, *medium* column (40k files · 1.5 M spans · 1.0 M L2 edges · 3.9 M L3 call sites); the Linux-sized yardstick (33 M lines) is ×3.3. **M** = measured in this repo (DI-07 §16); everything else is an estimate from the §8 equation (cost ≈ 2 · params · tokens for an encoder; Air ≈ 1.1–1.7e12 FLOP/s GPU, ≈ 4e11 FLOP/s CPU). Training is always offline on a desktop GPU or rented box — never on the Air, never at runtime.
+
+```text
+ name                     training INPUT dataset (what the model sees)           training OUTPUT / label set (who produces it)          how much data · time to build it               runtime volume on the 10 M-line tree · time on the Air          where it sits in the 30 min
+ ──────────────────────── ────────────────────────────────────────────────────── ────────────────────────────────────────────────────── ────────────────────────────────────────────── ─────────────────────────────────────────────────────────────── ─────────────────────────────
+ tiny-llm-span-clarifier  grey span bytes + ~20 lines of context, taken from     the TRUE item boundaries, kind, name, visibility of     synthetic: 1 M-line parseable corpus ×         ≤ 2 % of 40k files have parse errors ≈ 800 files × 1–2 grey     NOT in the 30 min. First map
+                          DELIBERATELY BROKEN copies of parseable files          the same file BEFORE it was broken — from syn /         5 mutation kinds × several sites per file      spans ≈ 1–2k spans × ~300 tokens ≈ 0.5 M tokens.                 writes them grey (conf ≤ 0.3);
+                          (mutate.py: delete `}`, truncate, half-typed item,     ra_ap_syntax on the unbroken file. Fully automatic,    → 0.5–1 M labelled examples; generation        30–100 M model → ~1e14 FLOP → 1–2 min GPU / ~5 min CPU.          clarifier runs in background
+                          delete `;`, stray `{`) + the recovery rule's own       no human, no compiler run. (M: the oracle exists        ≈ minutes (parser at 789 klines/s, M).         Per broken file: milliseconds.                                     and flips rows to extracted.
+                          grey span as the "question"                            today, 376/376.)                                       Training: ~3e8 tokens × 3 epochs on a 30–100 M
+                                                                                                                                        encoder ≈ 2–6e17 FLOP ≈ 1–3 h desktop GPU.
+ tiny-llm-edge-binder     a call/field site's text + the enclosing item's use    the ONE span the name resolves to — from the           real: every ambiguous site in the open-source  L2: 1.0 M edges × (1 − join rate). At 20 % ambiguous (to be      NOT in the 30 min. First map
+                          tree + the 2–8 candidate spans' signatures, from REAL  offline teacher (rust-analyzer go-to-definition /      corpus (this VM: 3,370 files, 1 M lines →      measured, step 4) ≈ 200k rows × ~400 tokens ≈ 80 M tokens;        publishes unique joins
+                          files in the corpus, only where name-join returned     rustc HIR), run once per corpus on a desktop. Human    ≈ 400k call sites, ~80k ambiguous). Teacher    100 M model → 1.6e16 FLOP ≈ 15–45 min on the Air GPU.            (extracted) and candidate
+                          several candidates                                     correction rows from step 14 are added over time.      pass: RA load + per-site resolve ≈ 1 h per     L3: 3.9 M sites, ~0.8 M ambiguous ≈ 320 M tokens → 6e16 ≈ 1.5 h  lists; binder drains L2 then
+                                                                                                                                        1 M lines (estimate). Training: 100 M encoder, background; per region on demand: seconds.                       L3 in the background (DI-07
+                                                                                                                                        ~1.6e8 tokens × 3 epochs ≈ 3e17 ≈ 2 h GPU.                                                                      §12.7 "L3 drain").
+ tiny-llm-macro-guesser   an item-position macro invocation's bytes + the        the items the macro actually produces (kind, name,     real: top ~1,000 crates.io crates + kernel     1–3 % of 480k public spans are item-position macro calls ≈        NOT in the 30 min. First map
+                          macro_rules!/proc-macro definition's bytes when it is  visibility, impl-of) — from cargo-expand (offline       Rust; cargo-expand needs a BUILD → 1–5 min     5–15k × ~500 tokens ≈ 2.5–7.5 M tokens; 100 M model → ~1e15      stores the span as kind
+                          in the tree, from real crates                          teacher) on crates that compile, diffed against the    per crate, 1–3 CPU-days total, parallel;       FLOP ≈ 1 min GPU / ~5 min CPU. Known-macro table (hand-written    macro_call; guesser adds
+                                                                                 un-expanded tree. Automatic for compiling crates.      ≈ 50–200k examples. Training ≈ 1 h GPU.        for std/kernel macros) removes most of these before the model.    inferred items in background.
+ tiny-llm-result-ranker   a `find` query + the 20–50 candidate rows (names,       the row the agent actually used — from                 starts empty; grows with use; thousands of     per query: ~20 rows × 100 tokens ≈ 2k tokens → milliseconds.      not part of the map at all;
+                          signatures, doc first line, BM25 score)                agent-learned-notes-table and step-14 review clicks.   examples before it is worth training.                                                                           per-query, optional.
+```
+
+How the 30 minutes are spent, given the above (10 M lines; Linux-sized ×3.3 still fits):
+
+```text
+ inside the 30 min — CPU only, zero tiny-LLM time on the critical path
+   step 0  read 350 MB + digests                                ≈ 1–5 min   (disk-bound)
+   step 1–3 one ra_ap_syntax pass, rows out                      ≈ 1 min    (M: 789 klines/s/core → 13 s/core; 4 cores ≈ 5 s parse, the rest is row writing)
+   step 2/6 DB write + FTS + roll-up triggers                    ≈ 5–10 min (1.5 M spans, 7 M name tokens, 1.0 M edges — DI-07 §14.3 ≈ 1 GB)
+   step 4  name-join SQL                                         ≈ 2–5 min  (indexed joins over use trees × names)
+   step 7  banner                                                seconds
+   total                                                         ≈ 10–20 min → headroom for the ×3.3 Linux-sized tree
+ after the 30 min — one model loaded at a time (≤ 100 MB int8 → < 0.5 GB RAM; parser and DB stay under ~2 GB; fits 8 GB)
+   clarifier   ≈ 1–5 min      macro guesser ≈ 1–5 min      binder L2 ≈ 15–45 min      binder L3 ≈ 1.5 h, by region on demand
+ second map (edit loop)   only changed files re-enter; per file: parse ms, join ms, binder seconds
+```
+
+What changed versus DI-07 §8's first budget: the 2–5 MB "every token" tagger (20–25 min of the 30) is gone — the parser does that work in ~1 minute — so the critical path is now disk + database, and every tiny LLM is a background worker whose cost is proportional to the *ambiguous* fraction, not to the tree.
+
 Rules that hold for all four: text in, labels + confidence out; never write a table (a CPU tool writes the row with the label); always allowed to abstain; every output carries status `inferred` so hld-delta-dependency-view and the human reviewer can see which rows came from a model.
 
 Name note: the four-word rule forces two-word descriptors; "grey" and "candidate" moved from the names into the "called when" column.
