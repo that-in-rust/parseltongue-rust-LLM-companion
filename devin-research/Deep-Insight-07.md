@@ -725,3 +725,36 @@ Measured in one process over every `.rs` file on the VM — 3,370 files, 31 MB, 
 ```
 - Why not `rustc_parse`: it is `rustc_private` — no crates.io, nightly only, breaks every few weeks, needs the compiler's `SourceMap`/`Session` globals to hand back a span, its AST is not lossless and its recovery exists to print diagnostics, not to return a usable tree. Nobody embeds it.
 - Why `ra_ap_syntax` on valid code is as trustworthy as rustc: same grammar, tested against rustc's parser test suite and by parsing rust-lang/rust itself; and our own 376/376 oracle agreement.
+
+### §16 reasoning — are we using the best possible compiler code to cut spans? (user question, 2026-11-09)
+
+Short answer: **yes for the lexer; "tested equal to the compiler on valid code" for the parser; better than the compiler on broken code.** The compiler's own parser is not on the table, and this records why.
+
+```text
+ what rustc itself uses to make spans            what Parseltongue uses                   same?
+ ──────────────────────────────────────────────── ──────────────────────────────────────── ─────────────────────────────
+ rustc_lexer   bytes → tokens                     ra-ap-rustc_lexer                        IDENTICAL CODE. rustc's source,
+                                                                                           auto-published weekly.
+ rustc_parse   tokens → AST, spans = BytePos      ra_ap_parser + ra_ap_syntax              DIFFERENT CODE, SAME GRAMMAR.
+               lo..hi                             TextRange start..end (bytes too)         RA is tested against rustc's own
+                                                                                           parser test-suite and parses
+                                                                                           rust-lang/rust itself in CI.
+                                                                                           Measured here (checkpoint 7):
+                                                                                           376/376 items byte-identical to
+                                                                                           syn (which tracks rustc) after
+                                                                                           trivia normalisation.
+```
+
+Why not `rustc_parse` itself, even though it is "the law":
+- It is `rustc_private`: nightly compiler only, not on crates.io, API breaks every few weeks. It cannot be built with a stable toolchain, so the Parseltongue binary would require a nightly compiler on the user's machine. That alone excludes it.
+- To produce a span it needs the compiler's globals (`SourceMap`, `Session`, the type interner). Cutting one file would mean instantiating a large part of rustc.
+- Its recovery exists to print good diagnostics and then abort compilation; it does not hand back a tree for a half-typed file. rust-analyzer's recovery exists to keep a tree alive on every keystroke — the property a map of code-in-progress needs.
+
+Ranking for "convert files into spans":
+```text
+ valid Rust        rustc_parse = ra_ap_syntax = syn        (all agree byte for byte — grammar is grammar)
+ broken Rust       ra_ap_syntax + our §16 recovery rule  >  ra_ap_syntax alone  >  rustc_parse (no tree)  >  syn (whole-file fail)
+ embeddable        ra_ap_syntax ✔   syn ✔   rustc_parse ✘ (nightly + compiler internals)
+```
+
+Caveat, stated plainly: rust-analyzer's parser is a *re-implementation* of the grammar, so the guarantee is "tested equal", not "the same bytes of code". That is why the `syn` oracle (376 items on 125 real files, 5 mutation kinds — checkpoints 3–5, 7) stays in the test suite and is re-run on every `ra_ap_*` version bump: if RA ever diverges from rustc on a construct we depend on, that test goes red before the divergence reaches `span-reference-text-table`.
