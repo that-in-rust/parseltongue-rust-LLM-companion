@@ -239,3 +239,6 @@ Decisions deliberately deferred. Each is independent of the structure above.
 - Turso versus stock SQLite versus a graph-native store, after a benchmark.
 - Span identity under rename and move.
 - Whether the file layer adopts AgentFS's schema when an agent runs sandboxed.
+- The training and evaluation loop as a component: who runs rust-analyzer off-line to label spans, fields and bindings for tinyLLM01–04 and scores them on held-out repositories — a `parseltongue-teacher` inside this repo, or a separate one.
+- What "grey" means precisely: the rule CPU-tool-02 uses to hand a span to tinyLLM02 — confidence below a threshold · unbalanced braces · a macro invocation inside the span · unknown kind · some combination.
+- The L3 trigger: resolve bodies only when the agent asks (`impact --depth`, `find --body`), or also pre-warm regions in the background once L2 is bound.
