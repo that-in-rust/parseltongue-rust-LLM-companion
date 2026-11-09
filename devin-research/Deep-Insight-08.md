@@ -19,6 +19,7 @@ This document is the single, self-contained description of the pipeline. It is w
  §10 the names       every four-word name used here, plus names retired and not to be reused
  §11 the open question
  §12 fields           once spans are known: why fields, what is done with them, how a public-interface signature is built
+ §13 parked ideas     explorations not yet part of the design: public-only tiers, the six axes of a span, virtual spans
 ```
 
 Conventions used throughout:
@@ -537,3 +538,94 @@ For other kinds the same order applies with the kind's own parts:
 ```
 
 One line: **the span says where an item is; the fields say what it is made of; the signature built from the fields is what every other item, the agent, and the human see of it — and the only part whose change should ripple through the map.**
+
+## 13. Ideas and explorations — not yet part of the design
+
+*Parked here so they are not lost. Nothing in this section is decided; §1–§12 remain the design. Each idea has a plain-words summary first, the detail after, and the question that would decide it.*
+
+### 13.1 Should the map focus on public-interface spans only?
+
+**Plain words.** The product is public → public edges, so it is tempting to cut only public items. That does not work, because a public item can reach another public item *through* a private helper, and the map must still show that edge. The likely answer is two tiers: public items get everything; private items get a cheap "light" row that exists only so chains can be collapsed.
+
+```text
+ the product                 hld-current-dependency-edges = public item → public item. Private items never appear as nodes.
+
+ why private spans must      public A calls private helper h, h calls public B  →  HLD must show A → B.
+ still be CUT                To collapse that chain the walker needs h's box and the call sites inside h.
+                             A private struct field `policy: RetryPolicy` is an edge Config → RetryPolicy — evidence, not interface.
+                             A private item becomes public with one keyword edit; an existing light row makes that a flip, not a re-parse.
+
+ what "public" would mean    pub, pub(crate), pub(super), pub(in path), and anything re-exported by `pub use` — the crate's visible surface.
+                             Items inside a private module are NOT public even if marked pub (not reachable from outside).
+                             Rule: public = reachable from the crate root through pub paths. Computable from the module tree; no model.
+```
+
+Proposed tiers (if adopted):
+
+```text
+ tier            which spans                        what steps 1–3 store                                            cost share (10 M lines, medium)
+ ─────────────── ────────────────────────────────── ─────────────────────────────────────────────────────────────── ───────────────────────────────
+ public (full)   reachable from the crate root via   span · fields · names/FTS · docs · signature string + digest ·  ≈ 880k spans → all field, name
+                 pub paths; pub use re-exports        body sites                                                      and FTS rows
+ private (light) everything else at module level,    span (kind, name, range, parent, digest) · body sites only       ≈ 590k spans, ~1/5 of the bytes:
+                 incl. nested fns                     NO fields, NO docs, NO FTS, NO signature                          no FTS, no field rows
+ body-only       locals, closures, let bindings       nothing — not a span; their calls are sites of the enclosing item —
+```
+
+Effects if adopted: `find` only ever returns public items (what the agent may use); the field table shrinks ≈ 40 %; private rows exist solely for chain collapsing and for a cheap `pub` flip; the L3 drain order follows — sites in public bodies first, private bodies only when a chain needs them.
+
+**Deciding question.** On a real tree, what share of public → public edges pass through at least one private helper? If it is small, the light tier could be deferred; if it is large (likely), the two-tier rule goes into §5 steps 1–2 and §12.3.
+
+### 13.2 There are many more kinds of span than "fn, struct, impl…" — six axes
+
+**Plain words.** A span is always one shape (a byte range with a kind), but it varies along six independent axes, and most extraction bugs come from treating only the first axis as real. The glossary's "kind · name · visibility" is a simplification of this.
+
+```text
+ AXIS 1 — grammar kind (what the parser hands over directly)
+   fn · struct · enum · union · trait · trait alias · impl (inherent) · impl (trait for type) · type alias · const · static
+   mod (inline `mod x { }` vs file `mod x;`) · use · extern crate · extern block + its foreign fn/static · macro_rules! · `pub macro` (2.0)
+   macro invocation at item position · module header (the file's `//!` docs + `#![…]` attrs — crate-level docs ARE interface)
+
+ AXIS 2 — nesting (where the box sits)
+   module-level item · impl member (method, assoc const, assoc type) · trait member (required / provided) · enum variant · struct field
+   · fn nested inside a body · item inside a block or closure
+   → members of a public type are addressable interface (RetryPolicy::next_delay), so they are SPANS, not merely fields of their parent
+
+ AXIS 3 — reachability (what "public" means)
+   reachable from the crate root via pub paths · pub(crate) · pub(super) / pub(in path) · private · public-but-#[doc(hidden)]
+   · #[deprecated] · re-exported under another path by `pub use` · exported symbol (#[no_mangle], extern "C" — interface to OTHER languages)
+   → "pub" inside a private mod is NOT public; computable from the module tree, no model
+
+ AXIS 4 — origin (where the bytes came from)
+   written by hand · generated by a macro invocation · generated by #[derive] (Clone, Debug… impls that exist with NO text of their own)
+   · one of several #[cfg] twins (same name, different cfg) · #[cfg(test)] / #[test] / bench / example / build.rs · generated file (bindgen, prost)
+   · doc-test code block inside a /// comment (compiles; references items; worth a tag, not a span)
+
+ AXIS 5 — parse status (how sure we are of the box)
+   clean (conf 1.0) · grey from the recovery rule · error region (garbage the parser wrapped) · truncated at EOF (half-typed)
+   · inside git conflict markers <<<<<<< ======= >>>>>>> (both halves are real code; neither should be mapped as truth)
+
+ AXIS 6 — identity across time (does the digest stay put)
+   same bytes moved (new offsets, same digest) · body edit (span digest changes, signature digest does not) · signature edit · rename
+   · visibility flip (private → pub: the row already exists, it changes tier) · cfg twin added
+```
+
+Two consequences, if this view is adopted:
+
+```text
+ 1  VIRTUAL SPANS      three kinds of interface have no bytes of their own and would be DERIVED rows pointing at the span that caused them:
+      #[derive(Clone)] on Config        → impl Clone for Config            CPU, from the known-macro table
+      pub use a::b::X;                  → an alias of span X at a new path  CPU, after step 4 resolves X; `pub use a::*` expands to many
+      foo! { … } at item position       → the items the guesser proposes    tiny-llm-macro-guesser
+    same table, origin = derived, source_span = the attribute / use / invocation span
+
+ 2  TIER IS A FUNCTION OF AXES 2–4, NOT OF KIND
+      full      reachable public items and their public members, re-export aliases, extern "C" exports
+      light     private items, test-only items, nested fns
+      tag only  doc-tests, conflict regions
+      nothing   locals, closures
+```
+
+Proposed four-word name, if adopted: `span-kind-axis-taxonomy`; each axis would become a column of span-reference-text-table.
+
+**Deciding question.** Which axes does the agent actually ask about? Reachability (axis 3) and parse status (axis 5) are needed for the product's correctness; origin (axis 4) matters for cfg twins and derives; the rest can wait until a `find` or impact question needs them.
