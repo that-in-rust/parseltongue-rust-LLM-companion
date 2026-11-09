@@ -242,3 +242,73 @@ Decisions deliberately deferred. Each is independent of the structure above.
 - The training and evaluation loop as a component: who runs rust-analyzer off-line to label spans, fields and bindings for tinyLLM01–04 and scores them on held-out repositories — a `parseltongue-teacher` inside this repo, or a separate one.
 - What "grey" means precisely: the rule CPU-tool-02 uses to hand a span to tinyLLM02 — confidence below a threshold · unbalanced braces · a macro invocation inside the span · unknown kind · some combination.
 - The L3 trigger: resolve bodies only when the agent asks (`impact --depth`, `find --body`), or also pre-warm regions in the background once L2 is bound.
+
+## 12. HLD_current · HLD_future · HLD_delta
+
+*The map, named for what it is. L0–L2 of the multi-level code map is a high-level design extracted from the code; the proposed records are the high-level design as intended. Giving the two tables those names, and deriving the gap between them as a third, gives humans and agents one language: rows.*
+
+### 12.1 Three logical databases in one file
+
+```text
+ HLD_current   written only by extraction (CPU tools + tiny models)        the as-built design, true by construction
+ HLD_future    written only by the agent-LLM or a human; never by the tool   the intended design
+ HLD_delta     a VIEW over the two — nobody writes it                        the gap; it cannot be stale or disagree with the truth
+
+ all three live in the one Turso file beside file · span · name · field · edge
+```
+
+A row in either HLD table is one edge at the signature level:
+
+```text
+ node01_signature · node01_file · node01_folder · node01_kind · node01_span_id
+ node02_signature · node02_file · node02_folder · node02_kind · node02_span_id
+ edge_type · status · confidence · cfg · creator · reason · snapshot
+```
+
+Raw code is not in the row. It lives once in the reference `span` table, keyed by digest, where the full-text index also lives. Search starts there — FTS over `span.raw_code` returns span ids; one join lands in the HLD rows with their folders and edges. An HLD row is the signature level by definition; the body is LLD and does not belong in it, and a span that appears in many rows must be stored once so a change touches one place.
+
+Nodes with no edges still get a row (node02 null, edge_type `none` or `abstained`), so "no edges" means none rather than "not indexed".
+
+### 12.2 HLD_delta as a view
+
+```text
+ full outer join of HLD_future and HLD_current on (node01_span_id, node02_span_id, edge_type)
+
+ in future only                         → to_build      the work; a bounded task with a file, a folder, neighbours, a signature
+ in current only, future says retire    → to_remove
+ in both                                → realized      the proposed row's status flips when extraction lands a match
+ in current only, no future opinion     → unplanned     structure nobody intended — the most interesting rows on a legacy tree
+```
+
+Because it is a view, the agent's loop is one query — `SELECT * FROM HLD_delta WHERE state = 'to_build' ORDER BY node01_folder` — and there is no job to forget and no second artefact to trust. At kernel scale a whole-tree read of the view is slow (tens of millions of edge rows); it is then materialised per folder or per snapshot into a cache table that is regenerable from the view, so it can be fast without ever being wrong.
+
+### 12.3 Programming at the HLD level
+
+```text
+ today                                   with the three tables
+ code is the source                      HLD_future is what you edit
+ the design document drifts              HLD_current is extracted — always true
+ "what should I write?" is open-ended    "make this to_build row real" has a location, neighbours and a signature
+ review reads diffs of code              review reads rows of intent; the realized flip is the proof the code matches
+
+ human / agent  ──writes rows──►  HLD_future
+                                       │   HLD_delta: to_build
+                                       ▼
+                                agent writes code for exactly those rows
+                                       │
+                                re-extract (CPU tools + tiny models)
+                                       ▼
+                                HLD_current gains the matching rows  →  to_build becomes realized
+```
+
+Gaps are visible before any code exists: a future node with no incoming edge is dead on arrival; a future edge from `gateway` to `db` breaks an agreed layering; both are rows, found by SQL, with nothing written.
+
+### 12.4 Scope note
+
+Earlier in this research the verification product — a diff command, an as-built map, a conformance report, a CI gate — was cut as unnecessary complication. HLD_delta is a deliberate, smaller reversal: a derived view, no workflow of its own, no report, no gate. The reason it earns its place is language — three named tables let a human and an agent talk about the same rows.
+
+### 12.5 Open in this section
+
+- Deletion: "this edge should stop existing" needs a `retire` marker in HLD_future that becomes realized when extraction stops seeing the row.
+- Whether HLD_future is written as whole rows or as add/retire events with a reason (the event form gives "why" and "when" for free and makes retire natural; a view can present it as rows either way).
+- The one-hour test: write the view, hand-author ten HLD_future rows for `cargo-modules`, and check that to_build / to_remove / realized / unplanned come out as a person would classify them. No model needed.
