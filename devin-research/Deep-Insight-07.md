@@ -578,3 +578,11 @@ Grep proxies: a `fn` inside a macro body or string literal is counted; calls und
 - `cargo test` on the stub: `test result: FAILED. 0 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s` — every test panics on `todo!()`, as required; none passes without an implementation.
 - Status: 10 tests failing (RED) · 0 passing · implementation pending.
 - Next: GREEN — the minimum lexer (strings, chars vs lifetimes, raw strings, nested block comments, attributes/docs attached to the following item, brace matching, `;` termination, ITEM_RECOVERY_SET resync with confidence 0.3 on grey spans), then the oracle comparison on real files.
+
+### Checkpoint 2 — GREEN
+- `cargo test`: `10 passed; 0 failed`. Implementation ≈ 120 lines: lexer (line/doc/nested block comments, `"…"`, `b"…"`, `r#"…"#`, char vs lifetime by look-ahead, identifiers, numbers, punctuation) → attribute/doc attachment → visibility/modifier prefix → item keyword → scan to matching `}` or depth-0 `;` → resync rules → confidence.
+- Two bugs found by the tests, both in the *terminator/name* logic, not in brace matching:
+  1. `macro_rules! m` — the name sits after `!`; first version named it `""`.
+  2. Missing `}` in a body: `pub fn f() { let a = 1;\npub fn g() {}\npub struct S;` — at depth 1 the cutter legitimately sees `pub fn g` as a *nested* item (Rust allows items in blocks), swallows the file, and is right by the grammar, wrong by the human. rust-analyzer does the same (nests it). Fix adopted: **indentation resync** — an item keyword at the same column as the open item's start, first on its line, while still inside its braces, closes the open item as grey (0.3) and starts a new item. This is a heuristic, not grammar; it is the first concrete place where "the lexer cannot know" appears, and it is exactly the kind of judgment a grey-span model would make better than a column rule.
+- Decision: grey confidence fixed at 0.3 for unterminated/resynced/truncated spans; macro invocations at item level recorded as `MacroCall` at 0.9 (they *may* define items — a model question, not a lexer one).
+- Next: oracle comparison on 125 real files (cargo-modules 25, rust-analyzer 60, linux/rust 25, flowistry 15) for start/end/kind/name/visibility agreement; then mutations.
