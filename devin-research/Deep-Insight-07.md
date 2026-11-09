@@ -594,3 +594,19 @@ Grep proxies: a `fn` inside a macro body or string literal is counted; calls und
 - Two grey marks on good code (`fn normalize_bounds` in zerocopy util.rs:596; a `macro` in kernel/platform.rs:531): the indentation-resync heuristic fired inside a legitimately nested, column-0 construct — the predicted false-positive of the heuristic. Kept for inspection in the next run.
 - Lesson so far: every real-file failure has been in **terminator and classification logic**, none in lexing (strings, chars, lifetimes, comments, raw strings) and none in brace matching. The "regex / follow the semicolons" approach fails exactly here; the lexer approach fails nowhere yet.
 - Added RED tests: `test_use_tree_ends_semicolon` · `test_tuple_struct_ends_semicolon` · `test_const_block_ends_semicolon` · `test_extern_crate_kind_classified`. Next: GREEN on them, re-run the oracle, then mutations.
+
+### Checkpoint 4 — oracle agreement after fixing the real-file misses (still GREEN, no refactor yet)
+Each fix = one RED test + minimum change; agreement on the same 125 files / 376 syn items after each:
+
+```text
+ run  exact / 376   bug class fixed (with the snippet that exposed it)
+ 1    310  82.4 %   use a::{b, c};  → closed at `}` not `;`; `const X = { 1 };` same          → terminator depends on item kind
+ 2    362  96.3 %   //! inner docs and #![inner attrs] attached to the NEXT item (syn: module-level)  → skipped at top level
+                    extern "C" { fn x(); }  → `extern` was eaten as a modifier                   → extern block is a keyword
+ 3    373  99.2 %   -> impl 'a + Iterator<…>  → `impl` in a return type fired the resync rule     → no resync after > + : = & ( ,
+                    kernel::impl_device_context_deref!(unsafe { Device });  → path macro call      → path before `!` accepted
+ 4    (next)        unsafe extern "C" fn cb()  → the ABI string after `extern` left `m` on a Str   → skip the ABI string
+```
+- All remaining disagreements were in **prefix/terminator/classification** logic; zero in lexing, zero in brace matching, zero spans mis-cut because of a `{`/`}` inside a string, char, raw string or comment — on 125 real files including kernel code.
+- Tests now 17, all four-word-named; implementation still ~140 lines, no dependencies.
+- Next (checkpoint 5): mutation runs — delete a `}`, truncate mid-item, insert `pub fn half_typed(`, delete a `;`, insert a stray `{` — measuring (a) how many *unaffected* items are still cut exactly, (b) whether the damaged region is marked grey. This is the number that decides how much a model is needed.
