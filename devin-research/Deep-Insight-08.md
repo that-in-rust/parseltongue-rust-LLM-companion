@@ -14,6 +14,33 @@
 
 ## End-to-end workflow, with roles
 
+### The journey in one line per step
+
+```text
+ 0   codebase  →  files           the working tree is walked; every .rs file's bytes are stored unchanged as one row in Turso, with a digest;
+                                  a file whose digest did not change is skipped
+ 1   file      →  spans           each file is parsed once (ra_ap_syntax); every module-level item becomes a span row: byte start, byte end, kind,
+                                  name, visibility; a file with parse errors is re-cut by the recovery rule and its doubtful spans are marked grey
+ 2   span      →  fields + names  from the same tree: params, return, generics, bounds, struct fields, trait items, use trees, cfg/attrs, docs;
+                                  names are split into tokens and indexed for full-text search
+ 3   span      →  body sites      from the same tree: every call, method call, construction, field read/write, .await, unsafe block, panic!/? inside
+                                  a body becomes a pending L3 row pointing at its byte range — found, not yet resolved
+ 4   name      →  target          each site/field name is joined to span rows through use trees and paths: one match = extracted edge,
+                                  several = candidate list, none = unresolved; the join rate is published
+ 5   candidates →  one target     the CPU resolver tries first; only still-ambiguous candidates go to the tiny binder; macro invocations at item
+                                  position go to the macro guesser; no evidence = abstain, never guess
+ 6   edges     →  HLD             public → public edges are derived by collapsing private chains; file and folder roll-ups update by trigger
+ 7   tables    →  banner          coverage per level, parser-error count, grey-span count, join rate and unresolved backlog are published
+ ─── first map done; everything below is the daily loop
+ 8   agent asks                   "where is X", "what breaks if X changes" — answered by search and graph walk over the tables
+ 9   agent/human writes intent    new node, new edge, retire edge → rows in hld-future-dependency-edges (validated, never auto-created from code)
+ 10  agent reads the gap          hld-delta-dependency-view lists to_build rows with file, folder, neighbours and signature
+ 11  agent writes code            exactly for those rows, in the working tree
+ 12  changed files re-mapped      steps 0–7 run again for the changed files only (digest says which)
+ 13  delta flips                  a future row whose fact now exists in hld-current becomes realized — by definition, nobody edits it
+ 14  human reviews                rows of intent against rows of fact
+```
+
 
 Decision (evidence: DI-07 §16): one parse per file with `ra_ap_syntax` (pinned library, not the rust-analyzer server) does the cutting; models leave steps 1–3 entirely; the only model-shaped step left is binding (step 5), and even there pure name-join is measured first.
 
