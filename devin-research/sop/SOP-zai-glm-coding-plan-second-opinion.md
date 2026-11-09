@@ -86,3 +86,14 @@ curl -s -G -H "Authorization: Bearer $ZAI_API_KEY" --data-urlencode "startTime=$
 - Waiting with `while pgrep -f "claude -p"` matches the waiting shell's own command line and never exits. Use `pgrep -x node` filtered on the claude path, or `wait` on the backgrounded PID.
 - The `[1m]` unrecognized-model warning in `.err` is harmless; the run used glm-5.3.
 - The output is a strong independent read when the prompt forces a restatement first and demands file/H-number citations; it caught two real inconsistencies between our own notes that we had not.
+
+## 6. Persisting across Devin sessions (added 2026-11-09)
+```text
+   key        saved as the PERSONAL Devin secret ZAI_CODING_PLAN_API_KEY (Settings → Secrets → Personal). Injected into every
+              new session's env; never on disk, never in settings.json, never committed. Not visible to snapshot builds (personal scope).
+   harness    repo blueprint installs nvm → Node 22 → @anthropic-ai/claude-code and writes ~/bin/zcode, so a fresh session has `zcode`.
+   key order  the launcher reads ZAI_CODING_PLAN_API_KEY first, ZAI_API_KEY second. Gotcha found 2026-11-09: a session may also carry a
+              pay-as-you-go ZAI_API_KEY; if the launcher prefers that one, every call fails with 1113 and `claude -p` appears to hang.
+   smoke      echo 'Reply with exactly the word pong.' | ~/bin/zcode -p --output-format text --model glm-5.3-flash   → pong (~5 s)
+   quota      curl -s -H "Authorization: Bearer $ZAI_CODING_PLAN_API_KEY" https://api.z.ai/api/monitor/usage/quota/limit
+```
