@@ -6,7 +6,7 @@
 2. **It is read on every task and rebuilt only where the tree changed.**
    - One row = a public item depending on a public item: node01 (signature, file, folder, kind, span id) · node02 (same) · edge type · status · confidence [min, max] · evidence count · snapshot. No bodies, no private items — those are evidence behind a row, in edge-evidence-record-table and span-reference-text-table.
    - Raw code is not in the row. It lives once in span-reference-text-table, keyed by digest, where full-text search also lives; search starts there and lands in HLD rows by one join.
-   - **Written only by extraction** — cpu-tool-hld-table-builder deriving from edge and span rows that CPU tools and tiny models produced. Never by ext-llm-coding-agent, never by human-architect-intent-author.
+   - **Written only by extraction** — cpu-tool-hld-table-builder deriving from edge and span rows that the parser pass (cpu-tool-syntax-tree-walker) and the two remaining tiny models produced. Never by ext-llm-coding-agent, never by human-architect-intent-author.
    - **hld-future-dependency-edges** holds the intended design. Written only by ext-llm-coding-agent or human-architect-intent-author through cpu-tool-propose-future-rows, which validates and never authors. Same row shape, status `proposed`, plus creator and reason.
    - **hld-delta-dependency-view** is the gap: a full outer join of the two. Nobody writes it. States: to_build · to_remove · realized · unplanned.
    - **hld-file-level-rollup** and **hld-folder-level-rollup** are counters (weight, kinds, confidence range) updated by trigger on every HLD row — the folder map is never stale relative to the item map.
@@ -14,49 +14,8 @@
 
 ## End-to-end workflow, with roles
 
-```text
- step  what happens                                                       who does it                                   writes
- ───── ───────────────────────────────────────────────────────────────── ───────────────────────────────────────────── ──────────────────────────────
- 0     tree is walked, hashed, saved                                      cpu-tool-ingest-source-files                  file-source-text-table
- 1     files cut into public spans; grey spans re-read                   cpu-tool-span-cutting-driver                  span-reference-text-table
-                                                                           → tiny-model-span-boundary-tagger
-                                                                           → tiny-model-grey-span-clarifier
- 2     span text/doc copied, names tokenised, FTS built                   cpu-tool-text-copy-indexer                    span, name-token-index-table
- 3     signature details extracted                                        cpu-tool-field-extraction-driver              field-signature-detail-table
-                                                                           → tiny-model-field-detail-tagger
- 4     names joined to targets; unique = extracted, else candidates       cpu-tool-name-join-edges                      edge-evidence-record-table
- 5     candidates resolved; L3 sites found and queued                     cpu-tool-bind-resolve-edges                   edge-evidence-record-table
-                                                                           → tiny-model-candidate-edge-binder
-                                                                           → tiny-model-body-site-tagger
- 6     HLD rows and roll-ups derived                                      cpu-tool-hld-table-builder                    hld-current-dependency-edges,
-                                                                                                                         hld-file/folder-level-rollup
- 7     coverage per level published                                       cpu-tool-status-coverage-banner               per-level-coverage-banner
- ───── first map ends here: ≤ 30 min for a Linux-sized tree on an 8 GB Air; L3 pending rows counted, draining in background
- 8     agent asks: where is X · what breaks if X changes                  ext-llm-coding-agent                          —
-       answered from the tables                                           cpu-tool-find-search-query, cpu-tool-impact-graph-walk
- 9     intent written as rows: new node, new edge, retire edge            ext-llm-coding-agent or human-architect-intent-author
-                                                                           via cpu-tool-propose-future-rows             hld-future-dependency-edges
- 10    gap read: to_build rows, each with file, folder, neighbours, sig   ext-llm-coding-agent (reads hld-delta-dependency-view)   —
- 11    code written for exactly those rows                                ext-llm-coding-agent                          the working tree
- 12    changed files re-run steps 0–7 for those files only                cpu tools + tiny models                       all extraction tables
- 13    matching rows appear in hld-current → delta flips to realized      hld-delta-dependency-view (by definition)        —
- 14    review: rows of intent vs rows of fact                             human-architect-intent-author                 —
- ───── always in background: L3 drain (steps 5–6 per region), labels, re-map on edit; offline-teacher-rust-analyzer and
-       offline-judge-heldout-evaluation train and score the tiny models, never at runtime
-```
 
-Roles in one line each:
-- **ext-llm-coding-agent** — reads the product, writes intent and code; never writes facts.
-- **human-architect-intent-author** — writes intent, reviews rows; never writes facts.
-- **CPU tools** — move bytes, run SQL, derive tables; decide nothing.
-- **tiny models** — make every judgment; see text, return labels; never touch a table.
-- **offline teacher and judge** — rust-analyzer/rustc label and score; absent at runtime.
-
-## End-to-end workflow, revised after DI-07 §16 (2026-11-09)
-
-*Append-only: the table above is kept as the pre-§16 version. This section supersedes it. ◆ = changed row. Inspiration column: ✔ as is = a library we depend on or a tool we run offline; ○ pattern = idea only, never at runtime; ours = Parseltongue code.*
-
-Decision carried in from DI-07 §16: one parse per file with `ra_ap_syntax` (pinned library, not the rust-analyzer server) does the cutting; models leave steps 1–3 entirely; the only model-shaped step left is binding (step 5), and even there pure name-join is measured first.
+Decision (evidence: DI-07 §16): one parse per file with `ra_ap_syntax` (pinned library, not the rust-analyzer server) does the cutting; models leave steps 1–3 entirely; the only model-shaped step left is binding (step 5), and even there pure name-join is measured first.
 
 ```text
  step  what happens                                                        who does it → writes                                 inspiration crates / repos                           use
@@ -65,22 +24,22 @@ Decision carried in from DI-07 §16: one parse per file with `ra_ap_syntax` (pin
        change), digest per file; unchanged digests skipped                  → file-source-text-table                             turso / libsql crate (embedded DB)                   ✔ as is
                                                                                                                                  ignore crate (ripgrep's .gitignore walker)           ✔ as is
                                                                                                                                  blake3 crate (file + span digests)                   ✔ as is
- 1 ◆   ONE PARSE PER FILE: module-level items → byte range, kind, name,     cpu-tool-syntax-tree-walker                          ra-ap-rustc_lexer (= rustc's own lexer)              ✔ as is
+ 1     ONE PARSE PER FILE: module-level items → byte range, kind, name,     cpu-tool-syntax-tree-walker                          ra-ap-rustc_lexer (= rustc's own lexer)              ✔ as is
        visibility, conf 1.0; nested items kept under a parent id; tree      → span-reference-text-table                          ra_ap_parser + ra_ap_syntax (lossless tree, ranges)  ✔ as is, pinned
        dropped after the file. Files whose parse reports errors →           → tiny-model-grey-span-clarifier (grey rows only,    syn 2 (oracle in tests; fallback parser)             ✔ as is
        indentation-recovery re-cut; those spans conf < 1 = grey               background)                                        rust-analyzer ITEM_RECOVERY_SET / error_block        ○ pattern
                                                                                                                                  experiments/spancut (indentation recovery rule)      ✔ ours
- 2 ◆   same pass: params, returns, generics, bounds, struct fields, trait   cpu-tool-syntax-tree-walker (no model)               rustdoc JSON (which fields a public item has)        ○ schema idea
+ 2     same pass: params, returns, generics, bounds, struct fields, trait   cpu-tool-syntax-tree-walker (no model)               rustdoc JSON (which fields a public item has)        ○ schema idea
        items, use trees, cfg/attrs, docs; name tokens for FTS               → field-signature-detail-table                       SQLite FTS5 / Turso FTS                              ✔ as is
                                                                             → name-token-index-table                             cargo-modules (what counts as a module item)         ○ pattern
- 3 ◆   same pass: body sites — calls, method calls, constructions, field    cpu-tool-syntax-tree-walker (no model)               ra_ap_syntax ast::CallExpr / MethodCallExpr /        ✔ as is
+ 3     same pass: body sites — calls, method calls, constructions, field    cpu-tool-syntax-tree-walker (no model)               ra_ap_syntax ast::CallExpr / MethodCallExpr /        ✔ as is
        reads/writes, .await, unsafe, panic!/? — written as PENDING L3 rows  → edge-evidence-record-table (status pending)        FieldExpr / AwaitExpr / BlockExpr(unsafe)
        pointing at span + byte range; nothing resolved yet                                                                      rust-code-analysis (Mozilla; per-fn metrics)         ○ pattern
                                                                                                                                  cargo-geiger (unsafe counting)                       ○ pattern
- 4 ◆   names joined to spans via use trees + paths: unique → extracted,     cpu-tool-name-join-edges                             SCIP (Sourcegraph symbol naming scheme)              ○ id format
+ 4     names joined to spans via use trees + paths: unique → extracted,     cpu-tool-name-join-edges                             SCIP (Sourcegraph symbol naming scheme)              ○ id format
        several → candidates, none → unresolved; JOIN RATE published —       → edge-evidence-record-table                         github/stack-graphs (name resolution w/o compiler)   ○ pattern
        the number that decides how much binding is needed                                                                       rust-analyzer hir-def nameres                        ○ offline teacher only
- 5 ◆   only candidate rows go to the binder (CPU resolver first); macro     cpu-tool-bind-resolve-edges                          rust-analyzer (labels to train the binder)           ✔ offline teacher
+ 5     only candidate rows go to the binder (CPU resolver first); macro     cpu-tool-bind-resolve-edges                          rust-analyzer (labels to train the binder)           ✔ offline teacher
        invocations at item position go to the guesser; background after    → tiny-model-candidate-edge-binder                   cargo-expand (macro truth for offline labels)        ✔ offline teacher
        the first map; abstain when evidence is missing                     → tiny-model-macro-item-guesser                      Qwen2.5-Coder small / Cassini-class encoders         ○ teacher / base
                                                                             → edge-evidence-record-table
@@ -88,9 +47,9 @@ Decision carried in from DI-07 §16: one parse per file with `ra_ap_syntax` (pin
        roll-ups by trigger                                                  → hld-current-dependency-edges,                      RustPräzi (ecosystem call graph)                     ○ pattern
                                                                               hld-file/folder-level-rollup                       cargo-semver-checks (what "public" means)            ○ pattern
                                                                                                                                  SQL recursive CTEs (Turso/SQLite)                    ✔ as is
- 7 ◆   coverage per level + parser-error count + grey-span count +          cpu-tool-status-coverage-banner                      —                                                    ours
+ 7     coverage per level + parser-error count + grey-span count +          cpu-tool-status-coverage-banner                      —                                                    ours
        join rate + unresolved/binding backlog published                     → per-level-coverage-banner
- ───── ◆ first map: parse ≈ 1 min for 10 M lines (measured 789 klines/s/core, DI-07 §16 cp 8); DB write and binding are the long poles;
+ ─────   first map: parse ≈ 1 min for 10 M lines (measured 789 klines/s/core, DI-07 §16 cp 8); DB write and binding are the long poles;
        budget stays ≤ 30 min on an 8 GB Air but is no longer spent reading tokens
  8     agent asks: where is X · what breaks if X changes                    ext-llm-coding-agent                                 Aider repo-map (ranked context for an LLM)           ○ pattern
        answered from the tables                                             cpu-tool-find-search-query, cpu-tool-impact-graph-   DeusData/codebase-memory-mcp (graph + MCP)           ○ pattern; ✔ dev tool
@@ -112,7 +71,7 @@ Decision carried in from DI-07 §16: one parse per file with `ra_ap_syntax` (pin
 
 Reading rule for the inspiration column: anything ✔ at runtime is a *library* (parser, lexer, DB, FTS, hashing, walker) — never a server, a build loop, or a compiler. Everything that needs a compiler or a whole-program database is ✔ only in the offline lanes.
 
-### Names changed by this revision
+### Names changed by this revision (first draft → this version)
 
 ```text
  new       cpu-tool-syntax-tree-walker        one ra_ap_syntax pass per file → span, field, name-token and pending L3 rows (steps 1–3)
@@ -127,9 +86,14 @@ Reading rule for the inspiration column: anything ✔ at runtime is a *library* 
  kept      tiny-model-candidate-edge-binder   now gated behind the measured join rate
 ```
 
-Role line that changes: **tiny models** — "make every judgment" → "make the judgments grammar cannot: grey boundaries, macro-defined items, ambiguous binding; see text, return labels; never touch a table."
+Roles in one line each:
+- **ext-llm-coding-agent** — reads the product, writes intent and code; never writes facts.
+- **human-architect-intent-author** — writes intent, reviews rows; never writes facts.
+- **CPU tools** — move bytes, run the parser, run SQL, derive tables; decide nothing.
+- **tiny models** — make the judgments grammar cannot: grey boundaries, macro-defined items, ambiguous binding; see text, return labels; never touch a table.
+- **offline teacher and judge** — rust-analyzer/rustc/cargo-expand label, syn-oracle scores; absent at runtime.
 
-### Three journeys through the revised workflow
+### Three journeys through the workflow
 
 **Journey A — the ordinary case (≈ 98 % of items): `pub fn send` calls `RetryPolicy::next_delay` through a private helper.** Measured path (DI-07 §16).
 ```text
