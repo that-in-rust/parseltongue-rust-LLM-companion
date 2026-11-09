@@ -610,3 +610,20 @@ Each fix = one RED test + minimum change; agreement on the same 125 files / 376 
 - All remaining disagreements were in **prefix/terminator/classification** logic; zero in lexing, zero in brace matching, zero spans mis-cut because of a `{`/`}` inside a string, char, raw string or comment — on 125 real files including kernel code.
 - Tests now 17, all four-word-named; implementation still ~140 lines, no dependencies.
 - Next (checkpoint 5): mutation runs — delete a `}`, truncate mid-item, insert `pub fn half_typed(`, delete a `;`, insert a stray `{` — measuring (a) how many *unaffected* items are still cut exactly, (b) whether the damaged region is marked grey. This is the number that decides how much a model is needed.
+
+### Checkpoint 5 — oracle 100 %, then mutations (broken code)
+- After the fourth fix (ABI string after `extern`): **376 / 376 syn items exact** on the 125 real files — start byte, end byte, kind, name and visibility all equal to `syn`'s. 18 tests green.
+- One more RED→GREEN pair came from the mutation harness, not from real files: a half-typed `pub fn half_typed(` swallowed the next item when that item began with `///` docs or `#[attr]`. Fix: the indentation resync also fires on a doc comment or outer attribute first on its line at the open item's column.
+- Mutations on 22 files (random file subset with ≥ 3 items; one mutation per kind per file). "Kept exact" = items the mutation did not touch that are still cut byte-exact at confidence ≥ 0.9; "flagged" = the damaged region overlaps a grey/ERROR span:
+
+```text
+ mutation                     unaffected items kept exact   damage flagged grey
+ delete one `}`                      298 / 298  100 %            17 / 22
+ truncate mid-item (EOF cut)         133 / 133  100 %            22 / 22
+ insert `pub fn half_typed(`         295 / 300   98.3 %          22 / 22
+ delete one `;`                      297 / 298   99.7 %           7 / 22
+ insert a stray `{` before an item   296 / 297   99.7 %          22 / 22
+```
+- Residuals, named: (a) a deleted `}` inside a `macro_rules!` body or inside the last item of a file is sometimes not flagged (5/22) — the span closes at EOF with confidence 0.3 only when nothing follows to resync on; (b) a deleted item-level `;` between two `use` lines merges them silently (1 case) — a lexer cannot tell `use a::b use c::d;` from a typo without indentation evidence it does not have on one-line uses; (c) deleted `;` inside bodies is invisible to item boundaries by design (correct, 15/22 "unflagged" are this). Two of the three harness "losses" turned out to be measurement bugs (a `≥` threshold and an end-offset shift), fixed before these numbers.
+- **Answer to the question under test.** On code that parses, the CPU lexer+recovery cutter equals the compiler-grade oracle byte for byte (376/376). On broken code it keeps 98–100 % of untouched items exact and marks the damage grey in 17–22 of 22 cases per mutation kind. The residue a model would see is therefore the grey spans — roughly one per broken file — plus the two named blind spots. The earlier chat estimate ("lexer cuts ~99 %, model on grey ≈ 0.5 % of spans") stands and is now measured rather than asserted; the earlier wording "tinyLLM01 reads every token" is withdrawn.
+- Caveats: 125 + 22 files, five synthetic mutation kinds, one random seed; nested-item visibility (`pub fn` inside a fn body) is handled by nesting, as rust-analyzer does; `macro_rules!` bodies that *define* items remain a model question (unchanged).
