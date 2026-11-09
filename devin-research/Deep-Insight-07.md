@@ -557,3 +557,19 @@ Grep proxies: a `fn` inside a macro body or string literal is counted; calls und
  run it beside       the agent keeps a Hindsight bank whose memories cite Parseltongue span ids and HLD rows; Parseltongue
                      stays map-only; the two meet at the digest. Costs a server and an LLM key on the agent's side only.
 ```
+
+## 16. Span cutter — TDD log (STUB → RED → GREEN → REFACTOR)
+
+*Rubber-duck recheck of the span claims in §9 and the chat ("a lexer cuts ~99 %, a tiny model only the grey rows"), done as a test-first experiment instead of an assertion. Oracle: `syn::parse_file` item spans (proc-macro2 span-locations) on real files; broken-code cases are hand-written fixtures plus mutated real files. Checkpoints appended after each phase.*
+
+**Question under test.** Does a CPU lexer with brace matching and rust-analyzer's ITEM_RECOVERY_SET resync cut module-level item spans (a) exactly on code that parses, (b) usefully on broken code — and how large is the residue that would need a model?
+
+**Facts read from source (2026-11-09).** rustc `SpanData { lo: BytePos(u32), hi: BytePos(u32), ctxt, parent }`; rust-analyzer `TextRange` over a lossless rowan tree, `LineCol { line, col: UTF-8 byte offset }` derived by a line index; `ITEM_RECOVERY_SET = { fn struct enum impl trait const async unsafe extern static let mod pub crate use macro ; }` with `error_block` and `err_and_bump` on unmatched delimiters. Decision taken for Parseltongue: span identity = (file digest, start byte, end byte, text digest); line/col derived for display only.
+
+### Checkpoint 0 — STUB
+- Crate `spancut` (local, `~/spanbench/spancut`): `cut_item_spans(&str) -> Vec<Span {kind, name, vis, start, end, confidence}>`, `line_col(&str, usize)`; bodies `todo!()`; `cargo check` green.
+- Oracle binary `truth` (`~/spanbench/truth`): prints syn item kind, name, visibility, start/end line:col for any parseable file.
+- Tests written (RED next), four-word names: `test_cut_two_items_one_line` · `test_cut_brace_inside_string` · `test_attach_attrs_docs_above` · `test_resync_after_missing_brace` · `test_grey_half_typed_tail` · `test_macro_rules_braces_not_block` · `test_nested_items_not_module_level` · `test_cfg_duplicate_names_two_spans` · `test_visibility_variants_classified` · `test_line_col_derived_only`.
+- Decision: byte offsets in the API; attributes and doc comments belong to the item span; confidence < 0.5 marks a grey span (unterminated, resynced, or truncated).
+- Next: run tests (must all fail on `todo!()`), then GREEN with the minimum lexer; then the real-file comparison against `truth` on rust-analyzer, cargo-modules and linux/rust, then mutation runs (delete `}`, truncate, inject half item) with the failing snippets recorded here.
+- Blocker/question: none. A first Python prototype of the cutter mis-handled `;` termination (emitted an ERROR span for the semicolon) — recorded as the first real bug class: terminator handling, not brace matching.
