@@ -632,3 +632,13 @@ Each fix = one RED test + minimum change; agreement on the same 125 files / 376 
 - `cargo fmt` applied; `cargo clippy --all-targets -- -D warnings` clean (one `if` with identical branches merged); `cargo test` 18/18; oracle re-run after refactor: 376/376 unchanged.
 - Code committed under `experiments/spancut/` (cutter crate, `truth` oracle crate, `compare.py`, `mutate.py`, file sample, README). Not part of Parseltongue; it is the evidence behind this section.
 - Status: cycle complete (STUB → RED → GREEN → REFACTOR). Open follow-ups: run the mutation harness with more seeds and on whole crates; measure `macro_rules!`-defined items separately; decide the grey confidence scale (currently a single 0.3) once a grey-span model exists to calibrate against.
+
+### Addendum — how byte spans fit the AgentFS-style ingest (§6)
+- The ingest tool stores a file's **bytes, verbatim**, as one row: `file(id, path, digest, text)`. A span is **two byte offsets into that same text**: `span(file_id, start, end, text_digest)`. So a span is an address into a stored row, not a copy of code:
+
+```text
+ raw code of a span  =  substr(file.text, span.start + 1, span.end − span.start)      -- plain SQL, no parser, no line table
+ validity            =  span.file_digest == file.digest                                -- else the span is `stale` by definition
+ identity            =  text_digest of those bytes                                     -- same bytes moved elsewhere ⇒ same item
+```
+- Rules this fixes: (1) ingest stores bytes unchanged — no CRLF normalisation, no whitespace trim, no re-encoding — or every offset is wrong; (2) line/column is never stored as truth, only computed on read (rust-analyzer's line index); (3) `span-reference-text-table.raw_code` is a generated/materialised column kept only because FTS needs a column, so the §14 span-text bytes are an upper bound; (4) incremental re-map is a byte diff — new file digest → re-cut that file (ms) → spans with unchanged `text_digest` keep their ids and HLD rows, only changed bytes re-enter stages 3–6; a moved item changes `start/end` but not `text_digest`; (5) broken files store the same way — byte 0 and byte N always exist, so grey spans have valid addresses too.
