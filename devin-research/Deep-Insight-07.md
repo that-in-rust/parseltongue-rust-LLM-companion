@@ -2,6 +2,50 @@
 
 *Concise edition. The earlier long form (schema discussion, staged pipeline, AgentFS and the hands-on comparison of code-graph tools) is preserved verbatim as Part 9 of the collected Deep-Insight-01. This edition states the thesis, separates what is fixed from what is still moving, and gives the pipeline, the schema and the evidence in the fewest words that still carry them. Vertical sections only.*
 
+## 0. The whole document in one picture
+
+```text
+ THESIS      save the code into a table first → tiny models cut it into PUBLIC SPANS and fill in what each span is
+             → derive the graph afterwards → serve the agent bounded answers, every unknown stored as a record
+             → no compiler, tree-sitter or Cargo at runtime; rust-analyzer/rustc are off-line TEACHER and JUDGE
+
+ agent-LLM / orchestrator / human
+        │  one CLI
+        ▼
+ PARSELTONGUE ─┬─ ENTITY 1  multi-level-code-map  (we build it)      ─┬─ ENTITY 2  multi-level-query-engine (agent uses it)
+               │   CPU-tool-01 INGEST   walk · digest · file rows      │   CPU-tool-07 FIND     trie/FTS/BM25 → rows + span text
+               │   CPU-tool-02 SPAN     → tinyLLM01 spanner 2–5 MB     │   CPU-tool-08 IMPACT   BFS over edges, depth/kind/conf
+               │                        → tinyLLM02 clarifier ~100 MB  │   CPU-tool-09 PROPOSE  writes HLD_future rows, never a model
+               │   CPU-tool-03 TEXT     copy span text · names · FTS   │   CPU-tool-10 STATUS   coverage banner, stale rows
+               │   CPU-tool-04 FIELD    → tinyLLM03 fielder 30–100 MB  │
+               │   CPU-tool-05 JOIN     SQL: use-paths × names → edges │   rule: a tiny model makes EVERY judgment;
+               │   CPU-tool-06 BIND     → tinyLLM04 binder ~100 MB     │         a CPU tool only MOVES BYTES and runs SQL;
+               │                                                       │         a model never touches the table
+               ▼                                                       ▼
+ ┌─────────────────────────── ONE TURSO FILE (SQLite-compatible, portable) ───────────────────────────┐
+ │  reference   file · span (raw code lives HERE, once, by digest; FTS here) · name · field · edge     │
+ │  HLD_current  extraction-only  = the as-built design (L0 crate · L1 folder/file · L2 public items)   │
+ │  HLD_future   agent/human-only = the intended design                                                 │
+ │  HLD_delta    a VIEW, nobody writes it = to_build · to_remove · realized · unplanned                 │
+ │  statuses     extracted · abstained · inferred · proposed · realized · stale                         │
+ │  levels       L1 = roll-up of L2 (weight = count · kinds ∪ · cfg ∪ · conf [min,max]) · L3 body LAZY  │
+ └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+ PIPELINE    0 INGEST(CPU) → 1 SPAN(tinyLLM01, every token) → 2 TEXT(CPU) → 3 CLARIFY(tinyLLM02, grey 2–5 %)
+             → 4 FIELD(tinyLLM03, span text only 10–20 %) → 5 JOIN(CPU) → 6 BIND(tinyLLM04, ambiguous ~1–3 %)
+ EQUATION    y = T_io + Σ_p [ N·(1−h)·f_p·r_ctx·2·P_act / (η·C_dev)  +  WRITE_p (0 for encoders) ] + T_store + T_index
+             → routing fraction f_p and cache hit h dominate; quantisation barely touches READ
+ TARGET      Linux-sized tree (400 M tokens) → L0–L2 map in 30 min on an 8 GB MacBook Air — the HARD target
+             forces: tinyLLM01 ≤ 3 M params at η ≥ 0.7 · heavy models read ≤ 2–3 % inside the window · CPU ≤ 10 min · h ≥ 0.9 on re-map
+ HLD LOOP    edit HLD_future rows → HLD_delta.to_build → agent writes exactly that code → re-extract → realized
+ RUST RULE   items are order-free (fn, struct, impl, use anywhere in the file) → identity = digest, never line numbers;
+             statements run top-down only inside bodies (L3); macro_rules! is the one position-sensitive item
+ PRECEDENTS  AgentFS (files in Turso) · Codemogger (tree-sitter chunks in Turso) · code-graph-mcp (typed edges + confidence)
+             — storage shape proven by others; nobody stores visibility, a roll-up rule, abstention, or a future
+ OPEN        model call style · runtime · scheduler · agent interface · return shape · grey rule · L3 trigger · teacher loop
+             · retire marker · rows vs events for HLD_future · boundary accuracy on broken code (the one risk)
+```
+
 ---
 
 ## 1. The answer
@@ -312,3 +356,35 @@ Earlier in this research the verification product — a diff command, an as-buil
 - Deletion: "this edge should stop existing" needs a `retire` marker in HLD_future that becomes realized when extraction stops seeing the row.
 - Whether HLD_future is written as whole rows or as add/retire events with a reason (the event form gives "why" and "when" for free and makes retire natural; a view can present it as rows either way).
 - The one-hour test: write the view, hand-author ten HLD_future rows for `cargo-modules`, and check that to_build / to_remove / realized / unplanned come out as a person would classify them. No model needed.
+
+## 13. Order in a Rust file — what moves, what does not
+
+*Why a function can sit below its caller, why a `use` can sit at the bottom, and what that means for identity and the join.*
+
+### 13.1 Items are order-independent; statements are not
+
+```text
+ ITEMS at module level                                     order does NOT matter
+   fn · struct · enum · trait · impl · const · static       a fn may call one defined 500 lines below
+   type · mod · use · extern crate                          an impl may precede its struct
+                                                            a `use` anywhere in the file is in scope for the whole module
+ STATEMENTS inside a body                                   order matters — evaluated top to bottom
+   let · expressions · nested fn/use/struct in a block       a `let` precedes its use; a block-local `use` applies to that block only
+ the one exception: macro_rules!                            textual — must be defined ABOVE its first use in the same file
+                                                            (#[macro_use] on the module, or 2018-style paths, make it item-like again)
+```
+
+Nothing at module level runs. A Rust file is a set of declarations resolved over the whole module at once; the only thing that executes top to bottom is a function body, starting at `main`. `static` and `const` initialisers are evaluated at compile time; there is no module-initialisation code.
+
+### 13.2 What this fixes in the map
+
+- **Identity is the digest, never the line.** Moving a `pub fn` above another, or a `use` to the bottom, changes nothing in HLD_current — same signature, same edges, same span id; only `start_line` moves. Line numbers are display data.
+- **The join may treat every `use` in a file as visible to every item in it**, regardless of position. CPU-tool-05 needs no ordering logic at L2. Block-local `use` inside a body is L3 and scoped to its block — the one case where position matters for binding.
+- **The roll-up is order-free.** A file's dependencies are the union of its items' edges; there is no "what the file does first". Two `impl` blocks for one type in different files merge — the map unions them.
+- **The spanner must know the macro exception.** A `macro_rules!` used above its definition in the same file is a real error; a model that treats macros as order-free would miss it. The macro's definition line is the one span where position is semantic.
+
+### 13.3 Three ways to be surprised anyway
+
+- `mod foo;` only declares the file; items inside `foo` still need `pub` and a `use` to be visible, wherever the `mod` line sits.
+- Two `use` lines bringing the same name into one scope are an error, not an override — there is no shadowing by position at module level.
+- Glob imports (`use x::*`) resolve against whatever `x` exports at compile time; the join cannot enumerate them without the target's span rows — a `use *` edge is `inferred` until the target file is indexed.
