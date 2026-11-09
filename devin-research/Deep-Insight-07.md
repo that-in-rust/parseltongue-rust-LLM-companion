@@ -28,7 +28,7 @@
  │  HLD_future   agent/human-only = the intended design                                                 │
  │  HLD_delta    a VIEW, nobody writes it = to_build · to_remove · realized · unplanned                 │
  │  statuses     extracted · abstained · inferred · proposed · realized · stale                         │
- │  levels       L1 = roll-up of L2 (weight = count · kinds ∪ · cfg ∪ · conf [min,max]) · L3 body LAZY  │
+ │  levels       L1 = roll-up of L2+L3 on write (weight · kinds ∪ · cfg ∪ · conf [min,max]) · L3 DEFERRED  │
  └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
  PIPELINE    0 INGEST(CPU) → 1 SPAN(tinyLLM01, every token) → 2 TEXT(CPU) → 3 CLARIFY(tinyLLM02, grey 2–5 %)
@@ -72,7 +72,7 @@ Save the code first, as rows in one Turso table, using a CPU tool that decides n
 **Records**
 - Identity is the content digest of the span text; the file is identified by path @ file digest.
 - Statuses: `extracted · abstained · inferred · proposed · realized · stale`. A name join that is not unique yields `inferred` with a confidence, never `extracted`. A site the binder cannot resolve is stored as `abstained` with its span — a record, not a gap.
-- Levels: L0 crate (cargo metadata), L1 folder and file, L2 public-interface item, L3 body. L1 is a roll-up of L2 edges by the fixed rule (weight = count, kinds = union, cfg = union, confidence = [min, max]). L3 is lazy, per region, when an agent asks.
+- Levels: L0 crate (cargo metadata), L1 folder and file, L2 public-interface item, L3 body. L1 is a roll-up of L2 and L3 edges by the fixed rule (weight = count, kinds = union, cfg = union, confidence = [min, max]), maintained on write. L3 is deferred and incremental — pending rows counted from the first map, resolved in the background, immediately for edited files and on demand for queried regions — never skipped (§12.7).
 
 **Storage**
 - One SQLite-compatible embedded file. Turso is the first candidate: Rust, MIT, recursive CTEs, FTS, vector functions, MVCC writers so spanners can write while agents read. The schema must stay portable to stock SQLite.
@@ -234,6 +234,7 @@ Parseltongue is one CLI with two entities inside it. The first is the thing we b
  MAP      CPU-tool-04 FIELD     read span text → field rows (generics, bounds, flags, cfg, impl…)    tinyLLM03 fielder    30–100 MB
  MAP      CPU-tool-05 JOIN      SQL: use-paths × names → unique = edge(extracted) · else candidates  —
  MAP      CPU-tool-06 BIND      candidate lists → edge(inferred | abstained)                         tinyLLM04 binder     ~100 MB
+                                L3: find sites in bodies → pending rows                               tinyLLM06 site tagger 2–5 MB
  QUERY    CPU-tool-07 FIND      trie / FTS / BM25 over span + field → ranked rows + span text        tinyLLM05 ranker (optional)
  QUERY    CPU-tool-08 IMPACT    BFS over edge with depth, kind filter, confidence range              —
  QUERY    CPU-tool-09 PROPOSE   validate and write edge(status=proposed, creator=agent)              — never a model
@@ -244,7 +245,7 @@ Parseltongue is one CLI with two entities inside it. The first is the thing we b
 
 ## 10. Constraints and success criteria
 
-**Success criterion.** A Linux-sized codebase — about 400 million tokens, 1.5 GB of source, the yardstick for "very large" — becomes a multi-level code map in 30 minutes **on an 8 GB MacBook Air**. The Air is the hard target, not a nice-to-have; the design must get there. "Map" means L0, L1 and L2 complete with every unresolved site stored as `abstained`, the coverage banner telling the truth, and L3 available lazily per region in seconds. Faster hardware is a bonus, never the assumption.
+**Success criterion.** A Linux-sized codebase — about 400 million tokens, 1.5 GB of source, the yardstick for "very large" — becomes a multi-level code map in 30 minutes **on an 8 GB MacBook Air**. The Air is the hard target, not a nice-to-have; the design must get there. "Map" means L0, L1 and L2 complete with every unresolved site stored as `abstained`, every L3 site written as a pending row so it is counted, a per-level coverage banner telling the truth, and L3 resolved in the background and on demand per region in seconds (§12.7). Faster hardware is a bonus, never the assumption.
 
 **What the Air target forces.** Thirty minutes of Air GPU is ≈ 2.2e15 operations (plus ≈ 0.7e15 on CPU), against 400 M tokens. By the equation in §8 that budget is met only if all four hold:
 
@@ -356,6 +357,66 @@ Earlier in this research the verification product — a diff command, an as-buil
 - Deletion: "this edge should stop existing" needs a `retire` marker in HLD_future that becomes realized when extraction stops seeing the row.
 - Whether HLD_future is written as whole rows or as add/retire events with a reason (the event form gives "why" and "when" for free and makes retire natural; a view can present it as rows either way).
 - The one-hour test: write the view, hand-author ten HLD_future rows for `cargo-modules`, and check that to_build / to_remove / realized / unplanned come out as a person would classify them. No model needed.
+
+### 12.6 Building HLD_current, step by step
+
+*A derivation from the base tables; every step is SQL a CPU tool runs. Inputs: `file`, `span`, `field` (stage 4), `edge` (stage 5 join and stage 6 binder; L2- and L3-sourced).*
+
+**Step 1 — the node set: every public span, once.** `hld_node` = spans with visibility `pub` or `pub(crate)` whose kind is an item (members — fields, variants — fold into their parent), joined to `file` for path and folder. `pub(crate)` is kept with its visibility column: it is HLD inside the crate and filtered out across crates.
+
+**Step 2 — L2-sourced edges from signatures.** Each `field` row that names a type (param_type, return_type, field_type, implements, bound, reexports) is joined through the file's `use` scope to a span by path. A unique match is `extracted`; several matches are `candidate` rows for CPU-tool-06 and tinyLLM04, which turn them into `inferred` or `abstained`.
+
+**Step 3 — L3-sourced edges, collapsed to public anchors.** Raw call, construct and may_call rows exist between any spans. HLD wants public → public, so a recursive walk starts at a public item, passes through private items (depth ≤ 6), and stops at the first public target: depth 1 is `calls`, deeper is `calls_via` with the chain as evidence and the minimum confidence along it. Private → private calls never enter HLD on their own.
+
+**Step 4 — HLD_current: one row per (public item, public item, edge kind).** Join `edge` to `hld_node` twice and aggregate: status by precedence (any extracted → extracted; else any inferred → inferred; else abstained), confidence as [min, max], `evidence_count` = number of sites, `evidence_spans` as the list, cfg as the union, snapshot as the latest. The signature text from `field` rows is kept in the row so it reads as a sentence.
+
+**Step 5 — nodes with no edges still get a row** (`edge_type = none`), and every abstained site with an unknown target gets a row with node02 null — so "no edges" means none and "unknown" is counted.
+
+**Step 6 — the L1 roll-ups, maintained on write.** `hld_file (src_file, dst_file, weight, kinds, conf_min, conf_max, status)` and `hld_folder` likewise, filled once by GROUP BY and then kept current by an AFTER INSERT/DELETE trigger on `hld_current` that upserts weight ± 1, kinds ∪, confidence min/max. Every L3 edge that lands is in the folder map immediately.
+
+**Step 7 — incremental maintenance.** A changed file deletes its span, field and edge rows, re-runs stages 1–6 for that file only, deletes the HLD rows touching its spans and re-inserts them; triggers fix the roll-ups. A binder result updates one `edge` row and re-aggregates one HLD row. Every row carries the tree digest it was built from; `stale` is a comparison, not a flag someone sets.
+
+### 12.7 L3 is deferred, not lazy — and how it is built
+
+**The correction.** Earlier sections said "L3 lazy". That is right for the first map on the Air and wrong as a steady state, because roughly half of HLD edges (the `calls` kinds) are read from bodies: until L3 is bound for a file, that file's HLD rows show only signature-sourced edges, and file → file dependencies that exist only through calls (glob imports, trait methods) are missing from L1 altogether. So:
+
+```text
+ first map (30-minute criterion)   L0–L2 complete · every L3 site written as a row with status = pending, so it is COUNTED
+ after minute 30                   CPU-tool-06 drains L3 in the background: the folders the agent touched first, then by in-degree
+ on every edit                     the changed file's L3 is resolved immediately — one file, seconds
+ on every agent query              the region asked about is resolved on demand, ahead of the queue
+ on every L3 row written           the roll-up updates incrementally (step 6) — the folder map reflects it within milliseconds
+ the banner                        per level: "L1 93 % · L2 98 % · L3 41 % · climbing"; `impact` on a function is declared a
+                                   lower bound until L3 for its callers' files is done
+```
+
+Information also travels down and sideways: an L2 `abstained` edge (which impl of `RetryPolicy`?) is often resolved by an L3 construction site (`FixedBackoff::new()` passed into `Client`) — L3 rows may flip L2 rows to `inferred` with the L3 row as evidence; and an L3 `may_call` with three candidates narrows when another site on the same receiver resolves — the `evidence_count` refinement of §15.
+
+**HLD is not L3.** HLD is the public-item graph (L0–L2). L2 and L3 are the two places its edges are *read from*; L3 rows themselves — the call at line 212, the field read, the await — are evidence behind an HLD edge, not HLD rows.
+
+**How L3 is built, and which model.** Two jobs; only the second needs the heavy model.
+
+```text
+ job 1  FIND THE SITES in bodies          calls f( · a::b::f( · .f( · constructs Foo { } / Foo::new( · field .x · .await · ? · unsafe {
+        tinyLLM06 "site tagger", 2–5 MB — the spanner's class. Bodies are 80–90 % of all tokens, so this is the one L3 pass that
+        reads everything and it must be tiny: ~20 min in the background on an Air (§8). A tokenizer alone cannot separate a macro
+        argument, a closure call, a string literal and a method call on broken code; the tagger does, with confidence.
+
+ job 2  RESOLVE EACH SITE to a public target
+        2a  deterministic (CPU-tool-05 JOIN)     path calls a::b::f(  → unique span by path
+                                                 Foo::new( / Foo { }   → unique type by name
+                                                 self.field.f(         → field_type from `field` → impl → f
+                                                 let x = Foo::new(); x.f()   → local binding in the same body, one-pass scope
+                                                 expected to clear 60–70 % of all sites with no model
+        2b  tinyLLM04 BINDER (~100 MB) on the rest: receiver of unknown type · trait method with several impls · generic T.
+            Input: the site, the enclosing signature, the let-bindings above it, k candidate signatures from `name`.
+            Output: one candidate or abstain. For a 10 M-line tree ≈ 1.2–2.5 M sites × ~400 tokens ≈ 0.5–1 B tokens →
+            Air: days in the background · Mac mini: ~a day · desktop GPU: 1–2 h — hence deferred, by region, on demand first.
+        2c  teacher: rust-analyzer labels every site on compiling snapshots off-line; tinyLLM04 and tinyLLM06 are trained on
+            those and scored on held-out repositories; a Rust-adapted 4B teacher adds labels on broken code.
+```
+
+The same cascade as L2 — tiny tagger over everything, SQL for the majority, the ~100 MB binder only where the join cannot type the receiver — with a much larger queue. The structure table in §9 gains one row: CPU-tool-06 BIND also calls tinyLLM06 site tagger (2–5 MB) for job 1.
 
 ## 13. Order in a Rust file — what moves, what does not
 
