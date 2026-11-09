@@ -38,25 +38,25 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-a
  agent-learned-notes-table         what the agent learned about the map; agent-written; the only table with prose
 
  CPU TOOLS (decide nothing; move bytes, run SQL)
- cpu-tool-ingest-source-files      walk tree · digest · write file-source-text-table
- cpu-tool-span-cutting-driver      feed file text to the span tagger; grey rows to the clarifier; write span rows
- cpu-tool-text-copy-indexer        copy span text/doc into columns · name tokens · FTS
- cpu-tool-field-extraction-driver  feed span text to the field tagger; write field rows
- cpu-tool-name-join-edges          SQL: use-paths × names → extracted edges or candidate lists
- cpu-tool-bind-resolve-edges       feed candidates to the binder; feed bodies to the site tagger; write inferred/abstained
+ cpu-tool-ingest-source-files      walk tree · store bytes verbatim · digest · write file-source-text-table
+ cpu-tool-syntax-tree-walker       one pinned ra_ap_syntax parse per file → span, field, name-token and pending L3 rows; recovery re-cut on error files
+ cpu-tool-name-join-edges          SQL: use-paths × names → extracted edges or candidate lists; publishes the join rate
+ cpu-tool-bind-resolve-edges       CPU resolver first; only ambiguous candidates to the binder; macro items to the guesser; write inferred/abstained
  cpu-tool-hld-table-builder        derive hld-current-dependency-edges and the roll-ups from edge + span (DI-07 §12.6)
  cpu-tool-find-search-query        trie / FTS / BM25 → ranked rows + span text
  cpu-tool-impact-graph-walk        recursive CTE over edges: callers, callees, blast radius, cycles
  cpu-tool-propose-future-rows      validate and write hld-future-dependency-edges rows for the agent/human
  cpu-tool-status-coverage-banner   per-level coverage, stale rows, pending L3
 
- TINY MODELS (batch of text in → labels + confidence out; never touch the table)
- tiny-model-span-boundary-tagger   2–5 MB; every token; where public items start/end, kind, name, visibility
- tiny-model-grey-span-clarifier    ~100 MB; grey spans only; fix boundary/kind/visibility
- tiny-model-field-detail-tagger    30–100 MB; span text only; generics, bounds, flags, cfg, impl
- tiny-model-candidate-edge-binder  ~100 MB; site + candidates → one target or abstain
+ TINY MODELS (only where grammar cannot decide; text in → labels + confidence out; never touch the table)
+ tiny-model-grey-span-clarifier    grey spans only (recovery rule conf < 1); fix boundary/kind/visibility
+ tiny-model-candidate-edge-binder  ~100 MB; site + candidates → one target or abstain; gated behind the measured join rate
+ tiny-model-macro-item-guesser     macro invocation at item position → which item(s) it defines
  tiny-model-result-rank-scorer     optional; reranks find results
- tiny-model-body-site-tagger       2–5 MB; every body token; call/construct/field/await/unsafe sites (L3)
+
+ RETIRED 2026-11-09 (DI-07 §16: boundaries, fields and sites come from the parser) — do not reuse the names
+ tiny-model-span-boundary-tagger · tiny-model-field-detail-tagger · tiny-model-body-site-tagger
+ cpu-tool-span-cutting-driver · cpu-tool-text-copy-indexer · cpu-tool-field-extraction-driver
 
  LEVELS
  crate-level-l0-context · folder-file-l1-rollup · public-item-l2-interface · body-site-l3-evidence
