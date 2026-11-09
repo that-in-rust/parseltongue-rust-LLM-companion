@@ -70,3 +70,28 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-a
 - `devin-research/` is append-only: new thinking is a new section or a new file; earlier text is never replaced. Standalone Deep-Insight files are mirrored into `Deep-Insight-01.md` as new Parts.
 - Vertical sections and fenced `text` blocks; no wide side-by-side markdown tables.
 - Separate measured numbers from envelope estimates; say which is which.
+
+## Codebase exploration tool: codebase-memory-mcp
+
+Use DeusData/codebase-memory-mcp (MIT, native binary, 17 MCP tools, vendored tree-sitter grammars + hybrid LSP) to explore this or any repository before reading files by hand.
+
+```bash
+# install (macOS / Linux); the installer refuses a group-writable ~/.local/bin — chmod 755 ~/.local/bin first if it complains
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
+codebase-memory-mcp --version
+
+# index a repository (once; re-run after large changes)
+codebase-memory-mcp cli index_repository --repo_path /abs/path/to/repo
+codebase-memory-mcp cli list_projects
+codebase-memory-mcp cli index_status --project <name>
+
+# query (flag-based; `codebase-memory-mcp cli <tool> --help` lists flags)
+codebase-memory-mcp cli get_architecture --project <name> --aspects all
+codebase-memory-mcp cli query_graph --project <name> ...        # callers, callees, dependencies, impact
+codebase-memory-mcp cli detect_changes --project <name>          # change-aware test selection
+codebase-memory-mcp cli manage_adr --project <name> --mode update   # persist architecture decisions across sessions
+
+# MCP for a coding agent: run the binary with no args (stdio); optional graph UI: daemon start --open --port=9749
+```
+
+Indexed on 2026-11-09 for this repo: 24,681 nodes, 50,558 edges; project name `home-ubuntu-repos-parseltongue-rust-LLM-companion`. It is an exploration aid for agents working on this repo; it is not part of the Parseltongue runtime (it uses tree-sitter and LSP, which the product excludes — see Deep-Insight-07 §2).
