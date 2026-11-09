@@ -155,3 +155,63 @@ Three turns mattered more than the rest. The first was the refusal to run a comp
 - Whether Turso is the right backend after benchmarking against SQLite and the graph-native options.
 - Whether span digests survive real rename/move histories.
 - Whether the timing envelopes hold on actual Apple hardware; every number in this journal is arithmetic from published throughput figures, not a measurement, except the Linux line counts, the rust-analyzer measurement on a 42 k-line workspace, and the three code-graph tools run on `cargo-modules`.
+
+---
+
+# Continuation — 2026-11-08 → 2026-11-09
+
+*Appended, not edited: the exchanges after the first journal entry, in order, then the ladder and the open list extended.*
+
+## 16. DI-07 made concise; the Turso founders' precedents
+
+**Asked.** "Make DI-07 a bit more concise — there are moving variables and fixed variables — segregate; e.g. we will use CPU tools to first save code in a Turso table." Then: "also research code mogger which was also built — add reference of AgentFS and code mogger."
+
+**Done.** DI-07 rewritten as a concise edition (long form preserved as DI-01 Part 9; concise appended as Part 9b): §1 answer, §2 fixed (order of work: files into Turso first by a CPU tool → spans → edges; who decides what; records; storage), §3 moving (model sizes and the grey gate, packaging, every unmeasured number), §4 pipeline, §5 schema, §6 evidence, §7 non-goals and the one risk. Codemogger found: glommer/codemogger, MIT, by Turso co-founder Glauber Costa — tree-sitter chunks of definitions embedded and stored with FTS in one Turso `.db`, keyword search 1–12 ms against ripgrep 25–1,500 ms on an 8 GB M2. Both Turso founders have put code into Turso: AgentFS stores file bytes, Codemogger stores definition chunks. Neither stores visibility, fields, edges, statuses or a future.
+
+## 17. The equation, the structure, the constraints, the open questions
+
+**Asked.** "Add the whole equation of time taken for the model to process as a separate section." Then, invoking the brainstorming skill: "how to break down this problem — what is CLI, what is tinyLLM01, tinyLLM02…" The user declined slices ("we will solve all at once — we need to think it through"), reframed the unit as CPU tools that call tiny models ("think of it as CPU-tool-01, CPU-tool-02 … can call tinyLLM01, tinyLLM02"), deferred the model-call style ("we will decide this later — create an open questions section"), and asked for a structure section, constraints and the success criterion: "Linux-size codebase multi-level-code-map created in 30 minutes; Parseltongue will have multi-level-code-map as one entity; another entity will be multi-level-query-engine."
+
+**Done.** DI-07 §8 the time-to-map equation in full, every variable, two settled facts, instantiated per span-first stage. §9 structure: two entities, dispatcher, CPU-tool-01…10, tinyLLM01…05, the contract (rows in, rows out; a model never touches the table; stubbable; only three tools need a GPU). §10 constraints and success criterion. §11 open questions. The user then fixed the hardware: "8 GB MacBook Air — the hard target; the design must get there" → §10 amended with what the Air budget forces (tinyLLM01 ≤ 3 M params at η ≥ 0.7; heavy models read ≤ 2–3 % inside the window; CPU ≤ 10 min; h ≥ 0.9 on re-map) and a recorded fallback. The query return shape was deferred to open questions; three more (teacher/eval loop as a component, the precise grey rule, the L3 trigger) were added and the design dialogue closed at the user's call.
+
+## 18. The map as HLD; three tables; programming at the HLD level
+
+**Asked.** "Explain using ASCII what we are thinking here." Then: "Can you think of the database we are building L1 L2 L3 — is it not the HLD?" Then the table sketch — Node01 signature/filepath/folderpath, Node02 the same, edge type, raw code of both — "so actual search can begin at the raw code, and since we know span, file, folder we can do a lot of CPU computation to help the agent decide which 'auth' they mean." Then: "call this HLD table — current HLD table — do we need raw text here or in a reference table? Good programmers code at the HLD level. What if we had HLD current and HLD future, the agent fills in the future, and then changes the code — it becomes obvious what code to write." Then: "we should have 3 DBs — HLD_current, HLD_future, HLD_delta — delta derived from the first two — simulations."
+
+**Answered.** L0–L2 is the HLD, extracted and therefore true; proposed records are the to-be HLD; L3 is LLD. Raw text goes in the reference span table, not the HLD row. The timeline-traverser simulations compared three physical databases, one database with delta as a view, no delta, and an event-sourced future; the user chose the view ("B looks better — it gives a better language to communicate"). Recorded as a deliberate, smaller reversal of the earlier verify/diff cut: a derived view, no workflow, report or gate. DI-07 §12 written.
+
+## 19. Rust ordering; embedded databases; row counts; Hindsight
+
+**Asked.** "In Rust does it matter if I move a function above another, can an import come later, is it always run top to down?" → items are order-free, statements top-down inside bodies, `macro_rules!` the one exception; identity is the digest, never the line; the use-join needs no ordering. DI-07 §13 plus a §0 whole-document ASCII summary. "Best OSS embedded databases for forward/backward call and graph analytics?" → Turso/SQLite recursive CTEs for traversal plus an in-memory graph for analytics; the user ruled out in-memory work ("suppose I want to NOT use petgraph"), CozoDB was ruled unmaintained, SurrealDB checked (v4.0.0, BSL 1.1, recursive paths with +path/+collect/+shortest, no PageRank/SCC) — same analytics gap as Turso at the cost of the one-file, SQLite-compatible, OSI-open story. "How many rows, low/med/high, for a 10 M-line Rust tree?" → measured densities on six cloned trees and scaled: spans 0.7–2.3 M, HLD rows 0.5–2.3 M, L3 sites 2.6–7.8 M, L0–L2 file 0.8–2.4 GB; DI-07 §14. "Explore how to use Hindsight" → world/experience split → a store for what the agent learned; observations → evidence_count on inferred edges; mental models → background-written labels; four-way recall with RRF → FIND; its 0.1–0.8B typed decision models validate the tiny-model thesis; DI-07 §15.
+
+## 20. L3 is not lazy; building HLD_current; the README in SQL
+
+**Asked.** "Shouldn't L3 be actively updated and information travelling up?" — the user caught a design error. "Is HLD at L3 level?" "How would we create HLD_current table exactly?" "But L3 — how will we create, which LLM?" Then: "sorry this is very verbose — tell me succinctly." Then: "as per your estimations, can all the analyses in the main-branch README be run with CTEs?"
+
+**Answered.** L3 is deferred, never skipped: pending rows counted from the first map, drained in the background, resolved immediately for edited files and on demand for queried regions, each row rolling up on write; information also travels down (L3 evidence flips L2 abstained) and sideways (evidence_count narrows may_call). HLD is the public-item graph; L2 and L3 are its two sources; L3 rows are evidence, not HLD. HLD_current is built by seven SQL steps (node set, L2 edges from fields, L3 edges collapsed through private helpers to public anchors, aggregation with status precedence and [min,max] confidence, edgeless rows, trigger-maintained roll-ups, incremental maintenance). L3 is two jobs: a 2–5 MB site tagger over every body, then SQL for ~60–70 % of sites and the ~100 MB binder for receivers SQL cannot type. DI-07 §12.6–12.7; §0/§2/§9/§10 amended. The README's 26 analyses: 17 are plain SQL or one recursive CTE, 5 are iterative SQL loops (SCC, k-core, PageRank, label propagation, WMC/LCOM), 1 — item-level betweenness — is not sensible in SQL and is offered at file level only.
+
+## 21. A new starting point: DI-08 and the naming rule
+
+**Asked.** "Create an empty file DI08 — we will now start from a new place — without writing anything in it, tell me the first 10 lines, top of pyramid — e.g. HLD table is our final artefact which will be constantly used." Then: "HLD_current table is the product." "Yes — good with line 1." "Line 2 and related HLD things should be sub-bullets — be clear what is edited by whom — define a workflow of Parseltongue END to END — and then it is easier to see the roles." "Name the external coding agent ext-coding-agent." "We need explicit 4-word nomenclature for everything — include it in your agents.md." Then: "is HLD current product table really the right kind of name, you idiot."
+
+**Done, and corrected.** DI-08 created empty, then line 1, then line 2 with HLD sub-bullets (who writes each table) and a fourteen-step end-to-end workflow with a who/writes column and one-line roles. AGENTS.md created at the repo root with the four-word rule and a nomenclature table. The first names padded four words with claims and filler (`hld-current-product-table`, `agent-memory-prose-table`, `human-architect-reviewer-role`); the user rejected them. Rule tightened in AGENTS.md — the four words must describe what the thing is, never a claim or filler — and names fixed: `hld-current-dependency-edges` / `hld-future-dependency-edges` / `hld-delta-dependency-view`, `ext-llm-coding-agent`, `agent-learned-notes-table`, `human-architect-intent-author`.
+
+## 22. The ladder, extended
+
+```text
+ … (steps 1–16 above)
+ fix          fixed versus moving variables; files saved into Turso first by a CPU tool                         (DI-07 concise)
+ name         the map is the HLD; three tables — current, future, delta as a view — "a better language to communicate"
+ correct      L3 deferred, never lazy; roll-ups on write; HLD edges come from L2 and L3; L3 rows are evidence
+ measure      row counts from six real trees; the README's 26 analyses mapped to SQL; SurrealDB vs Turso checked
+ restart      DI-08 from the apex: hld-current-dependency-edges is the product; who writes what; fourteen-step workflow
+ discipline   four-word names that describe, never claim — written into AGENTS.md after getting it wrong once
+```
+
+The turn that mattered most in this stretch was the user's "shouldn't L3 be actively updated?" — it exposed that "lazy" had quietly made the folder map incomplete, and forced roll-up-on-write and the per-level banner.
+
+## 23. What stands and what is open — updated
+
+**Added to what stands.** Fixed/moving separation in DI-07 §2–3; the 8 GB Air as the hard target; CPU tools that call tiny models as the unit of work; three HLD tables in one file with delta as a view; raw text in the span reference table only; L3 deferred and incremental with roll-ups on write; HLD = public-item graph sourced from L2 and L3; the four-word descriptive naming rule and AGENTS.md; `ext-llm-coding-agent` as the external agent's name; DI-08 as the new top-of-pyramid document with lines 1–2 and the end-to-end workflow.
+
+**Added to what is open.** Model call style, runtime and scheduler; agent interface and return shape; the precise grey rule; the L3 trigger policy beyond "edited files first"; the teacher/eval loop as a component; a retire marker and rows-vs-events for the future table; Turso vs SurrealDB on the same edge set; members-per-type density (the first thing to measure once the spanner exists); whether `agent-learned-notes-table` belongs inside the map file or in a Hindsight bank beside it; lines 3–10 of DI-08.
