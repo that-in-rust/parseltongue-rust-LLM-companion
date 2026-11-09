@@ -1,5 +1,6 @@
 # Build artifacts
 /target
+target/
 
 # Cargo lock (tracked for binary projects)
 # Cargo.lock
