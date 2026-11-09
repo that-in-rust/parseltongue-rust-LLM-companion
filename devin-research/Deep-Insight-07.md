@@ -573,3 +573,8 @@ Grep proxies: a `fn` inside a macro body or string literal is counted; calls und
 - Decision: byte offsets in the API; attributes and doc comments belong to the item span; confidence < 0.5 marks a grey span (unterminated, resynced, or truncated).
 - Next: run tests (must all fail on `todo!()`), then GREEN with the minimum lexer; then the real-file comparison against `truth` on rust-analyzer, cargo-modules and linux/rust, then mutation runs (delete `}`, truncate, inject half item) with the failing snippets recorded here.
 - Blocker/question: none. A first Python prototype of the cutter mis-handled `;` termination (emitted an ERROR span for the semicolon) — recorded as the first real bug class: terminator handling, not brace matching.
+
+### Checkpoint 1 — RED
+- `cargo test` on the stub: `test result: FAILED. 0 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s` — every test panics on `todo!()`, as required; none passes without an implementation.
+- Status: 10 tests failing (RED) · 0 passing · implementation pending.
+- Next: GREEN — the minimum lexer (strings, chars vs lifetimes, raw strings, nested block comments, attributes/docs attached to the following item, brace matching, `;` termination, ITEM_RECOVERY_SET resync with confidence 0.3 on grey spans), then the oracle comparison on real files.
