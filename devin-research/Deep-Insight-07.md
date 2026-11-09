@@ -453,3 +453,46 @@ Scale: the Linux-sized yardstick (33 M lines) is ×3.3; rust-analyzer itself (43
 ### 14.5 Caveats
 
 Grep proxies: a `fn` inside a macro body or string literal is counted; calls under `#[cfg(test)]` are included; comment lines are excluded but doc lines are counted separately; path-call counts include function definitions (a few percent). The five-tree range is narrow for fn and use density and wide for impl and doc density; the envelope reflects that.
+
+## 15. Interesting ideas from elsewhere
+
+*A section for ideas worth stealing from neighbouring systems, each with what it is, what transfers, and what does not. Entries are dated; nothing here is a decision.*
+
+### 15.1 Hindsight — agent memory that learns (2026-11-09)
+
+**What it is.** vectorize-io/hindsight: MIT, Python, created 2025-10, 60k stars, active; paper arXiv 2512.12818. An agent memory system whose point is that agents should *learn*, not just recall conversation. Storage is PostgreSQL + pgvector (or an embedded `pg0`); it needs an LLM for `retain`. Its vocabulary:
+
+```text
+ world facts     facts about the world                              "the stove gets hot"
+ experiences     the agent's own                                    "I touched it and it hurt"
+ observations    consolidated, evidence-backed beliefs formed from many memories — each keeps its quotes and a proof
+                 count, and is REFINED rather than overwritten when new evidence arrives
+ mental models   a standing answer to a question about a bank, rewritten in the background; reading one is a database
+                 read — no retrieval, no LLM call at query time
+ knowledge pages mental models presented as a wiki: living markdown the bank writes about itself
+ retain / recall / reflect
+                 recall runs four strategies in parallel — semantic, BM25, graph (entity/temporal/causal links),
+                 temporal — merged by reciprocal rank fusion and a cross-encoder reranker, trimmed to a token budget
+ decision models small typed-answer models that replace LLM calls for the judgments inside recall, consolidation and
+                 reflect: hs-decide-1-flash 0.8B (Apache-2.0) · hs-rerank-1 114M (MIT) · hs-embed-1 112M (MIT)
+ banks           isolated stores with disposition traits; memory defense scans every retain for secrets and PII
+```
+
+**What transfers to Parseltongue.**
+
+- *A fourth logical store: the agent's experience of the map.* HLD_current is world fact (extracted), HLD_future is intent, HLD_delta is the gap. None of them holds what the agent *learned* while working: that the `auth` in `gateway/middleware` was the one that mattered, that an `abstained` call site turned out to resolve to `RetryPolicy::next_delay`, that a `to_build` row took three attempts because of a lifetime. Hindsight's world-vs-experience split says this belongs in its own store, written only by the agent, keyed to our span digests and HLD rows — never mixed into extraction. Call it MEMORY; it is the only table where prose is allowed.
+- *Observations are our `inferred` edges, done properly.* An observation keeps its evidence quotes and a proof count and is refined, not overwritten. Our binder emits one `inferred` edge with one confidence; the better record is one edge with a list of evidence spans and a count that grows as more sites agree, so a second map does not restart from zero. Add `evidence_count` beside `evidence_span`.
+- *Mental models are the labeller tier with the right execution model.* "What is this folder for?" is a standing question whose answer is rewritten in the background when the folder's rows change, and read as a plain row at query time. That is exactly how the optional tinyLLM05 label column should behave — never computed on the agent's critical path.
+- *Four-way recall with RRF is FIND.* Our trie / trigram / BM25 plan plus graph proximity (edges from the hits) plus the snapshot dimension (temporal) merged by reciprocal rank fusion, then trimmed to a token budget — the budgeted-page option from §11, independently arrived at.
+- *Decision models validate the tiny-model thesis.* A production memory system replaced its in-loop LLM judgments with 0.1–0.8B typed-answer models and published them. Their 114M reranker and 112M embedder sit exactly at our 100 MB tier; hs-rerank-1 (MIT) is a concrete candidate base for tinyLLM05 after code post-training.
+- *Memory defense for the public feed.* Scan spans for secrets before they leave the machine; the pattern list is a solved problem to copy.
+
+**What does not transfer.** The Postgres server and the LLM-in-the-loop `retain` — the map must build with no big model and no server. The biomimetic framing adds nothing. Entity extraction by LLM is what our deterministic tools and tiny models replace for code; it remains fine for the agent's own prose memories, which are the agent's business, not the map's.
+
+**Two ways to use it, both open.**
+```text
+ borrow the schema   add MEMORY (agent-written, span-keyed, prose allowed) · evidence_count on edges · background-written
+                     labels · RRF in FIND — all inside the one Turso file, no dependency
+ run it beside       the agent keeps a Hindsight bank whose memories cite Parseltongue span ids and HLD rows; Parseltongue
+                     stays map-only; the two meet at the digest. Costs a server and an LLM key on the agent's side only.
+```
