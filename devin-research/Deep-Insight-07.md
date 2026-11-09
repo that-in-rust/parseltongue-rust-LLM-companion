@@ -233,7 +233,7 @@ Decisions deliberately deferred. Each is independent of the structure above.
 - Where models run: inside the CLI call · background worker processes draining queues · a warm local server.
 - Who schedules the stages: the CLI inline · a daemon · the agent calling each verb.
 - How the agent talks to Parseltongue: subcommands with JSON output · MCP · both.
-- What a query returns: raw rows · a token-budgeted page · span text verbatim.
+- What a query returns to the agent-LLM by default: headlines first (one line per hit, expand on demand) · a token-budgeted page packed by the engine · raw rows as JSON · span text verbatim.
 - Model sizes per stage and the grey-span gate threshold (§3).
 - Whether the binder is distilled from a Rust-adapted 4B teacher.
 - Turso versus stock SQLite versus a graph-native store, after a benchmark.

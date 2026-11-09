@@ -4841,3 +4841,7 @@ Decisions deliberately deferred. Each is independent of the structure above.
 ```
 
 If (a) fails on real hardware, the fallback that keeps the criterion is a deterministic first cut for spans with tinyLLM01 demoted to the grey rows — a loss of the "model owns every judgment" purity at stage 1 only, recorded here so it is a conscious trade, not a drift.
+
+#### Part 9b amendment (2026-11-08) — §11 open question widened
+
+- What a query returns to the agent-LLM by default: headlines first (one line per hit, expand on demand) · a token-budgeted page packed by the engine · raw rows as JSON · span text verbatim.
