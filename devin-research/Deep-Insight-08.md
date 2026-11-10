@@ -101,6 +101,23 @@ Everything else in this document — the CPU tools, the parser, the tiny LLMs, t
 
 **Each file is parsed exactly once, with rust-analyzer's parser used as a pinned library (`ra_ap_syntax` + `ra_ap_parser`, on top of rustc's own lexer `ra-ap-rustc_lexer`). From that one parse come the spans, the fields, the names, the use trees and the body sites. No model reads ordinary source. The rust-analyzer server, its analysis database, the compiler and the Cargo build loop are not run.**
 
+**Hard constraint: no rust-analyzer at runtime, ever.** Neither its language server nor its analysis database (name resolution, type inference, macro expansion) runs on the user's machine. The reason is memory: the target is a map of a very large tree in far less RAM than an analysis engine needs. Measured for comparison, rust-analyzer loading a 42k-line workspace cold took 29 s and 2.3 GB. Only the parser crates (`ra_ap_syntax`, `ra_ap_parser`, `ra-ap-rustc_lexer`) are used, as a library: one file in, one tree out, the tree dropped before the next file. rust-analyzer itself appears only offline, as the teacher that labels training data and the judge that scores results.
+
+What the constraint costs, stated plainly:
+
+```text
+ what rust-analyzer's analysis engine would give          how Parseltongue must get it instead                      status
+ ──────────────────────────────────────────────────────── ───────────────────────────────────────────────────────── ─────────────────────────
+ the type of a method call's receiver (66 % of call sites  CPU resolver from field types, parameter types, use trees;  unmeasured — the main
+ in the corpus are method calls)                           tiny-llm-edge-binder for what is left; abstain otherwise    risk of the product
+ names resolved across modules, glob imports, re-exports   SQL name-join over use trees and module paths              unmeasured (join rate, §11)
+ what a macro expands to                                   known-macro table; tiny-llm-macro-guesser                   unmeasured
+ calls written inside macro arguments, e.g. println!(…)    re-parse the macro's argument tokens as expressions        not designed yet; 7.9 % of
+                                                                                                                       call-shaped sites (M)
+```
+
+RAM budget this implies (to be measured, not yet measured): one file's syntax tree at a time, the database on disk, at most one tiny LLM in memory (< 0.5 GB), whole process well under 2 GB on an 8 GB machine.
+
 Why this is safe to rely on — the measurements (M):
 
 ```text
