@@ -12,5 +12,8 @@ cargo_metadata = "=0.23.1"
 blake3 = "1"
 toml = "0.9"
 
+[dev-dependencies]
+tempfile = "3"
+
 [lints]
 workspace = true

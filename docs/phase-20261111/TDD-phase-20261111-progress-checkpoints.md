@@ -126,3 +126,23 @@ to row/request output function; discovery requests must persist before ingestion
 The external Python process/RSS auditor is scaffolded separately from production.
 Next: SPEC-named failing M1 tests, including negative process arguments and publication/cancellation cases.
 No runtime M1 behavior or corpus mapping pass is claimed at STUB.
+
+STUB check: cargo check --workspace finished successfully in 29.70s (full output: /home/ubuntu/m1-stub-check.log).
+
+## M1 RED — executable fixture contracts
+
+Added SPEC-named graph (6), syntax (6), scheduler (2), store (9), CLI (1) and external audit (2) tests.
+Graph fixtures exercise missing locks, lock mutation restoration, stderr, cfg, metadata Cargo env and
+build-script provenance. Syntax fixtures include empty/binary/error input, tiling, fields/body sites,
+inactive modules, path/include closure and OUT_DIR. Store fixtures cover unchanged byte content, reruns,
+stage ownership, missing inputs, concurrent writers, bounded retries, atomic publication and cancellation.
+CLI fixture requires 1/4-worker deterministic generations, non-closure bytes-only files and retention of
+the old publication after an active-file parser failure.
+
+Observed RED: graph 0 passed/6 failed; syntax 0/6; scheduler 0/2; store 0/8 plus retry 0/1;
+CLI 0/1. All these failures are todo!() panics. Python: Ran 2 tests; FAILED (errors=2), NotImplementedError.
+The existing offline dependency gate also failed on an uncached cross-platform objc2 package; cargo fetch
+--locked provisioned it. Do not count that infrastructure failure as a behavior RED.
+Logs: /home/ubuntu/m1-red-tests.log, m1-red-cli-tests.log, m1-red-retry-tests.log,
+m1-red-process-tests.log. Next: minimal implementations, then run the entire changed fixture suite.
+S1 fresh indexes completed for all five repos with exit zero; S2 pagination is in progress.

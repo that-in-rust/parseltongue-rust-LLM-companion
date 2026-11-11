@@ -4,6 +4,7 @@ use parseltongue_core_row_types::StoreBackendFailureError;
 
 #[path = "stage-table-store-backend.rs"]
 mod stage_table_store_backend;
+pub use stage_table_store_backend::retry_bounded_store_write;
 
 pub struct TursoWorkspaceStoreAdapter {
     store_database_handle_value: turso::Database,
