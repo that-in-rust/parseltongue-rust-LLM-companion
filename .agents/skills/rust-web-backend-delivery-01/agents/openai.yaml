@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust Web Backend Delivery"
+  short_description: "Spec-first production delivery for Rust web backends"
+  default_prompt: "Use $rust-web-backend-delivery-01 to turn this Rust backend request into executable requirements, a service design, a verification plan, and production-aware delivery gates."

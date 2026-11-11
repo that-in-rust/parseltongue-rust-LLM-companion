@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust Executable Specs"
+  short_description: "Spec-first Rust delivery and reliability"
+  default_prompt: "Use $rust-executable-specs-01 to turn this Rust request into executable requirements, a Rust design, and a reliability-aware implementation plan."

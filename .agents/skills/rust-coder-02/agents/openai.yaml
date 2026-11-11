@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust Reliability"
+  short_description: "Reliability-first Rust coding guide"
+  default_prompt: "Use $rust-coder-02 to implement or refactor reliable Rust with strong type boundaries, typed errors, async safety, and executable verification."

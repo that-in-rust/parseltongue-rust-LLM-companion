@@ -1,0 +1,4 @@
+interface:
+  display_name: "Idiomatic Rust Coder 01"
+  short_description: "Build Rust code with TDD and idiomatic patterns"
+  default_prompt: "Use $idiomatic-rust-coder-01 to turn this feature into executable Rust specs, tests, and an idiomatic implementation plan."
