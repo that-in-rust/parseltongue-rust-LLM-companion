@@ -368,3 +368,51 @@ cleanup plan 1, store contracts 14, build/runtime gates 3). Release Finished in 
 Unchanged Python check: Ran 5 tests in 0.349s, OK. No production todo/panic added.
 Fresh run: m1-prepared-final-measurements, log /home/ubuntu/m1-prepared-production-measurements.log.
 Do not rebuild/replace the release binary until all three separate runs per repository finish.
+
+### M1 residual persistence profiling — REFACTOR
+
+All fifteen corpus runs completed before replacing the measured release binary. Five mapper/status
+results are successful; all tiling identities, sampled RSS budgets and both separate audits pass.
+Final report numbers use m1-prepared-final-measurements and the unchanged 2c461fd80 binary.
+Rust-analyzer: 228.278 s, 0.669 GiB; cargo-modules: 222.112 s, 0.485 GiB. Both remain above the
+approximate three-minute goal; do not describe that goal as passed.
+
+Added opt-in PARSELTONGUE_PROFILE_STAGE_WRITES diagnostics at the L3 transaction boundary, and
+manual release-mode profiles for statement size, atomic unit size and an alternative JSON bulk
+statement. The production batch size remains 128 and transactions remain atomic per file unit.
+JSON batching is confined to tests: its quoted/NUL/Unicode payload, empty replacement and duplicate
+rollback contract passes, but it is slower than bound VALUES in the measured synthetic workload.
+Statement sizes 32..1024 and unit sizes 64..4096 do not show a substantial monotonic batching win.
+No rejected optimization was enabled, no database/version change, and no atomicity weakening.
+
+Separate real rust-analyzer profile: exit 0, 192.941 s, 0.664 GiB sampled tree RSS.
+Exactly 2612 extraction units / 1136982 records: setup 0.460 s; cleanup 0.846 s;
+INSERT 41.243 s; Concurrent commit 106.921 s (summed adapter wall intervals).
+That locates remaining persistence time at commit. It does not prove which Turso internals consume
+that interval, and the faster diagnostic wall time is not an attributable optimization result.
+Logs: /home/ubuntu/m1-row-batch-profile-log.txt, m1-json-batch-profile-log.txt,
+m1-unit-size-profile-log.txt, and rust-analyzer/m1-write-phase-profile under the dated artifacts.
+
+Checks after the final Rust edit: fmt --all --check exit 0; adapter Clippy all targets/features
+-D warnings Finished dev profile in 0.84s; adapter + CLI tests: 22 passed, 3 manual profiles ignored.
+All three ignored profiles were also run explicitly in release mode and exited zero.
+Next: publish the all-five S3 report, then implement M2 semantic oracle exports and name resolution.
+
+### M2 oracle investigation — not implemented
+
+Pinned hir/src/semantics/source_to_def.rs documents the ambiguity of a physical file in multiple
+crates. Semantics::new has no active-crate selector; base-db::relevant_crates selects the file's
+source-root crates. Removing other crate roots alone is insufficient when the same file is also
+a dependency target with another configuration.
+Candidate approach, not yet compiled/verified: duplicate file IDs in memory while preserving
+canonical physical VfsPaths in a separate FileSet/SourceRoot, and point only the selected unit's
+crate root at its duplicate. SourceDatabase::resolve_path uses the anchor's SourceRoot only,
+so the duplicate FileSet must contain every loaded source path needed by relative modules/includes,
+not merely the root file. Dependencies keep original IDs. Reuse this duplicate source set across
+unit exports and swap the selected crate root; do not invent virtual filenames that change file!().
+Normalize duplicate IDs back to physical paths in exported site/target identities.
+
+PRIMARY must keep load_out_dirs_from_check=false while enabling proc macros from verified cached
+dylibs; SECONDARY enables build scripts. load-cargo's public builder path and proc-macro loading
+need implementation/verification; ordinary load_workspace_at alone does not establish that pairing.
+Current harness remains provenance-only; no semantic exports or S5 denominators exist yet.

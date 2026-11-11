@@ -105,6 +105,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         }
         retry_bounded_store_write(cancel, || {
             self.store_runtime_handle_value.block_on(async {
+            let started=std::time::Instant::now();
+            let profile=std::env::var_os("PARSELTONGUE_PROFILE_STAGE_WRITES").is_some();
             let mut connection = self.store_database_handle_value.connect()?;
             let transaction = connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
             let result = async {
@@ -116,16 +118,20 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                         return Err(turso::Error::Misuse(format!("StageInputMissingError: {input}")));
                     }
                 }
+                let setup=started.elapsed().as_secs_f64();
+                let cleanup_started=std::time::Instant::now();
                 for (table,owner) in STAGE_OWNED_TABLE_NAMES {
                     if *owner == request.stage_owner_name_value {
                         transaction.execute(format!("DELETE FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_unit_work_key=?"),
                             turso::params![scope.run_generation_digest_value.clone(), scope.stage_attempt_sequence_value.clone(), request.stage_unit_work_key.to_owned()]).await?;
                     }
                 }
+                let cleanup=cleanup_started.elapsed().as_secs_f64();
+                let insert_started=std::time::Instant::now();
                 for (table,owner) in STAGE_OWNED_TABLE_NAMES {
                     if *owner != request.stage_owner_name_value { continue; }
                     let rows: Vec<_> = request.stage_unit_output_rows.iter().filter(|row|row.stage_owned_table_name==*table).collect();
-                    for batch in rows.chunks(128) {
+                    for batch in rows.chunks(self.stage_insert_batch_limit.get()) {
                         check_stage_cancel_requested(cancel)?;
                         let placeholders = std::iter::repeat_n("(?,?,?,?,?)",batch.len()).collect::<Vec<_>>().join(",");
                         let parameters: Vec<_> = batch.iter().flat_map(|row|[
@@ -135,14 +141,21 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                         transaction.execute(format!("INSERT INTO \"{table}\" VALUES {placeholders}"),parameters).await?;
                     }
                 }
+                let insert=insert_started.elapsed().as_secs_f64();
                 check_stage_cancel_requested(cancel)?;
                 transaction.execute("INSERT OR REPLACE INTO \"stage-run-generation-records\" VALUES (?,?,?,?,?)",
                     turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),
                     format!("__marker__/{}/{}",request.stage_owner_name_value,request.stage_unit_work_key),request.stage_unit_work_key.to_owned(),"{\"status\":\"complete\"}".to_owned()]).await?;
                 check_stage_cancel_requested(cancel)?;
-                Ok::<_,turso::Error>(request.stage_unit_output_rows.len())
+                Ok::<_,turso::Error>((request.stage_unit_output_rows.len(),setup,cleanup,insert))
             }.await;
-            match result { Ok(count) => { transaction.commit().await?; Ok(count) }, Err(error) => { let _ = transaction.rollback().await; Err(error) } }
+            match result { Ok((count,setup,cleanup,insert)) => {
+                let commit_started=std::time::Instant::now();
+                transaction.commit().await?;
+                if profile { eprintln!("stage=store-unit owner={} unit={} rows={count} batch_limit={} setup_seconds={setup:.6} cleanup_seconds={cleanup:.6} insert_seconds={insert:.6} commit_seconds={:.6} total_seconds={:.6}",
+                    request.stage_owner_name_value,request.stage_unit_work_key,self.stage_insert_batch_limit.get(),commit_started.elapsed().as_secs_f64(),started.elapsed().as_secs_f64()); }
+                Ok(count)
+            }, Err(error) => { let _ = transaction.rollback().await; Err(error) } }
         })
         })
     }
@@ -307,6 +320,222 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
 mod stage_unit_cleanup_tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
+    use std::hash::{Hash, Hasher};
+
+    fn write_fixture_json_units(
+        store: &TursoWorkspaceStoreAdapter,
+        scope: &StageRunScopeValue,
+        unit: &str,
+        rows: &[StageTableRowRecord],
+        limit: usize,
+    ) -> Result<(), turso::Error> {
+        store.store_runtime_handle_value.block_on(async{
+            let mut connection=store.store_database_handle_value.connect()?;
+            let transaction=connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
+            let result=async{
+                for (table,owner) in STAGE_OWNED_TABLE_NAMES {
+                    if *owner=="syntax-spans" {
+                        transaction.execute(format!(r#"DELETE FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_unit_work_key=?"#),
+                            turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),unit.to_owned()]).await?;
+                    }
+                }
+                for batch in rows.chunks(limit) {
+                    let records:Vec<_>=batch.iter().map(|row|(&row.stage_row_record_key,&row.stage_row_payload_text)).collect();
+                    let records=serde_json::to_string(&records).map_err(|error|turso::Error::ConversionFailure(error.to_string()))?;
+                    transaction.execute(r#"INSERT INTO "body-site-reference-table" SELECT ?1,?2,json_extract(value,'$[0]'),?3,json_extract(value,'$[1]') FROM json_each(?4)"#,
+                        turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),unit.to_owned(),records]).await?;
+                }
+                transaction.execute(r#"INSERT OR REPLACE INTO "stage-run-generation-records" VALUES (?,?,?,?,?)"#,
+                    turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),format!("__marker__/syntax-spans/{unit}"),unit.to_owned(),r#"{"status":"complete"}"#.to_owned()]).await?;
+                Ok::<_,turso::Error>(())
+            }.await;
+            match result{Ok(())=>transaction.commit().await,Err(error)=>{let _=transaction.rollback().await;Err(error)}}
+        })
+    }
+
+    #[test]
+    fn test_json_bulk_payloads_roundtrip() {
+        let store = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+        store.initialize_workspace_stage_schema().unwrap();
+        let scope = StageRunScopeValue {
+            run_generation_digest_value: "g".repeat(64),
+            stage_attempt_sequence_value: "a".repeat(64),
+        };
+        let rows = vec![
+            StageTableRowRecord {
+                stage_owned_table_name: "body-site-reference-table".into(),
+                stage_row_record_key: "0\0\"雪".into(),
+                stage_row_payload_text: "a\n\t\0\"😀".into(),
+            },
+            StageTableRowRecord {
+                stage_owned_table_name: "body-site-reference-table".into(),
+                stage_row_record_key: "1".into(),
+                stage_row_payload_text: String::new(),
+            },
+        ];
+        write_fixture_json_units(&store, &scope, "unit", &rows, 1024).unwrap();
+        assert_eq!(
+            store
+                .read_stage_table_rows(&scope, "body-site-reference-table")
+                .unwrap(),
+            rows
+        );
+        assert!(
+            write_fixture_json_units(
+                &store,
+                &scope,
+                "unit",
+                &[rows[0].clone(), rows[0].clone()],
+                1024
+            )
+            .is_err()
+        );
+        assert_eq!(
+            store
+                .read_stage_table_rows(&scope, "body-site-reference-table")
+                .unwrap(),
+            rows
+        );
+        write_fixture_json_units(&store, &scope, "unit", &[], 1024).unwrap();
+        assert_eq!(
+            store
+                .count_stage_table_rows(&scope, "body-site-reference-table")
+                .unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    #[ignore = "manual JSON bulk insert profile"]
+    fn test_profile_json_bulk_batches() {
+        for limit in [128, 1024] {
+            let store = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+            store.initialize_workspace_stage_schema().unwrap();
+            let scope = StageRunScopeValue {
+                run_generation_digest_value: "g".repeat(64),
+                stage_attempt_sequence_value: "a".repeat(64),
+            };
+            let started = std::time::Instant::now();
+            for unit in 0..12u64 {
+                let rows: Vec<_> = (0..1024u64)
+                    .map(|row| {
+                        let mut hash = std::collections::hash_map::DefaultHasher::new();
+                        (unit, row).hash(&mut hash);
+                        StageTableRowRecord {
+                            stage_owned_table_name: "body-site-reference-table".into(),
+                            stage_row_record_key: format!(
+                                "{:016x}{unit:024x}{row:024x}",
+                                hash.finish()
+                            ),
+                            stage_row_payload_text: "p".repeat(1024),
+                        }
+                    })
+                    .collect();
+                write_fixture_json_units(&store, &scope, &format!("{unit:064x}"), &rows, limit)
+                    .unwrap();
+            }
+            eprintln!(
+                "stage=json-bulk-profile batch_limit={limit} rows={} elapsed_seconds={:.6}",
+                12 * 1024,
+                started.elapsed().as_secs_f64()
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "manual bounded bulk insert profile"]
+    fn test_profile_bulk_batch_sizes() {
+        for limit in [32, 64, 128, 256, 512, 1024] {
+            let mut store =
+                TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+            store.stage_insert_batch_limit = std::num::NonZeroUsize::new(limit).unwrap();
+            store.initialize_workspace_stage_schema().unwrap();
+            let scope = StageRunScopeValue {
+                run_generation_digest_value: "g".repeat(64),
+                stage_attempt_sequence_value: "a".repeat(64),
+            };
+            let started = std::time::Instant::now();
+            for unit in 0..12u64 {
+                let rows: Vec<_> = (0..1024u64)
+                    .map(|row| {
+                        let mut hash = std::collections::hash_map::DefaultHasher::new();
+                        (unit, row).hash(&mut hash);
+                        StageTableRowRecord {
+                            stage_owned_table_name: "body-site-reference-table".into(),
+                            stage_row_record_key: format!(
+                                "{:016x}{unit:024x}{row:024x}",
+                                hash.finish()
+                            ),
+                            stage_row_payload_text: "p".repeat(1024),
+                        }
+                    })
+                    .collect();
+                store
+                    .write_stage_table_unit(
+                        &StageUnitWriteRequest {
+                            stage_run_scope_value: &scope,
+                            stage_owner_name_value: "syntax-spans",
+                            stage_unit_work_key: &format!("{unit:064x}"),
+                            stage_input_stage_names: &[],
+                            stage_unit_output_rows: &rows,
+                        },
+                        &RunCancelFlagValue::default(),
+                    )
+                    .unwrap();
+            }
+            eprintln!(
+                "stage=bulk-profile batch_limit={limit} rows={} elapsed_seconds={:.6}",
+                12 * 1024,
+                started.elapsed().as_secs_f64()
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "manual bounded transaction profile"]
+    fn test_profile_bounded_unit_sizes() {
+        for unit_size in [64, 256, 1024, 4096u64] {
+            let store = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+            store.initialize_workspace_stage_schema().unwrap();
+            let scope = StageRunScopeValue {
+                run_generation_digest_value: "g".repeat(64),
+                stage_attempt_sequence_value: "a".repeat(64),
+            };
+            let started = std::time::Instant::now();
+            for unit in 0..12288 / unit_size {
+                let rows: Vec<_> = (0..unit_size)
+                    .map(|row| {
+                        let mut hash = std::collections::hash_map::DefaultHasher::new();
+                        (unit, row).hash(&mut hash);
+                        StageTableRowRecord {
+                            stage_owned_table_name: "body-site-reference-table".into(),
+                            stage_row_record_key: format!(
+                                "{:016x}{unit:024x}{row:024x}",
+                                hash.finish()
+                            ),
+                            stage_row_payload_text: "p".repeat(1024),
+                        }
+                    })
+                    .collect();
+                store
+                    .write_stage_table_unit(
+                        &StageUnitWriteRequest {
+                            stage_run_scope_value: &scope,
+                            stage_owner_name_value: "syntax-spans",
+                            stage_unit_work_key: &format!("{unit:064x}"),
+                            stage_input_stage_names: &[],
+                            stage_unit_output_rows: &rows,
+                        },
+                        &RunCancelFlagValue::default(),
+                    )
+                    .unwrap();
+            }
+            eprintln!(
+                "stage=unit-size-profile unit_size={unit_size} rows=12288 elapsed_seconds={:.6}",
+                started.elapsed().as_secs_f64()
+            );
+        }
+    }
 
     #[test]
     fn test_stage_unit_cleanup_indexed() {

@@ -9,6 +9,7 @@ pub use stage_table_store_backend::retry_bounded_store_write;
 pub struct TursoWorkspaceStoreAdapter {
     store_database_handle_value: turso::Database,
     store_runtime_handle_value: tokio::runtime::Runtime,
+    stage_insert_batch_limit: std::num::NonZeroUsize,
 }
 
 impl TursoWorkspaceStoreAdapter {
@@ -39,6 +40,8 @@ impl TursoWorkspaceStoreAdapter {
         Ok(Self {
             store_runtime_handle_value,
             store_database_handle_value,
+            stage_insert_batch_limit: std::num::NonZeroUsize::new(128)
+                .ok_or_else(|| build_store_backend_error("stage batch limit must be positive"))?,
         })
     }
 
