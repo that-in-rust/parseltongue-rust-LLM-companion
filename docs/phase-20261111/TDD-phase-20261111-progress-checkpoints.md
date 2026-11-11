@@ -259,3 +259,15 @@ declared span text remain unchanged. Syntax 7/7 and CLI 1/1 pass; Clippy Finishe
 release build Finished release profile in 3.68s; Python separation tests Ran 4 tests in 0.159s, OK.
 The final driver uses fresh nested evidence directories m1-batched-final-measurements to avoid
 contamination by interrupted/failed stores. Log /home/ubuntu/m1-final-production-measurements.log.
+
+### M1 bounded persistence refinement — STUB
+
+The fresh optimized N=4 map reached an unlabelled database-is-locked error after 79.699s; its separate
+audit explicitly exhausted the six bounded writer attempts. A new mixed read/write fixture with four
+writers and 20,480 rows passed, so this does not prove a general read failure. The exact untraced error
+operation remains unverified. Corpus file units are larger than that fixture.
+
+Preserve the six-attempt bound and Concurrent transactions. Refine the CLI to read at most N file inputs,
+parse those N in parallel, then persist their file units in deterministic order. This avoids long-unit
+in-process write contention without global locks, whole-stage buffering, weaker atomicity or changes to
+the adapter's independently tested concurrent-writer API. Added a generic bounded worker-map signature.

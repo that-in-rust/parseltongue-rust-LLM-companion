@@ -1,5 +1,14 @@
 use parseltongue_core_row_types::{RunCancelFlagValue, StoreBackendFailureError};
 
+pub fn map_bounded_stage_workers<T: Send>(
+    _stage_unit_work_keys: &[String],
+    _stage_worker_count_value: usize,
+    _stage_cancel_flag_value: &RunCancelFlagValue,
+    _stage_unit_work_function: impl Fn(&str) -> Result<T, StoreBackendFailureError> + Sync,
+) -> Result<Vec<T>, StoreBackendFailureError> {
+    todo!()
+}
+
 pub fn run_bounded_stage_workers(
     stage_unit_work_keys: &[String],
     stage_worker_count_value: usize,

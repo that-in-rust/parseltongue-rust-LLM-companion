@@ -148,6 +148,30 @@ fn test_bulk_failure_restores_unit() {
             .is_empty()
     );
 }
+
+#[test]
+fn test_readers_survive_concurrent_units() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("readers");
+    store.write_file_content_bytes("source", b"source bytes").unwrap();
+    std::thread::scope(|threads| {
+        let jobs: Vec<_> = (0..4).map(|worker| {
+            let store = &store;
+            let scope = &scope;
+            threads.spawn(move || {
+                for unit in 0..40 {
+                    assert_eq!(store.read_file_content_bytes("source").unwrap(), b"source bytes");
+                    let rows: Vec<_> = (0..128).map(|row| {
+                        make_fixture_graph_rows(&format!("{worker}/{unit}/{row}")).remove(0)
+                    }).collect();
+                    write_fixture_stage_rows(store, scope, "crate-graph", &format!("{worker}/{unit}"), &[], &rows).unwrap();
+                }
+            })
+        }).collect();
+        for job in jobs { job.join().unwrap(); }
+    });
+    assert_eq!(store.read_stage_table_rows(&scope,"crate-dependency-graph-table").unwrap().len(),4*40*128);
+}
 #[test]
 fn test_stage_refuses_missing_input() {
     let store = make_fixture_store_adapter();
