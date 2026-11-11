@@ -489,3 +489,19 @@ Stable Cargo's upstream unused lints.cargo warnings are expected: verified stabl
 cargo 1.99.1 and rustc 1.99.1; no missing environment/setup. Pinned upstream manifests remain untouched.
 This is a foundation GREEN, NOT completed M2 or a valid corpus answer key yet. Next refactor/gates,
 then per-crate generic/import fixtures, validated proc-macro cache loading and paired exports.
+
+### M2 oracle base paths — REFACTOR
+
+Cargo configuration is now a pure constructor; path-prefix state uses try_fold instead of
+mutable module/name accumulators. Clippy found a redundant guard in the adapted loader;
+replaced it with an equivalent LoadingProgress pattern.
+
+Verification: oracle cargo fmt --check exited 0 (silent); offline Clippy --all-targets
+with -D warnings completed in 0.32s; all five oracle tests passed in 35.58s, including
+the unchanged M0 provenance test. Offline release build completed in 1m 22s.
+git diff --check passed. No production crates changed during this foundation cycle.
+
+M2 remains incomplete: unit identity needs package/target kind (not root path alone);
+type-position resolution must filter namespaces, scoped generic/self/associated paths need
+coverage, and the PRIMARY cache/configuration manifest plus SECONDARY/KL1 export remain pending.
+No S5 measurements or final semantic-oracle capability are claimed.

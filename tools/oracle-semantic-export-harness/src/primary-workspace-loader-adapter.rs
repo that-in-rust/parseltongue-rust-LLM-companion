@@ -63,9 +63,10 @@ pub(super) fn load_primary_workspace_database(
     });
     for message in receiver {
         match message {
-            vfs::loader::Message::Progress { n_done, .. }
-                if n_done == LoadingProgress::Finished =>
-            {
+            vfs::loader::Message::Progress {
+                n_done: LoadingProgress::Finished,
+                ..
+            } => {
                 break;
             }
             vfs::loader::Message::Loaded { files: loaded }

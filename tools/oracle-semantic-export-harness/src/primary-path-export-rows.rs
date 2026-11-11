@@ -53,26 +53,7 @@ pub fn export_primary_semantic_paths(
     )
     .map_err(|_| build_oracle_export_error("workspace root is not an absolute UTF-8 path"))?;
     let manifest = ProjectManifest::discover_single(&root).map_err(build_oracle_export_error)?;
-    let mut configuration = CargoConfig {
-        all_targets: false,
-        set_test: false,
-        target: request.oracle_target_triple_value.clone(),
-        features: CargoFeatures::Selected {
-            features: request.oracle_enabled_feature_values.clone(),
-            no_default_features: !request.oracle_default_features_flag,
-        },
-        sysroot: Some(RustLibSource::Discover),
-        metadata_extra_args: vec!["--offline".into()],
-        extra_includes: vec![root.clone()],
-        ..CargoConfig::default()
-    };
-    configuration
-        .extra_env
-        .insert("CARGO_NET_OFFLINE".into(), Some("true".into()));
-    configuration.cfg_overrides.global = cfg::CfgDiff::new(
-        vec![],
-        vec![cfg::CfgAtom::Flag(hir::Symbol::intern("rust_analyzer"))],
-    );
+    let configuration = build_primary_cargo_configuration(request, &root);
     let workspace = ProjectWorkspace::load(manifest, &configuration, &|_| {})
         .map_err(build_oracle_export_error)?;
     let selected: BTreeSet<String> = match &workspace.kind {
@@ -184,6 +165,35 @@ pub fn export_primary_semantic_paths(
     Ok(rows)
 }
 
+fn build_primary_cargo_configuration(
+    request: &OracleWorkspaceExportConfig,
+    root: &vfs::AbsPathBuf,
+) -> CargoConfig {
+    CargoConfig {
+        all_targets: false,
+        set_test: false,
+        target: request.oracle_target_triple_value.clone(),
+        features: CargoFeatures::Selected {
+            features: request.oracle_enabled_feature_values.clone(),
+            no_default_features: !request.oracle_default_features_flag,
+        },
+        sysroot: Some(RustLibSource::Discover),
+        metadata_extra_args: vec!["--offline".into()],
+        extra_includes: vec![root.clone()],
+        extra_env: [("CARGO_NET_OFFLINE".into(), Some("true".into()))]
+            .into_iter()
+            .collect(),
+        cfg_overrides: project_model::CfgOverrides {
+            global: cfg::CfgDiff::new(
+                vec![],
+                vec![cfg::CfgAtom::Flag(hir::Symbol::intern("rust_analyzer"))],
+            ),
+            ..project_model::CfgOverrides::default()
+        },
+        ..CargoConfig::default()
+    }
+}
+
 pub(super) fn build_oracle_export_error(error: impl fmt::Display) -> OracleSemanticExportError {
     OracleSemanticExportError {
         error_context_detail_text: error.to_string(),
@@ -278,7 +288,7 @@ fn check_oracle_signature_path(path: &ast::Path, module: Module, database: &Root
 }
 
 fn resolve_oracle_module_paths(
-    mut module: Module,
+    module: Module,
     path: &ast::Path,
     database: &RootDatabase,
 ) -> Option<Vec<ModuleDef>> {
@@ -286,16 +296,27 @@ fn resolve_oracle_module_paths(
         .segments()
         .map(|segment| segment.kind())
         .collect::<Option<Vec<_>>>()?;
-    let mut names = Vec::new();
-    for segment in segments {
-        match segment {
-            ast::PathSegmentKind::CrateKw => module = module.krate(database).root_module(database),
-            ast::PathSegmentKind::SelfKw => {}
-            ast::PathSegmentKind::SuperKw => module = module.parent(database)?,
-            ast::PathSegmentKind::Name(name) => names.push(Name::new_root(name.text())),
-            _ => return None,
-        }
-    }
+    let (module, names) =
+        segments
+            .into_iter()
+            .try_fold(
+                (module, Vec::new()),
+                |(module, names), segment| match segment {
+                    ast::PathSegmentKind::CrateKw => {
+                        Some((module.krate(database).root_module(database), names))
+                    }
+                    ast::PathSegmentKind::SelfKw => Some((module, names)),
+                    ast::PathSegmentKind::SuperKw => Some((module.parent(database)?, names)),
+                    ast::PathSegmentKind::Name(name) => Some((
+                        module,
+                        names
+                            .into_iter()
+                            .chain(std::iter::once(Name::new_root(name.text())))
+                            .collect(),
+                    )),
+                    _ => None,
+                },
+            )?;
     if names.is_empty() {
         return Some(vec![ModuleDef::Module(module)]);
     }
