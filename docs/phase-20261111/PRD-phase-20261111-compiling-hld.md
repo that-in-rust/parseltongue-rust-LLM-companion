@@ -1,6 +1,6 @@
 # PRD — phase-20261111: HLD for Rust code that compiles
 
-Status: draft · Scope owner: human-architect-intent-author · Source design: `devin-research/Deep-Insight-08.md` (copied and narrowed here; this file stands alone)
+Status: draft · Executable specs: `SPEC-phase-20261111-executable-requirements.md` · Scope owner: human-architect-intent-author · Source design: `devin-research/Deep-Insight-08.md` (copied and narrowed here; this file stands alone)
 
 ## 0. How to read this document
 
@@ -307,7 +307,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  REQ-RUST-006.0  macro_rules! expansion agreement
    WHEN an item-position macro_rules! invocation is expanded
    THEN the set of (kind, name) of the produced items SHALL equal rust-analyzer's expansion for ≥ 99 % of invocations
-   AND  a proc-macro invocation SHALL be written as unresolved(proc_macro), never expanded or guessed
+   AND  a proc-macro invocation SHALL go through proc-macro-shape-table (REQ 013) or be written unresolved(proc_macro), never guessed
 
  REQ-RUST-007.0  method-call precision
    WHEN cpu-tool-port-body-inferencer writes a method-call site as extracted
@@ -322,7 +322,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
 
  REQ-RUST-009.0  HLD derivation
    WHEN cpu-tool-hld-table-builder runs
-   THEN every row SHALL connect two public items (or a public item and an external item), and every collapsed row SHALL have
+   THEN every row SHALL connect two HLD nodes (§2, D6) (or a node and an external item), and every collapsed row SHALL have
         evidence rows naming the private items it passed through
 
  REQ-RUST-010.0  no hidden analysis engine
@@ -401,7 +401,7 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
                                        are added on top of this phase's tables and ported resolvers
  all LLMs and all training            no tiny LLM (binder, guesser, ranker, clarifier), no training or post-training, no
                                        labelled datasets; unresolved rows are counted, not guessed
- proc-macro expansion                  unresolved(proc_macro) except the built-in derive table
+ full proc-macro expansion             only shapes from proc-macro-shape-table (D3); every other proc macro → unresolved(proc_macro)
  build-script output                  (D4) never run, never read. Consequences: `include!(concat!(env!("OUT_DIR"), …))` →
                                        unresolved(build_script); `env!` of a build-script variable → unresolved(build_script);
                                        `CARGO_PKG_*` / `CARGO_MANIFEST_DIR` are filled from cargo metadata; a cfg that only a
