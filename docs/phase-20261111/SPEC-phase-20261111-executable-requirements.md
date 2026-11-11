@@ -362,3 +362,78 @@ PRD as **M**.
      proposed, so humans edit text and REQ 013 tests it
  Q4  cfg set: one run = default features only (PRD §13). Is a second run with --all-features wanted for the five repos?
 ```
+
+## 8. Repositories we take from
+
+How each repository is used: **copy-adapt** = code copied, licence headers and attribution kept, inputs rewired to our
+tables · **link-pinned** = published crate linked unchanged at one version · **rewrite-from** = our own code following its
+structure, nothing copied · **oracle** = run offline only, in tests, as the answer key · **idea-only** = design studied,
+no code copied or linked · **tooling** = used by agents working on this repo, never part of the Parseltongue binary.
+Commits marked (M) are the checkouts on this VM on 2026-11-05; "pin at M0/M1" means the exact commit is fixed then.
+
+```text
+ ── CODE WE COPY OR LINK ────────────────────────────────────────────────────────────────────────────────────────────
+
+ rust-lang/rust-analyzer          https://github.com/rust-lang/rust-analyzer        MIT OR Apache-2.0   commit 6e37b2d62 (M)
+   copy-adapt     crates/hir-def/src/nameres/ (collector.rs resolution_loop, path_resolution.rs) → stage 4+5
+                  crates/mbe/src/ (expander.rs, transcriber.rs) → macro_rules! (unless ra_ap_mbe links without salsa, Q2)
+                  crates/hir-expand/src/builtin/ (fn_macro.rs, attr_macro.rs, derive) → built-in macros
+                  crates/hir-def/src/lang_item.rs → lang-item-definition-table names
+   rewrite-from   crates/hir-def/src/expr_store/lower.rs (body lowering) · crates/hir-ty/src/lower.rs (signatures) ·
+                  crates/hir-ty/src/infer/ + method_resolution.rs (inference, method lookup) ·
+                  crates/hir-ty/src/next_solver/interner.rs (shape of the solver adapter, M7)
+                  crates/project-model/ (how rustc --print cfg / sysroot and cargo metadata are read)
+                  crates/ide-db/src/prime_caches.rs (dependency-ordered parallel crate scheduling)
+   link-pinned    ra_ap_syntax · ra_ap_parser · ra-ap-rustc_lexer (parser up to the span table), the versions that
+                  rust-analyzer@6e37b2d62's Cargo.toml uses (M: ra-ap-rustc_lexer 0.180; ra_ap_syntax 0.0.362 in registry)
+   oracle         rust-analyzer binary at the same commit, offline, for every *_matches_oracle test
+   never          ra_ap_hir*, ra_ap_ide*, ra_ap_base_db, salsa, the proc-macro server (REQ 010)
+
+ rust-lang/rust                   https://github.com/rust-lang/rust                 MIT OR Apache-2.0   pin at M7
+   link-pinned    rustc_type_ir + rustc_next_trait_solver, as published ra-ap-rustc_type_ir / ra-ap-rustc_next_trait_solver
+                  (M7 only, the versions rust-analyzer@6e37b2d62 uses)
+   input          the toolchain's library/ sources (core, alloc, std) found via `rustc --print sysroot`; parsed, not compiled
+
+ tursodatabase/turso              https://github.com/tursodatabase/turso            MIT                 pin at M0
+   link-pinned    crate `turso` (TursoDB, BEGIN CONCURRENT / MVCC) — the only database (PRD §4.2)
+
+ oli-obk/cargo_metadata           https://github.com/oli-obk/cargo_metadata          MIT                 pin at M0
+   link-pinned    typed parsing of `cargo metadata --offline` JSON (M: 0.19.2 and 0.23.1 in registry)
+
+ BLAKE3-team/BLAKE3               https://github.com/BLAKE3-team/BLAKE3              CC0 / Apache-2.0    pin at M0
+   link-pinned    crate `blake3` for file digests and SpanId
+
+ proptest-rs/proptest             https://github.com/proptest-rs/proptest            MIT OR Apache-2.0   dev-dependency
+   link-pinned    property tests (REQ 002, 007)
+
+ ── ORACLE CORPUS (each passes `cargo check` once when chosen; Parseltongue never builds them) ────────────────────────
+
+ rust-lang/rust-analyzer          https://github.com/rust-lang/rust-analyzer        commit 6e37b2d62 (M)
+ BurntSushi/ripgrep               https://github.com/BurntSushi/ripgrep              pin at M1
+ tokio-rs/tokio                   https://github.com/tokio-rs/tokio                  pin at M1
+ serde-rs/serde                   https://github.com/serde-rs/serde                  pin at M1
+ regexident/cargo-modules         https://github.com/regexident/cargo-modules        commit 48455ca59 (M)
+
+ ── IDEAS ONLY (studied; no code copied or linked) ──────────────────────────────────────────────────────────────────
+
+ regexident/cargo-modules         MPL-2.0 (file-level copyleft → we do NOT copy its code)
+   idea-only      module tree and visibility rendering on top of rust-analyzer → how D6 nodes and
+                  reachable_outside_crate are shown
+ cargo-public-api/cargo-public-api https://github.com/cargo-public-api/cargo-public-api  MIT    commit 68b218915 (M)
+   idea-only      what "the public API of a crate" is, as rustdoc JSON lists it → cross-check for reachable_outside_crate
+ obi1kenobi/cargo-semver-checks   https://github.com/obi1kenobi/cargo-semver-checks  MIT OR Apache-2.0  commit 161450e93 (M)
+   idea-only      queries over public items and re-exports (import paths) → pub use / reexports edge rules
+ praezi/rust (RustPräzi)          https://github.com/praezi/rust                     MIT OR Apache-2.0  commit ec5aa0ed2 (M)
+   idea-only      crate-level call graphs over a whole ecosystem → evidence rows and the public graph feed later
+ willcrichton/flowistry           https://github.com/willcrichton/flowistry          MIT               commit 693ceda92 (M)
+   idea-only      information flow inside bodies; needs a rustc driver (a build) → not usable this phase; noted for later
+
+ ── TOOLING (agents only, never in the binary) ──────────────────────────────────────────────────────────────────────
+
+ DeusData/codebase-memory-mcp     https://github.com/DeusData/codebase-memory-mcp    MIT
+   tooling        structural exploration of rust-analyzer while porting (AGENTS.md)
+ that-in-rust/agent-room-of-requirements  commit 117afc24b — the Rust skills installed in .agents/skills/
+```
+
+Rule: anything copied keeps its original licence header and an entry in a `THIRD-PARTY-NOTICES` file in the copying crate;
+MPL-2.0 code (cargo-modules) is never copied.

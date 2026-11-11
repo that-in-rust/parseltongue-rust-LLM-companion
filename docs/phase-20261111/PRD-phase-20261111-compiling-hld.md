@@ -20,6 +20,7 @@ Status: draft · Executable specs: `SPEC-phase-20261111-executable-requirements.
  §12 budgets                           time and memory targets (targets, not measurements)
  §13 out of scope                      what this phase deliberately does not do
  §14 risks and open questions
+ §15 repositories we take from        pointer to the full list in the SPEC file
 ```
 
 Conventions: four-word hyphenated names for every named thing (AGENTS.md). **M** = measured in this project; every other number is a target or an estimate and says so. `→` = "produces".
@@ -452,3 +453,7 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
  D1  decided 2026-11-05: the crate graph comes from `cargo metadata --offline` (the only Cargo call)
  D2  decided 2026-11-05: test set = rust-analyzer, ripgrep, tokio, serde, cargo-modules, all scored equally
 ```
+
+## 15. Repositories we take from
+
+The full list — each repository, what is taken from it, how (copy-adapt · link-pinned · rewrite-from · oracle · idea-only · tooling), licence and pinned commit — is §8 of `SPEC-phase-20261111-executable-requirements.md`. In short: rust-analyzer (copy-adapt name resolution and macros, rewrite-from types and inference, parser crates linked, offline oracle), rust-lang/rust (std sources; the next trait solver in M7), tursodatabase/turso, cargo_metadata, blake3, proptest; corpus ripgrep, tokio, serde, cargo-modules; ideas only from cargo-modules (MPL-2.0, never copied), cargo-public-api, cargo-semver-checks, RustPräzi, Flowistry.
