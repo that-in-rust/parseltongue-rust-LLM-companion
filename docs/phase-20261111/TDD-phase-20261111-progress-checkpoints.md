@@ -606,3 +606,12 @@ handling or a documented fallback. Native TypeParam::trait_bounds explicitly omi
 method bounds (hir/src/lib.rs); missing shared lookup fails rather than borrowing another
 crate's Semantics. Full-unit cfg manifests, proc-macro cache, SECONDARY, production
 resolution and S5 are still pending. Next: refactor gates and exact configuration inputs.
+
+### M2 oracle complete signatures — REFACTOR
+
+Unified namespaced-target construction. Associated-path lookup is a total Option
+projection (it has no error branch), with ? for missing qualifiers; error propagation
+remains in the source/identity adapters. Formatting check exited 0. Offline --all-targets
+Clippy with -D warnings finished in 0.50s; all fifteen tests passed in 72.31s; offline
+release build finished in 2.50s. git diff --check passed. No production inputs changed.
+Remaining work above is unchanged; passing fixture tests do not constitute S5 evidence.

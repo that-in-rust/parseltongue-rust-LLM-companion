@@ -249,7 +249,7 @@ fn build_oracle_path_targets(
     if let Some(target) = resolve_oracle_generic_target(module, path, semantics, files, packages)? {
         return Ok(vec![target]);
     }
-    if let Some(definitions) = resolve_oracle_associated_paths(module, path, semantics)? {
+    if let Some(definitions) = resolve_oracle_associated_paths(module, path, semantics) {
         return definitions
             .into_iter()
             .map(|definition| {
@@ -259,8 +259,7 @@ fn build_oracle_path_targets(
                     } else {
                         "type"
                     };
-                build_oracle_symbol_target(definition, semantics, files, packages)
-                    .map(|target| assign_oracle_target_namespace(target, namespace))
+                build_oracle_namespaced_target(definition, namespace, semantics, files, packages)
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|targets| targets.into_iter().flatten().collect());
@@ -269,8 +268,7 @@ fn build_oracle_path_targets(
         return definitions
             .into_iter()
             .map(|(definition, namespace)| {
-                build_oracle_symbol_target(definition, semantics, files, packages)
-                    .map(|target| assign_oracle_target_namespace(target, namespace))
+                build_oracle_namespaced_target(definition, namespace, semantics, files, packages)
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|targets| targets.into_iter().flatten().collect());
@@ -320,16 +318,13 @@ fn resolve_oracle_associated_paths(
     module: Module,
     path: &ast::Path,
     semantics: &Semantics<'_, RootDatabase>,
-) -> Result<Option<Vec<ModuleDef>>, OracleSemanticExportError> {
-    let Some(qualifier) = path
+) -> Option<Vec<ModuleDef>> {
+    let qualifier = path
         .qualifier()
-        .filter(|qualifier| qualifier.qualifier().is_none())
-    else {
-        return Ok(None);
-    };
+        .filter(|qualifier| qualifier.qualifier().is_none())?;
     let Some(ast::PathSegmentKind::Name(name)) = path.segment().and_then(|segment| segment.kind())
     else {
-        return Ok(None);
+        return None;
     };
     let owners = collect_oracle_generic_owners(module, path, semantics);
     let traits: Vec<_> = match qualifier.segment().and_then(|segment| segment.kind()) {
@@ -373,7 +368,18 @@ fn resolve_oracle_associated_paths(
         .filter(|item| item.name(semantics.db) == Some(Name::new_root(name.text())))
         .map(read_oracle_associated_definition)
         .collect();
-    Ok((!definitions.is_empty()).then_some(definitions))
+    (!definitions.is_empty()).then_some(definitions)
+}
+
+fn build_oracle_namespaced_target(
+    definition: ModuleDef,
+    namespace: &str,
+    semantics: &Semantics<'_, RootDatabase>,
+    files: &vfs::Vfs,
+    packages: &OraclePackageRootIndex,
+) -> Result<Option<Value>, OracleSemanticExportError> {
+    build_oracle_symbol_target(definition, semantics, files, packages)
+        .map(|target| assign_oracle_target_namespace(target, namespace))
 }
 
 fn read_oracle_associated_definition(item: hir::AssocItem) -> ModuleDef {
