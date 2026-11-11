@@ -278,3 +278,16 @@ test_pure_worker_results_ordered and test_pure_worker_errors_propagate both fail
 Contracts cover ordered bounded results, empty input, zero workers, cancellation, errors and panics.
 The ripgrep run separately exposed valid comments in cfg predicates from regex-automata; add a pinned
 syntax-token normalization regression for comments, raw strings/raw identifiers and boolean literals.
+
+### M1 corpus source compatibility — RED
+
+The completed diagnostic pass failed all five (no coverage publication): rust-analyzer lock conflict;
+ripgrep cfg comments; tokio CRLF inside half's multiline doc strings; serde path attributes in syn's
+non-mod.rs source; cargo-modules contextual safe! macro names in bitvec. Syntax regressions reproduce
+the latter three (8 pass, 3 fail). A separate fixture checks that test-only workspace members cannot
+seed normal dependency contexts. Only lib/bin and proc-macro provider roots seed those contexts.
+
+Keep raw bytes and raw byte coordinates authoritative. Parse compiler-normalized CRLF with a lossless
+offset restoration map. Use the already-transitive pinned ra_ap_parser public token-input/tree-builder
+APIs to retain contextual identifiers in macro paths (macro_rules definitions remain special); no
+dependency version changes, source rewriting, vendored patch or semantic-engine dependency is needed.

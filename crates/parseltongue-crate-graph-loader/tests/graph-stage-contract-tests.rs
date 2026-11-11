@@ -58,6 +58,34 @@ fn make_fixture_command_runner() -> FixtureWorkspaceCommandRunner {
     }
 }
 
+struct UnmappedWorkspaceCommandRunner;
+impl WorkspaceCommandRunPort for UnmappedWorkspaceCommandRunner {
+    fn run_workspace_command_output(&self,root:&Path,args:&[&str])->Result<Vec<u8>,StoreBackendFailureError>{
+        let bytes=make_fixture_command_runner().run_workspace_command_output(root,args)?;
+        if args!=["cargo","metadata","--offline"] {return Ok(bytes);}
+        let mut document:serde_json::Value=serde_json::from_slice(&bytes).unwrap();
+        let mut helper=document["packages"][0].clone();
+        let helper_id="path+file:///helper#helper@0.1.0";
+        helper["id"]=json!(helper_id);
+        helper["name"]=json!("helper");
+        helper["targets"]=json!([helper["targets"][0].clone()]);
+        document["packages"][0]["targets"]=json!([{"kind":["test"],"src_path":root.join("tests/check.rs")}]);
+        document["packages"][0]["dependencies"]=json!([{"name":"helper","kind":null,"target":null,"features":[],"uses_default_features":true,"optional":false}]);
+        document["packages"].as_array_mut().unwrap().push(helper);
+        document["resolve"]["nodes"][0]["deps"]=json!([{"name":"helper","pkg":helper_id,"dep_kinds":[{"kind":null,"target":null}]}]);
+        document["resolve"]["nodes"].as_array_mut().unwrap().push(json!({"id":helper_id,"deps":[],"features":["default","one"]}));
+        Ok(serde_json::to_vec(&document).unwrap())
+    }
+}
+
+#[test]
+fn test_testonly_workspace_stays_unmapped() {
+    let directory=tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("Cargo.lock"),b"lock").unwrap();
+    let rows=load_workspace_crate_graph(directory.path(),&UnmappedWorkspaceCommandRunner).unwrap();
+    assert!(!rows.iter().any(|r|r.stage_owned_table_name=="crate-dependency-graph-table"));
+}
+
 #[test]
 fn test_crate_graph_offline_only() {
     let directory = tempfile::tempdir().unwrap();
