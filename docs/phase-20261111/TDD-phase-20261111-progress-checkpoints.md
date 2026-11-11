@@ -589,3 +589,20 @@ its type and constructor namespaces. This keeps existing symbol-set contracts wh
 retaining both bindings. The strengthened fixture requires one Item target with both
 namespaces and permits a trait plus macro of the same spelling. It still fails at the
 namespace todo: "FAILED. 0 passed; 1 failed; ... 14 filtered out" in 23.83s.
+
+### M2 oracle complete signatures — GREEN
+
+All fifteen oracle tests pass: "ok. 15 passed; 0 failed" in 69.67s.
+Native resolve_path_per_ns supplies import namespaces; target normalization merges
+namespace sets for a single definition. Shared contexts use current-module GenericDef,
+Trait items/supertraits and impl/trait-associated generic owners for the tested T::Assoc,
+fully-qualified paths, Self and method-parameter cases. Source-container keys include
+syntax kind so one inline module cannot masquerade as a shared file merely by covering
+the same byte range as its SourceFile. No IDs were duplicated.
+
+This is the tested subset, not complete corpus support: inherited method-only bounds,
+shared local items/concrete associated lookup and expansion provenance still need exact
+handling or a documented fallback. Native TypeParam::trait_bounds explicitly omits added
+method bounds (hir/src/lib.rs); missing shared lookup fails rather than borrowing another
+crate's Semantics. Full-unit cfg manifests, proc-macro cache, SECONDARY, production
+resolution and S5 are still pending. Next: refactor gates and exact configuration inputs.
