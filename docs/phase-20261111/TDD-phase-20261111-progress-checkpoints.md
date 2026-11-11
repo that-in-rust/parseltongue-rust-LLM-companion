@@ -453,3 +453,14 @@ Next RED: empty output, bad workspace, exact normalized targets, cfg/test exclus
 module shared by two crates whose chosen dependency aliases point to different packages.
 PRIMARY must never run build scripts; cached proc-macro DLL injection still needs implementation.
 No semantic export, M2 resolver/differ, or S5 result is claimed by this phase.
+
+### M2 oracle path export — RED
+
+Added four executable contracts: test_nameres_matches_oracle_paths (exact alias target/range and
+cfg/test/example exclusions), test_shared_modules_preserve_context (one physical module, two crates,
+different dependency aliases), test_empty_oracle_paths_succeed, test_missing_oracle_workspace_errors.
+Ran the focused offline oracle test filter; all four fail at the intended todo!(), not a compiler or
+dependency failure: "not yet implemented"; "FAILED. 0 passed; 4 failed; 1 filtered out".
+Next implement PRIMARY loading with scripts disabled and proc macros enabled, verify module-first
+resolution on the shared-file fixture, normalize per-site rows, then refactor and run oracle gates.
+Production resolver, proc-macro cache injection, PRIMARY/SECONDARY pairing and S5 remain unfinished.
