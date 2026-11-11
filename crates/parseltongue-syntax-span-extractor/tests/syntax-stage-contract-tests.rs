@@ -36,6 +36,23 @@ fn test_module_raw_identifier_paths() {
 }
 
 #[test]
+fn test_cfg_comments_keep_semantics() {
+    let enabled = BTreeSet::from(["unix".into(),"feature=\"selected\"".into()]);
+    for source in [
+        "all(/* nested /* inner */ outer */ unix, // comment with (, \"\n feature = \"selected\")",
+        "all(unix, feature = r#\"selected\"#)",
+        "all(true, not(false), r#unix)",
+    ] {
+        assert!(evaluate_cfg_expression_truth(source,&enabled).unwrap(),"{source}");
+    }
+    assert!(!evaluate_cfg_expression_truth("all(unix, /* comment */ windows)",&enabled).unwrap());
+    assert!(evaluate_cfg_expression_truth("all(unix, /* unterminated",&enabled).is_err());
+    let mut input = make_syntax_file_input(b"#[cfg_attr(/* ( \" */ unix, cfg(feature = r#\"selected\"#))] fn selected() {}");
+    input.unit_target_cfg_values = enabled;
+    assert!(extract_file_syntax_rows(&input).is_ok());
+}
+
+#[test]
 fn test_span_gap_tiling_identity() {
     for source in [
         b"".as_slice(),

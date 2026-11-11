@@ -271,3 +271,10 @@ Preserve the six-attempt bound and Concurrent transactions. Refine the CLI to re
 parse those N in parallel, then persist their file units in deterministic order. This avoids long-unit
 in-process write contention without global locks, whole-stage buffering, weaker atomicity or changes to
 the adapter's independently tested concurrent-writer API. Added a generic bounded worker-map signature.
+
+### M1 bounded persistence refinement — RED
+
+test_pure_worker_results_ordered and test_pure_worker_errors_propagate both fail with todo!().
+Contracts cover ordered bounded results, empty input, zero workers, cancellation, errors and panics.
+The ripgrep run separately exposed valid comments in cfg predicates from regex-automata; add a pinned
+syntax-token normalization regression for comments, raw strings/raw identifiers and boolean literals.
