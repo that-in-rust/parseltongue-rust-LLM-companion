@@ -1,6 +1,6 @@
 # SOP — end-to-end test of `hld-current-dependency-edges` (phase-20261111)
 
-Name: `hld-current-e2e-test-procedure` · Status: draft · Applies to: every milestone gate from M2 on, and every release
+Name: `hld-current-test-procedure` · Status: draft · Applies to: every milestone gate from M2 on, and every release
 Inputs: `PRD-phase-20261111-compiling-hld.md`, `SPEC-phase-20261111-executable-requirements.md` (REQ-RUST-001 … 022)
 
 **Rule: this SOP is run on ALL FIVE repositories, every time.** A run that skips a repository is not a pass.

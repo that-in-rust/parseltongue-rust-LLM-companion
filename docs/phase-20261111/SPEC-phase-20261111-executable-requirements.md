@@ -193,35 +193,35 @@ Revision `.0` = as in the PRD; `.1` = tightened here (the change is stated). 014
 ```
 
 Rule: L2 stage crates never name TursoDB, ra_ap_syntax or cargo; they see traits only, so every stage is unit-tested
-with an in-memory fake store (`InMemoryRowStoreFake`, test-only). REQ-RUST-010 is checked by a `cargo tree` gate.
+with an in-memory fake store (`MemoryRowStoreFake`, test-only). REQ-RUST-010 is checked by a `cargo tree` gate.
 
 ### 3.2 L1 core types (invalid states unrepresentable)
 
 ```rust
-pub struct SpanId([u8; 16]);          // blake3(file digest, start, end, kind) truncated — identity is bytes (REQ 003, 012)
-pub struct FileDigest([u8; 32]);
-pub struct CrateId(u32);              // dense index assigned in sorted (name, version) order → deterministic
-pub struct ByteRange { start: u32, end: u32 }   // constructor rejects start > end
-pub struct ItemPath(Box<str>);        // crate::module::Name; external items keep crate@version
+pub struct SpanDigestIdValue([u8; 16]);          // blake3(file digest, start, end, kind) truncated — identity is bytes (REQ 003, 012)
+pub struct FileContentDigestValue([u8; 32]);
+pub struct CrateDenseIndexValue(u32);              // dense index assigned in sorted (name, version) order → deterministic
+pub struct SpanByteRangeValue { start: u32, end: u32 }   // constructor rejects start > end
+pub struct ItemQualifiedPathText(Box<str>);        // crate::module::Name; external items keep crate@version
 
-pub enum Namespace { Types, Values, Macros }
-pub enum SpanVisibility { Private, Public, PubCrate, PubSuper, PubIn(ItemPath) }
-pub enum NodePlacement { FileTopLevel, InlineModule, TopLevelAssocItem, InsideFnBody }   // REQ 019
-pub enum EdgeTarget { Span(SpanId), External { krate: ItemPath, item: ItemPath } }
-pub enum EdgeKind { Calls, UsesType, Implements, Reexports, Contains, Derives }
-pub enum EdgeVia { Direct, Collapsed }
-pub enum EdgeOrigin { SameCrate, WorkspaceCrate, Std, ExternalCrate }
+pub enum NameResolutionNamespaceKind { Types, Values, Macros }
+pub enum SpanDeclaredVisibilityKind { Private, Public, PubCrate, PubSuper, PubIn(ItemQualifiedPathText) }
+pub enum HldNodePlacementKind { FileTopLevel, InlineModule, TopLevelAssocItem, InsideFnBody }   // REQ 019
+pub enum EdgeTargetReferenceValue { Span(SpanDigestIdValue), External { krate: ItemQualifiedPathText, item: ItemQualifiedPathText } }
+pub enum HldEdgeRelationKind { Calls, UsesType, Implements, Reexports, Contains, Derives }
+pub enum HldEdgeViaKind { Direct, Collapsed }
+pub enum HldEdgeOriginKind { SameCrate, WorkspaceCrate, Std, ExternalCrate }
 
-pub enum UnresolvedReason {           // the ONLY reasons allowed (REQ 007, 014, 015, 013)
+pub enum SiteUnresolvedReasonKind {           // the ONLY reasons allowed (REQ 007, 014, 015, 013)
     UnknownReceiver, TraitSolverNeeded, ProcMacro, BuildScript, CfgInactive, ExternalSourceMissing,
 }
-pub enum SiteResolution {             // no "maybe": a site is one or the other
-    Extracted { target: EdgeTarget, via_trait: Option<ItemPath> },
-    Unresolved(UnresolvedReason),
+pub enum BodySiteResolutionOutcome {             // no "maybe": a site is one or the other
+    Extracted { target: EdgeTargetReferenceValue, via_trait: Option<ItemQualifiedPathText> },
+    Unresolved(SiteUnresolvedReasonKind),
 }
 ```
 
-`HldNodeCandidate::try_from(span) -> Option<HldNode>` is the single place that applies REQ 019, so a fn-body item cannot
+`HldNodeCandidateSpan::try_from(span) -> Option<HldSelectedNodeRow>` is the single place that applies REQ 019, so a fn-body item cannot
 become a node by construction.
 
 ### 3.3 Trait seams (L2), one pair per table
@@ -229,15 +229,15 @@ become a node by construction.
 ```text
  trait                              methods (shape)                                          used by
  ────────────────────────────────── ──────────────────────────────────────────────────────── ─────────────────────────
- CrateGraphReadStore                crates_in_dependency_order() · deps_of(CrateId)          scheduler, name resolver
- SpanRowReadStore                   spans_of_file / spans_of_crate / span(SpanId)             every stage after 2
- FieldDetailReadStore               fields_of(SpanId)                                        name resolver, lowerer
- BodySiteReadStore                  sites_of_body(SpanId)                                    body inferencer
- ScopeBindingReadStore              resolve(CrateId, module, name, Namespace) -> EdgeTarget  lowerer, inferencer
+ CrateGraphReadStore                crates_in_dependency_order() · deps_of(CrateDenseIndexValue)          scheduler, name resolver
+ SpanRowReadStore                   spans_of_file / spans_of_crate / span(SpanDigestIdValue)             every stage after 2
+ FieldDetailReadStore               fields_of(SpanDigestIdValue)                                        name resolver, lowerer
+ BodySiteReadStore                  sites_of_body(SpanDigestIdValue)                                    body inferencer
+ ScopeBindingReadStore              resolve(CrateDenseIndexValue, module, name, NameResolutionNamespaceKind) -> EdgeTargetReferenceValue  lowerer, inferencer
  ImplHeaderLookupIndex              impls_for_self_head(head) · impls_of_trait(trait)        inferencer, solver adapter
- LangItemReadStore                  lang_item(name) -> Option<SpanId>                         inferencer
- ProcMacroShapeLookup               shape(macro crate, version, name) -> Option<MacroShape>   macro expander
- StageRowWriteSink<Row>             write_unit(UnitKey, Vec<Row>) — one transaction per unit  every stage
+ LangItemReadStore                  lang_item(name) -> Option<SpanDigestIdValue>                         inferencer
+ ProcMacroShapeLookup               shape(macro crate, version, name) -> Option<ProcMacroShapeRow>   macro expander
+ StageRowWriteSink<Row>             write_unit(WorkUnitKeyValue, Vec<Row>) — one transaction per unit  every stage
  StageRunMarkerStore                begin(stage) · complete(stage) · is_complete(stage)       REQ 020, 022
 ```
 
@@ -267,7 +267,7 @@ Unresolved sites are rows, not errors: an error stops the run, an unresolved sit
  TursoDB          BEGIN CONCURRENT per unit; conflict → bounded retry with backoff (REQ 021)
  async boundary   if the pinned turso crate exposes an async API, the L3 adapter owns one runtime and offers blocking trait
                   methods; L2 stays synchronous, so no lock or guard is ever held across .await (to check in M1, Q1)
- cancellation     one shared CancelFlag checked between units; an interrupted unit is rolled back; the stage marker is not
+ cancellation     one shared RunCancelFlagShared checked between units; an interrupted unit is rolled back; the stage marker is not
                   completed (REQ 022)
  unsafe           none planned; any unsafe needs a written justification and a test
 ```
@@ -283,27 +283,27 @@ Unresolved sites are rows, not errors: an error stops the run, an unresolved sit
  002.0     test_unchanged_digest_skips_write          unit                         second run writes 0 rows                           0
  003.0     test_span_gap_tiling_identity              integration, corpus          tiling identity on every file                      0 failures
  004.1     test_parse_error_stops_run                 unit                         error file → WorkspaceNotCompilingError(path)      —
- 004.1     test_non_utf8_file_stops_run               unit                         invalid UTF-8 → error with byte offset             —
- 014.0     test_cfg_set_from_rustc_print              integration                  active cfg = rustc --print cfg + features          exact
+ 004.1     test_non_utf8_stops_run               unit                         invalid UTF-8 → error with byte offset             —
+ 014.0     test_cfg_from_rustc_print              integration                  active cfg = rustc --print cfg + features          exact
  014.0     test_inactive_cfg_items_counted            unit                         #[cfg(any())] item → unresolved(cfg_inactive)      counted
  015.0     test_build_script_never_executed           integration                  fixture build.rs that writes a file → file absent  0 runs
  015.0     test_out_dir_include_unresolved            unit                         include!(…OUT_DIR…) → unresolved(build_script)     —
- 015.0     test_cargo_pkg_env_from_metadata           unit                         env!("CARGO_PKG_VERSION") = manifest version       exact
+ 015.0     test_cargo_env_from_metadata           unit                         env!("CARGO_PKG_VERSION") = manifest version       exact
  005.0     test_nameres_matches_oracle_paths          integration + oracle         port target == rust-analyzer target                ≥ 99.5 %
- 016.0     test_macro_adds_import_fixed_point         unit                         macro-generated `use` resolves in the same loop    —
+ 016.0     test_macro_import_fixed_point         unit                         macro-generated `use` resolves in the same loop    —
  016.0     test_fixed_point_limit_errors              unit                         self-feeding macro → NameResolutionStuckError      —
  006.1     test_macro_rules_items_match               integration + oracle         expanded (kind, name) set equal                    ≥ 99 %
  006.1     test_body_macro_sites_match                integration + oracle         call sites inside format!/vec!/assert! equal       ≥ 99 %
- 013.0     test_proc_macro_shapes_match_oracle        integration + oracle         shape (kind, name, signature) set equal            100 % of rows
+ 013.0     test_macro_shapes_match_oracle        integration + oracle         shape (kind, name, signature) set equal            100 % of rows
  013.0     test_unknown_proc_macro_unresolved         unit                         no shape row / other version → unresolved          —
- 017.0     test_lang_items_found_in_sysroot           integration                  every lang_item.rs name present in sysroot found   100 %
+ 017.0     test_lang_items_in_sysroot           integration                  every lang_item.rs name present in sysroot found   100 %
  017.0     test_incoherent_primitive_impls_indexed    integration                  f32::abs, str::len resolve to std impls            exact
  018.0     test_signature_edges_match_oracle          integration + oracle         uses_type / implements edges equal                 ≥ 99.5 %
  007.1     test_method_target_precision_oracle        integration + oracle         extracted target == oracle target                  ≥ 99 %
  007.1     test_unresolved_has_one_reason             property                     every unresolved row has exactly one reason        100 %
  008.0     test_method_coverage_per_substep           benchmark report             extracted share after 7a / 7b / 7c                 ≥ 95 % after 7c
- 019.0     test_fn_body_pub_item_not_node             unit                         `pub fn` inside a fn body → not a node             —
- 019.0     test_pub_use_makes_reexport_edge           unit                         `pub use a::B` → reexports edge; `use` → evidence  —
+ 019.0     test_body_items_never_nodes             unit                         `pub fn` inside a fn body → not a node             —
+ 019.0     test_pub_use_reexport_edge           unit                         `pub use a::B` → reexports edge; `use` → evidence  —
  019.0     test_reachable_outside_crate_flag          integration + oracle         flag == item reachable in rust-analyzer            100 %
  009.1     test_hld_rows_connect_nodes                integration                  both ends nodes; collapsed rows have evidence      100 %
  010.1     test_no_analysis_crates_linked             build gate (cargo tree)      forbidden crates absent; L1 has 0 deps             0
@@ -312,7 +312,7 @@ Unresolved sites are rows, not errors: an error stops the run, an unresolved sit
  021.0     test_concurrent_writers_lose_nothing       integration (N = 1, 4, 16)   row count + digest equal to N = 1                  equal
  021.0     test_conflict_retry_is_bounded             unit (fault-injecting fake)  always-conflict store → error after K attempts     K attempts
  021.0     test_in_flight_units_bounded               unit                         observed max in-flight ≤ N                         ≤ N
- 022.0     test_cancel_mid_stage_then_rerun           integration                  cancel at random unit → rerun output == clean run  identical
+ 022.0     test_cancel_then_rerun_identical           integration                  cancel at random unit → rerun output == clean run  identical
  011.0     test_peak_memory_within_budget             benchmark (/usr/bin/time -v) peak RSS on rust-analyzer repo                     ≤ 2 GB target
  012.0     test_hld_export_is_deterministic           integration                  sorted export equal for 1 and N threads, twice     byte-identical
  gates     cargo fmt --check · cargo clippy --all-targets -- -D warnings · cargo test · cargo build --release · cargo tree gate
@@ -324,7 +324,7 @@ oracle-edge-agreement-table; they are slow and run as a separate `--ignored` sui
 ## 5. Implementation plan (TDD: RED test first, then GREEN, then refactor)
 
 ```text
- M0  workspace skeleton       crates of §3.1 empty; L1 types; InMemoryRowStoreFake
+ M0  workspace skeleton       crates of §3.1 empty; L1 types; MemoryRowStoreFake
                               RED: test_no_analysis_crates_linked, test_unresolved_has_one_reason
  M1  inputs                   crate graph loader, ingest, span extractor, Turso adapter, run markers, worker pool
                               RED: 001 · 002 · 003 · 004 · 014 · 015 · 020 · 021 · 022 tests
@@ -401,7 +401,7 @@ Commits marked (M) are the checkouts on this VM on 2026-11-05; "pin at M0/M1" me
    link-pinned    typed parsing of `cargo metadata --offline` JSON (M: 0.19.2 and 0.23.1 in registry)
 
  BLAKE3-team/BLAKE3               https://github.com/BLAKE3-team/BLAKE3              CC0 / Apache-2.0    pin at M0
-   link-pinned    crate `blake3` for file digests and SpanId
+   link-pinned    crate `blake3` for file digests and SpanDigestIdValue
 
  proptest-rs/proptest             https://github.com/proptest-rs/proptest            MIT OR Apache-2.0   dev-dependency
    link-pinned    property tests (REQ 002, 007)

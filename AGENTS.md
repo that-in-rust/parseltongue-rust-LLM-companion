@@ -10,6 +10,12 @@ The four words must describe what the thing IS (its contents, scope, kind) — n
 
 The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-agent`; `ext-coding-agent` is its accepted short form in prose.
 
+Scope of the rule (clarified 2026-11-11): it covers Rust identifiers too — crates (`parseltongue-core-row-types`), types,
+traits and error types (`SpanDigestIdValue`, `SpanRowReadStore`, `CrateGraphLoadError`), functions, CLI verbs, and test names
+(four words after the `test_` prefix: `test_span_gap_tiling_identity`). Exempt: enum variants and status values (`Extracted`,
+`unresolved`), and names owned by other projects (rust-analyzer's `DefCollector`). The fixed prefixes `cpu-tool-` and
+`tiny-llm-` count as one word, as in the nomenclature below (`cpu-tool-syntax-tree-walker`).
+
 ## Working method (always apply)
 
 - Classify first: broken behavior → bug; existing rails → enhancement; bounded new capability → feature; unclear new system → product. Use the lightest safe workflow.
@@ -79,7 +85,7 @@ Full workflows, research rubric and source attribution: [agent-working-method-pl
 
  PHASE-20261111 ADDITIONS (docs/phase-20261111/PRD-phase-20261111-compiling-hld.md; compiling code only, ported rust-analyzer logic)
  crate-dependency-graph-table · body-site-pending-table · module-scope-binding-table · macro-expanded-item-table
- lowered-signature-type-table · impl-header-index-table · oracle-edge-agreement-table · lang-item-definition-table · proc-macro-shape-table · hld-current-e2e-test-procedure
+ lowered-signature-type-table · impl-header-index-table · oracle-edge-agreement-table · lang-item-definition-table · proc-macro-shape-table · hld-current-test-procedure
  cpu-tool-crate-graph-loader · cpu-tool-port-name-resolver · cpu-tool-port-macro-expander · cpu-tool-port-signature-lowerer
  cpu-tool-port-body-inferencer · cpu-tool-oracle-edge-differ
 

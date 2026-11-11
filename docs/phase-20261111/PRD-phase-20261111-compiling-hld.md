@@ -117,7 +117,7 @@ Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis d
 Layers:
 
 ```text
- L1 core      row and id types (SpanId, CrateId, ItemPath, EdgeStatus, UnresolvedReason), typed errors per stage; no dependencies
+ L1 core      row and id types (SpanDigestIdValue, CrateDenseIndexValue, ItemQualifiedPathText, HldEdgeStatusKind, SiteUnresolvedReasonKind), typed errors per stage; no dependencies
  L2 std       stage logic written against row-store traits; dependency-ordered crate scheduler; bounded worker pool
  L3 external  Turso adapter · ra_ap_syntax / ra_ap_parser / ra-ap-rustc_lexer · cargo_metadata · (M7 only) ra-ap-rustc_next_trait_solver
 ```
@@ -360,7 +360,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  009      test_hld_rows_public_endpoints           integration               both ends public; collapsed rows have evidence 100 %
  010      test_no_analysis_crates_linked           build gate (cargo tree)   forbidden crates absent                       0
  011      test_peak_memory_within_budget           benchmark (/usr/bin/time) peak RSS on rust-analyzer repo               ≤ 2 GB target
- 013      test_proc_macro_shapes_match_oracle      integration + oracle      shape (kind, name, signature) set equal       100 % of shape rows
+ 013      test_macro_shapes_match_oracle      integration + oracle      shape (kind, name, signature) set equal       100 % of shape rows
  012      test_hld_export_is_deterministic         integration               sorted exports equal across 1 and N threads   byte-identical
  gates    cargo fmt · cargo clippy --all-targets -- -D warnings · cargo test · cargo build --release
 ```
