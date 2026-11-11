@@ -62,3 +62,28 @@ Status: PASS, no runtime behavior claimed. Public identity constructors and adap
 - Adapter verifies async build/query/execute/prepare and concurrent begin/rollback behind a sync L3 runtime.
   This is an API foundation, not M1 schema/persistence/concurrency correctness implementation.
 - Next: refactor pure validation/error diagnostics, format and run final gates; no open build blocker.
+
+## REFACTOR — functional boundaries and final gates
+
+- Extracted pure path/unit validation, destructured range inputs and improved typed error diagnostics.
+  Core remains dependency-free. Small clones preserve clear ownership; no speculative cache/optimisation.
+- Database handle drops before its owned runtime. Synchronous adapter rejects async-runtime entry;
+  callers must also drop the adapter outside async executors, as documented.
+- Formatted production and external harness; RED test assertions remain unchanged.
+- cargo fmt --all -- --check, plus the harness manifest equivalent: PASS.
+- cargo clippy --workspace --all-targets --all-features --offline --locked -- -D warnings:
+  Finished dev profile in 0.42s, PASS.
+- cargo test --workspace --all-targets --all-features --offline --locked:
+  core 3 passed, fake store 1 passed, adapter/build gates 3 passed; zero failures.
+- cargo build --workspace --all-targets --all-features --offline --locked:
+  Finished dev profile in 0.12s, PASS.
+- External harness clippy --all-targets -- -D warnings: PASS, Finished dev profile in 0.44s.
+- External harness offline/locked tests: 1 passed, zero failures; executable rebuilt and manifest refreshed.
+- Naming/source audit: four-word owned functions/tests/types; no todo!/unimplemented!, unsafe,
+  static mut, unwrap or expect in the new Rust sources. git diff --check: PASS.
+- Warning remains external only: stable Cargo ignores upstream lints.cargo; source and environment diagnosis
+  recorded under STUB. The harness intentionally links salsa; the production dependency gate excludes it.
+- Final production test log: /home/ubuntu/m0-final-production-tests.log.
+- Next: M1 graph/ingest/parser, stage schemas, persistence/runtime integration, generation scheduler.
+  Extend the harness with real semantic exports at the owning resolution milestones.
+- Blockers: none for this M0 subset. No release-performance, corpus, final HLD or full semantic export claim.

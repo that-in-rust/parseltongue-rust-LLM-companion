@@ -29,52 +29,102 @@ pub trait SpanRowReadStore {
 #[cfg(test)]
 mod stage_store_fixture_tests {
     use super::*;
-    use parseltongue_core_row_types::{CompilationUnitRoleKind, CrateCompilationUnitKey, SpanByteRangeValue, SpanDigestIdValue};
+    use parseltongue_core_row_types::{
+        CompilationUnitRoleKind, CrateCompilationUnitKey, SpanByteRangeValue, SpanDigestIdValue,
+    };
     use std::collections::BTreeMap;
 
     #[derive(Default)]
     struct FakeStageRowStore {
-        stage_unit_stored_rows: BTreeMap<(RunGenerationDigestValue, SemanticOccurrenceKeyValue), StageUnitRowRecord>,
+        stage_unit_stored_rows:
+            BTreeMap<(RunGenerationDigestValue, SemanticOccurrenceKeyValue), StageUnitRowRecord>,
     }
 
     impl StageRowWriteSink for FakeStageRowStore {
-        fn write_stage_unit_rows(&mut self, stage_unit_output_rows: &[StageUnitRowRecord]) -> Result<(), StoreBackendFailureError> {
-            self.stage_unit_stored_rows.extend(stage_unit_output_rows.iter().map(|stage_unit_output_row| {
-                ((stage_unit_output_row.run_generation_digest_value, stage_unit_output_row.span_semantic_occurrence_key.clone()), stage_unit_output_row.clone())
-            }));
+        fn write_stage_unit_rows(
+            &mut self,
+            stage_unit_output_rows: &[StageUnitRowRecord],
+        ) -> Result<(), StoreBackendFailureError> {
+            self.stage_unit_stored_rows
+                .extend(stage_unit_output_rows.iter().map(|stage_unit_output_row| {
+                    (
+                        (
+                            stage_unit_output_row.run_generation_digest_value,
+                            stage_unit_output_row.span_semantic_occurrence_key.clone(),
+                        ),
+                        stage_unit_output_row.clone(),
+                    )
+                }));
             Ok(())
         }
     }
 
     impl SpanRowReadStore for FakeStageRowStore {
-        fn read_span_by_digest(&self, run_generation_digest_value: RunGenerationDigestValue,
-            span_semantic_occurrence_key: &SemanticOccurrenceKeyValue) -> Result<Option<StageUnitRowRecord>, StoreBackendFailureError> {
-            Ok(self.stage_unit_stored_rows.get(&(run_generation_digest_value, span_semantic_occurrence_key.clone())).cloned())
+        fn read_span_by_digest(
+            &self,
+            run_generation_digest_value: RunGenerationDigestValue,
+            span_semantic_occurrence_key: &SemanticOccurrenceKeyValue,
+        ) -> Result<Option<StageUnitRowRecord>, StoreBackendFailureError> {
+            Ok(self
+                .stage_unit_stored_rows
+                .get(&(
+                    run_generation_digest_value,
+                    span_semantic_occurrence_key.clone(),
+                ))
+                .cloned())
         }
     }
 
     #[test]
     fn test_fake_store_preserves_generations() -> Result<(), Box<dyn std::error::Error>> {
         let unit_compilation_identity_key = CrateCompilationUnitKey {
-            unit_cargo_package_identifier: "sample@1".into(), unit_cargo_target_name: "sample".into(),
-            unit_cargo_target_kind: "lib".into(), unit_compilation_role_kind: CompilationUnitRoleKind::Target,
+            unit_cargo_package_identifier: "sample@1".into(),
+            unit_cargo_target_name: "sample".into(),
+            unit_cargo_target_kind: "lib".into(),
+            unit_compilation_role_kind: CompilationUnitRoleKind::Target,
             unit_configuration_digest_full: [0; 32],
         };
-        let span_semantic_occurrence_key = SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
-            &unit_compilation_identity_key, "lib.rs", SpanByteRangeValue::try_from((0, 0))?, SpanDigestIdValue::from([0; 32]), &[])?;
+        let span_semantic_occurrence_key =
+            SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+                &unit_compilation_identity_key,
+                "lib.rs",
+                SpanByteRangeValue::try_from((0, 0))?,
+                SpanDigestIdValue::from([0; 32]),
+                &[],
+            )?;
         let mut fake_stage_row_store = FakeStageRowStore::default();
-        assert_eq!(fake_stage_row_store.read_span_by_digest(RunGenerationDigestValue([0; 32]), &span_semantic_occurrence_key)?, None);
+        assert_eq!(
+            fake_stage_row_store.read_span_by_digest(
+                RunGenerationDigestValue([0; 32]),
+                &span_semantic_occurrence_key
+            )?,
+            None
+        );
         fake_stage_row_store.write_stage_unit_rows(&[])?;
-        let first_stage_unit_row = StageUnitRowRecord { run_generation_digest_value: RunGenerationDigestValue([0; 32]),
-            span_semantic_occurrence_key, file_source_content_bytes: vec![0, 255] };
-        let second_stage_unit_row = StageUnitRowRecord { run_generation_digest_value: RunGenerationDigestValue([1; 32]),
-            file_source_content_bytes: vec![42], ..first_stage_unit_row.clone() };
-        fake_stage_row_store.write_stage_unit_rows(&[first_stage_unit_row.clone(), second_stage_unit_row.clone()])?;
+        let first_stage_unit_row = StageUnitRowRecord {
+            run_generation_digest_value: RunGenerationDigestValue([0; 32]),
+            span_semantic_occurrence_key,
+            file_source_content_bytes: vec![0, 255],
+        };
+        let second_stage_unit_row = StageUnitRowRecord {
+            run_generation_digest_value: RunGenerationDigestValue([1; 32]),
+            file_source_content_bytes: vec![42],
+            ..first_stage_unit_row.clone()
+        };
+        fake_stage_row_store.write_stage_unit_rows(&[
+            first_stage_unit_row.clone(),
+            second_stage_unit_row.clone(),
+        ])?;
         fake_stage_row_store.write_stage_unit_rows(std::slice::from_ref(&first_stage_unit_row))?;
         assert_eq!(fake_stage_row_store.stage_unit_stored_rows.len(), 2);
         for expected_stage_unit_row in [first_stage_unit_row, second_stage_unit_row] {
-            assert_eq!(fake_stage_row_store.read_span_by_digest(expected_stage_unit_row.run_generation_digest_value,
-                &expected_stage_unit_row.span_semantic_occurrence_key)?, Some(expected_stage_unit_row));
+            assert_eq!(
+                fake_stage_row_store.read_span_by_digest(
+                    expected_stage_unit_row.run_generation_digest_value,
+                    &expected_stage_unit_row.span_semantic_occurrence_key
+                )?,
+                Some(expected_stage_unit_row)
+            );
         }
         Ok(())
     }

@@ -16,8 +16,18 @@ mod oracle_manifest_contract_tests {
     #[test]
     fn test_oracle_build_manifest_pinned() {
         let oracle_source_build_manifest = super::build_oracle_source_manifest();
-        assert_eq!(oracle_source_build_manifest["oracle_source_commit_hash"], "6e37b2d62127d445d77069031b416c48c9b0b4f2");
-        assert_eq!(oracle_source_build_manifest["oracle_export_support_kind"], "provenance_only");
-        assert!(oracle_source_build_manifest["oracle_toolchain_version_text"].as_str().is_some_and(|version| version.starts_with("rustc ")));
+        assert_eq!(
+            oracle_source_build_manifest["oracle_source_commit_hash"],
+            "6e37b2d62127d445d77069031b416c48c9b0b4f2"
+        );
+        assert_eq!(
+            oracle_source_build_manifest["oracle_export_support_kind"],
+            "provenance_only"
+        );
+        assert!(
+            oracle_source_build_manifest["oracle_toolchain_version_text"]
+                .as_str()
+                .is_some_and(|version| version.starts_with("rustc "))
+        );
     }
 }
