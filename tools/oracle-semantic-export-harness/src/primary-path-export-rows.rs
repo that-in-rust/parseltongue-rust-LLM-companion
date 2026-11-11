@@ -35,6 +35,8 @@ impl fmt::Display for OracleSemanticExportError {
 
 impl std::error::Error for OracleSemanticExportError {}
 
+type OraclePackageRootIndex = BTreeMap<(String, String), String>;
+
 pub fn export_primary_semantic_paths(
     request: &OracleWorkspaceExportConfig,
 ) -> Result<Vec<serde_json::Value>, OracleSemanticExportError> {
@@ -56,6 +58,21 @@ pub fn export_primary_semantic_paths(
     let configuration = build_primary_cargo_configuration(request, &root);
     let workspace = ProjectWorkspace::load(manifest, &configuration, &|_| {})
         .map_err(build_oracle_export_error)?;
+    let package_roots: OraclePackageRootIndex = match &workspace.kind {
+        ProjectWorkspaceKind::Cargo { cargo, .. } => cargo
+            .packages()
+            .flat_map(|package| {
+                let data = &cargo[package];
+                data.targets.iter().map(move |target| {
+                    (
+                        (cargo[*target].root.to_string(), data.name.clone()),
+                        data.id.to_string(),
+                    )
+                })
+            })
+            .collect(),
+        _ => return Err(build_oracle_export_error("a Cargo workspace is required")),
+    };
     let selected: BTreeSet<String> = match &workspace.kind {
         ProjectWorkspaceKind::Cargo { cargo, .. } => cargo
             .packages()
@@ -104,6 +121,7 @@ pub fn export_primary_semantic_paths(
     );
     let mut rows = Vec::new();
     for module in modules {
+        let owner = build_oracle_compilation_record(module, &database, &vfs, &package_roots)?;
         let source = module.definition_source(&database);
         let tree = source.value.node();
         semantics.parse_or_expand(source.file_id);
@@ -151,6 +169,7 @@ pub fn export_primary_semantic_paths(
                 .then_some(SiteUnresolvedReasonKind::ExternalSourceMissing);
             rows.push(json!({
                 "unit_source_root_path":vfs.file_path(module.krate(&database).root_file(&database)).to_string(),
+                "site_compilation_scope_record":owner,
                 "site_source_absolute_path":file,
                 "site_source_range_start":u32::from(range.range.start()),
                 "site_source_range_end":u32::from(range.range.end()),
@@ -163,6 +182,15 @@ pub fn export_primary_semantic_paths(
     rows.sort_by_cached_key(Value::to_string);
     rows.dedup();
     Ok(rows)
+}
+
+fn build_oracle_compilation_record(
+    _module: Module,
+    _database: &RootDatabase,
+    _files: &vfs::Vfs,
+    _packages: &OraclePackageRootIndex,
+) -> Result<Value, OracleSemanticExportError> {
+    todo!()
 }
 
 fn build_primary_cargo_configuration(

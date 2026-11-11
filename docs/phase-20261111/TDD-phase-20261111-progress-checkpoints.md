@@ -505,3 +505,13 @@ M2 remains incomplete: unit identity needs package/target kind (not root path al
 type-position resolution must filter namespaces, scoped generic/self/associated paths need
 coverage, and the PRIMARY cache/configuration manifest plus SECONDARY/KL1 export remain pending.
 No S5 measurements or final semantic-oracle capability are claimed.
+
+### M2 oracle scoped signatures — STUB
+
+Added a typed package/root identity index and compilation-scope record seam. Its deliberate
+todo! will be exercised by the next RED fixtures. Intended coverage: a shared lib/bin root
+must retain two compilation identities; repeated modules need distinct source/target scopes;
+type-position paths must not return value/macro namespace answers; shared generic/import
+paths must resolve in the actual crate or fail closed. Advanced cache/cfg support remains pending.
+Offline cargo check completed in 0.35s. This phase intentionally replaces the base scope seam
+with todo!; base tests will be restored during the scoped-signatures GREEN.
