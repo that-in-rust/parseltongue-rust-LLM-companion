@@ -16,6 +16,23 @@ pub trait StageTableStorePort: Send + Sync {
         stage_run_scope_value: &StageRunScopeValue,
         stage_owned_table_name: &str,
     ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError>;
+    fn count_stage_table_rows(
+        &self,
+        _stage_run_scope_value: &StageRunScopeValue,
+        _stage_owned_table_name: &str,
+    ) -> Result<usize,StoreBackendFailureError> { todo!() }
+    fn visit_stage_table_rows(
+        &self,
+        _stage_run_scope_value: &StageRunScopeValue,
+        _stage_owned_table_name: &str,
+        _stage_row_visit_function: &mut dyn FnMut(StageTableRowRecord)->Result<(),StoreBackendFailureError>,
+    ) -> Result<usize,StoreBackendFailureError> { todo!() }
+    fn prepare_workspace_generation_scope(
+        &self,
+        _stage_run_scope_value: &StageRunScopeValue,
+        _run_generation_digest_value: &str,
+        _stage_cancel_flag_value: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue,StoreBackendFailureError> { todo!() }
     fn write_file_content_bytes(
         &self,
         file_content_digest_full: &str,

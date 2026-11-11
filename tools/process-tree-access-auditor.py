@@ -134,6 +134,10 @@ def audit_process_trace_events(trace_source_text, mapper_process_identifier):
     return process_audit_violation_rows
 
 
+def read_process_tree_residency(mapper_process_identifier_value, process_metadata_root_path=Path("/proc")):
+    raise NotImplementedError
+
+
 def sample_process_tree_memory(command_argument_values, sample_output_file_path):
     if not command_argument_values:
         raise ValueError("nonempty command required")

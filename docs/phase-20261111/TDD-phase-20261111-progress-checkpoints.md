@@ -312,3 +312,19 @@ ordered publication remain visibly distinct. cargo fmt --all --check exited 0; w
 (1.21s). Other GREEN checks cover unchanged crates (43 total tests across commands). Release build
 Finished release profile in 5.71s. No API/version substitution, database change or global mutable lock.
 Next fresh corpus pass: m1-ordered-final-measurements; log /home/ubuntu/m1-ordered-production-measurements.log.
+
+### M1 measured publication budget miss — STUB
+
+Stopped the fresh driver/sampler/mapper (812572/812573/812574) before accepting any result. At 5:07:
+crate graph 0.307s, ingest 11.804s, syntax 186.792s; publication still running; mapper observed RSS
+2,471,044 KiB (a lower bound, above 2 GiB). The sampler itself consumed 54.1% CPU by scanning every
+host process every 10ms. Replace that scan with traversal of children of every thread in the mapper tree.
+
+Publication's executed path rewrites the generation key on every output row in one Concurrent transaction;
+the last emitted timing is syntax and publication is the next call. This retains a corpus-sized MVCC write
+set. Fix the lifecycle: discover source closure into small persisted request rows, compute its final digest,
+prepare/rekey only those small rows before emitting spans, then atomically publish only the ready pointer.
+No alias generations, partial reader publication or weaker transaction semantics.
+
+Add synchronous prepare/count/visitor ports (STUB) for bounded status aggregation and preparation.
+Profile load/parse/write separately on the next untraced attempt; no completed S3 success is claimed.
