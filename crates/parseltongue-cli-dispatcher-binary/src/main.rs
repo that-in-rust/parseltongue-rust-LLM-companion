@@ -135,11 +135,17 @@ fn build_syntax_file_input(
     })
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SyntaxStageOperationKind {
+    Discovery,
+    Extraction,
+}
 fn run_persisted_syntax_stage(
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
     cancel: &RunCancelFlagValue,
     workers: usize,
+    mode: SyntaxStageOperationKind,
 ) -> Result<(), StoreBackendFailureError> {
     let units: BTreeMap<String, Value> = store
         .read_stage_table_rows(scope, "crate-dependency-graph-table")?
@@ -188,10 +194,11 @@ fn run_persisted_syntax_stage(
         let pending: BTreeMap<_, _> = requests
             .into_iter()
             .filter(|request| {
-                !markers.contains(&format!(
-                    "__marker__/syntax-spans/{}",
-                    request.stage_row_record_key
-                ))
+                mode == SyntaxStageOperationKind::Extraction
+                    || !markers.contains(&format!(
+                        "__marker__/syntax-spans/{}",
+                        request.stage_row_record_key
+                    ))
             })
             .map(|r| (r.stage_row_record_key, r.stage_row_payload_text))
             .collect();
@@ -206,36 +213,75 @@ fn run_persisted_syntax_stage(
                 })
                 .collect::<Result<_, StoreBackendFailureError>>()?;
         let keys: Vec<_> = pending.keys().cloned().collect();
-        for batch in keys.chunks(workers) {
-            let inputs: BTreeMap<_, _> = batch
-                .iter()
-                .map(|key| {
-                    let request: Value =
-                        serde_json::from_str(&pending[key]).map_err(build_pipeline_stage_error)?;
-                    let unit = &units
-                        [read_required_json_string(&request, "unit_compilation_identity_key")?];
-                    let path = read_required_json_string(&request, "file_source_absolute_path")?;
-                    let file = files.get(path).ok_or_else(|| {
-                        build_pipeline_stage_error(format!(
-                            "StageInputMissingError: source file {path}"
-                        ))
-                    })?;
-                    let bytes = store.read_file_content_bytes(read_required_json_string(
-                        file,
-                        "file_content_digest_full",
-                    )?)?;
-                    let input = build_syntax_file_input(&request, unit, bytes)?;
-                    Ok((key.clone(), input))
-                })
-                .collect::<Result<_, StoreBackendFailureError>>()?;
-            let output = map_bounded_stage_workers(batch, workers, cancel, |key| {
-                extract_file_syntax_rows(&inputs[key])
-                    .map(|result| (key.to_owned(), result.stage_unit_output_rows))
+        let timing = keys
+            .chunks(workers)
+            .try_fold((0.0, 0.0, 0.0, 0usize), |timing, batch| {
+                let started = std::time::Instant::now();
+                let inputs: BTreeMap<_, _> = batch
+                    .iter()
+                    .map(|key| {
+                        let request: Value = serde_json::from_str(&pending[key])
+                            .map_err(build_pipeline_stage_error)?;
+                        let unit = &units
+                            [read_required_json_string(&request, "unit_compilation_identity_key")?];
+                        let path =
+                            read_required_json_string(&request, "file_source_absolute_path")?;
+                        let file = files.get(path).ok_or_else(|| {
+                            build_pipeline_stage_error(format!(
+                                "StageInputMissingError: source file {path}"
+                            ))
+                        })?;
+                        let bytes = store.read_file_content_bytes(read_required_json_string(
+                            file,
+                            "file_content_digest_full",
+                        )?)?;
+                        let input = build_syntax_file_input(&request, unit, bytes)?;
+                        Ok((key.clone(), input))
+                    })
+                    .collect::<Result<_, StoreBackendFailureError>>()?;
+                let load = started.elapsed().as_secs_f64();
+                let started = std::time::Instant::now();
+                let output = map_bounded_stage_workers(batch, workers, cancel, |key| {
+                    extract_file_syntax_rows(&inputs[key]).map(|result| {
+                        (
+                            key.to_owned(),
+                            result
+                                .stage_unit_output_rows
+                                .into_iter()
+                                .filter(|row| {
+                                    mode == SyntaxStageOperationKind::Extraction
+                                        || row.stage_owned_table_name
+                                            == "module-source-closure-requests"
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                })?;
+                let parse = started.elapsed().as_secs_f64();
+                let records = output.iter().map(|(_, rows)| rows.len()).sum::<usize>();
+                let started = std::time::Instant::now();
+                output.into_iter().try_for_each(|(key, rows)| {
+                    write_pipeline_stage_unit(store, scope, "syntax-spans", &key, &rows, cancel)
+                })?;
+                Ok::<_, StoreBackendFailureError>((
+                    timing.0 + load,
+                    timing.1 + parse,
+                    timing.2 + started.elapsed().as_secs_f64(),
+                    timing.3 + records,
+                ))
             })?;
-            output.into_iter().try_for_each(|(key, rows)| {
-                write_pipeline_stage_unit(store, scope, "syntax-spans", &key, &rows, cancel)
-            })?;
+        eprintln!(
+            "stage=syntax-batches mode={mode:?} units={} records={} load_seconds={:.3} parse_seconds={:.3} write_seconds={:.3}",
+            keys.len(),
+            timing.3,
+            timing.0,
+            timing.1,
+            timing.2
+        );
+        if mode == SyntaxStageOperationKind::Extraction {
+            break;
         }
+        let started = std::time::Instant::now();
         let requests = read_stage_json_records(store, scope, "module-source-closure-requests")?;
         let known: BTreeSet<_> = store
             .read_stage_table_rows(scope, "syntax-file-work-requests")?
@@ -296,11 +342,20 @@ fn run_persisted_syntax_stage(
             )?;
             added += 1;
         }
+        eprintln!(
+            "stage=source-closure-enqueue units={added} elapsed_seconds={:.3}",
+            started.elapsed().as_secs_f64()
+        );
         if added == 0 {
             break;
         }
     }
-    write_pipeline_stage_unit(store, scope, "syntax-spans", "__complete__", &[], cancel)
+    match mode {
+        SyntaxStageOperationKind::Discovery => Ok(()),
+        SyntaxStageOperationKind::Extraction => {
+            write_pipeline_stage_unit(store, scope, "syntax-spans", "__complete__", &[], cancel)
+        }
+    }
 }
 fn build_workspace_coverage_banner(
     store: &dyn StageTableStorePort,
@@ -321,7 +376,9 @@ fn build_workspace_coverage_banner(
         })
         .collect::<Result<_, StoreBackendFailureError>>()?;
     let mut groups: BTreeMap<String, (String, Vec<(u64, u64)>)> = BTreeMap::new();
-    for range in read_stage_json_records(store, &scope, "span-byte-ownership-ranges")? {
+    store.visit_stage_table_rows(&scope, "span-byte-ownership-ranges", &mut |row| {
+        let range: Value = serde_json::from_str(&row.stage_row_payload_text)
+            .map_err(build_pipeline_stage_error)?;
         let path = read_required_json_string(&range, "file_source_absolute_path")?;
         let key = json!([
             range["unit_compilation_identity_key"],
@@ -341,7 +398,8 @@ fn build_workspace_coverage_banner(
                     .as_u64()
                     .ok_or_else(|| build_pipeline_stage_error("missing range end"))?,
             ));
-    }
+        Ok(())
+    })?;
     let tiling = groups.values_mut().all(|(path, ranges)| {
         ranges.sort_unstable();
         let end = ranges.iter().try_fold(0, |end, (start, next)| {
@@ -353,27 +411,53 @@ fn build_workspace_coverage_banner(
         });
         end == lengths.get(path).copied()
     });
-    let spans = read_stage_json_records(store, &scope, "span-reference-text-table")?;
-    let inactive = spans
-        .iter()
-        .filter(|s| s["site_unresolved_reason_kind"] == "cfg_inactive")
-        .count();
-    let span_count = spans.len();
-    drop(spans);
-    let fields = store
-        .read_stage_table_rows(&scope, "field-signature-detail-table")?
-        .len();
-    let sites = store.read_stage_table_rows(&scope, "body-site-reference-table")?;
-    let build_script = sites
-        .iter()
-        .filter(|s| s.stage_row_payload_text.contains("\"build_script\""))
-        .count();
+    let mut reasons: BTreeMap<String, (usize, usize)> = store
+        .read_stage_table_rows(&scope, "crate-dependency-graph-table")?
+        .into_iter()
+        .map(|row| (row.stage_row_record_key, (0, 0)))
+        .collect();
+    let mut inactive = 0;
+    let span_count =
+        store.visit_stage_table_rows(&scope, "span-reference-text-table", &mut |row| {
+            let value: Value = serde_json::from_str(&row.stage_row_payload_text)
+                .map_err(build_pipeline_stage_error)?;
+            if value["site_unresolved_reason_kind"] == "cfg_inactive" {
+                inactive += 1;
+                reasons
+                    .entry(
+                        read_required_json_string(&value, "unit_compilation_identity_key")?
+                            .to_owned(),
+                    )
+                    .or_default()
+                    .0 += 1;
+            }
+            Ok(())
+        })?;
+    let fields = store.count_stage_table_rows(&scope, "field-signature-detail-table")?;
+    let mut build_script = 0;
+    let sites = store.visit_stage_table_rows(&scope, "body-site-reference-table", &mut |row| {
+        let value: Value = serde_json::from_str(&row.stage_row_payload_text)
+            .map_err(build_pipeline_stage_error)?;
+        if value["site_unresolved_reason_kind"] == "build_script" {
+            build_script += 1;
+            reasons
+                .entry(
+                    read_required_json_string(&value, "unit_compilation_identity_key")?.to_owned(),
+                )
+                .or_default()
+                .1 += 1;
+        }
+        Ok(())
+    })?;
+    let reasons:Vec<_>=reasons.into_iter().map(|(unit,(inactive,build_script))|
+        json!({"unit_compilation_identity_key":unit,"unit_unresolved_reason_counts":{"cfg_inactive":inactive,"build_script":build_script}})).collect();
     Ok(
         json!({"run_generation_digest_value":scope.run_generation_digest_value,
         "source_file_record_count":files.len(),"syntax_span_record_count":span_count,
-        "signature_field_record_count":fields,"body_site_record_count":sites.len(),
+        "signature_field_record_count":fields,"body_site_record_count":sites,
         "source_tiling_identity_holds":tiling,"inactive_item_record_count":inactive,
         "build_script_unresolved_count":build_script,
+        "crate_unresolved_reason_counts":reasons,
         "stage_implementation_status_values":{"crate-graph":"complete","source-ingest":"complete","syntax-spans":"complete",
             "name-resolution":"not yet implemented","macro-expansion":"not yet implemented","proc-macro-shapes":"not yet implemented",
             "signature-lowering":"not yet implemented","call-resolution":"not yet implemented","visibility-hld":"not yet implemented"}}),
@@ -412,9 +496,15 @@ fn run_workspace_mapping_pipeline(
     );
     write_pipeline_stage_unit(store, &scope, "source-ingest", "__complete__", &[], cancel)?;
     let started = std::time::Instant::now();
-    run_persisted_syntax_stage(store, &scope, cancel, workers)?;
+    run_persisted_syntax_stage(
+        store,
+        &scope,
+        cancel,
+        workers,
+        SyntaxStageOperationKind::Discovery,
+    )?;
     eprintln!(
-        "stage=syntax-spans elapsed_seconds={:.3}",
+        "stage=source-closure elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
     let mut digest = blake3::Hasher::new();
@@ -430,9 +520,31 @@ fn run_workspace_mapping_pipeline(
         }
     }
     let started = std::time::Instant::now();
-    store.publish_workspace_generation_manifest(
+    let scope = store.prepare_workspace_generation_scope(
         &scope,
         digest.finalize().to_hex().as_ref(),
+        cancel,
+    )?;
+    eprintln!(
+        "stage=generation-preparation elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
+    let started = std::time::Instant::now();
+    run_persisted_syntax_stage(
+        store,
+        &scope,
+        cancel,
+        workers,
+        SyntaxStageOperationKind::Extraction,
+    )?;
+    eprintln!(
+        "stage=syntax-spans elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
+    let started = std::time::Instant::now();
+    store.publish_workspace_generation_manifest(
+        &scope,
+        &scope.run_generation_digest_value,
         cancel,
     )?;
     eprintln!(

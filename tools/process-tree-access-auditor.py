@@ -4,6 +4,7 @@ import ast
 import json
 import os
 import re
+import resource
 import subprocess
 import sys
 import time
@@ -135,37 +136,58 @@ def audit_process_trace_events(trace_source_text, mapper_process_identifier):
 
 
 def read_process_tree_residency(mapper_process_identifier_value, process_metadata_root_path=Path("/proc")):
-    raise NotImplementedError
+    pending = [(mapper_process_identifier_value, None)]
+    visited = set()
+    resident_bytes = 0
+    while pending:
+        pid, expected_parent = pending.pop()
+        if pid in visited:
+            continue
+        visited.add(pid)
+        directory = process_metadata_root_path / str(pid)
+        try:
+            status = (directory / "status").read_text()
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        parent = re.search(r"^PPid:\s+(\d+)", status, re.M)
+        group = re.search(r"^Tgid:\s+(\d+)", status, re.M)
+        if expected_parent is not None and (not parent or int(parent[1]) != expected_parent):
+            continue
+        if group and int(group[1]) != pid:
+            continue
+        resident = re.search(r"^VmRSS:\s+(\d+)\s+kB", status, re.M)
+        resident_bytes += int(resident[1]) * 1024 if resident else 0
+        try:
+            tasks = list((directory / "task").iterdir())
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        for task in tasks:
+            try:
+                children = (task / "children").read_text().split()
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            pending.extend((int(child), pid) for child in children)
+    return resident_bytes
 
 
 def sample_process_tree_memory(command_argument_values, sample_output_file_path):
     if not command_argument_values:
         raise ValueError("nonempty command required")
     started = time.monotonic()
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    cpu_started = usage.ru_utime + usage.ru_stime
     process = subprocess.Popen(command_argument_values)
     samples = []
-    while process.poll() is None:
-        records = {}
-        for directory in Path("/proc").iterdir():
-            if not directory.name.isdecimal():
-                continue
-            try:
-                status = (directory / "status").read_text()
-            except (FileNotFoundError, PermissionError, ProcessLookupError):
-                continue
-            parent = re.search(r"^PPid:\s+(\d+)", status, re.M)
-            resident = re.search(r"^VmRSS:\s+(\d+)\s+kB", status, re.M)
-            if parent:
-                records[int(directory.name)] = (int(parent[1]), int(resident[1]) * 1024 if resident else 0)
-        descendants = {process.pid}
-        while True:
-            extended = descendants | {pid for pid, (parent, _) in records.items() if parent in descendants}
-            if extended == descendants:
-                break
-            descendants = extended
-        samples.append([time.monotonic() - started, sum(records.get(pid, (0, 0))[1] for pid in descendants)])
-        time.sleep(.01)
+    try:
+        while process.poll() is None:
+            samples.append([time.monotonic() - started, read_process_tree_residency(process.pid)])
+            time.sleep(.01)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait()
     exit_code = process.wait()
+    usage = resource.getrusage(resource.RUSAGE_SELF)
     Path(sample_output_file_path).write_text(json.dumps({
         "mapper_process_identifier_value": process.pid,
         "mapper_process_exit_code": exit_code,
@@ -173,6 +195,7 @@ def sample_process_tree_memory(command_argument_values, sample_output_file_path)
         "process_tree_elapsed_seconds": time.monotonic() - started,
         "process_memory_sample_values": samples,
         "sample_interval_millisecond_value": 10,
+        "sampler_process_cpu_seconds": usage.ru_utime + usage.ru_stime - cpu_started,
     }, indent=2) + "\n")
     return exit_code
 

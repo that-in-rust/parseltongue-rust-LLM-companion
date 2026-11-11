@@ -346,3 +346,14 @@ and updates the manifest pointer without rewriting corpus rows. Existing direct-
 Prepare rejects scopes already containing spans/ownership/fields/body data and changes no published pointer.
 Status uses SQL counts and a streaming visitor for inactive/build-script counts and ownership ranges.
 Add per-compilation-unit reason counts using actual reason fields, never payload substring matching.
+
+### M1 publication preparation and bounded readers — GREEN
+
+Implemented the plan above. Focused Rust checks: CLI 3/3, traits 1/1, adapter cleanup 1/1,
+adapter contracts 14/14, dependency/runtime gates 3/3 (22 total); Python 5/5, including a real
+64 MiB child allocation. fmt --all --check and git diff --check exited 0. Workspace Clippy
+--all-targets --all-features -D warnings Finished dev profile in 0.72s.
+The publication pointer remains unchanged during preparation, missing completions and cancellation.
+No database/version/process-policy substitution. Source discovery intentionally adds a bounded second
+CPU parsing pass rather than retaining ASTs across stages or aliasing generation identities.
+Next: refactor the snapshot hash to the streaming port, then fresh m1-prepared-final-measurements.

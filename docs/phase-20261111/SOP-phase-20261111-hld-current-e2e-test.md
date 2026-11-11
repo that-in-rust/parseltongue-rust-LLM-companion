@@ -116,6 +116,17 @@ Use strace --seccomp-bpf so excluded syscall classes do not incur ptrace stops.
 N bounds CPU parsing workers and resident file inputs/results. The CLI loads at most N file inputs,
 parses them in parallel without store calls, then writes their atomic file units in stable order.
 The adapter retains Concurrent transactions and bounded retries for independent concurrent callers.
+The sampler traverses children of every thread in the mapper tree, not every host process, and records
+its own CPU seconds separately. A real child-residency fixture checks that child memory is included.
+M1 first discovers the complete source closure into small request rows; no span/field/body outputs or
+global syntax completion are published by this pass. After hashing persisted source/config tables,
+prepare the final generation scope while it contains only metadata/control rows. Full extraction is
+a second bounded parsing pass that replaces discovery units under that canonical generation key.
+No AST crosses these passes. This extra CPU pass avoids a corpus-sized MVCC key rewrite: final
+publication validates stage completion and commits only the manifest pointer. Prepare rejects late
+calls containing syntax outputs. Profile load/parse/write seconds separately; final S3 timing includes
+both passes and coverage aggregation, not just the faster one. Status streams large tables and uses
+SQL counts rather than materializing complete body/field datasets.
 The lightweight execve/connect audit retains clone/fork metadata solely to prove direct-child versus
 Cargo-descendant ancestry; it traces no file opens. Filtered openat is a separate run. strace -P matches
 the exact repo/target path, not all descendants: recursive target rejection is enforced by canonical-path

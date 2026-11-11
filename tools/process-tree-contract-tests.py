@@ -95,6 +95,12 @@ class ProcessTreeContractTests(unittest.TestCase):
             self.assertGreater(result["process_tree_peak_bytes"], 0)
             self.assertGreater(result["process_tree_elapsed_seconds"], 0)
             self.assertTrue(result["process_memory_sample_values"])
+            child = "import time; data=bytearray(64*2**20); data[::4096]=b'x'*(len(data)//4096); time.sleep(.15)"
+            parent = f"import subprocess,sys; subprocess.run([sys.executable,'-c',{child!r}],check=True)"
+            self.assertEqual(auditor.sample_process_tree_memory([sys.executable, "-c", parent], str(output)), 0)
+            result = json.loads(output.read_text())
+            self.assertGreater(result["process_tree_peak_bytes"], 64 * 2**20)
+            self.assertGreaterEqual(result["sampler_process_cpu_seconds"], 0)
             self.assertEqual(auditor.sample_process_tree_memory([sys.executable, "-c", "raise SystemExit(7)"], str(output)), 7)
             with self.assertRaises(ValueError):
                 auditor.sample_process_tree_memory([], str(output))

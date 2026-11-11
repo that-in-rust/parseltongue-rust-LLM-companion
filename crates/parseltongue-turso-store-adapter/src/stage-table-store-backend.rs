@@ -165,6 +165,73 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         }).map_err(build_store_backend_error)
     }
 
+    fn count_stage_table_rows(
+        &self,
+        scope: &StageRunScopeValue,
+        table: &str,
+    ) -> Result<usize, StoreBackendFailureError> {
+        validate_stage_owned_table(table)?;
+        self.store_runtime_handle_value.block_on(async{
+            let connection=self.store_database_handle_value.connect()?;
+            let mut rows=connection.query(format!(r#"SELECT COUNT(*) FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=?"#),
+                turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+            let count:i64=rows.next().await?.ok_or(turso::Error::QueryReturnedNoRows)?.get(0)?;
+            usize::try_from(count).map_err(|error|turso::Error::ConversionFailure(error.to_string()))
+        }).map_err(build_store_backend_error)
+    }
+
+    fn visit_stage_table_rows(
+        &self,
+        scope: &StageRunScopeValue,
+        table: &str,
+        visitor: &mut dyn FnMut(StageTableRowRecord) -> Result<(), StoreBackendFailureError>,
+    ) -> Result<usize, StoreBackendFailureError> {
+        validate_stage_owned_table(table)?;
+        self.store_runtime_handle_value.block_on(async{
+            let connection=self.store_database_handle_value.connect().map_err(build_store_backend_error)?;
+            let mut rows=connection.query(format!(r#"SELECT stage_row_record_key,stage_row_payload_text FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? ORDER BY stage_row_record_key"#),
+                turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await.map_err(build_store_backend_error)?;
+            let mut count=0;
+            while let Some(row)=rows.next().await.map_err(build_store_backend_error)? {
+                visitor(StageTableRowRecord{stage_owned_table_name:table.into(),stage_row_record_key:row.get(0).map_err(build_store_backend_error)?,stage_row_payload_text:row.get(1).map_err(build_store_backend_error)?})?;
+                count+=1;
+            }
+            Ok(count)
+        })
+    }
+
+    fn prepare_workspace_generation_scope(
+        &self,
+        scope: &StageRunScopeValue,
+        generation: &str,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        retry_bounded_store_write(cancel, || {
+            if scope.run_generation_digest_value == generation {
+                return Ok(scope.clone());
+            }
+            self.store_runtime_handle_value.block_on(async{
+                let mut connection=self.store_database_handle_value.connect()?;
+                let transaction=connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
+                let result=async{
+                    for table in ["span-reference-text-table","span-byte-ownership-ranges","field-signature-detail-table","body-site-reference-table"]{
+                        let mut rows=transaction.query(format!(r#"SELECT 1 FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? LIMIT 1"#),
+                            turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                        if rows.next().await?.is_some(){return Err(turso::Error::Misuse("StageScopePreparationError: prepare before syntax outputs".into()));}
+                    }
+                    for (table,_) in STAGE_OWNED_TABLE_NAMES {
+                        check_stage_cancel_requested(cancel)?;
+                        transaction.execute(format!(r#"UPDATE "{table}" SET run_generation_digest_value=? WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=?"#),
+                            turso::params![generation.to_owned(),scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                    }
+                    check_stage_cancel_requested(cancel)?;
+                    Ok::<_,turso::Error>(StageRunScopeValue{run_generation_digest_value:generation.into(),stage_attempt_sequence_value:scope.stage_attempt_sequence_value.clone()})
+                }.await;
+                match result {Ok(scope)=>{transaction.commit().await?;Ok(scope)},Err(error)=>{let _=transaction.rollback().await;Err(error)}}
+            })
+        })
+    }
+
     fn write_file_content_bytes(
         &self,
         digest: &str,
@@ -208,9 +275,11 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                         turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),format!("__marker__/{stage}/__complete__")]).await?;
                     if rows.next().await?.is_none() { return Err(turso::Error::Misuse(format!("StageInputMissingError: {stage}"))); }
                 }
+                if scope.run_generation_digest_value!=generation {
                 for (table,_) in STAGE_OWNED_TABLE_NAMES {
                     transaction.execute(format!("UPDATE \"{table}\" SET run_generation_digest_value=? WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=?"),
                         turso::params![generation.to_owned(),scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                }
                 }
                 check_stage_cancel_requested(cancel)?;
                 transaction.execute("INSERT OR REPLACE INTO \"workspace-generation-publication-manifest\" VALUES (1,?,?)",
