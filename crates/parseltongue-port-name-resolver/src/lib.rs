@@ -21,3 +21,7 @@ pub fn resolve_crate_name_bindings(
 ) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
     todo!()
 }
+
+#[cfg(test)]
+#[path = "row-resolution-contract-tests.rs"]
+mod row_resolution_contract_tests;

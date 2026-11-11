@@ -631,3 +631,13 @@ Record native source notices. Next RED: namespace/alias/glob cycles and preceden
 edition/prelude rules, visibility, deterministic output, cancellation/input errors,
 macro/import interleaving and the attempted 8193rd-round limit. Parser/MBe adapters,
 atomic persistence, cfg/cache inputs, lang-item discovery and all-five S5 remain pending.
+
+### M2 row-based name resolver — RED
+
+Eight pure-row contracts fail at the intended entry-point todo: namespace aliases and
+order independence; cyclic/diamond globs, ambiguity and explicit precedence; visibility;
+generic-parent vs module/prelude boundaries; 2015 vs 2024 extern paths; empty/inactive
+rows; invalid scopes/cycles/cancellation; macro-generated imports; exactly 8192 changing
+rounds and rejection on attempted 8193. Output: "FAILED. 0 passed; 8 failed" in 0.00s.
+The macro ports here are deterministic test doubles, not the future MBe/parser adapter;
+these are not oracle-agreement or atomic-Turso-publication results.
