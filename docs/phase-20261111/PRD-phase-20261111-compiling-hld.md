@@ -90,7 +90,7 @@ What "ported" means, per stage (decided in §6):
                   and hir types to copy: signature lowering, body inference, method lookup, the solver adapter
 ```
 
-Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. `cargo metadata --offline` is allowed: it reads manifests and the lockfile, compiles nothing.
+Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. `cargo metadata --offline` is the decided source of the crate graph (decided 2026-11-05): it reads manifests and the lockfile, compiles nothing.
 
 ## 5. The journey — one line per step
 
@@ -284,13 +284,13 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  gates    cargo fmt · cargo clippy --all-targets -- -D warnings · cargo test · cargo build --release
 ```
 
-Oracle corpus (each must pass `cargo check` once, offline, when chosen): rust-analyzer, ripgrep, tokio, serde, cargo-modules. Split by repository: CPU rules may be adjusted on the first two only; the last three are held out.
+Oracle corpus (each must pass `cargo check` once, offline, when chosen): rust-analyzer, ripgrep, tokio, serde, cargo-modules. All five are test cases on equal terms (decided 2026-11-05); there is no tune/held-out split, because phase-20261111 has CPU rules only and no trained models.
 
 ## 11. Milestones — each ends with a measured gate
 
 ```text
  M1  crate graph + ingest + walker on workspace AND library source roots      gate: REQ 001–004 green; file/span counts published
- M2  cpu-tool-port-name-resolver                                              gate: REQ 005 on held-out repos
+ M2  cpu-tool-port-name-resolver                                              gate: REQ 005 on all five repos
  M3  cpu-tool-port-macro-expander (macro_rules! + built-in derive table)      gate: REQ 006
  M4  cpu-tool-port-signature-lowerer + impl-header-index-table                gate: every signature type path resolved or unresolved
                                                                               with a reason; signature edges (uses_type, implements)
@@ -301,7 +301,7 @@ Oracle corpus (each must pass `cargo check` once, offline, when chosen): rust-an
  M8  cpu-tool-hld-table-builder + roll-ups + banner                           gate: REQ 009, 011, 012
 ```
 
-Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage on the held-out repos, M7 is optional for this phase.
+Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage on all five repos, M7 is optional for this phase.
 
 ## 12. Budgets (targets, to be measured — none of these is measured yet)
 
@@ -339,7 +339,6 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
  R4  disk-backed lookups may be slow for method lookup. Mitigation: per-body caches and an in-memory impl index per crate;
      measure before optimising
  R5  copied code keeps rust-analyzer's licence headers and attribution (MIT OR Apache-2.0)
- Q1  is `cargo metadata --offline` acceptable as the only Cargo call, or must the crate graph come from parsing Cargo.toml
-     and Cargo.lock ourselves?
- Q2  which corpus beyond rust-analyzer is the acceptance set?
+ D1  decided 2026-11-05: the crate graph comes from `cargo metadata --offline` (the only Cargo call)
+ D2  decided 2026-11-05: test set = rust-analyzer, ripgrep, tokio, serde, cargo-modules, all scored equally
 ```
