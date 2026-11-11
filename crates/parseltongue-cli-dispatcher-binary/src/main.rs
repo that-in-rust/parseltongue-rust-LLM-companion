@@ -379,7 +379,12 @@ fn run_workspace_mapping_pipeline(
     cancel: &RunCancelFlagValue,
     workers: usize,
 ) -> Result<Value, StoreBackendFailureError> {
+    let started = std::time::Instant::now();
     let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?;
+    eprintln!(
+        "stage=crate-graph elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
     let nonce = format!(
         "{}-{}-{:?}",
         std::process::id(),
@@ -393,9 +398,19 @@ fn run_workspace_mapping_pipeline(
     write_pipeline_stage_unit(store, &scope, "crate-graph", "workspace", &graph, cancel)?;
     write_pipeline_stage_unit(store, &scope, "crate-graph", "__complete__", &[], cancel)?;
     drop(graph);
+    let started = std::time::Instant::now();
     ingest_workspace_source_files(&scope, store, cancel)?;
+    eprintln!(
+        "stage=source-ingest elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
     write_pipeline_stage_unit(store, &scope, "source-ingest", "__complete__", &[], cancel)?;
+    let started = std::time::Instant::now();
     run_persisted_syntax_stage(store, &scope, cancel, workers)?;
+    eprintln!(
+        "stage=syntax-spans elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
     let mut digest = blake3::Hasher::new();
     digest.update(b"parseltongue/0.1.0/m1-schema-1/ra_ap_syntax-0.0.362");
     for table in [
@@ -408,11 +423,16 @@ fn run_workspace_mapping_pipeline(
             digest.update(row.stage_row_payload_text.as_bytes());
         }
     }
+    let started = std::time::Instant::now();
     store.publish_workspace_generation_manifest(
         &scope,
         digest.finalize().to_hex().as_ref(),
         cancel,
     )?;
+    eprintln!(
+        "stage=generation-publication elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
     build_workspace_coverage_banner(store)
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {

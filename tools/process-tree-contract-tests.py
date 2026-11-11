@@ -9,9 +9,26 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location("auditor", Path(__file__).with_name("process-tree-access-auditor.py"))
 auditor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(auditor)
+driver_spec = importlib.util.spec_from_file_location("driver", Path(__file__).with_name("corpus-production-stage-measurements.py"))
+driver = importlib.util.module_from_spec(driver_spec)
+driver_spec.loader.exec_module(driver)
 
 
 class ProcessTreeContractTests(unittest.TestCase):
+    def test_measurement_audit_runs_separated(self):
+        record = {"corpus_source_checkout_path": "/source/repo"}
+        measurement, audit, reads = driver.build_corpus_measurement_commands(record, Path("/evidence"))
+        self.assertNotIn("strace", measurement)
+        self.assertIn("sample", measurement)
+        self.assertEqual(audit[0], "strace")
+        self.assertNotIn("sample", audit)
+        self.assertNotIn("openat", audit[audit.index("-e") + 1])
+        self.assertIn("execve", audit[audit.index("-e") + 1])
+        self.assertIn("connect", audit[audit.index("-e") + 1])
+        self.assertNotEqual(measurement[measurement.index("--workspace-store-file-path") + 1],
+                            audit[audit.index("--workspace-store-file-path") + 1])
+        self.assertIn("-P", reads)
+        self.assertIn("/source/repo/target", reads)
     def test_crate_graph_offline_only(self):
         trace = '''100 execve("/bin/parseltongue", ["parseltongue", "map-workspace-full-run"], []) = 0
 100 clone(child_stack=NULL, flags=SIGCHLD) = 101

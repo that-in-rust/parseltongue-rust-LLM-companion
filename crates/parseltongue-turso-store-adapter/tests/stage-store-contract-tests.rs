@@ -110,6 +110,44 @@ fn test_stage_rerun_is_identical() {
             .unwrap()
     );
 }
+
+#[test]
+fn test_bulk_failure_restores_unit() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("batch");
+    let original = make_fixture_graph_rows("original");
+    write_fixture_stage_rows(&store, &scope, "crate-graph", "unit", &[], &original).unwrap();
+    let mut rows: Vec<_> = (0..260)
+        .map(|index| make_fixture_graph_rows(&format!("row-{index}")).remove(0))
+        .collect();
+    rows.push(rows[0].clone());
+    assert!(write_fixture_stage_rows(&store, &scope, "crate-graph", "unit", &[], &rows).is_err());
+    assert_eq!(
+        store
+            .read_stage_table_rows(&scope, "crate-dependency-graph-table")
+            .unwrap(),
+        original
+    );
+    rows.pop();
+    assert_eq!(
+        write_fixture_stage_rows(&store, &scope, "crate-graph", "unit", &[], &rows).unwrap(),
+        260
+    );
+    assert_eq!(
+        store
+            .read_stage_table_rows(&scope, "crate-dependency-graph-table")
+            .unwrap()
+            .len(),
+        260
+    );
+    write_fixture_stage_rows(&store, &scope, "crate-graph", "unit", &[], &[]).unwrap();
+    assert!(
+        store
+            .read_stage_table_rows(&scope, "crate-dependency-graph-table")
+            .unwrap()
+            .is_empty()
+    );
+}
 #[test]
 fn test_stage_refuses_missing_input() {
     let store = make_fixture_store_adapter();

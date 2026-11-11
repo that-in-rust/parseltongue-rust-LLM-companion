@@ -225,3 +225,27 @@ The database and transaction log were growing; do not rerun another writer again
 The driver proceeds sequentially through all five and writes production-stage-measurement-summary.json,
 production-process-audit-result.json and hld-current-coverage-banner.json per repository when each finishes.
 S3 is not yet complete, and the final report must be updated from those artifacts before M1 acceptance.
+
+## M1 performance repair — separated telemetry and bounded SQL batches
+
+Stopped the 17-minute traced driver, mapper, sampler and strace supervisor as requested. Its incomplete
+trace is not a timing/RSS result. An independent untraced baseline exceeded three minutes; cancelled
+after 3:31.34 (GNU time: user 184.76s, system 58.11s, maximum RSS 179472 KiB). This is a censored
+baseline, not a completed mapping measurement.
+
+Inspection disproved span-per-transaction writes: each stage file/unit already has one BEGIN CONCURRENT
+transaction plus its marker, while immutable content uses one separate insert per file. However, every
+unit and queue insertion clears all tables owned by that stage. The RED query-plan test showed cleanup
+searched only generation+attempt, scanning the full generation's rows to filter the unit key.
+Added generation+attempt+unit indexes and bounded 128-row INSERT statements inside the existing atomic
+unit transaction. Added duplicate-in-later-batch rollback and empty-unit replacement coverage.
+RED: test_stage_unit_cleanup_indexed FAILED, plan lacked stage_unit_work_key.
+GREEN: adapter tests (including index plan and 260-row rollback) and CLI tests pass.
+Clippy Finished dev profile in 0.56s; release build Finished release profile in 4.34s.
+
+The S3 driver now measures an untraced mapper with the external RSS sampler, then separately audits
+execve/connect (retaining cheap clone/fork ancestry metadata) and exact-path-filtered target openat.
+No sampler is traced. Python separation contracts: Ran 4 tests in 0.125s; OK.
+Stage elapsed timings go to stderr. The new untraced rust-analyzer attempt measured graph 0.434s and
+ingestion 15.546s, then exposed a source-closure bug: raw identifier mod r#impl searched r#impl.rs
+instead of impl.rs. Fix next with a focused regression; no complete S3 success is claimed.

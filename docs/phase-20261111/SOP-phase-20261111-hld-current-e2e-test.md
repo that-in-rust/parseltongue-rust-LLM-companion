@@ -82,15 +82,23 @@ release-build the production binary separately from the oracle harness.
 Audit production's dependency tree, not the harness's permitted ide/hir/salsa tree.
 
 ```bash
-strace -f -s 65535 -e trace=process,openat,connect,sendto,sendmsg -o "$OUT/production-process-access-audit.txt" \
-  process-tree-memory-sampler --sample-interval-millisecond-value 10 \
+python3 tools/process-tree-access-auditor.py sample \
   --memory-sample-output-path "$OUT/process-tree-memory-samples.json" -- \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
-  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" --worker-thread-count-value 4 \
+  --workspace-store-file-path "$OUT/production-untraced-workspace-store.db" --worker-thread-count-value 4 \
   > "$OUT/production-stage-output-log.txt" 2> "$OUT/production-stage-error-log.txt"
+strace -f -s 65535 -e trace=execve,connect,clone,clone3,fork,vfork \
+  -o "$OUT/production-process-access-audit.txt" \
+  parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
+  --workspace-store-file-path "$OUT/production-audit-workspace-store.db" --worker-thread-count-value 4
+strace -f -s 65535 -e trace=openat -P "$REPO/target" \
+  -o "$OUT/production-target-access-audit.txt" \
+  parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
+  --workspace-store-file-path "$OUT/production-target-workspace-store.db" --worker-thread-count-value 4
 parseltongue status-coverage-banner-show \
-  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" --json \
+  --workspace-store-file-path "$OUT/production-untraced-workspace-store.db" --json \
   > "$OUT/hld-current-coverage-banner.json"
+# HLD export applies at M8/releases, not M1/M2.
 parseltongue hld-current-export-sorted \
   --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
   > "$OUT/hld-current-dependency-export.tsv"
@@ -102,6 +110,12 @@ The repository's tools/process-tree-access-auditor.py sample command is the exec
 the planned process-tree-memory-sampler wrapper. It records mapper PID, exit, elapsed seconds and sampled
 sum of live mapper/descendant VmRSS in bytes at nominal 10 ms intervals; supervisor RSS is excluded.
 tools/corpus-production-stage-measurements.py runs sampling, audit and JSON status for the pinned corpus.
+Timing/RSS SHALL come only from the untraced run. Do not put the sampler beneath strace: its /proc
+opens can dominate the trace and stop the mapper. Separate stores prevent measurement/audit interference.
+The lightweight execve/connect audit retains clone/fork metadata solely to prove direct-child versus
+Cargo-descendant ancestry; it traces no file opens. Filtered openat is a separate run. strace -P matches
+the exact repo/target path, not all descendants: recursive target rejection is enforced by canonical-path
+source guards and fixture tests, and the report SHALL distinguish this limit from full access tracing.
 Reconstruct fork/clone/exec ancestry and check complete argv: direct children remain exactly the three
 commands; Cargo descendants are restricted to rustc -vV and the approved stdin ___ discovery probe.
 That probe has exactly one each of --crate-type bin/rlib/dylib/cdylib/staticlib/proc-macro,

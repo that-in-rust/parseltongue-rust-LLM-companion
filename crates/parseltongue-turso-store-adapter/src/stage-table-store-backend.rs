@@ -76,6 +76,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                     run_generation_digest_value TEXT NOT NULL, stage_attempt_sequence_value TEXT NOT NULL,
                     stage_row_record_key TEXT NOT NULL, stage_unit_work_key TEXT NOT NULL, stage_row_payload_text TEXT NOT NULL,
                     PRIMARY KEY(run_generation_digest_value,stage_attempt_sequence_value,stage_row_record_key))"), ()).await?;
+                let prefix = table.rsplit_once('-').map(|(prefix,_)|prefix).unwrap_or(table);
+                connection.execute(format!("CREATE INDEX IF NOT EXISTS \"{prefix}-lookup\" ON \"{table}\" (run_generation_digest_value,stage_attempt_sequence_value,stage_unit_work_key)"), ()).await?;
             }
             connection.execute("CREATE TABLE IF NOT EXISTS \"file-source-content-records\" (file_content_digest_full TEXT PRIMARY KEY, file_source_content_bytes BLOB NOT NULL)", ()).await?;
             connection.execute("CREATE TABLE IF NOT EXISTS \"workspace-generation-publication-manifest\" (manifest_singleton_key_value INTEGER PRIMARY KEY, run_generation_digest_value TEXT NOT NULL, stage_attempt_sequence_value TEXT NOT NULL)", ()).await?;
@@ -120,10 +122,18 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                             turso::params![scope.run_generation_digest_value.clone(), scope.stage_attempt_sequence_value.clone(), request.stage_unit_work_key.to_owned()]).await?;
                     }
                 }
-                for row in request.stage_unit_output_rows {
-                    check_stage_cancel_requested(cancel)?;
-                    transaction.execute(format!("INSERT INTO \"{}\" VALUES (?,?,?,?,?)", row.stage_owned_table_name),
-                        turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),row.stage_row_record_key.clone(),request.stage_unit_work_key.to_owned(),row.stage_row_payload_text.clone()]).await?;
+                for (table,owner) in STAGE_OWNED_TABLE_NAMES {
+                    if *owner != request.stage_owner_name_value { continue; }
+                    let rows: Vec<_> = request.stage_unit_output_rows.iter().filter(|row|row.stage_owned_table_name==*table).collect();
+                    for batch in rows.chunks(128) {
+                        check_stage_cancel_requested(cancel)?;
+                        let placeholders = std::iter::repeat_n("(?,?,?,?,?)",batch.len()).collect::<Vec<_>>().join(",");
+                        let parameters: Vec<_> = batch.iter().flat_map(|row|[
+                            scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),
+                            row.stage_row_record_key.clone(),request.stage_unit_work_key.to_owned(),row.stage_row_payload_text.clone()
+                        ]).collect();
+                        transaction.execute(format!("INSERT INTO \"{table}\" VALUES {placeholders}"),parameters).await?;
+                    }
                 }
                 check_stage_cancel_requested(cancel)?;
                 transaction.execute("INSERT OR REPLACE INTO \"stage-run-generation-records\" VALUES (?,?,?,?,?)",
@@ -221,5 +231,28 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             let mut rows = connection.query("SELECT run_generation_digest_value,stage_attempt_sequence_value FROM \"workspace-generation-publication-manifest\" WHERE manifest_singleton_key_value=1", ()).await?;
             rows.next().await?.map(|row| Ok::<_,turso::Error>(StageRunScopeValue {run_generation_digest_value:row.get(0)?, stage_attempt_sequence_value:row.get(1)?})).transpose()
         }).map_err(build_store_backend_error)
+    }
+}
+
+#[cfg(test)]
+mod stage_unit_cleanup_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn test_stage_unit_cleanup_indexed() {
+        let store = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+        store.initialize_workspace_stage_schema().unwrap();
+        store.store_runtime_handle_value.block_on(async {
+            let connection = store.store_database_handle_value.connect().unwrap();
+            let mut rows = connection.query(
+                "EXPLAIN QUERY PLAN DELETE FROM \"body-site-reference-table\" WHERE run_generation_digest_value='generation' AND stage_attempt_sequence_value='attempt' AND stage_unit_work_key='unit'", ()
+            ).await.unwrap();
+            let mut plan = String::new();
+            while let Some(row) = rows.next().await.unwrap() {
+                plan.push_str(&row.get::<String>(3).unwrap());
+            }
+            assert!(plan.contains("stage_unit_work_key"), "{plan}");
+        });
     }
 }
