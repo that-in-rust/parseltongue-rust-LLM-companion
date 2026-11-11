@@ -1,4 +1,17 @@
-use std::{fmt, path::PathBuf};
+use hir::{Adt, HasSource, ItemInNs, Module, ModuleDef, Name, PathResolution, Semantics};
+use ide_db::RootDatabase;
+use parseltongue_core_row_types::SiteUnresolvedReasonKind;
+use project_model::{
+    CargoConfig, CargoFeatures, ProjectManifest, ProjectWorkspace, ProjectWorkspaceKind,
+    RustLibSource,
+};
+use serde_json::{Value, json};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    path::PathBuf,
+};
+use syntax::{AstNode, SyntaxNode, ast};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OracleWorkspaceExportConfig {
@@ -23,9 +36,369 @@ impl fmt::Display for OracleSemanticExportError {
 impl std::error::Error for OracleSemanticExportError {}
 
 pub fn export_primary_semantic_paths(
-    _oracle_workspace_export_config: &OracleWorkspaceExportConfig,
+    request: &OracleWorkspaceExportConfig,
 ) -> Result<Vec<serde_json::Value>, OracleSemanticExportError> {
-    todo!()
+    if request.oracle_macro_cache_manifest.is_some() {
+        return Err(build_oracle_export_error(
+            "cached proc-macro injection is not implemented",
+        ));
+    }
+    let root = request
+        .workspace_source_root_path
+        .canonicalize()
+        .map_err(build_oracle_export_error)?;
+    let root = vfs::AbsPathBuf::try_from(
+        root.to_str()
+            .ok_or_else(|| build_oracle_export_error("workspace path is not UTF-8"))?,
+    )
+    .map_err(|_| build_oracle_export_error("workspace root is not an absolute UTF-8 path"))?;
+    let manifest = ProjectManifest::discover_single(&root).map_err(build_oracle_export_error)?;
+    let mut configuration = CargoConfig {
+        all_targets: false,
+        set_test: false,
+        target: request.oracle_target_triple_value.clone(),
+        features: CargoFeatures::Selected {
+            features: request.oracle_enabled_feature_values.clone(),
+            no_default_features: !request.oracle_default_features_flag,
+        },
+        sysroot: Some(RustLibSource::Discover),
+        metadata_extra_args: vec!["--offline".into()],
+        extra_includes: vec![root.clone()],
+        ..CargoConfig::default()
+    };
+    configuration
+        .extra_env
+        .insert("CARGO_NET_OFFLINE".into(), Some("true".into()));
+    configuration.cfg_overrides.global = cfg::CfgDiff::new(
+        vec![],
+        vec![cfg::CfgAtom::Flag(hir::Symbol::intern("rust_analyzer"))],
+    );
+    let workspace = ProjectWorkspace::load(manifest, &configuration, &|_| {})
+        .map_err(build_oracle_export_error)?;
+    let selected: BTreeSet<String> = match &workspace.kind {
+        ProjectWorkspaceKind::Cargo { cargo, .. } => cargo
+            .packages()
+            .filter(|package| cargo[*package].is_member)
+            .flat_map(|package| cargo[package].targets.iter())
+            .map(|target| &cargo[*target])
+            .filter(|target| matches!(target.kind.as_cargo_target(), Some("lib" | "bin")))
+            .map(|target| target.root.to_string())
+            .collect(),
+        _ => return Err(build_oracle_export_error("a Cargo workspace is required")),
+    };
+    let exclusions = match &workspace.kind {
+        ProjectWorkspaceKind::Cargo { cargo, .. } => vec![
+            root.join("target"),
+            root.join(".git"),
+            cargo.target_directory().to_path_buf(),
+        ],
+        _ => vec![root.join("target"), root.join(".git")],
+    };
+    let loaded = crate::primary_workspace_loader_adapter::load_primary_workspace_database(
+        workspace,
+        &configuration,
+        &exclusions,
+    )?;
+    let database = loaded.oracle_database_owned_value;
+    let vfs = loaded.oracle_source_virtual_files;
+    let _server = loaded.oracle_macro_server_handle;
+    let semantics = Semantics::new(&database);
+    let modules: Vec<_> = hir::Crate::all(&database)
+        .into_iter()
+        .filter(|krate| selected.contains(&vfs.file_path(krate.root_file(&database)).to_string()))
+        .flat_map(|krate| collect_oracle_module_contexts(krate.root_module(&database), &database))
+        .collect();
+    let contexts = modules.iter().fold(
+        BTreeMap::<String, BTreeSet<String>>::new(),
+        |mut contexts, module| {
+            let source = module.definition_source(&database);
+            semantics.parse_or_expand(source.file_id);
+            let range = semantics.original_range(&source.value.node());
+            contexts
+                .entry(vfs.file_path(range.file_id.file_id(&database)).to_string())
+                .or_default()
+                .insert(format!("{:?}", module.krate(&database)));
+            contexts
+        },
+    );
+    let mut rows = Vec::new();
+    for module in modules {
+        let source = module.definition_source(&database);
+        let tree = source.value.node();
+        semantics.parse_or_expand(source.file_id);
+        for path in tree
+            .descendants()
+            .filter_map(ast::Path::cast)
+            .filter(|path| check_oracle_signature_path(path, module, &database))
+        {
+            let range = semantics.original_range(path.syntax());
+            let file = vfs.file_path(range.file_id.file_id(&database)).to_string();
+            let scoped = resolve_oracle_module_paths(module, &path, &database);
+            let targets = if let Some(definitions) = scoped {
+                definitions
+                    .into_iter()
+                    .filter_map(|definition| {
+                        build_oracle_symbol_target(definition, &semantics, &vfs)
+                    })
+                    .collect::<Vec<_>>()
+            } else if contexts
+                .get(&file)
+                .is_some_and(|contexts| contexts.len() > 1)
+            {
+                return Err(build_oracle_export_error(format!(
+                    "module-scoped API cannot resolve multi-crate path {} in {file}",
+                    path.syntax().text()
+                )));
+            } else {
+                semantics
+                    .resolve_path(&path)
+                    .and_then(|resolution| match resolution {
+                        PathResolution::Def(definition) => {
+                            build_oracle_symbol_target(definition, &semantics, &vfs)
+                        }
+                        _ => None,
+                    })
+                    .into_iter()
+                    .collect()
+            };
+            let targets: BTreeMap<_, _> = targets
+                .into_iter()
+                .map(|target| (target.to_string(), target))
+                .collect();
+            let reason = targets
+                .is_empty()
+                .then_some(SiteUnresolvedReasonKind::ExternalSourceMissing);
+            rows.push(json!({
+                "unit_source_root_path":vfs.file_path(module.krate(&database).root_file(&database)).to_string(),
+                "site_source_absolute_path":file,
+                "site_source_range_start":u32::from(range.range.start()),
+                "site_source_range_end":u32::from(range.range.end()),
+                "path_site_source_text":path.syntax().text().to_string(),
+                "path_target_symbol_rows":targets.into_values().collect::<Vec<_>>(),
+                "path_unresolved_reason_kind":reason.map(read_oracle_reason_label),
+            }));
+        }
+    }
+    rows.sort_by_cached_key(Value::to_string);
+    rows.dedup();
+    Ok(rows)
+}
+
+pub(super) fn build_oracle_export_error(error: impl fmt::Display) -> OracleSemanticExportError {
+    OracleSemanticExportError {
+        error_context_detail_text: error.to_string(),
+    }
+}
+
+fn read_oracle_reason_label(reason: SiteUnresolvedReasonKind) -> &'static str {
+    match reason {
+        SiteUnresolvedReasonKind::CfgInactive => "cfg_inactive",
+        SiteUnresolvedReasonKind::BuildScript => "build_script",
+        SiteUnresolvedReasonKind::ProcMacro => "proc_macro",
+        SiteUnresolvedReasonKind::ExternalSourceMissing => "external_source_missing",
+        SiteUnresolvedReasonKind::UnknownReceiver => "unknown_receiver",
+        SiteUnresolvedReasonKind::TraitSolverNeeded => "trait_solver_needed",
+    }
+}
+
+fn collect_oracle_module_contexts(module: Module, database: &RootDatabase) -> Vec<Module> {
+    std::iter::once(module)
+        .chain(
+            module
+                .children(database)
+                .flat_map(|child| collect_oracle_module_contexts(child, database)),
+        )
+        .collect()
+}
+
+fn check_oracle_meta_enabled(meta: ast::Meta, options: &cfg::CfgOptions) -> bool {
+    match meta {
+        ast::Meta::CfgMeta(meta) => {
+            meta.cfg_predicate()
+                .and_then(|predicate| options.check(&cfg::CfgExpr::parse_from_ast(predicate)))
+                == Some(true)
+        }
+        ast::Meta::CfgAttrMeta(meta) => {
+            meta.cfg_predicate()
+                .and_then(|predicate| options.check(&cfg::CfgExpr::parse_from_ast(predicate)))
+                != Some(true)
+                || meta
+                    .metas()
+                    .all(|meta| check_oracle_meta_enabled(meta, options))
+        }
+        _ => true,
+    }
+}
+
+fn check_oracle_signature_path(path: &ast::Path, module: Module, database: &RootDatabase) -> bool {
+    if path
+        .syntax()
+        .parent()
+        .is_some_and(|parent| ast::Path::can_cast(parent.kind()))
+    {
+        return false;
+    }
+    let ancestors: Vec<_> = path.syntax().ancestors().collect();
+    let inline = ancestors
+        .iter()
+        .filter_map(|node| ast::Module::cast(node.clone()))
+        .find(|module| module.item_list().is_some());
+    if inline.is_some_and(|inline| {
+        !module.is_inline(database)
+            || module.definition_source(database).value.node().text_range()
+                != inline.syntax().text_range()
+    }) {
+        return false;
+    }
+    if !ancestors.iter().all(|node| {
+        node.children()
+            .filter_map(ast::Attr::cast)
+            .filter_map(|attribute| attribute.meta())
+            .all(|meta| check_oracle_meta_enabled(meta, module.krate(database).cfg(database)))
+    }) {
+        return false;
+    }
+    if ancestors.iter().any(|node| ast::Use::can_cast(node.kind())) {
+        return true;
+    }
+    if let Some(function) = ancestors
+        .iter()
+        .find_map(|node| ast::Fn::cast(node.clone()))
+        && function.body().is_some_and(|body| {
+            body.syntax()
+                .text_range()
+                .contains_range(path.syntax().text_range())
+        })
+    {
+        return false;
+    }
+    ancestors
+        .iter()
+        .any(|node| ast::Type::can_cast(node.kind()) || ast::TypeBound::can_cast(node.kind()))
+}
+
+fn resolve_oracle_module_paths(
+    mut module: Module,
+    path: &ast::Path,
+    database: &RootDatabase,
+) -> Option<Vec<ModuleDef>> {
+    let segments = path
+        .segments()
+        .map(|segment| segment.kind())
+        .collect::<Option<Vec<_>>>()?;
+    let mut names = Vec::new();
+    for segment in segments {
+        match segment {
+            ast::PathSegmentKind::CrateKw => module = module.krate(database).root_module(database),
+            ast::PathSegmentKind::SelfKw => {}
+            ast::PathSegmentKind::SuperKw => module = module.parent(database)?,
+            ast::PathSegmentKind::Name(name) => names.push(Name::new_root(name.text())),
+            _ => return None,
+        }
+    }
+    if names.is_empty() {
+        return Some(vec![ModuleDef::Module(module)]);
+    }
+    for end in 1..names.len() {
+        if !module
+            .resolve_mod_path(database, names[..end].iter().cloned())?
+            .any(|item| matches!(item, ItemInNs::Types(ModuleDef::Module(_))))
+        {
+            return None;
+        }
+    }
+    let definitions: Vec<_> = module
+        .resolve_mod_path(database, names)?
+        .map(ItemInNs::into_module_def)
+        .collect();
+    (!definitions.is_empty()).then_some(definitions)
+}
+
+fn build_oracle_source_record(
+    node: &SyntaxNode,
+    kind: &str,
+    semantics: &Semantics<'_, RootDatabase>,
+    vfs: &vfs::Vfs,
+) -> Value {
+    let range = semantics.original_range(node);
+    json!({
+        "target_source_file_path":vfs.file_path(range.file_id.file_id(semantics.db)).to_string(),
+        "target_source_range_start":u32::from(range.range.start()),
+        "target_source_range_end":u32::from(range.range.end()),
+        "target_symbol_kind_value":kind,
+    })
+}
+
+fn build_oracle_target_source<Definition: HasSource>(
+    definition: Definition,
+    kind: &str,
+    semantics: &Semantics<'_, RootDatabase>,
+    vfs: &vfs::Vfs,
+) -> Option<Value> {
+    let source = semantics.source(definition)?;
+    Some(build_oracle_source_record(
+        source.value.syntax(),
+        kind,
+        semantics,
+        vfs,
+    ))
+}
+
+fn build_oracle_symbol_target(
+    definition: ModuleDef,
+    semantics: &Semantics<'_, RootDatabase>,
+    vfs: &vfs::Vfs,
+) -> Option<Value> {
+    match definition {
+        ModuleDef::Module(module) => {
+            if let Some(source) = module.declaration_source(semantics.db) {
+                semantics.parse_or_expand(source.file_id);
+                Some(build_oracle_source_record(
+                    source.value.syntax(),
+                    "Module",
+                    semantics,
+                    vfs,
+                ))
+            } else {
+                Some(
+                    json!({"target_source_file_path":vfs.file_path(module.krate(semantics.db).root_file(semantics.db)).to_string(),"target_source_range_start":0,"target_source_range_end":0,"target_symbol_kind_value":"Crate"}),
+                )
+            }
+        }
+        ModuleDef::Function(definition) => {
+            build_oracle_target_source(definition, "Function", semantics, vfs)
+        }
+        ModuleDef::Adt(Adt::Struct(definition)) => {
+            build_oracle_target_source(definition, "Struct", semantics, vfs)
+        }
+        ModuleDef::Adt(Adt::Enum(definition)) => {
+            build_oracle_target_source(definition, "Enum", semantics, vfs)
+        }
+        ModuleDef::Adt(Adt::Union(definition)) => {
+            build_oracle_target_source(definition, "Union", semantics, vfs)
+        }
+        ModuleDef::EnumVariant(definition) => {
+            build_oracle_target_source(definition, "Variant", semantics, vfs)
+        }
+        ModuleDef::Const(definition) => {
+            build_oracle_target_source(definition, "Const", semantics, vfs)
+        }
+        ModuleDef::Static(definition) => {
+            build_oracle_target_source(definition, "Static", semantics, vfs)
+        }
+        ModuleDef::Trait(definition) => {
+            build_oracle_target_source(definition, "Trait", semantics, vfs)
+        }
+        ModuleDef::TypeAlias(definition) => {
+            build_oracle_target_source(definition, "TypeAlias", semantics, vfs)
+        }
+        ModuleDef::Macro(definition) => {
+            build_oracle_target_source(definition, "Macro", semantics, vfs)
+        }
+        ModuleDef::BuiltinType(definition) => Some(
+            json!({"target_builtin_name_value":definition.name().as_str(),"target_symbol_kind_value":"Builtin"}),
+        ),
+    }
 }
 
 #[cfg(test)]

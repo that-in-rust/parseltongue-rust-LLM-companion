@@ -2,6 +2,8 @@
 
 #[path = "primary-path-export-rows.rs"]
 mod primary_path_export_rows;
+#[path = "primary-workspace-loader-adapter.rs"]
+mod primary_workspace_loader_adapter;
 pub use primary_path_export_rows::{
     OracleSemanticExportError, OracleWorkspaceExportConfig, export_primary_semantic_paths,
 };

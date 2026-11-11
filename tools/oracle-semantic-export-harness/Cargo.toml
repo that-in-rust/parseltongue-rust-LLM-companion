@@ -16,6 +16,12 @@ project-model = { path = "../../../rust-tools/rust-analyzer/crates/project-model
 ide-db = { path = "../../../rust-tools/rust-analyzer/crates/ide-db" }
 syntax = { path = "../../../rust-tools/rust-analyzer/crates/syntax" }
 vfs = { path = "../../../rust-tools/rust-analyzer/crates/vfs" }
+cfg = { path = "../../../rust-tools/rust-analyzer/crates/cfg", features = ["syntax"] }
+vfs-notify = { path = "../../../rust-tools/rust-analyzer/crates/vfs-notify" }
+proc-macro-api = { path = "../../../rust-tools/rust-analyzer/crates/proc-macro-api" }
+hir-expand = { path = "../../../rust-tools/rust-analyzer/crates/hir-expand" }
+crossbeam-channel = "0.5"
+parseltongue-core-row-types = { path = "../../crates/parseltongue-core-row-types" }
 
 [dev-dependencies]
 tempfile = "3"

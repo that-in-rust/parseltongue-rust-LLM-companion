@@ -1152,15 +1152,21 @@ name = "oracle-semantic-export-harness"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "cfg",
+ "crossbeam-channel",
  "hir",
+ "hir-expand",
  "ide",
  "ide-db",
  "load-cargo",
+ "parseltongue-core-row-types",
+ "proc-macro-api",
  "project-model",
  "serde_json",
  "syntax",
  "tempfile",
  "vfs",
+ "vfs-notify",
 ]
 
 [[package]]
@@ -1185,6 +1191,10 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "parseltongue-core-row-types"
+version = "0.1.0"
 
 [[package]]
 name = "parser"

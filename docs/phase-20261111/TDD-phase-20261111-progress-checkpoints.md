@@ -464,3 +464,28 @@ dependency failure: "not yet implemented"; "FAILED. 0 passed; 4 failed; 1 filter
 Next implement PRIMARY loading with scripts disabled and proc macros enabled, verify module-first
 resolution on the shared-file fixture, normalize per-site rows, then refactor and run oracle gates.
 Production resolver, proc-macro cache injection, PRIMARY/SECONDARY pairing and S5 remain unfinished.
+
+### M2 oracle base paths — GREEN
+
+Implemented workspace-member lib/bin selection, cfg(test) OFF, native cfg/cfg_attr filtering,
+use/signature-only path rows with raw byte ranges and normalized target sources. Removed the
+rust_analyzer cfg flag from PRIMARY to match the production inputs. Module::resolve_mod_path
+resolves the shared physical file's chosen alias to the correct left/right package in each crate;
+no duplicated IDs are used. Non-module-qualified multi-crate paths currently fail closed.
+PRIMARY never calls run_build_scripts. It starts the sysroot proc-macro server, but cached provider
+injection is still unsupported (an explicit typed error when a cache manifest is supplied).
+Missing normalized answers retain external_source_missing from the shared authoritative reason enum.
+Generic/self targets, expansion provenance and per-unit feature overrides still need follow-up.
+
+The first shared-file execution exposed a different issue before resolution: native load-cargo's
+separate package roots omitted the workspace-root shared.rs. Adapted its loader (with source/license
+notice) to merge local roots through the workspace include while excluding configured Cargo target,
+root target and .git paths. This made the existing, unchanged shared-file test pass. No module-ID
+duplication was needed. Corrected initial API mismatches: AbsPathBuf accepts &str, original_range
+returns EditionedFileId, and NameRef::text is already &str.
+
+Focused offline oracle tests: "ok. 4 passed; 0 failed; 1 filtered out" in 36.40s.
+Stable Cargo's upstream unused lints.cargo warnings are expected: verified stable toolchain,
+cargo 1.99.1 and rustc 1.99.1; no missing environment/setup. Pinned upstream manifests remain untouched.
+This is a foundation GREEN, NOT completed M2 or a valid corpus answer key yet. Next refactor/gates,
+then per-crate generic/import fixtures, validated proc-macro cache loading and paired exports.
