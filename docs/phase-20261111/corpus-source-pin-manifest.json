@@ -1,0 +1,77 @@
+[
+  {
+    "corpus_repository_short_name": "rust-analyzer",
+    "corpus_repository_remote_url": "https://github.com/rust-lang/rust-analyzer",
+    "corpus_source_commit_hash": "6e37b2d62127d445d77069031b416c48c9b0b4f2",
+    "corpus_source_checkout_path": "/home/ubuntu/repos/rust-tools/rust-analyzer",
+    "corpus_qualification_command_values": [
+      "cargo fetch",
+      "cargo check --workspace"
+    ],
+    "corpus_fetch_exit_code": 0,
+    "corpus_check_exit_code": 0,
+    "corpus_check_reported_duration": "1m 19s",
+    "corpus_target_output_path": "/home/ubuntu/m1-corpus-build-targets/rust-analyzer",
+    "corpus_evidence_directory_path": "e2e-runs/2026-11-11/rust-analyzer"
+  },
+  {
+    "corpus_repository_short_name": "ripgrep",
+    "corpus_repository_remote_url": "https://github.com/BurntSushi/ripgrep",
+    "corpus_source_commit_hash": "178cc027e283fd965cb72d0a7395b219eada170c",
+    "corpus_source_checkout_path": "/home/ubuntu/repos/rust-tools/ripgrep",
+    "corpus_qualification_command_values": [
+      "cargo fetch",
+      "cargo check --workspace"
+    ],
+    "corpus_fetch_exit_code": 0,
+    "corpus_check_exit_code": 0,
+    "corpus_check_reported_duration": "34.12s",
+    "corpus_target_output_path": "/home/ubuntu/m1-corpus-build-targets/ripgrep",
+    "corpus_evidence_directory_path": "e2e-runs/2026-11-11/ripgrep"
+  },
+  {
+    "corpus_repository_short_name": "tokio",
+    "corpus_repository_remote_url": "https://github.com/tokio-rs/tokio",
+    "corpus_source_commit_hash": "ab0814fc8c62b3d8be40aad068e2fed6562cfeb0",
+    "corpus_source_checkout_path": "/home/ubuntu/repos/rust-tools/tokio",
+    "corpus_qualification_command_values": [
+      "cargo fetch",
+      "cargo check --workspace"
+    ],
+    "corpus_fetch_exit_code": 0,
+    "corpus_check_exit_code": 0,
+    "corpus_check_reported_duration": "11.08s",
+    "corpus_target_output_path": "/home/ubuntu/m1-corpus-build-targets/tokio",
+    "corpus_evidence_directory_path": "e2e-runs/2026-11-11/tokio"
+  },
+  {
+    "corpus_repository_short_name": "serde",
+    "corpus_repository_remote_url": "https://github.com/serde-rs/serde",
+    "corpus_source_commit_hash": "aa7913ad0211fef960df68e7812a6211145a888c",
+    "corpus_source_checkout_path": "/home/ubuntu/repos/rust-tools/serde",
+    "corpus_qualification_command_values": [
+      "cargo fetch",
+      "cargo check --workspace"
+    ],
+    "corpus_fetch_exit_code": 0,
+    "corpus_check_exit_code": 0,
+    "corpus_check_reported_duration": "5.79s",
+    "corpus_target_output_path": "/home/ubuntu/m1-corpus-build-targets/serde",
+    "corpus_evidence_directory_path": "e2e-runs/2026-11-11/serde"
+  },
+  {
+    "corpus_repository_short_name": "cargo-modules",
+    "corpus_repository_remote_url": "https://github.com/regexident/cargo-modules",
+    "corpus_source_commit_hash": "48455ca5961ccfc3196b5d6bd5dd3efec97374c0",
+    "corpus_source_checkout_path": "/home/ubuntu/repos/rust-tools/cargo-modules",
+    "corpus_qualification_command_values": [
+      "cargo fetch",
+      "cargo check --workspace"
+    ],
+    "corpus_fetch_exit_code": 0,
+    "corpus_check_exit_code": 0,
+    "corpus_check_reported_duration": "59.63s",
+    "corpus_target_output_path": "/home/ubuntu/m1-corpus-build-targets/cargo-modules",
+    "corpus_evidence_directory_path": "e2e-runs/2026-11-11/cargo-modules"
+  }
+]

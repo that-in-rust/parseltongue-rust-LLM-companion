@@ -2,6 +2,11 @@
 /target
 target/
 
+# M1 run artifacts: only human-readable reports are committed.
+/e2e-runs/**
+!/e2e-runs/**/
+!/e2e-runs/**/hld-current-test-report.md
+
 # Cargo lock (tracked for binary projects)
 # Cargo.lock
 

@@ -16,8 +16,10 @@ Every applicable corpus gate runs on all five repos, never a tune/held-out split
   Heuristic and missing edges never override PRIMARY oracle evidence.
 - SCIP is optional secondary occurrence evidence; method references are useful, but SCIP's empty
   relationship export does not prove impl/expansion/visibility relations.
-- The three-command allowlist applies to the production mapping process tree only:
+- The direct-child three-command allowlist applies to production mapping only:
   cargo metadata --offline, rustc --print cfg, rustc --print sysroot.
+  Only beneath metadata Cargo, permit rustc -vV or rustc - --crate-name ___ followed only by
+  --print flags with no output artifacts. All other descendants, compilation, build scripts and network fail.
   Corpus qualification, harness builds/exports, version collection and test drivers are outside it.
 
 ## 1. Preconditions
@@ -78,14 +80,14 @@ release-build the production binary separately from the oracle harness.
 Audit production's dependency tree, not the harness's permitted ide/hir/salsa tree.
 
 ```bash
-strace -f -e trace=execve,openat -o "$OUT/production-process-access-audit.txt" \
+strace -f -s 65535 -e trace=process,openat,connect -o "$OUT/production-process-access-audit.txt" \
   process-tree-memory-sampler --sample-interval-millisecond-value 10 \
   --memory-sample-output-path "$OUT/process-tree-memory-samples.json" -- \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
   --workspace-store-file-path "$OUT/hld-current-workspace-store.db" --worker-thread-count-value 4 \
   > "$OUT/production-stage-output-log.txt" 2> "$OUT/production-stage-error-log.txt"
 parseltongue status-coverage-banner-show \
-  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
+  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" --json \
   > "$OUT/hld-current-coverage-banner.json"
 parseltongue hld-current-export-sorted \
   --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
@@ -94,6 +96,11 @@ parseltongue hld-current-export-sorted \
 
 The sampler/strace are external supervisors: filter the allowlist to the mapper and its descendants,
 not supervisor startup. Resolve audited paths/symlinks; forbid build-script execution and target/ output reads.
+Reconstruct fork/clone/exec ancestry and check complete argv: direct children remain exactly the three
+commands; Cargo descendants are restricted to rustc -vV and the approved print-only stdin probe.
+Reject unknown probe flags, output paths, real crate inputs, other executables and network connect activity.
+A rustup shim re-exec of the identical approved argv is the same logical command, not a new permission.
+Run the trace checker on the saved audit; any violation makes S3 FAIL, regardless of mapper exit status.
 Check lock existence BEFORE metadata; compare full lock digest before/after; failed/mutated metadata
 publishes no graph rows and preserves original bytes. A missing lock is explicit validation, not assumed Cargo behavior.
 Production errors include stderr; require successful stage markers/publication for the selected milestone.

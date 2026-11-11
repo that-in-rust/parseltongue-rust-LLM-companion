@@ -87,3 +87,31 @@ Status: PASS, no runtime behavior claimed. Public identity constructors and adap
 - Next: M1 graph/ingest/parser, stage schemas, persistence/runtime integration, generation scheduler.
   Extend the harness with real semantic exports at the owning resolution milestones.
 - Blockers: none for this M0 subset. No release-performance, corpus, final HLD or full semantic export claim.
+
+## M1 preflight — blocked before STUB by process policy
+
+- Cloned ripgrep/tokio/serde; all five checkouts exist under ~/repos/rust-tools.
+  Full current HEAD pins are recorded in SPEC §8 and corpus-source-pin-manifest.json.
+- Ran cargo fetch and cargo check --workspace exactly once per repo, outside production.
+  All fetch/check exit codes were zero; logs are under e2e-runs/2026-11-11/<repo>/.
+  Compilation outputs are isolated under /home/ubuntu/m1-corpus-build-targets/<repo>/.
+  Matching rust-src library sources are present in the installed toolchain.
+- A strace preflight of the exact required cargo metadata --offline command on rust-analyzer emitted
+  rustc -vV and a target-information probe (--print=file-names, --crate-type, etc.).
+  Both exceed REQ 001's process-tree allowlist; neither executes a build script.
+- Countercheck: the same command on the warm-cache Parseltongue workspace emitted no rustc subprocesses.
+  Thus cache-dependent success cannot prove that the strict allowlist works on cold corpus inputs.
+- This is a preflight command trace, not a claim about a completed M1 production dispatch.
+- Decision needed before STUB: permit Cargo's compiler-discovery probes as narrowly scoped descendants,
+  or require cold-cache metadata runs to fail under the unchanged allowlist. Do not silently whitelist them.
+- STUB/RED/GREEN/REFACTOR and S1/S2/S3 have not run. No M1 commit or passing stage count is claimed.
+
+## M1 process-policy amendment — user decision
+
+Direct children remain the original three commands. Only beneath metadata Cargo, rustc -vV or the
+stdin crate-name ___ print-only discovery probe is permitted; no other descendants or network.
+REQ 001 and SOP now require ancestry plus full-argv strace validation. Unknown flags fail closed.
+The captured Cargo probe also contains --crate-type and -Wwarnings; these are not silently exempted by
+the literal print-only policy and will be reported if observed in S3.
+Corpus pins, qualification logs, artifact ignore rules and this amendment form the prep commit.
+Next: M1 STUB, RED, GREEN and REFACTOR with SPEC-named tests and measured S1–S3 reports.

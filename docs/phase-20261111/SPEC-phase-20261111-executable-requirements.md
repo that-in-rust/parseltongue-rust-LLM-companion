@@ -43,8 +43,12 @@ WHEN production mapping starts, THEN check Cargo.lock exists before metadata, ha
 Missing dependencies/metadata failure SHALL preserve stderr and publish no graph rows.
 Write one crate-dependency-graph-table row per selected package/target plus explicitly tagged dependency
 contexts (§1), preserving Cargo package ID/source, target name/kind, root, edition, features, cfg, host/target
-role and dependency alias. Alias is not crate identity. The production process tree SHALL spawn only
+role and dependency alias. Alias is not crate identity. Parseltongue's direct children SHALL be only
 `cargo metadata --offline`, `rustc --print cfg`, `rustc --print sysroot`; reject other executable requests.
+Under the metadata Cargo process only, permit rustc discovery descendants: `rustc -vV` or
+`rustc - --crate-name ___ --print=...` with only print flags and no output artifacts.
+Reject every other descendant, including real-crate compilation, build-script binaries and network activity.
+The strace audit SHALL reconstruct ancestry and validate full argument vectors, not executable names alone.
 Harness builds/exports, version recording and corpus qualification are outside this allowlist.
 Metadata SHALL use a read-only input checkout or equivalent write guard; lock mutation fails before publication
 and leaves the original lock bytes intact (test with a writable isolated fixture and restoration guard).
@@ -435,7 +439,7 @@ Every entry names a clause assertion, not merely a requirement-level coverage cl
 
 ```text
 001 → S3
-  test_crate_graph_offline_only: selected package/target fields, aliases, process-tree allowlist.
+  test_crate_graph_offline_only: selected package/target fields, aliases, direct/descendant argument allowlists.
   test_lockfile_guard_preserves_bytes: absent lock rejects before spawn; mutation rejects and restores bytes.
   test_metadata_failure_writes_nothing: missing download/nonzero exit preserves stderr, publishes zero rows.
 002 → S3
@@ -613,13 +617,17 @@ All five are equal test cases; external offline lib+bin qualification once, neve
 - https://github.com/rust-lang/rust-analyzer
   Commit: 6e37b2d62127d445d77069031b416c48c9b0b4f2.
 - https://github.com/BurntSushi/ripgrep
-  Full commit: pin at M1.
+  Full commit: 178cc027e283fd965cb72d0a7395b219eada170c.
 - https://github.com/tokio-rs/tokio
-  Full commit: pin at M1.
+  Full commit: ab0814fc8c62b3d8be40aad068e2fed6562cfeb0.
 - https://github.com/serde-rs/serde
-  Full commit: pin at M1.
+  Full commit: aa7913ad0211fef960df68e7812a6211145a888c.
 - https://github.com/regexident/cargo-modules
-  Observed short commit: 48455ca59; record full commit at M1.
+  Full commit: 48455ca5961ccfc3196b5d6bd5dd3efec97374c0.
+
+M1 source pins and one-time qualification outcomes: corpus-source-pin-manifest.json beside this SPEC.
+All five cargo fetch and cargo check --workspace commands passed on 2026-11-11, outside production.
+These checks do not establish semantic oracle agreement or a passing M1 mapping run.
 
 ### Ideas without copying
 
