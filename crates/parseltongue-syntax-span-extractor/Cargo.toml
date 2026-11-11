@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
 parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" }
+parseltongue-port-name-resolver = { path = "../parseltongue-port-name-resolver" }
 ra_ap_syntax = "=0.0.362"
 ra_ap_parser = "=0.0.362"
 serde_json = "1"

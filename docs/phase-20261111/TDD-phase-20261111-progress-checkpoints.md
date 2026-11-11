@@ -688,3 +688,12 @@ resolver tests: 8 passed, 0 failed, 0.26s; build finished in 0.09s. Core identit
 also passed (3/3). Existing dependency/runtime gates passed (3/3, 0.20s), including
 the zero-dependency L1/no hosted analysis dependency check. No real MBe expansion or
 corpus agreement is claimed. Next: persisted parser projection and publication adapters.
+
+### M2 persisted stage wiring — STUB
+
+Added the synchronous L3 run_persisted_name_resolution seam, called after persisted syntax
+extraction and before workspace publication. New CLI generations declare required stages
+in the persisted workspace configuration; this also distinguishes M2 configuration from M1.
+The adapter remains an intentional todo. Offline CLI cargo check passed in 0.59s.
+Next RED: persisted resolved paths, per-crate atomic replacement/rollback, declared-stage
+publication rejection, empty/cancelled/error cases, and lib/bin/module occurrence identity.

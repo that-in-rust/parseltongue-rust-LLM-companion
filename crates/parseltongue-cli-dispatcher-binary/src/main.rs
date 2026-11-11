@@ -7,7 +7,9 @@ use parseltongue_crate_graph_loader::{
     load_workspace_crate_graph,
 };
 use parseltongue_stage_worker_scheduler::map_bounded_stage_workers;
-use parseltongue_syntax_span_extractor::{SyntaxFileInputData, extract_file_syntax_rows};
+use parseltongue_syntax_span_extractor::{
+    SyntaxFileInputData, extract_file_syntax_rows, run_persisted_name_resolution,
+};
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::{Value, json};
@@ -493,7 +495,23 @@ fn run_workspace_mapping_pipeline(
     workers: usize,
 ) -> Result<Value, StoreBackendFailureError> {
     let started = std::time::Instant::now();
-    let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?;
+    let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?
+        .into_iter()
+        .map(|mut row| {
+            if row.stage_owned_table_name == "workspace-config-state-records" {
+                let mut value: Value = serde_json::from_str(&row.stage_row_payload_text)
+                    .map_err(build_pipeline_stage_error)?;
+                value["workspace_required_stage_names"] = json!([
+                    "crate-graph",
+                    "source-ingest",
+                    "syntax-spans",
+                    "name-resolution"
+                ]);
+                row.stage_row_payload_text = value.to_string();
+            }
+            Ok(row)
+        })
+        .collect::<Result<Vec<_>, StoreBackendFailureError>>()?;
     eprintln!(
         "stage=crate-graph elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
@@ -547,6 +565,12 @@ fn run_workspace_mapping_pipeline(
     )?;
     eprintln!(
         "stage=syntax-spans elapsed_seconds={:.3}",
+        started.elapsed().as_secs_f64()
+    );
+    let started = std::time::Instant::now();
+    run_persisted_name_resolution(&scope, store, cancel)?;
+    eprintln!(
+        "stage=name-resolution elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
     let started = std::time::Instant::now();
