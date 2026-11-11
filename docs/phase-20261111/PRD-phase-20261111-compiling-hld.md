@@ -51,7 +51,12 @@ Phase-20261111 builds `hld-current-dependency-edges` — public item → public 
  trait solver              answers "does type X implement trait Y, via which impl, with which associated types"
  oracle                    rust-analyzer run offline on the same workspace; its answers are the ground truth for this phase
  extracted · unresolved    the two edge statuses in this phase: resolved by the port / not resolved (with a reason code)
- HLD                       public → public edges with private chains collapsed (public A → private h → public B gives A → B)
+ HLD node (D6)             an item another FILE can use: an item at a file's top level (or an inline `mod` in it), or an
+                           associated item of a top-level impl/trait, with visibility pub, pub(crate), pub(super) or pub(in …).
+                           Never a node: anything inside a fn body (even if `pub`); private top-level items (collapsed).
+                           Private `use` = evidence of a file's outgoing dependencies, not a node; `pub use` = reexports edge.
+                           Column `reachable_outside_crate` (yes/no) separates the crate's external API from the whole map
+ HLD                       node → node edges with private chains collapsed (node A → private h → node B gives A → B)
 ```
 
 ## 3. The product
@@ -91,7 +96,7 @@ What "ported" means, per stage (decided in §6):
                   and hir types to copy: signature lowering, body inference, method lookup, the solver adapter
 ```
 
-Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. `cargo metadata --offline` is the decided source of the crate graph (decided 2026-11-05): it reads manifests and the lockfile, compiles nothing.
+Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. Two print-only rustc calls are allowed (D5): `rustc --print cfg` (target cfg: unix, target_os, target_pointer_width …) and `rustc --print sysroot` (std source root). `cargo metadata --offline` is the decided source of the crate graph (decided 2026-11-05): it reads manifests and the lockfile, compiles nothing.
 
 ### 4.1 Architecture: every stage is table in → table out (option A, decided 2026-11-05)
 
@@ -142,7 +147,7 @@ Layers:
  4+5 crate     → module scopes      ONE PORTED fixed-point per crate, in dependency order: imports and macro expansion are
                     + expanded items   resolved in the same loop (an expanded macro can add items and imports; a new import can
                                      make a macro resolvable) → module-scope-binding-table + macro-expanded-item-table;
-                                     macro_rules! and built-in macros expanded; proc macros → unresolved(proc_macro)
+                                     macro_rules! and built-in macros expanded; proc macros via proc-macro-shape-table (D3), else unresolved(proc_macro)
  6  signature   → lowered types      every fn/struct/impl/trait signature's type paths resolved through module scopes → lowered
                                      signature rows; every impl header → impl-header-index-table (self type, trait, generics, where)
  7  body        → resolved sites     PORTED body lowering (desugar for / ? / .await, expand body macros) then inference per fn body: local types, autoderef, method lookup over impl-header-index-table,
@@ -182,7 +187,13 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
    writes          macro-expanded-item-table: expanded text is parsed with the same parser; its items become spans with
                    origin = macro, pointing back at the invocation span
    built-in        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)] → a fixed table of the impls
-                   they generate; serde/other proc-macro derives → unresolved(proc_macro), counted
+                   they generate
+   proc macros     (D3) proc-macro-shape-table: per (macro crate, version, macro name) the SHAPE of what it adds — items,
+                   impls, methods and their signatures — not the full expansion. E.g. derive(Serialize) → impl Serialize for T;
+                   salsa::input struct S → S::new + one getter per field; salsa::tracked fn f → f stays callable.
+                   Versions come from Cargo.lock. Every shape is checked against rust-analyzer's real expansion on the
+                   five repos (REQ-RUST-013). First set: serde, salsa, thiserror, tokio::main/test, derives used in
+                   rust-analyzer itself. A macro without a shape row → unresolved(proc_macro), counted
    built-in fn-like hir-expand/src/builtin/fn_macro.rs registers 29: format_args, concat, stringify, include, include_str,
                    include_bytes, env, option_env, cfg, cfg_select, line, column, file, module_path, assert, panic,
                    unreachable, compile_error, asm … — ported as written; include!/include_str! read files through
@@ -237,6 +248,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  span-reference-text-table          cpu-tool-syntax-tree-walker         one span: id, kind, name, visibility, byte range, parent, origin
  field-signature-detail-table       cpu-tool-syntax-tree-walker         one field of a span: params, return, generics, bounds, use tree…
  body-site-pending-table            cpu-tool-syntax-tree-walker         one body site: span, byte range, site kind, name text
+ proc-macro-shape-table             human-written, checked by test      (macro crate, version, macro name) → items/impls/methods it adds
  lang-item-definition-table         cpu-tool-port-name-resolver         one lang item: name (deref, into_iter, branch, add …) → item span
  module-scope-binding-table         cpu-tool-port-name-resolver         (crate, module, name, namespace) → target
  macro-expanded-item-table          cpu-tool-port-macro-expander        one expanded item: invocation span, expanded span, status
@@ -272,7 +284,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  REQ-RUST-001.0  crate graph
    WHEN cpu-tool-crate-graph-loader runs on a workspace with a Cargo.lock and downloaded dependencies
    THEN it SHALL write one crate-dependency-graph-table row per crate in `cargo metadata --offline` output
-   AND  it SHALL NOT invoke rustc, cargo build, cargo check or a build script
+   AND  it SHALL NOT invoke cargo build, cargo check or a build script, nor rustc except `--print cfg` and `--print sysroot`
 
  REQ-RUST-002.0  byte-exact ingest
    WHEN a file is ingested
@@ -321,6 +333,11 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
    WHEN the full pipeline runs on the rust-analyzer repository itself (workspace + library source roots)
    THEN peak resident memory SHALL stay ≤ 2 GB (target, not measured) and SHALL be reported with the run
 
+ REQ-RUST-013.0  proc-macro shape agreement
+   WHEN a proc-macro invocation matches a proc-macro-shape-table row
+   THEN the (kind, name, signature) set of the items it adds SHALL equal rust-analyzer's expansion on the five repos for 100 %
+        of shape rows; a mismatching row SHALL fail the test with the macro, version and diff
+
  REQ-RUST-012.0  determinism
    WHEN the pipeline runs twice on the same tree with the same thread count or different thread counts
    THEN hld-current-dependency-edges SHALL be byte-identical when exported in sorted order
@@ -342,6 +359,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  009      test_hld_rows_public_endpoints           integration               both ends public; collapsed rows have evidence 100 %
  010      test_no_analysis_crates_linked           build gate (cargo tree)   forbidden crates absent                       0
  011      test_peak_memory_within_budget           benchmark (/usr/bin/time) peak RSS on rust-analyzer repo               ≤ 2 GB target
+ 013      test_proc_macro_shapes_match_oracle      integration + oracle      shape (kind, name, signature) set equal       100 % of shape rows
  012      test_hld_export_is_deterministic         integration               sorted exports equal across 1 and N threads   byte-identical
  gates    cargo fmt · cargo clippy --all-targets -- -D warnings · cargo test · cargo build --release
 ```
@@ -405,20 +423,16 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
  R7  rust-analyzer's OWN code is proc-macro heavy (M, grep of crates/, tests included): 196 `#[salsa::tracked|interned|input|db|
      query_group]` uses and ~170 Serialize / ~167 Deserialize derives. salsa attributes generate the query methods that most of
      rust-analyzer calls through `db.…()`; without proc-macro expansion those call sites are unresolved(proc_macro), so the
-     ≥ 95 % method-call target (REQ 008) is not reachable on rust-analyzer itself (see Q3)
+     ≥ 95 % method-call target (REQ 008) depends on proc-macro-shape-table covering salsa and serde (D3)
  R8  codebase-memory's graph for rust-analyzer has no CALLS edges out of DefCollector methods (trace_path: 0 callees); the
      stage structure above was checked against the source, not the graph
  R5  copied code keeps rust-analyzer's licence headers and attribution (MIT OR Apache-2.0)
- Q3  proc macros: (a) keep unresolved(proc_macro) and report coverage with and without proc-macro sites, (b) allow
-     loading proc-macro dylibs from an existing target/ dir offline, (c) hand-written expansion tables for salsa/serde
+ D3  decided 2026-11-05: proc macros via proc-macro-shape-table (shape, not full expansion), checked against rust-analyzer
  Q4  build scripts: rust-analyzer runs `cargo check --message-format=json` (project-model build_dependencies.rs) to get OUT_DIR
      and build-script env values; this PRD forbids that → include!(concat!(env!("OUT_DIR"), …)) and env!("CARGO_PKG_*")
      sites: unresolved(build_script), or compute CARGO_PKG_* from cargo metadata and leave OUT_DIR unresolved?
- Q5  target cfg: features come from cargo metadata, but target cfg (unix, target_os, target_pointer_width …) comes from
-     `rustc --print cfg` (project-model toolchain_info/rustc_cfg.rs), and the std source root from `rustc --print sysroot`.
-     Allow these two print-only rustc calls? (REQ-RUST-001 currently forbids invoking rustc)
- Q6  "public": hir-def Visibility has Public, PubCrate and Module(restricted). Is an HLD node every item declared `pub`, or
-     only items reachable from the crate root (a `pub fn` in a private module is not)?
+ D5  decided 2026-11-05: `rustc --print cfg` and `rustc --print sysroot` are allowed (print-only, compile nothing)
+ D6  decided 2026-11-05: HLD node = item another file can use (§2 "HLD node"); fn-body items never; reachable_outside_crate column
  D1  decided 2026-11-05: the crate graph comes from `cargo metadata --offline` (the only Cargo call)
  D2  decided 2026-11-05: test set = rust-analyzer, ripgrep, tokio, serde, cargo-modules, all scored equally
 ```
