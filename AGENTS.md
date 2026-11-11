@@ -58,6 +58,12 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-a
  tiny-llm-span-boundary-tagger · tiny-llm-field-detail-tagger · tiny-llm-body-site-tagger
  cpu-tool-span-cutting-driver · cpu-tool-text-copy-indexer · cpu-tool-field-extraction-driver
 
+ PHASE-20261111 ADDITIONS (docs/phase-20261111/PRD-phase-20261111-compiling-hld.md; compiling code only, ported rust-analyzer logic)
+ crate-dependency-graph-table · body-site-pending-table · module-scope-binding-table · macro-expanded-item-table
+ lowered-signature-type-table · impl-header-index-table · oracle-edge-agreement-table
+ cpu-tool-crate-graph-loader · cpu-tool-port-name-resolver · cpu-tool-port-macro-expander · cpu-tool-port-signature-lowerer
+ cpu-tool-port-body-inferencer · cpu-tool-oracle-edge-differ
+
  LEVELS
  crate-level-l0-context · folder-file-l1-rollup · public-item-l2-interface · body-site-l3-evidence
 
