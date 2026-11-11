@@ -10,6 +10,25 @@ The four words must describe what the thing IS (its contents, scope, kind) — n
 
 The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-agent`; `ext-coding-agent` is its accepted short form in prose.
 
+## Working method (always apply)
+
+- Classify first: broken behavior → bug; existing rails → enhancement; bounded new capability → feature; unclear new system → product. Use the lightest safe workflow.
+- Define correctness before implementation: write a failing executable spec or regression test first; use explicit structural checks for documentation-only work.
+- Proceed when correctness is definable; research missing facts; escalate unclear requirements rather than guessing.
+- Load only relevant rules, interfaces, dependency context, tests and prior patterns; explore with codebase-memory-mcp before reading files by hand.
+- Give precise names, types, constraints and examples; enforce this repo's four-word hyphenated naming rule.
+- Explore, constrain, refine, then verify; challenge assumptions and simplify the design before shipping.
+- Let requirements and architecture co-evolve; remove unnecessary scope rather than building the first draft literally.
+- Serialize phase, requirements, decisions, rejected options, test status, open questions and next steps to durable files after major decisions and before handoff.
+- Keep a concrete negative-knowledge registry in a scoped four-word-named file: failure, cause, detection signal, safer replacement and proof gate; reuse it during review.
+- Research with an incremental source ledger: URL/path, line range, version/date, authority, claim and uncertainty; separate sourced facts from inference.
+- Adopt idioms only with an applicability boundary, failure prevented, tradeoff and verification gate; measure performance and reliability claims.
+- Package reusable skills with explicit triggers, exclusions, mode routing, progressive reference loading and repo-native checks.
+- Verify against the executable spec and relevant existing checks; report observed output and remaining uncertainty, not unsupported success claims.
+- Close the loop: record failures, fixes and repeatable wins; preserve append-only research conventions.
+
+Full workflows, research rubric and source attribution: [agent-working-method-playbook](docs/agent-working-method-playbook.md).
+
 ## Nomenclature (keep in sync with devin-research/Deep-Insight-08.md)
 
 ```text
@@ -68,7 +87,7 @@ The external coding agent (Claude Code, Codex, Cursor, …) is `ext-llm-coding-a
  crate-level-l0-context · folder-file-l1-rollup · public-item-l2-interface · body-site-l3-evidence
 
  OTHER
- per-level-coverage-banner · snapshot-tree-digest-stamp · public-span-feed-export
+ per-level-coverage-banner · snapshot-tree-digest-stamp · public-span-feed-export · agent-working-method-playbook
 ```
 
 ## Research conventions
