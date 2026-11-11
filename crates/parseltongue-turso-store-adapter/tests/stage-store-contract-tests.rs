@@ -48,6 +48,59 @@ fn complete_fixture_stage_set(store: &dyn StageTableStorePort, scope: &StageRunS
 }
 
 #[test]
+fn test_stage_row_visits_bounded() {
+    let store=make_fixture_store_adapter();
+    let scope=make_fixture_stage_scope("visit");
+    let rows:Vec<_>=(0..3).flat_map(|n|make_fixture_graph_rows(&n.to_string())).collect();
+    write_fixture_stage_rows(&store,&scope,"crate-graph","unit",&[],&rows).unwrap();
+    assert_eq!(store.count_stage_table_rows(&scope,"crate-dependency-graph-table").unwrap(),3);
+    let mut keys=Vec::new();
+    assert_eq!(store.visit_stage_table_rows(&scope,"crate-dependency-graph-table",&mut|row|{keys.push(row.stage_row_record_key);Ok(())}).unwrap(),3);
+    assert_eq!(keys,vec!["0","1","2"]);
+    assert_eq!(store.count_stage_table_rows(&scope,"body-site-reference-table").unwrap(),0);
+    assert_eq!(store.visit_stage_table_rows(&scope,"body-site-reference-table",&mut|_|panic!("empty")).unwrap(),0);
+    assert!(store.visit_stage_table_rows(&scope,"crate-dependency-graph-table",&mut|_|Err(StoreBackendFailureError{error_context_detail_text:"stop".into()})).unwrap_err().to_string().contains("stop"));
+    assert_eq!(store.count_stage_table_rows(&scope,"crate-dependency-graph-table").unwrap(),3);
+    assert!(store.count_stage_table_rows(&scope,"unknown").is_err());
+    assert!(store.visit_stage_table_rows(&scope,"unknown",&mut|_|Ok(())).is_err());
+}
+
+#[test]
+fn test_stage_scope_preparation_atomic() {
+    let store=make_fixture_store_adapter();
+    let old=make_fixture_stage_scope("old");
+    complete_fixture_stage_set(&store,&old);
+    let published=store.publish_workspace_generation_manifest(&old,&"a".repeat(64),&RunCancelFlagValue::default()).unwrap();
+    let scope=make_fixture_stage_scope("next");
+    let rows=make_fixture_graph_rows("next");
+    write_fixture_stage_rows(&store,&scope,"crate-graph","unit",&[],&rows).unwrap();
+    let prepared=store.prepare_workspace_generation_scope(&scope,&"b".repeat(64),&RunCancelFlagValue::default()).unwrap();
+    assert_eq!(store.read_workspace_publication_scope().unwrap(),Some(published.clone()));
+    assert_eq!(store.read_stage_table_rows(&prepared,"crate-dependency-graph-table").unwrap(),rows);
+    assert!(store.read_stage_table_rows(&scope,"crate-dependency-graph-table").unwrap().is_empty());
+    assert!(store.publish_workspace_generation_manifest(&prepared,&prepared.run_generation_digest_value,&RunCancelFlagValue::default()).is_err());
+    assert_eq!(store.read_workspace_publication_scope().unwrap(),Some(published.clone()));
+    complete_fixture_stage_set(&store,&prepared);
+    assert_eq!(store.publish_workspace_generation_manifest(&prepared,&prepared.run_generation_digest_value,&RunCancelFlagValue::default()).unwrap(),prepared);
+    let empty=make_fixture_stage_scope("empty");
+    assert!(store.prepare_workspace_generation_scope(&empty,&"c".repeat(64),&RunCancelFlagValue::default()).is_ok());
+    let cancelled=RunCancelFlagValue::default();
+    cancelled.request_stage_work_cancellation();
+    assert!(store.prepare_workspace_generation_scope(&prepared,&"d".repeat(64),&cancelled).is_err());
+    assert_eq!(store.read_workspace_publication_scope().unwrap(),Some(prepared));
+}
+
+#[test]
+fn test_scope_preparation_rejects_outputs() {
+    let store=make_fixture_store_adapter();
+    let scope=make_fixture_stage_scope("late");
+    let rows=vec![StageTableRowRecord{stage_owned_table_name:"span-reference-text-table".into(),stage_row_record_key:"span".into(),stage_row_payload_text:"{}".into()}];
+    write_fixture_stage_rows(&store,&scope,"syntax-spans","file",&[],&rows).unwrap();
+    assert!(store.prepare_workspace_generation_scope(&scope,&"a".repeat(64),&RunCancelFlagValue::default()).unwrap_err().to_string().contains("StageScopePreparationError"));
+    assert_eq!(store.read_stage_table_rows(&scope,"span-reference-text-table").unwrap(),rows);
+}
+
+#[test]
 fn test_ingest_bytes_stay_identical() {
     let store = make_fixture_store_adapter();
     let bytes = [0, 255, b'\r', b'\n'];

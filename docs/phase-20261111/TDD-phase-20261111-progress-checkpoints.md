@@ -328,3 +328,21 @@ No alias generations, partial reader publication or weaker transaction semantics
 
 Add synchronous prepare/count/visitor ports (STUB) for bounded status aggregation and preparation.
 Profile load/parse/write separately on the next untraced attempt; no completed S3 success is claimed.
+
+### M1 publication preparation and bounded readers — RED
+
+Rust: stage-row visitor/count, scope preparation atomicity, and rejection of late preparation fail at
+todo!(); reason-count CLI regression fails (a variable named build_script is falsely counted).
+Python: test_tree_walk_stays_local errors with NotImplementedError. Its fake proc tree covers descendants
+from non-main threads, grandchildren, duplicates/cycles, vanished children, unrelated processes and denial.
+The ordinary extensionless include fixture already passes; preserve its digest/tiling contract.
+
+GREEN implementation plan: add early prepare after a discovery-only pass. Discovery uses the SAME file-unit
+keys and writes only module-source-closure-requests, not spans/fields/body rows; it does NOT write syntax's
+global __complete__ marker. Full extraction then ignores discovery's per-unit complete markers and overwrites
+those units with full output rows (normal cleanup removes discovery request rows, avoiding duplicate keys).
+The prepared scope already has the final generation digest, so final publish validates all stage completions
+and updates the manifest pointer without rewriting corpus rows. Existing direct-publication API stays compatible.
+Prepare rejects scopes already containing spans/ownership/fields/body data and changes no published pointer.
+Status uses SQL counts and a streaming visitor for inactive/build-script counts and ownership ranges.
+Add per-compilation-unit reason counts using actual reason fields, never payload substring matching.

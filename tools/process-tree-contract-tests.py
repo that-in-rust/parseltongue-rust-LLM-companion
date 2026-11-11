@@ -3,6 +3,7 @@ import sys
 import tempfile
 import json
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -15,6 +16,32 @@ driver_spec.loader.exec_module(driver)
 
 
 class ProcessTreeContractTests(unittest.TestCase):
+    def test_tree_walk_stays_local(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            records = {10: (1, 10, {10: [20, 99], 11: [30]}),
+                       20: (10, 20, {20: [40]}), 30: (10, 30, {30: []}),
+                       40: (20, 40, {40: [10]}), 50: (1, 100000, {50: []})}
+            for pid, (parent, rss, tasks) in records.items():
+                process = root / str(pid)
+                process.mkdir()
+                (process / "status").write_text(f"Tgid:\t{pid}\nPPid:\t{parent}\nVmRSS:\t{rss} kB\n")
+                for tid, children in tasks.items():
+                    task = process / "task" / str(tid)
+                    task.mkdir(parents=True)
+                    (task / "children").write_text(" ".join(map(str, children)))
+            original = Path.read_text
+            def read_scoped_process_files(path, *args, **kwargs):
+                self.assertTrue(path.is_relative_to(root))
+                self.assertNotEqual(path, root / "50" / "status")
+                return original(path, *args, **kwargs)
+            with patch.object(Path, "read_text", autospec=True, side_effect=read_scoped_process_files):
+                self.assertEqual(auditor.read_process_tree_residency(10, root), 100 * 1024)
+                self.assertEqual(auditor.read_process_tree_residency(99, root), 0)
+            with patch.object(Path, "read_text", side_effect=PermissionError("denied")):
+                with self.assertRaises(PermissionError):
+                    auditor.read_process_tree_residency(10, root)
+
     def test_measurement_audit_runs_separated(self):
         record = {"corpus_source_checkout_path": "/source/repo"}
         measurement, audit, reads = driver.build_corpus_measurement_commands(record, Path("/evidence"))

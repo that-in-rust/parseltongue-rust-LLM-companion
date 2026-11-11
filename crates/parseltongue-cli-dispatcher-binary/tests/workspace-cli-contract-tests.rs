@@ -114,3 +114,42 @@ fn test_stage_rerun_is_identical() {
         retained["run_generation_digest_value"]
     );
 }
+
+#[test]
+fn test_reason_counts_use_metadata() {
+    let directory=tempfile::tempdir().unwrap();
+    let root=directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/child.rs"),"pub fn g(x:u8)->u8 { let build_script=x; build_script }").unwrap();
+    let database=directory.path().join("store.db");
+    let output=run_workspace_mapping_fixture(&root,&database,"4");
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let banner=read_workspace_banner_fixture(&database);
+    assert_eq!(banner["build_script_unresolved_count"],0);
+    fs::write(root.join("src/child.rs"),"pub fn g(x:u8)->u8 { let build_script=x; let _ = include!(concat!(env!(\"OUT_DIR\"),\"/generated.rs\")); build_script }").unwrap();
+    let output=run_workspace_mapping_fixture(&root,&database,"4");
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let banner=read_workspace_banner_fixture(&database);
+    assert_eq!(banner["build_script_unresolved_count"],1);
+    assert_eq!(banner["crate_unresolved_reason_counts"].as_array().unwrap().iter().map(|row|row["unit_unresolved_reason_counts"]["build_script"].as_u64().unwrap()).sum::<u64>(),1);
+}
+
+#[test]
+fn test_include_closure_digest_complete() {
+    let directory=tempfile::tempdir().unwrap();
+    let root=directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/child.rs"),"pub fn g(x:u8)->u8 { x + include!(\"value.inc\") }").unwrap();
+    fs::write(root.join("src/value.inc"),"7").unwrap();
+    let database=directory.path().join("store.db");
+    let output=run_workspace_mapping_fixture(&root,&database,"4");
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let first=read_workspace_banner_fixture(&database);
+    assert_eq!(first["source_file_record_count"],5);
+    assert_eq!(first["source_tiling_identity_holds"],true);
+    fs::write(root.join("src/value.inc"),"9").unwrap();
+    let output=run_workspace_mapping_fixture(&root,&database,"4");
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let second=read_workspace_banner_fixture(&database);
+    assert_ne!(first["run_generation_digest_value"],second["run_generation_digest_value"]);
+}
