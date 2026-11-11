@@ -124,6 +124,9 @@ pub fn export_primary_semantic_paths(
         let source = module.definition_source(&database);
         let tree = source.value.node();
         semantics.parse_or_expand(source.file_id);
+        let shared = contexts
+            .get(&read_oracle_context_key(module, &semantics))
+            .is_some_and(|contexts| contexts.len() > 1);
         for path in tree
             .descendants()
             .filter_map(ast::Path::cast)
@@ -131,43 +134,8 @@ pub fn export_primary_semantic_paths(
         {
             let range = semantics.original_range(path.syntax());
             let file = vfs.file_path(range.file_id.file_id(&database)).to_string();
-            let targets = if contexts
-                .get(&read_oracle_context_key(module, &semantics))
-                .is_some_and(|contexts| contexts.len() > 1)
-            {
-                if let Some(target) =
-                    resolve_oracle_generic_target(module, &path, &semantics, &vfs, &package_roots)?
-                {
-                    vec![target]
-                } else if let Some(definitions) =
-                    resolve_oracle_module_paths(module, &path, &database)
-                {
-                    definitions
-                        .into_iter()
-                        .map(|definition| {
-                            build_oracle_symbol_target(definition, &semantics, &vfs, &package_roots)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?
-                        .into_iter()
-                        .flatten()
-                        .collect()
-                } else {
-                    return Err(build_oracle_export_error(format!(
-                        "module-scoped API cannot resolve shared-context path {} in {file}",
-                        path.syntax().text()
-                    )));
-                }
-            } else {
-                semantics
-                    .resolve_path(&path)
-                    .map(|resolution| {
-                        build_oracle_resolution_target(resolution, &semantics, &vfs, &package_roots)
-                    })
-                    .transpose()?
-                    .flatten()
-                    .into_iter()
-                    .collect()
-            };
+            let targets =
+                build_oracle_path_targets(module, &path, &semantics, &vfs, &package_roots, shared)?;
             let targets: BTreeMap<_, _> = targets
                 .into_iter()
                 .map(|target| (target.to_string(), target))
@@ -244,38 +212,70 @@ fn read_oracle_context_key(module: Module, semantics: &Semantics<'_, RootDatabas
     )
 }
 
+fn build_oracle_path_targets(
+    module: Module,
+    path: &ast::Path,
+    semantics: &Semantics<'_, RootDatabase>,
+    files: &vfs::Vfs,
+    packages: &OraclePackageRootIndex,
+    shared: bool,
+) -> Result<Vec<Value>, OracleSemanticExportError> {
+    if !shared {
+        return semantics
+            .resolve_path(path)
+            .map(|resolution| {
+                build_oracle_resolution_target(resolution, semantics, files, packages)
+            })
+            .transpose()
+            .map(|target| target.flatten().into_iter().collect());
+    }
+    if let Some(target) = resolve_oracle_generic_target(module, path, semantics, files, packages)? {
+        return Ok(vec![target]);
+    }
+    if let Some(definitions) = resolve_oracle_module_paths(module, path, semantics.db) {
+        return definitions
+            .into_iter()
+            .map(|definition| build_oracle_symbol_target(definition, semantics, files, packages))
+            .collect::<Result<Vec<_>, _>>()
+            .map(|targets| targets.into_iter().flatten().collect());
+    }
+    let range = semantics.original_range(path.syntax());
+    Err(build_oracle_export_error(format!(
+        "module-scoped API cannot resolve shared-context path {} in {}",
+        path.syntax().text(),
+        files.file_path(range.file_id.file_id(semantics.db))
+    )))
+}
+
+fn read_oracle_source_syntax<Definition: HasSource>(
+    definition: Definition,
+    semantics: &Semantics<'_, RootDatabase>,
+) -> Option<SyntaxNode> {
+    semantics
+        .source(definition)
+        .map(|source| source.value.syntax().clone())
+}
+
 fn read_oracle_generic_source(
     definition: hir::GenericDef,
     semantics: &Semantics<'_, RootDatabase>,
 ) -> Option<SyntaxNode> {
     match definition {
-        hir::GenericDef::Function(definition) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Adt(Adt::Struct(definition)) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Adt(Adt::Enum(definition)) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Adt(Adt::Union(definition)) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Trait(definition) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::TypeAlias(definition) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Impl(definition) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Const(definition) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
-        hir::GenericDef::Static(definition) => semantics
-            .source(definition)
-            .map(|source| source.value.syntax().clone()),
+        hir::GenericDef::Function(definition) => read_oracle_source_syntax(definition, semantics),
+        hir::GenericDef::Adt(Adt::Struct(definition)) => {
+            read_oracle_source_syntax(definition, semantics)
+        }
+        hir::GenericDef::Adt(Adt::Enum(definition)) => {
+            read_oracle_source_syntax(definition, semantics)
+        }
+        hir::GenericDef::Adt(Adt::Union(definition)) => {
+            read_oracle_source_syntax(definition, semantics)
+        }
+        hir::GenericDef::Trait(definition) => read_oracle_source_syntax(definition, semantics),
+        hir::GenericDef::TypeAlias(definition) => read_oracle_source_syntax(definition, semantics),
+        hir::GenericDef::Impl(definition) => read_oracle_source_syntax(definition, semantics),
+        hir::GenericDef::Const(definition) => read_oracle_source_syntax(definition, semantics),
+        hir::GenericDef::Static(definition) => read_oracle_source_syntax(definition, semantics),
     }
 }
 
@@ -656,12 +656,10 @@ fn build_oracle_symbol_target(
     };
     target
         .map(|mut target| {
-            let module = definition
-                .module(semantics.db)
-                .or_else(|| match definition {
-                    ModuleDef::Module(module) => Some(module),
-                    _ => None,
-                });
+            let module = definition.module(semantics.db).or(match definition {
+                ModuleDef::Module(module) => Some(module),
+                _ => None,
+            });
             target["target_compilation_scope_record"] = module
                 .map(|module| build_oracle_compilation_record(module, semantics.db, vfs, packages))
                 .transpose()?

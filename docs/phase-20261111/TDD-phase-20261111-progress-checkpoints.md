@@ -548,3 +548,14 @@ materialization must settle these before corpus scoring. Next: refactor gates, i
 multi-namespace and associated/Self fixtures, then exact-unit cfg and proc-macro artifacts.
 The corpus selection must use all mapped normal units, not just workspace-member roots.
 S5 is still unmeasured; the oracle build manifest still does not claim complete semantic support.
+
+### M2 oracle scoped signatures — REFACTOR
+
+Extracted target selection and the common native source-node projection into small helpers;
+source-context multiplicity is computed once per module. Fixed Clippy's unnecessary lazy
+evaluation in the cheap Module fallback without changing behavior.
+
+Oracle formatting check exited 0; offline --all-targets Clippy with -D warnings completed
+in 0.41s; all ten tests passed in 47.47s; offline release build completed in 1.79s.
+git diff --check passed. Production dependency inputs are unchanged, so previous production
+dependency gates are not rerun or newly claimed. No corpus agreement results yet.
