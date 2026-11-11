@@ -10,7 +10,7 @@ pub(crate) enum ResolvedPathLookupKind {
 }
 
 pub(crate) struct ScopeBindingLookupState<'a> {
-    pub(crate) lookup_input_record_rows: &'a NameResolutionInputRows,
+    lookup_input_record_rows: &'a NameResolutionInputRows,
     lookup_scope_record_rows: BTreeMap<&'a NameResolutionScopeKey, &'a NameScopeRecordRow>,
     lookup_symbol_binding_rows:
         BTreeMap<&'a NameResolutionScopeKey, BTreeMap<&'a str, Vec<&'a NameResolvedBindingRow>>>,

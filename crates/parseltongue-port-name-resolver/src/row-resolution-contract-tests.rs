@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use super::*;
 use parseltongue_core_row_types::*;
 use std::sync::atomic::{AtomicUsize, Ordering};

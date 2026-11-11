@@ -677,3 +677,14 @@ no partial result escapes on errors.
 Offline resolver tests: 8 passed, 0 failed, 0.26s (including both sides of the 8192
 boundary). These are row-level algorithm contracts, not a real parser/MBe implementation,
 Turso publication proof or oracle comparison. Next: refactor gates, followed by adapters.
+
+### M2 row-based name resolver — REFACTOR
+
+Restricted the lookup state's input field to its module and matched the repository's
+test-only unwrap lint exemption. The first Clippy run rejected six unwraps in tests;
+production code had no lint errors. After that focused correction: cargo fmt --all
+--check exited 0; offline all-targets Clippy with -D warnings finished in 0.34s;
+resolver tests: 8 passed, 0 failed, 0.26s; build finished in 0.09s. Core identity tests
+also passed (3/3). Existing dependency/runtime gates passed (3/3, 0.20s), including
+the zero-dependency L1/no hosted analysis dependency check. No real MBe expansion or
+corpus agreement is claimed. Next: persisted parser projection and publication adapters.
