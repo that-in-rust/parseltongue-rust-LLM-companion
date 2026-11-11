@@ -8,7 +8,8 @@ Status: draft · Scope owner: human-architect-intent-author · Source design: `d
  §1  the phase in one paragraph        what is in, what is out, why this cut
  §2  glossary                          terms used below, defined once
  §3  the product                       the one table this phase must produce, and its row shape
- §4  the one design decision           parse once with the pinned parser, then run PORTED rust-analyzer logic on our tables
+ §4  the one design decision           parse once with the pinned parser, then run PORTED rust-analyzer logic on our tables;
+                                       §4.1 architecture (table in → table out), §4.2 TursoDB constraint
  §5  the journey                       one line per step, codebase → files → spans → … → HLD
  §6  what is ported, from where        each rust-analyzer stage, its source location, what it reads, what we build
  §7  tables                            every table and who writes it
@@ -91,6 +92,42 @@ What "ported" means, per stage (decided in §6):
 ```
 
 Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. `cargo metadata --offline` is the decided source of the crate graph (decided 2026-11-05): it reads manifests and the lockfile, compiles nothing.
+
+### 4.1 Architecture: every stage is table in → table out (option A, decided 2026-11-05)
+
+```text
+ up to the span table     rust-analyzer's parser crates as a pinned library: ra-ap-rustc_lexer, ra_ap_parser, ra_ap_syntax
+                          (+ `cargo metadata --offline` for the crate graph) → file, span, field and body-site rows
+ from the span table on   the WHOLE HLD is built from the tables: name resolution, macro_rules! expansion, signature lowering,
+                          body inference, HLD derivation each read their input tables and write their output tables
+ between stages           nothing is held in memory across stages; the tables are the only interface, so every stage can be
+                          re-run, inspected and scored against rust-analyzer on its own
+ parallelism              files, items and fn bodies: fully parallel workers reading and writing the same database;
+                          name resolution: crates in dependency order, independent crates in parallel (Rust's rule, not ours)
+ in-memory caches         none by default; a per-crate read cache for body inference is added ONLY if the body-inference step
+                          misses its budget (§12), and the decision is recorded with the measurement
+```
+
+Layers:
+
+```text
+ L1 core      row and id types (SpanId, CrateId, ItemPath, EdgeStatus, UnresolvedReason), typed errors per stage; no dependencies
+ L2 std       stage logic written against row-store traits; dependency-ordered crate scheduler; bounded worker pool
+ L3 external  Turso adapter · ra_ap_syntax / ra_ap_parser / ra-ap-rustc_lexer · cargo_metadata · (M7 only) ra-ap-rustc_next_trait_solver
+```
+
+### 4.2 Constraint: the database is TursoDB (decided 2026-11-05)
+
+```text
+ engine          TursoDB — in-process SQL database written in Rust, SQLite-compatible (dialect and file format); Rust crate `turso`
+ why             concurrent writes and reads: `BEGIN CONCURRENT` uses MVCC so several workers can write in parallel, and readers do
+                 not block writers; this is what lets every stage in §4.1 run its workers in parallel against one file
+ file            one database file per mapped workspace (plus one shared file for library source roots, reused by digest)
+ rule            no other database (no CozoDB, no RocksDB, no rusqlite/SQLite C library) in phase-20261111
+ status (checked 2026-11-05, upstream README)  `BEGIN CONCURRENT` is listed as a feature, not experimental; Turso is pre-1.0
+                 (crates.io max version 0.9.0-pre.5) → pin one version for the phase; write conflicts under MVCC are retried
+                 by the worker, and REQ-RUST-012 (determinism) must hold regardless of commit order
+```
 
 ## 5. The journey — one line per step
 
@@ -311,7 +348,7 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
  name resolution         target: minutes for the whole crate graph, crates in parallel
  body inference          target: < 30 min on 4 cores for the rust-analyzer repo including dependencies
  peak memory             target: ≤ 2 GB (REQ 011); the reference point is rust-analyzer itself (M: 2.3 GB for 42 k lines)
- disk                    target: one Turso / SQLite file; size reported
+ disk                    target: one TursoDB file per workspace (§4.2); size reported
 ```
 
 ## 13. Out of scope for this phase
@@ -336,6 +373,8 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
  R2  ra-ap-* crates are republished weekly with 0.0.x APIs. Mitigation: pin one version for the whole phase
  R3  library source roots are large (std + all dependencies can exceed the workspace). Mitigation: map them once, reuse rows
      across workspaces by digest
+ R6  TursoDB is pre-1.0 and evolving fast; MVCC write conflicts under heavy parallel writes are unmeasured. Mitigation: pin
+     one version, retry on conflict, measure write throughput in M1
  R4  disk-backed lookups may be slow for method lookup. Mitigation: per-body caches and an in-memory impl index per crate;
      measure before optimising
  R5  copied code keeps rust-analyzer's licence headers and attribution (MIT OR Apache-2.0)
