@@ -5,6 +5,13 @@ use parseltongue_core_row_types::{
     NameResolutionOutputRows, NameResolutionStageError, RunCancelFlagValue,
 };
 
+#[path = "crate-resolution-round-engine.rs"]
+mod crate_resolution_round_engine;
+#[path = "namespace-binding-normalization-rules.rs"]
+mod namespace_binding_normalization_rules;
+#[path = "scope-path-resolution-rules.rs"]
+mod scope_path_resolution_rules;
+
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
 pub trait ItemMacroExpansionPort: Send + Sync {
@@ -15,11 +22,15 @@ pub trait ItemMacroExpansionPort: Send + Sync {
 }
 
 pub fn resolve_crate_name_bindings(
-    _name_resolution_input_rows: &NameResolutionInputRows,
-    _item_macro_expansion_port: &dyn ItemMacroExpansionPort,
-    _stage_cancel_flag_value: &RunCancelFlagValue,
+    name_resolution_input_rows: &NameResolutionInputRows,
+    item_macro_expansion_port: &dyn ItemMacroExpansionPort,
+    stage_cancel_flag_value: &RunCancelFlagValue,
 ) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
-    todo!()
+    crate_resolution_round_engine::run_crate_resolution_rounds(
+        name_resolution_input_rows,
+        item_macro_expansion_port,
+        stage_cancel_flag_value,
+    )
 }
 
 #[cfg(test)]

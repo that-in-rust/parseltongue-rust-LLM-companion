@@ -641,3 +641,39 @@ rows; invalid scopes/cycles/cancellation; macro-generated imports; exactly 8192 
 rounds and rejection on attempted 8193. Output: "FAILED. 0 passed; 8 failed" in 0.00s.
 The macro ports here are deterministic test doubles, not the future MBe/parser adapter;
 these are not oracle-agreement or atomic-Turso-publication results.
+
+GREEN implementation in progress: namespace-binding-normalization-rules.rs is not yet
+wired and has not been checked. Intended engine: canonical namespace/priority target sets;
+recompute import closure from declarations on each pass so newly explicit bindings remove
+stale glob-derived aliases; accumulate sorted unique import evidence, not unbounded cycle
+paths. Detect import-state cycles with Brent's algorithm (two snapshots, no arbitrary
+8192 import-round cap); only changing macro rounds use FIXED_POINT_LIMIT.
+
+Lookup should operate per namespace independently: nearest generic parent lookup stops at
+module boundaries, then edition-appropriate extern/implicit preludes; explicit self/crate/
+super paths bypass preludes. Intermediate segments require one type-namespace child scope.
+Visibility is checked from the original requester. More than one target in one namespace
+is Ambiguous with candidates, never extracted; Any may resolve one target in each namespace.
+
+Settle imports before each macro callback; drop completed invocations from pending rows
+while retaining completed keys. Canonically merge new scopes/symbols/imports/paths/semantic
+outputs and detect conflicting same-key payloads. Completion-only bookkeeping is not a
+changing macro round. Allow an unchanged callback after 8192 changing rounds; reject a
+changing attempted 8193rd before returning any output. The budget fixture deliberately
+uses only one pending invocation per round, so do not retain/clones all old request bodies.
+Validate scopes, parent cycles, references and cancellation before lookup; publish nothing
+here (the later L3 adapter must atomically write the complete per-crate result).
+
+### M2 row-based name resolver — GREEN
+
+Wired normalization and implemented resolve_crate_name_bindings through a pure round
+engine and namespace-aware path lookup. Imports settle before macro callbacks; cyclic
+glob evidence is deduplicated; explicit bindings supersede globs; ambiguous candidates
+never become extracted answers. Parent lookup, visibility, extern/implicit preludes and
+2015 use-root rules are explicit. Scope validation and cancellation fail with typed errors.
+Macro completion keeps only pending request bodies and rejects changing round 8193;
+no partial result escapes on errors.
+
+Offline resolver tests: 8 passed, 0 failed, 0.26s (including both sides of the 8192
+boundary). These are row-level algorithm contracts, not a real parser/MBe implementation,
+Turso publication proof or oracle comparison. Next: refactor gates, followed by adapters.
