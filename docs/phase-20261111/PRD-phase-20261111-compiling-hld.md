@@ -27,7 +27,7 @@ Conventions: four-word hyphenated names for every named thing (AGENTS.md). **M**
 
 **Objective: a complete, exact `hld-current-dependency-edges` for a repository that compiles. Code that does not compile is the next phase, which builds on these tables (§13).**
 
-Phase-20261111 builds `hld-current-dependency-edges` — public item → public item dependency rows — for **Rust workspaces that compile** (rust-analyzer itself, ripgrep, tokio-sized repositories). Because the code compiles, every file parses without error, every name has exactly one meaning, and rust-analyzer run offline gives an exact answer key. That removes the three hardest parts of the full design — broken-file recovery, grey spans, and guessing — and lets this phase answer one question cleanly: **can rust-analyzer's resolution logic, ported to run over our span and field tables one crate and one body at a time, reproduce rust-analyzer's dependency edges at a fraction of its memory?** No tiny LLM is used in this phase. Anything the port cannot resolve is written as `unresolved` and counted — never guessed.
+Phase-20261111 builds `hld-current-dependency-edges` — public item → public item dependency rows — for **Rust workspaces that compile** (rust-analyzer itself, ripgrep, tokio-sized repositories). Because the code compiles, every file parses without error, every name has exactly one meaning, and rust-analyzer run offline gives an exact answer key. That removes the three hardest parts of the full design — broken-file recovery, grey spans, and guessing — and lets this phase answer one question cleanly: **can rust-analyzer's resolution logic, ported to run over our span and field tables one crate and one body at a time, reproduce rust-analyzer's dependency edges at a fraction of its memory?** **Every step is a CPU tool: no LLM of any size, no model training or post-training, no labels.** Anything the port cannot resolve is written as `unresolved` and counted — never guessed.
 
 ## 2. Glossary
 
@@ -200,7 +200,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  cpu-tool-port-body-inferencer      stage 7 (includes method lookup and the solver adapter)
  cpu-tool-hld-table-builder         stage 9
  cpu-tool-status-coverage-banner    stage 10
- cpu-tool-oracle-edge-differ        stage 11, offline only; runs rust-analyzer (scip export / analysis-stats) as offline-teacher-rust-analyzer
+ cpu-tool-oracle-edge-differ        stage 11, offline only; runs rust-analyzer (scip export / analysis-stats) only to score the port (an answer key for tests, never training data)
  cpu-tool-find-search-query · cpu-tool-impact-graph-walk   unchanged from DI-08; read the tables built here
 ```
 
@@ -284,7 +284,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  gates    cargo fmt · cargo clippy --all-targets -- -D warnings · cargo test · cargo build --release
 ```
 
-Oracle corpus (each must pass `cargo check` once, offline, when chosen): rust-analyzer, ripgrep, tokio, serde, cargo-modules. Split by repository: rules may be tuned on the first two only; the last three are held out.
+Oracle corpus (each must pass `cargo check` once, offline, when chosen): rust-analyzer, ripgrep, tokio, serde, cargo-modules. Split by repository: CPU rules may be adjusted on the first two only; the last three are held out.
 
 ## 11. Milestones — each ends with a measured gate
 
@@ -319,7 +319,8 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
 ```text
  broken or partially written code      NEXT PHASE: recovery rule, grey spans, tiny-llm-span-clarifier and the other tiny LLMs
                                        are added on top of this phase's tables and ported resolvers
- all tiny LLMs                         no binder, guesser or ranker; unresolved rows are counted, not guessed
+ all LLMs and all training            no tiny LLM (binder, guesser, ranker, clarifier), no training or post-training, no
+                                       labelled datasets; unresolved rows are counted, not guessed
  proc-macro expansion                  unresolved(proc_macro) except the built-in derive table
  cfg combinations                      one cfg set per run: the default features from cargo metadata; inactive code counted
  intent tables                         hld-future-dependency-edges, hld-delta-dependency-view, cpu-tool-propose-future-rows
