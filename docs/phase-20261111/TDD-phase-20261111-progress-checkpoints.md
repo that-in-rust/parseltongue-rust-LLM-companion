@@ -31,3 +31,18 @@ Status: PASS, no runtime behavior claimed. Public identity constructors and adap
   manifest-lint feature, not a missing project environment. No upstream files/toolchain were changed.
 - Next: add SPEC-named dependency/identity tests and fake-store/oracle/adapter boundary tests; record RED.
 - Blockers: no build blocker; full semantic export intentionally belongs to later milestones.
+
+## RED — executable contracts fail on stubs
+
+- cargo test --workspace --no-fail-fast: exit 101; core 0 passed/3 failed, fake store 0/1,
+  adapter/build gates 0/3. Constructors and adapter methods panic with `not yet implemented`.
+- cargo test --offline --manifest-path tools/oracle-semantic-export-harness/Cargo.toml:
+  exit 101; test_oracle_build_manifest_pinned 0 passed/1 failed, `not yet implemented`.
+- SPEC names: test_semantic_identity_collision_safety and test_no_analysis_crates_linked;
+  additional tests cover reversed/empty ranges, invalid paths/units, generation-isolated fake rows,
+  Turso concurrent API, nested-runtime error and oracle provenance.
+- Dependency gate additionally exposed unprovisioned cross-platform metadata dependency
+  `android_system_properties v0.1.6`; this is fixture provisioning, not a forbidden-dependency result.
+  Next: cargo fetch --locked before the offline metadata gate, then implement the stubs without changing tests.
+- Full RED logs: /home/ubuntu/m0-red-production-tests.log and /home/ubuntu/m0-red-oracle-tests.log.
+- No Turso compiler/API failure occurred. No database substitution or test weakening is authorized.
