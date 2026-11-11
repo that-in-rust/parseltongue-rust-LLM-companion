@@ -221,16 +221,30 @@ fn build_oracle_path_targets(
     shared: bool,
 ) -> Result<Vec<Value>, OracleSemanticExportError> {
     if !shared {
-        return semantics
-            .resolve_path(path)
-            .map(|resolution| {
-                build_oracle_resolution_target(resolution, semantics, files, packages)
+        return read_oracle_namespace_paths(path, semantics)
+            .into_iter()
+            .map(|(namespace, resolution)| {
+                build_oracle_resolution_target(resolution, semantics, files, packages).map(
+                    |target| {
+                        target.map(|mut target| {
+                            target["target_namespace_kind_value"] = json!(namespace);
+                            target
+                        })
+                    },
+                )
             })
-            .transpose()
-            .map(|target| target.flatten().into_iter().collect());
+            .collect::<Result<Vec<_>, _>>()
+            .map(|targets| targets.into_iter().flatten().collect());
     }
     if let Some(target) = resolve_oracle_generic_target(module, path, semantics, files, packages)? {
         return Ok(vec![target]);
+    }
+    if let Some(definitions) = resolve_oracle_associated_paths(module, path, semantics)? {
+        return definitions
+            .into_iter()
+            .map(|definition| build_oracle_symbol_target(definition, semantics, files, packages))
+            .collect::<Result<Vec<_>, _>>()
+            .map(|targets| targets.into_iter().flatten().collect());
     }
     if let Some(definitions) = resolve_oracle_module_paths(module, path, semantics.db) {
         return definitions
@@ -245,6 +259,21 @@ fn build_oracle_path_targets(
         path.syntax().text(),
         files.file_path(range.file_id.file_id(semantics.db))
     )))
+}
+
+fn read_oracle_namespace_paths<'db>(
+    _path: &ast::Path,
+    _semantics: &Semantics<'db, RootDatabase>,
+) -> Vec<(&'static str, PathResolution<'db>)> {
+    todo!()
+}
+
+fn resolve_oracle_associated_paths(
+    _module: Module,
+    _path: &ast::Path,
+    _semantics: &Semantics<'_, RootDatabase>,
+) -> Result<Option<Vec<ModuleDef>>, OracleSemanticExportError> {
+    todo!()
 }
 
 fn read_oracle_source_syntax<Definition: HasSource>(

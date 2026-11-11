@@ -559,3 +559,13 @@ Oracle formatting check exited 0; offline --all-targets Clippy with -D warnings 
 in 0.41s; all ten tests passed in 47.47s; offline release build completed in 1.79s.
 git diff --check passed. Production dependency inputs are unchanged, so previous production
 dependency gates are not rerun or newly claimed. No corpus agreement results yet.
+
+### M2 oracle complete signatures — STUB
+
+Introduced namespace-aware native resolution and shared-context associated-path seams,
+deliberately todo!. RED will cover multi-namespace imports, Self/associated types and a
+single-inline-module source-container collision. Public Type::iterate_path_candidates
+requires a SemanticsScope; do not pass a first-crate scope as if it selected the current module.
+Prefer native Module/GenericDef/Trait items, and only duplicate IDs if the public API proves
+insufficient. Existing tests are intentionally red again until this cycle's GREEN.
+Offline cargo check passed in 0.32s; no production dependency changes.
