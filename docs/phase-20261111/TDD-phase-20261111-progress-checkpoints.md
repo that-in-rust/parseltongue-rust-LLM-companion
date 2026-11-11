@@ -515,3 +515,19 @@ type-position paths must not return value/macro namespace answers; shared generi
 paths must resolve in the actual crate or fail closed. Advanced cache/cfg support remains pending.
 Offline cargo check completed in 0.35s. This phase intentionally replaces the base scope seam
 with todo!; base tests will be restored during the scoped-signatures GREEN.
+
+### M2 oracle scoped signatures — RED
+
+Five new minimal fixtures exercise same-file lib/bin identities, namespace separation,
+same-file repeated module occurrences, shared-file generic parameters, and nested grouped
+imports across distinct dependency aliases. Targets must retain their own compilation/module
+scope, not merely a physical path/range. Focused offline test output:
+
+```text
+panicked at src/primary-path-export-rows.rs:193:5:
+not yet implemented
+test result: FAILED. 0 passed; 5 failed; 5 filtered out; finished in 47.58s
+```
+
+All failures reach the deliberate scope-record seam. GREEN must satisfy these assertions
+and restore the five previously green oracle tests; no assertion weakening is planned.

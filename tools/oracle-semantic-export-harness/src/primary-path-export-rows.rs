@@ -589,6 +589,226 @@ mod oracle_path_contract_tests {
         }
     }
 
+    fn create_shared_scope_fixture(root: &Path, source: &str) {
+        create_oracle_workspace_fixture(
+            root,
+            &[
+                (
+                    "Cargo.toml",
+                    "[workspace]\nmembers=[\"front\",\"back\",\"left\",\"right\"]\nresolver=\"3\"\n",
+                ),
+                (
+                    "front/Cargo.toml",
+                    "[package]\nname=\"front\"\nversion=\"0.1.0\"\nedition=\"2024\"\n[dependencies]\nchosen={package=\"left\",path=\"../left\"}\n",
+                ),
+                (
+                    "back/Cargo.toml",
+                    "[package]\nname=\"back\"\nversion=\"0.1.0\"\nedition=\"2024\"\n[dependencies]\nchosen={package=\"right\",path=\"../right\"}\n",
+                ),
+                (
+                    "left/Cargo.toml",
+                    "[package]\nname=\"left\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "right/Cargo.toml",
+                    "[package]\nname=\"right\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "front/src/lib.rs",
+                    "#[path=\"../../shared.rs\"] pub mod shared;",
+                ),
+                (
+                    "back/src/lib.rs",
+                    "#[path=\"../../shared.rs\"] pub mod shared;",
+                ),
+                ("left/src/lib.rs", "pub mod nested { pub struct Choice; }"),
+                ("right/src/lib.rs", "pub mod nested { pub struct Choice; }"),
+                ("shared.rs", source),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_scope_unit_targets_distinct() {
+        let directory = tempfile::tempdir().unwrap();
+        create_oracle_workspace_fixture(
+            directory.path(),
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname=\"twins\"\nversion=\"0.1.0\"\nedition=\"2024\"\n[lib]\npath=\"src/lib.rs\"\n[[bin]]\nname=\"twins\"\npath=\"src/lib.rs\"\n",
+                ),
+                (
+                    "src/lib.rs",
+                    "pub struct Thing; pub struct Wrap(pub Thing); pub fn main() {}",
+                ),
+            ],
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let things: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "Thing")
+            .collect();
+        assert_eq!(things.len(), 2);
+        let kinds: BTreeSet<_> = things
+            .iter()
+            .map(|row| {
+                let scope = &row["site_compilation_scope_record"];
+                assert_eq!(scope["unit_cargo_target_name"], "twins");
+                assert!(
+                    scope["unit_cargo_package_identifier"]
+                        .as_str()
+                        .unwrap()
+                        .starts_with("path+file://")
+                );
+                let targets = row["path_target_symbol_rows"].as_array().unwrap();
+                assert_eq!(targets.len(), 1);
+                assert_eq!(targets[0]["target_compilation_scope_record"], *scope);
+                scope["unit_cargo_target_kind"].as_str().unwrap()
+            })
+            .collect();
+        assert_eq!(kinds, BTreeSet::from(["bin", "lib"]));
+    }
+
+    #[test]
+    fn test_scope_namespaces_remain_separate() {
+        let directory = tempfile::tempdir().unwrap();
+        create_oracle_workspace_fixture(
+            directory.path(),
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname=\"namespaces\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "src/lib.rs",
+                    "pub struct Thing {} #[allow(non_snake_case)] pub fn Thing() -> Thing { Thing {} } pub struct Wrap(pub Thing);",
+                ),
+            ],
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let things: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "Thing")
+            .collect();
+        assert_eq!(things.len(), 2);
+        for row in things {
+            let targets = row["path_target_symbol_rows"].as_array().unwrap();
+            assert_eq!(targets.len(), 1);
+            assert_eq!(targets[0]["target_symbol_kind_value"], "Struct");
+        }
+    }
+
+    #[test]
+    fn test_scope_modules_retain_occurrences() {
+        let directory = tempfile::tempdir().unwrap();
+        create_oracle_workspace_fixture(
+            directory.path(),
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname=\"modules\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "src/lib.rs",
+                    "#[path=\"shared.rs\"] pub mod one; #[path=\"shared.rs\"] pub mod two;",
+                ),
+                (
+                    "src/shared.rs",
+                    "pub struct Thing; pub struct Wrap(pub Thing);",
+                ),
+            ],
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let things: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "Thing")
+            .collect();
+        assert_eq!(things.len(), 2);
+        let scopes: BTreeSet<_> = things
+            .iter()
+            .map(|row| {
+                let scope = &row["site_compilation_scope_record"];
+                let targets = row["path_target_symbol_rows"].as_array().unwrap();
+                assert_eq!(targets.len(), 1);
+                assert_eq!(targets[0]["target_compilation_scope_record"], *scope);
+                scope["unit_module_path_values"].to_string()
+            })
+            .collect();
+        assert_eq!(
+            scopes,
+            BTreeSet::from([json!(["one"]).to_string(), json!(["two"]).to_string()])
+        );
+    }
+
+    #[test]
+    fn test_scope_generics_retain_context() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = "pub struct Wrap<T>(pub T);";
+        create_shared_scope_fixture(directory.path(), source);
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let paths: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "T")
+            .collect();
+        assert_eq!(paths.len(), 2);
+        for row in paths {
+            let targets = row["path_target_symbol_rows"].as_array().unwrap();
+            assert_eq!(targets.len(), 1);
+            assert_eq!(targets[0]["target_symbol_kind_value"], "TypeParam");
+            assert_eq!(
+                targets[0]["target_source_range_start"],
+                source.find("<T>").unwrap() + 1
+            );
+            assert_eq!(
+                targets[0]["target_compilation_scope_record"],
+                row["site_compilation_scope_record"]
+            );
+        }
+    }
+
+    #[test]
+    fn test_scope_imports_retain_context() {
+        let directory = tempfile::tempdir().unwrap();
+        create_shared_scope_fixture(
+            directory.path(),
+            "use chosen::{nested::{Choice as Alias}}; pub struct Wrap(pub Alias);",
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let paths: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "Choice")
+            .collect();
+        assert_eq!(paths.len(), 2);
+        for (owner, dependency) in [("front", "left"), ("back", "right")] {
+            let root = directory.path().join(owner).join("src/lib.rs");
+            let row = paths
+                .iter()
+                .find(|row| row["unit_source_root_path"] == root.to_str().unwrap())
+                .unwrap();
+            let targets = row["path_target_symbol_rows"].as_array().unwrap();
+            assert_eq!(targets.len(), 1);
+            assert_eq!(
+                targets[0]["target_source_file_path"],
+                directory
+                    .path()
+                    .join(dependency)
+                    .join("src/lib.rs")
+                    .to_str()
+                    .unwrap()
+            );
+            assert_eq!(
+                targets[0]["target_compilation_scope_record"]["unit_module_path_values"],
+                json!(["nested"])
+            );
+        }
+    }
+
     #[test]
     fn test_empty_oracle_paths_succeed() {
         let directory = tempfile::tempdir().unwrap();
