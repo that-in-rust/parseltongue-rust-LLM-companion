@@ -615,3 +615,19 @@ remains in the source/identity adapters. Formatting check exited 0. Offline --al
 Clippy with -D warnings finished in 0.50s; all fifteen tests passed in 72.31s; offline
 release build finished in 2.50s. git diff --check passed. No production inputs changed.
 Remaining work above is unchanged; passing fixture tests do not constitute S5 evidence.
+
+### M2 row-based name resolver — STUB
+
+Added L1 scope/namespace/import/path/expansion rows, typed stage errors and the
+parseltongue-port-name-resolver L2 boundary. It depends only on L1. Workspace membership
+and L1 shared rows change because this persisted stage cannot be expressed without them;
+no parser or hosted analysis dependency enters the engine. The macro port is synchronous.
+The entry point is deliberately todo!. Offline cargo check passed in 0.27s.
+
+The algorithm adaptation is grounded in the pinned hir-def collector's resolution_loop,
+resolve_imports and resolve_import: settle imports, expand/reseed, repeat, enforce 8192
+changing macro rounds, and return a typed error instead of publishing partial output.
+Record native source notices. Next RED: namespace/alias/glob cycles and precedence,
+edition/prelude rules, visibility, deterministic output, cancellation/input errors,
+macro/import interleaving and the attempted 8193rd-round limit. Parser/MBe adapters,
+atomic persistence, cfg/cache inputs, lang-item discovery and all-five S5 remain pending.
