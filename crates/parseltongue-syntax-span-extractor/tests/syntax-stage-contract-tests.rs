@@ -18,6 +18,24 @@ fn make_syntax_file_input(source: &[u8]) -> SyntaxFileInputData {
 }
 
 #[test]
+fn test_module_raw_identifier_paths() {
+    let input = make_syntax_file_input(b"mod r#impl; mod r#type { mod r#match; }");
+    let result = extract_file_syntax_rows(&input).unwrap();
+    let candidates: Vec<_> = result
+        .source_closure_file_requests
+        .iter()
+        .flat_map(|request| {
+            request
+                .source_request_path_candidates
+                .iter()
+                .map(String::as_str)
+        })
+        .collect();
+    assert!(candidates.contains(&"/workspace/src/impl.rs"));
+    assert!(candidates.contains(&"/workspace/src/type/match.rs"));
+}
+
+#[test]
 fn test_span_gap_tiling_identity() {
     for source in [
         b"".as_slice(),

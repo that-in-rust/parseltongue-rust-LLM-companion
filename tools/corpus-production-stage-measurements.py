@@ -34,6 +34,11 @@ def build_corpus_measurement_commands(record, output):
 
 def measure_corpus_production_stages(record):
     output = ROOT / record["corpus_evidence_directory_path"]
+    if suffix := os.environ.get("PARSELTONGUE_CORPUS_RUN_DIRECTORY"):
+        if Path(suffix).name != suffix or suffix in {".", ".."}:
+            raise ValueError("run directory must be one relative path component")
+        output = output / suffix
+        output.mkdir(exist_ok=True)
     database = output / "production-untraced-workspace-store.db"
     memory = output / "process-tree-memory-samples.json"
     trace = output / "production-process-access-audit.txt"

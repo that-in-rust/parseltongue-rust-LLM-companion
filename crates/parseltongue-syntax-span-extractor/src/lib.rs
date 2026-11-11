@@ -310,7 +310,8 @@ pub fn extract_file_syntax_rows(
                 .name()
                 .ok_or_else(|| build_syntax_stage_failure("module name missing"))?
                 .text()
-                .to_string();
+                .trim_start_matches("r#")
+                .to_owned();
             let mut base = PathBuf::from(&input.file_module_directory_path);
             let ancestors: Vec<_> = node
                 .ancestors()
@@ -323,7 +324,7 @@ pub fn extract_file_syntax_rows(
                 {
                     base.push(path);
                 } else if let Some(name) = ancestor.name() {
-                    base.push(name.text());
+                    base.push(name.text().trim_start_matches("r#"));
                 }
             }
             let candidates = if let Some(path) =

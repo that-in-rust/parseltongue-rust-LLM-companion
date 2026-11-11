@@ -249,3 +249,13 @@ No sampler is traced. Python separation contracts: Ran 4 tests in 0.125s; OK.
 Stage elapsed timings go to stderr. The new untraced rust-analyzer attempt measured graph 0.434s and
 ingestion 15.546s, then exposed a source-closure bug: raw identifier mod r#impl searched r#impl.rs
 instead of impl.rs. Fix next with a focused regression; no complete S3 success is claimed.
+
+### Raw module identifier correction
+
+The optimized failed attempt reached the raw-module error in 32.179s; this is not a full-run throughput
+comparison. Added test_module_raw_identifier_paths (RED: expected impl.rs absent), then stripped the
+Rust r# escape only for module filesystem components, including inline ancestors. Source bytes and
+declared span text remain unchanged. Syntax 7/7 and CLI 1/1 pass; Clippy Finished dev profile in 0.61s;
+release build Finished release profile in 3.68s; Python separation tests Ran 4 tests in 0.159s, OK.
+The final driver uses fresh nested evidence directories m1-batched-final-measurements to avoid
+contamination by interrupted/failed stores. Log /home/ubuntu/m1-final-production-measurements.log.
