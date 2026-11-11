@@ -215,3 +215,13 @@ Final commands:
 Clippy initially rejected test-only unwrap and four collapsible/unnecessary allocation patterns;
 these were fixed without suppressing production warnings. S3 corpus measurement is running through
 tools/corpus-production-stage-measurements.py; no corpus success or resource claim is made here.
+
+### S3 live execution handoff
+
+The external corpus driver is still running, shell 086763, log /home/ubuntu/m1-production-measurements.log.
+At the observed 11m13s rust-analyzer mapper was alive with 74,336 KiB resident; these are instantaneous
+progress observations, NOT its measured peak or completed elapsed time. No error had been emitted.
+The database and transaction log were growing; do not rerun another writer against this active store.
+The driver proceeds sequentially through all five and writes production-stage-measurement-summary.json,
+production-process-audit-result.json and hld-current-coverage-banner.json per repository when each finishes.
+S3 is not yet complete, and the final report must be updated from those artifacts before M1 acceptance.
