@@ -1,161 +1,275 @@
-# SOP — end-to-end test of `hld-current-dependency-edges` (phase-20261111)
+# SOP — phase-20261111 HLD validation
 
-Name: `hld-current-test-procedure` · Status: draft · Applies to: every milestone gate from M2 on, and every release
-Inputs: `PRD-phase-20261111-compiling-hld.md`, `SPEC-phase-20261111-executable-requirements.md` (REQ-RUST-001 … 022)
+Name: hld-current-test-procedure. Status: planned executable procedure, not a record of passing runs.
+Inputs: PRD-phase-20261111-compiling-hld.md and SPEC-phase-20261111-executable-requirements.md.
+SPEC owns requirement/test names and scoring; PRD owns scope; this SOP applies those contracts.
+Full S1–S10 runs apply at M8/releases. Intermediate milestone subsets are listed in §3.
+Every applicable corpus gate runs on all five repos, never a tune/held-out split.
 
-**Rule: this SOP is run on ALL FIVE repositories, every time.** A run that skips a repository is not a pass.
+## 0. Witnesses and boundaries
 
-```text
- the five    rust-analyzer · ripgrep · tokio · serde · cargo-modules   (PRD D2; pinned commits in SPEC §8)
- verdict     HLD current WORKS  ⇔  every step below passes on all five repositories
+- Parseltongue is the production mapper under test: CPU-only, tables between stages.
+- oracle-semantic-export-harness is the answer key, built from rust-analyzer's pinned checkout in SPEC §8.
+  Its offline ide/hir/salsa dependencies are allowed ONLY in the harness. Installed rust-analyzer 1.99.1
+  (58cf8f9) is not the oracle for checkout 6e37b2d62.
+- codebase-memory-mcp 0.12.1 is a structural/coverage cross-check, not an answer key.
+  Heuristic and missing edges never override PRIMARY oracle evidence.
+- SCIP is optional secondary occurrence evidence; method references are useful, but SCIP's empty
+  relationship export does not prove impl/expansion/visibility relations.
+- The three-command allowlist applies to the production mapping process tree only:
+  cargo metadata --offline, rustc --print cfg, rustc --print sysroot.
+  Corpus qualification, harness builds/exports, version collection and test drivers are outside it.
+
+## 1. Preconditions
+
+P1: pin clean corpus commits: rust-analyzer, ripgrep, tokio, serde, cargo-modules (SPEC §8).
+Record full hashes, lockfile digest, source snapshot and all tool/config versions.
+P2: qualify selected workspace lib+bin targets once with offline cargo check outside production.
+Do not infer that unrelated fixtures or inactive modules parse.
+P3: provision downloaded normal dependencies, matching sysroot sources and real proc-macro artifacts offline.
+PRIMARY needs proc macros available without executing build scripts in its export. Record artifact hashes;
+missing proc-macro expansions BLOCK gates, never fall back to the installed oracle binary.
+P4: build oracle-semantic-export-harness from SPEC §8's full source commit; record source commit,
+executable digest and build manifest. Both export modes have proc macros enabled and test cfg OFF.
+P5: record machine/OS, memory accounting method and production executable digest.
+Use identical lib+bin/default-feature/per-unit cfg/edition/host-target policy for mapper and both oracle exports.
+Tests/benches/examples/dev-dependencies are out; build contexts are provenance only.
+
+Placeholders: $REPO absolute checkout, $CMP indexed project, $OUT persistent output directory:
+hld-current-test-runs/<run-id>/<repo-name>. Create it before commands.
+Owned command/flag names below are planned contracts, not claims that implementations already exist.
+External tool flags/property names keep their upstream spelling.
+
+## 2. Steps S1–S10
+
+### S1 — fresh structural index
+
+```bash
+codebase-memory-mcp cli index_repository --repo-path "$REPO" --mode full
+codebase-memory-mcp cli list_projects
+codebase-memory-mcp cli index_status --project "$CMP"
+codebase-memory-mcp cli get_graph_schema --project "$CMP"
 ```
 
-## 0. What "works" means — three independent witnesses
+Require succeeded generation at pinned checkout; record counts and generation. Re-index after source changes.
+Never reuse an older source generation just because a project name exists.
 
-```text
- witness                              role                              trusted for
- ──────────────────────────────────── ───────────────────────────────── ───────────────────────────────────────────────────
- parseltongue (under test)            produces hld-current-dependency-edges + edge-evidence-record-table
- offline-teacher-rust-analyzer        ANSWER KEY (oracle)               exact targets of paths, method calls, impls
- codebase-memory-mcp (0.12.1, M)      INDEPENDENT CROSS-CHECK           a second, differently built graph: finds edges
-                                                                        both other witnesses might miss, file/folder
-                                                                        structure, index coverage gaps
+### S2 — complete coverage inventory
+
+```bash
+codebase-memory-mcp cli check_index_coverage --project "$CMP" --scopes '["."]' \
+  --scope-limit 20 --scope-offset 0 --diagnostics full --format json
+codebase-memory-mcp cli query_graph --project "$CMP" --graph missed \
+  --query "MATCH (f:File) RETURN f.file_path" --max-rows 200 --format json
 ```
 
-codebase-memory is **not** an answer key. Measured on rust-analyzer (2026-11-05): 70,991 CALLS edges, of which 29,752
-(42 %) have strategy `suffix_match` (name heuristic, confidence as low as 0.55); only `lsp_*` strategies (lsp_direct 5,336,
-lsp_method_dispatch 1,236, lsp_trait_dispatch 271, lsp_ufcs 353, lsp_constructor 263, lsp_short_name_unique 7,525) are
-type-aware. So the SOP uses it in two ways only: (1) structure and coverage, (2) a triage signal on disagreements —
-filtered by strategy and confidence. It never overrules rust-analyzer.
+Save each response as codebase-index-coverage-page-<ordinal>.json or codebase-missed-source-page-<ordinal>.json.
+For check_index_coverage, repeat with --scope-offset from next_offset until has_more=false and
+scope_truncated=false; require strictly increasing offsets or BLOCK on an incomplete inventory.
+For query_graph, pass next_cursor via --cursor with the same project/graph/query until has_more=false.
+Restrict to File: the missed graph also contains folders, which are not missed files.
+A partial/unusable/missed file is missing CROSS-CHECK evidence only; CM-GAP NEVER excuses an oracle-proven error.
 
-## 1. Preconditions (once per repository, before any run)
+### S3 — fixture gates and production map
 
-```text
- P1  checkout at the pinned commit (SPEC §8); `git status` clean; commit hash written to the run report
- P2  `cargo check --workspace` passed ONCE when the corpus was chosen (outside Parseltongue; PRD §2 "workspace that compiles")
- P3  dependencies already downloaded: `cargo fetch` done earlier; the run itself is offline (no network)
- P4  toolchain recorded: `rustc -V`, `cargo -V`, `rust-analyzer --version` (oracle, M today: 1.99.1 58cf8f9),
-     `codebase-memory-mcp --version`, parseltongue git hash
- P5  machine recorded: cores, RAM, OS — needed to read REQ 011 memory and the time budgets
+Run the applicable SPEC §4 fixture/build suite first, including failure/empty cases in isolated fixtures.
+Use cargo fmt --check, cargo clippy --all-targets -- -D warnings, cargo test and production cargo tree;
+release-build the production binary separately from the oracle harness.
+Audit production's dependency tree, not the harness's permitted ide/hir/salsa tree.
+
+```bash
+strace -f -e trace=execve,openat -o "$OUT/production-process-access-audit.txt" \
+  process-tree-memory-sampler --sample-interval-millisecond-value 10 \
+  --memory-sample-output-path "$OUT/process-tree-memory-samples.json" -- \
+  parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
+  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" --worker-thread-count-value 4 \
+  > "$OUT/production-stage-output-log.txt" 2> "$OUT/production-stage-error-log.txt"
+parseltongue status-coverage-banner-show \
+  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
+  > "$OUT/hld-current-coverage-banner.json"
+parseltongue hld-current-export-sorted \
+  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
+  > "$OUT/hld-current-dependency-export.tsv"
 ```
 
-## 2. The procedure — run steps S1–S10 for each repository in turn
+The sampler/strace are external supervisors: filter the allowlist to the mapper and its descendants,
+not supervisor startup. Resolve audited paths/symlinks; forbid build-script execution and target/ output reads.
+Check lock existence BEFORE metadata; compare full lock digest before/after; failed/mutated metadata
+publishes no graph rows and preserves original bytes. A missing lock is explicit validation, not assumed Cargo behavior.
+Production errors include stderr; require successful stage markers/publication for the selected milestone.
+Do not require M8 HLD exports before M8: at earlier milestones export only available stage tables.
+The S3 fixture suite exercises SPEC §4's negative/stale/collision/cancellation cases without corrupting corpus runs.
 
-Placeholders: `$REPO` = absolute path of the checkout, `$NAME` = short name, `$OUT` = `e2e-runs/<date>/$NAME/`.
-Parseltongue verbs are the planned CLI (names fixed at M0); every other command exists today.
+### S4 — paired semantic oracle exports
 
-```text
- S1  INDEX WITH CODEBASE-MEMORY (fresh, full)
-       codebase-memory-mcp cli index_repository --repo-path $REPO --mode full
-       codebase-memory-mcp cli list_projects                   → note the project name for $REPO  ($CMP)
-       codebase-memory-mcp cli index_status --project $CMP     → succeeded; node and edge counts → report
-       codebase-memory-mcp cli get_graph_schema --project $CMP → label and edge-type counts → report
-     pass: index succeeded at the pinned commit (stale index = re-index; never reuse an older generation)
+Run in isolated oracle output/build locations, never allowing SECONDARY to alter PRIMARY's inputs.
+Write normalized rows in oracle-primary-semantic-rows.jsonl and oracle-secondary-semantic-rows.jsonl.
 
- S2  INDEX COVERAGE — what codebase-memory could NOT parse
-       codebase-memory-mcp cli check_index_coverage --project $CMP --scopes '["."]' --diagnostics full --format json
-       codebase-memory-mcp cli query_graph --project $CMP --graph missed --query "MATCH (f) RETURN f.file_path"
-     record: partially parsed / unusable files (rust-analyzer M: 137 partial, 148 unusable)
-     rule:   any disagreement in S7 that lands in a missed file is bucket CM-GAP, never a Parseltongue failure
-
- S3  RUN PARSELTONGUE (full pipeline, CPU only)
-       /usr/bin/time -v parseltongue map-workspace-full-run --workspace $REPO --db $OUT/pt.db --threads 4  2> $OUT/time.txt
-       parseltongue status-coverage-banner-show --db $OUT/pt.db --json > $OUT/banner.json
-       parseltongue hld-current-export-sorted --db $OUT/pt.db > $OUT/hld.tsv
-     pass: exit 0; no WorkspaceNotCompilingError (REQ 004); child processes ⊆ {cargo metadata --offline, rustc --print cfg,
-           rustc --print sysroot} (REQ 001, checked with `strace -f -e trace=execve`); no build.rs executed (REQ 015)
-
- S4  RUN THE ORACLE (offline rust-analyzer, same commit, same features)
-       rust-analyzer scip $REPO --output $OUT/ra.scip                         → definitions + references per occurrence
-       rust-analyzer analysis-stats $REPO --disable-build-scripts > $OUT/ra-stats-nobuild.txt
-       rust-analyzer analysis-stats $REPO > $OUT/ra-stats-full.txt
-     the two analysis-stats runs isolate KL1: what changes between them is build-script dependent (expected unresolved
-     in Parseltongue as unresolved(build_script)), never counted as a Parseltongue failure
-
- S5  DIFF AGAINST THE ORACLE
-       parseltongue oracle-edge-differ-run --db $OUT/pt.db --scip $OUT/ra.scip > $OUT/oracle-diff.json
-     writes oracle-edge-agreement-table; reads off REQ 005 (paths ≥ 99.5 %), 006 (macro items ≥ 99 %), 013 (proc-macro
-     shapes 100 %), 018 (signature edges ≥ 99.5 %), 007 (method precision ≥ 99 %), 008 (coverage ≥ 95 % after 7c)
-
- S6  STRUCTURAL CROSS-CHECK WITH CODEBASE-MEMORY (files, folders, items)
-       query_graph --project $CMP --query "MATCH (f:File) RETURN count(f)"
-       query_graph --project $CMP --query "MATCH (n) WHERE n:Function OR n:Method OR n:Struct OR n:Enum OR n:Interface
-                                            OR n:Type RETURN labels(n)[0], count(*)"
-       query_graph --project $CMP --query "MATCH (a)-[r:IMPLEMENTS]->(b) RETURN a.qualified_name, b.qualified_name"
-     compare with parseltongue:
-       C1  .rs file count of the workspace           equal, except files listed in S2 as missed
-       C2  item counts per kind                       explained difference only (fn-body items, macro-expanded items,
-                                                       cfg_inactive items — each difference assigned to one of these)
-       C3  every IMPLEMENTS edge (impl Trait for T)   present in hld-current as `implements`, or explained
-
- S7  EDGE CROSS-CHECK WITH CODEBASE-MEMORY (type-aware edges only)
-       query_graph --project $CMP --max-rows 99998 --format json --query
-         "MATCH (a)-[r:CALLS]->(b) WHERE r.strategy STARTS WITH 'lsp_' AND r.strategy <> 'lsp_short_name_unique'
-          RETURN a.qualified_name, a.file_path, a.start_line, b.qualified_name, b.file_path, r.strategy, r.confidence"
-       (page with --cursor until has_more = false; the 100 k-row ceiling applies)
-     map each edge to file-level: (a.file_path → b.file_path) and compare with hld-file-level-rollup
-     classify every file pair that differs into exactly one bucket:
-       AGREE        all three witnesses have it
-       PT-BUG       rust-analyzer has it, parseltongue does not, and the banner gives no reason  → FAIL, open an issue
-       PT-EXTRA     parseltongue has it, rust-analyzer does not                                  → FAIL (precision)
-       KNOWN-GAP    parseltongue has it unresolved with a reason (proc_macro, build_script, cfg_inactive,
-                    external_source_missing, trait_solver_needed) and S4/S5 confirm that cause → counted, not a failure
-       CM-ONLY      only codebase-memory has it (heuristic or missed-file) → logged, not a failure
-       CM-GAP       codebase-memory lacks it because of S2 coverage → logged, not a failure
-     pass: 0 PT-EXTRA; PT-BUG ≤ the REQ thresholds above; every KNOWN-GAP has a reason row
-
- S8  SPOT CHECK BY READING CODE (50 random HLD rows, fixed seed = run date)
-       for each sampled row: codebase-memory-mcp cli get_code_snippet --project $CMP --qualified-name <node01>
-       a human or ext-llm-coding-agent confirms the call / type use / impl is in the snippet (or in the collapsed
-       private chain named by the evidence rows)
-     pass: 50 / 50 confirmed; any miss is a PT-EXTRA and fails the run
-
- S9  HLD SHAPE RULES (REQ 019, 009)
-       every node: top-level item / inline-mod item / top-level impl or trait item, with non-private visibility
-       no node inside a fn body; private `use` never a node; every `pub use` → one reexports edge
-       every via = collapsed row has evidence rows naming the private items
-       reachable_outside_crate agrees with rust-analyzer's visibility for 100 % of nodes
-       codebase-memory check: trace_path --function-name <a collapsed row's private helper> --direction both
-       → its callers and callees contain the two HLD endpoints (when both are in non-missed files)
-
- S10 DETERMINISM, MEMORY, TIME (REQ 012, 011, budgets)
-       re-run S3 with --threads 1 and --threads 16 → hld.tsv byte-identical to the 4-thread run (`cmp`)
-       peak RSS from time.txt ("Maximum resident set size") ≤ 2 GB on rust-analyzer (target); recorded for all five
-       wall time recorded per stage from banner.json
+```bash
+oracle-semantic-export-harness export-workspace-semantic-rows \
+  --workspace-root-path-value "$REPO" --oracle-export-mode-value PRIMARY \
+  --semantic-row-output-path "$OUT/oracle-primary-semantic-rows.jsonl" \
+  > "$OUT/oracle-primary-output-log.txt" 2> "$OUT/oracle-primary-error-log.txt"
+oracle-semantic-export-harness export-workspace-semantic-rows \
+  --workspace-root-path-value "$REPO" --oracle-export-mode-value SECONDARY \
+  --semantic-row-output-path "$OUT/oracle-secondary-semantic-rows.jsonl" \
+  > "$OUT/oracle-secondary-output-log.txt" 2> "$OUT/oracle-secondary-error-log.txt"
 ```
 
-## 3. Pass / fail per repository
+PRIMARY: build scripts disabled. SECONDARY: enabled. Both: proc macros enabled, identical selected targets,
+features/cfg/editions, test cfg OFF (--no-test equivalent), offline inputs and recorded artifacts.
+Export path resolutions, invocation-keyed expansion items/signatures/body sites, impl relations,
+method/call targets, signature refs and effective visibility/reachability.
+The per-site PRIMARY/SECONDARY diff is the KL1 set; analysis-stats summaries cannot identify those sites.
+Optional `rust-analyzer scip` occurrence export must use a matching pinned binary/configuration and writes
+oracle-secondary-occurrence-index.scip; never substitute it for semantic rows or agreement gates.
 
-```text
- PASS  S1–S10 all pass, AND the REQ thresholds hold:
-         005 ≥ 99.5 % · 006 ≥ 99 % · 013 100 % · 018 ≥ 99.5 % · 007 ≥ 99 % precision · 008 reported (≥ 95 % after 7c)
-         009 / 019 100 % · 012 identical · 011 ≤ 2 GB (rust-analyzer)
- FAIL  any PT-EXTRA, any S8 miss, any forbidden process, any non-identical re-run, any threshold missed
- BLOCKED  a precondition P1–P5 not met → fix it and run again; never record BLOCKED as PASS
+### S5 — canonical per-site comparison
+
+```bash
+parseltongue oracle-edge-differ-run \
+  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
+  --primary-semantic-input-path "$OUT/oracle-primary-semantic-rows.jsonl" \
+  --secondary-semantic-input-path "$OUT/oracle-secondary-semantic-rows.jsonl" \
+  > "$OUT/hld-current-oracle-difference.json" 2> "$OUT/oracle-differ-error-log.txt"
 ```
 
-HLD current **works** only when all five are PASS in the same run (same Parseltongue hash, same toolchain).
+Write oracle-edge-agreement-table with each match/mismatch/unresolved/exclusion and causal evidence.
+Use compilation-unit identity, normalized path/range/site kind and expansion invocation/provenance keys.
+Target identity preserves Cargo source/target; duplicate keys canonicalize, different unit contexts stay separate.
+PRIMARY is the sole agreement denominator; SECONDARY-only sites are KL1 observations, not production misses.
 
-## 4. Run report (one file per run: `e2e-runs/<date>/REPORT.md`, append-only)
+Per-repo gates (SPEC §2.1 gives full formulas):
+- 005 exact path matches / eligible PRIMARY path sites ≥99.5%.
+- 006 exact invocation item+body-site sets / eligible PRIMARY invocations ≥99%.
+- 013 matching shape-expansion sets / matching-shape PRIMARY invocations =100%; every shape has a fixture.
+- 018 relation intersection / relation union ≥99.5%.
+- 007 correct extracted method targets / all extracted method sites ≥99%.
+- 008 correct extracted method targets / eligible PRIMARY method sites ≥95% mandatory at M8,
+  after the last selected inference sub-step, whether 7b or 7c.
+- 019 correct selection/visibility/reachability / union of candidate occurrences =100%.
 
-```text
- header        date · parseltongue hash · toolchain (P4) · machine (P5)
- per repo      pinned commit · codebase-memory nodes / edges / missed files (S1, S2)
-               parseltongue: files, spans, nodes, HLD rows, peak RSS, wall time (S3, S10)
-               oracle agreement per REQ (S5) — measured numbers, marked M
-               S6 C1–C3 results · S7 bucket counts (AGREE, PT-BUG, PT-EXTRA, KNOWN-GAP by reason, CM-ONLY, CM-GAP)
-               S8 50/50 · S9 · S10
-               verdict PASS / FAIL / BLOCKED, with the first failing step
- summary       one line per repo; overall verdict; issues opened for every PT-BUG / PT-EXTRA
+Report raw counts, exclusions and rates; no pooled-five-repo success. Empty denominator is N/A/BLOCKED for
+corpus gates, not 100%; empty fixtures assert zero output. Missing oracle evidence BLOCKS comparison.
+M2 alone excludes-and-reports proc-macro-dependent sites. M3 and later remove that temporary exemption.
+
+Authoritative reasons and scoring, identical to SPEC §2.2:
+cfg_inactive → build_script → proc_macro → external_source_missing → unknown_receiver → trait_solver_needed.
+Exactly one earliest causal reason per site. Count all reasons separately.
+Inactive/PRIMARY-absent KL1 are exclusions; PRIMARY-visible unresolved sites remain nonmatches, including
+unknown_receiver and build_script. Missing oracle source blocks; missing production source alone is a nonmatch.
+A wrong extracted target is never excused by an unresolved reason.
+
+### S6 — structural cross-check
+
+```bash
+codebase-memory-mcp cli query_graph --project "$CMP" \
+  --query "MATCH (f:File) RETURN f.file_path"
+codebase-memory-mcp cli query_graph --project "$CMP" \
+  --query "MATCH (n) WHERE n:Function OR n:Method OR n:Struct OR n:Enum OR n:Interface OR n:Type RETURN labels(n), count(*)"
+codebase-memory-mcp cli query_graph --project "$CMP" \
+  --query "MATCH (a)-[r:IMPLEMENTS]->(b) RETURN a.qualified_name, b.qualified_name"
 ```
 
-## 5. Rules
+Paginate row queries. Filter file paths to .rs and compare the same active closure/context, not the index's
+HTML/docs/unrelated fixture count. Explain bytes-only files, inactive cfg, body items and expansion differences.
+Impl graph differences prompt PRIMARY checks, not automatic pass/fail from codebase-memory.
+Compare file/folder roll-ups exactly with published HLD aggregation (REQ 009), separately from index counts.
 
-```text
- R1  all five repositories, every run (no subset, no "it passed last time")
- R2  rust-analyzer is the answer key; codebase-memory is a cross-check and never overrules it
- R3  codebase-memory absence is not proof of absence (S2 missed files, heuristic strategies)
- R4  numbers in the report are measured; targets are written as targets
- R5  parseltongue is never patched during a run; a fix means a new run of all five
- R6  re-index codebase-memory at the pinned commit for every run (S1); never reuse an old generation
+### S7 — edge triage without heuristic authority
+
+```bash
+codebase-memory-mcp cli query_graph --project "$CMP" --max-rows 99998 --format json \
+  --query "MATCH (a)-[r:CALLS]->(b) WHERE r.strategy STARTS WITH 'lsp_' AND r.strategy <> 'lsp_short_name_unique' RETURN a.qualified_name, a.file_path, a.start_line, b.qualified_name, b.file_path, r.strategy, r.confidence"
 ```
+
+Page with --cursor until has_more=false. STARTS WITH is supported in 0.12.1.
+Index CALLS edges are not occurrence-complete: use them to locate candidates, then score the normalized
+PRIMARY/production site rows. Never calculate method precision from deduplicated graph/file pairs.
+Assign each compared semantic site one result: AGREE (correct), PT-EXTRA (incorrect extracted),
+PT-BUG (PRIMARY-visible but not extracted), KNOWN-GAP (verified excluded cause).
+Record CM-ONLY/CM-GAP as separate cross-check evidence flags, not semantic exemptions.
+PT-EXTRA method rate = incorrect extracted method sites / all extracted method sites, must be ≤1%;
+PT-BUG method sites affect mandatory coverage under REQ 008.
+Record deduplicated HLD/file-pair discrepancies separately, without using them as precision denominators.
+Sample misses in S8 still fail even when the aggregate precision threshold passes.
+
+### S8 — sampled evidence review
+
+Sample min(50, published HLD row count) WITHOUT replacement using explicit recorded seed 42 by default,
+never derived from the run date. Rank canonical UTF-8 row keys by BLAKE3-256 of the seed (u64 little-endian),
+key byte length (u64 little-endian) and key bytes; select the smallest hashes, breaking ties by row key.
+Record algorithm/version, any overridden integer seed and all sampled row keys.
+Zero rows yields zero samples and N/A, not 50/50; empty fixtures pass emptiness assertions, while nonempty
+corpus gates still require SPEC's observations and cannot claim full success from no samples.
+For each sample, inspect its stored source/evidence, optionally locating code with:
+
+```bash
+codebase-memory-mcp cli get_code_snippet --project "$CMP" --qualified-name "<qualified-name>" --source-mode full
+```
+
+The reviewer (human-architect-intent-author or ext-llm-coding-agent) validates actual code/evidence,
+not just a snippet match. A missing index node uses stored source, not automatic failure.
+Every sampled false edge/missing required evidence FAILS, independent of the ≥99% aggregate gate.
+
+### S9 — node, reexport and collapse proof
+
+Compare effective visibility and node_reachable_outside_crate with PRIMARY for all candidate occurrences.
+Validate body-ancestry exclusion; trait/trait-impl/enum inherited visibility; restricted visibility;
+private parents and public aliases/globs. One reexports edge per resolved exported binding;
+source endpoints follow SPEC §2.4's module/root rule.
+Validate collapsed paths against stored evidence rows: each hop resolved, endpoints valid, private
+intermediates named, provenance/counts complete. No graph trace_path depth limit or CALLS-only traversal.
+Run cycles/diamonds/genuine self-edge/unresolved-link fixtures; roll-ups count HLD rows, not paths.
+Only extracted status enters HLD; an unresolved intermediate stops that path.
+
+### S10 — determinism, memory and time
+
+Run production twice at each worker count 1, 4, 16 under the same compatibility key; export stable sorted
+semantic rows to hld-current-dependency-export-<workers>-<attempt>.tsv and compare with cmp.
+Use fresh staging attempts; also run isolated concurrent-write and cancel/rerun fixtures.
+For rust-analyzer, process-tree peak RSS ≤2 GiB (2 × 1024³ bytes), including allowed children, excluding
+external samplers/indexers/harness. Record 10 ms summed-RSS samples, short-lived child accounting,
+the larger observed process-tree peak and sampling limits. Parent-only /usr/bin/time -v is supplementary.
+Report stage wall times and disk size; budget measurements are M, not assumed achievements.
+Final 008 coverage is mandatory here at M8 even when M7 was skipped.
+
+## 3. Milestone subsets and verdict
+
+SPEC M0–M8 is authoritative. All applicable corpus comparisons use all five pinned repos.
+Unavailable future stages are NOT silently marked passed.
+
+- M0: S3 skeleton/build/dependency/identity fixtures; S4 harness build/provenance smoke fixtures only.
+- M1: S1/S2, S3 input/store/generation/concurrency/cancellation fixtures; S10 input-row determinism and
+  write-throughput measurements only. No HLD, final coverage or full-pipeline memory verdict.
+- M2: S1/S2/S3, S4/S5 path/declarative/built-in/lang-item gates; proc-macro sites excluded-and-reported.
+- M3: M2 subset plus S4/S5 shape gates and paths/macros with temporary exclusions removed.
+- M4: M3 subset plus S4/S5 signatures/impl headers and S6 impl triage.
+- M5: M4 subset plus S4/S5/S7 body 7a precision, primitive lookup and coverage report.
+- M6: M5 subset for 7b; ≥95% on all five permits skipping M7.
+- M7: M6 subset for 7c, production no-salsa gate remains mandatory.
+- M8/releases: full S1–S10, all SPEC §4 contracts, final ≥95% coverage and ≤2 GiB rust-analyzer memory gate.
+
+PASS: every applicable clause/test and per-repo threshold passes. Full HLD works only when all five
+pass S1–S10 with the same production hash/toolchain.
+FAIL: contract failure, sampled miss, forbidden production access/spawn, nondeterminism, missed mandatory
+coverage/memory/agreement gate; PT-EXTRA is rate-gated, not automatically zero-tolerance.
+BLOCKED: missing precondition, incomplete coverage pagination or unavailable oracle evidence; never PASS.
+A codebase-memory omission cannot turn an oracle-proven error into KNOWN-GAP.
+Do not patch production during a run: fix, then start a new applicable run on all five.
+
+## 4. Persistent report
+
+Write hld-current-test-runs/<run-id>/hld-current-test-report.md, append-only per run.
+Artifact ordinal/worker/attempt suffixes are data values, not extra semantic name words.
+Record:
+- Corpus/source/lock/tool/config hashes, PRIMARY/SECONDARY manifests, harness source/executable hashes.
+- Generation keys and workspace/shared-library manifests, completed stages and exact applicable tests.
+- Index generation/counts, every coverage page and caveats; production exec/read audit and stderr.
+- Per-repo numerators/denominators/exclusions, authoritative reason counts, KL1 site evidence, rates.
+- Method PT-EXTRA/PT-BUG counts separately from deduplicated HLD/file-pair discrepancies and CM flags.
+- Sample seed/algorithm/keys and confirmed count; node/reexport/collapse/roll-up results.
+- Process-tree RSS telemetry, stage times, disk size, worker/attempt export comparisons.
+- Per-repo PASS/FAIL/BLOCKED, first failed clause, overall verdict and follow-up defects.
+
+A planned harness/test/command is not an observed passing result. Preserve output evidence for every claimed gate.
