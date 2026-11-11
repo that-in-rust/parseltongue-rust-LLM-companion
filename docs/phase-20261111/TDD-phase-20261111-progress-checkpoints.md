@@ -441,3 +441,15 @@ M2 oracle direction follows the latest user preference: first try per-crate Modu
 and Module::resolve_mod_path; only use duplicate IDs if a fixture shows the public scoped APIs cannot
 handle an actual case. SemanticsScope::speculative_resolve exists but its resolver is private and it
 explicitly disregards hygiene. Do not use that heuristic as an exact answer key without verification.
+
+### M2 oracle path export — STUB
+
+Added typed OracleWorkspaceExportConfig / OracleSemanticExportError and
+export_primary_semantic_paths signature, plus a CLI root/output route. Implementation is todo!();
+the build manifest deliberately still says provenance_only. Added pinned-checkout load-cargo,
+project-model, ide-db, syntax and vfs dependencies ONLY in the offline harness workspace.
+Production dependency graph is untouched. Offline cargo check finished successfully in 24.22s.
+Next RED: empty output, bad workspace, exact normalized targets, cfg/test exclusion and a physical
+module shared by two crates whose chosen dependency aliases point to different packages.
+PRIMARY must never run build scripts; cached proc-macro DLL injection still needs implementation.
+No semantic export, M2 resolver/differ, or S5 result is claimed by this phase.

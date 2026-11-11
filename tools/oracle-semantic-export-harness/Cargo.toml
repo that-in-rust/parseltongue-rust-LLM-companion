@@ -11,6 +11,14 @@ ide = { path = "../../../rust-tools/rust-analyzer/crates/ide" }
 hir = { path = "../../../rust-tools/rust-analyzer/crates/hir" }
 blake3 = "1"
 serde_json = "1"
+load-cargo = { path = "../../../rust-tools/rust-analyzer/crates/load-cargo" }
+project-model = { path = "../../../rust-tools/rust-analyzer/crates/project-model" }
+ide-db = { path = "../../../rust-tools/rust-analyzer/crates/ide-db" }
+syntax = { path = "../../../rust-tools/rust-analyzer/crates/syntax" }
+vfs = { path = "../../../rust-tools/rust-analyzer/crates/vfs" }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints.rust]
 unsafe_code = "forbid"

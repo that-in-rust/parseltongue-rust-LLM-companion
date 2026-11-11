@@ -1,4 +1,10 @@
-//! M0 pinned-build provenance only; semantic exports start with the resolution milestones.
+//! Offline semantic oracle; never linked into the production mapper.
+
+#[path = "primary-path-export-rows.rs"]
+mod primary_path_export_rows;
+pub use primary_path_export_rows::{
+    OracleSemanticExportError, OracleWorkspaceExportConfig, export_primary_semantic_paths,
+};
 
 pub fn build_oracle_source_manifest() -> serde_json::Value {
     let oracle_analysis_host_value = ide::AnalysisHost::default();
