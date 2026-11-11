@@ -202,3 +202,90 @@ What the model brings from pre-training is a prior, not knowledge of your code: 
 ### What this means for Hypothesis 01
 
 The model's task is narrow and well posed: for an in-repository method call whose receiver type the CPU could not work out, choose among a handful of shown signatures or abstain. Whether it does that well is the open question, and the two measurements under "Fastest experiment" above decide it before any training is paid for.
+
+## Hypothesis 02 — a tiny LLM can be taught to drive the span search itself
+
+**Statement.** Instead of the CPU handing the model a fixed shortlist (Hypothesis 01), the model runs the search. It reads a span, asks the span search a question, reads the rows that come back, and then picks a target, searches again, or says "not sure". Proposed name: `tiny-llm-span-searcher`.
+
+**How to prove it wrong.** Any of these kills it:
+- on unseen repositories it does not find more correct targets than the fixed shortlist of Hypothesis 01, at the same wrong-edge budget;
+- it needs more than about three searches per reference to get there;
+- it cannot be kept to valid queries without a larger model than the 8 GB machine allows.
+
+Nothing in this project has tested this yet. Every likelihood below is a judgement.
+
+### What it looks like
+
+```text
+ span says:   self.client.send(req).await?.json()
+
+ model asks:  search field `client` in this struct        → client: HttpClient
+ model asks:  search fn `send` on HttpClient              → HttpClient::send(..) -> Result<Response>
+ model asks:  search fn `json` on Response                → not in repo; `use reqwest::Response` → external: reqwest
+ model says:  edge to HttpClient::send (yours) + boundary edge to crate reqwest
+```
+
+Each line is one turn: the model writes one small query, the span search (a database lookup, not a compiler crate) returns a few rows, and the model reads them before deciding its next move.
+
+### Why it could beat a fixed shortlist
+
+| Case | Fixed shortlist (Hypothesis 01) | Model-driven search (Hypothesis 02) |
+|---|---|---|
+| Chains, `a.b().c()` | Stalls after the first call unless the CPU loop handles it | Each call's return type tells the model what to search next |
+| Re-exports and glob imports | Target may be missing from the list | Can follow a `pub use` to the real item |
+| Trait methods | Needs the right trait already in the list | Can search for traits in scope that have that method name |
+| External libraries | Not in the repo's span table | Can tell "yours" from "theirs" from `use` lines and `Cargo.toml` |
+
+### What it needs
+
+- **A span search.** The name and full-text index already in the design. Queries the model may write, kept to a tiny grammar:
+
+```text
+ find item   <name>                    any span with this name
+ find method <name> on <type>          a method of a given type
+ find field  <name> in <type>          a field of a given struct
+ find trait-method <name>              traits that declare this method
+ find use    <name> in <file>          the import line that brings a name in
+ find crate  <name>                    is this a workspace crate, a dependency, or std
+```
+
+- **External libraries made searchable.** Either index the dependency sources Cargo keeps on disk with the same parser, or ship a prebuilt index of popular crates. Without one of these the model can name the crate but not the exact item. Neither has been tried here.
+- **Training data.** Run rust-analyzer offline to get the true target of each reference. From the span tables, generate the shortest sequence of searches that reaches that target. The model learns to imitate those sequences. Labels are automatic; no human writes them.
+
+### Risks
+
+- **Small models wander.** Cap it at three searches per reference and constrain its output to the query grammar above, so it cannot write an invalid search.
+- **Errors compound.** A wrong first hop spoils the rest, so it must be allowed to abstain at any hop, and the CPU should check the final pick against the chosen signature (argument count, `self` form).
+- **It is slower.** Writing queries costs more than picking from a list. It should run only on what plain rules and the fixed shortlist leave over, in the background.
+- **It needs a generating model.** Picking from a list can be done by a small encoder. Writing queries needs a decoder, which is larger and slower for the same quality.
+
+### Likelihood
+
+Roughly even odds that a model of a few hundred MB learns one-to-three-hop search reliably. Lower for chains through generic return types and for trait methods on external types.
+
+### How it relates to Hypothesis 01
+
+```text
+ reference in a span
+        │
+        ▼
+ plain rules (paths, use lines, prelude, uniqueness) ── resolved → edge
+        │ not resolved
+        ▼
+ Hypothesis 01: fixed shortlist, model picks ─────────── resolved → edge (inferred)
+        │ target not in the shortlist, or model abstains
+        ▼
+ Hypothesis 02: model searches, up to three hops ─────── resolved → edge (inferred)
+        │ still not sure
+        ▼
+ abstained: the row stays visible and counted
+```
+
+The two are layers, not rivals. Hypothesis 02 is only worth building for the references Hypothesis 01 cannot reach.
+
+### The measurement that decides how much this matters
+
+The experiment already planned under Hypothesis 01 answers it before any training: on a labelled set from rust-analyzer, how often is the true target inside the simple name-search shortlist?
+
+- If it is usually there, a fixed shortlist is enough and Hypothesis 02 is a small refinement.
+- If it is often missing, model-driven search is the way to reach it, and the missing cases (sorted by cause: chain, re-export, trait method, external) say which query kinds to teach first.
