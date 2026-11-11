@@ -16,6 +16,17 @@ traits and error types (`SpanDigestIdValue`, `SpanRowReadStore`, `CrateGraphLoad
 `unresolved`), and names owned by other projects (rust-analyzer's `DefCollector`). The fixed prefixes `cpu-tool-` and
 `tiny-llm-` count as one word, as in the nomenclature below (`cpu-tool-syntax-tree-walker`).
 
+## Rust code style: idiomatic functional Rust (always apply)
+
+- Prefer pure functions, immutable data, expressions, and small total functions with typed inputs/outputs.
+- Prefer iterator combinators (`map`, `filter`, `fold`, `try_fold`), `Option`/`Result` combinators and `?` over mutation and loops with flags.
+- Keep side effects (I/O, DB, processes) at L3 edges behind traits.
+- No `unwrap`/`expect` outside tests; no `unsafe`; no global mutable state.
+- Make ownership/borrowing clear rather than clever; readability and reasoning beat speed.
+- Accept small-value clones or a second pass for clarity; optimise only after a measured budget miss.
+- Implement with TDD stub → red → green → refactor (`tdd-workflow-for-rust-stub-red-green-refactor`).
+- Use repo skills in `.agents/skills`: `rust-coder-02`, `idiomatic-rust-coder-01`, `rust-executable-specs-01`.
+
 ## Working method (always apply)
 
 - Classify first: broken behavior → bug; existing rails → enhancement; bounded new capability → feature; unclear new system → product. Use the lightest safe workflow.
