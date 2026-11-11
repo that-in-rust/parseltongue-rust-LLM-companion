@@ -60,30 +60,88 @@ fn make_fixture_command_runner() -> FixtureWorkspaceCommandRunner {
 
 struct UnmappedWorkspaceCommandRunner;
 impl WorkspaceCommandRunPort for UnmappedWorkspaceCommandRunner {
-    fn run_workspace_command_output(&self,root:&Path,args:&[&str])->Result<Vec<u8>,StoreBackendFailureError>{
-        let bytes=make_fixture_command_runner().run_workspace_command_output(root,args)?;
-        if args!=["cargo","metadata","--offline"] {return Ok(bytes);}
-        let mut document:serde_json::Value=serde_json::from_slice(&bytes).unwrap();
-        let mut helper=document["packages"][0].clone();
-        let helper_id="path+file:///helper#helper@0.1.0";
-        helper["id"]=json!(helper_id);
-        helper["name"]=json!("helper");
-        helper["targets"]=json!([helper["targets"][0].clone()]);
-        document["packages"][0]["targets"]=json!([{"kind":["test"],"src_path":root.join("tests/check.rs")}]);
-        document["packages"][0]["dependencies"]=json!([{"name":"helper","kind":null,"target":null,"features":[],"uses_default_features":true,"optional":false}]);
+    fn run_workspace_command_output(
+        &self,
+        root: &Path,
+        args: &[&str],
+    ) -> Result<Vec<u8>, StoreBackendFailureError> {
+        let bytes = make_fixture_command_runner().run_workspace_command_output(root, args)?;
+        if args != ["cargo", "metadata", "--offline"] {
+            return Ok(bytes);
+        }
+        let mut document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut helper = document["packages"][0].clone();
+        let helper_id = "path+file:///helper#helper@0.1.0";
+        helper["id"] = json!(helper_id);
+        helper["name"] = json!("helper");
+        helper["targets"] = json!([helper["targets"][0].clone()]);
+        let mut test_target = document["packages"][0]["targets"][0].clone();
+        test_target["kind"] = json!(["test"]);
+        test_target["crate_types"] = json!(["bin"]);
+        test_target["src_path"] = json!(root.join("tests/check.rs"));
+        document["packages"][0]["targets"] = json!([test_target]);
+        document["packages"][0]["dependencies"] = json!([{"name":"helper","req":"*","source":null,"rename":null,"kind":null,"target":null,"features":[],"uses_default_features":true,"optional":false}]);
         document["packages"].as_array_mut().unwrap().push(helper);
-        document["resolve"]["nodes"][0]["deps"]=json!([{"name":"helper","pkg":helper_id,"dep_kinds":[{"kind":null,"target":null}]}]);
-        document["resolve"]["nodes"].as_array_mut().unwrap().push(json!({"id":helper_id,"deps":[],"features":["default","one"]}));
+        document["resolve"]["nodes"][0]["deps"] =
+            json!([{"name":"helper","pkg":helper_id,"dep_kinds":[{"kind":null,"target":null}]}]);
+        document["resolve"]["nodes"][0]["dependencies"] = json!([helper_id]);
+        let mut helper_node = document["resolve"]["nodes"][0].clone();
+        helper_node["id"] = json!(helper_id);
+        helper_node["deps"] = json!([]);
+        helper_node["dependencies"] = json!([]);
+        document["resolve"]["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .push(helper_node);
         Ok(serde_json::to_vec(&document).unwrap())
     }
 }
 
 #[test]
 fn test_testonly_workspace_stays_unmapped() {
-    let directory=tempfile::tempdir().unwrap();
-    std::fs::write(directory.path().join("Cargo.lock"),b"lock").unwrap();
-    let rows=load_workspace_crate_graph(directory.path(),&UnmappedWorkspaceCommandRunner).unwrap();
-    assert!(!rows.iter().any(|r|r.stage_owned_table_name=="crate-dependency-graph-table"));
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
+    let rows =
+        load_workspace_crate_graph(directory.path(), &UnmappedWorkspaceCommandRunner).unwrap();
+    assert!(
+        !rows
+            .iter()
+            .any(|r| r.stage_owned_table_name == "crate-dependency-graph-table")
+    );
+}
+
+#[test]
+fn test_source_targets_stay_excluded() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("source.rs");
+    std::fs::write(&source, b"fn source() {}").unwrap();
+    assert_eq!(
+        read_safe_source_bytes(&source).unwrap().1,
+        b"fn source() {}"
+    );
+    std::fs::write(&source, b"").unwrap();
+    assert!(read_safe_source_bytes(&source).unwrap().1.is_empty());
+    let target = directory.path().join("target/nested");
+    std::fs::create_dir_all(&target).unwrap();
+    let generated = target.join("generated.rs");
+    std::fs::write(&generated, b"fn generated() {}").unwrap();
+    assert!(
+        read_safe_source_bytes(&generated)
+            .unwrap_err()
+            .to_string()
+            .contains("forbidden target source")
+    );
+    #[cfg(unix)]
+    {
+        let linked = directory.path().join("linked.rs");
+        std::os::unix::fs::symlink(&generated, &linked).unwrap();
+        assert!(
+            read_safe_source_bytes(&linked)
+                .unwrap_err()
+                .to_string()
+                .contains("forbidden target source")
+        );
+    }
 }
 
 #[test]

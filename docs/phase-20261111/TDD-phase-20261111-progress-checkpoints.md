@@ -291,3 +291,15 @@ Keep raw bytes and raw byte coordinates authoritative. Parse compiler-normalized
 offset restoration map. Use the already-transitive pinned ra_ap_parser public token-input/tree-builder
 APIs to retain contextual identifiers in macro paths (macro_rules definitions remain special); no
 dependency version changes, source rewriting, vendored patch or semantic-engine dependency is needed.
+
+### M1 bounded persistence and source compatibility — GREEN
+
+Syntax 11/11 pass, including all three source compatibility regressions and cfg-token normalization.
+Remaining workspace 32/32 pass: graph 8, scheduler 4, CLI 1, core 3, fake store 1, Turso 15.
+The test-only-root fixture initially lacked required Cargo metadata fields; copied complete target/node
+shapes and reran against the unfiltered implementation to obtain the intended graph-row assertion
+failure, then restored selected-root filtering. No production validation was relaxed.
+The source guard fixture checks normal/empty bytes and rejects nested target files plus symlink aliases.
+Python separation contracts: Ran 4 tests in 0.128s, OK. Direct parser dependency is the same pinned
+already-transitive version; cargo tree gate still passes (L1 dependency-free, no forbidden semantic crates).
+strace now uses --seccomp-bpf to avoid stopping the mapper on excluded syscalls.

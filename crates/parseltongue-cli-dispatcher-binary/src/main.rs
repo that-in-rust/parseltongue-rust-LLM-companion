@@ -6,7 +6,7 @@ use parseltongue_crate_graph_loader::{
     OfflineWorkspaceCommandRunner, ingest_requested_source_file, ingest_workspace_source_files,
     load_workspace_crate_graph,
 };
-use parseltongue_stage_worker_scheduler::run_bounded_stage_workers;
+use parseltongue_stage_worker_scheduler::map_bounded_stage_workers;
 use parseltongue_syntax_span_extractor::{SyntaxFileInputData, extract_file_syntax_rows};
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
@@ -171,65 +171,71 @@ fn run_persisted_syntax_stage(
                 })
                 .collect::<Result<_, StoreBackendFailureError>>()?;
         let keys: Vec<_> = pending.keys().cloned().collect();
-        run_bounded_stage_workers(&keys, workers, cancel, |key| {
-            let request: Value =
-                serde_json::from_str(&pending[key]).map_err(build_pipeline_stage_error)?;
-            let unit =
-                &units[read_required_json_string(&request, "unit_compilation_identity_key")?];
-            let path = read_required_json_string(&request, "file_source_absolute_path")?;
-            let file = files.get(path).ok_or_else(|| {
-                build_pipeline_stage_error(format!("StageInputMissingError: source file {path}"))
+        for batch in keys.chunks(workers) {
+            let inputs: BTreeMap<_, _> = batch
+                .iter()
+                .map(|key| {
+                    let request: Value =
+                        serde_json::from_str(&pending[key]).map_err(build_pipeline_stage_error)?;
+                    let unit = &units
+                        [read_required_json_string(&request, "unit_compilation_identity_key")?];
+                    let path = read_required_json_string(&request, "file_source_absolute_path")?;
+                    let file = files.get(path).ok_or_else(|| {
+                        build_pipeline_stage_error(format!(
+                            "StageInputMissingError: source file {path}"
+                        ))
+                    })?;
+                    let bytes = store.read_file_content_bytes(read_required_json_string(
+                        file,
+                        "file_content_digest_full",
+                    )?)?;
+                    let input = SyntaxFileInputData {
+                        file_source_absolute_path: path.into(),
+                        file_source_content_bytes: bytes,
+                        unit_compilation_identity_key: read_required_json_string(
+                            &request,
+                            "unit_compilation_identity_key",
+                        )?
+                        .into(),
+                        unit_rust_edition_value: read_required_json_string(
+                            unit,
+                            "unit_rust_edition_value",
+                        )?
+                        .into(),
+                        unit_target_cfg_values: serde_json::from_value(
+                            unit["unit_target_cfg_values"].clone(),
+                        )
+                        .map_err(build_pipeline_stage_error)?,
+                        file_module_directory_path: read_required_json_string(
+                            &request,
+                            "file_module_directory_path",
+                        )?
+                        .into(),
+                        unit_metadata_environment_values: serde_json::from_value(
+                            unit["unit_metadata_environment_values"].clone(),
+                        )
+                        .map_err(build_pipeline_stage_error)?,
+                        file_parse_context_kind: read_required_json_string(
+                            &request,
+                            "file_parse_context_kind",
+                        )?
+                        .into(),
+                        file_expansion_provenance_chain: serde_json::from_value(
+                            request["file_expansion_provenance_chain"].clone(),
+                        )
+                        .map_err(build_pipeline_stage_error)?,
+                    };
+                    Ok((key.clone(), input))
+                })
+                .collect::<Result<_, StoreBackendFailureError>>()?;
+            let output = map_bounded_stage_workers(batch, workers, cancel, |key| {
+                extract_file_syntax_rows(&inputs[key])
+                    .map(|result| (key.to_owned(), result.stage_unit_output_rows))
             })?;
-            let bytes = store.read_file_content_bytes(read_required_json_string(
-                file,
-                "file_content_digest_full",
-            )?)?;
-            let input = SyntaxFileInputData {
-                file_source_absolute_path: path.into(),
-                file_source_content_bytes: bytes,
-                unit_compilation_identity_key: read_required_json_string(
-                    &request,
-                    "unit_compilation_identity_key",
-                )?
-                .into(),
-                unit_rust_edition_value: read_required_json_string(
-                    unit,
-                    "unit_rust_edition_value",
-                )?
-                .into(),
-                unit_target_cfg_values: serde_json::from_value(
-                    unit["unit_target_cfg_values"].clone(),
-                )
-                .map_err(build_pipeline_stage_error)?,
-                file_module_directory_path: read_required_json_string(
-                    &request,
-                    "file_module_directory_path",
-                )?
-                .into(),
-                unit_metadata_environment_values: serde_json::from_value(
-                    unit["unit_metadata_environment_values"].clone(),
-                )
-                .map_err(build_pipeline_stage_error)?,
-                file_parse_context_kind: read_required_json_string(
-                    &request,
-                    "file_parse_context_kind",
-                )?
-                .into(),
-                file_expansion_provenance_chain: serde_json::from_value(
-                    request["file_expansion_provenance_chain"].clone(),
-                )
-                .map_err(build_pipeline_stage_error)?,
-            };
-            let result = extract_file_syntax_rows(&input)?;
-            write_pipeline_stage_unit(
-                store,
-                scope,
-                "syntax-spans",
-                key,
-                &result.stage_unit_output_rows,
-                cancel,
-            )
-        })?;
+            output.into_iter().try_for_each(|(key, rows)| {
+                write_pipeline_stage_unit(store, scope, "syntax-spans", &key, &rows, cancel)
+            })?;
+        }
         let requests = read_stage_json_records(store, scope, "module-source-closure-requests")?;
         let known: BTreeSet<_> = store
             .read_stage_table_rows(scope, "syntax-file-work-requests")?

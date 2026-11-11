@@ -10,32 +10,50 @@ fn test_pure_worker_results_ordered() {
     let keys = vec!["one".into(), "two".into(), "three".into()];
     let peak = AtomicUsize::new(0);
     let active = AtomicUsize::new(0);
-    let output = map_bounded_stage_workers(&keys,2,&RunCancelFlagValue::default(),|key|{
-        let count = active.fetch_add(1,Ordering::SeqCst)+1;
-        peak.fetch_max(count,Ordering::SeqCst);
+    let output = map_bounded_stage_workers(&keys, 2, &RunCancelFlagValue::default(), |key| {
+        let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+        peak.fetch_max(count, Ordering::SeqCst);
         std::thread::yield_now();
-        active.fetch_sub(1,Ordering::SeqCst);
+        active.fetch_sub(1, Ordering::SeqCst);
         Ok(key.len())
-    }).unwrap();
-    assert_eq!(output,vec![3,3,5]);
-    assert!(peak.load(Ordering::SeqCst)<=2);
-    let output: Vec<usize> = map_bounded_stage_workers(&[],2,&RunCancelFlagValue::default(),|_|Ok(0)).unwrap();
+    })
+    .unwrap();
+    assert_eq!(output, vec![3, 3, 5]);
+    assert!(peak.load(Ordering::SeqCst) <= 2);
+    let output: Vec<usize> =
+        map_bounded_stage_workers(&[], 2, &RunCancelFlagValue::default(), |_| Ok(0)).unwrap();
     assert!(output.is_empty());
 }
 
 #[test]
 fn test_pure_worker_errors_propagate() {
     use parseltongue_stage_worker_scheduler::map_bounded_stage_workers;
-    let keys = vec!["one".into(),"two".into()];
-    assert!(map_bounded_stage_workers(&keys,0,&RunCancelFlagValue::default(),|_|Ok(0)).is_err());
-    assert!(map_bounded_stage_workers::<()>(&keys,2,&RunCancelFlagValue::default(),|_|Err(StoreBackendFailureError{error_context_detail_text:"failure".into()})).is_err());
+    let keys = vec!["one".into(), "two".into()];
+    assert!(
+        map_bounded_stage_workers(&keys, 0, &RunCancelFlagValue::default(), |_| Ok(0)).is_err()
+    );
+    assert!(
+        map_bounded_stage_workers::<()>(&keys, 2, &RunCancelFlagValue::default(), |_| Err(
+            StoreBackendFailureError {
+                error_context_detail_text: "failure".into()
+            }
+        ))
+        .is_err()
+    );
     let cancelled = RunCancelFlagValue::default();
     cancelled.request_stage_work_cancellation();
-    assert!(map_bounded_stage_workers(&keys,2,&cancelled,|_|Ok(0)).is_err());
-    assert!(map_bounded_stage_workers::<()>(&keys,2,&RunCancelFlagValue::default(),|key|{
-        if key=="one" {panic!("worker failure");}
-        Err(StoreBackendFailureError{error_context_detail_text:"other failure".into()})
-    }).is_err());
+    assert!(map_bounded_stage_workers(&keys, 2, &cancelled, |_| Ok(0)).is_err());
+    assert!(
+        map_bounded_stage_workers::<()>(&keys, 2, &RunCancelFlagValue::default(), |key| {
+            if key == "one" {
+                panic!("worker failure");
+            }
+            Err(StoreBackendFailureError {
+                error_context_detail_text: "other failure".into(),
+            })
+        })
+        .is_err()
+    );
 }
 
 #[test]

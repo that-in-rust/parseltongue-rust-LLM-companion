@@ -83,7 +83,11 @@ pub fn evaluate_cfg_expression_truth(
                         _ => Err(()),
                     }
                 }
-                _ => Ok(self.values.contains(name)),
+                _ => Ok(match name {
+                    "true" => true,
+                    "false" => false,
+                    _ => self.values.contains(name),
+                }),
             }
         }
     }

@@ -87,11 +87,11 @@ python3 tools/process-tree-access-auditor.py sample \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
   --workspace-store-file-path "$OUT/production-untraced-workspace-store.db" --worker-thread-count-value 4 \
   > "$OUT/production-stage-output-log.txt" 2> "$OUT/production-stage-error-log.txt"
-strace -f -s 65535 -e trace=execve,connect,clone,clone3,fork,vfork \
+strace --seccomp-bpf -f -s 65535 -e trace=execve,connect,clone,clone3,fork,vfork \
   -o "$OUT/production-process-access-audit.txt" \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
   --workspace-store-file-path "$OUT/production-audit-workspace-store.db" --worker-thread-count-value 4
-strace -f -s 65535 -e trace=openat -P "$REPO/target" \
+strace --seccomp-bpf -f -s 65535 -e trace=openat -P "$REPO/target" \
   -o "$OUT/production-target-access-audit.txt" \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
   --workspace-store-file-path "$OUT/production-target-workspace-store.db" --worker-thread-count-value 4
@@ -112,6 +112,10 @@ sum of live mapper/descendant VmRSS in bytes at nominal 10 ms intervals; supervi
 tools/corpus-production-stage-measurements.py runs sampling, audit and JSON status for the pinned corpus.
 Timing/RSS SHALL come only from the untraced run. Do not put the sampler beneath strace: its /proc
 opens can dominate the trace and stop the mapper. Separate stores prevent measurement/audit interference.
+Use strace --seccomp-bpf so excluded syscall classes do not incur ptrace stops.
+N bounds CPU parsing workers and resident file inputs/results. The CLI loads at most N file inputs,
+parses them in parallel without store calls, then writes their atomic file units in stable order.
+The adapter retains Concurrent transactions and bounded retries for independent concurrent callers.
 The lightweight execve/connect audit retains clone/fork metadata solely to prove direct-child versus
 Cargo-descendant ancestry; it traces no file opens. Filtered openat is a separate run. strace -P matches
 the exact repo/target path, not all descendants: recursive target rejection is enforced by canonical-path

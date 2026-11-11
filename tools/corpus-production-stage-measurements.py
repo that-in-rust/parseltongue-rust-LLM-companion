@@ -22,10 +22,10 @@ def build_corpus_measurement_commands(record, output):
     measurement = [sys.executable, str(ROOT / "tools/process-tree-access-auditor.py"),
                    "sample", "--memory-sample-output-path", str(output / "process-tree-memory-samples.json"),
                    "--", *common, str(output / "production-untraced-workspace-store.db")]
-    audit = ["strace", "-f", "-s", "65535", "-e", "trace=execve,connect,clone,clone3,fork,vfork",
+    audit = ["strace", "--seccomp-bpf", "-f", "-s", "65535", "-e", "trace=execve,connect,clone,clone3,fork,vfork",
              "-o", str(output / "production-process-access-audit.txt"),
              *common, str(output / "production-audit-workspace-store.db")]
-    reads = ["strace", "-f", "-s", "65535", "-e", "trace=openat",
+    reads = ["strace", "--seccomp-bpf", "-f", "-s", "65535", "-e", "trace=openat",
              "-P", str(Path(record["corpus_source_checkout_path"]) / "target"),
              "-o", str(output / "production-target-access-audit.txt"),
              *common, str(output / "production-target-workspace-store.db")]

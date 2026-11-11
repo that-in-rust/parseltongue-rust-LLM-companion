@@ -133,14 +133,25 @@ pub fn load_workspace_crate_graph(
     let mut contexts: BTreeMap<(String, bool), BTreeSet<String>> = members
         .iter()
         .filter_map(|id| {
-            packages.get(id).map(|package| {
-                let defaults = if package["features"].get("default").is_some() {
-                    BTreeSet::from(["default".into()])
-                } else {
-                    BTreeSet::new()
-                };
-                ((id.clone(), check_proc_macro_package(package)), defaults)
-            })
+            packages
+                .get(id)
+                .filter(|package| {
+                    package["targets"].as_array().is_some_and(|targets| {
+                        targets.iter().any(|target| {
+                            check_library_target_kind(target)
+                                || target["kind"][0] == "bin"
+                                || target["kind"][0] == "proc-macro"
+                        })
+                    })
+                })
+                .map(|package| {
+                    let defaults = if package["features"].get("default").is_some() {
+                        BTreeSet::from(["default".into()])
+                    } else {
+                        BTreeSet::new()
+                    };
+                    ((id.clone(), check_proc_macro_package(package)), defaults)
+                })
         })
         .collect();
     loop {

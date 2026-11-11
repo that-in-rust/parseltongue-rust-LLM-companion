@@ -60,41 +60,84 @@ fn test_cfg_comments_keep_semantics() {
 
 #[test]
 fn test_source_crlf_tiling_exact() {
-    let source=b"#![doc = \"\r\nDocs\r\n\"]\r\nfn active() { let text = \"x\r\ny\"; }\r\n";
-    let result=extract_file_syntax_rows(&make_syntax_file_input(source)).unwrap();
-    let spans: Vec<Value> = result.stage_unit_output_rows.iter().filter(|r|r.stage_owned_table_name=="span-reference-text-table")
-        .map(|r|serde_json::from_str(&r.stage_row_payload_text).unwrap()).collect();
+    let source = b"#![doc = \"\r\nDocs\r\n\"]\r\nfn active() { let text = \"x\r\ny\"; }\r\n";
+    let result = extract_file_syntax_rows(&make_syntax_file_input(source)).unwrap();
+    let spans: Vec<Value> = result
+        .stage_unit_output_rows
+        .iter()
+        .filter(|r| r.stage_owned_table_name == "span-reference-text-table")
+        .map(|r| serde_json::from_str(&r.stage_row_payload_text).unwrap())
+        .collect();
     for span in spans {
-        let start=span["span_byte_start_offset"].as_u64().unwrap() as usize;
-        let end=span["span_byte_end_offset"].as_u64().unwrap() as usize;
-        assert_eq!(span["span_source_code_text"],std::str::from_utf8(&source[start..end]).unwrap());
-        assert_eq!(span["span_content_digest_full"],blake3::hash(&source[start..end]).to_hex().to_string());
+        let start = span["span_byte_start_offset"].as_u64().unwrap() as usize;
+        let end = span["span_byte_end_offset"].as_u64().unwrap() as usize;
+        assert_eq!(
+            span["span_source_code_text"],
+            std::str::from_utf8(&source[start..end]).unwrap()
+        );
+        assert_eq!(
+            span["span_content_digest_full"],
+            blake3::hash(&source[start..end]).to_hex().to_string()
+        );
     }
-    let ranges: Vec<Value> = result.stage_unit_output_rows.iter().filter(|r|r.stage_owned_table_name=="span-byte-ownership-ranges")
-        .map(|r|serde_json::from_str(&r.stage_row_payload_text).unwrap()).collect();
-    assert_eq!(ranges.iter().map(|r|r["span_byte_end_offset"].as_u64().unwrap()-r["span_byte_start_offset"].as_u64().unwrap()).sum::<u64>(),source.len() as u64);
+    let ranges: Vec<Value> = result
+        .stage_unit_output_rows
+        .iter()
+        .filter(|r| r.stage_owned_table_name == "span-byte-ownership-ranges")
+        .map(|r| serde_json::from_str(&r.stage_row_payload_text).unwrap())
+        .collect();
+    assert_eq!(
+        ranges
+            .iter()
+            .map(|r| r["span_byte_end_offset"].as_u64().unwrap()
+                - r["span_byte_start_offset"].as_u64().unwrap())
+            .sum::<u64>(),
+        source.len() as u64
+    );
 }
 
 #[test]
 fn test_module_path_parent_relative() {
     let mut input=make_syntax_file_input(b"#[path=\"discouraged.rs\"] mod discouraged; mod normal; mod inner { #[path=\"nested.rs\"] mod nested; }");
-    input.file_source_absolute_path="/workspace/src/parser.rs".into();
-    input.file_module_directory_path="/workspace/src/parser".into();
-    let result=extract_file_syntax_rows(&input).unwrap();
-    let paths:Vec<_>=result.source_closure_file_requests.iter().flat_map(|r|r.source_request_path_candidates.iter()).collect();
-    for expected in ["/workspace/src/discouraged.rs","/workspace/src/parser/normal.rs","/workspace/src/parser/inner/nested.rs"] {
-        assert!(paths.iter().any(|p|p.as_str()==expected),"{paths:?}");
+    input.file_source_absolute_path = "/workspace/src/parser.rs".into();
+    input.file_module_directory_path = "/workspace/src/parser".into();
+    let result = extract_file_syntax_rows(&input).unwrap();
+    let paths: Vec<_> = result
+        .source_closure_file_requests
+        .iter()
+        .flat_map(|r| r.source_request_path_candidates.iter())
+        .collect();
+    for expected in [
+        "/workspace/src/discouraged.rs",
+        "/workspace/src/parser/normal.rs",
+        "/workspace/src/parser/inner/nested.rs",
+    ] {
+        assert!(paths.iter().any(|p| p.as_str() == expected), "{paths:?}");
     }
 }
 
 #[test]
 fn test_contextual_macro_names_parse() {
-    let input=make_syntax_file_input(b"macro_rules! safe {() => {}} safe! {} macro_rules! default {() => {}} default! {}");
-    let result=extract_file_syntax_rows(&input).unwrap();
-    let sites: Vec<Value> = result.stage_unit_output_rows.iter().filter(|r|r.stage_owned_table_name=="body-site-reference-table")
-        .map(|r|serde_json::from_str(&r.stage_row_payload_text).unwrap()).collect();
-    assert!(sites.iter().any(|r|r["site_syntax_source_text"]=="safe! {}"));
-    assert!(sites.iter().any(|r|r["site_syntax_source_text"]=="default! {}"));
+    let input = make_syntax_file_input(
+        b"macro_rules! safe {() => {}} safe! {} macro_rules! default {() => {}} default! {}",
+    );
+    let result = extract_file_syntax_rows(&input).unwrap();
+    let sites: Vec<Value> = result
+        .stage_unit_output_rows
+        .iter()
+        .filter(|r| r.stage_owned_table_name == "body-site-reference-table")
+        .map(|r| serde_json::from_str(&r.stage_row_payload_text).unwrap())
+        .collect();
+    assert!(
+        sites
+            .iter()
+            .any(|r| r["site_syntax_source_text"] == "safe! {}")
+    );
+    assert!(
+        sites
+            .iter()
+            .any(|r| r["site_syntax_source_text"] == "default! {}")
+    );
 }
 
 #[test]

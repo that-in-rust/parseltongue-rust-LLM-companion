@@ -1701,6 +1701,7 @@ dependencies = [
  "blake3",
  "parseltongue-core-row-types",
  "parseltongue-table-store-traits",
+ "ra_ap_parser",
  "ra_ap_syntax",
  "serde_json",
 ]

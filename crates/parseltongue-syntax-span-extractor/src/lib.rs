@@ -1,11 +1,133 @@
-pub use parseltongue_core_row_types::evaluate_cfg_expression_truth;
 use parseltongue_core_row_types::{StageTableRowRecord, StoreBackendFailureError};
 use ra_ap_syntax::{AstNode, AstToken, Edition, SyntaxNode, ast};
 use serde_json::{Value, json};
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},
 };
+
+fn parse_compatible_rust_syntax(
+    source: &str,
+    context: &str,
+    edition: Edition,
+) -> Result<ra_ap_syntax::Parse<SyntaxNode>, StoreBackendFailureError> {
+    use ra_ap_parser::{Input, LexedStr, StrStep, TopEntryPoint};
+    use ra_ap_syntax::{SyntaxKind, SyntaxTreeBuilder, TextSize};
+    u32::try_from(source.len()).map_err(build_syntax_stage_failure)?;
+    let lexed = LexedStr::new(edition, source);
+    let (input, _) = (0..lexed.len()).fold(
+        (Input::with_capacity(lexed.len()), false),
+        |(mut input, was_joint), index| {
+            let kind = lexed.kind(index);
+            if kind.is_trivia() {
+                (input, false)
+            } else if kind == SyntaxKind::IDENT {
+                let contextual = SyntaxKind::from_contextual_keyword(lexed.text(index), edition)
+                    .unwrap_or(SyntaxKind::IDENT);
+                let macro_path = (index + 1..lexed.len())
+                    .find(|next| !lexed.kind(*next).is_trivia())
+                    .is_some_and(|next| lexed.kind(next) == ra_ap_syntax::T![!]);
+                input.push_ident(
+                    if macro_path && contextual != ra_ap_syntax::T![macro_rules] {
+                        SyntaxKind::IDENT
+                    } else {
+                        contextual
+                    },
+                    edition,
+                );
+                (input, was_joint)
+            } else {
+                if was_joint {
+                    input.was_joint();
+                }
+                input.push(kind, edition);
+                if kind == SyntaxKind::FLOAT_NUMBER {
+                    if !lexed.text(index).ends_with('.') {
+                        input.was_joint();
+                        (input, was_joint)
+                    } else {
+                        (input, false)
+                    }
+                } else {
+                    (input, true)
+                }
+            }
+        },
+    );
+    let entry = if context == "expression" {
+        TopEntryPoint::Expr
+    } else {
+        TopEntryPoint::SourceFile
+    };
+    let mut builder = SyntaxTreeBuilder::default();
+    let exhausted = lexed.intersperse_trivia(&entry.parse(&input), &mut |step| match step {
+        StrStep::Token { kind, text } => builder.token(kind, text),
+        StrStep::Enter { kind } => builder.start_node(kind),
+        StrStep::Exit => builder.finish_node(),
+        StrStep::Error { msg, pos } => builder.error(msg.into(), TextSize::new(pos as u32)),
+    });
+    if !exhausted {
+        return Err(build_syntax_stage_failure(
+            "source tokens remain unconsumed",
+        ));
+    }
+    for (index, error) in lexed.errors() {
+        builder.error(error.into(), TextSize::new(lexed.text_start(index) as u32));
+    }
+    Ok(builder.finish())
+}
+
+fn restore_source_byte_offset(offset: ra_ap_syntax::TextSize, removed: &[usize]) -> usize {
+    let normalized = u32::from(offset) as usize;
+    normalized + removed.partition_point(|position| *position < normalized)
+}
+
+fn normalize_cfg_source_tokens(source: &str) -> Result<String, StoreBackendFailureError> {
+    let parsed = ast::Expr::parse(&format!("cfg!({source}\n)"), Edition::Edition2024);
+    if !parsed.errors().is_empty() {
+        return Err(build_syntax_stage_failure(format!(
+            "invalid cfg token source: {source}"
+        )));
+    }
+    let tree = parsed
+        .syntax_node()
+        .descendants()
+        .find_map(ast::MacroCall::cast)
+        .and_then(|call| call.token_tree())
+        .ok_or_else(|| build_syntax_stage_failure("cfg token tree absent"))?;
+    let tokens: Vec<_> = tree
+        .syntax()
+        .descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+        .filter(|token| !token.kind().is_trivia())
+        .collect();
+    tokens
+        .get(1..tokens.len().saturating_sub(1))
+        .ok_or_else(|| build_syntax_stage_failure("cfg delimiters absent"))?
+        .iter()
+        .try_fold(String::new(), |mut normalized, token| {
+            if let Some(literal) = ast::String::cast(token.clone()) {
+                let value = literal
+                    .value()
+                    .map_err(|error| build_syntax_stage_failure(format!("{error:?}")))?;
+                normalized.push_str(&format!("{value:?}"));
+            } else {
+                normalized.push_str(token.text().trim_start_matches("r#"));
+            }
+            Ok(normalized)
+        })
+}
+
+pub fn evaluate_cfg_expression_truth(
+    source: &str,
+    values: &BTreeSet<String>,
+) -> Result<bool, StoreBackendFailureError> {
+    parseltongue_core_row_types::evaluate_cfg_expression_truth(
+        &normalize_cfg_source_tokens(source)?,
+        values,
+    )
+}
 
 pub struct SyntaxFileInputData {
     pub file_source_absolute_path: String,
@@ -75,6 +197,12 @@ fn expand_effective_attribute_values(
     source: &str,
     cfg: &BTreeSet<String>,
 ) -> Result<Vec<String>, StoreBackendFailureError> {
+    let normalized = ["cfg", "path"]
+        .iter()
+        .any(|prefix| source.trim_start_matches("r#").starts_with(prefix))
+        .then(|| normalize_cfg_source_tokens(source))
+        .transpose()?;
+    let source = normalized.as_deref().unwrap_or(source);
     if let Some(arguments) = source
         .strip_prefix("cfg_attr")
         .and_then(|s| s.trim().strip_prefix('('))
@@ -190,13 +318,17 @@ fn read_effective_module_path(
                 .and_then(|s| decode_rust_string_literal(s.trim()))
         }))
 }
-fn build_syntax_occurrence_key(input: &SyntaxFileInputData, node: &SyntaxNode) -> (String, Value) {
+fn build_syntax_occurrence_key(
+    input: &SyntaxFileInputData,
+    node: &SyntaxNode,
+    removed: &[usize],
+) -> (String, Value) {
     let range = node.text_range();
     let canonical = json!([
         input.unit_compilation_identity_key,
         input.file_source_absolute_path,
-        u32::from(range.start()),
-        u32::from(range.end()),
+        restore_source_byte_offset(range.start(), removed),
+        restore_source_byte_offset(range.end(), removed),
         format!("{:?}", node.kind()),
         input.file_expansion_provenance_chain
     ]);
@@ -248,18 +380,24 @@ pub fn extract_file_syntax_rows(
         "2024" => Edition::Edition2024,
         _ => return Err(build_syntax_stage_failure("unknown Rust edition")),
     };
-    let (root, errors) = if input.file_parse_context_kind == "expression" {
-        let parsed = ast::Expr::parse(source, edition);
-        (parsed.syntax_node(), parsed.errors())
+    let removed: Vec<_> = source
+        .match_indices("\r\n")
+        .enumerate()
+        .map(|(count, (offset, _))| offset - count)
+        .collect();
+    let normalized = if removed.is_empty() {
+        Cow::Borrowed(source)
     } else {
-        let parsed = ast::SourceFile::parse(source, edition);
-        (parsed.syntax_node(), parsed.errors())
+        Cow::Owned(source.replace("\r\n", "\n"))
     };
+    let parsed =
+        parse_compatible_rust_syntax(&normalized, &input.file_parse_context_kind, edition)?;
+    let (root, errors) = (parsed.syntax_node(), parsed.errors());
     if let Some(error) = errors.first() {
         return Err(build_syntax_stage_failure(format!(
             "{} offset {}: {error}",
             input.file_source_absolute_path,
-            u32::from(error.range().start())
+            restore_source_byte_offset(error.range().start(), &removed)
         )));
     }
     let mut active_flags = HashMap::new();
@@ -277,7 +415,7 @@ pub fn extract_file_syntax_rows(
     let mut requests = Vec::new();
     let items: Vec<_> = root.descendants().filter(check_syntax_item_node).collect();
     for node in &items {
-        let (key, canonical) = build_syntax_occurrence_key(input, node);
+        let (key, canonical) = build_syntax_occurrence_key(input, node, &removed);
         let active = active_flags.get(node).copied().unwrap_or(true);
         let name = node
             .children()
@@ -289,13 +427,15 @@ pub fn extract_file_syntax_rows(
             .map(|n| n.text().to_string())
             .unwrap_or_else(|| "private".into());
         let range = node.text_range();
+        let start = restore_source_byte_offset(range.start(), &removed);
+        let end = restore_source_byte_offset(range.end(), &removed);
         rows.push(build_syntax_output_record("span-reference-text-table",key.clone(),json!({
             "span_semantic_occurrence_key":key,"span_occurrence_canonical_key":canonical,
             "unit_compilation_identity_key":input.unit_compilation_identity_key,"file_source_absolute_path":input.file_source_absolute_path,
-            "span_byte_start_offset":u32::from(range.start()),"span_byte_end_offset":u32::from(range.end()),
-            "span_content_digest_full":blake3::hash(node.text().to_string().as_bytes()).to_hex().to_string(),
+            "span_byte_start_offset":start,"span_byte_end_offset":end,
+            "span_content_digest_full":blake3::hash(&input.file_source_content_bytes[start..end]).to_hex().to_string(),
             "span_syntax_kind_value":format!("{:?}",node.kind()),"span_declared_name_value":name,"span_visibility_source_text":visibility,
-            "span_source_code_text":node.text().to_string(),"span_configuration_active_flag":active,
+            "span_source_code_text":&source[start..end],"span_configuration_active_flag":active,
             "site_unresolved_reason_kind":if active{Value::Null}else{json!("cfg_inactive")},
             "span_expansion_provenance_chain":input.file_expansion_provenance_chain
         })));
@@ -330,6 +470,12 @@ pub fn extract_file_syntax_rows(
             let candidates = if let Some(path) =
                 read_effective_module_path(node, &input.unit_target_cfg_values)?
             {
+                if ancestors.is_empty() {
+                    base = Path::new(&input.file_source_absolute_path)
+                        .parent()
+                        .ok_or_else(|| build_syntax_stage_failure("module file parent absent"))?
+                        .to_path_buf();
+                }
                 vec![base.join(path).to_string_lossy().into_owned()]
             } else {
                 vec![
@@ -356,8 +502,8 @@ pub fn extract_file_syntax_rows(
     let mut cursor = 0_usize;
     for node in top_items {
         let range = node.text_range();
-        let start = u32::from(range.start()) as usize;
-        let end = u32::from(range.end()) as usize;
+        let start = restore_source_byte_offset(range.start(), &removed);
+        let end = restore_source_byte_offset(range.end(), &removed);
         if start > cursor {
             rows.push(build_ownership_range_record(
                 input,
@@ -418,17 +564,19 @@ pub fn extract_file_syntax_rows(
         if !field && !body && kind != "IMPL" {
             continue;
         }
-        let (key, _) = build_syntax_occurrence_key(input, &node);
+        let (key, _) = build_syntax_occurrence_key(input, &node, &removed);
         let owner = node
             .ancestors()
             .skip(1)
             .find(check_syntax_item_node)
-            .map(|n| build_syntax_occurrence_key(input, &n).0);
+            .map(|n| build_syntax_occurrence_key(input, &n, &removed).0);
         let range = node.text_range();
+        let start = restore_source_byte_offset(range.start(), &removed);
+        let end = restore_source_byte_offset(range.end(), &removed);
         let mut payload = json!({"unit_compilation_identity_key":input.unit_compilation_identity_key,
             "file_source_absolute_path":input.file_source_absolute_path,
-            "span_byte_start_offset":u32::from(range.start()),"span_byte_end_offset":u32::from(range.end()),
-            "site_syntax_kind_value":kind,"site_syntax_source_text":node.text().to_string(),
+            "span_byte_start_offset":start,"span_byte_end_offset":end,
+            "site_syntax_kind_value":kind,"site_syntax_source_text":&source[start..end],
             "site_owner_occurrence_key":owner,"site_resolution_status_kind":"pending",
             "site_unresolved_reason_kind":Value::Null,"span_expansion_provenance_chain":input.file_expansion_provenance_chain});
         if let Some(call) = ast::MacroCall::cast(node.clone()) {
