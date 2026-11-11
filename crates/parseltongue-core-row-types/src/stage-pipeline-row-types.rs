@@ -1,11 +1,18 @@
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 #[derive(Clone, Default)]
 pub struct RunCancelFlagValue(Arc<AtomicBool>);
 
 impl RunCancelFlagValue {
-    pub fn request_stage_work_cancellation(&self) { self.0.store(true, Ordering::Relaxed); }
-    pub fn check_stage_work_cancelled(&self) -> bool { self.0.load(Ordering::Relaxed) }
+    pub fn request_stage_work_cancellation(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+    pub fn check_stage_work_cancelled(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

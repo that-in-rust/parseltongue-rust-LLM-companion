@@ -82,7 +82,7 @@ release-build the production binary separately from the oracle harness.
 Audit production's dependency tree, not the harness's permitted ide/hir/salsa tree.
 
 ```bash
-strace -f -s 65535 -e trace=process,openat,connect -o "$OUT/production-process-access-audit.txt" \
+strace -f -s 65535 -e trace=process,openat,connect,sendto,sendmsg -o "$OUT/production-process-access-audit.txt" \
   process-tree-memory-sampler --sample-interval-millisecond-value 10 \
   --memory-sample-output-path "$OUT/process-tree-memory-samples.json" -- \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
@@ -98,6 +98,10 @@ parseltongue hld-current-export-sorted \
 
 The sampler/strace are external supervisors: filter the allowlist to the mapper and its descendants,
 not supervisor startup. Resolve audited paths/symlinks; forbid build-script execution and target/ output reads.
+The repository's tools/process-tree-access-auditor.py sample command is the executable equivalent of
+the planned process-tree-memory-sampler wrapper. It records mapper PID, exit, elapsed seconds and sampled
+sum of live mapper/descendant VmRSS in bytes at nominal 10 ms intervals; supervisor RSS is excluded.
+tools/corpus-production-stage-measurements.py runs sampling, audit and JSON status for the pinned corpus.
 Reconstruct fork/clone/exec ancestry and check complete argv: direct children remain exactly the three
 commands; Cargo descendants are restricted to rustc -vV and the approved stdin ___ discovery probe.
 That probe has exactly one each of --crate-type bin/rlib/dylib/cdylib/staticlib/proc-macro,

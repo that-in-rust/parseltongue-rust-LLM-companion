@@ -1,6 +1,9 @@
-use parseltongue_core_row_types::{RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest, StoreBackendFailureError};
-use parseltongue_table_store_traits::StageTableStorePort;
 use super::{TursoWorkspaceStoreAdapter, build_store_backend_error};
+use parseltongue_core_row_types::{
+    RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
+    StoreBackendFailureError,
+};
+use parseltongue_table_store_traits::StageTableStorePort;
 
 const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("crate-dependency-graph-table", "crate-graph"),
@@ -16,16 +19,29 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
 ];
 
 fn check_stage_cancel_requested(cancel: &RunCancelFlagValue) -> Result<(), turso::Error> {
-    if cancel.check_stage_work_cancelled() { Err(turso::Error::Interrupt("stage cancelled".into())) } else { Ok(()) }
+    if cancel.check_stage_work_cancelled() {
+        Err(turso::Error::Interrupt("stage cancelled".into()))
+    } else {
+        Ok(())
+    }
 }
 
-pub fn retry_bounded_store_write<T>(cancel: &RunCancelFlagValue, mut attempt: impl FnMut() -> Result<T, turso::Error>) -> Result<T, StoreBackendFailureError> {
+pub fn retry_bounded_store_write<T>(
+    cancel: &RunCancelFlagValue,
+    mut attempt: impl FnMut() -> Result<T, turso::Error>,
+) -> Result<T, StoreBackendFailureError> {
     for retry in 0..6 {
         check_stage_cancel_requested(cancel).map_err(build_store_backend_error)?;
         match attempt() {
             Ok(value) => return Ok(value),
-            Err(error) if matches!(error, turso::Error::Busy(_) | turso::Error::BusySnapshot(_)) => {
-                if retry == 5 { return Err(build_store_backend_error(format!("StoreWriteConflictError: {error}; 6 attempts"))); }
+            Err(error)
+                if matches!(error, turso::Error::Busy(_) | turso::Error::BusySnapshot(_)) =>
+            {
+                if retry == 5 {
+                    return Err(build_store_backend_error(format!(
+                        "StoreWriteConflictError: {error}; 6 attempts"
+                    )));
+                }
                 for _ in 0..(10_u64 << retry) {
                     check_stage_cancel_requested(cancel).map_err(build_store_backend_error)?;
                     std::thread::sleep(std::time::Duration::from_millis(1));
@@ -38,8 +54,16 @@ pub fn retry_bounded_store_write<T>(cancel: &RunCancelFlagValue, mut attempt: im
 }
 
 fn validate_stage_owned_table(table: &str) -> Result<(), StoreBackendFailureError> {
-    if STAGE_OWNED_TABLE_NAMES.iter().any(|(name,_)| *name == table) { Ok(()) }
-    else { Err(build_store_backend_error(format!("undeclared table {table}"))) }
+    if STAGE_OWNED_TABLE_NAMES
+        .iter()
+        .any(|(name, _)| *name == table)
+    {
+        Ok(())
+    } else {
+        Err(build_store_backend_error(format!(
+            "undeclared table {table}"
+        )))
+    }
 }
 
 impl StageTableStorePort for TursoWorkspaceStoreAdapter {
@@ -59,14 +83,26 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         }).map_err(build_store_backend_error)
     }
 
-    fn write_stage_table_unit(&self, request: &StageUnitWriteRequest<'_>, cancel: &RunCancelFlagValue) -> Result<usize, StoreBackendFailureError> {
+    fn write_stage_table_unit(
+        &self,
+        request: &StageUnitWriteRequest<'_>,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<usize, StoreBackendFailureError> {
         for row in request.stage_unit_output_rows {
-            let owner = STAGE_OWNED_TABLE_NAMES.iter().find(|(name,_)| *name == row.stage_owned_table_name).map(|(_,owner)| *owner);
-            if owner != Some(request.stage_owner_name_value) || row.stage_row_record_key.starts_with("__marker__/") {
-                return Err(build_store_backend_error("stage output table access denied"));
+            let owner = STAGE_OWNED_TABLE_NAMES
+                .iter()
+                .find(|(name, _)| *name == row.stage_owned_table_name)
+                .map(|(_, owner)| *owner);
+            if owner != Some(request.stage_owner_name_value)
+                || row.stage_row_record_key.starts_with("__marker__/")
+            {
+                return Err(build_store_backend_error(
+                    "stage output table access denied",
+                ));
             }
         }
-        retry_bounded_store_write(cancel, || self.store_runtime_handle_value.block_on(async {
+        retry_bounded_store_write(cancel, || {
+            self.store_runtime_handle_value.block_on(async {
             let mut connection = self.store_database_handle_value.connect()?;
             let transaction = connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
             let result = async {
@@ -97,10 +133,15 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                 Ok::<_,turso::Error>(request.stage_unit_output_rows.len())
             }.await;
             match result { Ok(count) => { transaction.commit().await?; Ok(count) }, Err(error) => { let _ = transaction.rollback().await; Err(error) } }
-        }))
+        })
+        })
     }
 
-    fn read_stage_table_rows(&self, scope: &StageRunScopeValue, table: &str) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
+    fn read_stage_table_rows(
+        &self,
+        scope: &StageRunScopeValue,
+        table: &str,
+    ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async {
             let connection = self.store_database_handle_value.connect()?;
@@ -114,8 +155,13 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         }).map_err(build_store_backend_error)
     }
 
-    fn write_file_content_bytes(&self, digest: &str, bytes: &[u8]) -> Result<bool, StoreBackendFailureError> {
-        retry_bounded_store_write(&RunCancelFlagValue::default(), || self.store_runtime_handle_value.block_on(async {
+    fn write_file_content_bytes(
+        &self,
+        digest: &str,
+        bytes: &[u8],
+    ) -> Result<bool, StoreBackendFailureError> {
+        retry_bounded_store_write(&RunCancelFlagValue::default(), || {
+            self.store_runtime_handle_value.block_on(async {
             let connection = self.store_database_handle_value.connect()?;
             let mut rows = connection.query("SELECT file_source_content_bytes FROM \"file-source-content-records\" WHERE file_content_digest_full=?", [digest.to_owned()]).await?;
             if let Some(row) = rows.next().await? {
@@ -124,7 +170,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             }
             connection.execute("INSERT INTO \"file-source-content-records\" VALUES (?,?)", turso::params![digest.to_owned(),bytes.to_vec()]).await?;
             Ok(true)
-        }))
+        })
+        })
     }
 
     fn read_file_content_bytes(&self, digest: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
@@ -135,8 +182,14 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         }).map_err(build_store_backend_error)
     }
 
-    fn publish_workspace_generation_manifest(&self, scope: &StageRunScopeValue, generation: &str, cancel: &RunCancelFlagValue) -> Result<StageRunScopeValue, StoreBackendFailureError> {
-        retry_bounded_store_write(cancel, || self.store_runtime_handle_value.block_on(async {
+    fn publish_workspace_generation_manifest(
+        &self,
+        scope: &StageRunScopeValue,
+        generation: &str,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        retry_bounded_store_write(cancel, || {
+            self.store_runtime_handle_value.block_on(async {
             let mut connection = self.store_database_handle_value.connect()?;
             let transaction = connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
             let result = async {
@@ -156,10 +209,13 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                 Ok(StageRunScopeValue { run_generation_digest_value:generation.into(),stage_attempt_sequence_value:scope.stage_attempt_sequence_value.clone() })
             }.await;
             match result { Ok(value) => { transaction.commit().await?; Ok(value) }, Err(error) => { let _ = transaction.rollback().await; Err(error) } }
-        }))
+        })
+        })
     }
 
-    fn read_workspace_publication_scope(&self) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
+    fn read_workspace_publication_scope(
+        &self,
+    ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
         self.store_runtime_handle_value.block_on(async {
             let connection = self.store_database_handle_value.connect()?;
             let mut rows = connection.query("SELECT run_generation_digest_value,stage_attempt_sequence_value FROM \"workspace-generation-publication-manifest\" WHERE manifest_singleton_key_value=1", ()).await?;

@@ -119,7 +119,7 @@ def audit_process_trace_events(trace_source_text, mapper_process_identifier):
             process_audit_violation_rows.append(f"{process_identifier_number_value}: forbidden exec {command_executable_path_value} {command_argument_tail_values!r}")
         elif process_trace_event_text.startswith(("execve(", "execveat(")) and " = -1 " not in process_trace_event_text:
             process_audit_violation_rows.append(f"{process_identifier_number_value}: incomplete execution event")
-        if process_trace_event_text.startswith("connect(") and re.search(r"AF_INET6?\b", process_trace_event_text):
+        if process_trace_event_text.startswith(("connect(", "sendto(", "sendmsg(")) and re.search(r"AF_INET6?\b", process_trace_event_text):
             process_audit_violation_rows.append(f"{process_identifier_number_value}: forbidden network connection")
         source_open_match_value = re.match(r'openat\([^,]+, ("(?:[^"\\]|\\.)*"), ([^)]*)\)', process_trace_event_text)
         if source_open_match_value and "O_WRONLY" not in source_open_match_value[2]:

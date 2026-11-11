@@ -1,15 +1,39 @@
 //! Synchronous stage seams; concrete storage belongs to L3.
 
-use parseltongue_core_row_types::{RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest};
+use parseltongue_core_row_types::{
+    RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
+};
 
 pub trait StageTableStorePort: Send + Sync {
     fn initialize_workspace_stage_schema(&self) -> Result<(), StoreBackendFailureError>;
-    fn write_stage_table_unit(&self, stage_unit_write_request: &StageUnitWriteRequest<'_>, stage_cancel_flag_value: &RunCancelFlagValue) -> Result<usize, StoreBackendFailureError>;
-    fn read_stage_table_rows(&self, stage_run_scope_value: &StageRunScopeValue, stage_owned_table_name: &str) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError>;
-    fn write_file_content_bytes(&self, file_content_digest_full: &str, file_source_content_bytes: &[u8]) -> Result<bool, StoreBackendFailureError>;
-    fn read_file_content_bytes(&self, file_content_digest_full: &str) -> Result<Vec<u8>, StoreBackendFailureError>;
-    fn publish_workspace_generation_manifest(&self, stage_run_scope_value: &StageRunScopeValue, run_generation_digest_value: &str, stage_cancel_flag_value: &RunCancelFlagValue) -> Result<StageRunScopeValue, StoreBackendFailureError>;
-    fn read_workspace_publication_scope(&self) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError>;
+    fn write_stage_table_unit(
+        &self,
+        stage_unit_write_request: &StageUnitWriteRequest<'_>,
+        stage_cancel_flag_value: &RunCancelFlagValue,
+    ) -> Result<usize, StoreBackendFailureError>;
+    fn read_stage_table_rows(
+        &self,
+        stage_run_scope_value: &StageRunScopeValue,
+        stage_owned_table_name: &str,
+    ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError>;
+    fn write_file_content_bytes(
+        &self,
+        file_content_digest_full: &str,
+        file_source_content_bytes: &[u8],
+    ) -> Result<bool, StoreBackendFailureError>;
+    fn read_file_content_bytes(
+        &self,
+        file_content_digest_full: &str,
+    ) -> Result<Vec<u8>, StoreBackendFailureError>;
+    fn publish_workspace_generation_manifest(
+        &self,
+        stage_run_scope_value: &StageRunScopeValue,
+        run_generation_digest_value: &str,
+        stage_cancel_flag_value: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError>;
+    fn read_workspace_publication_scope(
+        &self,
+    ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError>;
 }
 
 use parseltongue_core_row_types::{

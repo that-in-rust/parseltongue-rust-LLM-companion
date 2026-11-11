@@ -196,3 +196,22 @@ the external test driver before mapping. Its bytes-only inventory is four files,
 build.rs must also be stored without execution. The lock guard and all-.rs coverage remain enforced.
 An initial Rust type-inference error in optional publication decoding was fixed with an explicit error type.
 Next: functional cleanup, fmt/clippy/test/build gates, S3 process/RSS measurements for all five.
+
+## M1 REFACTOR — fixture and production gates
+
+Formatted the owned Rust implementations; collapsed nested conditions and removed unnecessary temporary
+string allocations. Integration tests explicitly permit unwrap only in test crates, matching the
+always-loaded rule; production unwrap remains denied. Added the external corpus measurement driver;
+network auditing now covers connect/sendto/sendmsg, not only connect. No database substitution.
+
+Final commands:
+- cargo fmt --all --check: exit 0.
+- cargo clippy --all-targets -- -D warnings: Finished dev profile in 0.29s.
+- cargo test --workspace: all 31 tests pass; store 9/9, graph 6/6, syntax 6/6,
+  workers 2/2, CLI 1/1 and M0 7/7.
+- cargo build --release -p parseltongue-cli-dispatcher-binary: Finished release profile in 4.32s.
+- Python process contracts: Ran 3 tests in 0.115s; OK.
+
+Clippy initially rejected test-only unwrap and four collapsible/unnecessary allocation patterns;
+these were fixed without suppressing production warnings. S3 corpus measurement is running through
+tools/corpus-production-stage-measurements.py; no corpus success or resource claim is made here.

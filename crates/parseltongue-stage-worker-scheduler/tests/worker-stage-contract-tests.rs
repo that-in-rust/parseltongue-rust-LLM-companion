@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use parseltongue_core_row_types::{RunCancelFlagValue, StoreBackendFailureError};
 use parseltongue_stage_worker_scheduler::run_bounded_stage_workers;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -15,14 +17,20 @@ fn test_in_flight_units_bounded() {
         active.fetch_sub(1, Ordering::SeqCst);
         finished.fetch_add(1, Ordering::SeqCst);
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
     assert!(peak.load(Ordering::SeqCst) <= 3);
     assert_eq!(finished.load(Ordering::SeqCst), 24);
     assert!(run_bounded_stage_workers(&[], 0, &RunCancelFlagValue::default(), |_| Ok(())).is_err());
     assert!(run_bounded_stage_workers(&[], 1, &RunCancelFlagValue::default(), |_| Ok(())).is_ok());
-    assert!(run_bounded_stage_workers(&jobs, 1, &RunCancelFlagValue::default(), |_| Err(StoreBackendFailureError {
-        error_context_detail_text: "injected failure".into(),
-    })).is_err());
+    assert!(
+        run_bounded_stage_workers(&jobs, 1, &RunCancelFlagValue::default(), |_| Err(
+            StoreBackendFailureError {
+                error_context_detail_text: "injected failure".into(),
+            }
+        ))
+        .is_err()
+    );
 }
 
 #[test]
@@ -30,8 +38,14 @@ fn test_cancel_then_rerun_identical() {
     let cancelled = RunCancelFlagValue::default();
     cancelled.request_stage_work_cancellation();
     let jobs = vec!["one".into(), "two".into()];
-    assert!(run_bounded_stage_workers(&jobs, 2, &cancelled, |_| panic!("cancelled task ran")).is_err());
+    assert!(
+        run_bounded_stage_workers(&jobs, 2, &cancelled, |_| panic!("cancelled task ran")).is_err()
+    );
     let finished = AtomicUsize::new(0);
-    run_bounded_stage_workers(&jobs, 2, &RunCancelFlagValue::default(), |_| { finished.fetch_add(1, Ordering::SeqCst); Ok(()) }).unwrap();
+    run_bounded_stage_workers(&jobs, 2, &RunCancelFlagValue::default(), |_| {
+        finished.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    })
+    .unwrap();
     assert_eq!(finished.load(Ordering::SeqCst), 2);
 }
