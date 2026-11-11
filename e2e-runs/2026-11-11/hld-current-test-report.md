@@ -164,7 +164,7 @@ cargo-modules
   exec/connect: PASS; filtered target access: PASS; sampler CPU: 5.063 s
 ```
 
-Counts include mapped dependency/sysroot contexts; files include byte-only Rust files outside the
+Counts include mapped dependency contexts; files include byte-only Rust files outside the
 active module closure, whereas spans/fields/body sites come from active mapped contexts.
 The exec audit preserves clone/fork events solely to validate ancestry and the approved Cargo
 discovery grammar. No compilation, build-script executable or network connect was accepted.
@@ -226,3 +226,44 @@ summed setup was 0.460 s, cleanup 0.846 s, INSERT 41.243 s, and Concurrent commi
 The measured remaining hot operation is the pinned Turso commit, not per-row transactions or
 DELETE cleanup. This separate diagnostic run is NOT substituted for the all-five measurements
 above and its faster wall time is not attributed to the instrumentation as a performance fix.
+
+### Verified byte inventory versus active source closure
+
+The file numbers above are byte inventories, NOT closure sizes or numbers of workspace-local files.
+Audited the published Turso generation: joined every span's unit/path to persisted
+syntax-file-work-requests, joined each request to its mapped lib/bin graph target, and counted
+workspace-local paths separately from dependency paths. No spans lay outside those requests,
+and no request belonged to an unmapped target. Independently checked Cargo manifests/root seeding:
+cargo-modules depends on the ra_ap_* 0.0.358 analysis stack; ripgrep maps nine member libraries
+and the rg binary. The production mapper itself does not link that analysis stack.
+
+```text
+cargo-modules
+  ingested Rust files, workspace plus dependencies: 5597
+  active closure, unique files / compilation-file contexts: 2535 / 2535
+  workspace-local ingested files: 87; active workspace-local files: 39
+  workspace-local spans: 577; dependency spans: 113438
+  tests/ files stored as bytes: 48; tests/ closure files: 0; tests/ spans: 0
+  mapped workspace roots: src/lib.rs and src/main.rs
+  largest dependency span counts:
+    ra_ap_syntax 6496; ra_ap_hir_ty 6288; ra_ap_ide_assists 4962
+ripgrep
+  ingested Rust files, workspace plus dependencies: 1039
+  active closure, unique files / compilation-file contexts: 391 / 391
+  workspace-local ingested files: 102; active workspace-local files: 78
+  workspace-local spans: 4728; dependency spans: 16706
+  root tests/ files stored as bytes: 10; tests/ closure files: 0; tests/ spans: 0
+  mapped workspace roots: rg plus grep, grep_searcher, grep_matcher,
+    grep_printer, grep_regex, globset, ignore, grep_cli, grep_pcre2
+  largest dependency span counts:
+    regex-automata 3762; regex-syntax 2163; serde_json 1704
+```
+
+Saved full path/target/package-count inventories beside each original S3 summary as
+corpus-source-closure-inventory.json. No closure leak was found, so no production closure change
+or affected-repository S3 mapping rerun was needed; these are read-only audits of the original runs.
+A characterization fixture now covers malformed nested fixture projects, integration tests,
+a library-form example, benchmarks, inactive modules and an active empty module. It passes with
+unchanged production code: ten byte-inventory files, exactly three requested closure files.
+An initial test-harness failure held the store open while spawning the status subprocess; dropping
+that handle before the subprocess fixed the test setup, not production behavior.

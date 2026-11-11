@@ -1,6 +1,9 @@
 #![allow(clippy::unwrap_used)]
 
+use parseltongue_table_store_traits::StageTableStorePort;
+use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::{fs, path::Path, process::Command};
 
 fn create_workspace_source_fixture(root: &Path) {
@@ -64,6 +67,86 @@ fn read_workspace_banner_fixture(database: &Path) -> Value {
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+#[test]
+fn test_fixture_projects_remain_unmapped() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+    fs::write(root.join("Cargo.toml"), format!("{manifest}\n[[example]]\nname=\"unused_lib\"\npath=\"examples/unused_lib.rs\"\ncrate-type=[\"rlib\"]\n")).unwrap();
+    let library = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    fs::write(
+        root.join("src/lib.rs"),
+        format!("{library}\nmod empty; #[cfg(any())] mod dormant;"),
+    )
+    .unwrap();
+    fs::write(root.join("src/empty.rs"), []).unwrap();
+    fs::write(root.join("src/dormant.rs"), [255, 0]).unwrap();
+    for path in ["tests/fixtures/project/src", "examples", "benches"] {
+        fs::create_dir_all(root.join(path)).unwrap();
+    }
+    fs::write(
+        root.join("tests/fixtures/project/Cargo.toml"),
+        "[package]\nname=\"nested-fixture\"\nversion=\"0.1.0\"\n[workspace]\n",
+    )
+    .unwrap();
+    for path in [
+        "tests/fixtures/project/src/lib.rs",
+        "tests/integration.rs",
+        "examples/unused_lib.rs",
+        "benches/unused.rs",
+    ] {
+        fs::write(root.join(path), [255, 0]).unwrap();
+    }
+    let database = directory.path().join("store.db");
+    let mapped = run_workspace_mapping_fixture(&root, &database, "4");
+    assert!(
+        mapped.status.success(),
+        "{}",
+        String::from_utf8_lossy(&mapped.stderr)
+    );
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let expected: BTreeSet<_> = ["src/lib.rs", "src/child.rs", "src/empty.rs"]
+        .into_iter()
+        .map(|path| root.join(path).to_str().unwrap().to_owned())
+        .collect();
+    let requests = store
+        .read_stage_table_rows(&scope, "syntax-file-work-requests")
+        .unwrap();
+    let actual: BTreeSet<_> = requests
+        .iter()
+        .map(|row| {
+            let value: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            value["file_source_absolute_path"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(actual, expected);
+    assert_eq!(requests.len(), 3);
+    assert_eq!(
+        store
+            .count_stage_table_rows(&scope, "file-source-text-table")
+            .unwrap(),
+        10
+    );
+    store
+        .visit_stage_table_rows(&scope, "span-reference-text-table", &mut |row| {
+            let value: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            assert!(expected.contains(value["file_source_absolute_path"].as_str().unwrap()));
+            Ok(())
+        })
+        .unwrap();
+    drop(store);
+    assert_eq!(
+        read_workspace_banner_fixture(&database)["source_tiling_identity_holds"],
+        true
+    );
 }
 #[test]
 fn test_stage_rerun_is_identical() {

@@ -416,3 +416,28 @@ PRIMARY must keep load_out_dirs_from_check=false while enabling proc macros from
 dylibs; SECONDARY enables build scripts. load-cargo's public builder path and proc-macro loading
 need implementation/verification; ordinary load_workspace_at alone does not establish that pairing.
 Current harness remains provenance-only; no semantic exports or S5 denominators exist yet.
+
+### M1 source closure verification — characterization
+
+Investigated the user's fixture-leak hypothesis before changing production code. Persisted spans
+all join to syntax-file-work-requests and mapped graph units. cargo-modules: 5597 byte-inventory
+files, 2535 closure files, 39 local closure files / 577 local spans; 113438 dependency spans.
+All 48 local tests/ files remain byte-only, with zero requests/spans. ripgrep: 1039 byte-inventory
+files, 391 closure files, 78 local closure files / 4728 local spans; 16706 dependency spans.
+Its ten root tests/ files have zero requests/spans. Manifests confirm cargo-modules's large normal
+ra_ap_* dependency stack and ripgrep's nine library members plus binary. No production leak found.
+Read-only audit tool: /home/ubuntu/corpus-source-closure-inventory; full JSON inventories are ignored
+artifacts next to both original S3 summaries. Clarified report labels; no mapping/audit reruns needed.
+
+Added test_fixture_projects_remain_unmapped BEFORE any contemplated closure fix. It passes without
+production changes and covers nested fixture Cargo projects, malformed test/example/bench bytes,
+library-form examples, inactive modules and an active zero-byte module. Ten ingested files, three
+requests; every emitted span belongs to a requested path. The first execution failed only because
+the fixture retained a Turso handle while opening a status subprocess; drop it before that subprocess.
+No false product RED or closure fix is claimed. Final focused result: 1 passed, 0 failed;
+fmt check exited 0; CLI all-target/all-feature Clippy -D warnings Finished in 0.55s.
+
+M2 oracle direction follows the latest user preference: first try per-crate Module/ModuleDef traversal
+and Module::resolve_mod_path; only use duplicate IDs if a fixture shows the public scoped APIs cannot
+handle an actual case. SemanticsScope::speculative_resolve exists but its resolver is private and it
+explicitly disregards hygiene. Do not use that heuristic as an exact answer key without verification.
