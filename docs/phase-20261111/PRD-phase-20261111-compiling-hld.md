@@ -25,6 +25,8 @@ Conventions: four-word hyphenated names for every named thing (AGENTS.md). **M**
 
 ## 1. The phase in one paragraph
 
+**Objective: a complete, exact `hld-current-dependency-edges` for a repository that compiles. Code that does not compile is the next phase, which builds on these tables (§13).**
+
 Phase-20261111 builds `hld-current-dependency-edges` — public item → public item dependency rows — for **Rust workspaces that compile** (rust-analyzer itself, ripgrep, tokio-sized repositories). Because the code compiles, every file parses without error, every name has exactly one meaning, and rust-analyzer run offline gives an exact answer key. That removes the three hardest parts of the full design — broken-file recovery, grey spans, and guessing — and lets this phase answer one question cleanly: **can rust-analyzer's resolution logic, ported to run over our span and field tables one crate and one body at a time, reproduce rust-analyzer's dependency edges at a fraction of its memory?** No tiny LLM is used in this phase. Anything the port cannot resolve is written as `unresolved` and counted — never guessed.
 
 ## 2. Glossary
@@ -315,7 +317,8 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
 ## 13. Out of scope for this phase
 
 ```text
- broken or partially written code      no recovery rule, no grey spans, no tiny-llm-span-clarifier
+ broken or partially written code      NEXT PHASE: recovery rule, grey spans, tiny-llm-span-clarifier and the other tiny LLMs
+                                       are added on top of this phase's tables and ported resolvers
  all tiny LLMs                         no binder, guesser or ranker; unresolved rows are counted, not guessed
  proc-macro expansion                  unresolved(proc_macro) except the built-in derive table
  cfg combinations                      one cfg set per run: the default features from cargo metadata; inactive code counted
