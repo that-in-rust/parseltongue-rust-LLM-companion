@@ -96,7 +96,7 @@ What "ported" means, per stage (decided in §6):
                   and hir types to copy: signature lowering, body inference, method lookup, the solver adapter
 ```
 
-Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. Two print-only rustc calls are allowed (D5): `rustc --print cfg` (target cfg: unix, target_os, target_pointer_width …) and `rustc --print sysroot` (std source root). `cargo metadata --offline` is the decided source of the crate graph (decided 2026-11-05): it reads manifests and the lockfile, compiles nothing.
+Hard rules kept from DI-08: no rust-analyzer server, no rust-analyzer analysis database (`ra_ap_hir*`, `ra_ap_ide*`, salsa) linked into Parseltongue, no `cargo build`/`cargo check`, no proc-macro execution at runtime. **Build scripts (`build.rs`) are never run (D4)** — not by Parseltongue, not via `cargo check`, and their saved results in `target/` are not read either. Two print-only rustc calls are allowed (D5): `rustc --print cfg` (target cfg: unix, target_os, target_pointer_width …) and `rustc --print sysroot` (std source root). `cargo metadata --offline` is the decided source of the crate graph (decided 2026-11-05): it reads manifests and the lockfile, compiles nothing.
 
 ### 4.1 Architecture: every stage is table in → table out (option A, decided 2026-11-05)
 
@@ -402,6 +402,11 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
  all LLMs and all training            no tiny LLM (binder, guesser, ranker, clarifier), no training or post-training, no
                                        labelled datasets; unresolved rows are counted, not guessed
  proc-macro expansion                  unresolved(proc_macro) except the built-in derive table
+ build-script output                  (D4) never run, never read. Consequences: `include!(concat!(env!("OUT_DIR"), …))` →
+                                       unresolved(build_script); `env!` of a build-script variable → unresolved(build_script);
+                                       `CARGO_PKG_*` / `CARGO_MANIFEST_DIR` are filled from cargo metadata; a cfg that only a
+                                       build script sets (`cargo:rustc-cfg=…`) is treated as OFF, as rust-analyzer does without
+                                       build scripts, and the items under it are counted
  cfg combinations                      one cfg set per run: the default features from cargo metadata; inactive code counted
  intent tables                         hld-future-dependency-edges, hld-delta-dependency-view, cpu-tool-propose-future-rows
  incremental re-map on edit            full runs only; digests are stored so the next phase can add it
@@ -428,9 +433,11 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
      stage structure above was checked against the source, not the graph
  R5  copied code keeps rust-analyzer's licence headers and attribution (MIT OR Apache-2.0)
  D3  decided 2026-11-05: proc macros via proc-macro-shape-table (shape, not full expansion), checked against rust-analyzer
- Q4  build scripts: rust-analyzer runs `cargo check --message-format=json` (project-model build_dependencies.rs) to get OUT_DIR
-     and build-script env values; this PRD forbids that → include!(concat!(env!("OUT_DIR"), …)) and env!("CARGO_PKG_*")
-     sites: unresolved(build_script), or compute CARGO_PKG_* from cargo metadata and leave OUT_DIR unresolved?
+ D4  decided 2026-11-05: build scripts are never run and their target/ output is never read. Estimate (M, this VM's
+     ~/.cargo/registry, a sample biased to the tools cloned here): 112 of 847 crate names (13 %) have a build.rs; of the 203
+     versioned crate dirs with one, 117 (58 %) emit rustc-cfg (mostly compiler-version probes) and 15 (7 %) include generated
+     code from OUT_DIR. rust-analyzer's own 5 build.rs only set env values (commit hash, version) or check-cfg → effect on
+     the HLD of the five test repos expected small; measured by the unresolved(build_script) count
  D5  decided 2026-11-05: `rustc --print cfg` and `rustc --print sysroot` are allowed (print-only, compile nothing)
  D6  decided 2026-11-05: HLD node = item another file can use (§2 "HLD node"); fn-body items never; reachable_outside_crate column
  D1  decided 2026-11-05: the crate graph comes from `cargo metadata --offline` (the only Cargo call)
