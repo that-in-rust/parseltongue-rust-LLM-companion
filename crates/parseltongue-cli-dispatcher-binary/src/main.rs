@@ -100,6 +100,41 @@ fn read_file_module_directory(path: &Path) -> Result<PathBuf, StoreBackendFailur
         ))
     }
 }
+fn build_syntax_file_input(
+    request: &Value,
+    unit: &Value,
+    bytes: Vec<u8>,
+) -> Result<SyntaxFileInputData, StoreBackendFailureError> {
+    Ok(SyntaxFileInputData {
+        file_source_absolute_path: read_required_json_string(request, "file_source_absolute_path")?
+            .into(),
+        file_source_content_bytes: bytes,
+        unit_compilation_identity_key: read_required_json_string(
+            request,
+            "unit_compilation_identity_key",
+        )?
+        .into(),
+        unit_rust_edition_value: read_required_json_string(unit, "unit_rust_edition_value")?.into(),
+        unit_target_cfg_values: serde_json::from_value(unit["unit_target_cfg_values"].clone())
+            .map_err(build_pipeline_stage_error)?,
+        file_module_directory_path: read_required_json_string(
+            request,
+            "file_module_directory_path",
+        )?
+        .into(),
+        unit_metadata_environment_values: serde_json::from_value(
+            unit["unit_metadata_environment_values"].clone(),
+        )
+        .map_err(build_pipeline_stage_error)?,
+        file_parse_context_kind: read_required_json_string(request, "file_parse_context_kind")?
+            .into(),
+        file_expansion_provenance_chain: serde_json::from_value(
+            request["file_expansion_provenance_chain"].clone(),
+        )
+        .map_err(build_pipeline_stage_error)?,
+    })
+}
+
 fn run_persisted_syntax_stage(
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
@@ -189,42 +224,7 @@ fn run_persisted_syntax_stage(
                         file,
                         "file_content_digest_full",
                     )?)?;
-                    let input = SyntaxFileInputData {
-                        file_source_absolute_path: path.into(),
-                        file_source_content_bytes: bytes,
-                        unit_compilation_identity_key: read_required_json_string(
-                            &request,
-                            "unit_compilation_identity_key",
-                        )?
-                        .into(),
-                        unit_rust_edition_value: read_required_json_string(
-                            unit,
-                            "unit_rust_edition_value",
-                        )?
-                        .into(),
-                        unit_target_cfg_values: serde_json::from_value(
-                            unit["unit_target_cfg_values"].clone(),
-                        )
-                        .map_err(build_pipeline_stage_error)?,
-                        file_module_directory_path: read_required_json_string(
-                            &request,
-                            "file_module_directory_path",
-                        )?
-                        .into(),
-                        unit_metadata_environment_values: serde_json::from_value(
-                            unit["unit_metadata_environment_values"].clone(),
-                        )
-                        .map_err(build_pipeline_stage_error)?,
-                        file_parse_context_kind: read_required_json_string(
-                            &request,
-                            "file_parse_context_kind",
-                        )?
-                        .into(),
-                        file_expansion_provenance_chain: serde_json::from_value(
-                            request["file_expansion_provenance_chain"].clone(),
-                        )
-                        .map_err(build_pipeline_stage_error)?,
-                    };
+                    let input = build_syntax_file_input(&request, unit, bytes)?;
                     Ok((key.clone(), input))
                 })
                 .collect::<Result<_, StoreBackendFailureError>>()?;

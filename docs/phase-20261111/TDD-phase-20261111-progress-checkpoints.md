@@ -303,3 +303,12 @@ The source guard fixture checks normal/empty bytes and rejects nested target fil
 Python separation contracts: Ran 4 tests in 0.128s, OK. Direct parser dependency is the same pinned
 already-transitive version; cargo tree gate still passes (L1 dependency-free, no forbidden semantic crates).
 strace now uses --seccomp-bpf to avoid stopping the mapper on excluded syscalls.
+
+### M1 bounded persistence and source compatibility — REFACTOR
+
+Extracted pure build_syntax_file_input from the CLI's store-read loop so loading, CPU parsing and
+ordered publication remain visibly distinct. cargo fmt --all --check exited 0; workspace Clippy
+--all-targets --all-features -D warnings Finished dev profile in 0.89s; affected CLI test 1/1 passes
+(1.21s). Other GREEN checks cover unchanged crates (43 total tests across commands). Release build
+Finished release profile in 5.71s. No API/version substitution, database change or global mutable lock.
+Next fresh corpus pass: m1-ordered-final-measurements; log /home/ubuntu/m1-ordered-production-measurements.log.
