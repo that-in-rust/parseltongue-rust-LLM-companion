@@ -139,13 +139,13 @@ Layers:
                                      every byte is either in a span or in a classified gap (M: 3,370 files, 0 identity failures)
  3  span        → body sites         every call, method call, path, construction, field access, operator and `?` inside a body
                                      → a pending site row with its byte range
- 4  crate       → module scopes      PORTED name resolution, one crate at a time in dependency order: mod tree, use trees, globs,
-                                     re-exports, preludes, extern crates, macro_rules! scoping → module-scope-binding-table
- 5  macro call  → expanded items     PORTED macro_rules! expansion for item-position calls; built-in derives from a fixed table;
-                                     other proc macros → unresolved(proc_macro) → macro-expanded-item-table
+ 4+5 crate     → module scopes      ONE PORTED fixed-point per crate, in dependency order: imports and macro expansion are
+                    + expanded items   resolved in the same loop (an expanded macro can add items and imports; a new import can
+                                     make a macro resolvable) → module-scope-binding-table + macro-expanded-item-table;
+                                     macro_rules! and built-in macros expanded; proc macros → unresolved(proc_macro)
  6  signature   → lowered types      every fn/struct/impl/trait signature's type paths resolved through module scopes → lowered
                                      signature rows; every impl header → impl-header-index-table (self type, trait, generics, where)
- 7  body        → resolved sites     PORTED inference per fn body: local types, autoderef, method lookup over impl-header-index-table,
+ 7  body        → resolved sites     PORTED body lowering (desugar for / ? / .await, expand body macros) then inference per fn body: local types, autoderef, method lookup over impl-header-index-table,
                                      trait solving for bounds/associated types → each site extracted with its target, or unresolved
  8  sites       → evidence edges     every resolved site and signature reference → edge-evidence-record-table
  9  evidence    → HLD                public → public rows, private chains collapsed, origin tagged → hld-current-dependency-edges;
@@ -159,7 +159,11 @@ Layers:
 Source locations are from the rust-analyzer checkout indexed with codebase-memory-mcp (project `home-ubuntu-repos-rust-tools-rust-analyzer`, 38,467 nodes, 229,944 edges); line counts exclude tests (M).
 
 ```text
- STAGE 4 — NAME RESOLUTION                                       mode: copy-adapt
+ STAGES 4+5 ARE ONE STAGE. rust-analyzer's DefCollector::resolution_loop (collector.rs) nests 'resolve_imports inside
+ 'resolve_macros inside 'resolve_attr: imports reach a fixed point, then macros are expanded, then imports again, until both
+ settle. So macro expansion is called FROM name resolution as a library; it is not a separate table-in/table-out stage.
+
+ STAGE 4 — NAME RESOLUTION (calls stage 5 inside its loop)       mode: copy-adapt
    rust-analyzer   crates/hir-def/src/nameres/ (4.5k lines)
                    collector.rs: collect_defs (l.63), DefCollector::resolve_imports (l.792), resolve_macros (l.1306)
                    path_resolution.rs: resolve_path_fp_with_macro (l.154) · entry: nameres.rs crate_def_map (l.384)
@@ -173,11 +177,18 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
 
  STAGE 5 — MACRO_RULES! EXPANSION                                mode: copy-adapt (or link ra_ap_mbe if it builds standalone)
    rust-analyzer   crates/mbe/src/ (3.0k lines): expander.rs expand_rules (l.17), expander/transcriber.rs transcribe (l.124)
-   reads           macro definition span + invocation token tree
+   reads           macro definition span + invocation token tree; called by stage 4 for item-position calls and by stage 7
+                   body lowering for expression/statement-position calls (format!, vec!, assert_eq!, matches!, write! …)
    writes          macro-expanded-item-table: expanded text is parsed with the same parser; its items become spans with
                    origin = macro, pointing back at the invocation span
    built-in        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)] → a fixed table of the impls
                    they generate; serde/other proc-macro derives → unresolved(proc_macro), counted
+   built-in fn-like hir-expand/src/builtin/fn_macro.rs registers 29: format_args, concat, stringify, include, include_str,
+                   include_bytes, env, option_env, cfg, cfg_select, line, column, file, module_path, assert, panic,
+                   unreachable, compile_error, asm … — ported as written; include!/include_str! read files through
+                   file-source-text-table; env!/option_env! need values (see Q4)
+   built-in attrs  attr_macro.rs: derive, derive_const, test, bench, test_case, cfg_accessible, cfg_eval,
+                   global_allocator, define_opaque — ported as written
    not ported      hir-expand's proc-macro server (needs compiled .so files → a build)
 
  STAGE 6 — SIGNATURE LOWERING AND IMPL INDEX                     mode: rewrite-from
@@ -192,8 +203,21 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
    rust-analyzer   crates/hir-ty/src/infer/ (14.5k lines): infer.rs infer_query (l.120), expr.rs infer_method_call (l.1773),
                    autoderef.rs; method_resolution.rs lookup_method_including_private (l.136) (3.7k lines with
                    method_resolution/); next_solver/ (19.8k lines) = adapter onto ra-ap-rustc_next_trait_solver + rustc_type_ir
+   step 0          BODY LOWERING — hir-def/src/expr_store/lower.rs (+ lower/, ~5.2k lines): collect_for_loop (IntoIterator /
+                   Iterator::next), collect_try_operator (Try::branch), desugar_try_block, .await, coroutines, and
+                   collect_macro_call for body macros. Inference runs on the lowered body, not on syntax. The lowered body
+                   lives only inside the one-body unit of work (it is not a table)
    reads           one fn body's syntax (re-parsed from its span), lowered signatures of everything it touches,
-                   impl-header-index-table rows for the receiver types it meets
+                   impl-header-index-table rows for the receiver types it meets, traits in scope at the body (from
+                   module-scope-binding-table), lang-item-definition-table, and infer.rs's other inputs (trait environment
+                   = where-clauses of the enclosing items, value types, impl self types, target data layout)
+   lang items      autoderef (Deref), for (IntoIterator), ? (Try), operators (Add …), closures (Fn*) are found through
+                   #[lang = "…"] items in core/alloc/std; hir-def/src/lang_item.rs lists 169 → lang-item-definition-table
+   incoherent      std puts inherent impls on primitives (f32, str, slices) via #[rustc_has_incoherent_inherent_impls];
+                   method_resolution.rs with_incoherent_inherent_impls searches sysroot crates for them → impl index must
+                   include them
+   solver adapter  next_solver/interner.rs: `impl Interner for DbInterner` spans l.875–2019 (~1.1k lines, ~240 fn/type items)
+                   — that is the interface our table-backed adapter must implement for M7 (R1)
    writes          resolved site rows: (site span, target span id | external item id, receiver type, via-trait) or
                    unresolved(reason)
    order of build  7a local inference + inherent methods + autoderef table, NO solver
@@ -213,6 +237,7 @@ Source locations are from the rust-analyzer checkout indexed with codebase-memor
  span-reference-text-table          cpu-tool-syntax-tree-walker         one span: id, kind, name, visibility, byte range, parent, origin
  field-signature-detail-table       cpu-tool-syntax-tree-walker         one field of a span: params, return, generics, bounds, use tree…
  body-site-pending-table            cpu-tool-syntax-tree-walker         one body site: span, byte range, site kind, name text
+ lang-item-definition-table         cpu-tool-port-name-resolver         one lang item: name (deref, into_iter, branch, add …) → item span
  module-scope-binding-table         cpu-tool-port-name-resolver         (crate, module, name, namespace) → target
  macro-expanded-item-table          cpu-tool-port-macro-expander        one expanded item: invocation span, expanded span, status
  lowered-signature-type-table       cpu-tool-port-signature-lowerer     one type path in a signature → resolved target
@@ -377,7 +402,23 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
      one version, retry on conflict, measure write throughput in M1
  R4  disk-backed lookups may be slow for method lookup. Mitigation: per-body caches and an in-memory impl index per crate;
      measure before optimising
+ R7  rust-analyzer's OWN code is proc-macro heavy (M, grep of crates/, tests included): 196 `#[salsa::tracked|interned|input|db|
+     query_group]` uses and ~170 Serialize / ~167 Deserialize derives. salsa attributes generate the query methods that most of
+     rust-analyzer calls through `db.…()`; without proc-macro expansion those call sites are unresolved(proc_macro), so the
+     ≥ 95 % method-call target (REQ 008) is not reachable on rust-analyzer itself (see Q3)
+ R8  codebase-memory's graph for rust-analyzer has no CALLS edges out of DefCollector methods (trace_path: 0 callees); the
+     stage structure above was checked against the source, not the graph
  R5  copied code keeps rust-analyzer's licence headers and attribution (MIT OR Apache-2.0)
+ Q3  proc macros: (a) keep unresolved(proc_macro) and report coverage with and without proc-macro sites, (b) allow
+     loading proc-macro dylibs from an existing target/ dir offline, (c) hand-written expansion tables for salsa/serde
+ Q4  build scripts: rust-analyzer runs `cargo check --message-format=json` (project-model build_dependencies.rs) to get OUT_DIR
+     and build-script env values; this PRD forbids that → include!(concat!(env!("OUT_DIR"), …)) and env!("CARGO_PKG_*")
+     sites: unresolved(build_script), or compute CARGO_PKG_* from cargo metadata and leave OUT_DIR unresolved?
+ Q5  target cfg: features come from cargo metadata, but target cfg (unix, target_os, target_pointer_width …) comes from
+     `rustc --print cfg` (project-model toolchain_info/rustc_cfg.rs), and the std source root from `rustc --print sysroot`.
+     Allow these two print-only rustc calls? (REQ-RUST-001 currently forbids invoking rustc)
+ Q6  "public": hir-def Visibility has Public, PubCrate and Module(restricted). Is an HLD node every item declared `pub`, or
+     only items reachable from the crate root (a `pub fn` in a private module is not)?
  D1  decided 2026-11-05: the crate graph comes from `cargo metadata --offline` (the only Cargo call)
  D2  decided 2026-11-05: test set = rust-analyzer, ripgrep, tokio, serde, cargo-modules, all scored equally
 ```
