@@ -1,0 +1,16 @@
+[package]
+name = "oracle-semantic-export-harness"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[dependencies]
+ide = { path = "../../../rust-tools/rust-analyzer/crates/ide" }
+hir = { path = "../../../rust-tools/rust-analyzer/crates/hir" }
+blake3 = "1"
+serde_json = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
