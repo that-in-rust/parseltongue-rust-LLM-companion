@@ -357,3 +357,14 @@ The publication pointer remains unchanged during preparation, missing completion
 No database/version/process-policy substitution. Source discovery intentionally adds a bounded second
 CPU parsing pass rather than retaining ASTs across stages or aliasing generation identities.
 Next: refactor the snapshot hash to the streaming port, then fresh m1-prepared-final-measurements.
+
+### M1 publication preparation and bounded readers — REFACTOR
+
+Extracted compute_workspace_generation_digest and streamed its ordered inputs without changing the hash
+framing or table order; clarified default trait parameter names. fmt check and diff check exited 0.
+Workspace Clippy --all-targets --all-features -D warnings Finished dev profile in 0.66s.
+All 48 workspace tests pass (CLI 3, core 3, graph 8, scheduler 4, syntax 11, fake store 1,
+cleanup plan 1, store contracts 14, build/runtime gates 3). Release Finished in 4.58s.
+Unchanged Python check: Ran 5 tests in 0.349s, OK. No production todo/panic added.
+Fresh run: m1-prepared-final-measurements, log /home/ubuntu/m1-prepared-production-measurements.log.
+Do not rebuild/replace the release binary until all three separate runs per repository finish.

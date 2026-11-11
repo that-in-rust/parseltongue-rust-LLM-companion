@@ -18,24 +18,24 @@ pub trait StageTableStorePort: Send + Sync {
     ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError>;
     fn count_stage_table_rows(
         &self,
-        _stage_run_scope_value: &StageRunScopeValue,
-        _stage_owned_table_name: &str,
+        stage_run_scope_value: &StageRunScopeValue,
+        stage_owned_table_name: &str,
     ) -> Result<usize, StoreBackendFailureError> {
-        self.read_stage_table_rows(_stage_run_scope_value, _stage_owned_table_name)
+        self.read_stage_table_rows(stage_run_scope_value, stage_owned_table_name)
             .map(|rows| rows.len())
     }
     fn visit_stage_table_rows(
         &self,
-        _stage_run_scope_value: &StageRunScopeValue,
-        _stage_owned_table_name: &str,
-        _stage_row_visit_function: &mut dyn FnMut(
+        stage_run_scope_value: &StageRunScopeValue,
+        stage_owned_table_name: &str,
+        stage_row_visit_function: &mut dyn FnMut(
             StageTableRowRecord,
         ) -> Result<(), StoreBackendFailureError>,
     ) -> Result<usize, StoreBackendFailureError> {
-        self.read_stage_table_rows(_stage_run_scope_value, _stage_owned_table_name)?
+        self.read_stage_table_rows(stage_run_scope_value, stage_owned_table_name)?
             .into_iter()
             .try_fold(0, |count, row| {
-                _stage_row_visit_function(row)?;
+                stage_row_visit_function(row)?;
                 Ok(count + 1)
             })
     }

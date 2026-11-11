@@ -463,6 +463,29 @@ fn build_workspace_coverage_banner(
             "signature-lowering":"not yet implemented","call-resolution":"not yet implemented","visibility-hld":"not yet implemented"}}),
     )
 }
+fn compute_workspace_generation_digest(
+    store: &dyn StageTableStorePort,
+    scope: &StageRunScopeValue,
+) -> Result<String, StoreBackendFailureError> {
+    let mut digest = blake3::Hasher::new();
+    digest.update(b"parseltongue/0.1.0/m1-schema-1/ra_ap_syntax-0.0.362");
+    [
+        "workspace-config-state-records",
+        "crate-dependency-graph-table",
+        "file-source-text-table",
+    ]
+    .into_iter()
+    .try_for_each(|table| {
+        store
+            .visit_stage_table_rows(scope, table, &mut |row| {
+                digest.update(&(row.stage_row_payload_text.len() as u64).to_le_bytes());
+                digest.update(row.stage_row_payload_text.as_bytes());
+                Ok(())
+            })
+            .map(|_| ())
+    })?;
+    Ok(digest.finalize().to_hex().to_string())
+}
 fn run_workspace_mapping_pipeline(
     root: &Path,
     store: &dyn StageTableStorePort,
@@ -507,24 +530,9 @@ fn run_workspace_mapping_pipeline(
         "stage=source-closure elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
-    let mut digest = blake3::Hasher::new();
-    digest.update(b"parseltongue/0.1.0/m1-schema-1/ra_ap_syntax-0.0.362");
-    for table in [
-        "workspace-config-state-records",
-        "crate-dependency-graph-table",
-        "file-source-text-table",
-    ] {
-        for row in store.read_stage_table_rows(&scope, table)? {
-            digest.update(&(row.stage_row_payload_text.len() as u64).to_le_bytes());
-            digest.update(row.stage_row_payload_text.as_bytes());
-        }
-    }
+    let generation = compute_workspace_generation_digest(store, &scope)?;
     let started = std::time::Instant::now();
-    let scope = store.prepare_workspace_generation_scope(
-        &scope,
-        digest.finalize().to_hex().as_ref(),
-        cancel,
-    )?;
+    let scope = store.prepare_workspace_generation_scope(&scope, &generation, cancel)?;
     eprintln!(
         "stage=generation-preparation elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
