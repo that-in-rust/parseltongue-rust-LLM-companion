@@ -1058,6 +1058,165 @@ mod oracle_path_contract_tests {
     }
 
     #[test]
+    fn test_complete_import_namespaces() {
+        let directory = tempfile::tempdir().unwrap();
+        create_oracle_workspace_fixture(
+            directory.path(),
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname=\"namespaces\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "src/lib.rs",
+                    "pub mod defs { pub struct Item(pub u8); pub trait Both {} #[macro_export] macro_rules! Both { () => {}; } } use defs::Item as Alias; use crate::Both as MacroAlias; use defs::Both as TraitAlias;",
+                ),
+            ],
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let imported = rows
+            .iter()
+            .find(|row| row["path_site_source_text"] == "defs::Item")
+            .unwrap();
+        let namespaces: BTreeSet<_> = imported["path_target_symbol_rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|target| target["target_namespace_kind_value"].as_str().unwrap())
+            .collect();
+        assert_eq!(namespaces, BTreeSet::from(["type", "value"]));
+        for (path, kind) in [("crate::Both", "Macro"), ("defs::Both", "Trait")] {
+            let imported = rows
+                .iter()
+                .find(|row| row["path_site_source_text"] == path)
+                .unwrap();
+            assert!(
+                imported["path_target_symbol_rows"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|target| target["target_symbol_kind_value"] == kind)
+            );
+        }
+    }
+
+    #[test]
+    fn test_complete_associated_types() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = "pub trait Bound { type Assoc; } pub struct Wrap<T: Bound>(pub T, pub T::Assoc, pub <T as Bound>::Assoc);";
+        create_shared_scope_fixture(directory.path(), source);
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let paths: Vec<_> = rows
+            .iter()
+            .filter(|row| {
+                row["path_site_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("::Assoc")
+            })
+            .collect();
+        assert_eq!(paths.len(), 4);
+        for row in paths {
+            let targets = row["path_target_symbol_rows"].as_array().unwrap();
+            assert_eq!(targets.len(), 1);
+            assert_eq!(targets[0]["target_symbol_kind_value"], "TypeAlias");
+            assert_eq!(
+                targets[0]["target_source_range_start"],
+                source.find("type Assoc;").unwrap()
+            );
+            assert_eq!(
+                targets[0]["target_compilation_scope_record"],
+                row["site_compilation_scope_record"]
+            );
+        }
+    }
+
+    #[test]
+    fn test_complete_trait_self() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = "pub trait Bound { type Assoc; fn make(value: Self::Assoc) -> Self; }";
+        create_shared_scope_fixture(directory.path(), source);
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        for (path, kind) in [("Self", "TypeParam"), ("Self::Assoc", "TypeAlias")] {
+            let paths: Vec<_> = rows
+                .iter()
+                .filter(|row| row["path_site_source_text"] == path)
+                .collect();
+            assert_eq!(paths.len(), 2);
+            for row in paths {
+                let targets = row["path_target_symbol_rows"].as_array().unwrap();
+                assert_eq!(targets.len(), 1);
+                assert_eq!(targets[0]["target_symbol_kind_value"], kind);
+                assert_eq!(
+                    targets[0]["target_compilation_scope_record"],
+                    row["site_compilation_scope_record"]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_complete_method_generics() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = "pub struct Wrap<T>(pub T); impl<T> Wrap<T> { pub fn pass<U>(value: U) -> U { value } }";
+        create_shared_scope_fixture(directory.path(), source);
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let paths: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "U")
+            .collect();
+        assert_eq!(paths.len(), 4);
+        for row in paths {
+            let targets = row["path_target_symbol_rows"].as_array().unwrap();
+            assert_eq!(targets.len(), 1);
+            assert_eq!(targets[0]["target_symbol_kind_value"], "TypeParam");
+            assert_eq!(
+                targets[0]["target_source_range_start"],
+                source.find("<U>").unwrap() + 1
+            );
+            assert_eq!(
+                targets[0]["target_compilation_scope_record"],
+                row["site_compilation_scope_record"]
+            );
+        }
+    }
+
+    #[test]
+    fn test_complete_inline_identity() {
+        let directory = tempfile::tempdir().unwrap();
+        create_oracle_workspace_fixture(
+            directory.path(),
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname=\"inline\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "src/lib.rs",
+                    "pub mod one { pub trait Bound { type Assoc; } pub struct Wrap<T: Bound>(pub T, pub <T as Bound>::Assoc); }",
+                ),
+            ],
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let row = rows
+            .iter()
+            .find(|row| row["path_site_source_text"] == "<T as Bound>::Assoc")
+            .unwrap();
+        let targets = row["path_target_symbol_rows"].as_array().unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0]["target_symbol_kind_value"], "TypeAlias");
+        assert_eq!(
+            targets[0]["target_compilation_scope_record"]["unit_module_path_values"],
+            json!(["one"])
+        );
+    }
+
+    #[test]
     fn test_empty_oracle_paths_succeed() {
         let directory = tempfile::tempdir().unwrap();
         create_oracle_workspace_fixture(

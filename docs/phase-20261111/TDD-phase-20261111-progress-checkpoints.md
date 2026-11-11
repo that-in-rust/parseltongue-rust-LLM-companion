@@ -569,3 +569,16 @@ requires a SemanticsScope; do not pass a first-crate scope as if it selected the
 Prefer native Module/GenericDef/Trait items, and only duplicate IDs if the public API proves
 insufficient. Existing tests are intentionally red again until this cycle's GREEN.
 Offline cargo check passed in 0.32s; no production dependency changes.
+
+### M2 oracle complete signatures — RED
+
+Five new fixtures fail at the intended namespace/associated-path todo seams:
+test_complete_import_namespaces, test_complete_associated_types,
+test_complete_trait_self, test_complete_method_generics, test_complete_inline_identity.
+They cover constructor type/value namespaces, macro/type imports, T::Assoc and fully
+qualified associated types across two crates, implicit Self, impl-method type parameters,
+and an inline module covering its entire physical source file.
+
+Focused offline test output: "FAILED. 0 passed; 5 failed; 0 ignored; 0 measured;
+10 filtered out; finished in 46.26s". No assertions were weakened. GREEN must restore
+all earlier tests as well; corpus comparison is not yet runnable.
