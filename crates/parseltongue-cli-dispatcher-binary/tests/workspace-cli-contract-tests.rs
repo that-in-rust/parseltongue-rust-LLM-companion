@@ -9,6 +9,8 @@ fn create_workspace_source_fixture(root: &Path) {
     fs::write(root.join("src/child.rs"), "pub fn g(x: u8) -> u8 { x }").unwrap();
     fs::write(root.join("unrelated.rs"), [255, 0]).unwrap();
     fs::write(root.join("build.rs"), "compile_error!(\"never execute me\");").unwrap();
+    let lock = Command::new(env!("CARGO")).current_dir(root).args(["generate-lockfile", "--offline"]).output().unwrap();
+    assert!(lock.status.success(), "{}", String::from_utf8_lossy(&lock.stderr));
 }
 fn run_workspace_mapping_fixture(root: &Path, database: &Path, workers: &str) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_parseltongue")).args(["map-workspace-full-run",
@@ -28,7 +30,7 @@ fn test_stage_rerun_is_identical() {
     let output=run_workspace_mapping_fixture(&root,&database,"1");
     assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
     let first=read_workspace_banner_fixture(&database);
-    assert_eq!(first["source_file_record_count"],3);
+    assert_eq!(first["source_file_record_count"],4);
     assert!(first["syntax_span_record_count"].as_u64().unwrap()>0);
     assert!(first["signature_field_record_count"].as_u64().unwrap()>0);
     assert!(first["body_site_record_count"].as_u64().unwrap()>0);

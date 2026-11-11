@@ -9,6 +9,9 @@ fn make_syntax_file_input(source: &[u8]) -> SyntaxFileInputData {
         unit_rust_edition_value: "2024".into(),
         unit_target_cfg_values: BTreeSet::from(["unix".into(), "target_os=\"linux\"".into()]),
         file_module_directory_path: "/workspace/src".into(),
+        unit_metadata_environment_values: Default::default(),
+        file_parse_context_kind: "items".into(),
+        file_expansion_provenance_chain: Vec::new(),
     }
 }
 

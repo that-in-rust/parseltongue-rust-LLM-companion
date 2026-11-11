@@ -4,6 +4,10 @@
 mod stage_pipeline_row_types;
 pub use stage_pipeline_row_types::*;
 
+#[path = "configuration-expression-truth-values.rs"]
+mod configuration_expression_truth_values;
+pub use configuration_expression_truth_values::evaluate_cfg_expression_truth;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct SpanDigestIdValue([u8; 32]);
 

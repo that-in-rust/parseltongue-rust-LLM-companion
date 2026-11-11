@@ -1,5 +1,7 @@
 import importlib.util
 import sys
+import tempfile
+import json
 import unittest
 from pathlib import Path
 
@@ -33,6 +35,25 @@ class ProcessTreeContractTests(unittest.TestCase):
         direct = '100 clone(child_stack=NULL, flags=SIGCHLD) = 104\n104 execve("/bin/rustc", ["rustc", "-vV"], []) = 0\n'
         self.assertTrue(auditor.audit_process_trace_events(trace + direct, 100))
         self.assertTrue(auditor.audit_process_trace_events("", 100))
+        probe = ["-", "--crate-name", "___", "--print=file-names"]
+        for selector in ["bin", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"]:
+            probe.extend(["--crate-type", selector])
+        probe.extend(["--print=sysroot", "--print=split-debuginfo", "--print=crate-name", "--print=cfg", "-Wwarnings"])
+        self.assertTrue(auditor.check_rustc_discovery_arguments(probe))
+        for option in ["--emit=link", "--out-dir=/tmp/output", "--print=cfg=/tmp/output", "-o", "real.rs"]:
+            self.assertFalse(auditor.check_rustc_discovery_arguments(probe + [option]))
+
+    def test_process_tree_memory_sampling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "samples.json"
+            self.assertEqual(auditor.sample_process_tree_memory([sys.executable, "-c", "import time; data=bytearray(2**20); time.sleep(.05)"], str(output)), 0)
+            result = json.loads(output.read_text())
+            self.assertGreater(result["process_tree_peak_bytes"], 0)
+            self.assertGreater(result["process_tree_elapsed_seconds"], 0)
+            self.assertTrue(result["process_memory_sample_values"])
+            self.assertEqual(auditor.sample_process_tree_memory([sys.executable, "-c", "raise SystemExit(7)"], str(output)), 7)
+            with self.assertRaises(ValueError):
+                auditor.sample_process_tree_memory([], str(output))
 
     def test_build_script_never_executed(self):
         trace = '''100 execve("/bin/parseltongue", ["parseltongue"], []) = 0

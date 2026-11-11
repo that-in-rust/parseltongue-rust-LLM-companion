@@ -146,3 +146,53 @@ The existing offline dependency gate also failed on an uncached cross-platform o
 Logs: /home/ubuntu/m1-red-tests.log, m1-red-cli-tests.log, m1-red-retry-tests.log,
 m1-red-process-tests.log. Next: minimal implementations, then run the entire changed fixture suite.
 S1 fresh indexes completed for all five repos with exit zero; S2 pagination is in progress.
+
+## M1 GREEN work in progress — two remaining policy decisions
+
+Prep f5aa564d8, STUB d91ac4069 and RED 63b5406d4 are pushed. M1 production bodies remain todo!();
+do not mistake the boundary commits or the following external checks for M1 completion.
+
+The external argv/ancestry auditor now passes its two tests (Ran 2 tests in 0.001s; OK).
+A new cold-cache cargo metadata --offline trace still contains --crate-type bin/rlib/dylib/cdylib/staticlib/
+proc-macro and -Wwarnings. The literal approved print-only grammar rejects these. A real Cargo trace
+embedded beneath a synthetic mapper parent validates this rejection; a production mapper was not run.
+Need a narrowly scoped flag-selector decision before claiming the process requirement can pass.
+
+All five S1 indexes and S2 inventories were collected; per-repo metrics are in the run report.
+Second blocker: rust-analyzer's last scope page has has_more=false, scope_truncated=true, total=294,
+returned=14. The 15 pages contain exactly 294 entries. The literal SOP S2 gate therefore fails despite
+complete accumulated enumeration; other four repos meet its final-page flags. No SOP S2 change applied.
+The inventory driver preserves all responses and exits nonzero for this contradiction.
+
+Uncommitted work: strict process auditor, complete-coverage inventory driver, updated run report and this
+checkpoint. No GREEN/REFACTOR commit; no production spans, Turso rows, S3 counts, RSS or performance claim.
+
+## M1 GREEN — implementations and approved policy refinements
+
+Both remaining amendments are approved and recorded in SPEC/SOP. The auditor accepts only the six fixed
+crate-type selectors and -Wwarnings within the approved stdin ___ print probe; output/emit/real-input
+arguments remain rejected. S2 now gates stable generation, advancing offsets and total reconciliation;
+all five saved inventories pass. A fresh Cargo metadata .rustc_info.json cache is discovery provenance,
+not a saved build-script output; the auditor permits only that exact target-cache basename.
+
+Implemented byte-preserving immutable content storage, stage-owned physical tables, MVCC BEGIN CONCURRENT
+unit transactions with bounded conflict retries, prerequisite markers and atomic generation publication.
+Graph loading protects Cargo.lock and resolves normal/build/proc-macro feature contexts separately; dev
+dependencies are not mapped. Initial source ingestion stores all .rs bytes; only active module/include
+closure files are parsed with pinned ra_ap_syntax. Inactive items and OUT_DIR includes carry explicit reasons.
+Extraction writes semantic item occurrences, signatures, pending body sites and contiguous ownership ranges.
+Module/include requests and syntax work queues are persisted; no graph/ingest/parse in-memory stage handoff.
+The CLI implements map-workspace-full-run and JSON coverage; later stages explicitly say not yet implemented.
+
+Checks: all 31 production Rust tests pass across the workspace run plus the corrected graph/CLI rerun.
+Graph 6/6, syntax 6/6, scheduler 2/2, store 9/9, CLI 1/1; M0 tests 7/7.
+External Python tests: Ran 3 tests in 0.149s; OK. Added a memory-sampler RED first
+(NotImplementedError), then implemented process-tree RSS sampling at nominal 10 ms intervals.
+Logs: /home/ubuntu/m1-green-tests.log, m1-green-cli-tests.log, m1-green-graph-cli-tests.log.
+
+Two fixture defects were corrected without weakening production: the hand-written Cargo.lock was
+noncanonical and was correctly rejected as mutated; the fixture now runs offline generate-lockfile in
+the external test driver before mapping. Its bytes-only inventory is four files, not three, because its
+build.rs must also be stored without execution. The lock guard and all-.rs coverage remain enforced.
+An initial Rust type-inference error in optional publication decoding was fixed with an explicit error type.
+Next: functional cleanup, fmt/clippy/test/build gates, S3 process/RSS measurements for all five.

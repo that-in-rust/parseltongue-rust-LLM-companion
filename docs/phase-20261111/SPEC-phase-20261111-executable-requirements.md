@@ -46,9 +46,14 @@ contexts (§1), preserving Cargo package ID/source, target name/kind, root, edit
 role and dependency alias. Alias is not crate identity. Parseltongue's direct children SHALL be only
 `cargo metadata --offline`, `rustc --print cfg`, `rustc --print sysroot`; reject other executable requests.
 Under the metadata Cargo process only, permit rustc discovery descendants: `rustc -vV` or
-`rustc - --crate-name ___ --print=...` with only print flags and no output artifacts.
+`rustc - --crate-name ___` with approved discovery `--print=` flags, exactly the six
+`--crate-type` selectors bin/rlib/dylib/cdylib/staticlib/proc-macro, and `-Wwarnings`.
+No other flags, real source inputs or output artifacts are permitted. Approved print kinds are
+file-names/sysroot/split-debuginfo/crate-name/cfg; version-only `rustc -vV` remains permitted.
 Reject every other descendant, including real-crate compilation, build-script binaries and network activity.
 The strace audit SHALL reconstruct ancestry and validate full argument vectors, not executable names alone.
+SOP S2 scope pagination requires a stable generation, strictly advancing next_offset, has_more=false,
+and accumulated entry count equal to scope_total. The per-page scope_truncated flag is informational.
 Harness builds/exports, version recording and corpus qualification are outside this allowlist.
 Metadata SHALL use a read-only input checkout or equivalent write guard; lock mutation fails before publication
 and leaves the original lock bytes intact (test with a writable isolated fixture and restoration guard).

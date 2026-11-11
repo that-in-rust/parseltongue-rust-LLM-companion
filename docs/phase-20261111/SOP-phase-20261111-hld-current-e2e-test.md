@@ -18,8 +18,9 @@ Every applicable corpus gate runs on all five repos, never a tune/held-out split
   relationship export does not prove impl/expansion/visibility relations.
 - The direct-child three-command allowlist applies to production mapping only:
   cargo metadata --offline, rustc --print cfg, rustc --print sysroot.
-  Only beneath metadata Cargo, permit rustc -vV or rustc - --crate-name ___ followed only by
-  --print flags with no output artifacts. All other descendants, compilation, build scripts and network fail.
+  Only beneath metadata Cargo, permit rustc -vV or the stdin ___ probe with the six fixed
+  --crate-type selectors, approved --print= flags and -Wwarnings, without output artifacts.
+  All other descendants, compilation, build scripts and network fail.
   Corpus qualification, harness builds/exports, version collection and test drivers are outside it.
 
 ## 1. Preconditions
@@ -66,8 +67,9 @@ codebase-memory-mcp cli query_graph --project "$CMP" --graph missed \
 ```
 
 Save each response as codebase-index-coverage-page-<ordinal>.json or codebase-missed-source-page-<ordinal>.json.
-For check_index_coverage, repeat with --scope-offset from next_offset until has_more=false and
-scope_truncated=false; require strictly increasing offsets or BLOCK on an incomplete inventory.
+For check_index_coverage, keep one stable generation and repeat with --scope-offset from next_offset
+until has_more=false. Require strictly increasing offsets and accumulated entries == scope_total.
+scope_truncated describes an individual page window and is informational, not a gate.
 For query_graph, pass next_cursor via --cursor with the same project/graph/query until has_more=false.
 Restrict to File: the missed graph also contains folders, which are not missed files.
 A partial/unusable/missed file is missing CROSS-CHECK evidence only; CM-GAP NEVER excuses an oracle-proven error.
@@ -97,8 +99,14 @@ parseltongue hld-current-export-sorted \
 The sampler/strace are external supervisors: filter the allowlist to the mapper and its descendants,
 not supervisor startup. Resolve audited paths/symlinks; forbid build-script execution and target/ output reads.
 Reconstruct fork/clone/exec ancestry and check complete argv: direct children remain exactly the three
-commands; Cargo descendants are restricted to rustc -vV and the approved print-only stdin probe.
-Reject unknown probe flags, output paths, real crate inputs, other executables and network connect activity.
+commands; Cargo descendants are restricted to rustc -vV and the approved stdin ___ discovery probe.
+That probe has exactly one each of --crate-type bin/rlib/dylib/cdylib/staticlib/proc-macro,
+approved --print=file-names/sysroot/split-debuginfo/crate-name/cfg flags and -Wwarnings.
+The approved order is Cargo's observed order; no -o, --emit, --out-dir or other flags are accepted.
+Pure print-only probes without selectors remain accepted; they cannot compile or write artifacts.
+Reject unknown probe flags, output paths, real crate inputs, other executables and network activity.
+A metadata Cargo .rustc_info.json cache is compiler discovery provenance, not a build-script output;
+permit only that exact basename under target, never other target files.
 A rustup shim re-exec of the identical approved argv is the same logical command, not a new permission.
 Run the trace checker on the saved audit; any violation makes S3 FAIL, regardless of mapper exit status.
 Check lock existence BEFORE metadata; compare full lock digest before/after; failed/mutated metadata
