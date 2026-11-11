@@ -1,0 +1,26 @@
+[package]
+name = "parseltongue-cli-dispatcher-binary"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "parseltongue"
+path = "src/main.rs"
+
+[dependencies]
+parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
+parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" }
+parseltongue-turso-store-adapter = { path = "../parseltongue-turso-store-adapter" }
+parseltongue-crate-graph-loader = { path = "../parseltongue-crate-graph-loader" }
+parseltongue-syntax-span-extractor = { path = "../parseltongue-syntax-span-extractor" }
+parseltongue-stage-worker-scheduler = { path = "../parseltongue-stage-worker-scheduler" }
+serde_json = "1"
+blake3 = "1"
+ctrlc = { version = "3", features = ["termination"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+[package]
+name = "parseltongue-stage-worker-scheduler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
+
+[lints]
+workspace = true

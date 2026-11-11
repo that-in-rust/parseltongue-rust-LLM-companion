@@ -1,5 +1,9 @@
 //! Dependency-free semantic identities and typed stage boundaries.
 
+#[path = "stage-pipeline-row-types.rs"]
+mod stage_pipeline_row_types;
+pub use stage_pipeline_row_types::*;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct SpanDigestIdValue([u8; 32]);
 

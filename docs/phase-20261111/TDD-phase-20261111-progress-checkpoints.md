@@ -115,3 +115,14 @@ The captured Cargo probe also contains --crate-type and -Wwarnings; these are no
 the literal print-only policy and will be reported if observed in S3.
 Corpus pins, qualification logs, artifact ignore rules and this amendment form the prep commit.
 Next: M1 STUB, RED, GREEN and REFACTOR with SPEC-named tests and measured S1–S3 reports.
+
+## M1 STUB — persisted boundary signatures
+
+Added graph/ingest, pinned syntax extraction, bounded scheduler and CLI crates using SPEC component names.
+L1 adds cancellation, stage scopes and generic typed stage-row envelopes with zero dependencies.
+Store traits expose atomic stage units, immutable byte content and generation publication; implementations
+are todo!() stubs. Graph subprocesses remain behind a command port. Syntax extraction is a pure byte input
+to row/request output function; discovery requests must persist before ingestion resumes.
+The external Python process/RSS auditor is scaffolded separately from production.
+Next: SPEC-named failing M1 tests, including negative process arguments and publication/cancellation cases.
+No runtime M1 behavior or corpus mapping pass is claimed at STUB.
