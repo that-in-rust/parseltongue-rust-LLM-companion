@@ -431,6 +431,15 @@ Decision point after M6: if 7a + 7b already reach ≥ 95 % method-call coverage 
      ≥ 95 % method-call target (REQ 008) depends on proc-macro-shape-table covering salsa and serde (D3)
  R8  codebase-memory's graph for rust-analyzer has no CALLS edges out of DefCollector methods (trace_path: 0 callees); the
      stage structure above was checked against the source, not the graph
+ KL1 KNOWN LIMITATION — build scripts (D4). This phase never runs build.rs and never reads its output, so code that only
+     exists after a build script runs is outside the HLD. Measured on this VM's ~/.cargo/registry (sample biased to the
+     tools cloned here, not a crates.io survey):
+       13 % of crates have a build.rs (112 of 847 crate names)
+       of the 203 versioned crate dirs with one: 58 % (117) emit rustc-cfg, mostly compiler-version probes;
+                                                  7 % (15) include generated code from OUT_DIR — the case that loses edges
+       rust-analyzer's own 5 build.rs only set env values (commit hash, version) or check-cfg
+     Reported per run as the unresolved(build_script) count. Phase 2 will address build scripts (for example by reading
+     saved results in target/, or another approach decided then).
  R5  copied code keeps rust-analyzer's licence headers and attribution (MIT OR Apache-2.0)
  D3  decided 2026-11-05: proc macros via proc-macro-shape-table (shape, not full expansion), checked against rust-analyzer
  D4  decided 2026-11-05: build scripts are never run and their target/ output is never read. Estimate (M, this VM's
