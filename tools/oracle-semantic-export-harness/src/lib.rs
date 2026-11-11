@@ -1,8 +1,14 @@
 //! M0 pinned-build provenance only; semantic exports start with the resolution milestones.
 
 pub fn build_oracle_source_manifest() -> serde_json::Value {
-    let _ = (std::mem::size_of::<ide::AnalysisHost>(), std::mem::size_of::<hir::Crate>());
-    todo!()
+    let oracle_analysis_host_value = ide::AnalysisHost::default();
+    let _ = oracle_analysis_host_value.analysis();
+    serde_json::json!({
+        "oracle_source_commit_hash": env!("ORACLE_SOURCE_COMMIT_HASH"),
+        "oracle_toolchain_version_text": env!("ORACLE_RUSTC_VERSION_TEXT"),
+        "oracle_export_support_kind": "provenance_only",
+        "oracle_hir_crate_bytes": std::mem::size_of::<hir::Crate>(),
+    })
 }
 
 #[cfg(test)]

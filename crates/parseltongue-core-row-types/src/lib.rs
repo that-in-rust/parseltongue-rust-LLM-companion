@@ -4,18 +4,18 @@
 pub struct SpanDigestIdValue([u8; 32]);
 
 impl From<[u8; 32]> for SpanDigestIdValue {
-    fn from(_span_content_digest_full: [u8; 32]) -> Self {
-        todo!()
+    fn from(span_content_digest_full: [u8; 32]) -> Self {
+        Self(span_content_digest_full)
     }
 }
 
 impl SpanDigestIdValue {
     pub fn read_full_digest_bytes(&self) -> &[u8; 32] {
-        todo!()
+        &self.0
     }
 
     pub fn read_truncated_digest_bytes(&self) -> [u8; 16] {
-        todo!()
+        std::array::from_fn(|digest_byte_position_index| self.0[digest_byte_position_index])
     }
 }
 
@@ -28,8 +28,12 @@ pub struct SpanByteRangeValue {
 impl TryFrom<(u64, u64)> for SpanByteRangeValue {
     type Error = CoreRowValidationError;
 
-    fn try_from(_span_byte_range_pair: (u64, u64)) -> Result<Self, Self::Error> {
-        todo!()
+    fn try_from(span_byte_range_pair: (u64, u64)) -> Result<Self, Self::Error> {
+        if span_byte_range_pair.1 < span_byte_range_pair.0 {
+            Err(CoreRowValidationError::ReversedRange)
+        } else {
+            Ok(Self { span_byte_start_offset: span_byte_range_pair.0, span_byte_end_offset: span_byte_range_pair.1 })
+        }
     }
 }
 
@@ -59,13 +63,30 @@ pub struct SemanticOccurrenceKeyValue {
 
 impl SemanticOccurrenceKeyValue {
     pub fn build_semantic_occurrence_key(
-        _unit_compilation_identity_key: &CrateCompilationUnitKey,
-        _span_source_file_path: &str,
-        _span_byte_range_value: SpanByteRangeValue,
-        _span_content_digest_full: SpanDigestIdValue,
-        _span_expansion_provenance_chain: &[[u8; 32]],
+        unit_compilation_identity_key: &CrateCompilationUnitKey,
+        span_source_file_path: &str,
+        span_byte_range_value: SpanByteRangeValue,
+        span_content_digest_full: SpanDigestIdValue,
+        span_expansion_provenance_chain: &[[u8; 32]],
     ) -> Result<Self, CoreRowValidationError> {
-        todo!()
+        if span_source_file_path.contains(['\\', ':', '\0'])
+            || span_source_file_path.split('/').any(|source_path_component_text| matches!(source_path_component_text, "" | "." | "..")) {
+            return Err(CoreRowValidationError::InvalidPath);
+        }
+        if [
+            &unit_compilation_identity_key.unit_cargo_package_identifier,
+            &unit_compilation_identity_key.unit_cargo_target_name,
+            &unit_compilation_identity_key.unit_cargo_target_kind,
+        ].iter().any(|unit_identity_component_text| unit_identity_component_text.trim().is_empty()) {
+            return Err(CoreRowValidationError::EmptyUnitIdentity);
+        }
+        Ok(Self {
+            unit_compilation_identity_key: unit_compilation_identity_key.clone(),
+            span_source_file_path: span_source_file_path.to_owned(),
+            span_byte_range_value,
+            span_content_digest_full,
+            span_expansion_provenance_chain: span_expansion_provenance_chain.to_owned(),
+        })
     }
 }
 

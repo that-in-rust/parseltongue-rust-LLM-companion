@@ -1,0 +1,7 @@
+{
+  "oracle_executable_digest_full": "dad6b17b836f47cd92ef3d88e5e096f873e7cf8f41df419812c88c4634bdcbaa",
+  "oracle_export_support_kind": "provenance_only",
+  "oracle_hir_crate_bytes": 8,
+  "oracle_source_commit_hash": "6e37b2d62127d445d77069031b416c48c9b0b4f2",
+  "oracle_toolchain_version_text": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+}

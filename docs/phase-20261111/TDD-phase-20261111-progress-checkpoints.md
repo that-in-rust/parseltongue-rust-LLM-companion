@@ -46,3 +46,19 @@ Status: PASS, no runtime behavior claimed. Public identity constructors and adap
   Next: cargo fetch --locked before the offline metadata gate, then implement the stubs without changing tests.
 - Full RED logs: /home/ubuntu/m0-red-production-tests.log and /home/ubuntu/m0-red-oracle-tests.log.
 - No Turso compiler/API failure occurred. No database substitution or test weakening is authorized.
+
+## GREEN — minimum implementations pass unchanged tests
+
+- cargo test --workspace --offline --locked: PASS, core 3/3, fake store 1/1, adapter/build gates 3/3.
+- cargo test --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml:
+  PASS, oracle manifest 1/1. Stub bodies removed; tests unchanged from RED.
+- cargo run --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml
+  -- --oracle-build-manifest-output: built executable and recorded its BLAKE3 digest/toolchain/source pin
+  in oracle-source-build-manifest.json. This artifact explicitly says provenance_only, not semantic export.
+- cargo fetch --locked provisioned missing cross-platform packages; offline metadata now passes.
+- Corrected our initial namespace assumption: the enum is turso::transaction::TransactionBehavior,
+  not a root reexport. Source confirms the specified API exists; this was our compile error, not a SPEC
+  mismatch. Concurrent also requires PRAGMA journal_mode='mvcc', applied before the smoke transaction.
+- Adapter verifies async build/query/execute/prepare and concurrent begin/rollback behind a sync L3 runtime.
+  This is an API foundation, not M1 schema/persistence/concurrency correctness implementation.
+- Next: refactor pure validation/error diagnostics, format and run final gates; no open build blocker.

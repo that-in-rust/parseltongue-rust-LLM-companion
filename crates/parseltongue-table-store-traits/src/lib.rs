@@ -38,16 +38,18 @@ mod stage_store_fixture_tests {
     }
 
     impl StageRowWriteSink for FakeStageRowStore {
-        fn write_stage_unit_rows(&mut self, _stage_unit_output_rows: &[StageUnitRowRecord]) -> Result<(), StoreBackendFailureError> {
-            let _ = &self.stage_unit_stored_rows;
-            todo!()
+        fn write_stage_unit_rows(&mut self, stage_unit_output_rows: &[StageUnitRowRecord]) -> Result<(), StoreBackendFailureError> {
+            self.stage_unit_stored_rows.extend(stage_unit_output_rows.iter().map(|stage_unit_output_row| {
+                ((stage_unit_output_row.run_generation_digest_value, stage_unit_output_row.span_semantic_occurrence_key.clone()), stage_unit_output_row.clone())
+            }));
+            Ok(())
         }
     }
 
     impl SpanRowReadStore for FakeStageRowStore {
-        fn read_span_by_digest(&self, _run_generation_digest_value: RunGenerationDigestValue,
-            _span_semantic_occurrence_key: &SemanticOccurrenceKeyValue) -> Result<Option<StageUnitRowRecord>, StoreBackendFailureError> {
-            todo!()
+        fn read_span_by_digest(&self, run_generation_digest_value: RunGenerationDigestValue,
+            span_semantic_occurrence_key: &SemanticOccurrenceKeyValue) -> Result<Option<StageUnitRowRecord>, StoreBackendFailureError> {
+            Ok(self.stage_unit_stored_rows.get(&(run_generation_digest_value, span_semantic_occurrence_key.clone())).cloned())
         }
     }
 
