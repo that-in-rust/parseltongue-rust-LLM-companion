@@ -531,3 +531,20 @@ test result: FAILED. 0 passed; 5 failed; 5 filtered out; finished in 47.58s
 
 All failures reach the deliberate scope-record seam. GREEN must satisfy these assertions
 and restore the five previously green oracle tests; no assertion weakening is planned.
+
+### M2 oracle scoped signatures — GREEN
+
+Restored all ten tests: "ok. 10 passed; 0 failed" in 36.24s. Package identities come from
+Cargo's IDs; sites and targets now retain target name/kind, edition and module path. The
+same lib/bin source remains two units and repeated source files remain distinct module
+occurrences. Grouped use prefixes are resolved through the current Module, and generic
+parameters through that module's native GenericDef/Impl parameter lists. No file IDs were
+duplicated. Use native Semantics for unique source containers, not an unnecessarily broad
+module-only lookup; shared containers stay module-scoped and fail closed when unsupported.
+
+No production dependency or storage change. Sysroot identity labels remain provisional
+(sysroot+root#name); full configuration/compatibility manifests and production sysroot
+materialization must settle these before corpus scoring. Next: refactor gates, import
+multi-namespace and associated/Self fixtures, then exact-unit cfg and proc-macro artifacts.
+The corpus selection must use all mapped normal units, not just workspace-member roots.
+S5 is still unmeasured; the oracle build manifest still does not claim complete semantic support.
