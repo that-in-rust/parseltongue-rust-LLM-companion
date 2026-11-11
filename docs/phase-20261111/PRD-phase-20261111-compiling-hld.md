@@ -1,6 +1,6 @@
 # PRD — phase-20261111: HLD for Rust code that compiles
 
-Status: draft · Executable specs: `SPEC-phase-20261111-executable-requirements.md` · Scope owner: human-architect-intent-author · Source design: `devin-research/Deep-Insight-08.md` (copied and narrowed here; this file stands alone)
+Status: draft · Executable specs: `SPEC-phase-20261111-executable-requirements.md` · E2E test SOP: `SOP-phase-20261111-hld-current-e2e-test.md` (run on all five repos) · Scope owner: human-architect-intent-author · Source design: `devin-research/Deep-Insight-08.md` (copied and narrowed here; this file stands alone)
 
 ## 0. How to read this document
 
