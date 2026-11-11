@@ -697,3 +697,13 @@ in the persisted workspace configuration; this also distinguishes M2 configurati
 The adapter remains an intentional todo. Offline CLI cargo check passed in 0.59s.
 Next RED: persisted resolved paths, per-crate atomic replacement/rollback, declared-stage
 publication rejection, empty/cancelled/error cases, and lib/bin/module occurrence identity.
+
+### M2 persisted stage wiring — RED
+
+New CLI fixture reaches persisted source/syntax stages then fails at the adapter todo:
+0 passed, 1 failed (0.34s). It requires alias-path answers and original target/module identity
+in path-resolution-site-records and a completed name-resolution banner.
+The new Turso fixture fails before schema writes because publication incorrectly succeeds
+without its declared name-resolution stage: 0 passed, 1 failed (0.08s). It additionally
+requires one atomic crate transaction spanning bindings and expanded spans, rollback of
+duplicate-key writes, and unchanged old publication until the complete new stage is sealed.

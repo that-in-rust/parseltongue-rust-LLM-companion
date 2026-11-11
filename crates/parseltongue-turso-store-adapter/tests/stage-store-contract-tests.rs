@@ -48,6 +48,125 @@ fn complete_fixture_stage_set(store: &dyn StageTableStorePort, scope: &StageRunS
 }
 
 #[test]
+fn test_crate_bindings_publish_atomically() {
+    let store = make_fixture_store_adapter();
+    let old = make_fixture_stage_scope("old-published");
+    complete_fixture_stage_set(&store, &old);
+    let published = store
+        .publish_workspace_generation_manifest(
+            &old,
+            "old-generation",
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    let scope = make_fixture_stage_scope("m2-staging");
+    write_fixture_stage_rows(&store, &scope, "crate-graph", "workspace", &[], &[
+        StageTableRowRecord {
+            stage_owned_table_name:"workspace-config-state-records".into(),
+            stage_row_record_key:"workspace".into(),
+            stage_row_payload_text:serde_json::json!({
+                "workspace_required_stage_names":["crate-graph","source-ingest","syntax-spans","name-resolution"]
+            }).to_string(),
+        }
+    ]).unwrap();
+    complete_fixture_stage_set(&store, &scope);
+    assert!(
+        store
+            .publish_workspace_generation_manifest(
+                &scope,
+                "m2-generation",
+                &RunCancelFlagValue::default()
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("name-resolution")
+    );
+    let binding = StageTableRowRecord {
+        stage_owned_table_name: "module-scope-binding-table".into(),
+        stage_row_record_key: "binding-a".into(),
+        stage_row_payload_text: "old-binding".into(),
+    };
+    let span = StageTableRowRecord {
+        stage_owned_table_name: "span-reference-text-table".into(),
+        stage_row_record_key: "expanded-span-a".into(),
+        stage_row_payload_text: "expanded-span".into(),
+    };
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "name-resolution",
+        "crate/a",
+        &["syntax-spans"],
+        &[binding.clone(), span],
+    )
+    .unwrap();
+    let mut conflicting = binding.clone();
+    conflicting.stage_row_payload_text = "new-binding".into();
+    assert!(
+        write_fixture_stage_rows(
+            &store,
+            &scope,
+            "name-resolution",
+            "crate/a",
+            &["syntax-spans"],
+            &[conflicting.clone(), conflicting]
+        )
+        .is_err()
+    );
+    assert_eq!(
+        store
+            .read_stage_table_rows(&scope, "module-scope-binding-table")
+            .unwrap(),
+        vec![binding]
+    );
+    assert_eq!(
+        store
+            .count_stage_table_rows(&scope, "span-reference-text-table")
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store.read_workspace_publication_scope().unwrap(),
+        Some(published)
+    );
+    assert!(
+        store
+            .publish_workspace_generation_manifest(
+                &scope,
+                "m2-generation",
+                &RunCancelFlagValue::default()
+            )
+            .is_err()
+    );
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "name-resolution",
+        "__complete__",
+        &["syntax-spans"],
+        &[],
+    )
+    .unwrap();
+    let new = store
+        .publish_workspace_generation_manifest(
+            &scope,
+            "m2-generation",
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        store.read_workspace_publication_scope().unwrap(),
+        Some(new.clone())
+    );
+    assert_eq!(
+        store
+            .count_stage_table_rows(&new, "module-scope-binding-table")
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
 fn test_stage_row_visits_bounded() {
     let store = make_fixture_store_adapter();
     let scope = make_fixture_stage_scope("visit");

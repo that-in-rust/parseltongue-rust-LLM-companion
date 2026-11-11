@@ -70,6 +70,68 @@ fn read_workspace_banner_fixture(database: &Path) -> Value {
 }
 
 #[test]
+fn test_persisted_resolution_path_answers() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    fs::write(root.join("src/lib.rs"),format!("{source}\npub use child::T as PublicT; mod alias {{ pub use crate::PublicT as Again; pub fn make(x:Again)->Again{{x}} }}")).unwrap();
+    fs::write(
+        root.join("src/child.rs"),
+        "pub struct T; pub fn g(x:u8)->u8{x}",
+    )
+    .unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let rows: Vec<Value> = store
+        .read_stage_table_rows(&scope, "path-resolution-site-records")
+        .unwrap()
+        .iter()
+        .map(|row| serde_json::from_str(&row.stage_row_payload_text).unwrap())
+        .collect();
+    let answers: Vec<_> = rows
+        .iter()
+        .filter(|row| row["path_site_source_text"] == "Again")
+        .collect();
+    assert_eq!(answers.len(), 2);
+    for answer in answers {
+        assert_eq!(
+            answer["site_compilation_scope_record"]["unit_module_path_values"],
+            serde_json::json!(["alias"])
+        );
+        let targets = answer["path_target_symbol_rows"].as_array().unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0]["target_symbol_kind_value"], "Struct");
+        assert!(
+            targets[0]["target_source_file_path"]
+                .as_str()
+                .unwrap()
+                .ends_with("/src/child.rs")
+        );
+    }
+    assert!(
+        !store
+            .read_stage_table_rows(&scope, "module-scope-binding-table")
+            .unwrap()
+            .is_empty()
+    );
+    drop(store);
+    let banner = read_workspace_banner_fixture(&database);
+    assert_eq!(
+        banner["stage_implementation_status_values"]["name-resolution"],
+        "complete"
+    );
+}
+
+#[test]
 fn test_fixture_projects_remain_unmapped() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
