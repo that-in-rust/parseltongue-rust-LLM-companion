@@ -582,3 +582,10 @@ and an inline module covering its entire physical source file.
 Focused offline test output: "FAILED. 0 passed; 5 failed; 0 ignored; 0 measured;
 10 filtered out; finished in 46.26s". No assertions were weakened. GREEN must restore
 all earlier tests as well; corpus comparison is not yet runnable.
+
+Namespace RED clarification: preserve a single target definition with a sorted
+target_namespace_kind_values set, rather than duplicate a tuple-struct definition for
+its type and constructor namespaces. This keeps existing symbol-set contracts while
+retaining both bindings. The strengthened fixture requires one Item target with both
+namespaces and permits a trait plus macro of the same spelling. It still fails at the
+namespace todo: "FAILED. 0 passed; 1 failed; ... 14 filtered out" in 23.83s.

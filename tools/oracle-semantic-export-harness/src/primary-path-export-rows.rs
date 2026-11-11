@@ -227,7 +227,7 @@ fn build_oracle_path_targets(
                 build_oracle_resolution_target(resolution, semantics, files, packages).map(
                     |target| {
                         target.map(|mut target| {
-                            target["target_namespace_kind_value"] = json!(namespace);
+                            target["target_namespace_kind_values"] = json!([namespace]);
                             target
                         })
                     },
@@ -1069,7 +1069,7 @@ mod oracle_path_contract_tests {
                 ),
                 (
                     "src/lib.rs",
-                    "pub mod defs { pub struct Item(pub u8); pub trait Both {} #[macro_export] macro_rules! Both { () => {}; } } use defs::Item as Alias; use crate::Both as MacroAlias; use defs::Both as TraitAlias;",
+                    "pub trait Both {} pub mod defs { pub struct Item(pub u8); pub trait Both {} #[macro_export] macro_rules! Both { () => {}; } } use defs::Item as Alias; use crate::Both as MacroAlias; use defs::Both as TraitAlias;",
                 ),
             ],
         );
@@ -1079,11 +1079,12 @@ mod oracle_path_contract_tests {
             .iter()
             .find(|row| row["path_site_source_text"] == "defs::Item")
             .unwrap();
-        let namespaces: BTreeSet<_> = imported["path_target_symbol_rows"]
-            .as_array()
-            .unwrap()
+        let targets = imported["path_target_symbol_rows"].as_array().unwrap();
+        assert_eq!(targets.len(), 1);
+        let namespaces: BTreeSet<_> = targets
             .iter()
-            .map(|target| target["target_namespace_kind_value"].as_str().unwrap())
+            .flat_map(|target| target["target_namespace_kind_values"].as_array().unwrap())
+            .map(|namespace| namespace.as_str().unwrap())
             .collect();
         assert_eq!(namespaces, BTreeSet::from(["type", "value"]));
         for (path, kind) in [("crate::Both", "Macro"), ("defs::Both", "Trait")] {
