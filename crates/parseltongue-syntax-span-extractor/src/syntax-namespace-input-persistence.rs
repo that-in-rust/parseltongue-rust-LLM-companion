@@ -1,5 +1,6 @@
 use super::{
-    syntax_namespace_input_extraction::CrateSyntaxProjectionState, syntax_namespace_record_codec::*,
+    syntax_namespace_input_extraction::{CrateSyntaxProjectionState, MacroProjectionRowOffsets},
+    syntax_namespace_record_codec::*,
 };
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
@@ -67,30 +68,39 @@ fn flush_namespace_input_rows(
     Ok(pending)
 }
 
-fn persist_projection_input_rows(
-    projection: &CrateSyntaxProjectionState<'_>,
-    scope: &StageRunScopeValue,
-    store: &dyn StageTableStorePort,
-    cancel: &RunCancelFlagValue,
-) -> Result<usize, StoreBackendFailureError> {
+pub(super) fn namespace_input_row_records<'a>(
+    projection: &'a CrateSyntaxProjectionState<'_>,
+    offsets: &MacroProjectionRowOffsets,
+) -> impl Iterator<Item = Result<StageTableRowRecord, StoreBackendFailureError>> + 'a {
     let input = &projection.projection_resolution_input_rows;
-    let scopes = input.name_module_scope_rows.iter().map(|row| {
-        Ok(build_namespace_input_record(
-            "syntax-namespace-input-scopes",
-            encode_scope_record_value(row),
-        ))
-    });
-    let items = input.name_symbol_binding_rows.iter().map(|row| {
-        let metadata = projection
-            .projection_target_metadata_rows
-            .get(&row.binding_target_identity_key)
-            .ok_or_else(|| build_name_projection_error("declared target metadata absent"))?;
-        Ok(build_namespace_input_record(
-            "syntax-namespace-input-items",
-            encode_binding_record_value(row, metadata.clone()),
-        ))
-    });
-    let imports = input.name_import_request_rows.iter().map(|row| Ok(
+    let scopes = input
+        .name_module_scope_rows
+        .iter()
+        .skip(offsets.module_scope_row_count)
+        .map(move |row| {
+            let mut value = encode_scope_record_value(row);
+            value["scope_cargo_unit_key"] =
+                projection.projection_unit_record_value["unit_compilation_identity_key"].clone();
+            Ok(build_namespace_input_record(
+                "syntax-namespace-input-scopes",
+                value,
+            ))
+        });
+    let items = input
+        .name_symbol_binding_rows
+        .iter()
+        .skip(offsets.symbol_binding_row_count)
+        .map(move |row| {
+            let metadata = projection
+                .projection_target_metadata_rows
+                .get(&row.binding_target_identity_key)
+                .ok_or_else(|| build_name_projection_error("declared target metadata absent"))?;
+            Ok(build_namespace_input_record(
+                "syntax-namespace-input-items",
+                encode_binding_record_value(row, metadata.clone()),
+            ))
+        });
+    let imports = input.name_import_request_rows.iter().skip(offsets.import_request_row_count).map(|row| Ok(
         build_namespace_input_record("syntax-namespace-input-imports", json!({
             "import_site_occurrence_key":encode_occurrence_identity_value(&row.import_site_occurrence_key),
             "import_lexical_scope_key":encode_resolution_scope_value(&row.import_lexical_scope_key),
@@ -101,7 +111,7 @@ fn persist_projection_input_rows(
             "import_resolution_source_kind":format!("{:?}",row.import_resolution_source_kind),
         })),
     ));
-    let paths = input.name_signature_path_rows.iter().map(|row| {
+    let paths = input.name_signature_path_rows.iter().skip(offsets.signature_path_row_count).map(move |row| {
         let metadata = projection.projection_path_metadata_rows.get(&row.path_site_occurrence_key)
             .ok_or_else(|| build_name_projection_error("syntax path metadata absent"))?;
         Ok(build_namespace_input_record("syntax-namespace-input-paths", json!({
@@ -114,7 +124,7 @@ fn persist_projection_input_rows(
             "path_source_metadata_value":metadata,
         })))
     });
-    let macros = input.name_macro_invocation_rows.iter().map(|row| Ok(
+    let macros = input.name_macro_invocation_rows.iter().skip(offsets.macro_invocation_row_count).map(|row| Ok(
         build_namespace_input_record("syntax-namespace-input-macros", json!({
             "invocation_site_occurrence_key":encode_occurrence_identity_value(&row.invocation_site_occurrence_key),
             "invocation_lexical_scope_key":encode_resolution_scope_value(&row.invocation_lexical_scope_key),
@@ -125,6 +135,7 @@ fn persist_projection_input_rows(
     let externs = projection
         .projection_extern_declaration_rows
         .iter()
+        .skip(offsets.extern_declaration_row_count)
         .map(|row| {
             Ok(build_namespace_input_record(
                 "syntax-namespace-input-externs",
@@ -134,17 +145,36 @@ fn persist_projection_input_rows(
     let lang = projection
         .projection_lang_definition_rows
         .iter()
+        .skip(offsets.lang_definition_row_count)
         .cloned()
         .map(Ok);
     let legacy = projection
         .projection_legacy_source_event_rows
         .iter()
+        .skip(offsets.legacy_source_event_row_count)
         .map(|row| {
             Ok(build_namespace_input_record(
                 "legacy-macro-source-events",
                 row.clone(),
             ))
         });
+    scopes
+        .chain(items)
+        .chain(imports)
+        .chain(paths)
+        .chain(macros)
+        .chain(externs)
+        .chain(lang)
+        .chain(legacy)
+}
+
+fn persist_projection_input_rows(
+    projection: &CrateSyntaxProjectionState<'_>,
+    scope: &StageRunScopeValue,
+    store: &dyn StageTableStorePort,
+    cancel: &RunCancelFlagValue,
+) -> Result<usize, StoreBackendFailureError> {
+    let input = &projection.projection_resolution_input_rows;
     let prefix = format!(
         "crate/{}",
         blake3::hash(
@@ -154,14 +184,7 @@ fn persist_projection_input_rows(
         )
         .to_hex()
     );
-    let pending = scopes
-        .chain(items)
-        .chain(imports)
-        .chain(paths)
-        .chain(macros)
-        .chain(externs)
-        .chain(lang)
-        .chain(legacy)
+    let pending = namespace_input_row_records(projection, &MacroProjectionRowOffsets::default())
         .try_fold(
             NamespaceInputPendingRows::default(),
             |mut pending, record| {

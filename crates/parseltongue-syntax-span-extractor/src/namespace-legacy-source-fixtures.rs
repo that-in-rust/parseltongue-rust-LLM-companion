@@ -117,6 +117,45 @@ fn projection_empty_and_inactive_scopes() {
 }
 
 #[test]
+fn namespace_delta_empty_and_invalid_metadata() {
+    let store = LegacyMacroFixtureStore {
+        source: String::new(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let mut state = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &json!({"workspace_source_root_path":"/fixture"}),
+        &store,
+        &StageRunScopeValue {
+            run_generation_digest_value: "generation".into(),
+            stage_attempt_sequence_value: "attempt".into(),
+        },
+        &cancel,
+    )
+    .unwrap();
+    let offsets = read_projection_row_offsets(&state);
+    assert_eq!(
+        crate::syntax_namespace_input_persistence::namespace_input_row_records(&state, &offsets)
+            .count(),
+        0
+    );
+    let rows = crate::syntax_namespace_input_persistence::namespace_input_row_records(
+        &state,
+        &MacroProjectionRowOffsets::default(),
+    )
+    .collect::<Result<Vec<_>, _>>()
+    .unwrap();
+    assert!(rows.iter().filter(|row|row.stage_owned_table_name=="syntax-namespace-input-scopes").all(|row|serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["scope_cargo_unit_key"]=="fixture-unit"));
+    state.projection_target_metadata_rows.clear();
+    let invalid = crate::syntax_namespace_input_persistence::namespace_input_row_records(
+        &state,
+        &MacroProjectionRowOffsets::default(),
+    )
+    .collect::<Result<Vec<_>, _>>();
+    assert!(invalid.is_err());
+}
+
+#[test]
 fn projected_virtual_macro_scope() {
     let store = LegacyMacroFixtureStore {
         source: "make!(); generated!();".into(),

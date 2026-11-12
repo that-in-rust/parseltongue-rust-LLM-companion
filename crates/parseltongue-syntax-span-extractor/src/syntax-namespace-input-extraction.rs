@@ -26,7 +26,7 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     projection_macro_source_rows:
         BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
     projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
-    projection_unit_record_value: Value,
+    pub(super) projection_unit_record_value: Value,
     projection_workspace_root_path: PathBuf,
     projection_source_file_rows: BTreeMap<String, String>,
     projection_active_file_paths: BTreeSet<String>,
@@ -55,21 +55,31 @@ struct MacroInvocationSourceContext {
     macro_invocation_source_directory: PathBuf,
 }
 
-struct MacroProjectionRowOffsets {
-    module_scope_row_count: usize,
-    symbol_binding_row_count: usize,
-    import_request_row_count: usize,
-    signature_path_row_count: usize,
-    macro_invocation_row_count: usize,
+#[derive(Default)]
+pub(super) struct MacroProjectionRowOffsets {
+    pub(super) module_scope_row_count: usize,
+    pub(super) symbol_binding_row_count: usize,
+    pub(super) import_request_row_count: usize,
+    pub(super) signature_path_row_count: usize,
+    pub(super) macro_invocation_row_count: usize,
+    pub(super) extern_declaration_row_count: usize,
+    pub(super) lang_definition_row_count: usize,
+    pub(super) legacy_source_event_row_count: usize,
 }
 
-fn read_projection_row_offsets(input: &NameResolutionInputRows) -> MacroProjectionRowOffsets {
+fn read_projection_row_offsets(
+    projection: &CrateSyntaxProjectionState<'_>,
+) -> MacroProjectionRowOffsets {
+    let input = &projection.projection_resolution_input_rows;
     MacroProjectionRowOffsets {
         module_scope_row_count: input.name_module_scope_rows.len(),
         symbol_binding_row_count: input.name_symbol_binding_rows.len(),
         import_request_row_count: input.name_import_request_rows.len(),
         signature_path_row_count: input.name_signature_path_rows.len(),
         macro_invocation_row_count: input.name_macro_invocation_rows.len(),
+        extern_declaration_row_count: projection.projection_extern_declaration_rows.len(),
+        lang_definition_row_count: projection.projection_lang_definition_rows.len(),
+        legacy_source_event_row_count: projection.projection_legacy_source_event_rows.len(),
     }
 }
 
@@ -849,8 +859,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             };
             json!({"token_output_byte_range":[output.0,output.1],"token_original_byte_range":[start+original.0,start+original.1],"token_source_origin_kind":kind,"token_source_absolute_path":path})
         }).collect::<Vec<_>>();
-        let input = &self.projection_resolution_input_rows;
-        let before = read_projection_row_offsets(input);
+        let before = read_projection_row_offsets(self);
         self.visit_namespace_syntax_node(
             &parsed.syntax_node(),
             &invocation.invocation_lexical_scope_key,
@@ -862,6 +871,11 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         self.projection_source_store_port
             .write_file_content_bytes(&content, source.as_bytes())?;
         let mut rows = syntax.stage_unit_output_rows;
+        super::syntax_namespace_input_persistence::namespace_input_row_records(self, &before)
+            .try_for_each(|row| {
+                rows.push(row?);
+                Ok::<_, StoreBackendFailureError>(())
+            })?;
         rows.push(super::build_syntax_output_record("file-source-text-table",path.clone(),json!({
             "file_source_absolute_path":path,"file_content_digest_full":content,"file_source_byte_count":source.len(),"file_expansion_provenance_chain":chain,
         })));
