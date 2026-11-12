@@ -5,7 +5,14 @@ use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::Value;
 use std::collections::BTreeSet;
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+    process::{Child, Command, ExitStatus, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
 
 fn create_workspace_source_fixture(root: &Path) {
     fs::create_dir_all(root.join("src")).unwrap();
@@ -34,12 +41,14 @@ fn create_workspace_source_fixture(root: &Path) {
         String::from_utf8_lossy(&lock.stderr)
     );
 }
-fn run_workspace_mapping_fixture(
-    root: &Path,
-    database: &Path,
-    workers: &str,
-) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_parseltongue"))
+fn run_workspace_mapping_fixture(root: &Path, database: &Path, workers: &str) -> Output {
+    let file_paths = allocate_child_output_paths(database).unwrap();
+    eprintln!(
+        "native_child_stderr_log={}",
+        file_paths.child_stderr_output_path.display()
+    );
+    let mut command = Command::new(env!("CARGO_BIN_EXE_parseltongue"));
+    command
         .args([
             "map-workspace-full-run",
             "--workspace-root-path-value",
@@ -49,8 +58,278 @@ fn run_workspace_mapping_fixture(
             "--worker-thread-count-value",
             workers,
         ])
-        .output()
-        .unwrap()
+        .stdin(Stdio::null());
+    let capture = spawn_child_output_capture(command, file_paths).unwrap();
+    finish_child_output_capture(capture).unwrap()
+}
+
+struct ChildOutputFilePaths {
+    child_stdout_output_path: PathBuf,
+    child_stderr_output_path: PathBuf,
+}
+
+struct WorkspaceChildOutputCapture {
+    workspace_child_process_handle: Child,
+    child_output_file_paths: ChildOutputFilePaths,
+}
+
+fn allocate_child_output_paths(database: &Path) -> io::Result<ChildOutputFilePaths> {
+    let parent = database
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let (_, child_stdout_output_path) = tempfile::Builder::new()
+        .prefix("native-child-stdout-log-")
+        .tempfile_in(parent)?
+        .keep()
+        .map_err(|error| error.error)?;
+    let (_, child_stderr_output_path) = tempfile::Builder::new()
+        .prefix("native-child-stderr-log-")
+        .tempfile_in(parent)?
+        .keep()
+        .map_err(|error| error.error)?;
+    Ok(ChildOutputFilePaths {
+        child_stdout_output_path,
+        child_stderr_output_path,
+    })
+}
+
+fn spawn_child_output_capture(
+    mut command: Command,
+    file_paths: ChildOutputFilePaths,
+) -> io::Result<WorkspaceChildOutputCapture> {
+    let stdout_file = fs::File::create(&file_paths.child_stdout_output_path)?;
+    let stderr_file = fs::File::create(&file_paths.child_stderr_output_path)?;
+    let child = command
+        .stdout(Stdio::from(stdout_file))
+        .stderr(Stdio::from(stderr_file))
+        .spawn()?;
+    Ok(WorkspaceChildOutputCapture {
+        workspace_child_process_handle: child,
+        child_output_file_paths: file_paths,
+    })
+}
+
+fn finish_child_output_capture(mut capture: WorkspaceChildOutputCapture) -> io::Result<Output> {
+    let status = capture.workspace_child_process_handle.wait()?;
+    let stdout = fs::read(&capture.child_output_file_paths.child_stdout_output_path)?;
+    let stderr = fs::read(&capture.child_output_file_paths.child_stderr_output_path)?;
+    Ok(Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+impl Drop for WorkspaceChildOutputCapture {
+    fn drop(&mut self) {
+        if !matches!(self.workspace_child_process_handle.try_wait(), Ok(Some(_))) {
+            let _ = self.workspace_child_process_handle.kill();
+            let _ = self.workspace_child_process_handle.wait();
+        }
+    }
+}
+
+fn build_child_fixture_command(mode: &str, ready_marker_path: &Path) -> io::Result<Command> {
+    let mut command = Command::new(std::env::current_exe()?);
+    command
+        .args([
+            "--exact",
+            "test_child_fixture_waits_release",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env("PARSELTONGUE_CHILD_CAPTURE_MODE", mode)
+        .env("PARSELTONGUE_CHILD_READY_FILE", ready_marker_path)
+        .stdin(Stdio::piped());
+    Ok(command)
+}
+
+fn wait_for_ready_marker(
+    capture: &mut WorkspaceChildOutputCapture,
+    ready_marker_path: &Path,
+    timeout: Duration,
+) -> io::Result<()> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if ready_marker_path.is_file() {
+            return Ok(());
+        }
+        if capture.workspace_child_process_handle.try_wait()?.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "child exited before readiness",
+            ));
+        }
+        if Instant::now() >= deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "child readiness deadline elapsed",
+            ));
+        }
+        thread::yield_now();
+    }
+}
+
+fn wait_child_until_exit(child: &mut Child, timeout: Duration) -> io::Result<ExitStatus> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(status);
+        }
+        if Instant::now() >= deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "child exit deadline elapsed",
+            ));
+        }
+        thread::yield_now();
+    }
+}
+
+fn write_child_release_signal(capture: &mut WorkspaceChildOutputCapture) -> io::Result<()> {
+    let mut child_input = capture
+        .workspace_child_process_handle
+        .stdin
+        .take()
+        .ok_or_else(|| io::Error::other("child stdin was not piped"))?;
+    child_input.write_all(&[1])
+}
+
+/// REQ-RUST-028.0
+#[test]
+fn test_child_stderr_live_visibility() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("store.db");
+    let file_paths = allocate_child_output_paths(&database).unwrap();
+    let stderr_path = file_paths.child_stderr_output_path.clone();
+    let ready_marker_path = directory.path().join("native-child-ready-marker");
+    let command = build_child_fixture_command("live", &ready_marker_path).unwrap();
+    let mut capture = spawn_child_output_capture(command, file_paths).unwrap();
+
+    let readiness = wait_for_ready_marker(&mut capture, &ready_marker_path, Duration::from_secs(5));
+    let child_running = capture
+        .workspace_child_process_handle
+        .try_wait()
+        .map(|status| status.is_none());
+    let live_stderr = fs::read(stderr_path);
+    let release = write_child_release_signal(&mut capture);
+    let exit = wait_child_until_exit(
+        &mut capture.workspace_child_process_handle,
+        Duration::from_secs(5),
+    );
+    assert!(exit.is_ok(), "controlled child did not exit: {exit:?}");
+    let output = finish_child_output_capture(capture).unwrap();
+
+    assert!(
+        readiness.is_ok(),
+        "controlled child did not signal readiness"
+    );
+    assert!(child_running.unwrap(), "child exited before log inspection");
+    assert!(release.is_ok(), "controlled child could not be released");
+    let live_stderr = live_stderr.unwrap();
+    let marker = b"native-child-diagnostic-live\n";
+    assert!(
+        live_stderr
+            .windows(marker.len())
+            .any(|bytes| bytes == marker),
+        "diagnostic was unavailable before child completion: {live_stderr:?}"
+    );
+    assert!(output.status.success());
+    assert!(
+        output
+            .stderr
+            .windows(marker.len())
+            .any(|bytes| bytes == marker)
+    );
+}
+
+/// REQ-RUST-028.0
+#[test]
+fn test_child_output_exit_preservation() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("store.db");
+    let file_paths = allocate_child_output_paths(&database).unwrap();
+    let ready_marker_path = directory.path().join("native-child-ready-marker");
+    let command = build_child_fixture_command("output", &ready_marker_path).unwrap();
+    let mut capture = spawn_child_output_capture(command, file_paths).unwrap();
+    let exit = wait_child_until_exit(
+        &mut capture.workspace_child_process_handle,
+        Duration::from_secs(5),
+    );
+    assert!(exit.is_ok(), "output fixture did not exit: {exit:?}");
+    let output = finish_child_output_capture(capture).unwrap();
+
+    assert_eq!(output.status.code(), Some(23));
+    assert!(output.stdout.ends_with(b"fixture-child-stdout\n"));
+    assert!(output.stderr.ends_with(b"fixture-child-stderr\n"));
+}
+
+/// REQ-RUST-028.0
+#[test]
+fn test_child_spawn_error_propagation() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("store.db");
+    let file_paths = allocate_child_output_paths(&database).unwrap();
+    let command = Command::new(directory.path().join("missing-child-executable"));
+    let error = spawn_child_output_capture(command, file_paths)
+        .err()
+        .unwrap();
+
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+}
+
+/// REQ-RUST-028.0
+#[test]
+fn test_child_output_read_error() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("store.db");
+    let file_paths = allocate_child_output_paths(&database).unwrap();
+    let stdout_path = file_paths.child_stdout_output_path.clone();
+    let ready_marker_path = directory.path().join("native-child-ready-marker");
+    let command = build_child_fixture_command("output", &ready_marker_path).unwrap();
+    let mut capture = spawn_child_output_capture(command, file_paths).unwrap();
+    let exit = wait_child_until_exit(
+        &mut capture.workspace_child_process_handle,
+        Duration::from_secs(5),
+    );
+    assert!(exit.is_ok(), "output fixture did not exit: {exit:?}");
+    fs::remove_file(stdout_path).unwrap();
+    let error = finish_child_output_capture(capture).err().unwrap();
+
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+}
+
+/// REQ-RUST-028.0
+#[test]
+#[ignore = "subprocess fixture only"]
+fn test_child_fixture_waits_release() {
+    match std::env::var("PARSELTONGUE_CHILD_CAPTURE_MODE").as_deref() {
+        Ok("live") => {
+            let ready_marker_path = std::env::var_os("PARSELTONGUE_CHILD_READY_FILE")
+                .map(PathBuf::from)
+                .unwrap();
+            let mut diagnostic = std::io::stderr().lock();
+            diagnostic
+                .write_all(b"native-child-diagnostic-live\n")
+                .unwrap();
+            diagnostic.flush().unwrap();
+            drop(diagnostic);
+            fs::write(ready_marker_path, b"ready").unwrap();
+            let mut release = [0];
+            std::io::stdin().read_exact(&mut release).unwrap();
+        }
+        Ok("output") => {
+            std::io::stdout()
+                .write_all(b"fixture-child-stdout\n")
+                .unwrap();
+            std::io::stderr()
+                .write_all(b"fixture-child-stderr\n")
+                .unwrap();
+            std::process::exit(23);
+        }
+        _ => {}
+    }
 }
 
 fn run_workspace_stage_fixture(root: &Path, database: &Path, stage: &str) -> std::process::Output {

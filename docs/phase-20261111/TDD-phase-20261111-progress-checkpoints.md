@@ -3388,3 +3388,268 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   copy/resolution diagnostic is unresolved. Gate logs, timings, cache evidence,
   and the preserved binary are under
   `/home/ubuntu/hld-current-test-artifacts/20261112T200343Z-descendant-integrated-gates/`.
+
+## 2026-11-12 — Native M2 timeout postmortem (diagnostic only)
+
+- No source implementation, corpus, pin, or database changes were made. The
+  reviewed oracle metadata correction `f1e61976064008f1b001862b3a92cfa23242d8f4`
+  was not integrated. This is not a full SOP runner run.
+- The isolated release command
+  `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- test_lang_items_in_sysroot --exact --nocapture`
+  was budgeted at 1,200s expected / 2,400s maximum and stopped at the maximum:
+  exit 124, `timed_out=true`, elapsed 2,400.11s, empty suite results. Peak
+  process-tree RSS was 8,786,596 KiB, sampled from descendant `/proc` `VmRSS`
+  every 0.2s across at most five processes; no memory cap. The test emitted no
+  assertion or final test result. S3 is BLOCKED/incomplete, not failed by an
+  assertion and not accepted.
+- The earlier filtered release suite is separate: 270 passed, 0 failed, 3
+  ignored, 1 filtered; `test_lang_items_in_sysroot` was the filtered test and
+  is not among the 270. Ignored manual profiles remain unrun:
+  `test_profile_json_bulk_batches` (manual JSON bulk insert profile),
+  `test_profile_bulk_batch_sizes` (manual bounded bulk insert profile), and
+  `test_profile_bounded_unit_sizes` (manual bounded transaction profile).
+- Executed release test-harness SHA-256:
+  `c6e8f11398b5820175b3d19e132844d17d07e0ba64cc3c83f1c44421156a8e52`;
+  CLI SHA-256:
+  `b36a6d972d106ad42499fd9517adfd9bc7c186457752f34429f9a00954f5aa73`.
+  Phase/DuckDB telemetry was not visible: the Rust test helper captures child
+  output with `Command::output()`, and the wrapper log ended before a result.
+- Read-only fixture inspection found one analysis-file path tuple with
+  generation component `7f193f70ee51e76584825d94d13d150d94e9f02e4e2390349d4a9a3f21a03da3`
+  and attempt component `20149359d13566be0d659d643a00c833d499c657a9276b1b11e286781b30256c`.
+  A standard-library SQLite read-only catalog probe failed with
+  `sqlite3.DatabaseError: file is not a database`; no compatible DuckDB reader
+  was installed, and the DuckDB file was not opened. Original DB/sidecar hashes
+  and file sizes/timestamps matched before and after inspection. Normalized
+  source, fixed-point manifest, and relevant table counts remain unknown. The
+  available evidence does not distinguish copy, normalization, unit linking,
+  path-candidate fixed point, or repeated macro refresh; no stalled query or
+  root cause is inferred.
+- S3 remains BLOCKED/incomplete; all corpus runs and S4–S10 are NOT STARTED.
+  No all-five PASS, freeze, retry, commit, or push. Full evidence and this
+  diagnostic report are at
+  `hld-current-test-runs/20261112T203325Z-native-m2-regression/hld-current-test-report.md`;
+  external logs, identities, file listings, and before/after hashes are linked
+  from that report. Next action: lead review and a compatible existing
+  read-only reader prerequisite before any later runtime attempt.
+
+## 2026-11-12 — DuckDB diagnostic engine-version gate
+
+- Before any wheel download or DB copy/open, checked the adapter manifest,
+  Cargo.lock, and cached `libduckdb-sys-1.20000.1` source. The adapter pins
+  `duckdb = "=1.20000.1"` with `bundled`; the lock pins both `duckdb` and
+  `libduckdb-sys` to `1.20000.1`. `libduckdb-sys/src/build_version.rs` decodes
+  that package version to DuckDB 2.0.0 (the source test maps `1.20000.0` to
+  `2.0.0`), and `build_bundled_cc.rs` unpacks source whose version pragma
+  defaults to `v2.0.0`. The source archive SHA-256 is
+  `14f16777c569dd0090db7c80dc7a1eba8ffbb36cf3f6e008dd9c002356162c29`.
+- This conflicts with the requested Python engine version 1.2.0. No wheel was
+  downloaded or installed, `SELECT version()` was not run, and no forensic
+  copy or database open occurred. I did not substitute DuckDB 2.0.0. The
+  manifest/count postmortem remains blocked; last completed namespace stage
+  remains unknown. No source/lock or database changes, commit, or push.
+- Next action requires lead clarification: use the engine version encoded and
+  bundled by the pinned dependency (2.0.0), or separately review why the
+  native fixture was expected to use 1.2.0. Do not open the database with an
+  unconfirmed engine.
+
+## 2026-11-12 — External DuckDB forensic-copy postmortem (diagnostic only)
+
+- Follow-up to the source-version gate above: the user supplied a read-only
+  native reader built against the existing release rlibs, so the earlier
+  Python-wheel prerequisite no longer blocked inspection. Reader build evidence
+  supplied with the handoff: rustc exit 0 in 0.36s, linked
+  libduckdb-6f870ecc95602d07.rlib and
+  liblibduckdb_sys-d1afd9032eac8e4a.rlib, with no C++ rebuild. The exact rustc
+  argv was not provided. Reader source SHA-256:
+  e1fa096fc647163dacd4065cddbf5b786648250be22f236049cb6b781d582e30;
+  binary SHA-256:
+  385cf656a02cbd68434c67a76f15eaffdd73a3e67f403eb93435feebdda4db19.
+  The fresh scratch and forensic-copy SELECT version() outputs were both
+  v2.0.0, matching the bundled source/lock. The Python 3.10 binary-only wheel
+  request had no 2.0.0 match; no wheel was installed.
+- Read-only SELECT/catalog/count commands were run only on the external copy,
+  with per-query timeouts of 15, 25, 30, or 40 seconds. Original and copy were
+  2,430,873,600 bytes, mtime 2026-11-12 21:14:41.110329154 UTC, and SHA-256
+  33980e5fe9852a6ec52a9ee499a119ff6175b718d210240f9ab6d1a7a0e0b4f7 both
+  before and after. No DuckDB WAL sidecar was present. No database recovery,
+  extension loading, production modification, or replay occurred.
+- Persisted scope: generation
+  7f193f70ee51e76584825d94d13d150d94e9f02e4e2390349d4a9a3f21a03da3;
+  attempt
+  20149359d13566be0d659d643a00c833d499c657a9276b1b11e286781b30256c/frozen/8.
+  Eight frozen table manifests account for 221,822 source rows; the normalized
+  manifest count is 1 with source_rows=221,822; fixed-point manifest count is
+  0. Unit linking persisted 4 unit rows, 6 dependencies, 5 extern links, and 3
+  default-prelude requests. Path candidates total 71,941 (71,937 resolved,
+  4 ambiguous); binding results total 281,120 (279,860 resolved, 1,260
+  ambiguous). All 29 persistent table counts and per-state outputs are in the
+  run report and linked external evidence.
+- Source mapping: snapshot revision suffix frozen/8 is formed from the
+  publication-revision counter; the pipeline refreshes initially and after
+  macro expansion, while each refresh drops prior namespace/frozen tables.
+  Normalization writes its manifest in the committed transaction.
+  Unit-link/prelude and path-candidate writes also have committed outputs.
+  Resolution inserts its fixed-point manifest only after the rounds return.
+  Thus copy and normalization completed for revision 8; unit-link and
+  resolution outputs persisted, but fixed-point completion is not evidenced.
+  The missing manifest cannot distinguish interruption within resolution from
+  a later failure before manifest insertion. Exact last SQL operation, earlier
+  pass results, and original-run DuckDB phase/memory/settings telemetry remain
+  unknown; no stalled query or root cause is inferred.
+- S3 remains BLOCKED/incomplete because the native regression timed out at
+  2,400.11s (exit 124), not an assertion failure. The separate earlier release
+  suite remains 270 passed, 0 failed, 3 ignored, 1 filtered; it excludes the
+  native test. The three ignored manual profile names and reasons remain as
+  recorded above. All corpus runs and S4–S10 remain NOT STARTED. This is
+  forensic evidence, not a full SOP run or acceptance. No retry, source change,
+  commit, push, freeze, or qualification occurred.
+- Report and external query/build evidence:
+  hld-current-test-runs/20261112T203325Z-native-m2-regression/hld-current-test-report.md
+  and
+  /home/ubuntu/hld-current-test-artifacts/20261112T200343Z-descendant-integrated-gates/20261112T203325Z-native-m2-regression/.
+
+## 2026-11-12 — REQ-RUST-028.0 native-test stderr observability (design)
+
+- Classification/modes: CLI integration-test harness bug; Delivery + Reliability.
+  The mapper, resolver, semantic output, corpus, pins, locks, memory policy, and
+  qualification thresholds are outside this change.
+- **WHEN** the CLI integration-test harness launches a workspace-mapping child,
+  **THEN** it SHALL create retained stdout/stderr files beside the fixture DB
+  before spawn and make child stderr readable while that child remains alive.
+  It SHALL preserve the exact `Output` status/stdout/stderr and surface spawn or
+  output-read errors; unfinished captures SHALL terminate and reap their child.
+- L3-only design: private test helpers around `Command`/`Stdio` and retained
+  files; no production trait or adapter. Unique per-process paths avoid
+  collisions. A bounded, synchronized test subprocess writes a diagnostic,
+  signals readiness, and blocks until released; the test inspects its log while
+  it is alive, then releases and reaps it. REQ-RUST-027 remains reserved for
+  the pending oracle work.
+- Traceability: `test_child_stderr_live_visibility`,
+  `test_child_output_exit_preservation`, `test_child_spawn_error_propagation`,
+  and `test_child_output_read_error`; `test_child_fixture_waits_release` is
+  the ignored child-only fixture invoked by the live-visibility test.
+- Attribution correction: the previous forensic checkpoint called the native
+  reader user-supplied. The reader was built during this session against the
+  existing release rlibs; the exact rustc argv remains unavailable. Historical
+  journal wording above is preserved, and the current report/status use
+  “session-built reader.”
+- Next: STUB signatures plus focused test-target `cargo check`, then RED with
+  the live-file assertion, GREEN, REFACTOR, and scoped release gates. No mapper
+  or native regression retry is authorized in this step.
+
+### STUB — REQ-RUST-028.0
+
+- Added the private capture-path/capture types and stub signatures, routing only
+  `run_workspace_mapping_fixture` through the new seam. First focused check
+  caught `error[E0308]: expected Command, found &mut Command`; binding the
+  command before applying its builder methods corrected ownership.
+- Command: `cargo check --release -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --locked --offline`
+- Budget: 30s expected / 60s maximum; no memory cap; warmed shared release
+  target and `CXXFLAGS=-g0`.
+- Rerun output: `Finished `release` profile [optimized] target(s) in 0.38s`;
+  `elapsed_seconds=0.45`; `exit_status=0`. The release DuckDB archive SHA-256
+  remained `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`.
+  Only expected unused-stub-field warnings and the existing rust-analyzer
+  `unused manifest key `lints.cargo`` warnings appeared.
+- Next: replace the stub behavior with a controlled lightweight subprocess
+  regression and record its RED result before adding stderr redirection.
+
+### RED — REQ-RUST-028.0
+
+- Added a bounded ignored child-test fixture that writes a diagnostic, creates
+  a readiness marker, and blocks on parent stdin. The parent reads the retained
+  stderr path before releasing the fixture. The first compile attempt found
+  two borrow-mutability errors in `Command::spawn`/`Child::try_wait`; those
+  signatures were corrected before the behavioral rerun.
+- Command: `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- test_child_stderr_live_visibility --exact --nocapture`
+- Budget: 30s expected / 60s maximum; no memory cap; warmed shared release
+  target and `CXXFLAGS=-g0`.
+- RED output: `native-child-diagnostic-live`; fixture child passed; parent
+  failed at `diagnostic was unavailable before child completion: []`;
+  `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 28 filtered
+  out`; `elapsed_seconds=2.12`; `exit_status=101`. The test cleaned up/reaped
+  its controlled child. The release DuckDB archive SHA-256 remained
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`.
+- This RED is the intended harness-only failure: the child emitted stderr while
+  blocked, but the created retained file was empty because stderr had not yet
+  been redirected to it. Next: route both child output streams to their files.
+
+### GREEN — REQ-RUST-028.0
+
+- The capture now redirects child stdout/stderr directly to unique retained
+  files beside the fixture database, logs the stderr path before spawn, and
+  reconstructs `Output` after `wait`. An unfinished capture kills and reaps its
+  child on drop. The live test explicitly confirms the child is still running
+  when it reads the stderr file; the subprocess readiness and exit checks are
+  each bounded at five seconds and use `try_wait`/`yield_now`, not fixed sleeps.
+- Command: `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- test_child_ --nocapture`
+- Budget: 30s expected / 60s maximum; no memory cap; warmed shared release
+  target and `CXXFLAGS=-g0`.
+- Output: `test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 24 filtered
+  out`; `elapsed_seconds=2.03`; `exit_status=0`. The ignored test is the
+  subprocess-only fixture. The release DuckDB archive SHA-256 remained
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`.
+- Coverage includes live stderr visibility, nonzero exit/stdout/stderr payload
+  preservation, spawn `NotFound`, and output-read `NotFound` after child exit.
+  No mapper/native regression or corpus test was run.
+
+### REFACTOR — REQ-RUST-028.0
+
+- No additional refactor was needed: file-backed stdio avoids pipe-reader
+  threads and backpressure/deadlock risks; the existing helper remains
+  synchronous and preserves `Command::output`'s normal wait semantics. The
+  controlled subprocess tests bound readiness/exit and explicitly reap the
+  child. Next: fmt, workspace Clippy, and warmed release build.
+
+### VERIFY — REQ-RUST-028.0
+
+- Final focused tests: `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- test_child_ --nocapture`;
+  budget 30s expected / 60s maximum. Output:
+  `test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 24 filtered
+  out`; `elapsed_seconds=2.10`; `exit_status=0`.
+- Formatting: `cargo fmt --all -- --check`; budget 10s / 20s; `FMT_CHECK=PASS`.
+  The first check identified only rustfmt diffs; `cargo fmt --all` applied them
+  before this final check.
+- Clippy: `cargo clippy --workspace --all-targets --all-features --release --locked --offline -- -D warnings`;
+  budget 60s / 120s; `Finished `release` profile [optimized] target(s) in
+  0.40s`; `clippy_elapsed_seconds=0.46`; `clippy_exit_status=0`.
+- Build: `cargo build --workspace --all-targets --all-features --release --locked --offline`;
+  budget 60s / 120s; `Finished `release` profile [optimized] target(s) in
+  1.85s`; `build_elapsed_seconds=1.88`; `build_exit_status=0`.
+- All Cargo gates used warmed
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target`,
+  `CARGO_BUILD_JOBS=2`, `CXXFLAGS=-g0`, offline/locked, and no memory cap. The
+  release DuckDB archive SHA-256 remained
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`; no
+  DuckDB C++ rebuild occurred. Repeated Cargo manifest warnings were diagnosed
+  against the active stable `cargo/rustc 1.99.1`: pinned rust-analyzer
+  manifests use nightly-only `lints.cargo`; no toolchain/config change was
+  appropriate for this test-only task.
+- No real mapper/native regression, corpus, qualification, pin/lock change,
+  commit, or push. The report keeps the prior reader rustc-argv limitation
+  explicit; report/status attribution now says session-built reader, while the
+  historical journal wording is preserved with the correction note above.
+
+## 2026-11-12 — REQ-RUST-028 regression and reader-build evidence
+
+- After review, the CLI contract target was run with only the native M2 test
+  excluded. Command:
+  `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- --skip test_lang_items_in_sysroot`
+- Budget: 60s expected / 120s maximum; no memory cap. Output:
+  `test result: ok. 27 passed; 0 failed; 1 ignored; 0 measured; 1 filtered
+  out`; `elapsed_seconds=4.29`; `exit_code=0`. The ignored child fixture is
+  `test_child_fixture_waits_release`; the one filtered test is
+  `test_lang_items_in_sysroot`, which remains pending. The DuckDB archive SHA-256
+  matched before and after: `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`.
+- The earlier forensic checkpoint said the reader's exact rustc argv was not
+  included. The lead later supplied it; the historical note is retained and
+  corrected here. Exact command:
+  ```text
+  /usr/bin/time -f 'elapsed_seconds=%e exit_code=%x peak_rss_kib=%M' timeout 120s rustc --edition=2024 --crate-name duckdb_cache_forensic_reader /home/ubuntu/hld-current-test-artifacts/20261112T200343Z-descendant-integrated-gates/20261112T203325Z-native-m2-regression/duckdb-cache-forensic-reader.rs --extern duckdb=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target/release/deps/libduckdb-6f870ecc95602d07.rlib -L dependency=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target/release/deps -L native=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target/release/build/libduckdb-sys-2da06d709f76f2a9/out -o /home/ubuntu/hld-current-test-artifacts/20261112T200343Z-descendant-integrated-gates/20261112T203325Z-native-m2-regression/duckdb-cache-forensic-reader
+  ```
+- Supplied reader-build output: `elapsed_seconds=0.36 exit_code=0
+  peak_rss_kib=437232`; it reused existing release rlibs and did not rebuild
+  DuckDB C++.
+- This contract regression is separate from the native M2 test and does not
+  qualify S3 or start any corpus run.

@@ -520,6 +520,12 @@ Every entry names a clause assertion, not merely a requirement-level coverage cl
 009/019/020 → S6, S7, S8, S9
   test_crosscheck_evidence_never_overrules: CM-GAP cannot excuse oracle error; coverage pagination complete.
   test_sample_rows_record_keys: zero/small/large samples, explicit seed, every sampled miss fails.
+028 → test-harness-only; no SOP/corpus execution
+  test_child_stderr_live_visibility: diagnostic bytes are readable while the controlled child is blocked and alive.
+  test_child_output_exit_preservation: fixture stdout/stderr payload bytes and nonzero exit status are preserved.
+  test_child_spawn_error_propagation: spawn errors remain observable at the test-helper boundary.
+  test_child_output_read_error: output-file read errors are returned after the child is reaped.
+  test_child_fixture_waits_release: ignored subprocess fixture used by live-visibility, exit-preservation, and output-read cases.
 ```
 
 Build gates: cargo fmt --check; cargo clippy --all-targets -- -D warnings; cargo test;
@@ -1333,3 +1339,37 @@ separately active tests; the shared name is listed once per requirement.
 **REQ-RUST-026.5**
 - `test_published_comparison_is_deterministic`
 - `test_thread_counts_export_identically`
+
+## REQ-RUST-028.0 — child-stderr-live-visibility
+
+WHEN the CLI integration-test harness launches a workspace-mapping child,
+THEN it SHALL create retained stdout and diagnostic-stderr files beside the
+fixture database before spawning the child, and diagnostic stderr bytes SHALL
+be readable from the file while the child is still running. A retained native
+fixture SHALL keep that file under `PARSELTONGUE_NATIVE_FIXTURE_DIRECTORY` so
+an external timeout does not remove already-written diagnostics.
+
+AND the helper SHALL return the child's exact exit status, stdout bytes, and
+stderr bytes to existing assertions, including for a nonzero exit. Spawn and
+output-read errors SHALL be surfaced, and dropping an unfinished capture SHALL
+terminate and reap its child.
+
+### Test-harness-only L3 design
+
+This is a CLI integration-test harness defect, not a mapper, resolver, or
+semantic-output defect. Private test utilities use `std::process::Command`,
+`Stdio`, and adjacent files at the L3 boundary; no production module, trait,
+dependency, pin, lockfile, or mapper behavior changes. Unique per-process
+capture paths prevent concurrent fixture collisions. A controlled test-harness
+subprocess writes a diagnostic, signals readiness, then blocks on parent input;
+the test reads the retained file before releasing it and uses bounded readiness
+and exit checks. The existing helper waits for normal child completion and
+reconstructs `std::process::Output` from the captured files.
+
+### Authoritative REQ-RUST-028 test matrix
+
+- `test_child_stderr_live_visibility` — observes the diagnostic bytes before a synchronized child can finish.
+- `test_child_output_exit_preservation` — checks fixture stdout/stderr payload bytes and exit code 23.
+- `test_child_spawn_error_propagation` — checks a missing executable returns `NotFound`.
+- `test_child_output_read_error` — checks a missing captured output file returns `NotFound` after completion.
+- `test_child_fixture_waits_release` — ignored fixture process invoked by live-visibility, exit-preservation, and output-read cases; not an independent runtime gate.
