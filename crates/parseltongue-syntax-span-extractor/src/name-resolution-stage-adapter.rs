@@ -114,6 +114,7 @@ fn append_library_namespace_inputs(
                 "unit_source_root_path":dependency["unit_source_root_path"],"unit_cargo_package_identifier":dependency["unit_cargo_package_identifier"],
                 "unit_cargo_target_name":dependency["unit_cargo_target_name"],"unit_cargo_target_kind":dependency["unit_cargo_target_kind"],
                 "unit_rust_edition_value":dependency["unit_rust_edition_value"],"unit_module_path_values":[],
+                "unit_semantic_identity_record":encode_compilation_unit_value(&root.scope_compilation_unit_key),
             }
         }));
         let binding = NameResolvedBindingRow {

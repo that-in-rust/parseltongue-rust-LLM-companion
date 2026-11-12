@@ -1,3 +1,7 @@
+use crate::mapped_oracle_export_facade::{
+    OracleConfigurationKindValue, append_mapped_context_records, apply_mapped_unit_configuration,
+    check_mapped_compilation_record, read_manifest_unit_records,
+};
 use hir::{Adt, HasSource, ItemInNs, Module, ModuleDef, Name, PathResolution, Semantics};
 use ide_db::RootDatabase;
 use parseltongue_core_row_types::SiteUnresolvedReasonKind;
@@ -40,6 +44,19 @@ type OraclePackageRootIndex = BTreeMap<(String, String), String>;
 pub fn export_primary_semantic_paths(
     request: &OracleWorkspaceExportConfig,
 ) -> Result<Vec<serde_json::Value>, OracleSemanticExportError> {
+    let output =
+        export_configured_semantic_paths(request, None, OracleConfigurationKindValue::Primary)?;
+    output["oracle_path_export_rows"]
+        .as_array()
+        .cloned()
+        .ok_or_else(|| build_oracle_export_error("invalid oracle export rows"))
+}
+
+pub(super) fn export_configured_semantic_paths(
+    request: &OracleWorkspaceExportConfig,
+    mapped_manifest: Option<&Value>,
+    kind: OracleConfigurationKindValue,
+) -> Result<Value, OracleSemanticExportError> {
     if request.oracle_macro_cache_manifest.is_some() {
         return Err(build_oracle_export_error(
             "cached proc-macro injection is not implemented",
@@ -56,9 +73,9 @@ pub fn export_primary_semantic_paths(
     .map_err(|_| build_oracle_export_error("workspace root is not an absolute UTF-8 path"))?;
     let manifest = ProjectManifest::discover_single(&root).map_err(build_oracle_export_error)?;
     let configuration = build_primary_cargo_configuration(request, &root);
-    let workspace = ProjectWorkspace::load(manifest, &configuration, &|_| {})
+    let mut workspace = ProjectWorkspace::load(manifest, &configuration, &|_| {})
         .map_err(build_oracle_export_error)?;
-    let package_roots: OraclePackageRootIndex = match &workspace.kind {
+    let mut package_roots: OraclePackageRootIndex = match &workspace.kind {
         ProjectWorkspaceKind::Cargo { cargo, .. } => cargo
             .packages()
             .flat_map(|package| {
@@ -73,33 +90,105 @@ pub fn export_primary_semantic_paths(
             .collect(),
         _ => return Err(build_oracle_export_error("a Cargo workspace is required")),
     };
-    let selected: BTreeSet<String> = match &workspace.kind {
-        ProjectWorkspaceKind::Cargo { cargo, .. } => cargo
-            .packages()
-            .filter(|package| cargo[*package].is_member)
-            .flat_map(|package| cargo[package].targets.iter())
-            .map(|target| &cargo[*target])
-            .filter(|target| matches!(target.kind.as_cargo_target(), Some("lib" | "bin")))
-            .map(|target| target.root.to_string())
-            .collect(),
-        _ => return Err(build_oracle_export_error("a Cargo workspace is required")),
+    let mapped_units = mapped_manifest
+        .map(read_manifest_unit_records)
+        .transpose()?;
+    if let Some(units) = mapped_units {
+        units
+            .iter()
+            .filter(|unit| unit["unit_sysroot_context_flag"] == true)
+            .try_for_each(|unit| {
+                let root = unit["unit_source_root_path"]
+                    .as_str()
+                    .ok_or_else(|| build_oracle_export_error("support source root missing"))?;
+                let name = unit["unit_cargo_target_name"]
+                    .as_str()
+                    .ok_or_else(|| build_oracle_export_error("support name missing"))?;
+                let package = unit["unit_cargo_package_identifier"]
+                    .as_str()
+                    .ok_or_else(|| build_oracle_export_error("support package missing"))?;
+                package_roots.insert((root.into(), name.into()), package.into());
+                Ok::<_, OracleSemanticExportError>(())
+            })?;
+    }
+    let selected: BTreeSet<String> = if let Some(units) = mapped_units {
+        units
+            .iter()
+            .filter(|unit| unit["unit_mapped_target_flag"] == true)
+            .map(|unit| {
+                unit["unit_source_root_path"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| build_oracle_export_error("mapped source root missing"))
+            })
+            .collect::<Result<_, _>>()?
+    } else {
+        match &workspace.kind {
+            ProjectWorkspaceKind::Cargo { cargo, .. } => cargo
+                .packages()
+                .filter(|package| cargo[*package].is_member)
+                .flat_map(|package| cargo[package].targets.iter())
+                .map(|target| &cargo[*target])
+                .filter(|target| matches!(target.kind.as_cargo_target(), Some("lib" | "bin")))
+                .map(|target| target.root.to_string())
+                .collect(),
+            _ => return Err(build_oracle_export_error("a Cargo workspace is required")),
+        }
     };
-    let exclusions = match &workspace.kind {
-        ProjectWorkspaceKind::Cargo { cargo, .. } => vec![
-            root.join("target"),
-            root.join(".git"),
-            cargo.target_directory().to_path_buf(),
-        ],
-        _ => vec![root.join("target"), root.join(".git")],
+    if kind == OracleConfigurationKindValue::Secondary {
+        if let ProjectWorkspaceKind::Cargo { cargo, .. } = &workspace.kind
+            && mapped_units.is_some_and(|units| {
+                cargo.packages().any(|package| {
+                    units.iter().any(|unit| {
+                        unit["unit_mapped_target_flag"] == true
+                            && unit["unit_cargo_package_identifier"]
+                                == cargo[package].id.to_string()
+                    }) && cargo[package]
+                        .targets
+                        .iter()
+                        .any(|target| cargo[*target].kind.as_cargo_target() == Some("custom-build"))
+                })
+            })
+        {
+            return Err(build_oracle_export_error(
+                "SECONDARY requires recorded build-script configuration",
+            ));
+        }
+        let scripts = workspace
+            .run_build_scripts(&configuration, &|_| {})
+            .map_err(build_oracle_export_error)?;
+        if let Some(error) = scripts.error() {
+            return Err(build_oracle_export_error(format!(
+                "SECONDARY build scripts: {error}"
+            )));
+        }
+        workspace.set_build_scripts(scripts);
+    }
+    let exclusions = if kind == OracleConfigurationKindValue::Secondary {
+        vec![root.join(".git")]
+    } else {
+        match &workspace.kind {
+            ProjectWorkspaceKind::Cargo { cargo, .. } => vec![
+                root.join("target"),
+                root.join(".git"),
+                cargo.target_directory().to_path_buf(),
+            ],
+            _ => vec![root.join("target"), root.join(".git")],
+        }
     };
     let loaded = crate::primary_workspace_loader_adapter::load_primary_workspace_database(
         workspace,
         &configuration,
         &exclusions,
     )?;
-    let database = loaded.oracle_database_owned_value;
+    let mut database = loaded.oracle_database_owned_value;
     let vfs = loaded.oracle_source_virtual_files;
     let _server = loaded.oracle_macro_server_handle;
+    let macro_loading = loaded.oracle_macro_loading_rows;
+    let source_omissions = loaded.oracle_source_omission_rows;
+    if let Some(manifest) = mapped_manifest {
+        apply_mapped_unit_configuration(&mut database, &vfs, &package_roots, manifest)?;
+    }
     let export_attached_path_rows = || {
         let semantics = Semantics::new(&database);
         let modules: Vec<_> = hir::Crate::all(&database)
@@ -107,9 +196,23 @@ pub fn export_primary_semantic_paths(
             .filter(|krate| {
                 selected.contains(&vfs.file_path(krate.root_file(&database)).to_string())
             })
-            .flat_map(|krate| {
-                collect_oracle_module_contexts(krate.root_module(&database), &database)
+            .map(|krate| {
+                let root_module = krate.root_module(&database);
+                let owner =
+                    build_oracle_compilation_record(root_module, &database, &vfs, &package_roots)?;
+                if mapped_units.is_some_and(|units| {
+                    !units.iter().any(|unit| {
+                        unit["unit_mapped_target_flag"] == true
+                            && check_mapped_compilation_record(&owner, unit)
+                    })
+                }) {
+                    return Ok(Vec::new());
+                }
+                Ok(collect_oracle_module_contexts(root_module, &database))
             })
+            .collect::<Result<Vec<_>, OracleSemanticExportError>>()?
+            .into_iter()
+            .flatten()
             .collect();
         let contexts = modules.iter().fold(
             BTreeMap::<String, BTreeSet<String>>::new(),
@@ -158,6 +261,7 @@ pub fn export_primary_semantic_paths(
                 "site_source_range_start":u32::from(range.range.start()),
                 "site_source_range_end":u32::from(range.range.end()),
                 "path_site_source_text":path.syntax().text().to_string(),
+                "site_path_context_kind":if path.syntax().ancestors().any(|node|ast::Use::can_cast(node.kind())) {"import"} else {"signature"},
                 "path_target_symbol_rows":targets,
                 "path_unresolved_reason_kind":reason.map(read_oracle_reason_label),
             }));
@@ -167,7 +271,21 @@ pub fn export_primary_semantic_paths(
         rows.dedup();
         Ok(rows)
     };
-    hir::attach_db(&database, export_attached_path_rows)
+    let mut rows = hir::attach_db(&database, export_attached_path_rows)?;
+    if let Some(units) = mapped_units {
+        rows.iter_mut()
+            .for_each(|row| append_mapped_context_records(row, units));
+    }
+    Ok(json!({
+        "oracle_configuration_kind_value":match kind {OracleConfigurationKindValue::Primary=>"PRIMARY",OracleConfigurationKindValue::Secondary=>"SECONDARY"},
+        "oracle_build_scripts_flag":kind==OracleConfigurationKindValue::Secondary,
+        "oracle_proc_macros_flag":true,
+        "oracle_mapped_unit_count":mapped_units.map(|units|units.iter().filter(|unit|unit["unit_mapped_target_flag"]==true).count()),
+        "oracle_manifest_scope_record":mapped_manifest.map(|manifest|&manifest["manifest_scope_identity_record"]),
+        "oracle_path_export_rows":rows,
+        "oracle_proc_macro_rows":macro_loading,
+        "oracle_source_omission_rows":source_omissions,
+    }))
 }
 
 fn build_oracle_compilation_record(

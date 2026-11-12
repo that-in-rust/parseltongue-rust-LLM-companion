@@ -7,6 +7,10 @@
 use parseltongue_core_row_types::{StageTableRowRecord, StoreBackendFailureError};
 use ra_ap_syntax::{AstNode, AstToken, Edition, SyntaxNode, ast};
 use serde_json::{Value, json};
+
+pub fn read_parser_compiler_identity() -> &'static str {
+    env!("ORACLE_RUSTC_VERSION_TEXT")
+}
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},

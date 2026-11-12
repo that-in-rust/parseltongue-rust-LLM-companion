@@ -15,7 +15,7 @@ use parseltongue_crate_graph_loader::{
 use parseltongue_stage_worker_scheduler::map_bounded_stage_workers;
 use parseltongue_syntax_span_extractor::{
     SyntaxFileInputData, check_sysroot_context_needed, extract_file_syntax_rows,
-    read_unit_prelude_configuration, run_persisted_name_resolution,
+    read_parser_compiler_identity, read_unit_prelude_configuration, run_persisted_name_resolution,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
@@ -622,6 +622,11 @@ fn run_workspace_mapping_pipeline(
             if row.stage_owned_table_name == "workspace-config-state-records" {
                 let mut value: Value = serde_json::from_str(&row.stage_row_payload_text)
                     .map_err(build_pipeline_stage_error)?;
+                value["workspace_compiler_version_text"] = json!(read_parser_compiler_identity());
+                value["workspace_parser_source_record"] = serde_json::from_str(include_str!(
+                    "../../../docs/phase-20261111/parser-source-pin-manifest.json"
+                ))
+                .map_err(build_pipeline_stage_error)?;
                 value["workspace_required_stage_names"] =
                     if final_stage == MappingFinalStageKind::NameResolution {
                         json!([

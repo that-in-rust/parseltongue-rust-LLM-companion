@@ -8,6 +8,8 @@ pub(super) struct OracleLoadedWorkspaceState {
     pub oracle_database_owned_value: RootDatabase,
     pub oracle_source_virtual_files: vfs::Vfs,
     pub oracle_macro_server_handle: Option<proc_macro_api::ProcMacroClient>,
+    pub oracle_macro_loading_rows: Vec<serde_json::Value>,
+    pub oracle_source_omission_rows: Vec<serde_json::Value>,
 }
 
 pub(super) fn load_primary_workspace_database(
@@ -43,6 +45,7 @@ pub(super) fn load_primary_workspace_database(
         },
         &configuration.extra_env,
     );
+    let mut macro_loading = Vec::new();
     let macros: ProcMacrosBuilder = macros
         .into_iter()
         .map(|(krate, path)| {
@@ -52,6 +55,11 @@ pub(super) fn load_primary_workspace_database(
                     "no sysroot proc-macro server".into(),
                 )),
             });
+            macro_loading.push(serde_json::json!({
+                "macro_source_root_path":files.file_path(graph[krate].basic.root_file_id).to_string(),
+                "macro_loading_status_value":if loaded.is_ok() {"loaded"} else {"failed"},
+                "macro_loading_error_text":loaded.as_ref().err().map(ToString::to_string),
+            }));
             (krate, loaded)
         })
         .collect();
@@ -79,11 +87,16 @@ pub(super) fn load_primary_workspace_database(
         }
     }
     let mut change = ChangeWithProcMacros::default();
+    let mut source_omissions = Vec::new();
     for (_, file) in files.take_changes() {
-        if let vfs::Change::Create(content, _) | vfs::Change::Modify(content, _) = file.change
-            && let Ok(content) = String::from_utf8(content)
-        {
-            change.change_file(file.file_id, Some(content));
+        if let vfs::Change::Create(content, _) | vfs::Change::Modify(content, _) = file.change {
+            match String::from_utf8(content) {
+                Ok(content) => change.change_file(file.file_id, Some(content)),
+                Err(error) => source_omissions.push(serde_json::json!({
+                    "omitted_source_absolute_path":files.file_path(file.file_id).to_string(),
+                    "omitted_source_reason_text":error.to_string(),
+                })),
+            }
         }
     }
     change.set_roots(folders.source_root_config.partition(&files));
@@ -96,5 +109,7 @@ pub(super) fn load_primary_workspace_database(
         oracle_database_owned_value: database,
         oracle_source_virtual_files: files,
         oracle_macro_server_handle: server,
+        oracle_macro_loading_rows: macro_loading,
+        oracle_source_omission_rows: source_omissions,
     })
 }

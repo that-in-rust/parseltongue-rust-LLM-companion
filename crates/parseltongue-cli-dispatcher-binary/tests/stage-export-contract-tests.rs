@@ -155,6 +155,22 @@ fn test_exact_manifest_selected_closure() {
     let manifest: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(manifest["manifest_format_version_value"], 1);
     assert_eq!(manifest["manifest_target_context_kind"], "compiler_default");
+    assert_eq!(
+        manifest["manifest_mapped_target_policy"]["policy_test_targets_flag"],
+        false
+    );
+    assert_eq!(
+        manifest["manifest_mapped_target_policy"]["policy_target_kind_values"],
+        json!(["lib", "bin"])
+    );
+    assert_eq!(
+        manifest["manifest_mapped_target_policy"]["policy_dependency_kind_values"],
+        json!(["normal"])
+    );
+    assert_eq!(
+        manifest["manifest_mapped_target_policy"]["policy_support_mapping_flag"],
+        false
+    );
     assert!(
         manifest["manifest_compiler_version_text"]
             .as_str()
@@ -202,6 +218,27 @@ fn test_exact_manifest_selected_closure() {
         manifest["manifest_scope_identity_record"],
         exported[0]["export_scope_identity_record"]
     );
+    let sites = decode_export_fixture_rows(&run_export_fixture_command(
+        &database,
+        "export-published-stage-rows",
+        &["--stage-owned-table-name", "path-resolution-site-records"],
+    ));
+    assert!(sites.len() > 1);
+    for row in &sites[1..] {
+        let payload = &row["export_row_payload_value"];
+        let source = &payload["site_compilation_scope_record"];
+        let unit = units
+            .iter()
+            .find(|unit| {
+                unit["unit_cargo_package_identifier"] == source["unit_cargo_package_identifier"]
+            })
+            .unwrap();
+        assert_eq!(
+            source["unit_semantic_identity_record"],
+            unit["unit_semantic_identity_record"]
+        );
+        assert_eq!(payload["site_path_context_kind"], "signature");
+    }
 }
 
 #[test]
@@ -219,9 +256,12 @@ fn test_empty_manifest_unit_contexts() {
     let config = StageTableRowRecord {
         stage_owned_table_name: "workspace-config-state-records".into(),
         stage_row_record_key: "workspace".into(),
-        stage_row_payload_text:
-            json!({"workspace_source_root_path":directory.path(),"workspace_target_cfg_values":[]})
-                .to_string(),
+        stage_row_payload_text: json!({
+            "workspace_source_root_path":directory.path(),"workspace_target_cfg_values":[],
+            "workspace_compiler_version_text":"rustc fixture",
+            "workspace_parser_source_record":{"parser_source_commit_hash":"fixture"},
+        })
+        .to_string(),
     };
     store
         .write_stage_table_unit(

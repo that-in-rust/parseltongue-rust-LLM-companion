@@ -328,8 +328,17 @@ fn test_flags_without_sysroot_support() {
     );
     let unit = units
         .iter()
-        .find(|unit| unit["unit_package_root_path"] == root.to_str().unwrap())
+        .find(|unit| {
+            unit["unit_package_root_path"] == root.to_str().unwrap()
+                && unit["unit_cargo_target_kind"] == "lib"
+                && unit["unit_compilation_role_kind"] == "target"
+        })
         .unwrap();
+    assert!(units.iter().any(
+        |unit| unit["unit_package_root_path"] == root.to_str().unwrap()
+            && unit["unit_cargo_target_kind"] == "custom-build"
+            && unit["unit_mapped_target_flag"] == false
+    ));
     assert_eq!(unit["unit_no_std_flag"], true);
     assert_eq!(unit["unit_implicit_prelude_flag"], false);
     let paths = read_published_table_fixture(&database, "path-resolution-site-records");

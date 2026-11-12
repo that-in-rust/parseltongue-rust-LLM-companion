@@ -60,7 +60,14 @@ fn build_mapped_oracle_fixture() -> (tempfile::TempDir, OracleWorkspaceExportCon
     }).collect::<Vec<_>>();
     let manifest = json!({
         "manifest_format_version_value":1,"manifest_target_context_kind":"compiler_default",
+        "manifest_mapped_target_policy":{
+            "policy_target_kind_values":["lib","bin"],"policy_test_targets_flag":false,
+            "policy_dependency_kind_values":["normal"],
+            "policy_excluded_target_kinds":["test","bench","example","custom-build","proc-macro"],
+            "policy_support_mapping_flag":false,
+        },
         "manifest_compiler_version_text":env!("ORACLE_RUSTC_VERSION_TEXT"),
+        "manifest_parser_source_record":{"parser_source_commit_hash":env!("ORACLE_SOURCE_COMMIT_HASH")},
         "manifest_scope_identity_record":{"run_generation_digest_value":"fixture","stage_attempt_sequence_value":"one"},
         "manifest_configuration_state_record":{"workspace_source_root_path":root,"workspace_target_cfg_values":[]},
         "manifest_unit_context_rows":units,
@@ -73,6 +80,123 @@ fn build_mapped_oracle_fixture() -> (tempfile::TempDir, OracleWorkspaceExportCon
         oracle_default_features_flag: true,
     };
     (directory, config, manifest)
+}
+
+#[test]
+fn test_unmapped_support_context_validation() {
+    let (directory, config, mut manifest) = build_mapped_oracle_fixture();
+    fs::write(directory.path().join("build.rs"), "fn main() {}").unwrap();
+    let units = manifest["manifest_unit_context_rows"]
+        .as_array_mut()
+        .unwrap();
+    let mut host = units
+        .iter()
+        .find(|unit| unit["unit_cargo_target_name"] == "mapped")
+        .unwrap()
+        .clone();
+    host["unit_mapped_target_flag"] = json!(false);
+    host["unit_cargo_target_name"] = json!("build-script-build");
+    host["unit_cargo_target_kind"] = json!("custom-build");
+    host["unit_compilation_role_kind"] = json!("host");
+    host["unit_compilation_identity_key"] = json!("host");
+    host["unit_source_root_path"] = json!(directory.path().join("build.rs"));
+    host["unit_source_closure_rows"] = json!([]);
+    host["unit_source_root_paths"] = json!([]);
+    host["unit_semantic_identity_record"] = json!({
+        "unit_cargo_package_identifier":host["unit_cargo_package_identifier"],
+        "unit_cargo_target_name":host["unit_cargo_target_name"],
+        "unit_cargo_target_kind":host["unit_cargo_target_kind"],
+        "unit_compilation_role_kind":"host",
+        "unit_configuration_digest_full":blake3::hash(json!([
+            host["unit_target_cfg_values"],host["unit_enabled_feature_values"],"2024","host"
+        ]).to_string().as_bytes()).to_hex().to_string(),
+    });
+    units.push(host);
+    let output =
+        export_mapped_semantic_paths(&config, &manifest, OracleConfigurationKindValue::Primary)
+            .unwrap();
+    assert_eq!(output["oracle_mapped_unit_count"], 2);
+    for field in [
+        "unit_compilation_role_kind",
+        "unit_rust_edition_value",
+        "unit_target_cfg_values",
+    ] {
+        let mut invalid = manifest.clone();
+        invalid["manifest_unit_context_rows"][2][field] = json!("invalid");
+        assert!(
+            export_mapped_semantic_paths(&config, &invalid, OracleConfigurationKindValue::Primary)
+                .is_err()
+        );
+    }
+    let mut duplicate = manifest.clone();
+    let mut host = duplicate["manifest_unit_context_rows"][2].clone();
+    host["unit_compilation_identity_key"] = json!("other-host");
+    duplicate["manifest_unit_context_rows"]
+        .as_array_mut()
+        .unwrap()
+        .push(host);
+    assert!(
+        export_mapped_semantic_paths(&config, &duplicate, OracleConfigurationKindValue::Primary)
+            .is_err()
+    );
+}
+
+#[test]
+fn test_host_metadata_retains_target() {
+    let (_directory, config, mut manifest) = build_mapped_oracle_fixture();
+    let units = manifest["manifest_unit_context_rows"]
+        .as_array_mut()
+        .unwrap();
+    let mut host = units
+        .iter()
+        .find(|unit| unit["unit_cargo_target_name"] == "defs")
+        .unwrap()
+        .clone();
+    let expected = host["unit_semantic_identity_record"].clone();
+    host["unit_mapped_target_flag"] = json!(false);
+    host["unit_compilation_role_kind"] = json!("host");
+    host["unit_compilation_identity_key"] = json!("host-defs");
+    host["unit_source_closure_rows"] = json!([]);
+    host["unit_source_root_paths"] = json!([]);
+    host["unit_semantic_identity_record"]["unit_compilation_role_kind"] = json!("host");
+    host["unit_semantic_identity_record"]["unit_configuration_digest_full"] = json!(
+        blake3::hash(
+            json!([
+                host["unit_target_cfg_values"],
+                host["unit_enabled_feature_values"],
+                "2024",
+                "host"
+            ])
+            .to_string()
+            .as_bytes()
+        )
+        .to_hex()
+        .to_string()
+    );
+    units.insert(0, host);
+    let output =
+        export_mapped_semantic_paths(&config, &manifest, OracleConfigurationKindValue::Primary)
+            .unwrap();
+    let chosen = output["oracle_path_export_rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["path_site_source_text"] == "defs::Chosen")
+        .unwrap();
+    assert_eq!(
+        chosen["path_target_symbol_rows"][0]["target_compilation_scope_record"]["unit_semantic_identity_record"],
+        expected
+    );
+    let local = output["oracle_path_export_rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["path_site_source_text"] == "Local")
+        .unwrap();
+    assert_eq!(
+        local["site_compilation_scope_record"]["unit_semantic_identity_record"],
+        expected
+    );
 }
 
 #[test]

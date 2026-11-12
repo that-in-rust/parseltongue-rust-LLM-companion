@@ -280,6 +280,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "unit_cargo_target_name":self.projection_unit_record_value["unit_cargo_target_name"],
             "unit_cargo_target_kind":self.projection_unit_record_value["unit_cargo_target_kind"],
             "unit_rust_edition_value":self.projection_unit_record_value["unit_rust_edition_value"],
+            "unit_semantic_identity_record":encode_compilation_unit_value(&scope.scope_compilation_unit_key),
             "unit_module_path_values":scope.scope_semantic_path_parts.iter().filter(|part|!part.starts_with('@')).collect::<Vec<_>>(),
         })
     }
@@ -1206,6 +1207,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     "site_source_range_start":restore_source_byte_offset(range.start(),&file.source_crlf_removed_offsets),
                     "site_source_range_end":restore_source_byte_offset(range.end(),&file.source_crlf_removed_offsets),
                     "path_site_source_text":read_original_node_source(node,file),
+                    "site_path_context_kind":if in_use {"import"} else {"signature"},
                     "site_expansion_provenance_chain":file.source_expansion_provenance_rows.iter().map(encode_digest_hex_value).collect::<Vec<_>>(),
                     "site_compilation_scope_record":self.build_compilation_scope_record(scope),
                 }));

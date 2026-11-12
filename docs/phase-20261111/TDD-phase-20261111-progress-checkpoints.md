@@ -1467,3 +1467,61 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   should happen before semantic queries; validate exact unit matches and source
   closure. SECONDARY build-script deltas must not leak into PRIMARY.
 - No active background process, no S5 numbers. Available disk remains 32 GiB.
+
+### Exact mapped-unit manifest GREEN
+
+- Confirmed RED 12ac03491739b54e63a14260175cd5112be5b387 is on the
+  remote research branch. The producer now exports published stage rows with
+  a mandatory generation header, including empty exports, and exact unit
+  manifests including reached normal-dependency libraries, not only members.
+- Mapping stamps compiler and parser-source identities into the immutable
+  workspace configuration. Export reads those snapshot identities, not the
+  export executable's current compiler. Older snapshots missing them fail
+  explicitly and must be regenerated for S5. No runtime discovery command
+  was added; the syntax crate exposes its existing build-time compiler text.
+- Manifests declare the lib/bin, normal-only, tests/bench/example/build-script/
+  proc-macro exclusion policy. Unmapped host and sysroot metadata remain
+  present. Source closures join discovery requests to stored content digests.
+  Oracle validation checks compiler/pin, root, generation, cfg/edition/role,
+  graph and semantic identity uniqueness, and active-source bytes/UTF-8.
+- Oracle cfg inputs are overwritten before semantic queries. Mapped normal
+  dependencies participate; SDK support does not enter denominators. Host
+  metadata sharing a target source root cannot override target scope identity.
+  Missing/ambiguous unit matches fail rather than becoming empty path sets.
+- Production and oracle site/target scopes include canonical semantic unit
+  identities; site context distinguishes imports and signatures. Oracle
+  envelopes retain scope/mode/count plus proc-macro loading and source-omission
+  observations. These observations are not proc-macro invocation counts.
+- Checks: producer contracts 5 passed; syntax contracts 17 passed; oracle
+  full suite initially 20 passed, followed by 6 mapped-manifest contracts
+  after validation/host-role additions (the 16 legacy cases were unchanged).
+  Workspace and oracle all-target Clippy -D warnings passed. Formatting and
+  diff checks exited zero.
+- Native CLI regression initially reported 20 passed / 1 failed in 907.07s,
+  including a passing installed-sysroot/lang-item case. The failure selected
+  a unit by package root alone, although its fixture has both a mapped lib
+  and an unmapped custom-build host unit under that root. Selection now
+  requires the target lib and additionally asserts the unmapped host row
+  exists. The corrected case passed (1 passed / 20 filtered, 0.24s). No
+  production flag assertion was relaxed, and no second native/sysroot run
+  was needed because that case's inputs were unchanged.
+- Logs: /home/ubuntu/m2-mapped-manifest-green-tests.log,
+  /home/ubuntu/m2-mapped-oracle-green-tests.log,
+  /home/ubuntu/m2-mapped-oracle-final-tests.log,
+  /home/ubuntu/m2-mapped-native-regression-tests.log,
+  /home/ubuntu/m2-mapped-flag-selector-tests.log,
+  /home/ubuntu/m2-mapped-syntax-regression-tests.log,
+  /home/ubuntu/m2-mapped-manifest-clippy.log and
+  /home/ubuntu/m2-mapped-oracle-clippy.log.
+- Qualification is not S5 completion: cached proc-macro artifact injection
+  still explicitly rejects a supplied cache; SECONDARY with selected build
+  scripts requires recorded configuration and is not yet qualified. The
+  following comparison phase must implement those inputs and build-script
+  deltas before claiming PRIMARY/SECONDARY agreement. Differ and all-five S5
+  measurements remain outstanding. S6/S7 still require matched memory
+  project roots, schema inspection and complete paginated coverage.
+- Parser/oracle pin remains bf6b2099d6351c37039b01447a9bb64f9a54a586,
+  upstream 2a362a41a8eb6e090f1a12d9b712df85af6f0c33 plus
+  tools/parser-const-closure-statements.patch, SHA-256
+  89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa.
+  No additional parser patch or external-checkout edit was made.
