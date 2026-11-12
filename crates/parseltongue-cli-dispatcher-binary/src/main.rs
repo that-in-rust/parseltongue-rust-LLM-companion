@@ -381,12 +381,55 @@ fn run_persisted_syntax_stage(
         }
     }
 }
+fn stage_implementation_status_values(name_resolution_complete: bool) -> Value {
+    json!({"crate-graph":"complete","source-ingest":"complete","syntax-spans":"complete",
+        "name-resolution":if name_resolution_complete {"complete"} else {"not yet implemented"},"macro-expansion":if name_resolution_complete {"complete"} else {"not yet implemented"},"proc-macro-shapes":"not yet implemented",
+        "signature-lowering":"not yet implemented","call-resolution":"not yet implemented","visibility-hld":"not yet implemented"})
+}
+
+fn stage_publication_status_values(stage_marker_rows: &[StageTableRowRecord]) -> Value {
+    let stage_complete = |stage: &str| {
+        let marker_key = format!("__marker__/{stage}/__complete__");
+        stage_marker_rows
+            .iter()
+            .any(|row| row.stage_row_record_key == marker_key)
+    };
+    json!({
+        "crate-graph": if stage_complete("crate-graph") {"complete"} else {"pending"},
+        "source-ingest": if stage_complete("source-ingest") {"complete"} else {"pending"},
+        "syntax-spans": if stage_complete("syntax-spans") {"complete"} else {"pending"},
+        "name-resolution": if stage_complete("name-resolution") {"complete"} else {"pending"}
+    })
+}
+
+fn empty_workspace_coverage_banner(stage_publication_status: Value) -> Value {
+    json!({
+        "run_generation_digest_value": null,
+        "source_file_record_count": 0,
+        "syntax_span_record_count": 0,
+        "signature_field_record_count": 0,
+        "body_site_record_count": 0,
+        "source_tiling_identity_holds": false,
+        "inactive_item_record_count": 0,
+        "build_script_unresolved_count": 0,
+        "crate_unresolved_reason_counts": [],
+        "stage_implementation_status_values": stage_implementation_status_values(false),
+        "stage_publication_status_values": stage_publication_status
+    })
+}
+
 fn build_workspace_coverage_banner(
     store: &dyn StageTableStorePort,
 ) -> Result<Value, StoreBackendFailureError> {
-    let scope = store
-        .read_workspace_publication_scope()?
-        .ok_or_else(|| build_pipeline_stage_error("no completed published generation"))?;
+    let published_scope = store.read_workspace_publication_scope()?;
+    let stage_marker_rows = match published_scope.as_ref() {
+        Some(scope) => store.read_stage_table_rows(scope, "stage-run-generation-records")?,
+        None => Vec::new(),
+    };
+    let stage_publication_status = stage_publication_status_values(&stage_marker_rows);
+    let Some(scope) = published_scope else {
+        return Ok(empty_workspace_coverage_banner(stage_publication_status));
+    };
     let files = read_stage_json_records(store, &scope, "file-source-text-table")?;
     let lengths: BTreeMap<_, _> = files
         .iter()
@@ -475,8 +518,7 @@ fn build_workspace_coverage_banner(
     })?;
     let reasons:Vec<_>=reasons.into_iter().map(|(unit,(inactive,build_script))|
         json!({"unit_compilation_identity_key":unit,"unit_unresolved_reason_counts":{"cfg_inactive":inactive,"build_script":build_script}})).collect();
-    let name_resolution_complete = store
-        .read_stage_table_rows(&scope, "stage-run-generation-records")?
+    let name_resolution_complete = stage_marker_rows
         .iter()
         .any(|row| row.stage_row_record_key == "__marker__/name-resolution/__complete__");
     Ok(
@@ -486,9 +528,8 @@ fn build_workspace_coverage_banner(
         "source_tiling_identity_holds":tiling,"inactive_item_record_count":inactive,
         "build_script_unresolved_count":build_script,
         "crate_unresolved_reason_counts":reasons,
-        "stage_implementation_status_values":{"crate-graph":"complete","source-ingest":"complete","syntax-spans":"complete",
-            "name-resolution":if name_resolution_complete {"complete"} else {"not yet implemented"},"macro-expansion":if name_resolution_complete {"complete"} else {"not yet implemented"},"proc-macro-shapes":"not yet implemented",
-            "signature-lowering":"not yet implemented","call-resolution":"not yet implemented","visibility-hld":"not yet implemented"}}),
+        "stage_implementation_status_values":stage_implementation_status_values(name_resolution_complete),
+        "stage_publication_status_values":stage_publication_status}),
     )
 }
 fn compute_workspace_generation_digest(
@@ -871,4 +912,128 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     println!("{}", serde_json::to_string_pretty(&result)?);
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod coverage_banner_contract_tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct PublicationBannerStoreStub {
+        published_scope: Option<StageRunScopeValue>,
+        table_rows: BTreeMap<String, Vec<StageTableRowRecord>>,
+    }
+
+    impl StageTableStorePort for PublicationBannerStoreStub {
+        fn initialize_workspace_stage_schema(&self) -> Result<(), StoreBackendFailureError> {
+            Ok(())
+        }
+
+        fn write_stage_table_unit(
+            &self,
+            _request: &StageUnitWriteRequest<'_>,
+            _cancel: &RunCancelFlagValue,
+        ) -> Result<usize, StoreBackendFailureError> {
+            Ok(0)
+        }
+
+        fn read_stage_table_rows(
+            &self,
+            scope: &StageRunScopeValue,
+            table: &str,
+        ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
+            if self.published_scope.as_ref() != Some(scope) {
+                return Err(build_pipeline_stage_error(
+                    "unexpected test publication scope",
+                ));
+            }
+            Ok(self.table_rows.get(table).cloned().unwrap_or_default())
+        }
+
+        fn write_file_content_bytes(
+            &self,
+            _digest: &str,
+            _bytes: &[u8],
+        ) -> Result<bool, StoreBackendFailureError> {
+            Ok(true)
+        }
+
+        fn read_file_content_bytes(
+            &self,
+            _digest: &str,
+        ) -> Result<Vec<u8>, StoreBackendFailureError> {
+            Ok(Vec::new())
+        }
+
+        fn publish_workspace_generation_manifest(
+            &self,
+            scope: &StageRunScopeValue,
+            generation: &str,
+            _cancel: &RunCancelFlagValue,
+        ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+            Ok(StageRunScopeValue {
+                run_generation_digest_value: generation.into(),
+                stage_attempt_sequence_value: scope.stage_attempt_sequence_value.clone(),
+            })
+        }
+
+        fn read_workspace_publication_scope(
+            &self,
+        ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
+            Ok(self.published_scope.clone())
+        }
+    }
+
+    /// REQ-RUST-024.11
+    #[test]
+    fn test_source_publication_status_pending() {
+        let published_scope = StageRunScopeValue {
+            run_generation_digest_value: "source-only-generation".into(),
+            stage_attempt_sequence_value: "published-attempt".into(),
+        };
+        let file_row = StageTableRowRecord {
+            stage_owned_table_name: "file-source-text-table".into(),
+            stage_row_record_key: "source-file".into(),
+            stage_row_payload_text: json!({
+                "file_source_absolute_path": "/source-only/src/lib.rs",
+                "file_source_byte_count": 17
+            })
+            .to_string(),
+        };
+        let marker_rows = ["crate-graph", "source-ingest"]
+            .into_iter()
+            .map(|stage| StageTableRowRecord {
+                stage_owned_table_name: "stage-run-generation-records".into(),
+                stage_row_record_key: format!("__marker__/{stage}/__complete__"),
+                stage_row_payload_text: r#"{"status":"complete"}"#.into(),
+            })
+            .collect();
+        let store = PublicationBannerStoreStub {
+            published_scope: Some(published_scope),
+            table_rows: BTreeMap::from([
+                ("file-source-text-table".into(), vec![file_row]),
+                ("stage-run-generation-records".into(), marker_rows),
+            ]),
+        };
+
+        let banner = build_workspace_coverage_banner(&store).unwrap();
+
+        assert_eq!(banner["source_file_record_count"], 1);
+        assert_eq!(banner["syntax_span_record_count"], 0);
+        assert_eq!(banner["source_tiling_identity_holds"], true);
+        assert_eq!(
+            banner["stage_implementation_status_values"]["syntax-spans"],
+            "complete"
+        );
+        assert_eq!(
+            banner["stage_publication_status_values"],
+            json!({
+                "crate-graph": "complete",
+                "source-ingest": "complete",
+                "syntax-spans": "pending",
+                "name-resolution": "pending"
+            })
+        );
+    }
 }

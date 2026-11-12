@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
-use parseltongue_core_row_types::StageRunScopeValue;
+use parseltongue_core_row_types::{RunCancelFlagValue, StageRunScopeValue, StageUnitWriteRequest};
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::Value;
@@ -51,6 +51,43 @@ fn run_workspace_mapping_fixture(
         ])
         .output()
         .unwrap()
+}
+
+fn run_workspace_stage_fixture(root: &Path, database: &Path, stage: &str) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_parseltongue"))
+        .args([
+            "map-workspace-full-run",
+            "--workspace-root-path-value",
+            root.to_str().unwrap(),
+            "--workspace-store-file-path",
+            database.to_str().unwrap(),
+            "--worker-thread-count-value",
+            "2",
+            "--mapping-final-stage-kind",
+            stage,
+        ])
+        .output()
+        .unwrap()
+}
+
+fn write_stale_completion_marker(
+    store: &TursoWorkspaceStoreAdapter,
+    scope: &StageRunScopeValue,
+    stage: &str,
+    inputs: &[&str],
+) {
+    store
+        .write_stage_table_unit(
+            &StageUnitWriteRequest {
+                stage_run_scope_value: scope,
+                stage_owner_name_value: stage,
+                stage_unit_work_key: "__complete__",
+                stage_input_stage_names: inputs,
+                stage_unit_output_rows: &[],
+            },
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
 }
 fn read_workspace_banner_fixture(database: &Path) -> Value {
     let output = Command::new(env!("CARGO_BIN_EXE_parseltongue"))
@@ -522,6 +559,7 @@ fn test_nested_macro_crate_provenance() {
 }
 
 /// REQ-RUST-024.10
+/// REQ-RUST-024.11
 #[test]
 fn test_persisted_resolution_path_answers() {
     let directory = tempfile::tempdir().unwrap();
@@ -540,6 +578,16 @@ fn test_persisted_resolution_path_answers() {
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
+    );
+    let banner: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        banner["stage_publication_status_values"],
+        serde_json::json!({
+            "crate-graph": "complete",
+            "source-ingest": "complete",
+            "syntax-spans": "complete",
+            "name-resolution": "complete"
+        })
     );
     let store =
         TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
@@ -855,6 +903,102 @@ fn test_mapping_stage_selection_contract() {
     let output = run("");
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown mapping final stage"));
+}
+
+/// REQ-RUST-024.11
+#[test]
+fn test_syntax_publication_status_complete() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let database = directory.path().join("store.db");
+    let output = run_workspace_stage_fixture(&root, &database, "syntax-spans");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let banner: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        banner["stage_implementation_status_values"]["syntax-spans"],
+        "complete"
+    );
+    assert_eq!(
+        banner["stage_publication_status_values"],
+        serde_json::json!({
+            "crate-graph": "complete",
+            "source-ingest": "complete",
+            "syntax-spans": "complete",
+            "name-resolution": "pending"
+        })
+    );
+}
+
+/// REQ-RUST-024.11
+#[test]
+fn test_stale_publication_marker_pending() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let database = directory.path().join("store.db");
+    let output = run_workspace_stage_fixture(&root, &database, "syntax-spans");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let published_scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let stale_scope = StageRunScopeValue {
+        run_generation_digest_value: format!(
+            "stale-{}",
+            published_scope.run_generation_digest_value
+        ),
+        stage_attempt_sequence_value: "stale-attempt".into(),
+    };
+    write_stale_completion_marker(&store, &stale_scope, "name-resolution", &[]);
+    assert!(
+        store
+            .read_stage_table_rows(&stale_scope, "stage-run-generation-records")
+            .unwrap()
+            .iter()
+            .any(|row| row.stage_row_record_key == "__marker__/name-resolution/__complete__")
+    );
+    assert_eq!(
+        store.read_workspace_publication_scope().unwrap(),
+        Some(published_scope)
+    );
+    drop(store);
+
+    let banner = read_workspace_banner_fixture(&database);
+    assert_eq!(
+        banner["stage_publication_status_values"]["name-resolution"],
+        "pending"
+    );
+}
+
+/// REQ-RUST-024.11
+#[test]
+fn test_publication_status_without_generation() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("store.db");
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    store.initialize_workspace_stage_schema().unwrap();
+    drop(store);
+
+    let banner = read_workspace_banner_fixture(&database);
+    assert_eq!(
+        banner["stage_publication_status_values"],
+        serde_json::json!({
+            "crate-graph": "pending",
+            "source-ingest": "pending",
+            "syntax-spans": "pending",
+            "name-resolution": "pending"
+        })
+    );
 }
 
 #[test]

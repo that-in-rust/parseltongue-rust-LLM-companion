@@ -1031,3 +1031,55 @@ test_type: integration
 assertion: deterministic rerun preserves semantic outputs and a failed rerun retains the previous generation
 metric: stable generation/product counts, no failed-generation publication
 ```
+
+## REQ-RUST-024.11 — published-stage-coverage-status
+
+WHEN the CLI emits a coverage banner, it SHALL retain the existing
+`stage_implementation_status_values` availability map and add exactly four
+`stage_publication_status_values` keys: `crate-graph`, `source-ingest`,
+`syntax-spans`, and `name-resolution`. Each publication status SHALL be
+`complete` only when that stage's persisted `__complete__` marker exists in the
+currently published workspace generation and attempt; otherwise it SHALL be
+`pending`. With no published generation, all four statuses SHALL be `pending`.
+Markers persisted in another generation SHALL NOT complete the current
+publication status.
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_syntax_publication_status_complete
+test_type: integration
+assertion: syntax-spans publication is complete only for its published marker; exact four-key map
+metric: published marker-to-status equality
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_source_publication_status_pending
+test_type: unit
+assertion: source-only published scope with no syntax marker has vacuous tiling but pending syntax publication while the availability map remains compatible
+metric: availability/publication distinction, vacuous tiling and pending syntax status
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_stale_publication_marker_pending
+test_type: integration
+assertion: a name-resolution completion marker in an un-published other generation does not complete the current publication
+metric: published-scope marker isolation
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_publication_status_without_generation
+test_type: integration
+assertion: a database without a publication reports all four statuses pending
+metric: all-pending status map without publication
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_persisted_resolution_path_answers
+test_type: integration
+assertion: a full published namespace run reports all four stage markers complete in its generation
+metric: exact publication-status map for name-resolution completion
+```
