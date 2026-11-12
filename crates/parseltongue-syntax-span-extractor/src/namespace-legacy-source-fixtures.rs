@@ -152,6 +152,44 @@ fn ordered_macro_expansion_empty() {
     assert!(port.expand_next_resolved_macro_items().unwrap().is_none());
 }
 
+#[test]
+fn unresolved_macro_completion_records() {
+    let store = LegacyMacroFixtureStore {
+        source: "missing!();".into(),
+    };
+    let lookup = OrderedMacroFixtureLookup::default();
+    let cancel = RunCancelFlagValue::default();
+    let port = crate::prepare_macro_expansion_port(
+        unit(),
+        &json!({"workspace_source_root_path":"/fixture"}),
+        &store,
+        &StageRunScopeValue {
+            run_generation_digest_value: "generation".into(),
+            stage_attempt_sequence_value: "attempt".into(),
+        },
+        &cancel,
+        &lookup,
+    )
+    .unwrap();
+    assert!(port.expand_next_resolved_macro_items().unwrap().is_none());
+    let output = port.finish_unresolved_macro_items().unwrap();
+    assert_eq!(output.expansion_unavailable_reason_rows.len(), 1);
+    assert_eq!(output.expansion_semantic_output_rows.len(), 1);
+    assert_eq!(
+        serde_json::from_str::<Value>(
+            &output.expansion_semantic_output_rows[0].stage_row_payload_text
+        )
+        .unwrap()["macro_resolution_state_kind"],
+        "unresolved"
+    );
+    assert!(
+        port.finish_unresolved_macro_items()
+            .unwrap()
+            .expansion_semantic_output_rows
+            .is_empty()
+    );
+}
+
 struct LegacyMacroFixtureStore {
     source: String,
 }

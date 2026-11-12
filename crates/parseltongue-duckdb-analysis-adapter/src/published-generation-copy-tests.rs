@@ -369,6 +369,49 @@ fn final_namespace_products_contract() {
 }
 
 #[test]
+fn disposable_namespace_cache_lifetime() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    let source = namespace_source_fixture();
+    [0, 1].into_iter().for_each(|_| {
+        store
+            .copy_published_stage_rows(
+                &source,
+                &scope(),
+                NAMESPACE_SOURCE_TABLE_NAMES,
+                &RunCancelFlagValue::default(),
+            )
+            .unwrap();
+        store
+            .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+            .unwrap();
+        store
+            .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+            .unwrap();
+        store.discard_unpublished_analysis_inputs().unwrap();
+        assert!(
+            store
+                .visit_frozen_namespace_products(&scope(), &mut |_| Ok(()))
+                .is_err()
+        );
+    });
+    let connection = store._connection.lock().unwrap();
+    let access: bool = connection
+        .query_row(
+            "SELECT current_setting('enable_external_access')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(!access);
+}
+
+#[test]
 fn frozen_namespace_generation_integrity() {
     let directory = tempfile::tempdir().unwrap();
     let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
