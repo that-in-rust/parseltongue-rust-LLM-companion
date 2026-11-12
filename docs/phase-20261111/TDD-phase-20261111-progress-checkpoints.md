@@ -1026,3 +1026,49 @@ so no new table/config is needed. Collect recognized active lang attributes duri
 namespace projection (including non-public items and expanded source), link source/range,
 unit/provenance and target identity, then publish with the crate's existing atomic rows.
 No GREEN implementation or corpus run has occurred for this subphase yet.
+
+### M2 sysroot/prelude contexts — parser compatibility RED blocker
+
+GREEN implementation started: sysroot graph and source-context helpers, semantic-support
+unit ingestion/discovery, separate augmented staging, foreign prelude bindings, explicit
+extern-crate aliases, and atomic per-crate lang-item output. These implementation edits
+remain UNCOMMITTED and are not accepted GREEN. Graph tests passed (9 existing + 3 new);
+syntax tests passed (11 existing + 3 new) before adding the blocker regression.
+The CLI suite's first implementation run had 15 existing passes / 1 new failure.
+Fixed a TOML API mismatch (Value::from_str parses a value, toml::from_str parses a document).
+Also corrected the newly authored CLI assertion to use full generic path source text;
+path sites preserve Option<Vec<u8>>, not just Option. No existing test expectation changed.
+
+The native integration then reached actual matching rust-src and failed during closure
+discovery, BEFORE final generation preparation, on core/src/clone.rs offset 14967:
+WorkspaceNotCompilingError: expected an item. rustc --version is
+rustc 1.99.1 (58cf8f9c3 2026-10-13), and rustup component list --installed includes rust-src.
+The returned sysroot is /home/ubuntu/.rustup/toolchains/stable-x86_64-unknown-linux-gnu.
+Its core/src/lib.rs line 273 unconditionally declares pub mod clone; line 131 enables
+final_associated_functions. clone.rs lines 382–392 define Share with final fn share.
+This is a reached standard-library source, not an unreachable fixture or inferred path.
+
+Disproof check: reduced the source to an ordinary trait method and extraction passed.
+Adding only final reproduced expected-an-item at byte 18. Then called the pinned SDK
+SourceFile::parse directly, bypassing our compatibility wrapper: it also returned
+SyntaxError("expected an item", 18..18). The newly added test_sysroot_final_trait_methods
+records this failing requirement. Thus the observed native failure is not explained by
+our wrapper, TOML reader or new prelude code. Syntax and parser dependencies are both
+exactly =0.0.362. No parser recovery, token stripping, dependency-pin substitution or
+external rust-analyzer checkout edit has been made.
+
+Evidence:
+- /home/ubuntu/m2-sysroot-pure-green.log: graph 9+3 pass; syntax 14 pass.
+- /home/ubuntu/m2-sysroot-native-green.log: native fixture fails in 38.81s on clone.rs.
+- /home/ubuntu/m2-sysroot-parser-blocker.log: wrapper reduction fails at byte 18.
+- /home/ubuntu/m2-sysroot-parser-direct-blocker.log: direct pinned SDK fails at byte 18.
+
+REQ-RUST-004.2 explicitly makes pinned-parser/toolchain incompatibility block corpus
+acceptance. Decision needed: authorize focused parser compatibility work for Rust 1.99
+final associated functions, including review of its effect on the separately pinned
+oracle. Do not silently ignore the token or report this as a noncompiling user workspace.
+After that decision: finish native sysroot integration, add edition/no_std/no_core/
+no_implicit_prelude/extern alias integration cases, improve demand detection to cover
+all prelude identifiers (AsRef/AsMut and memory functions are currently missing), run
+affected tests and Clippy, then GREEN/REFACTOR commits. Exact oracle manifests, differ,
+all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exists.

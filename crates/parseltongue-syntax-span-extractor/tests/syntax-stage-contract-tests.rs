@@ -82,6 +82,29 @@ fn test_lang_item_recognition_rules() {
 }
 
 #[test]
+fn test_sysroot_final_trait_methods() {
+    assert!(
+        extract_file_syntax_rows(&make_syntax_file_input(
+            b"pub trait Share { fn share(&self) -> &Self { self } }"
+        ))
+        .is_ok()
+    );
+    let direct = ra_ap_syntax::SourceFile::parse(
+        "pub trait Share { final fn share(&self) -> &Self { self } }",
+        ra_ap_syntax::Edition::Edition2024,
+    );
+    assert!(
+        direct.errors().is_empty(),
+        "pinned parser: {:?}",
+        direct.errors()
+    );
+    extract_file_syntax_rows(&make_syntax_file_input(
+        b"pub trait Share { final fn share(&self) -> &Self { self } }",
+    ))
+    .unwrap();
+}
+
+#[test]
 fn test_cfg_comments_keep_semantics() {
     let enabled = BTreeSet::from(["unix".into(), "feature=\"selected\"".into()]);
     for source in [
