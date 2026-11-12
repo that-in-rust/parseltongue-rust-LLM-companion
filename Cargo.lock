@@ -1688,6 +1688,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "parseltongue-port-macro-expander"
+version = "0.1.0"
+dependencies = [
+ "parseltongue-core-row-types",
+]
+
+[[package]]
 name = "parseltongue-port-name-resolver"
 version = "0.1.0"
 dependencies = [

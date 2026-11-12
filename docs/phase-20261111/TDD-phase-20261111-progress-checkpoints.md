@@ -768,3 +768,15 @@ These are current-harness export counts, NOT S5 denominators, rates or gate resu
 Artifacts: each repo's m2-primary-path-exports directory; original failed outputs preserved
 as m2-primary-unattached-exports. The probe records executable SHA-256 and pending
 configuration/proc-cache/expanded-provenance qualifications. S5 comparison is still pending.
+
+### M2 declarative macro expander — STUB
+
+Added parseltongue-port-macro-expander with the specified pure L2 source-in/source-out API,
+typed L1 expansion input/output/error and per-token definition/invocation provenance records.
+The stub remains todo; offline cargo check passed (0.30s). No salsa/analysis dependency.
+Copy-adaptation source notice pins the matcher/transcriber and parser-input bridge.
+Source inspection found another span portability constraint: with salsa disabled, the pinned
+span's opaque SyntaxContext exposes only an unsafe constructor. Preserve the no-unsafe rule
+by using a compatible minimal safe span representation if TT needs it; do not enable salsa.
+RED will cover item/repetition/fragment expansion, empty output, malformed/no-match errors,
+token provenance, edition boundaries, cancellation and the explicit no-salsa macro tree gate.

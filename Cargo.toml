@@ -8,6 +8,7 @@ members = [
     "crates/parseltongue-stage-worker-scheduler",
     "crates/parseltongue-cli-dispatcher-binary",
     "crates/parseltongue-port-name-resolver",
+    "crates/parseltongue-port-macro-expander",
 ]
 resolver = "3"
 exclude = ["tools/oracle-semantic-export-harness"]
