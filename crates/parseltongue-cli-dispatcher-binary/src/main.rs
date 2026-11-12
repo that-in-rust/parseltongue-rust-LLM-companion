@@ -26,6 +26,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "oracle-path-comparison-facade.rs"]
+mod oracle_path_comparison_facade;
 #[path = "published-stage-export-facade.rs"]
 mod published_stage_export_facade;
 
@@ -744,6 +746,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 | "--mapping-final-stage-kind"
                 | "--stage-owned-table-name"
                 | "--stage-row-filter-value"
+                | "--primary-semantic-input-path"
+                | "--secondary-semantic-input-path"
+                | "--agreement-store-file-path"
         ) {
             return Err(format!("unknown flag {}", args[index]).into());
         }
@@ -755,7 +760,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing --workspace-store-file-path")?;
     let exporting = matches!(
         command.as_str(),
-        "export-published-stage-rows" | "export-mapped-unit-manifest"
+        "export-published-stage-rows" | "export-mapped-unit-manifest" | "oracle-edge-differ-run"
     );
     if (command == "status-coverage-banner-show" || exporting) && !Path::new(path).is_file() {
         return Err("workspace store does not exist".into());
@@ -765,6 +770,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         store.initialize_workspace_stage_schema()?;
     }
     let result = match command.as_str() {
+        "oracle-edge-differ-run" => {
+            let output = flags
+                .get("--agreement-store-file-path")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    Path::new(path).with_file_name("oracle-edge-agreement-store.db")
+                });
+            let parent = output.parent().unwrap_or_else(|| Path::new("."));
+            let normalized = parent.canonicalize()?.join(
+                output
+                    .file_name()
+                    .ok_or("agreement store filename missing")?,
+            );
+            if normalized == Path::new(path).canonicalize()? {
+                return Err("comparison cannot mutate source store".into());
+            }
+            let agreement = TursoWorkspaceStoreAdapter::open_turso_workspace_store(
+                output.to_str().ok_or("agreement store path is not UTF-8")?,
+            )?;
+            agreement.initialize_workspace_stage_schema()?;
+            oracle_path_comparison_facade::run_oracle_agreement_comparison(
+                &store,
+                Path::new(
+                    flags
+                        .get("--primary-semantic-input-path")
+                        .ok_or("missing PRIMARY input")?,
+                ),
+                Path::new(
+                    flags
+                        .get("--secondary-semantic-input-path")
+                        .ok_or("missing SECONDARY input")?,
+                ),
+                &agreement,
+                &RunCancelFlagValue::default(),
+            )?
+        }
         "status-coverage-banner-show" => build_workspace_coverage_banner(&store)?,
         "export-mapped-unit-manifest" => {
             published_stage_export_facade::read_published_unit_manifest(&store)?

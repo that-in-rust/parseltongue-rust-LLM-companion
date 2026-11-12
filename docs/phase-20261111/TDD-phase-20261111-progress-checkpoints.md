@@ -1660,3 +1660,14 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   Output: e2e-runs/2026-11-11/serde/s5-primary-path-agreement/.
   Shell ce054b owns the sole writer. It exports the exact manifest only after
   mapping succeeds. Do not run a second writer against this store.
+
+### Canonical path comparison STUB
+
+- Added explicit CPU differ route and facade boundary. Source mapping store
+  uses the read-only export route (no schema initialization). Comparison rows
+  will live in a separate Turso sidecar, preserving the frozen mapping
+  generation; identical normalized source/output paths are rejected.
+- PRIMARY alone supplies the denominator. SECONDARY-only observations are
+  KL1. Unresolved PRIMARY-visible sites are nonmatches; no empty-target
+  equality shortcut. M2 proc-dependent exclusions need oracle evidence and
+  remain separately reported. Known oracle errors block affected scoring.
