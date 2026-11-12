@@ -160,4 +160,86 @@ RED evidence:
 GREEN evidence:
   - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_ -- --nocapture`: `test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
   - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`: `test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
-  - Full command output is retained under `/home/ubuntu/comparator-work-logs/` in `sql-regression-tests.log` and `cli-contract-regression-tests.log`. Commit follows this GREEN checkpoint; refactor/gates are separate.
+- Full command output is retained under `/home/ubuntu/comparator-work-logs/` in `sql-regression-tests.log` and `cli-contract-regression-tests.log`. Commit follows this GREEN checkpoint; refactor/gates are separate.
+
+### Follow-up REFACTOR checkpoint — 2026-11-12
+
+The GREEN checkpoint is committed as `42db82b29` (`fix: validate oracle comparison evidence`). The comparator storage module is now `oracle-path-comparison-storage.rs`; the statistics tuple is a named struct, SQL table identifiers and new Rust identifiers follow the naming rule, and SQL tests follow the storage functions.
+
+REQ-RUST-025.0
+  - `test_macro_failure_blocks_publish`, `test_malformed_macro_record_rejected`, `test_scope_oracle_errors_block`.
+  - `test_ambiguous_unit_contexts_fail`, `test_invalid_context_kind_rejected`, `test_invalid_reason_enum_rejected`, `test_invalid_proc_flag_rejected`, `test_invalid_namespace_enum_rejected`.
+
+REQ-RUST-025.1
+  - `test_package_paths_normalize_lexically`, `test_site_context_identity_distinct`, `test_exact_duplicates_collapse_rows`, `test_conflicting_duplicate_payloads_fail`, `test_expansion_provenance_separates_sites`.
+  - `test_target_namespaces_are_canonicalized`, `test_builtin_namespace_changes_identity`, `test_split_target_namespaces_merge`.
+
+REQ-RUST-025.2
+  - `test_primary_classes_partition_once`, `test_proc_wrong_target_mismatch`, `test_proc_empty_answer_excluded`, `test_enum_variant_module_scored`, `test_empty_denominator_is_na`, `test_blocked_partition_reconciles_duplicates`.
+
+REQ-RUST-025.3
+  - `test_production_only_rows_visible`, `test_extra_production_secondary_counts`, `test_changed_targets_persist_semantically`.
+
+REQ-RUST-025.4
+  - `test_persisted_known_answer_matrix` covers persisted match/wrong/missing/extra/deferred evidence, counts, rate, repeated oracle changes without stale rows, and changed target persistence.
+  - `test_source_unpublished_generation_fails`, `test_scope_oracle_errors_block`, `test_cancel_prevents_agreement_publish`, `test_oracle_agreement_registry_roundtrip`, `test_exact_comparison_publishes_turso`.
+  - Source-change-during-read/before-publish through a delegating port and in-flight cancellation remain unimplemented; the pre-cancel test does not cover them.
+
+REQ-RUST-025.5
+  - `test_thread_counts_export_identically` covers one- and two-thread SQL result parity.
+  - `test_persisted_known_answer_matrix` compares complete persisted exported rows while excluding publication-attempt diagnostics and checks the semantic digest remains stable across attempts.
+
+Focused checks after refactor:
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_ -- --nocapture`: `test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`: `test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+  - `cargo fmt --all -- --check`: exit 0.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile` and exit 0.
+  - `cargo build --workspace --release`: `Finished release profile` and exit 0.
+  - `cargo test --workspace` is blocked by four unchanged `stage-export-contract-tests` cases; each reaches the out-of-scope `namespace-pipeline-publication-facade.rs` stub and reports `DuckDB name-resolution stage not implemented`. These tests do not reach the comparator. Full logs are in `/home/ubuntu/comparator-work-logs/`.
+
+### Final follow-up test and gate update — 2026-11-12
+
+This entry supersedes the earlier REFACTOR checkpoint's explicitly pending publication cases; prior entries remain historical and unchanged.
+
+REQ-RUST-025.0
+  - `test_unit_configuration_contracts_fail`, `test_unmapped_site_units_rejected`, `test_site_provenance_entries_validated`, `test_site_evidence_required_values` cover unit cfg/features/edition/role/mapped scope, provenance strings, and required site values.
+
+REQ-RUST-025.4
+  - `test_source_changes_after_reads` and `test_source_changes_before_publish` use a delegating port to change reported source scope at the read and pre-publication rechecks and assert the preexisting agreement generation remains published.
+  - `test_write_cancellation_preserves_generation` requests cancellation from the delegated agreement write and asserts the existing generation remains published.
+  - `test_persisted_known_answer_matrix` covers combined classifications, repeated changed oracle inputs with no stale rows, persisted changed target evidence, and attempt-independent persisted export rows.
+
+Final focused results after the added regressions:
+  - Adapter `oracle_path_` tests: `test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - CLI comparator contract tests: `test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+  - `cargo fmt --all -- --check`: exit 0.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: exit 0; output ends `Finished dev profile`.
+  - `cargo build --workspace --release`: exit 0, after the last production-source edit; remaining subsequent edits only added tests and journal text.
+  - Final `cargo test --workspace` again completes the comparator suite (14 passing) and is then blocked by the same four out-of-scope stage-export tests and namespace pipeline stub described above.
+
+### Authoritative final REQ-to-test mapping
+
+Use only these current identifiers for final traceability; earlier proposed names are historical.
+
+REQ-RUST-025.0
+  - `test_macro_failure_blocks_publish`, `test_malformed_macro_record_rejected`, `test_scope_oracle_errors_block`.
+  - `test_ambiguous_unit_contexts_fail`, `test_invalid_context_kind_rejected`, `test_invalid_reason_enum_rejected`, `test_invalid_proc_flag_rejected`, `test_invalid_namespace_enum_rejected`.
+  - `test_unit_configuration_contracts_fail`, `test_unmapped_site_units_rejected`, `test_site_provenance_entries_validated`, `test_site_evidence_required_values`.
+
+REQ-RUST-025.1
+  - `test_package_paths_normalize_lexically`, `test_site_context_identity_distinct`, `test_exact_duplicates_collapse_rows`, `test_conflicting_duplicate_payloads_fail`, `test_expansion_provenance_separates_sites`.
+  - `test_target_namespaces_are_canonicalized`, `test_builtin_namespace_changes_identity`, `test_split_target_namespaces_merge`, `test_builtin_target_names_canonicalize`, `test_malformed_target_ranges_fail`.
+
+REQ-RUST-025.2
+  - `test_primary_classes_partition_once`, `test_proc_wrong_target_mismatch`, `test_proc_empty_answer_excluded`, `test_enum_variant_module_scored`, `test_empty_denominator_is_na`, `test_blocked_partition_reconciles_duplicates`, `test_unknown_scope_is_blocked`.
+  - `test_persisted_known_answer_matrix` asserts persisted match, wrong, missing, extra, and deferred cases together.
+
+REQ-RUST-025.3
+  - `test_production_only_rows_visible`, `test_extra_production_secondary_counts`, `test_changed_targets_persist_semantically`, `test_persisted_known_answer_matrix`.
+
+REQ-RUST-025.4
+  - `test_source_unpublished_generation_fails`, `test_scope_oracle_errors_block`, `test_source_changes_after_reads`, `test_source_changes_before_publish`, `test_write_cancellation_preserves_generation`, `test_cancel_prevents_agreement_publish`.
+  - `test_oracle_agreement_registry_roundtrip`, `test_exact_comparison_publishes_turso`, `test_persisted_known_answer_matrix`.
+
+REQ-RUST-025.5
+  - `test_thread_counts_export_identically`, `test_persisted_known_answer_matrix`.

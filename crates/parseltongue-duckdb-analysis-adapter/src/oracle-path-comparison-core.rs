@@ -59,7 +59,7 @@ pub enum OracleComparisonFailureError {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CanonicalOraclePathSiteValue {
+pub(crate) struct CanonicalPathSiteValue {
     pub site_key: String,
     pub unit_identity: String,
     pub classification: String,
@@ -283,8 +283,9 @@ fn resolve_compilation_context_identity(
             continue;
         }
         let semantic = derive_semantic_unit_identity(unit)?;
+        let semantic_value: Value = serde_json::from_str(&semantic)?;
         if expected_semantic
-            .is_some_and(|expected| !expected.is_null() && expected.to_string() != semantic)
+            .is_some_and(|expected| !expected.is_null() && expected != &semantic_value)
         {
             continue;
         }
@@ -312,7 +313,7 @@ fn read_site_compilation_context(value: &Value) -> Option<&Value> {
     })
 }
 
-fn canonicalize_target_rows(
+fn canonicalize_target_symbol_rows(
     site: &Value,
     units: &[Value],
 ) -> Result<Vec<String>, OracleComparisonFailureError> {
@@ -438,8 +439,8 @@ pub(crate) fn canonicalize_site_evidence_rows(
     rows: &[Value],
     units: &[Value],
     classify: bool,
-) -> Result<Vec<CanonicalOraclePathSiteValue>, OracleComparisonFailureError> {
-    let mut sites = BTreeMap::<String, CanonicalOraclePathSiteValue>::new();
+) -> Result<Vec<CanonicalPathSiteValue>, OracleComparisonFailureError> {
+    let mut sites = BTreeMap::<String, CanonicalPathSiteValue>::new();
     for raw in rows {
         let metadata = raw
             .get("path_source_metadata_value")
@@ -544,7 +545,7 @@ pub(crate) fn canonicalize_site_evidence_rows(
         let identity_json =
             json!([unit_identity, normalized_file, start, end, kind, provenance]).to_string();
         let site_key = blake3::hash(identity_json.as_bytes()).to_hex().to_string();
-        let targets = canonicalize_target_rows(raw, units)?;
+        let targets = canonicalize_target_symbol_rows(raw, units)?;
         let targets_json = serde_json::to_string(&targets)?;
         let lookup_value = raw
             .get("path_lookup_scope_kind")
@@ -625,7 +626,7 @@ pub(crate) fn canonicalize_site_evidence_rows(
                     })?
             }
         };
-        let normalized = CanonicalOraclePathSiteValue {
+        let normalized = CanonicalPathSiteValue {
             site_key: site_key.clone(),
             unit_identity,
             classification: classification.into(),
@@ -903,5 +904,57 @@ mod oracle_path_normalization_tests {
         let mut site = build_test_path_site_row(&unit);
         site["path_target_symbol_rows"][0]["target_namespace_kind_values"] = json!(["constructor"]);
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
+    }
+
+    /// REQ-RUST-025.0
+    #[test]
+    fn test_unit_configuration_contracts_fail() {
+        for (field, value) in [
+            ("unit_target_cfg_values", json!("unix")),
+            ("unit_enabled_feature_values", json!({})),
+            ("unit_rust_edition_value", json!("future")),
+            ("unit_compilation_role_kind", json!("support")),
+            ("unit_mapped_target_flag", json!("true")),
+            ("unit_package_root_path", json!("")),
+        ] {
+            let mut unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
+            unit[field] = value;
+            assert!(validate_compilation_unit_rows(&[unit]).is_err(), "{field}");
+        }
+    }
+
+    /// REQ-RUST-025.0
+    #[test]
+    fn test_unmapped_site_units_rejected() {
+        let mut unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
+        unit["unit_mapped_target_flag"] = json!(false);
+        let site = build_test_path_site_row(&unit);
+        assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
+    }
+
+    /// REQ-RUST-025.0
+    #[test]
+    fn test_site_provenance_entries_validated() {
+        let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
+        let mut site = build_test_path_site_row(&unit);
+        site["site_expansion_provenance_chain"] = json!(["invocation", 7]);
+        assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
+    }
+
+    /// REQ-RUST-025.0
+    #[test]
+    fn test_site_evidence_required_values() {
+        let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
+        for (field, value) in [
+            ("site_source_absolute_path", json!("")),
+            ("site_path_context_kind", json!("")),
+        ] {
+            let mut site = build_test_path_site_row(&unit);
+            site[field] = value;
+            assert!(
+                canonicalize_site_evidence_rows(&[site], std::slice::from_ref(&unit), true)
+                    .is_err()
+            );
+        }
     }
 }

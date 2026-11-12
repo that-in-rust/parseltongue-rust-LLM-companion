@@ -1,6 +1,6 @@
 use super::OracleComparisonFailureError;
 use super::oracle_path_comparison_core::{
-    CanonicalOraclePathSiteValue, canonicalize_site_evidence_rows, read_required_text_value,
+    CanonicalPathSiteValue, canonicalize_site_evidence_rows, read_required_text_value,
     validate_compilation_unit_rows,
 };
 use duckdb::{Connection, params};
@@ -11,9 +11,9 @@ use parseltongue_table_store_traits::StageTableStorePort;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
 
-const GRAPH_TABLE: &str = "crate-dependency-graph-table";
-const PATH_TABLE: &str = "path-resolution-site-records";
-const AGREEMENT_TABLE: &str = "oracle-edge-agreement-table";
+const SOURCE_GRAPH_STAGE_NAME: &str = "crate-dependency-graph-table";
+const SOURCE_PATH_STAGE_NAME: &str = "path-resolution-site-records";
+const AGREEMENT_STAGE_TABLE_NAME: &str = "oracle-edge-agreement-table";
 
 pub fn compare_oracle_path_sites(
     source: &dyn StageTableStorePort,
@@ -33,15 +33,15 @@ pub(super) fn compare_oracle_path_sites_with_threads(
     cancel: &RunCancelFlagValue,
     threads: usize,
 ) -> Result<Value, OracleComparisonFailureError> {
-    check_comparison_cancel(cancel)?;
+    check_comparison_cancellation_flag(cancel)?;
     let source_scope = source
         .read_workspace_publication_scope()?
         .ok_or(OracleComparisonFailureError::SourceNotPublished)?;
     if agreement.read_workspace_publication_scope()?.as_ref() == Some(&source_scope) {
         return Err(OracleComparisonFailureError::CannotMutateSource);
     }
-    let graph_rows = read_verified_source_table(source, &source_scope, GRAPH_TABLE)?;
-    let path_rows = read_verified_source_table(source, &source_scope, PATH_TABLE)?;
+    let graph_rows = read_verified_source_table(source, &source_scope, SOURCE_GRAPH_STAGE_NAME)?;
+    let path_rows = read_verified_source_table(source, &source_scope, SOURCE_PATH_STAGE_NAME)?;
     if source.read_workspace_publication_scope()?.as_ref() != Some(&source_scope) {
         return Err(OracleComparisonFailureError::SourceChanged);
     }
@@ -51,28 +51,32 @@ pub(super) fn compare_oracle_path_sites_with_threads(
         .collect::<Result<Vec<_>, _>>()?;
     let mapped_unit_count = validate_compilation_unit_rows(&units)?;
     let (primary_envelope, primary_rows, primary_digest) =
-        read_oracle_envelope(primary, "PRIMARY", &source_scope, mapped_unit_count)?;
+        read_validated_oracle_envelope(primary, "PRIMARY", &source_scope, mapped_unit_count)?;
     let (secondary_envelope, secondary_rows, secondary_digest) =
-        read_oracle_envelope(secondary, "SECONDARY", &source_scope, mapped_unit_count)?;
-    check_comparison_cancel(cancel)?;
-    let production_sites =
-        canonicalize_site_evidence_rows(&parse_source_payloads(&path_rows)?, &units, false)?;
-    let primary_sites = canonicalize_site_evidence_rows(&primary_rows, &units, true)?;
-    let secondary_sites = canonicalize_site_evidence_rows(&secondary_rows, &units, true)?;
-    let connection = build_comparison_connection(threads)?;
-    let source_digest = verify_duckdb_source_copy(&connection, &graph_rows, &path_rows, cancel)?;
-    load_comparison_rows(
-        &connection,
-        &production_sites,
-        &primary_sites,
-        &secondary_sites,
+        read_validated_oracle_envelope(secondary, "SECONDARY", &source_scope, mapped_unit_count)?;
+    check_comparison_cancellation_flag(cancel)?;
+    let production_oracle_site_rows = canonicalize_site_evidence_rows(
+        &parse_persisted_source_payloads(&path_rows)?,
+        &units,
+        false,
     )?;
-    score_comparison_rows(&connection)?;
-    check_comparison_cancel(cancel)?;
+    let primary_oracle_site_rows = canonicalize_site_evidence_rows(&primary_rows, &units, true)?;
+    let secondary_oracle_site_rows =
+        canonicalize_site_evidence_rows(&secondary_rows, &units, true)?;
+    let connection = build_isolated_comparison_connection(threads)?;
+    let source_digest = verify_duckdb_source_copy(&connection, &graph_rows, &path_rows, cancel)?;
+    load_canonical_comparison_rows(
+        &connection,
+        &production_oracle_site_rows,
+        &primary_oracle_site_rows,
+        &secondary_oracle_site_rows,
+    )?;
+    score_canonical_comparison_rows(&connection)?;
+    check_comparison_cancellation_flag(cancel)?;
     if source.read_workspace_publication_scope()?.as_ref() != Some(&source_scope) {
         return Err(OracleComparisonFailureError::SourceChanged);
     }
-    let (mut site_results, mut result) = read_comparison_results(
+    let (mut site_results, mut result) = read_canonical_comparison_results(
         &connection,
         &source_scope,
         &source_digest,
@@ -87,7 +91,7 @@ pub(super) fn compare_oracle_path_sites_with_threads(
             field: "oracle_configuration_kind_value".into(),
         });
     }
-    publish_agreement_generation(
+    publish_completed_agreement_generation(
         agreement,
         &source_scope,
         &source_digest,
@@ -101,7 +105,7 @@ pub(super) fn compare_oracle_path_sites_with_threads(
     Ok(result)
 }
 
-fn check_comparison_cancel(
+fn check_comparison_cancellation_flag(
     cancel: &RunCancelFlagValue,
 ) -> Result<(), OracleComparisonFailureError> {
     if cancel.check_stage_work_cancelled() {
@@ -111,7 +115,7 @@ fn check_comparison_cancel(
     }
 }
 
-fn read_oracle_envelope(
+fn read_validated_oracle_envelope(
     path: &Path,
     expected_kind: &str,
     source_scope: &StageRunScopeValue,
@@ -135,13 +139,13 @@ fn read_oracle_envelope(
         ("oracle_build_scripts_flag", expected_build_scripts),
         ("oracle_proc_macros_flag", true),
     ] {
-        if let Some(value) = envelope.get(field) {
-            if value.as_bool() != Some(expected) {
-                return Err(OracleComparisonFailureError::InvalidEnvelope {
-                    configuration: expected_kind.into(),
-                    field: field.into(),
-                });
-            }
+        if let Some(value) = envelope.get(field)
+            && value.as_bool() != Some(expected)
+        {
+            return Err(OracleComparisonFailureError::InvalidEnvelope {
+                configuration: expected_kind.into(),
+                field: field.into(),
+            });
         }
     }
     let manifest_scope = envelope
@@ -273,7 +277,7 @@ fn read_verified_source_table(
     Ok(rows)
 }
 
-fn parse_source_payloads(
+fn parse_persisted_source_payloads(
     rows: &[StageTableRowRecord],
 ) -> Result<Vec<Value>, OracleComparisonFailureError> {
     rows.iter()
@@ -281,17 +285,17 @@ fn parse_source_payloads(
         .collect()
 }
 
-fn hash_framed_value(hasher: &mut blake3::Hasher, value: &str) {
+fn hash_framed_source_value(hasher: &mut blake3::Hasher, value: &str) {
     hasher.update(&(value.len() as u64).to_le_bytes());
     hasher.update(value.as_bytes());
 }
 
-fn digest_source_rows(rows: &[StageTableRowRecord]) -> String {
+fn digest_persisted_source_rows(rows: &[StageTableRowRecord]) -> String {
     let mut hasher = blake3::Hasher::new();
     for row in rows {
-        hash_framed_value(&mut hasher, &row.stage_owned_table_name);
-        hash_framed_value(&mut hasher, &row.stage_row_record_key);
-        hash_framed_value(&mut hasher, &row.stage_row_payload_text);
+        hash_framed_source_value(&mut hasher, &row.stage_owned_table_name);
+        hash_framed_source_value(&mut hasher, &row.stage_row_record_key);
+        hash_framed_source_value(&mut hasher, &row.stage_row_payload_text);
     }
     hasher.finalize().to_hex().to_string()
 }
@@ -304,7 +308,7 @@ fn verify_duckdb_source_copy(
 ) -> Result<String, OracleComparisonFailureError> {
     connection
         .execute_batch(
-            "CREATE TEMP TABLE source_copy (table_name VARCHAR, row_key VARCHAR, payload VARCHAR)",
+            "CREATE TEMP TABLE oracle_source_copy_rows (table_name VARCHAR, row_key VARCHAR, payload VARCHAR)",
         )
         .map_err(OracleComparisonFailureError::Duckdb)?;
     let expected = graph_rows
@@ -312,13 +316,13 @@ fn verify_duckdb_source_copy(
         .chain(path_rows)
         .cloned()
         .collect::<Vec<_>>();
-    let expected_digest = digest_source_rows(&expected);
+    let expected_digest = digest_persisted_source_rows(&expected);
     {
         let mut appender = connection
-            .appender("source_copy")
+            .appender("oracle_source_copy_rows")
             .map_err(OracleComparisonFailureError::Duckdb)?;
         for row in &expected {
-            check_comparison_cancel(cancel)?;
+            check_comparison_cancellation_flag(cancel)?;
             appender
                 .append_row(params![
                     row.stage_owned_table_name,
@@ -332,14 +336,16 @@ fn verify_duckdb_source_copy(
             .map_err(OracleComparisonFailureError::Duckdb)?;
     }
     let count: usize = connection
-        .query_row("SELECT count(*) FROM source_copy", [], |row| row.get(0))
+        .query_row("SELECT count(*) FROM oracle_source_copy_rows", [], |row| {
+            row.get(0)
+        })
         .map_err(OracleComparisonFailureError::Duckdb)?;
     if count != expected.len() {
         return Err(OracleComparisonFailureError::SourceCopyCountMismatch);
     }
     let mut hasher = blake3::Hasher::new();
     let mut statement = connection
-        .prepare("SELECT table_name,row_key,payload FROM source_copy ORDER BY table_name,row_key")
+        .prepare("SELECT table_name,row_key,payload FROM oracle_source_copy_rows ORDER BY table_name,row_key")
         .map_err(OracleComparisonFailureError::Duckdb)?;
     let mut rows = statement
         .query([])
@@ -349,9 +355,9 @@ fn verify_duckdb_source_copy(
         let table: String = row.get(0).map_err(OracleComparisonFailureError::Duckdb)?;
         let key: String = row.get(1).map_err(OracleComparisonFailureError::Duckdb)?;
         let payload: String = row.get(2).map_err(OracleComparisonFailureError::Duckdb)?;
-        hash_framed_value(&mut hasher, &table);
-        hash_framed_value(&mut hasher, &key);
-        hash_framed_value(&mut hasher, &payload);
+        hash_framed_source_value(&mut hasher, &table);
+        hash_framed_source_value(&mut hasher, &key);
+        hash_framed_source_value(&mut hasher, &payload);
         copied += 1;
     }
     let copied_digest = hasher.finalize().to_hex().to_string();
@@ -361,7 +367,9 @@ fn verify_duckdb_source_copy(
     Ok(expected_digest)
 }
 
-fn build_comparison_connection(threads: usize) -> Result<Connection, OracleComparisonFailureError> {
+fn build_isolated_comparison_connection(
+    threads: usize,
+) -> Result<Connection, OracleComparisonFailureError> {
     if !matches!(threads, 1 | 2) {
         return Err(OracleComparisonFailureError::UnsupportedThreadCount { threads });
     }
@@ -378,10 +386,10 @@ fn build_comparison_connection(threads: usize) -> Result<Connection, OracleCompa
     Ok(connection)
 }
 
-fn load_site_appender(
+fn append_canonical_site_rows(
     connection: &Connection,
     table: &str,
-    sites: &[CanonicalOraclePathSiteValue],
+    sites: &[CanonicalPathSiteValue],
 ) -> Result<(), OracleComparisonFailureError> {
     let mut appender = connection
         .appender(table)
@@ -407,27 +415,29 @@ fn load_site_appender(
         .map_err(OracleComparisonFailureError::Duckdb)
 }
 
-fn load_comparison_rows(
+fn load_canonical_comparison_rows(
     connection: &Connection,
-    production: &[CanonicalOraclePathSiteValue],
-    primary: &[CanonicalOraclePathSiteValue],
-    secondary: &[CanonicalOraclePathSiteValue],
+    production: &[CanonicalPathSiteValue],
+    primary: &[CanonicalPathSiteValue],
+    secondary: &[CanonicalPathSiteValue],
 ) -> Result<(), OracleComparisonFailureError> {
     connection.execute_batch(
-        "CREATE TEMP TABLE production_sites (site_key VARCHAR, unit_identity VARCHAR, classification VARCHAR, classification_reason VARCHAR, unresolved_reason VARCHAR, targets_json VARCHAR, targets_empty BOOLEAN, proc_macro_dependent BOOLEAN, duplicate_count UBIGINT, identity_json VARCHAR);
-         CREATE TEMP TABLE primary_sites AS SELECT * FROM production_sites WHERE false;
-         CREATE TEMP TABLE secondary_sites AS SELECT * FROM production_sites WHERE false;
-         CREATE TEMP TABLE comparison_evidence (site_key VARCHAR, classification VARCHAR, classification_reason VARCHAR, primary_reason VARCHAR, production_reason VARCHAR, secondary_reason VARCHAR, authoritative_reason VARCHAR, primary_targets VARCHAR, production_targets VARCHAR, secondary_targets VARCHAR, status VARCHAR, partition_kind VARCHAR, partition_reason VARCHAR, secondary_changed BOOLEAN, production_only BOOLEAN, secondary_only BOOLEAN, primary_duplicates UBIGINT, production_duplicates UBIGINT, secondary_duplicates UBIGINT, identity_json VARCHAR);",
+        "CREATE TEMP TABLE production_oracle_site_rows (site_key VARCHAR, unit_identity VARCHAR, classification VARCHAR, classification_reason VARCHAR, unresolved_reason VARCHAR, targets_json VARCHAR, targets_empty BOOLEAN, proc_macro_dependent BOOLEAN, duplicate_count UBIGINT, identity_json VARCHAR);
+         CREATE TEMP TABLE primary_oracle_site_rows AS SELECT * FROM production_oracle_site_rows WHERE false;
+         CREATE TEMP TABLE secondary_oracle_site_rows AS SELECT * FROM production_oracle_site_rows WHERE false;
+         CREATE TEMP TABLE oracle_comparison_evidence_rows (site_key VARCHAR, classification VARCHAR, classification_reason VARCHAR, primary_reason VARCHAR, production_reason VARCHAR, secondary_reason VARCHAR, authoritative_reason VARCHAR, primary_targets VARCHAR, production_targets VARCHAR, secondary_targets VARCHAR, status VARCHAR, partition_kind VARCHAR, partition_reason VARCHAR, secondary_changed BOOLEAN, production_only BOOLEAN, secondary_only BOOLEAN, primary_duplicates UBIGINT, production_duplicates UBIGINT, secondary_duplicates UBIGINT, identity_json VARCHAR);",
     ).map_err(OracleComparisonFailureError::Duckdb)?;
-    load_site_appender(connection, "production_sites", production)?;
-    load_site_appender(connection, "primary_sites", primary)?;
-    load_site_appender(connection, "secondary_sites", secondary)?;
+    append_canonical_site_rows(connection, "production_oracle_site_rows", production)?;
+    append_canonical_site_rows(connection, "primary_oracle_site_rows", primary)?;
+    append_canonical_site_rows(connection, "secondary_oracle_site_rows", secondary)?;
     Ok(())
 }
 
-fn score_comparison_rows(connection: &Connection) -> Result<(), OracleComparisonFailureError> {
+fn score_canonical_comparison_rows(
+    connection: &Connection,
+) -> Result<(), OracleComparisonFailureError> {
     connection.execute_batch(
-        "INSERT INTO comparison_evidence
+        "INSERT INTO oracle_comparison_evidence_rows
          WITH joined AS (
              SELECT p.site_key AS primary_key, d.site_key AS production_key, s.site_key AS secondary_key,
                     COALESCE(p.site_key,d.site_key,s.site_key) AS site_key,
@@ -443,9 +453,9 @@ fn score_comparison_rows(connection: &Connection) -> Result<(), OracleComparison
                     COALESCE(d.duplicate_count,0) AS production_duplicates,
                     COALESCE(s.duplicate_count,0) AS secondary_duplicates,
                     COALESCE(p.identity_json,d.identity_json,s.identity_json) AS identity_json
-             FROM primary_sites p
-             FULL OUTER JOIN production_sites d ON p.site_key=d.site_key
-             FULL OUTER JOIN secondary_sites s ON COALESCE(p.site_key,d.site_key)=s.site_key
+             FROM primary_oracle_site_rows p
+             FULL OUTER JOIN production_oracle_site_rows d ON p.site_key=d.site_key
+             FULL OUTER JOIN secondary_oracle_site_rows s ON COALESCE(p.site_key,d.site_key)=s.site_key
          ), reasoned AS (
              SELECT *, CASE
                  WHEN 'cfg_inactive' IN (primary_reason,production_reason,secondary_reason) THEN 'cfg_inactive'
@@ -506,7 +516,7 @@ fn score_comparison_rows(connection: &Connection) -> Result<(), OracleComparison
     Ok(())
 }
 
-struct OraclePathComparisonResultStatistics {
+struct PathComparisonResultStats {
     eligible: u64,
     matched: u64,
     deferred: u64,
@@ -529,7 +539,7 @@ struct OraclePathComparisonResultStatistics {
     mismatched: u64,
 }
 
-fn read_comparison_results(
+fn read_canonical_comparison_results(
     connection: &Connection,
     source_scope: &StageRunScopeValue,
     source_digest: &str,
@@ -557,10 +567,10 @@ fn read_comparison_results(
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='unresolved'),
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='missing-production'),
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='mismatch')
-         FROM comparison_evidence",
+         FROM oracle_comparison_evidence_rows",
         [],
         |row| {
-            Ok(OraclePathComparisonResultStatistics {
+            Ok(PathComparisonResultStats {
                 eligible: row.get(0)?,
                 matched: row.get(1)?,
                 deferred: row.get(2)?,
@@ -604,7 +614,7 @@ fn read_comparison_results(
         ("authoritative_reason", &mut authoritative_reason_counts),
     ] {
         let query = format!(
-            "SELECT COALESCE(NULLIF({field},''),'none'), SUM({}) FROM comparison_evidence WHERE {}>0 GROUP BY 1 ORDER BY 1",
+            "SELECT COALESCE(NULLIF({field},''),'none'), SUM({}) FROM oracle_comparison_evidence_rows WHERE {}>0 GROUP BY 1 ORDER BY 1",
             if field == "production_reason" {
                 "production_duplicates"
             } else {
@@ -633,7 +643,7 @@ fn read_comparison_results(
     }
     let mut partition_counts = BTreeMap::new();
     let mut partition_statement = connection.prepare(
-        "SELECT partition_kind, SUM(primary_duplicates) FROM comparison_evidence WHERE primary_duplicates>0 GROUP BY partition_kind ORDER BY partition_kind",
+        "SELECT partition_kind, SUM(primary_duplicates) FROM oracle_comparison_evidence_rows WHERE primary_duplicates>0 GROUP BY partition_kind ORDER BY partition_kind",
     ).map_err(OracleComparisonFailureError::Duckdb)?;
     let mut partition_rows = partition_statement
         .query([])
@@ -652,7 +662,7 @@ fn read_comparison_results(
     let partition_raw_total = partition_counts.values().sum::<u64>();
     let partition_reconciled = partition_raw_total == stats.primary_raw;
     let mut statement = connection.prepare(
-        "SELECT site_key,classification,classification_reason,primary_reason,production_reason,secondary_reason,authoritative_reason,primary_targets,production_targets,secondary_targets,status,partition_kind,partition_reason,secondary_changed,production_only,secondary_only,primary_duplicates,production_duplicates,secondary_duplicates,identity_json FROM comparison_evidence ORDER BY site_key",
+        "SELECT site_key,classification,classification_reason,primary_reason,production_reason,secondary_reason,authoritative_reason,primary_targets,production_targets,secondary_targets,status,partition_kind,partition_reason,secondary_changed,production_only,secondary_only,primary_duplicates,production_duplicates,secondary_duplicates,identity_json FROM oracle_comparison_evidence_rows ORDER BY site_key",
     ).map_err(OracleComparisonFailureError::Duckdb)?;
     let mut rows = statement
         .query([])
@@ -724,8 +734,167 @@ fn read_comparison_results(
     Ok((evidence, result))
 }
 
+fn write_completed_agreement_unit(
+    agreement: &dyn StageTableStorePort,
+    scope: &StageRunScopeValue,
+    owner: &str,
+    work_key: &str,
+    inputs: &[&str],
+    rows: &[StageTableRowRecord],
+    cancel: &RunCancelFlagValue,
+) -> Result<(), OracleComparisonFailureError> {
+    check_comparison_cancellation_flag(cancel)?;
+    agreement.write_stage_table_unit(
+        &StageUnitWriteRequest {
+            stage_run_scope_value: scope,
+            stage_owner_name_value: owner,
+            stage_unit_work_key: work_key,
+            stage_input_stage_names: inputs,
+            stage_unit_output_rows: rows,
+        },
+        cancel,
+    )?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn publish_completed_agreement_generation(
+    agreement: &dyn StageTableStorePort,
+    source_scope: &StageRunScopeValue,
+    source_digest: &str,
+    primary_digest: &str,
+    secondary_digest: &str,
+    evidence: &mut Vec<Value>,
+    result: &mut Value,
+    source: &dyn StageTableStorePort,
+    cancel: &RunCancelFlagValue,
+) -> Result<(), OracleComparisonFailureError> {
+    check_comparison_cancellation_flag(cancel)?;
+    let seed = format!(
+        "{}:{}:{}:{}:{}",
+        source_scope.run_generation_digest_value,
+        source_scope.stage_attempt_sequence_value,
+        source_digest,
+        primary_digest,
+        secondary_digest,
+    );
+    let generation = format!(
+        "oracle-agreement/{}",
+        blake3::hash(seed.as_bytes()).to_hex()
+    );
+    let previous = agreement.read_workspace_publication_scope()?;
+    let previous_identity = previous.map_or_else(
+        || "initial".to_owned(),
+        |scope| {
+            format!(
+                "{}:{}",
+                scope.run_generation_digest_value, scope.stage_attempt_sequence_value
+            )
+        },
+    );
+    let attempt = blake3::hash(format!("{previous_identity}:{generation}").as_bytes())
+        .to_hex()
+        .to_string();
+    let requested_scope = StageRunScopeValue {
+        run_generation_digest_value: generation.clone(),
+        stage_attempt_sequence_value: format!("oracle-agreement/{attempt}"),
+    };
+    let scope =
+        agreement.prepare_workspace_generation_scope(&requested_scope, &generation, cancel)?;
+    result["agreement_generation_digest_value"] = json!(generation);
+    result["agreement_operational_identity"] = json!({
+        "agreement_stage_attempt_sequence_value":scope.stage_attempt_sequence_value,
+    });
+    for row in evidence.iter_mut() {
+        row["agreement_source_generation_digest_value"] =
+            json!(source_scope.run_generation_digest_value);
+        row["agreement_source_stage_attempt_sequence_value"] =
+            json!(source_scope.stage_attempt_sequence_value);
+        row["agreement_source_framed_digest_full"] = json!(source_digest);
+        row["agreement_primary_oracle_digest_full"] = json!(primary_digest);
+        row["agreement_secondary_oracle_digest_full"] = json!(secondary_digest);
+    }
+    let mut semantic_result = result.clone();
+    if let Some(result_fields) = semantic_result.as_object_mut() {
+        result_fields.remove("agreement_operational_identity");
+        result_fields.remove("agreement_semantic_export_digest_full");
+    }
+    let semantic_export =
+        json!({"agreement_evidence_rows":evidence,"agreement_result":semantic_result});
+    result["agreement_semantic_export_digest_full"] = json!(
+        blake3::hash(semantic_export.to_string().as_bytes())
+            .to_hex()
+            .to_string()
+    );
+    for (owner, inputs) in [
+        ("crate-graph", &[][..]),
+        ("source-ingest", &["crate-graph"][..]),
+        ("syntax-spans", &["source-ingest"][..]),
+    ] {
+        write_completed_agreement_unit(
+            agreement,
+            &scope,
+            owner,
+            "__complete__",
+            inputs,
+            &[],
+            cancel,
+        )?;
+    }
+    let mut rows = evidence
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let key = value["agreement_site_key"]
+                .as_str()
+                .map(|site| format!("site/{site}"))
+                .unwrap_or_else(|| format!("site/{index:020}"));
+            StageTableRowRecord {
+                stage_owned_table_name: AGREEMENT_STAGE_TABLE_NAME.into(),
+                stage_row_record_key: key,
+                stage_row_payload_text: value.to_string(),
+            }
+        })
+        .collect::<Vec<_>>();
+    let summary_key = "summary".to_owned();
+    rows.push(StageTableRowRecord {
+        stage_owned_table_name: AGREEMENT_STAGE_TABLE_NAME.into(),
+        stage_row_record_key: summary_key,
+        stage_row_payload_text: result.to_string(),
+    });
+    write_completed_agreement_unit(
+        agreement,
+        &scope,
+        "oracle-agreement",
+        "comparison",
+        &["crate-graph", "source-ingest", "syntax-spans"],
+        &rows,
+        cancel,
+    )?;
+    write_completed_agreement_unit(
+        agreement,
+        &scope,
+        "oracle-agreement",
+        "__complete__",
+        &[],
+        &[],
+        cancel,
+    )?;
+    if source.read_workspace_publication_scope()?.as_ref() != Some(source_scope) {
+        return Err(OracleComparisonFailureError::SourceChanged);
+    }
+    check_comparison_cancellation_flag(cancel)?;
+    agreement.publish_workspace_generation_manifest(&scope, &generation, cancel)?;
+    evidence.sort_by(|left, right| {
+        left["agreement_site_key"]
+            .as_str()
+            .cmp(&right["agreement_site_key"].as_str())
+    });
+    Ok(())
+}
+
 #[cfg(test)]
-mod oracle_path_sql_tests {
+mod oracle_path_comparison_sql_tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
@@ -736,8 +905,8 @@ mod oracle_path_sql_tests {
         targets: &[&str],
         proc_macro_dependent: bool,
         unresolved_reason: &str,
-    ) -> CanonicalOraclePathSiteValue {
-        CanonicalOraclePathSiteValue {
+    ) -> CanonicalPathSiteValue {
+        CanonicalPathSiteValue {
             site_key: key.into(),
             unit_identity: "fixture-unit".into(),
             classification: classification.into(),
@@ -753,14 +922,14 @@ mod oracle_path_sql_tests {
 
     fn build_test_comparison_result(
         threads: usize,
-        production: &[CanonicalOraclePathSiteValue],
-        primary: &[CanonicalOraclePathSiteValue],
-        secondary: &[CanonicalOraclePathSiteValue],
+        production: &[CanonicalPathSiteValue],
+        primary: &[CanonicalPathSiteValue],
+        secondary: &[CanonicalPathSiteValue],
     ) -> (Vec<Value>, Value) {
-        let connection = build_comparison_connection(threads).unwrap();
-        load_comparison_rows(&connection, production, primary, secondary).unwrap();
-        score_comparison_rows(&connection).unwrap();
-        read_comparison_results(
+        let connection = build_isolated_comparison_connection(threads).unwrap();
+        load_canonical_comparison_rows(&connection, production, primary, secondary).unwrap();
+        score_canonical_comparison_rows(&connection).unwrap();
+        read_canonical_comparison_results(
             &connection,
             &StageRunScopeValue {
                 run_generation_digest_value: "generation".into(),
@@ -971,157 +1140,4 @@ mod oracle_path_sql_tests {
         assert_eq!(result["agreement_production_only_path_count"], 1);
         assert_eq!(result["agreement_status_kind"], "not-applicable");
     }
-}
-
-fn write_agreement_unit(
-    agreement: &dyn StageTableStorePort,
-    scope: &StageRunScopeValue,
-    owner: &str,
-    work_key: &str,
-    inputs: &[&str],
-    rows: &[StageTableRowRecord],
-    cancel: &RunCancelFlagValue,
-) -> Result<(), OracleComparisonFailureError> {
-    check_comparison_cancel(cancel)?;
-    agreement.write_stage_table_unit(
-        &StageUnitWriteRequest {
-            stage_run_scope_value: scope,
-            stage_owner_name_value: owner,
-            stage_unit_work_key: work_key,
-            stage_input_stage_names: inputs,
-            stage_unit_output_rows: rows,
-        },
-        cancel,
-    )?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn publish_agreement_generation(
-    agreement: &dyn StageTableStorePort,
-    source_scope: &StageRunScopeValue,
-    source_digest: &str,
-    primary_digest: &str,
-    secondary_digest: &str,
-    evidence: &mut Vec<Value>,
-    result: &mut Value,
-    source: &dyn StageTableStorePort,
-    cancel: &RunCancelFlagValue,
-) -> Result<(), OracleComparisonFailureError> {
-    check_comparison_cancel(cancel)?;
-    let seed = format!(
-        "{}:{}:{}:{}:{}",
-        source_scope.run_generation_digest_value,
-        source_scope.stage_attempt_sequence_value,
-        source_digest,
-        primary_digest,
-        secondary_digest,
-    );
-    let generation = format!(
-        "oracle-agreement/{}",
-        blake3::hash(seed.as_bytes()).to_hex()
-    );
-    let previous = agreement.read_workspace_publication_scope()?;
-    let previous_identity = previous.map_or_else(
-        || "initial".to_owned(),
-        |scope| {
-            format!(
-                "{}:{}",
-                scope.run_generation_digest_value, scope.stage_attempt_sequence_value
-            )
-        },
-    );
-    let attempt = blake3::hash(format!("{previous_identity}:{generation}").as_bytes())
-        .to_hex()
-        .to_string();
-    let requested_scope = StageRunScopeValue {
-        run_generation_digest_value: generation.clone(),
-        stage_attempt_sequence_value: format!("oracle-agreement/{attempt}"),
-    };
-    let scope =
-        agreement.prepare_workspace_generation_scope(&requested_scope, &generation, cancel)?;
-    result["agreement_generation_digest_value"] = json!(generation);
-    result["agreement_operational_identity"] = json!({
-        "agreement_stage_attempt_sequence_value":scope.stage_attempt_sequence_value,
-    });
-    for row in evidence.iter_mut() {
-        row["agreement_source_generation_digest_value"] =
-            json!(source_scope.run_generation_digest_value);
-        row["agreement_source_stage_attempt_sequence_value"] =
-            json!(source_scope.stage_attempt_sequence_value);
-        row["agreement_source_framed_digest_full"] = json!(source_digest);
-        row["agreement_primary_oracle_digest_full"] = json!(primary_digest);
-        row["agreement_secondary_oracle_digest_full"] = json!(secondary_digest);
-    }
-    let semantic_export = json!({"agreement_evidence_rows":evidence,"agreement_result":result});
-    result["agreement_semantic_export_digest_full"] = json!(
-        blake3::hash(semantic_export.to_string().as_bytes())
-            .to_hex()
-            .to_string()
-    );
-    for (owner, inputs) in [
-        ("crate-graph", &[][..]),
-        ("source-ingest", &["crate-graph"][..]),
-        ("syntax-spans", &["source-ingest"][..]),
-    ] {
-        write_agreement_unit(
-            agreement,
-            &scope,
-            owner,
-            "__complete__",
-            inputs,
-            &[],
-            cancel,
-        )?;
-    }
-    let mut rows = evidence
-        .iter()
-        .enumerate()
-        .map(|(index, value)| {
-            let key = value["agreement_site_key"]
-                .as_str()
-                .map(|site| format!("site/{site}"))
-                .unwrap_or_else(|| format!("site/{index:020}"));
-            StageTableRowRecord {
-                stage_owned_table_name: AGREEMENT_TABLE.into(),
-                stage_row_record_key: key,
-                stage_row_payload_text: value.to_string(),
-            }
-        })
-        .collect::<Vec<_>>();
-    let summary_key = "summary".to_owned();
-    rows.push(StageTableRowRecord {
-        stage_owned_table_name: AGREEMENT_TABLE.into(),
-        stage_row_record_key: summary_key,
-        stage_row_payload_text: result.to_string(),
-    });
-    write_agreement_unit(
-        agreement,
-        &scope,
-        "oracle-agreement",
-        "comparison",
-        &["crate-graph", "source-ingest", "syntax-spans"],
-        &rows,
-        cancel,
-    )?;
-    write_agreement_unit(
-        agreement,
-        &scope,
-        "oracle-agreement",
-        "__complete__",
-        &[],
-        &[],
-        cancel,
-    )?;
-    if source.read_workspace_publication_scope()?.as_ref() != Some(source_scope) {
-        return Err(OracleComparisonFailureError::SourceChanged);
-    }
-    check_comparison_cancel(cancel)?;
-    agreement.publish_workspace_generation_manifest(&scope, &generation, cancel)?;
-    evidence.sort_by(|left, right| {
-        left["agreement_site_key"]
-            .as_str()
-            .cmp(&right["agreement_site_key"].as_str())
-    });
-    Ok(())
 }

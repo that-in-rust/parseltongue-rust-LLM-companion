@@ -28,10 +28,10 @@ pub use namespace_analysis_phase_diagnostics::{
 };
 #[path = "oracle-path-comparison-core.rs"]
 mod oracle_path_comparison_core;
-#[path = "oracle-path-comparison-l3.rs"]
-mod oracle_path_comparison_l3;
+#[path = "oracle-path-comparison-storage.rs"]
+mod oracle_path_comparison_storage;
 pub use oracle_path_comparison_core::OracleComparisonFailureError;
-pub use oracle_path_comparison_l3::compare_oracle_path_sites;
+pub use oracle_path_comparison_storage::compare_oracle_path_sites;
 
 impl DuckdbAnalysisStoreAdapter {
     pub fn open_bounded_analysis_store(

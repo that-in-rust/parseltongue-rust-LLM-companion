@@ -2,6 +2,7 @@
 
 use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
+    StoreBackendFailureError,
 };
 use parseltongue_duckdb_analysis_adapter::{
     OracleComparisonFailureError, compare_oracle_path_sites,
@@ -13,6 +14,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Output},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 struct OracleComparisonTestFixture {
@@ -37,6 +39,16 @@ fn run_comparison_cli_command(database: &Path, command: &str, extra: &[&str]) ->
 }
 
 fn build_oracle_comparison_fixture() -> OracleComparisonTestFixture {
+    build_oracle_comparison_fixture_with_matrix(false)
+}
+
+fn build_oracle_comparison_matrix_fixture() -> OracleComparisonTestFixture {
+    build_oracle_comparison_fixture_with_matrix(true)
+}
+
+fn build_oracle_comparison_fixture_with_matrix(
+    include_matrix: bool,
+) -> OracleComparisonTestFixture {
     let directory = tempfile::tempdir().unwrap();
     fs::create_dir(directory.path().join("src")).unwrap();
     fs::write(
@@ -126,6 +138,31 @@ fn build_oracle_comparison_fixture() -> OracleComparisonTestFixture {
     let mut oracle_site = site.clone();
     oracle_site["path_lookup_scope_kind"] = json!("module-scope");
     oracle_site["site_proc_macro_dependent_flag"] = json!(false);
+    let (source_sites, oracle_sites) = if include_matrix {
+        let mut wrong_source = site.clone();
+        wrong_source["site_source_range_start"] = json!(40);
+        wrong_source["site_source_range_end"] = json!(44);
+        let mut wrong_oracle = wrong_source.clone();
+        wrong_oracle["path_lookup_scope_kind"] = json!("module-scope");
+        wrong_oracle["site_proc_macro_dependent_flag"] = json!(false);
+        wrong_oracle["path_target_symbol_rows"][0]["target_source_range_start"] = json!(10);
+        let mut missing_oracle = oracle_site.clone();
+        missing_oracle["site_source_range_start"] = json!(45);
+        missing_oracle["site_source_range_end"] = json!(49);
+        let mut deferred_oracle = oracle_site.clone();
+        deferred_oracle["site_source_range_start"] = json!(55);
+        deferred_oracle["site_source_range_end"] = json!(59);
+        deferred_oracle["path_lookup_scope_kind"] = json!("type-relative");
+        let mut extra_source = site.clone();
+        extra_source["site_source_range_start"] = json!(50);
+        extra_source["site_source_range_end"] = json!(54);
+        (
+            vec![site.clone(), wrong_source, extra_source],
+            vec![oracle_site, wrong_oracle, missing_oracle, deferred_oracle],
+        )
+    } else {
+        (vec![site.clone()], vec![oracle_site])
+    };
     let cancel = RunCancelFlagValue::default();
     let source_store =
         TursoWorkspaceStoreAdapter::open_turso_workspace_store(source.to_str().unwrap()).unwrap();
@@ -168,11 +205,15 @@ fn build_oracle_comparison_fixture() -> OracleComparisonTestFixture {
         "name-resolution",
         "crate/fixture",
         &["crate-graph", "source-ingest", "syntax-spans"],
-        &[StageTableRowRecord {
-            stage_owned_table_name: "path-resolution-site-records".into(),
-            stage_row_record_key: "fixture-site".into(),
-            stage_row_payload_text: site.to_string(),
-        }],
+        &source_sites
+            .iter()
+            .enumerate()
+            .map(|(index, site)| StageTableRowRecord {
+                stage_owned_table_name: "path-resolution-site-records".into(),
+                stage_row_record_key: format!("fixture-site-{index}"),
+                stage_row_payload_text: site.to_string(),
+            })
+            .collect::<Vec<_>>(),
         &cancel,
     );
     let source_scope = source_store
@@ -188,7 +229,7 @@ fn build_oracle_comparison_fixture() -> OracleComparisonTestFixture {
             "stage_attempt_sequence_value":source_scope.stage_attempt_sequence_value,
         },
         "oracle_mapped_unit_count":1,
-        "oracle_path_export_rows":[oracle_site],
+        "oracle_path_export_rows":oracle_sites,
         "oracle_proc_macro_rows":[],
         "oracle_source_omission_rows":[],
         "oracle_cached_script_rows":[],
@@ -227,6 +268,135 @@ fn write_fixture_stage_unit(
         .unwrap();
 }
 
+struct DelegatingStageStorePort<'a> {
+    inner: &'a TursoWorkspaceStoreAdapter,
+    changed_scope_read: Option<usize>,
+    scope_read_count: AtomicUsize,
+    cancel_after_write: Option<&'a RunCancelFlagValue>,
+}
+
+impl StageTableStorePort for DelegatingStageStorePort<'_> {
+    fn initialize_workspace_stage_schema(&self) -> Result<(), StoreBackendFailureError> {
+        self.inner.initialize_workspace_stage_schema()
+    }
+
+    fn write_stage_table_unit(
+        &self,
+        request: &StageUnitWriteRequest<'_>,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<usize, StoreBackendFailureError> {
+        let written = self.inner.write_stage_table_unit(request, cancel)?;
+        if let Some(cancel) = self.cancel_after_write {
+            cancel.request_stage_work_cancellation();
+        }
+        Ok(written)
+    }
+
+    fn read_stage_table_rows(
+        &self,
+        scope: &StageRunScopeValue,
+        table: &str,
+    ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
+        self.inner.read_stage_table_rows(scope, table)
+    }
+
+    fn prepare_workspace_generation_scope(
+        &self,
+        scope: &StageRunScopeValue,
+        generation: &str,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        self.inner
+            .prepare_workspace_generation_scope(scope, generation, cancel)
+    }
+
+    fn write_file_content_bytes(
+        &self,
+        digest: &str,
+        bytes: &[u8],
+    ) -> Result<bool, StoreBackendFailureError> {
+        self.inner.write_file_content_bytes(digest, bytes)
+    }
+
+    fn read_file_content_bytes(&self, digest: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
+        self.inner.read_file_content_bytes(digest)
+    }
+
+    fn publish_workspace_generation_manifest(
+        &self,
+        scope: &StageRunScopeValue,
+        generation: &str,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        self.inner
+            .publish_workspace_generation_manifest(scope, generation, cancel)
+    }
+
+    fn read_workspace_publication_scope(
+        &self,
+    ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
+        let read_number = self.scope_read_count.fetch_add(1, Ordering::SeqCst) + 1;
+        if self.changed_scope_read == Some(read_number) {
+            return Ok(Some(StageRunScopeValue {
+                run_generation_digest_value: "changed-source-generation".into(),
+                stage_attempt_sequence_value: "changed-source-attempt".into(),
+            }));
+        }
+        self.inner.read_workspace_publication_scope()
+    }
+}
+
+fn seed_existing_agreement_generation(
+    agreement: &TursoWorkspaceStoreAdapter,
+) -> StageRunScopeValue {
+    agreement.initialize_workspace_stage_schema().unwrap();
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "preexisting-agreement-generation".into(),
+        stage_attempt_sequence_value: "preexisting-agreement-attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    for (owner, inputs) in [
+        ("crate-graph", &[][..]),
+        ("source-ingest", &["crate-graph"][..]),
+        ("syntax-spans", &["source-ingest"][..]),
+    ] {
+        write_fixture_stage_unit(
+            agreement,
+            &scope,
+            owner,
+            "__complete__",
+            inputs,
+            &[],
+            &cancel,
+        );
+    }
+    write_fixture_stage_unit(
+        agreement,
+        &scope,
+        "oracle-agreement",
+        "comparison",
+        &["crate-graph", "source-ingest", "syntax-spans"],
+        &[StageTableRowRecord {
+            stage_owned_table_name: "oracle-edge-agreement-table".into(),
+            stage_row_record_key: "site/preexisting".into(),
+            stage_row_payload_text: json!({"agreement_status_kind":"match"}).to_string(),
+        }],
+        &cancel,
+    );
+    write_fixture_stage_unit(
+        agreement,
+        &scope,
+        "oracle-agreement",
+        "__complete__",
+        &[],
+        &[],
+        &cancel,
+    );
+    agreement
+        .publish_workspace_generation_manifest(&scope, &scope.run_generation_digest_value, &cancel)
+        .unwrap()
+}
+
 fn write_oracle_comparison_inputs(
     fixture: &OracleComparisonTestFixture,
     primary: &Value,
@@ -261,6 +431,27 @@ fn decode_oracle_comparison_result(output: &Output) -> Value {
         String::from_utf8_lossy(&output.stderr)
     );
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn canonicalize_persisted_export_rows(export: &[u8]) -> Vec<Value> {
+    let mut rows = String::from_utf8_lossy(export)
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    for row in &mut rows {
+        if row["export_record_kind_value"] == "header"
+            && let Some(scope) = row["export_scope_identity_record"].as_object_mut()
+        {
+            scope.remove("stage_attempt_sequence_value");
+        }
+        if row["export_row_identity_value"] == "summary"
+            && let Some(summary) = row["export_row_payload_value"].as_object_mut()
+        {
+            summary.remove("agreement_operational_identity");
+        }
+    }
+    rows.sort_by_key(Value::to_string);
+    rows
 }
 
 /// REQ-RUST-025.1, REQ-RUST-025.4
@@ -308,6 +499,72 @@ fn test_exact_comparison_publishes_turso() {
         )
         .stdout
     );
+}
+
+/// REQ-RUST-025.2, REQ-RUST-025.3, REQ-RUST-025.4
+#[test]
+fn test_persisted_known_answer_matrix() {
+    let fixture = build_oracle_comparison_matrix_fixture();
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_eligible_path_count"], 3);
+    assert_eq!(result["agreement_match_count_value"], 1);
+    assert_eq!(result["agreement_exact_match_rate"], 1.0 / 3.0);
+    assert_eq!(result["agreement_deferred_path_count"], 1);
+    assert_eq!(result["agreement_production_only_path_count"], 1);
+    assert_eq!(result["agreement_missing_production_path_count"], 1);
+
+    let rows = run_comparison_cli_command(
+        &fixture.agreement,
+        "export-published-stage-rows",
+        &["--stage-owned-table-name", "oracle-edge-agreement-table"],
+    );
+    assert!(rows.status.success());
+    let first_export = String::from_utf8(rows.stdout).unwrap();
+    assert!(first_export.contains("associated-deferred"));
+    assert!(first_export.contains("missing-production"));
+    assert!(first_export.contains("production-only"));
+    assert_eq!(first_export.matches("agreement_site_key").count(), 5);
+
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let repeated = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(
+        result["agreement_semantic_export_digest_full"],
+        repeated["agreement_semantic_export_digest_full"]
+    );
+    assert_ne!(
+        result["agreement_operational_identity"],
+        repeated["agreement_operational_identity"]
+    );
+    let rows = run_comparison_cli_command(
+        &fixture.agreement,
+        "export-published-stage-rows",
+        &["--stage-owned-table-name", "oracle-edge-agreement-table"],
+    );
+    assert!(rows.status.success());
+    assert_eq!(
+        canonicalize_persisted_export_rows(first_export.as_bytes()),
+        canonicalize_persisted_export_rows(&rows.stdout)
+    );
+
+    let mut changed_primary = fixture.primary_value.clone();
+    changed_primary["oracle_path_export_rows"][0]["path_target_symbol_rows"][0]["target_source_range_start"] =
+        json!(9);
+    write_oracle_comparison_inputs(&fixture, &changed_primary, None);
+    let changed = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_ne!(
+        result["agreement_generation_digest_value"],
+        changed["agreement_generation_digest_value"]
+    );
+    let rows = run_comparison_cli_command(
+        &fixture.agreement,
+        "export-published-stage-rows",
+        &["--stage-owned-table-name", "oracle-edge-agreement-table"],
+    );
+    assert!(rows.status.success());
+    let changed_export = String::from_utf8(rows.stdout).unwrap();
+    assert_eq!(changed_export.matches("agreement_site_key").count(), 5);
+    assert!(changed_export.contains(",9,15,"));
 }
 
 /// REQ-RUST-025.4
@@ -436,7 +693,7 @@ fn test_macro_failure_blocks_publish() {
 
 /// REQ-RUST-025.0
 #[test]
-fn test_malformed_macro_record_blocks_publish() {
+fn test_malformed_macro_record_rejected() {
     let fixture = build_oracle_comparison_fixture();
     let mut malformed = fixture.primary_value.clone();
     malformed["oracle_proc_macro_rows"] = json!([{
@@ -541,6 +798,113 @@ fn test_cancel_prevents_agreement_publish() {
         Err(OracleComparisonFailureError::Cancelled)
     ));
     assert_eq!(agreement.read_workspace_publication_scope().unwrap(), None);
+}
+
+/// REQ-RUST-025.4
+#[test]
+fn test_source_changes_after_reads() {
+    let fixture = build_oracle_comparison_fixture();
+    let source =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.source.to_str().unwrap())
+            .unwrap();
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let previous_scope = seed_existing_agreement_generation(&agreement);
+    let source_port = DelegatingStageStorePort {
+        inner: &source,
+        changed_scope_read: Some(2),
+        scope_read_count: AtomicUsize::new(0),
+        cancel_after_write: None,
+    };
+    let cancel = RunCancelFlagValue::default();
+    let comparison = compare_oracle_path_sites(
+        &source_port,
+        &fixture.primary,
+        &fixture.secondary,
+        &agreement,
+        &cancel,
+    );
+    assert!(
+        matches!(comparison, Err(OracleComparisonFailureError::SourceChanged)),
+        "{comparison:?}"
+    );
+    assert_eq!(
+        agreement.read_workspace_publication_scope().unwrap(),
+        Some(previous_scope)
+    );
+}
+
+/// REQ-RUST-025.4
+#[test]
+fn test_source_changes_before_publish() {
+    let fixture = build_oracle_comparison_fixture();
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let source =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.source.to_str().unwrap())
+            .unwrap();
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let previous_scope = seed_existing_agreement_generation(&agreement);
+    let source_port = DelegatingStageStorePort {
+        inner: &source,
+        changed_scope_read: Some(4),
+        scope_read_count: AtomicUsize::new(0),
+        cancel_after_write: None,
+    };
+    let cancel = RunCancelFlagValue::default();
+    let comparison = compare_oracle_path_sites(
+        &source_port,
+        &fixture.primary,
+        &fixture.secondary,
+        &agreement,
+        &cancel,
+    );
+    assert!(
+        matches!(comparison, Err(OracleComparisonFailureError::SourceChanged)),
+        "{comparison:?}"
+    );
+    assert_eq!(
+        agreement.read_workspace_publication_scope().unwrap(),
+        Some(previous_scope)
+    );
+}
+
+/// REQ-RUST-025.4
+#[test]
+fn test_write_cancellation_preserves_generation() {
+    let fixture = build_oracle_comparison_fixture();
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let source =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.source.to_str().unwrap())
+            .unwrap();
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let previous_scope = seed_existing_agreement_generation(&agreement);
+    let cancel = RunCancelFlagValue::default();
+    let agreement_port = DelegatingStageStorePort {
+        inner: &agreement,
+        changed_scope_read: None,
+        scope_read_count: AtomicUsize::new(0),
+        cancel_after_write: Some(&cancel),
+    };
+    let comparison = compare_oracle_path_sites(
+        &source,
+        &fixture.primary,
+        &fixture.secondary,
+        &agreement_port,
+        &cancel,
+    );
+    assert!(
+        matches!(comparison, Err(OracleComparisonFailureError::Cancelled)),
+        "{comparison:?}"
+    );
+    assert_eq!(
+        agreement.read_workspace_publication_scope().unwrap(),
+        Some(previous_scope)
+    );
 }
 
 /// REQ-RUST-025.0
