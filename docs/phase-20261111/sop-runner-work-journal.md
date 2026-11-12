@@ -784,3 +784,9 @@ PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools
 Ran 74 tests in 0.580s
 OK
 ```
+
+### Toolchain shim dispatch correction — REFACTOR
+
+No refactor needed: the change is limited to `probe_toolchain_versions`, and the symlink regression covers
+both the invoked version name and separately recorded canonical path. GREEN commit:
+`b22b92358bb187a5e8ab5e24d8d401d4a9d2dd1d`; this checkpoint changes only the journal.
