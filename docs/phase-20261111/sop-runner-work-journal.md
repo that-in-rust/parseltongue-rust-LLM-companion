@@ -1168,6 +1168,14 @@ Python AST syntax: 6 files parsed; test methods=119; non-four-word names=[]; mis
 diff checks: exit 0, no output
 ```
 
+### REQ-SOP-RUNNER-018 — no-refactor-needed checkpoint
+
+The fail-closed network correction and its regression tests were committed as GREEN in
+`6fd7c5a08` (`fix SOP audit and fail-fast evidence`). Review found no additional refactor needed: the
+local-IPC proof is per-event, socketpair data is not treated as FD provenance, and ambiguous sends remain
+unproven. No production, corpus, or unrelated files were changed. This checkpoint is journal-only; the
+runner/process tests above were run against the committed code before this entry.
+
 No corpus, mapper, production build, Rust gate, Cargo/lock regeneration, or graph refresh was run.
 Overall full milestone never PASS merely from S1-S3; M1 S10 and M2 S4/S5 are separate not-started/blocked
 gates until supplied and validated. Full S3 acceptance remains blocked pending current-run frozen-identity-bound
