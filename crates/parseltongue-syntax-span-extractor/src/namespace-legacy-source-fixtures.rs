@@ -185,7 +185,7 @@ fn projected_virtual_macro_scope() {
     let initial = state.read_legacy_lookup_updates().unwrap();
     assert!(!initial.is_empty());
     assert!(initial.iter().all(|row| {
-        serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["legacy_scope_revision"]
+        serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["legacy_scope_revision_value"]
             == 0
     }));
     assert!(state.read_legacy_lookup_updates().unwrap().is_empty());
@@ -233,7 +233,7 @@ fn projected_virtual_macro_scope() {
         updates
             .iter()
             .all(|row| row["legacy_macro_name_text"] == "generated"
-                && row["legacy_scope_revision"] == 1
+                && row["legacy_scope_revision_value"] == 1
                 && !row["legacy_target_identity_key"].is_null())
     );
     assert!(state.read_legacy_lookup_updates().unwrap().is_empty());

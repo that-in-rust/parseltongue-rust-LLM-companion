@@ -23,6 +23,8 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_lang_definition_rows: Vec<StageTableRowRecord>,
     pub(super) projection_extern_declaration_rows: Vec<Value>,
     pub(super) projection_legacy_source_event_rows: Vec<Value>,
+    projection_legacy_lookup_hashes: BTreeMap<String, [u8; 32]>,
+    projection_legacy_scope_revision: u64,
     projection_macro_source_rows:
         BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
     projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
@@ -132,7 +134,44 @@ impl<'a> CrateSyntaxProjectionState<'a> {
     pub(super) fn read_legacy_lookup_updates(
         &mut self,
     ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
-        Ok(Vec::new())
+        let previous = &self.projection_legacy_lookup_hashes;
+        let revision = self.projection_legacy_scope_revision;
+        let mut rows = Vec::new();
+        let mut updates = Vec::new();
+        super::visit_legacy_macro_scope_records(
+            &self.projection_legacy_source_event_rows,
+            &mut |row| {
+                let digest = *blake3::hash(row.stage_row_payload_text.as_bytes()).as_bytes();
+                let mut value: Value = serde_json::from_str(&row.stage_row_payload_text)
+                    .map_err(build_name_projection_error)?;
+                let identity = blake3::hash(
+                    json!([
+                        value["legacy_source_unit_key"],
+                        value["legacy_source_site_key"],
+                        value["legacy_macro_name_text"]
+                    ])
+                    .to_string()
+                    .as_bytes(),
+                )
+                .to_hex()
+                .to_string();
+                if previous.get(&identity) == Some(&digest) {
+                    return Ok(());
+                }
+                value["legacy_lookup_identity_key"] = json!(identity);
+                value["legacy_scope_revision_value"] = json!(revision);
+                let payload = value.to_string();
+                rows.push(StageTableRowRecord {
+                    stage_owned_table_name: "legacy-macro-scope-records".into(),
+                    stage_row_record_key: blake3::hash(payload.as_bytes()).to_hex().to_string(),
+                    stage_row_payload_text: payload,
+                });
+                updates.push((identity, digest));
+                Ok(())
+            },
+        )?;
+        self.projection_legacy_lookup_hashes.extend(updates);
+        Ok(rows)
     }
     pub(super) fn build_crate_projection_state(
         unit: Value,
@@ -223,6 +262,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             projection_lang_definition_rows: Vec::new(),
             projection_extern_declaration_rows: Vec::new(),
             projection_legacy_source_event_rows: Vec::new(),
+            projection_legacy_lookup_hashes: BTreeMap::new(),
+            projection_legacy_scope_revision: 0,
             projection_macro_source_rows: BTreeMap::new(),
             projection_macro_failure_rows: BTreeMap::new(),
             projection_source_store_port: store,
@@ -880,6 +921,10 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 rows.push(row?);
                 Ok::<_, StoreBackendFailureError>(())
             })?;
+        self.projection_legacy_scope_revision = self
+            .projection_legacy_scope_revision
+            .checked_add(1)
+            .ok_or_else(|| build_name_projection_error("legacy scope revision overflow"))?;
         rows.extend(self.read_legacy_lookup_updates()?);
         rows.push(super::build_syntax_output_record("file-source-text-table",path.clone(),json!({
             "file_source_absolute_path":path,"file_content_digest_full":content,"file_source_byte_count":source.len(),"file_expansion_provenance_chain":chain,

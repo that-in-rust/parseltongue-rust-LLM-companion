@@ -2123,3 +2123,36 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   17 GiB available. PID 1532439 remains stopped pending native builds.
   No serde full M2 measurements, exact manifests, SQL comparison or S5 numbers
   have been produced yet. Continue without an intermediate user report.
+
+### Macro delta namespace encoding and revised textual lookup persistence
+
+- `8b73ae3f4` RED / `14ff34c9f` GREEN factor the raw namespace encoder into
+  `namespace_input_row_records`. Both initial Turso persistence and macro
+  expansion semantic outputs now use the same streaming iterator. Offsets
+  cover scopes, bindings, imports, paths, invocations, externs, lang items and
+  legacy source events. Expanded target metadata is included, rather than
+  being lost when only typed delta rows leave the projection. Scope facts
+  carry `scope_cargo_unit_key` for graph-to-semantic identity joins.
+- `83a9ec38b` STUB / `fad9c34f2` RED / `06d626eab` retry RED add derived
+  `legacy-macro-scope-records` persistence at baseline and macro expansion.
+  Lookup identity is unit/site/name; records contain
+  `legacy_lookup_identity_key` and `legacy_scope_revision_value`.
+  Baseline revision is zero; successful expansions increment the revision.
+  Only new/changed lookup rows are emitted. A per-crate identity-to-BLAKE3
+  cache retains no historical payloads or cloned scope environments.
+- Lookup failure must not consume pending updates: unmatched-exit-after-valid
+  requests reproduced cache loss on retry. GREEN stages hash updates locally
+  and merges them only after the event interpreter succeeds. Normal, empty,
+  malformed, unchanged, virtual shadowing and retry behavior have coverage.
+- Latest source checks before the final field-name normalization:
+  `test result: ok. 17 passed; 0 failed` library;
+  `test result: ok. 17 passed; 0 failed` syntax contracts;
+  doc tests zero; syntax Clippy finished in 0.40s. Turso schema contracts
+  passed 19 in 2.79s after registering the lookup table; that schema has not
+  changed since. Logs are `/home/ubuntu/legacy-lookup-publication-*.log`.
+- Next: normalize frozen raw facts through Appenders into DuckDB; join latest
+  per-identity textual lookup revisions in SQL; unify the production and
+  contract fixed-point driver; implement dedicated analysis-input publication
+  before final workspace publication, then wire the CLI macro loop. No new
+  M2 or S5 measurements exist. The macro port already restricts expansion to
+  source/module/associated/extern item positions (not arbitrary body macros).
