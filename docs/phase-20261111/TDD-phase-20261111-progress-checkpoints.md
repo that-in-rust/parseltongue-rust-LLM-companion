@@ -2050,3 +2050,76 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   based on `2a362a41a8eb6e090f1a12d9b712df85af6f0c33`, with reviewable patch
   `tools/parser-const-closure-statements.patch`, SHA-256
   `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.
+
+### Ordered textual macro source facts — continuation
+
+- `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement
+  `legacy-macro-scope-records.rs`. Rust sorts source events by compilation unit
+  and numeric source-order vectors, maintains lexical frames, exports only
+  macro_use module definitions, normalizes raw identifiers and visits opaque
+  target/site records. Frames hold only their own definitions (no whole
+  environment clones). Empty, invalid, visitor-failure and spliced-expansion
+  cases are covered. This is textual scope calculation, not name resolution.
+- `9a9294759` STUB / `ffcda859d` initial RED / `2b3c0edba` corrected RED /
+  `91f0ab1cf` GREEN implement `legacy-macro-source-events.rs`. The initial RED
+  used the wrong pinned Parse API; corrected RED uses syntax_node and actually
+  fails at the intended todo. Source events include module/block entry/exit,
+  macro_rules definitions, single-name import/macro-path requests and macro
+  names within argument token trees. The latter preserve nested builtin
+  shadowing without treating string contents as macro calls.
+- Event order is prefix + [source byte position, phase, ordinal]: exit 0,
+  enter 1, definition 2, import/path request 3, invocation requests 4.
+  Outlined files and expansion files use the insertion prefix
+  parent prefix + [module/invocation start, 5]. Blocks, not functions, create
+  body frames, avoiding equal function/block closing-position collisions.
+- `f9e7eed34` STUB / `302c5f4c3` RED add persisted source-event storage and
+  three production-projection fixtures. GREEN wires the actual namespace AST
+  visitor, cfg filtering, outlined files, macro invocation contexts and virtual
+  expansion insertion prefixes. Raw facts are streamed with other namespace
+  inputs into the registered `legacy-macro-source-events` Turso table.
+- Checks after the final production visitor edit:
+  syntax library 16 passed; existing syntax contracts 17 passed; doc tests 0;
+  Turso contracts 19 passed in 2.73s; combined syntax/Turso all-target Clippy
+  completed successfully in 1.21s. Logs:
+  `/home/ubuntu/legacy-macro-wiring-green.log`,
+  `/home/ubuntu/legacy-macro-turso-schema.log`,
+  `/home/ubuntu/legacy-macro-wiring-clippy.log`.
+- Production integration is NOT finished: persist the derived legacy lookup
+  records with per-unit expansion revisions, include newly generated raw
+  namespace/lang/event rows in macro expansion outputs, and make SQL join
+  textual lookup facts. The typed macro alternation contracts already run;
+  the CLI still explicitly errors before analysis.
+- Recommended next refactor: factor namespace row encoding into a streaming
+  iterator shared by initial persistence and macro deltas. Extend row offsets
+  with extern/lang/event counts and encode delta target metadata while it is
+  still present in the per-crate projection. Source scope rows should also
+  carry the raw cargo unit key to join graph aliases to canonical semantic
+  unit keys without reimplementing identity hashing in the analysis adapter.
+- Production DuckDB should stream-decode frozen JSON payloads with serde_json
+  into normalized Appenders, not add a JSON/runtime extension or reconstruct
+  repository-wide typed inputs. Reuse one common SQL fixed-point function for
+  the typed contract facade and normalized production inputs.
+- CLI publication must distinguish complete analysis-input snapshots from
+  final workspace success. Add an analysis-input publication pointer/port,
+  leaving the existing workspace pointer unchanged until DuckDB completion.
+  The immutable work-unit membership implementation can serve both. Final
+  Turso publication needs only a receipt pointing at the exact completed
+  DuckDB generation/attempt; do not copy name-resolution rows back to Turso.
+- Macro lookup can continue using ResolvedMacroLookupPort: the existing port
+  already fetches external target metadata before expansion. A CLI wrapper
+  can serialize its typed query to the DuckDB adapter without an L3 dependency
+  from DuckDB on syntax. Keep one source projection for the current crate,
+  then drop it after publication. Use dependency order and total source order.
+  Barrier after generated macro definitions/imports/nested item invocations;
+  do not blindly expand later calls using pre-expansion shadowing decisions.
+- Normalized SQL must exclude private macro_rules from module namespace
+  declarations (textual lookup facts still reference their target metadata).
+  For macro_export, only its root namespace copy is namespaced, not the
+  original child-module copy. A use of a local legacy macro may create a
+  normal namespaced alias. Nested builtin queries need the outer invocation
+  site plus the queried name to respect the emitted textual lookup facts.
+- Freed 9.8 GiB of reproducible oracle incremental build cache only; retained
+  oracle executables, dependencies and every e2e artefact. Disk now has about
+  17 GiB available. PID 1532439 remains stopped pending native builds.
+  No serde full M2 measurements, exact manifests, SQL comparison or S5 numbers
+  have been produced yet. Continue without an intermediate user report.

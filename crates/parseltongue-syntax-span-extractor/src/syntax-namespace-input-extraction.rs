@@ -36,6 +36,7 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
 }
 
 struct NamespaceSourceFileContext {
+    source_legacy_order_prefix: Vec<u64>,
     source_file_absolute_path: String,
     source_file_original_text: String,
     source_crlf_removed_offsets: Vec<usize>,
@@ -45,6 +46,7 @@ struct NamespaceSourceFileContext {
 }
 
 struct MacroInvocationSourceContext {
+    macro_legacy_order_prefix: Vec<u64>,
     macro_source_absolute_path: String,
     macro_argument_range_start: usize,
     macro_invocation_directory_path: PathBuf,
@@ -556,7 +558,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "target_source_file_path":root,"target_source_range_start":0,"target_source_range_end":0,
             "target_symbol_kind_value":"Crate","target_compilation_scope_record":self.build_compilation_scope_record(&scope),
         }));
-        self.visit_namespace_source_file(&root, &scope)
+        self.visit_namespace_source_file(&root, &scope, Vec::new())
     }
 
     pub(super) fn build_builtin_expansion_input(
@@ -800,6 +802,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             )));
         }
         let file = NamespaceSourceFileContext {
+            source_legacy_order_prefix: context.macro_legacy_order_prefix.clone(),
             source_file_absolute_path: included.unwrap_or(&path).into(),
             source_file_original_text: source.clone(),
             source_crlf_removed_offsets: source
@@ -895,6 +898,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         &mut self,
         path: &str,
         scope: &NameResolutionScopeKey,
+        legacy_prefix: Vec<u64>,
     ) -> Result<(), StoreBackendFailureError> {
         if self
             .projection_cancel_flag_value
@@ -931,6 +935,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             return Err(build_name_projection_error(format!("{path}: {error}")));
         }
         let file = NamespaceSourceFileContext {
+            source_legacy_order_prefix: legacy_prefix,
             source_file_absolute_path: path.into(),
             source_file_original_text: source,
             source_crlf_removed_offsets: removed,
@@ -962,6 +967,45 @@ impl<'a> CrateSyntaxProjectionState<'a> {
     }
 
     fn visit_namespace_syntax_node(
+        &mut self,
+        node: &SyntaxNode,
+        scope: &NameResolutionScopeKey,
+        directory: &Path,
+        file: &NamespaceSourceFileContext,
+    ) -> Result<(), StoreBackendFailureError> {
+        if self
+            .projection_cancel_flag_value
+            .check_stage_work_cancelled()
+        {
+            return Err(build_name_projection_error("NameResolutionCancelledError"));
+        }
+        let events = super::read_legacy_node_events(
+            node,
+            &file.source_legacy_order_prefix,
+            &encode_compilation_unit_value(
+                &self
+                    .projection_resolution_input_rows
+                    .unit_compilation_identity_key,
+            ),
+            &self.projection_target_cfg_values,
+            &|node, definition| {
+                let occurrence = self.build_source_occurrence_key(file, node)?;
+                Ok(if definition {
+                    encode_symbol_target_value(&NameSymbolTargetKey::Definition(occurrence))
+                } else {
+                    encode_occurrence_identity_value(&occurrence)
+                })
+            },
+        )?;
+        self.projection_legacy_source_event_rows
+            .extend(events.before_node_rows);
+        self.visit_namespace_syntax_node_inner(node, scope, directory, file)?;
+        self.projection_legacy_source_event_rows
+            .extend(events.after_node_rows);
+        Ok(())
+    }
+
+    fn visit_namespace_syntax_node_inner(
         &mut self,
         node: &SyntaxNode,
         scope: &NameResolutionScopeKey,
@@ -1088,6 +1132,11 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     build_name_projection_error(format!("StageInputMissingError: module {name}"))
                 })?,
                 &child,
+                file.source_legacy_order_prefix
+                    .iter()
+                    .copied()
+                    .chain([u32::from(node.text_range().start()) as u64, 5])
+                    .collect(),
             );
         }
         let item_kind = read_syntax_symbol_kind(kind);
@@ -1276,6 +1325,12 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             self.projection_macro_source_rows.insert(
                 occurrence.clone(),
                 MacroInvocationSourceContext {
+                    macro_legacy_order_prefix: file
+                        .source_legacy_order_prefix
+                        .iter()
+                        .copied()
+                        .chain([u32::from(node.text_range().start()) as u64, 5])
+                        .collect(),
                     macro_source_absolute_path: file.source_file_absolute_path.clone(),
                     macro_argument_range_start: start,
                     macro_invocation_directory_path: directory.into(),
