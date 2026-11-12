@@ -2082,6 +2082,30 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   function; separate frozen-input publication and CLI macro alternation.
   No new full M2, process-tree peak, wall/round or S5 measurements yet.
 
+### Common SQL fixed point and textual joins — GREEN
+
+- Frozen-round entry STUB `79ae309b0`; production-style source fixtures RED
+  `c1941b468` (two failures at `frozen namespace resolution not implemented`).
+  The typed contract facade and normalized frozen-source entry now use the
+  same SQL-round function and import-round SQL file. Each round rebuilds the
+  complete current-generation binding set, preserves explicit-over-glob
+  priority, computes its Rust digest, and checks the 8192 changing-round bound.
+- SQL joins Rust-produced per-identity latest lookup revisions, never source
+  order reconstruction. A non-null textual target shadows only the matching
+  unqualified macro namespace; a latest null target permits ordinary module
+  lookup. Private textual definitions retain target/provenance metadata but
+  do not leak into ordinary module declarations. Import aliases consume the
+  same textual result. Conflicting targets at one lookup revision fail closed.
+- `test result: ok. 43 passed; 0 failed; ... finished in 41.01s`, including all
+  11 moved contracts, accuracy fixtures, normalized empty/cancelled/error input,
+  changed lookup revisions and null fallthrough. Added conflicting-revision
+  coverage is checked separately. Adapter all-target Clippy finished in 0.56s.
+  Logs: `/home/ubuntu/frozen-namespace-rounds-{green,clippy}.log` and
+  `/home/ubuntu/frozen-namespace-textual-errors.log`.
+- Production CLI publication/macro-loop orchestration is still unwired. Next
+  inspect graph-derived extern/prelude links, then the separate analysis-input
+  pointer and macro session. No full M2 or S5 measurements are claimed.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement

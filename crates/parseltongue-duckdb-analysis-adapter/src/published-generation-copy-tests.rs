@@ -245,6 +245,14 @@ fn frozen_namespace_latest_textual_lookup() {
         assert_eq!(imported,resolved);
         let private:usize=connection.query_row("SELECT count(*) FROM \"namespace-binding-declaration-records\" WHERE target_key IN (?,?)",duckdb::params![target("old").to_string(),target("new").to_string()],|row|row.get(0)).unwrap();
         assert_eq!(private,0);
+        drop(connection);
+        let invalid=StageRunScopeValue {stage_attempt_sequence_value:"conflicting-legacy".into(),..scope()};
+        source.published=Some(invalid.clone());
+        append_namespace_fixture_value(&mut source,"legacy-macro-scope-records",json!({"legacy_lookup_identity_key":"lookup-macro","legacy_source_site_key":{"site":"macro"},"legacy_macro_name_text":"m","legacy_target_identity_key":target("old"),"legacy_scope_revision_value":2,"legacy_source_order_parts":[10,4]}));
+        store.copy_published_stage_rows(&source,&invalid,NAMESPACE_SOURCE_TABLE_NAMES,&RunCancelFlagValue::default()).unwrap();
+        store.normalize_frozen_namespace_rows(&invalid,&RunCancelFlagValue::default()).unwrap();
+        let error=store.resolve_frozen_namespace_rows(&invalid,&RunCancelFlagValue::default()).unwrap_err();
+        assert!(error.to_string().contains("conflicting textual lookup revision"),"{error}");
     });
 }
 

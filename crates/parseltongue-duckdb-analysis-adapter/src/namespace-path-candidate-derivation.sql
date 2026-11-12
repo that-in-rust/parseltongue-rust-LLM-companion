@@ -88,6 +88,23 @@ WITH RECURSIVE seeds AS (
     WHERE w.position=r.segment_count AND w.target_key IS NOT NULL
         AND (r.namespace_filter='any' OR r.namespace_filter=w.namespace
             OR (r.namespace_filter='type-or-value' AND w.namespace IN ('type','value')))
+        AND NOT (w.namespace='macro' AND r.segment_count=1 AND EXISTS (
+            SELECT 1 FROM "namespace-latest-legacy-lookups" l
+            JOIN "namespace-path-segment-records" s ON s.generation_key=l.generation_key
+                AND s.attempt_key=l.attempt_key AND s.request_key=l.request_key AND s.position=0
+                AND s.segment_kind='name' AND regexp_replace(s.segment_text,'^r#','')=l.name
+            WHERE l.generation_key=r.generation_key AND l.attempt_key=r.attempt_key
+                AND l.request_key=r.request_key AND l.target_key IS NOT NULL))
+    UNION
+    SELECT r.generation_key,r.attempt_key,r.request_key,l.target_key,'macro',r.scope_key,l.name
+    FROM "namespace-active-path-requests" r JOIN "namespace-latest-legacy-lookups" l
+        ON l.generation_key=r.generation_key AND l.attempt_key=r.attempt_key AND l.request_key=r.request_key
+    JOIN "namespace-path-segment-records" s ON s.generation_key=r.generation_key
+        AND s.attempt_key=r.attempt_key AND s.request_key=r.request_key AND s.position=0
+        AND s.segment_kind='name' AND regexp_replace(s.segment_text,'^r#','')=l.name
+    JOIN "namespace-target-context-records" t ON t.generation_key=l.generation_key
+        AND t.attempt_key=l.attempt_key AND t.target_key=l.target_key
+    WHERE r.segment_count=1 AND r.namespace_filter IN ('any','macro') AND r.unavailable_reason IS NULL
 )
 SELECT *,CASE WHEN count(DISTINCT target_key) OVER (
     PARTITION BY generation_key,attempt_key,request_key,namespace)>1 THEN 'ambiguous' ELSE 'resolved' END AS state

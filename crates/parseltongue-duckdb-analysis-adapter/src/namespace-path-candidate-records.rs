@@ -8,6 +8,14 @@ pub fn recompute_path_candidates(
     let transaction = connection
         .unchecked_transaction()
         .map_err(build_analysis_error)?;
+    transaction
+        .execute_batch(include_str!("namespace-frozen-input-schema.sql"))
+        .map_err(build_analysis_error)?;
+    let conflicts:usize=transaction.query_row("SELECT count(*) FROM (SELECT lookup_key,revision FROM \"namespace-legacy-scope-records\" WHERE generation_key=? AND attempt_key=? GROUP BY lookup_key,revision HAVING count(DISTINCT coalesce(target_key,'unresolved'))>1)",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value],|row|row.get(0)).map_err(build_analysis_error)?;
+    if conflicts > 0 {
+        return Err(build_analysis_error("conflicting textual lookup revision"));
+    }
+    transaction.execute("CREATE OR REPLACE TEMP TABLE \"namespace-latest-legacy-lookups\" AS SELECT * FROM \"namespace-legacy-scope-records\" WHERE generation_key=? AND attempt_key=? QUALIFY row_number() OVER (PARTITION BY generation_key,attempt_key,lookup_key ORDER BY revision DESC,request_key,name,target_key NULLS FIRST,source_order)=1",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
     transaction.execute_batch("CREATE TABLE IF NOT EXISTS \"namespace-binding-visibility-records\" (
         generation_key VARCHAR,attempt_key VARCHAR,scope_key VARCHAR,name VARCHAR,
         namespace VARCHAR,target_key VARCHAR,priority INTEGER,evidence_key VARCHAR,visibility_scope VARCHAR);")

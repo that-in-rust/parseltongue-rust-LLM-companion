@@ -1,7 +1,4 @@
-use super::{
-    FIXED_POINT_LIMIT, namespace_binding_round_strata::recompute_binding_rows,
-    namespace_contract_input_codec::*,
-};
+use super::namespace_contract_input_codec::*;
 use parseltongue_core_row_types::*;
 
 pub(super) fn resolve_contract_input(
@@ -23,52 +20,11 @@ pub(super) fn resolve_contract_input(
         run_generation_digest_value: "contract".into(),
         stage_attempt_sequence_value: "0".into(),
     };
-    super::materialize_scope_relations(&connection, &scope).map_err(error)?;
-    connection.execute_batch("CREATE TABLE \"namespace-binding-round-inputs\" AS SELECT * FROM \"namespace-binding-declaration-records\"").map_err(error)?;
-    connection.execute_batch("CREATE TABLE \"namespace-binding-visibility-records\" AS SELECT * FROM \"namespace-declaration-visibility-records\"").map_err(error)?;
-    let mut previous = recompute_binding_rows(&connection, &scope).map_err(error)?;
-    let mut settled = false;
-    for _ in 0..=FIXED_POINT_LIMIT {
-        if cancel.check_stage_work_cancelled() {
-            return Err(NameResolutionStageError::Cancelled);
-        }
-        super::recompute_path_candidates(&connection, &scope).map_err(error)?;
-        connection.execute_batch("DELETE FROM \"namespace-binding-round-inputs\";
-            INSERT INTO \"namespace-binding-round-inputs\"
-            SELECT * FROM \"namespace-binding-declaration-records\"
-            UNION ALL SELECT i.generation_key,i.attempt_key,i.importer_scope,regexp_replace(coalesce(i.alias_name,c.binding_name),'^r#',''),c.namespace,c.target_key,3,i.request_key
-            FROM \"namespace-import-request-records\" i JOIN \"namespace-path-candidate-records\" c
-                ON c.generation_key=i.generation_key AND c.attempt_key=i.attempt_key AND c.request_key=i.request_key
-            WHERE NOT i.is_glob AND c.state='resolved' AND coalesce(i.alias_name,'')<>'_'
-            UNION ALL SELECT i.generation_key,i.attempt_key,i.importer_scope,b.name,b.namespace,b.target_key,2,i.request_key
-            FROM \"namespace-import-request-records\" i JOIN \"namespace-path-candidate-records\" c
-                ON c.generation_key=i.generation_key AND c.attempt_key=i.attempt_key AND c.request_key=i.request_key AND c.state='resolved'
-            JOIN \"namespace-target-context-records\" t ON t.generation_key=c.generation_key AND t.attempt_key=c.attempt_key AND t.target_key=c.target_key
-            JOIN \"namespace-binding-round-results\" b ON b.generation_key=t.generation_key AND b.attempt_key=t.attempt_key AND b.scope_key=t.child_scope
-            JOIN \"namespace-target-context-records\" v ON v.generation_key=b.generation_key AND v.attempt_key=b.attempt_key AND v.target_key=b.target_key
-            LEFT JOIN \"namespace-binding-visibility-records\" bv ON bv.generation_key=b.generation_key AND bv.attempt_key=b.attempt_key
-                AND bv.scope_key=b.scope_key AND bv.name=b.name AND bv.namespace=b.namespace AND bv.target_key=b.target_key AND bv.priority=b.priority AND bv.evidence_key=b.evidence_key
-            CROSS JOIN LATERAL (SELECT CASE WHEN bv.target_key IS NULL THEN v.visibility_scope ELSE bv.visibility_scope END AS restriction_scope) visibility
-            WHERE i.is_glob AND (visibility.restriction_scope IS NULL OR EXISTS (SELECT 1 FROM \"namespace-scope-ancestor-records\" a
-                WHERE a.generation_key=i.generation_key AND a.attempt_key=i.attempt_key AND a.scope_key=i.importer_scope AND a.ancestor_scope=visibility.restriction_scope));
-            DELETE FROM \"namespace-binding-visibility-records\";
-            INSERT INTO \"namespace-binding-visibility-records\"
-                SELECT * FROM \"namespace-declaration-visibility-records\"
-                UNION ALL SELECT b.*,v.visibility_scope FROM \"namespace-binding-round-inputs\" b
-                JOIN \"namespace-import-visibility-records\" v ON b.generation_key=v.generation_key AND b.attempt_key=v.attempt_key AND b.evidence_key=v.request_key;")
-            .map_err(error)?;
-        let digest = recompute_binding_rows(&connection, &scope).map_err(error)?;
-        if previous == digest {
-            settled = true;
-            break;
-        }
-        previous = digest;
-    }
-    if !settled {
-        return Err(NameResolutionStageError::Stuck(NameResolutionStuckError {
-            error_context_detail_text: "import fixed point exceeded 8192 rounds".into(),
-        }));
-    }
+    super::namespace_frozen_resolution_rounds::resolve_namespace_sql_rounds(
+        &connection,
+        &scope,
+        cancel,
+    )?;
     let mut statement=connection.prepare("SELECT scope_key,name,namespace,target_key,priority,evidence_key FROM \"namespace-binding-round-results\"
         WHERE state='resolved' ORDER BY generation_key,attempt_key,scope_key,name,namespace,target_key,evidence_key").map_err(error)?;
     let mut rows = statement.query([]).map_err(error)?;
