@@ -1219,3 +1219,18 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   for all derived tokens (definition or invocation). Do not strip comments or patch
   Rust source. Cover line/block, inner/outer, empty docs, quoting, meta matching,
   invocation provenance, unterminated comments and delimiter-limit errors.
+
+## Source macro documentation GREEN — 2026-11-12
+
+- Ported pinned syntax-bridge MBe doc conversion into the existing source-token
+  facade, preserving full source-comment range and definition/invocation anchor.
+  Raw delimiters are selected from contents and checked for lexer limits.
+- cargo test -p parseltongue-port-macro-expander:
+  test result: ok. 21 passed; 0 failed; plus 1 passing doctest.
+- cargo clippy -p parseltongue-port-macro-expander --all-targets -- -D warnings:
+  Finished dev profile in 2.15s. Existing upstream stable-Cargo manifest lint
+  warnings remain diagnosed nightly-only warnings, not an environment failure.
+- No additional upstream parser defect; parser/oracle fork pin unchanged.
+- Native all-CLI release test shell e94f0c, log
+  /home/ubuntu/m2-sysroot-cli-contracts-green.log. Graph/syntax shell 2b20d0, log
+  /home/ubuntu/m2-sysroot-graph-syntax-green.log. Distinct fixture stores only.

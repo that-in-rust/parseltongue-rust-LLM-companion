@@ -163,6 +163,17 @@ fn build_macro_source_tokens(
             } else {
                 return Err("unbalanced nested macro delimiter".into());
             }
+        } else if matches!(
+            lexed.kind(index),
+            ra_ap_syntax::SyntaxKind::OUTER_DOC_COMMENT
+                | ra_ap_syntax::SyntaxKind::INNER_DOC_COMMENT
+        ) {
+            append_macro_documentation_tokens(
+                &mut builder,
+                text,
+                span,
+                lexed.kind(index) == ra_ap_syntax::SyntaxKind::INNER_DOC_COMMENT,
+            )?;
         } else if lexed.kind(index).is_literal() {
             builder.push(Leaf::Literal(tt::token_to_literal(text, span)));
         } else if lexed.kind(index) == ra_ap_syntax::SyntaxKind::LIFETIME_IDENT {
@@ -205,6 +216,54 @@ fn build_macro_source_tokens(
         return Err("unclosed nested macro delimiter".into());
     }
     Ok(builder.build())
+}
+
+fn append_macro_documentation_tokens(
+    builder: &mut TopSubtreeBuilder,
+    text: &str,
+    span: Span,
+    inner: bool,
+) -> Result<(), String> {
+    let body = text.get(3..).ok_or("invalid doc comment prefix")?;
+    let body = if text.starts_with("/*") {
+        body.strip_suffix("*/").ok_or("unterminated doc comment")?
+    } else {
+        body
+    };
+    let (hashes, _) = body
+        .chars()
+        .fold((0usize, 0usize), |(maximum, count), character| {
+            let next = match character {
+                '"' => 1,
+                '#' if count > 0 => count + 1,
+                _ => 0,
+            };
+            (maximum.max(next), next)
+        });
+    let hashes =
+        u8::try_from(hashes).map_err(|_| "doc raw-string delimiter exceeds lexer limit")?;
+    let punctuation = |character| {
+        Leaf::Punct(tt::Punct {
+            char: character,
+            spacing: Spacing::Alone,
+            span,
+        })
+    };
+    builder.push(punctuation('#'));
+    if inner {
+        builder.push(punctuation('!'));
+    }
+    builder.open(DelimiterKind::Bracket, span);
+    builder.push(Leaf::Ident(tt::Ident::new("doc", span)));
+    builder.push(punctuation('='));
+    builder.push(Leaf::Literal(tt::Literal {
+        text_and_suffix: intern::Symbol::intern(body),
+        span,
+        kind: tt::LitKind::StrRaw(hashes),
+        suffix_len: 0,
+    }));
+    builder.close(span);
+    Ok(())
 }
 
 fn append_macro_output_token(
