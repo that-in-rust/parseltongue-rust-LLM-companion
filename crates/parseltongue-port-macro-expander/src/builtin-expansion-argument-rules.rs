@@ -31,6 +31,9 @@ pub fn expand_builtin_macro_items(
             BuiltinMacroExpansionOutput::Expression(format!("{value:?}"))
         }
         BuiltinArgumentValueKind::Number(value) => BuiltinMacroExpansionOutput::Expression(value),
+        BuiltinArgumentValueKind::Character(value) => {
+            BuiltinMacroExpansionOutput::Expression(format!("{value:?}"))
+        }
         BuiltinArgumentValueKind::Boolean(value) => {
             BuiltinMacroExpansionOutput::Expression(value.to_string())
         }
@@ -49,9 +52,17 @@ pub fn expand_builtin_macro_items(
 enum BuiltinArgumentValueKind {
     Text(String),
     Number(String),
+    Character(char),
     Boolean(bool),
     Optional(Option<String>),
     Unavailable(SiteUnresolvedReasonKind, String),
+}
+
+#[derive(Default)]
+struct BuiltinArgumentSplitState {
+    argument_delimiter_stack_rows: Vec<&'static str>,
+    argument_segment_start_offset: usize,
+    argument_source_segment_rows: Vec<String>,
 }
 
 fn build_builtin_argument_error(error: impl std::fmt::Display) -> MacroExpansionFailureKind {
@@ -134,36 +145,71 @@ fn split_builtin_argument_values(
     if let Some((_, error)) = lexed.errors().next() {
         return Err(build_builtin_argument_error(error));
     }
-    let (stack, start, mut values) = (0..lexed.len())
+    let mut state = (0..lexed.len())
         .filter(|index| !lexed.kind(*index).is_trivia())
-        .try_fold(
-            (Vec::new(), 0, Vec::new()),
-            |(mut stack, mut start, mut values), index| {
-                let token = lexed.text(index);
-                if let Some(close) = read_builtin_delimiter_close(token) {
-                    stack.push(close);
-                } else if matches!(token, ")" | "]" | "}") && stack.pop() != Some(token) {
-                    return Err(build_builtin_argument_error(
-                        "unbalanced argument delimiter",
-                    ));
-                } else if token == "," && stack.is_empty() {
-                    let value = source[start..lexed.text_start(index)].trim();
-                    if value.is_empty() {
-                        return Err(build_builtin_argument_error("empty builtin argument"));
-                    }
-                    values.push(value.into());
-                    start = lexed.text_start(index) + 1;
+        .try_fold(BuiltinArgumentSplitState::default(), |mut state, index| {
+            let token = lexed.text(index);
+            if let Some(close) = read_builtin_delimiter_close(token) {
+                state.argument_delimiter_stack_rows.push(close);
+            } else if matches!(token, ")" | "]" | "}")
+                && state.argument_delimiter_stack_rows.pop() != Some(token)
+            {
+                return Err(build_builtin_argument_error(
+                    "unbalanced argument delimiter",
+                ));
+            } else if token == "," && state.argument_delimiter_stack_rows.is_empty() {
+                let value =
+                    source[state.argument_segment_start_offset..lexed.text_start(index)].trim();
+                if !check_builtin_argument_tokens(value, edition) {
+                    return Err(build_builtin_argument_error("empty builtin argument"));
                 }
-                Ok((stack, start, values))
-            },
-        )?;
-    if !stack.is_empty() {
+                state.argument_source_segment_rows.push(value.into());
+                state.argument_segment_start_offset = lexed.text_start(index) + 1;
+            }
+            Ok(state)
+        })?;
+    if !state.argument_delimiter_stack_rows.is_empty() {
         return Err(build_builtin_argument_error("unclosed argument delimiter"));
     }
-    if !source[start..].trim().is_empty() {
-        values.push(source[start..].trim().into());
+    let tail = source[state.argument_segment_start_offset..].trim();
+    if check_builtin_argument_tokens(tail, edition) {
+        state.argument_source_segment_rows.push(tail.into());
     }
-    Ok(values)
+    Ok(state.argument_source_segment_rows)
+}
+
+fn check_builtin_argument_tokens(source: &str, edition: Edition) -> bool {
+    let lexed = LexedStr::new(edition, source);
+    (0..lexed.len()).any(|index| !lexed.kind(index).is_trivia())
+}
+
+fn normalize_builtin_cfg_source(
+    source: &str,
+    edition: Edition,
+) -> Result<String, MacroExpansionFailureKind> {
+    let lexed = LexedStr::new(edition, source);
+    let mut values = (0..lexed.len())
+        .filter(|index| !lexed.kind(*index).is_trivia())
+        .map(|index| {
+            let token = lexed.text(index);
+            if lexed.kind(index) == parser::SyntaxKind::STRING {
+                let parsed = ast::Expr::parse(token, edition);
+                let literal = ast::Literal::cast(parsed.syntax_node())
+                    .ok_or_else(|| build_builtin_argument_error("cfg string literal absent"))?;
+                if let ast::LiteralKind::String(value) = literal.kind() {
+                    return value
+                        .value()
+                        .map(|value| format!("{value:?}"))
+                        .map_err(|error| build_builtin_argument_error(format!("{error:?}")));
+                }
+            }
+            Ok(token.to_owned())
+        })
+        .collect::<Result<Vec<_>, MacroExpansionFailureKind>>()?;
+    if values.last().is_some_and(|value| value == ",") {
+        values.pop();
+    }
+    Ok(values.join(" "))
 }
 
 fn read_builtin_path_segments(path: &ast::Path) -> Vec<NamePathSegmentKind> {
@@ -219,11 +265,10 @@ fn evaluate_builtin_argument_value(
                     .map_err(|error| build_builtin_argument_error(format!("{error:?}")))?
                     .into_owned(),
             ),
-            ast::LiteralKind::Char(value) => BuiltinArgumentValueKind::Text(
+            ast::LiteralKind::Char(value) => BuiltinArgumentValueKind::Character(
                 value
                     .value()
-                    .map_err(|error| build_builtin_argument_error(format!("{error:?}")))?
-                    .to_string(),
+                    .map_err(|error| build_builtin_argument_error(format!("{error:?}")))?,
             ),
             ast::LiteralKind::IntNumber(value) => BuiltinArgumentValueKind::Number(
                 value
@@ -311,12 +356,7 @@ fn evaluate_builtin_macro_value(
         return Ok(BuiltinArgumentValueKind::Text(text));
     }
     if name == "cfg" {
-        let lexed = LexedStr::new(edition, body);
-        let normalized = (0..lexed.len())
-            .filter(|index| !lexed.kind(*index).is_trivia())
-            .map(|index| lexed.text(index))
-            .collect::<Vec<_>>()
-            .join(" ");
+        let normalized = normalize_builtin_cfg_source(body, edition)?;
         return evaluate_cfg_expression_truth(&normalized, &input.macro_compilation_cfg_values)
             .map(BuiltinArgumentValueKind::Boolean)
             .map_err(build_builtin_argument_error);
@@ -333,6 +373,7 @@ fn evaluate_builtin_macro_value(
                     BuiltinArgumentValueKind::Text(value)
                     | BuiltinArgumentValueKind::Number(value) => text.push_str(&value),
                     BuiltinArgumentValueKind::Boolean(value) => text.push_str(&value.to_string()),
+                    BuiltinArgumentValueKind::Character(value) => text.push(value),
                     value @ BuiltinArgumentValueKind::Unavailable(..) => return Ok(value),
                     _ => return Err(build_builtin_argument_error("concat expects literals")),
                 }

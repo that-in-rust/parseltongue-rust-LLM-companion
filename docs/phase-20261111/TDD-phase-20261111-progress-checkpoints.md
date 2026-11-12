@@ -950,3 +950,20 @@ are clean. Logs: /home/ubuntu/m2-builtin-*-green*.log. Builtin argument nesting 
 is explicitly unavailable, not invented output. Next: refactor argument parsing and
 expand edge/shadowing checks, then sysroot/preludes/lang items, exact oracle manifest,
 differ and all-five S5. No S5 measurement exists.
+
+### M2 built-in macro arguments — REFACTOR
+
+Replaced positional splitter state with named fields and kept char/string values
+distinct. Added raw cfg strings, optional trailing commas and comment-only tails.
+The added pure edge tests first failed (6 pass / 2 fail), then passed with the fixes.
+Added persisted call-site include-base and nested user-macro shadowing regressions.
+The include-base assertion initially used the DTO rather than stored JSON field name;
+corrected to path_target_symbol_rows after checking the codec. No production fix was
+needed for that assertion.
+
+Final checks: macro port 20 tests + 1 doctest passed; CLI 15 tests passed (1.96s).
+Macro/CLI Clippy passed (3.20s); final changed CLI test Clippy passed (1.22s).
+Formatting and diff checks passed. Earlier graph/resolver/syntax passes remain valid;
+their implementation inputs were unchanged in this refactor. Reindexed the repository:
+26,869 nodes / 58,402 edges; six unrelated query files have best-effort partial parses,
+zero unusable files. Sysroot/preludes/lang items are next. No S5 rate is claimed.

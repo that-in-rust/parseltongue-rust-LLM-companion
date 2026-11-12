@@ -55,6 +55,35 @@ fn test_builtin_cfg_arguments() {
 }
 
 #[test]
+fn test_builtin_token_argument_edges() {
+    assert_eq!(
+        expand_builtin_fixture("cfg", "(feature=r#\"enabled\"#, /* end */)").unwrap(),
+        BuiltinMacroExpansionOutput::Expression("true".into())
+    );
+    assert_eq!(
+        expand_builtin_fixture(
+            "concat",
+            "(r#\"a,b\"#, /* middle */ '/', env!(\"CARGO_PKG_NAME\"), /* end */)"
+        )
+        .unwrap(),
+        BuiltinMacroExpansionOutput::Expression("\"a,b/fixture\"".into())
+    );
+}
+
+#[test]
+fn test_builtin_character_argument_errors() {
+    for name in ["env", "option_env", "include"] {
+        assert!(
+            matches!(
+                expand_builtin_fixture(name, "('x')"),
+                Err(MacroExpansionFailureKind::InvalidInvocation(_))
+            ),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn test_builtin_include_arguments() {
     assert_eq!(
         expand_builtin_fixture(

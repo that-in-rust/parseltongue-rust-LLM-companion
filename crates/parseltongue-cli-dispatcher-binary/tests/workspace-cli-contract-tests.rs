@@ -459,6 +459,86 @@ fn test_builtin_missing_source_reasons() {
 }
 
 #[test]
+fn test_builtin_include_callsite_base() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"), "mod defs; pub mod child;").unwrap();
+    fs::write(
+        root.join("src/defs.rs"),
+        "#[macro_export] macro_rules! emit {()=>{include!(\"chosen.rs\");};}",
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/child.rs"),
+        "crate::emit!(); pub fn take(_:Chosen){}",
+    )
+    .unwrap();
+    fs::write(root.join("src/chosen.rs"), "pub struct Chosen;").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    let chosen = paths
+        .iter()
+        .find(|row| row["path_site_source_text"] == "Chosen")
+        .unwrap();
+    assert_eq!(chosen["path_resolution_state_kind"], "resolved");
+    assert!(
+        chosen["path_target_symbol_rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["target_source_file_path"]
+                .as_str()
+                .is_some_and(|path| path.ends_with("/src/chosen.rs")))
+    );
+    assert!(
+        read_published_table_fixture(&database, "macro-expanded-item-table")
+            .iter()
+            .any(|row| row["macro_invocation_provenance_chain"]
+                .as_array()
+                .is_some_and(|chain| chain.len() == 2))
+    );
+}
+
+#[test]
+fn test_builtin_nested_macro_shadowing() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"),r#"macro_rules! concat {($($tt:tt)*)=>{"other.rs"}} include!(concat!("right.rs")); pub fn take(_:Other){}"#).unwrap();
+    fs::write(root.join("src/right.rs"), "pub struct Right;").unwrap();
+    fs::write(root.join("src/other.rs"), "pub struct Other;").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let macros = read_published_table_fixture(&database, "macro-expanded-item-table");
+    assert!(macros.iter().any(|row| {
+        row["macro_unresolved_reason_kind"] == "external_source_missing"
+            && row["macro_unresolved_detail_text"]
+                .as_str()
+                .is_some_and(|detail| detail.contains("nested macro expansion unavailable"))
+    }));
+    assert!(
+        !read_published_table_fixture(&database, "module-scope-binding-table")
+            .iter()
+            .any(|row| matches!(
+                row["binding_resolved_name_text"].as_str(),
+                Some("Right" | "Other")
+            ))
+    );
+}
+
+#[test]
 fn test_type_macros_remain_deferred() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
