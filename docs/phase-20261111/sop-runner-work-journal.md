@@ -645,3 +645,10 @@ Final diff checks before commit:
 git diff --check && git diff --cached --check && git diff HEAD --check
 Exit code 0; no output.
 ```
+
+### REFACTOR — no refactor needed
+
+Reviewed the focused change set against the correction brief. The isolated production directory, target
+trace proof, M2 failure propagation, and bounded command ledger are covered by direct regressions; no
+additional refactor is warranted. GREEN commit: `0dfbfa14c`. This checkpoint contains only this journal
+entry; no runner behavior changed after the GREEN test run.
