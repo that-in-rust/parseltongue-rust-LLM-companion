@@ -140,6 +140,98 @@ fn build_fixture_import_request(
 }
 
 struct FixtureEmptyMacroPort;
+
+#[test]
+fn test_shared_namespace_rows_remain_shared() {
+    use std::sync::Arc;
+    let mut dependency = build_fixture_unit_identity();
+    dependency.unit_cargo_target_name = "dependency".into();
+    let dependency_root = NameResolutionScopeKey {
+        scope_compilation_unit_key: dependency.clone(),
+        scope_semantic_path_parts: vec![],
+    };
+    let shared = Arc::new(NameSharedNamespaceRows {
+        name_module_scope_rows: vec![NameScopeRecordRow {
+            scope_module_identity_key: dependency_root.clone(),
+            scope_parent_identity_key: None,
+            scope_parent_lookup_flag: false,
+            scope_module_boundary_flag: true,
+            scope_implicit_prelude_key: None,
+        }],
+        name_symbol_binding_rows: (0..1000)
+            .map(|index| {
+                let mut row = build_fixture_name_binding(
+                    &[],
+                    &format!("Item{index}"),
+                    NamespaceBindingKindValue::Type,
+                    index + 1,
+                );
+                row.binding_lexical_scope_key = dependency_root.clone();
+                row
+            })
+            .collect(),
+    });
+    let mut input = build_fixture_resolver_input(&[&[]]);
+    let mut module =
+        build_fixture_name_binding(&[], "dependency", NamespaceBindingKindValue::Type, 1001);
+    module.binding_target_identity_key = NameSymbolTargetKey::CrateRoot(dependency);
+    module.binding_target_child_scope = Some(dependency_root);
+    input.name_symbol_binding_rows.push(module);
+    input
+        .name_signature_path_rows
+        .push(build_fixture_path_request(
+            &[],
+            &["dependency", "Item999"],
+            NameNamespaceFilterKind::Type,
+            1002,
+        ));
+    input.name_shared_namespace_rows.push(shared.clone());
+    let cloned = input.clone();
+    assert!(Arc::ptr_eq(&shared, &cloned.name_shared_namespace_rows[0]));
+    drop(cloned);
+    let output = resolve_crate_name_bindings(
+        &input,
+        &FixtureEmptyMacroPort,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        output.resolved_signature_path_rows[0].path_resolution_state_kind,
+        NamePathAnswerKind::Resolved
+    );
+    assert_eq!(output.resolved_symbol_binding_rows.len(), 1);
+    assert_eq!(output.resolved_module_scope_rows.len(), 1);
+    let output = resolve_owned_crate_bindings(
+        input,
+        &FixtureEmptyMacroPort,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    assert_eq!(output.resolved_symbol_binding_rows.len(), 1);
+    assert_eq!(Arc::strong_count(&shared), 1);
+}
+
+#[test]
+fn test_owned_namespace_empty_and_cancelled() {
+    let output = resolve_owned_crate_bindings(
+        build_fixture_resolver_input(&[&[]]),
+        &FixtureEmptyMacroPort,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    assert!(output.resolved_symbol_binding_rows.is_empty());
+    let cancel = RunCancelFlagValue::default();
+    cancel.request_stage_work_cancellation();
+    assert!(matches!(
+        resolve_owned_crate_bindings(
+            build_fixture_resolver_input(&[&[]]),
+            &FixtureEmptyMacroPort,
+            &cancel
+        ),
+        Err(NameResolutionStageError::Cancelled)
+    ));
+}
+
 impl ItemMacroExpansionPort for FixtureEmptyMacroPort {
     fn expand_resolved_macro_items(
         &self,

@@ -9,6 +9,58 @@ fn make_fixture_store_adapter() -> TursoWorkspaceStoreAdapter {
     store.initialize_workspace_stage_schema().unwrap();
     store
 }
+
+#[test]
+fn test_unpublished_crate_chunks_hidden() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("bounded-crate");
+    let rows = ["module-scope-binding-table", "span-reference-text-table"].map(|table| {
+        StageTableRowRecord {
+            stage_owned_table_name: table.into(),
+            stage_row_record_key: "hidden".into(),
+            stage_row_payload_text: "{}".into(),
+        }
+    });
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "name-resolution",
+        "crate/example/pending/0000",
+        &[],
+        &rows,
+    )
+    .unwrap();
+    for table in ["module-scope-binding-table", "span-reference-text-table"] {
+        assert_eq!(store.count_stage_table_rows(&scope, table).unwrap(), 0);
+        assert!(
+            store
+                .read_stage_table_rows(&scope, table)
+                .unwrap()
+                .is_empty()
+        );
+        let mut seen = 0;
+        store
+            .visit_stage_table_rows(&scope, table, &mut |_| {
+                seen += 1;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(seen, 0);
+    }
+    write_fixture_stage_rows(&store, &scope, "name-resolution", "crate/example", &[], &[]).unwrap();
+    for table in ["module-scope-binding-table", "span-reference-text-table"] {
+        assert_eq!(store.count_stage_table_rows(&scope, table).unwrap(), 1);
+        assert_eq!(store.read_stage_table_rows(&scope, table).unwrap().len(), 1);
+        let mut seen = 0;
+        store
+            .visit_stage_table_rows(&scope, table, &mut |_| {
+                seen += 1;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(seen, 1);
+    }
+}
 fn make_fixture_stage_scope(attempt: &str) -> StageRunScopeValue {
     StageRunScopeValue {
         run_generation_digest_value: "staging".into(),

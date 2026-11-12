@@ -1743,3 +1743,15 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Read-only payload sizing found 2,118 expanded macro rows / 254,146,220
   export bytes, plus 2,053 unresolved rows; largest single expanded row
   10,130,358 bytes. /home/ubuntu/m2-macro-payload-size-records.json.
+
+### Bounded namespace state RED
+
+- STUB workspace check passed (0.36s).
+- Resolver contracts: 9 passed / 2 failed. Owned-input empty case fails at
+  owned namespace resolution not implemented; shared dependency case fails
+  at name-resolution row references a missing scope.
+- New adapter visibility contract fails as intended: pending crate chunk
+  count is 1, expected 0. It checks count/read/visit before and after the
+  constant-size crate completion marker, across bindings and span rows.
+- Logs: /home/ubuntu/m2-bounded-namespace-red-tests.log and
+  /home/ubuntu/m2-bounded-publication-red-tests.log.
