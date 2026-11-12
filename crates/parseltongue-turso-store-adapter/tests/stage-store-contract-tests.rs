@@ -11,6 +11,107 @@ fn make_fixture_store_adapter() -> TursoWorkspaceStoreAdapter {
 }
 
 #[test]
+fn independent_analysis_input_snapshots() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("analysis");
+    let cancel = RunCancelFlagValue::default();
+    assert!(
+        store
+            .publish_analysis_input_snapshot(&scope, &cancel)
+            .is_err()
+    );
+    assert!(
+        store
+            .read_analysis_input_publication_scope()
+            .unwrap()
+            .is_none()
+    );
+    complete_fixture_stage_set(&store, &scope);
+    assert!(
+        store
+            .publish_analysis_input_snapshot(&scope, &cancel)
+            .is_err()
+    );
+    let first_row = StageTableRowRecord {
+        stage_owned_table_name: "syntax-namespace-input-scopes".into(),
+        stage_row_record_key: "first".into(),
+        stage_row_payload_text: "first".into(),
+    };
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-namespace-input-records",
+        "first",
+        &[],
+        std::slice::from_ref(&first_row),
+    )
+    .unwrap();
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-namespace-input-records",
+        "__complete__",
+        &[],
+        &[],
+    )
+    .unwrap();
+    let first = store
+        .publish_analysis_input_snapshot(&scope, &cancel)
+        .unwrap();
+    assert_eq!(
+        store.read_analysis_input_publication_scope().unwrap(),
+        Some(first.clone())
+    );
+    assert!(store.read_workspace_publication_scope().unwrap().is_none());
+    assert!(
+        write_fixture_stage_rows(
+            &store,
+            &scope,
+            "syntax-namespace-input-records",
+            "first",
+            &[],
+            &[first_row]
+        )
+        .is_err()
+    );
+    let second_row = StageTableRowRecord {
+        stage_owned_table_name: "syntax-namespace-input-scopes".into(),
+        stage_row_record_key: "second".into(),
+        stage_row_payload_text: "second".into(),
+    };
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "name-resolution",
+        "expansion",
+        &[],
+        &[second_row],
+    )
+    .unwrap();
+    let second = store
+        .publish_analysis_input_snapshot(&scope, &cancel)
+        .unwrap();
+    assert_ne!(first, second);
+    assert_eq!(
+        store
+            .count_stage_table_rows(&first, "syntax-namespace-input-scopes")
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store
+            .count_stage_table_rows(&second, "syntax-namespace-input-scopes")
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        store.read_analysis_input_publication_scope().unwrap(),
+        Some(second)
+    );
+    assert!(store.read_workspace_publication_scope().unwrap().is_none());
+}
+
+#[test]
 fn published_snapshots_are_frozen_while_new_units_accumulate() {
     let store = make_fixture_store_adapter();
     let scope = make_fixture_stage_scope("frozen");
