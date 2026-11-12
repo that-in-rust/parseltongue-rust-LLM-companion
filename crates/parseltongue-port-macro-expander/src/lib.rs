@@ -19,5 +19,8 @@ mod builtin_expansion_argument_rules;
 pub use builtin_expansion_argument_rules::{BuiltinMacroLookupPort, expand_builtin_macro_items};
 
 #[cfg(test)]
+#[path = "builtin-expansion-contract-tests.rs"]
+mod builtin_expansion_contract_tests;
+#[cfg(test)]
 #[path = "declarative-expansion-contract-tests.rs"]
 mod declarative_expansion_contract_tests;

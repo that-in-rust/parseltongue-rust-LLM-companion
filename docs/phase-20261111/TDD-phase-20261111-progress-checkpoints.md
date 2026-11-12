@@ -908,3 +908,12 @@ None merely because an arbitrary process environment key was not supplied.
 Offline macro-port cargo check passed in 0.42s. Next RED covers supported builtins,
 metadata-only environment inputs, scope shadowing, malformed/empty arguments and stage
 include publication. No filesystem/process/environment access is added to L2.
+
+### M2 built-in macro arguments — RED
+
+Pure tests: 0 passed / 6 failed, each at the intended todo (12 declarative tests
+filtered). CLI include and unavailable-source contracts: 0 passed / 2 failed, showing
+missing included names and missing build_script evidence. A separate type-macro contract
+fails because the item adapter currently tries to parse a type expansion as items; GREEN
+will constrain item callbacks to item positions rather than change type semantics.
+The test cancellation method spelling was corrected before collecting the RED results.

@@ -407,6 +407,78 @@ fn test_persisted_resolution_path_answers() {
 }
 
 #[test]
+fn test_builtin_include_name_resolution() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"),r#"include!(concat!(env!("CARGO_MANIFEST_DIR"),"/src/fixture.rs")); pub fn take(_:Included){}"#).unwrap();
+    fs::write(root.join("src/fixture.rs"),"#[cfg_attr(not(test),cfg(feature=\"enabled\"))] pub struct Included {pub field:u8} #[cfg(test)] pub struct Excluded;").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rows = read_published_table_fixture(&database, "path-resolution-site-records");
+    let included = rows
+        .iter()
+        .find(|row| row["path_site_source_text"] == "Included")
+        .unwrap();
+    assert_eq!(included["path_resolution_state_kind"], "resolved");
+    assert!(
+        !read_published_table_fixture(&database, "module-scope-binding-table")
+            .iter()
+            .any(|row| row["binding_resolved_name_text"] == "Excluded")
+    );
+}
+
+#[test]
+fn test_builtin_missing_source_reasons() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(
+        root.join("src/lib.rs"),
+        "include!(concat!(env!(\"OUT_DIR\"),\"/generated.rs\"));",
+    )
+    .unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rows = read_published_table_fixture(&database, "macro-expanded-item-table");
+    assert!(
+        rows.iter()
+            .any(|row| row["macro_unresolved_reason_kind"] == "build_script"
+                && row["macro_resolution_state_kind"] == "unresolved")
+    );
+}
+
+#[test]
+fn test_type_macros_remain_deferred() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(
+        root.join("src/lib.rs"),
+        "macro_rules! ty {()=>{u8};} pub fn take(_:ty!()){}",
+    )
+    .unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(read_published_table_fixture(&database, "macro-expanded-item-table").is_empty());
+}
+
+#[test]
 fn test_empty_resolution_stage_rows() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
