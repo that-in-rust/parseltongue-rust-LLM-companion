@@ -219,9 +219,9 @@ fn append_standard_library_fixture(source: &mut Source, name: &str) {
 
 #[test]
 fn frozen_standard_type_macro_preludes() {
-    [(false,true),(true,true),(false,false)].into_iter().for_each(|(no_std,implicit)|{
+    [(false,true,0),(true,true,0),(false,false,0),(false,true,64)].into_iter().for_each(|(no_std,implicit,extra_scopes)|{
         let directory=tempfile::tempdir().unwrap();
-        let store=DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(&directory.path().join("analysis.duckdb"),directory.path(),64*1024*1024).unwrap();
+        let store=DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(&directory.path().join("analysis.duckdb"),directory.path(),1_288_490_188).unwrap();
         let mut source=namespace_source_fixture();
         let original:serde_json::Value=serde_json::from_str(&source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text).unwrap();
         let unit=&original["scope_module_identity_key"]["scope_compilation_unit_key"];
@@ -230,11 +230,34 @@ fn frozen_standard_type_macro_preludes() {
         let dependencies=["core","std"].map(|name|json!({"dependency_alias_name_value":name,"dependency_cargo_package_identifier":format!("sysroot-{name}"),"dependency_compilation_role_kind":"target","dependency_sysroot_context_flag":true}));
         let root=append_compilation_fixture(&mut source,unit,json!({"unit_compilation_identity_key":"fixture-unit","unit_rust_edition_value":"2024","unit_no_core_flag":false,"unit_no_std_flag":no_std,"unit_implicit_prelude_flag":implicit,"unit_normal_dependency_rows":dependencies}));
         ["core","std"].into_iter().for_each(|name|append_standard_library_fixture(&mut source,name));
+        (0..extra_scopes).for_each(|index|append_namespace_fixture_value(&mut source,"syntax-namespace-input-scopes",json!({"scope_module_identity_key":{"scope_compilation_unit_key":unit,"scope_semantic_path_parts":[format!("empty_{index}")]},"scope_parent_identity_key":root,"scope_parent_lookup_flag":false,"scope_module_boundary_flag":true,"scope_implicit_prelude_key":{"scope_compilation_unit_key":unit,"scope_semantic_path_parts":["@prelude"]},"scope_cargo_unit_key":"fixture-unit"})));
         append_namespace_fixture_value(&mut source,"syntax-namespace-input-paths",json!({"path_site_occurrence_key":{"site":"standard-type"},"path_lexical_scope_key":root,"path_source_segment_rows":[{"kind":"name","name":"Selected"}],"path_requested_namespace_kind":"Type","path_resolution_source_kind":"Signature","path_unavailable_reason_kind":null,"path_source_metadata_value":{}}));
         append_namespace_fixture_value(&mut source,"syntax-namespace-input-macros",json!({"invocation_site_occurrence_key":{"site":"standard-macro"},"invocation_lexical_scope_key":root,"invocation_macro_path_segments":[{"kind":"name","name":"sdk_macro"}],"invocation_macro_input_text":""}));
         store.copy_published_stage_rows(&source,&scope(),NAMESPACE_SOURCE_TABLE_NAMES,&RunCancelFlagValue::default()).unwrap();
         store.normalize_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
         store.resolve_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        if let Some(directory)=std::env::var_os("PARSELTONGUE_PRELUDE_PROFILE_DIRECTORY") {
+            let connection=store._connection.lock().unwrap();
+            let directory=std::path::PathBuf::from(directory);
+            [("paths",include_str!("namespace-path-candidate-derivation.sql")),("imports",include_str!("namespace-import-binding-rounds.sql"))].into_iter().for_each(|(phase,sql)|{
+                sql.split(';').filter(|query|!query.trim().is_empty()).enumerate().for_each(|(index,query)|{
+                    let plan:String=connection.query_row(&format!("EXPLAIN (ANALYZE, FORMAT JSON) {query}"),[],|row|row.get(1)).unwrap();
+                    std::fs::write(directory.join(format!("namespace-prelude-{phase}-plan-{no_std}-{implicit}-{extra_scopes}-{index}.json")),&plan).unwrap();
+                    let plan=serde_json::from_str::<serde_json::Value>(&plan).unwrap();
+                    eprintln!("PRELUDE_PROFILE no_std={no_std} implicit={implicit} extra_scopes={extra_scopes} phase={phase} statement={index} peak_buffer_bytes={} peak_temp_bytes={}",plan["system"]["peak_buffer_memory"],plan["system"]["peak_temp_dir_size"]);
+                });
+            });
+            let memory:u64=connection.query_row("SELECT sum(memory_usage_bytes)::UBIGINT FROM duckdb_memory()",[],|row|row.get(0)).unwrap();
+            let limit:String=connection.query_row("SELECT current_setting('memory_limit')",[],|row|row.get(0)).unwrap();
+            eprintln!("PRELUDE_MEMORY no_std={no_std} implicit={implicit} current_bytes={memory} limit={limit}");
+        }
+        {
+            let connection=store._connection.lock().unwrap();
+            let copies:usize=connection.query_row("SELECT count(*) FROM \"namespace-macro-prelude-records\"",[],|row|row.get(0)).unwrap();
+            assert_eq!(copies,usize::from(implicit));
+            let empty_bindings:usize=connection.query_row("SELECT count(*) FROM \"namespace-binding-round-results\" WHERE contains(scope_key,'empty_')",[],|row|row.get(0)).unwrap();
+            assert_eq!(empty_bindings,0);
+        }
         ["standard-type","standard-macro"].into_iter().for_each(|site|{
             let connection=store._connection.lock().unwrap();
             let mut statement=connection.prepare("SELECT target_key FROM \"namespace-path-candidate-records\" WHERE request_key=? ORDER BY generation_key,attempt_key,request_key,target_key,namespace,binding_scope,binding_name").unwrap();

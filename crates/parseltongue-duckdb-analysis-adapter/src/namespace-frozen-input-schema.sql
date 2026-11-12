@@ -27,3 +27,5 @@ CREATE TABLE IF NOT EXISTS "namespace-unit-dependency-records" (
 CREATE TABLE IF NOT EXISTS "namespace-extern-link-records" (
  generation_key VARCHAR,attempt_key VARCHAR,unit_key VARCHAR,scope_key VARCHAR,
  source_name VARCHAR,alias_name VARCHAR,visibility_scope VARCHAR);
+CREATE TABLE IF NOT EXISTS "namespace-macro-prelude-records" (
+ generation_key VARCHAR,attempt_key VARCHAR,importer_scope VARCHAR,source_scope VARCHAR,evidence_key VARCHAR);

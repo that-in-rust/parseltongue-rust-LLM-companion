@@ -2169,6 +2169,43 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   This does not supersede the failing new standard-prelude fixture above.
   Native checks are complete; rust-analyzer PID 1532439 was sent SIGCONT.
 
+### Standard prelude production-budget GREEN and mapped-unit persistence
+
+- User authorized the semantic fixture's production budget of 1,288,490,188
+  bytes. DuckDB reports this as `1.1 GiB` (display rounding). Semantic assertions
+  are unchanged; added a 64-empty-module scalability case with the same paths.
+- EXPLAIN ANALYZE JSON captured for path derivation and every statement of the
+  import-binding round. Persistent artifacts:
+  `/home/ubuntu/namespace-prelude-{paths,imports}-plan-*.json`.
+  Actual measured system peak buffer memory: 97,638,096 bytes for the tiny std
+  case; 113,204,416 bytes with 64 extra empty scopes. Peak temporary disk: zero.
+  Post-query duckdb_memory() usage in the initial three-case probe was
+  12,623,696 bytes (std/core enabled), 10,633,648 bytes (implicit prelude disabled).
+- Both analyzed sets have zero CROSS_PRODUCT operators. The binding-result
+  scans have cardinalities 1, 1 and 13 in both cases. The largest operator grows
+  from 76 to 588 rows: the scope-ancestor scan repeated by the recursive path
+  walk, not prelude names copied into every scope. Regression asserts zero
+  bindings on all 64 empty scopes and one macro-prelude link per enabled unit.
+  Prelude fallback is keyed by each request's prelude scope and name; bindings
+  are shared per compilation unit, not copied to each lexical/module scope.
+  These measurements disprove the proposed scopes-times-prelude-names failure
+  in this fixture, but do not qualify a full repository's memory footprint.
+- Adapter library: `45 passed; 0 failed; ... finished in 44.23s`.
+  Adapter all-target Clippy finished in 0.61s. Optional profile artifact output
+  is enabled only by PARSELTONGUE_PRELUDE_PROFILE_DIRECTORY; ordinary tests have
+  no hard-coded filesystem output path.
+- Persistence regression RED `5ecf48519` demonstrated that a mapped, non-sysroot
+  unit produced no namespace rows. GREEN `970cf45da` introduces the shared core
+  MAPPED_TARGET_FLAG_FIELD constant and uses it in graph creation, sysroot graph
+  creation, CLI selection and namespace persistence. Tests retain the literal
+  wire spelling independently. Regression also covers unmapped, sysroot and
+  malformed-source cases. Graph 9+3 and syntax 18+17 tests pass; all-target
+  four-crate Clippy finished in 18.88s.
+- Editor PID 1532439 was paused again because its unbounded competing native
+  build held Cargo's target lock and launched 19 descendants. Those build
+  descendants were terminated; our native builds use CARGO_BUILD_JOBS=2 and
+  CXXFLAGS=-g0. Resume the editor after remaining native work.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement

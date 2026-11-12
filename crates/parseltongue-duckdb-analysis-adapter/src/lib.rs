@@ -46,6 +46,8 @@ impl DuckdbAnalysisStoreAdapter {
             .and_then(|config| config.with("autoinstall_known_extensions", "false"))
             .and_then(|config| config.with("autoload_known_extensions", "false"))
             .and_then(|config| config.with("allow_community_extensions", "false"))
+            .and_then(|config| config.with("threads", "2"))
+            .and_then(|config| config.with("preserve_insertion_order", "false"))
             .and_then(|config| config.max_memory(&format!("{memory_limit_bytes}B")))
             .map_err(build_analysis_error)?;
         let connection =
