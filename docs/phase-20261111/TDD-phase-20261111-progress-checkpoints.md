@@ -2537,3 +2537,20 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   B-tree cell validation during syntax writes, before DuckDB analysis.
   Next: isolate that upstream debug cost with a command-line profile override
   (no source/config edits), retaining explicit default-vs-override results.
+
+### Indexed Turso predicates REFACTOR
+
+- REQ-RUST-020.1 / 021.1 / 024.1. No further refactor is needed for this
+  bounded fix: independent EXISTS probes deliberately remain independent so
+  the pinned planner preserves complete-key seeks. Deduplicating them back
+  into IN/OR inside one subquery would reintroduce the measured poor plan.
+  The named probe closures already isolate SQL construction.
+- No source inputs changed after the GREEN checks. Reuse their observed
+  `5 passed; 0 failed; 3 ignored`, `22 passed; 0 failed`, `4 passed; 0 failed`,
+  Clippy completion and `FORMAT_CHECK_EXIT=0`; do not re-run unchanged gates.
+- CPU profile: 990 samples, no lost samples; inclusive
+  `debug_validate_cells_core` is 31.82% during the sampled syntax writes.
+  This proves reachable debug-validation overhead, not the entire remaining
+  native latency or any production RAM-budget failure.
+- Next: finish the original CLI WIP only after the bounded native check,
+  then freeze the release executable for the serde-first SOP run.
