@@ -2,10 +2,45 @@ use super::build_analysis_error;
 use parseltongue_core_row_types::{StageRunScopeValue, StoreBackendFailureError};
 
 pub fn recompute_path_candidates(
-    _connection: &duckdb::Connection,
-    _scope: &StageRunScopeValue,
+    connection: &duckdb::Connection,
+    scope: &StageRunScopeValue,
 ) -> Result<(), StoreBackendFailureError> {
-    Err(build_analysis_error("path candidate SQL not implemented"))
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(build_analysis_error)?;
+    transaction
+        .execute(
+            "CREATE OR REPLACE TEMP TABLE \"namespace-active-path-requests\" AS
+        SELECT * FROM \"namespace-path-source-requests\" WHERE generation_key=? AND attempt_key=?",
+            duckdb::params![
+                scope.run_generation_digest_value,
+                scope.stage_attempt_sequence_value
+            ],
+        )
+        .map_err(build_analysis_error)?;
+    let missing: usize = transaction.query_row("SELECT count(*) FROM \"namespace-active-path-requests\" r
+        LEFT JOIN \"namespace-scope-context-records\" s ON s.generation_key=r.generation_key AND s.attempt_key=r.attempt_key AND s.scope_key=r.scope_key
+        WHERE s.scope_key IS NULL",[],|row|row.get(0)).map_err(build_analysis_error)?;
+    if missing != 0 {
+        return Err(build_analysis_error(
+            "StageInputMissingError: path lexical scope absent",
+        ));
+    }
+    transaction.execute_batch("CREATE TABLE IF NOT EXISTS \"namespace-path-candidate-records\" (
+        generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,request_key VARCHAR NOT NULL,
+        target_key VARCHAR NOT NULL,namespace VARCHAR NOT NULL,binding_scope VARCHAR NOT NULL,binding_name VARCHAR NOT NULL,state VARCHAR NOT NULL,
+        PRIMARY KEY(generation_key,attempt_key,request_key,target_key,namespace,binding_scope,binding_name));")
+        .map_err(build_analysis_error)?;
+    transaction.execute("DELETE FROM \"namespace-path-candidate-records\" WHERE generation_key=? AND attempt_key=?",
+        duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+    transaction
+        .execute_batch(&format!(
+            "INSERT INTO \"namespace-path-candidate-records\" {}",
+            include_str!("namespace-path-candidate-derivation.sql")
+        ))
+        .map_err(build_analysis_error)?;
+    transaction.commit().map_err(build_analysis_error)?;
+    Ok(())
 }
 
 #[cfg(test)]
