@@ -36,9 +36,16 @@ pub(super) fn build_snapshot_unit_visibility(table: &str, revision: Option<i64>)
             || owner == "source-ingest"
             || owner == "syntax-namespace-input-records"
         {
-            return format!("EXISTS (SELECT 1 FROM \"frozen-stage-unit-memberships\" AS frozen WHERE frozen.generation_key=\"{table}\".run_generation_digest_value
+            let build_frozen_owner_probe = |owner: &str| {
+                format!("EXISTS (SELECT 1 FROM \"frozen-stage-unit-memberships\" AS frozen WHERE frozen.generation_key=\"{table}\".run_generation_digest_value
                 AND frozen.source_attempt_key=\"{table}\".stage_attempt_sequence_value AND frozen.publication_revision<={revision}
-                AND frozen.stage_marker_key IN ('__marker__/{owner}/' || \"{table}\".stage_unit_work_key,'__marker__/name-resolution/' || \"{table}\".stage_unit_work_key))");
+                AND frozen.stage_marker_key='__marker__/{owner}/' || \"{table}\".stage_unit_work_key)")
+            };
+            return format!(
+                "({} OR {})",
+                build_frozen_owner_probe(owner),
+                build_frozen_owner_probe("name-resolution")
+            );
         }
         format!("'__marker__/{owner}/' || \"{table}\".stage_unit_work_key")
     };

@@ -139,19 +139,25 @@ fn build_crate_visibility_clause(table: &str, revision: Option<i64>) -> String {
     let unit = format!(
         "substr(\"{table}\".stage_unit_work_key,1,instr(\"{table}\".stage_unit_work_key,'/pending/')-1)"
     );
+    let build_completion_marker_probe = |owner: &str| {
+        format!(
+            r#"EXISTS (SELECT 1 FROM "stage-run-generation-records" AS completed
+        WHERE completed.run_generation_digest_value="{table}".run_generation_digest_value
+        AND completed.stage_attempt_sequence_value="{table}".stage_attempt_sequence_value
+        AND completed.stage_row_record_key='__marker__/{owner}/' || {unit} {frozen_completion})"#
+        )
+    };
     let completion = if owner == "name-resolution" {
-        format!("completed.stage_row_record_key='__marker__/name-resolution/' || {unit}")
+        build_completion_marker_probe(owner)
     } else {
         format!(
-            "completed.stage_row_record_key IN ('__marker__/{owner}/' || {unit},'__marker__/name-resolution/' || {unit})"
+            "{} OR {}",
+            build_completion_marker_probe(owner),
+            build_completion_marker_probe("name-resolution")
         )
     };
     format!(
-        r#"("{table}".stage_unit_work_key NOT LIKE 'crate/%/pending/%' OR EXISTS (
-        SELECT 1 FROM "stage-run-generation-records" AS completed
-        WHERE completed.run_generation_digest_value="{table}".run_generation_digest_value
-        AND completed.stage_attempt_sequence_value="{table}".stage_attempt_sequence_value
-        AND {completion} {frozen_completion})) AND {snapshot_visibility}"#
+        r#"("{table}".stage_unit_work_key NOT LIKE 'crate/%/pending/%' OR {completion}) AND {snapshot_visibility}"#
     )
 }
 
@@ -178,7 +184,9 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                     run_generation_digest_value TEXT NOT NULL, stage_attempt_sequence_value TEXT NOT NULL,
                     stage_row_record_key TEXT NOT NULL, stage_unit_work_key TEXT NOT NULL, stage_row_payload_text TEXT NOT NULL,
                     PRIMARY KEY(run_generation_digest_value,stage_attempt_sequence_value,stage_row_record_key))"), ()).await?;
-                let prefix = table.rsplit_once('-').map(|(prefix,_)|prefix).unwrap_or(table);
+                let prefix = table.strip_prefix("syntax-namespace-input-")
+                    .map(|kind|format!("syntax-namespace-{kind}"))
+                    .unwrap_or_else(||table.rsplit_once('-').map(|(prefix,_)|prefix).unwrap_or(table).to_owned());
                 connection.execute(format!("CREATE INDEX IF NOT EXISTS \"{prefix}-lookup\" ON \"{table}\" (run_generation_digest_value,stage_attempt_sequence_value,stage_unit_work_key)"), ()).await?;
             }
             connection.execute("CREATE TABLE IF NOT EXISTS \"file-source-content-records\" (file_content_digest_full TEXT PRIMARY KEY, file_source_content_bytes BLOB NOT NULL)", ()).await?;

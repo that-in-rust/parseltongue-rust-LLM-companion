@@ -2517,3 +2517,23 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   establish that the cleanup collision dominates that earlier phase. Next:
   give each input kind its own four-word lookup-index name, then verify all
   plan and atomic-publication contracts. No memory tuning is undertaken.
+
+### Frozen visibility and namespace index GREEN
+
+- REQ-RUST-020.1 / 021.1 / 024.1. The two marker alternatives now use
+  independent complete-key EXISTS lookups; namespace input kinds have
+  distinct `syntax-namespace-<kind>-lookup` indexes. Frozen revision bounds,
+  private-chunk sealing and owner alternatives are unchanged.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 timeout --signal=TERM --kill-after=5s 180s cargo test -p parseltongue-turso-store-adapter -- --nocapture`.
+  Exact results: `5 passed; 0 failed; 3 ignored` library (0.72s),
+  `22 passed; 0 failed` stage contracts (3.18s),
+  `4 passed; 0 failed` build/dependency gates (0.38s), zero doc tests.
+- Two-crate all-target Clippy `-D warnings` completed successfully in 1.92s;
+  `cargo fmt --all -- --check` returned `FORMAT_CHECK_EXIT=0`.
+  Logs: `/home/ubuntu/cli-visibility-complete-{green,clippy,format}.log`.
+- This is GREEN for the bounded Turso predicates/indexes, NOT completion of
+  the CLI native contract or an SOP milestone. The ongoing 600s default-profile
+  CLI check remains pending. CPU sampling shows reachable Turso debug-only
+  B-tree cell validation during syntax writes, before DuckDB analysis.
+  Next: isolate that upstream debug cost with a command-line profile override
+  (no source/config edits), retaining explicit default-vs-override results.
