@@ -1542,3 +1542,16 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   qualified path/provenance exports and the differ, then fresh all-five M2
   snapshots/S5 results. Old S3 stores are not suitable manifest sources
   because their immutable configurations predate snapshot compiler/pin fields.
+
+### Oracle artifact-cache input STUB
+
+- Next comparison-phase boundary: offline Cargo check may prepare proc-macro
+  dylibs and record build-script observations. PRIMARY must inject only
+  verified cached dylib paths into the loader; cfg/env/OUT_DIR from build
+  scripts stay disabled. SECONDARY receives recorded configuration deltas.
+- Added build_oracle_artifact_cache and the explicit CLI output route as
+  STUBs. New cache artifacts must bind compiler/pin, published manifest scope,
+  exact host-proc-macro semantic units/features, source roots and dylib bytes.
+  Required missing/ambiguous/tampered artifacts must fail, not silently drop
+  macro exports. Artifact loading observations are distinct from invocation
+  provenance and S5 exclusions, which remain following work.

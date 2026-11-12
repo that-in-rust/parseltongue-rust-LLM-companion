@@ -1,5 +1,24 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let oracle_cli_argument_values = std::env::args().skip(1).collect::<Vec<_>>();
+    if let [root_flag, root, manifest_flag, manifest, cache_flag, output] =
+        oracle_cli_argument_values.as_slice()
+        && root_flag == "--workspace-source-root-path"
+        && manifest_flag == "--mapped-unit-manifest-path"
+        && cache_flag == "--oracle-artifact-cache-output"
+    {
+        let config = oracle_semantic_export_harness::OracleWorkspaceExportConfig {
+            workspace_source_root_path: root.into(),
+            oracle_macro_cache_manifest: None,
+            oracle_target_triple_value: None,
+            oracle_enabled_feature_values: Vec::new(),
+            oracle_default_features_flag: true,
+        };
+        let manifest = serde_json::from_slice(&std::fs::read(manifest)?)?;
+        let cache =
+            oracle_semantic_export_harness::build_oracle_artifact_cache(&config, &manifest)?;
+        std::fs::write(output, serde_json::to_vec_pretty(&cache)?)?;
+        return Ok(());
+    }
     if let [
         root_flag,
         root,
