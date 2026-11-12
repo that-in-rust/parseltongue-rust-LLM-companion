@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -157,11 +158,18 @@ def create_preflight_fixture(root_path: Path) -> dict[str, object]:
 def create_coverage_scope_page(generation: str = "generation-a", offset: int = 0, next_offset: int = 1,
                                has_more: bool = False, entries: list[str] | None = None,
                                total: int = 1, generation_matches: bool = True) -> dict:
+    raw_entries = entries if entries is not None else ["tools/a.py"]
+    scope_entries = [
+        dict(entry) if isinstance(entry, dict) else {
+            "path": entry, "kind": "not_indexed_dir", "detail": "excluded subtree",
+        }
+        for entry in raw_entries
+    ]
     return {
         "indexed_at": generation,
         "requested_offset": offset,
         "metadata": {"recording_status": "complete", "generation_matches": generation_matches},
-        "scopes": [{"entries": entries if entries is not None else ["tools/a.py"]}],
+        "scopes": [{"entries": scope_entries}],
         "scope_total": total,
         "has_more": has_more,
         "next_offset": next_offset,
@@ -171,9 +179,16 @@ def create_coverage_scope_page(generation: str = "generation-a", offset: int = 0
 def create_coverage_missed_page(generation: str = "generation-a", rows: list[str] | None = None,
                                 has_more: bool = False, next_cursor: str | None = None,
                                 total: int = 0) -> dict:
+    row_values = [list(row) if isinstance(row, (list, tuple)) else [row]
+                  for row in (rows if rows is not None else [])]
     return {
+        "columns": ["f.file_path"],
+        "returned": len(row_values),
+        "total_relation": "eq",
         "indexed_at": generation,
-        "rows": rows if rows is not None else [],
+        "rows": row_values,
+        "truncated": has_more,
+        "truncation_reason": "page_limit" if has_more else None,
         "has_more": has_more,
         "next_cursor": next_cursor,
         "total": total,
@@ -187,6 +202,286 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary_directory.cleanup()
+
+    def build_output_validation_fixture(self):
+        project_root = self.root_path / "output-project"
+        project_root.mkdir()
+        corpus_roots = {}
+        manifest_records = []
+        for repository_name in runner.DEFAULT_REPOSITORY_ORDER:
+            corpus_root = self.root_path / "output-corpora" / repository_name
+            corpus_root.mkdir(parents=True)
+            corpus_roots[repository_name] = corpus_root
+            manifest_records.append({
+                "corpus_repository_short_name": repository_name,
+                "corpus_source_checkout_path": str(corpus_root),
+            })
+        manifest_path = self.root_path / "output-corpus-manifest.json"
+        manifest_path.write_text(json.dumps(manifest_records))
+        return project_root, corpus_roots, manifest_path
+
+    def run_output_validation_plan(self, project_root, manifest_path, report_root, artifact_root, run_id):
+        argument_values = [
+            "--run-id", run_id, "--milestone", "M1", "--mode", "plan",
+            "--corpus-manifest", str(manifest_path), "--report-root", str(report_root),
+        ]
+        if artifact_root is not None:
+            argument_values.extend(["--artifact-root", str(artifact_root)])
+        arguments = runner.build_runner_argument_parser().parse_args(argument_values)
+        with patch.object(runner, "PROJECT_ROOT", project_root):
+            return runner.run_persistent_qualification_plan(arguments)
+
+    def build_corpus_lock_fixture(self, repository_name, ignored):
+        source_root = self.root_path / f"lock-{repository_name}"
+        file_values = {
+            "Cargo.toml": f"[package]\nname='{repository_name}'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        }
+        if ignored:
+            file_values[".gitignore"] = "Cargo.lock\n"
+        create_committed_git_repository(source_root, file_values)
+        lock_path = source_root / "Cargo.lock"
+        lock_path.write_bytes(f"# {repository_name} frozen lock\n".encode())
+        return source_root, lock_path
+
+    def build_selected_lock_fixture(self):
+        project_root = self.root_path / "lock-project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='runner-fixture'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        serde_root, serde_lock = self.build_corpus_lock_fixture("serde", True)
+        tokio_root, tokio_lock = self.build_corpus_lock_fixture("tokio", False)
+        return project_root, serde_root, serde_lock, tokio_root, tokio_lock
+
+    def build_complete_publication_banner(self):
+        return {
+            "run_generation_digest_value": "published-generation-sha256",
+            "source_tiling_identity_holds": True,
+            "source_file_record_count": 1,
+            "stage_publication_status_values": {
+                "crate-graph": "complete",
+                "source-ingest": "complete",
+                "syntax-spans": "complete",
+                "name-resolution": "complete",
+            },
+        }
+
+    def test_output_checkout_root_blocks(self):
+        """REQ-SOP-RUNNER-015: reject checkout-root report output before persistence."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        run_id = "checkout-root-output"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, project_root, self.root_path / "artifacts", run_id
+            )
+        self.assertFalse((project_root / run_id).exists())
+
+    def test_output_source_ancestor_blocks(self):
+        """REQ-SOP-RUNNER-015: reject report roots that are ancestors of project sources."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        report_root = project_root.parent
+        run_id = "project-ancestor-output"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, self.root_path / "artifacts", run_id
+            )
+        self.assertFalse((report_root / run_id).exists())
+
+    def test_output_source_subtree_blocks(self):
+        """REQ-SOP-RUNNER-015: reject artifact roots within project source subtrees."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        report_root = self.root_path / "safe-reports"
+        artifact_root = project_root / "src"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, artifact_root, "source-subtree-output"
+            )
+        self.assertFalse((report_root / "source-subtree-output").exists())
+
+    def test_corpus_ancestor_root_blocks(self):
+        """REQ-SOP-RUNNER-015: reject artifact roots that are corpus ancestors."""
+        project_root, corpus_roots, manifest_path = self.build_output_validation_fixture()
+        artifact_root = corpus_roots["serde"].parent
+        report_root = self.root_path / "safe-reports"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, artifact_root, "corpus-ancestor-output"
+            )
+        self.assertFalse((report_root / "corpus-ancestor-output").exists())
+
+    def test_corpus_root_output_blocks(self):
+        """REQ-SOP-RUNNER-015: reject report output at a pinned corpus root."""
+        project_root, corpus_roots, manifest_path = self.build_output_validation_fixture()
+        report_root = corpus_roots["serde"]
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, self.root_path / "artifacts", "corpus-root-output"
+            )
+        self.assertFalse((report_root / "corpus-root-output").exists())
+
+    def test_output_symlink_bypass_blocks(self):
+        """REQ-SOP-RUNNER-015: reject symlink aliases into source trees."""
+        project_root, corpus_roots, manifest_path = self.build_output_validation_fixture()
+        output_alias = self.root_path / "artifact-source-alias"
+        output_alias.symlink_to(corpus_roots["serde"], target_is_directory=True)
+        report_root = self.root_path / "safe-reports"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, output_alias, "symlink-source-output"
+            )
+        self.assertFalse((report_root / "symlink-source-output").exists())
+
+    def test_output_symlink_alias_blocks(self):
+        """REQ-SOP-RUNNER-015: reject symlink-equivalent external report roots."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        external_target = self.root_path / "external-report-target"
+        external_target.mkdir()
+        report_alias = self.root_path / "external-report-alias"
+        report_alias.symlink_to(external_target, target_is_directory=True)
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_alias, self.root_path / "artifacts", "symlink-alias-output"
+            )
+        self.assertFalse((external_target / "symlink-alias-output").exists())
+
+    def test_output_safe_paths_validate(self):
+        """REQ-SOP-RUNNER-015: accept the exact default report root and external roots."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        default_report_root = project_root / "hld-current-test-runs"
+        default_result = self.run_output_validation_plan(
+            project_root, manifest_path, default_report_root, None, "valid-default-output"
+        )
+        self.assertEqual(default_result["overall_status"], "NOT STARTED")
+        self.assertTrue((default_report_root / "valid-default-output").is_dir())
+        external_result = self.run_output_validation_plan(
+            project_root, manifest_path, self.root_path / "external-reports",
+            self.root_path / "external-artifacts", "valid-external-output",
+        )
+        self.assertEqual(external_result["overall_status"], "NOT STARTED")
+
+    def test_outputs_block_before_writes(self):
+        """REQ-SOP-RUNNER-015: report unsafe output configuration to stderr without writes."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        artifact_root = self.root_path / "unsafe-artifacts"
+        stderr = StringIO()
+        argument_values = [
+            "--run-id", "unsafe-before-write", "--milestone", "M1", "--mode", "plan",
+            "--corpus-manifest", str(manifest_path), "--report-root", str(project_root),
+            "--artifact-root", str(artifact_root),
+        ]
+        with patch.object(runner, "PROJECT_ROOT", project_root), patch.object(runner.sys, "stderr", stderr):
+            return_code = runner.main(argument_values)
+        self.assertEqual(return_code, 2)
+        self.assertEqual(json.loads(stderr.getvalue())["overall_status"], "BLOCKED")
+        self.assertFalse((project_root / "unsafe-before-write").exists())
+        self.assertFalse(artifact_root.exists())
+
+    def test_output_exclusions_detect_mutations(self):
+        """REQ-SOP-RUNNER-015: only owned run directories are excluded from source snapshots."""
+        source_root = self.root_path / "snapshot-output-project"
+        create_committed_git_repository(source_root, {
+            ".gitignore": "hld-current-test-runs/\n",
+            "Cargo.toml": "[package]\nname='fixture'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        report_run_directory = source_root / "hld-current-test-runs" / "owned-run"
+        artifact_run_directory = self.root_path / "artifact-runs" / "owned-run"
+        report_run_directory.mkdir(parents=True)
+        artifact_run_directory.mkdir(parents=True)
+        (report_run_directory / "hld-current-test-report.md").write_text("owned report\n")
+        exclusions = runner.build_owned_run_exclusions(report_run_directory, artifact_run_directory)
+        self.assertEqual(exclusions, [report_run_directory.resolve(), artifact_run_directory.resolve()])
+        registry = runner.capture_identity_registry(source_root, [], {}, exclusions, [])
+        unexpected_source = source_root / "hld-current-test-runs" / "unowned-run" / "src" / "rogue.rs"
+        unexpected_source.parent.mkdir(parents=True)
+        unexpected_source.write_text("pub fn rogue() {}\n")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_selected_locks_are_frozen(self):
+        """REQ-SOP-RUNNER-016: selected ignored and untracked Cargo.lock bytes enter identity evidence."""
+        project_root, serde_root, serde_lock, tokio_root, tokio_lock = self.build_selected_lock_fixture()
+        registry = runner.capture_identity_registry(
+            project_root, [], {"serde": serde_root, "tokio": tokio_root}, [], []
+        )
+        expected_provenance = ((serde_root, serde_lock, "ignored"), (tokio_root, tokio_lock, "untracked"))
+        for source_root, lock_path, provenance in expected_provenance:
+            snapshot = registry["source_snapshots"][str(source_root.resolve())]
+            lock_evidence = snapshot["permitted_lock_files"]["Cargo.lock"]
+            self.assertEqual(lock_evidence["provenance"], provenance)
+            self.assertEqual(lock_evidence["identity"]["sha256"], hashlib.sha256(lock_path.read_bytes()).hexdigest())
+            self.assertEqual(registry["lock_files"][str(lock_path.absolute())]["sha256"],
+                             hashlib.sha256(lock_path.read_bytes()).hexdigest())
+
+    def test_selected_lock_modification_fails(self):
+        """REQ-SOP-RUNNER-016: selected ignored lock mutation fails frozen identity checks."""
+        project_root, serde_root, serde_lock, tokio_root, _ = self.build_selected_lock_fixture()
+        registry = runner.capture_identity_registry(
+            project_root, [], {"serde": serde_root, "tokio": tokio_root}, [], []
+        )
+        serde_lock.write_bytes(b"changed selected lock\n")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_selected_lock_deletion_fails(self):
+        """REQ-SOP-RUNNER-016: selected untracked lock deletion fails frozen identity checks."""
+        project_root, serde_root, _, tokio_root, tokio_lock = self.build_selected_lock_fixture()
+        registry = runner.capture_identity_registry(
+            project_root, [], {"serde": serde_root, "tokio": tokio_root}, [], []
+        )
+        tokio_lock.unlink()
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_unselected_lock_stays_blocked(self):
+        """REQ-SOP-RUNNER-016: ignored Cargo.lock files outside the explicit allowlist stay blocked."""
+        project_root = self.root_path / "unselected-lock-project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='runner-fixture'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        ripgrep_root, _ = self.build_corpus_lock_fixture("ripgrep", True)
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            runner.capture_identity_registry(project_root, [], {"ripgrep": ripgrep_root}, [], [])
+
+    def test_publication_map_accepts_complete(self):
+        """REQ-SOP-RUNNER-017: complete publication statuses pass with a generation digest."""
+        result = measurements.validate_publication_stage_markers(
+            self.build_complete_publication_banner(), "name-resolution"
+        )
+        self.assertTrue(result["pass"], result["reason"])
+
+    def test_publication_map_requires_stages(self):
+        """REQ-SOP-RUNNER-017: incomplete published stage values cannot pass."""
+        banner = self.build_complete_publication_banner()
+        banner["stage_publication_status_values"]["syntax-spans"] = "staged"
+        result = measurements.validate_publication_stage_markers(banner, "source-ingest")
+        self.assertFalse(result["pass"])
+
+    def test_publication_map_requires_generation(self):
+        """REQ-SOP-RUNNER-017: publication completion requires its published generation identity."""
+        banner = self.build_complete_publication_banner()
+        banner.pop("run_generation_digest_value")
+        result = measurements.validate_publication_stage_markers(banner, "source-ingest")
+        self.assertFalse(result["pass"])
+
+    def test_static_status_cannot_publish(self):
+        """REQ-SOP-RUNNER-017: static implementation completion and vacuous tiling do not qualify publication."""
+        banner = {
+            "run_generation_digest_value": "published-generation-sha256",
+            "source_tiling_identity_holds": True,
+            "source_file_record_count": 3,
+            "stage_implementation_status_values": {
+                "crate-graph": "complete",
+                "source-ingest": "complete",
+                "syntax-spans": "complete",
+                "name-resolution": "complete",
+            },
+        }
+        result = measurements.validate_publication_stage_markers(banner, "name-resolution")
+        self.assertFalse(result["pass"])
+        self.assertIn("missing", result["reason"])
 
     def test_report_initializes_repo_states(self):
         """REQ-SOP-RUNNER-001: initialize five repositories as NOT STARTED."""
@@ -503,6 +798,94 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
                 [create_coverage_missed_page(total=True)], "generation-a"
             )
 
+    def test_scope_duplicate_identity_blocks(self):
+        """REQ-SOP-RUNNER-019: duplicate scope paths cannot satisfy complete pagination."""
+        first_paths = [f"src/{index}.rs" for index in range(20)]
+        first_paths[0] = "src/lib.rs"
+        pages = [
+            create_coverage_scope_page(offset=0, next_offset=20, has_more=True,
+                                       entries=first_paths, total=21),
+            create_coverage_scope_page(offset=20, has_more=False,
+                                       entries=["src/lib.rs"], total=21),
+        ]
+        with self.assertRaises(inventory.CoverageInventoryBlockedError):
+            inventory.validate_scope_response_pages(pages, expected_generation="generation-a")
+
+    def test_scope_identity_missing_blocks(self):
+        """REQ-SOP-RUNNER-019: scope entries without a path identity are BLOCKED."""
+        page = create_coverage_scope_page(
+            entries=[{"kind": "not_indexed_file", "detail": "missing"}], total=1,
+        )
+        with self.assertRaises(inventory.CoverageInventoryBlockedError):
+            inventory.validate_scope_response_pages([page], expected_generation="generation-a")
+
+    def test_scope_content_conflict_blocks(self):
+        """REQ-SOP-RUNNER-019: repeated scope paths with conflicting content are BLOCKED."""
+        first_entries = [
+            {"path": f"src/{index}.rs", "kind": "file", "detail": "indexed"}
+            for index in range(20)
+        ]
+        first_entries[0]["path"] = "src/lib.rs"
+        pages = [
+            create_coverage_scope_page(
+                offset=0, next_offset=20, has_more=True, entries=first_entries, total=21,
+            ),
+            create_coverage_scope_page(
+                offset=20, has_more=False,
+                entries=[{"path": "src/lib.rs", "kind": "not_indexed_file", "detail": "missing"}], total=21,
+            ),
+        ]
+        with self.assertRaises(inventory.CoverageInventoryBlockedError):
+            inventory.validate_scope_response_pages(pages, expected_generation="generation-a")
+
+    def test_missed_duplicate_identity_blocks(self):
+        """REQ-SOP-RUNNER-019: duplicate missed File paths cannot satisfy pagination totals."""
+        first_paths = [f"src/{index}.rs" for index in range(200)]
+        pages = [
+            create_coverage_missed_page(rows=first_paths, has_more=True,
+                                        next_cursor="cursor-a", total=201),
+            create_coverage_missed_page(rows=[first_paths[0]], total=201),
+        ]
+        with self.assertRaises(inventory.CoverageInventoryBlockedError):
+            inventory.validate_missed_response_pages(pages, "generation-a")
+
+    def test_duplicate_page_stops_collection(self):
+        """REQ-SOP-RUNNER-019: live duplicate missed paths stop before another query."""
+        report_directory = self.root_path / "reports" / "serde"
+        artifact_directory = self.root_path / "artifacts" / "serde"
+        report_directory.mkdir(parents=True)
+        artifact_directory.mkdir(parents=True)
+        (artifact_directory / "codebase-index-result-log.txt").write_text(json.dumps({
+            "status": "indexed", "indexed_at": "generation-a", "nodes": 1, "edges": 1,
+        }))
+        scope_text = json.dumps({
+            "indexed_at": "generation-a",
+            "metadata": {"recording_status": "complete", "generation_matches": True},
+            "scope_total": 0, "scopes": [{"entries": []}], "has_more": False,
+        })
+        missed_texts = [json.dumps({
+            "columns": ["f.file_path"], "rows": [["src/lib.rs"]], "returned": 1,
+            "total_relation": "eq", "has_more": True, "next_cursor": cursor, "total": 201,
+        }) for cursor in ("cursor-a", "cursor-b")]
+        fake_run, missed_query_count = create_coverage_command_runner(scope_text, missed_texts)
+        with patch.object(inventory.subprocess, "run", side_effect=fake_run):
+            with self.assertRaises(inventory.CoverageInventoryBlockedError):
+                inventory.collect_index_coverage_inventory(
+                    "serde", report_directory, "fixture-indexer", "project-fixture", "generation-a",
+                    raw_response_directory_path=artifact_directory,
+                    digest_file_callback=lambda _path: "b" * 64,
+                )
+        self.assertEqual(missed_query_count(), 2)
+        self.assertEqual(
+            (artifact_directory / "codebase-missed-source-page-1.json").read_text(), missed_texts[1]
+        )
+
+    def test_missed_identity_missing_blocks(self):
+        """REQ-SOP-RUNNER-019: a missed File row without a path identity is BLOCKED."""
+        page = create_coverage_missed_page(rows=[None], total=1)
+        with self.assertRaises(inventory.CoverageInventoryBlockedError):
+            inventory.validate_missed_response_pages([page], "generation-a")
+
     def test_empty_pages_cannot_loop(self):
         """REQ-SOP-RUNNER-010: empty pages with continuation cannot outlive declared totals."""
         scope_page = {
@@ -511,7 +894,11 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "scope_total": 0, "scopes": [{"entries": []}],
             "has_more": True, "next_offset": 20,
         }
-        missed_page = {"rows": [], "has_more": True, "next_cursor": "cursor-a", "total": 0}
+        missed_page = {
+            "columns": ["f.file_path"], "rows": [], "returned": 0,
+            "total_relation": "eq", "has_more": True,
+            "next_cursor": "cursor-a", "total": 0,
+        }
         with self.assertRaises(inventory.CoverageInventoryBlockedError):
             inventory.validate_scope_response_pages(
                 [{"response": scope_page, "boundary_offset": 0}],
@@ -541,7 +928,8 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "has_more": False,
         })
         missed_texts = [json.dumps({
-            "indexed_at": "generation-a", "rows": [str(index)], "has_more": True,
+            "indexed_at": "generation-a", "columns": ["f.file_path"],
+            "rows": [[str(index)]], "returned": 1, "total_relation": "eq", "has_more": True,
             "next_cursor": cursor, "total": 1000,
         }) for index, cursor in enumerate(("cursor-a", "cursor-b", "cursor-a"))]
         fake_run, missed_query_count = create_coverage_command_runner(scope_text, missed_texts)
@@ -571,7 +959,8 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "has_more": False,
         })
         stale_page = json.dumps({
-            "indexed_at": "generation-stale", "rows": ["row"], "has_more": True,
+            "indexed_at": "generation-stale", "columns": ["f.file_path"],
+            "rows": [["row"]], "returned": 1, "total_relation": "eq", "has_more": True,
             "next_cursor": "cursor-next", "total": 10,
         })
         fake_run, missed_query_count = create_coverage_command_runner(scope_text, [stale_page])
@@ -598,7 +987,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "indexed_at": "generation-a",
             "metadata": {"recording_status": "complete", "generation_matches": True},
             "scope_total": 2,
-            "scopes": [{"entries": ["entry-a"]}],
+            "scopes": [{"entries": [{"path": "entry-a", "kind": "file", "detail": "indexed"}]}],
             "has_more": True,
             "next_offset": True,
         })
@@ -648,7 +1037,9 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "has_more": False,
         }, separators=(",", ":"))
         missed_text = json.dumps({
-            "rows": [], "has_more": False, "total": 0, "index_generation": "generation-a",
+            "columns": ["f.file_path"], "rows": [], "returned": 0,
+            "total_relation": "eq", "has_more": False,
+            "total": 0, "index_generation": "generation-a",
         }, separators=(",", ":"))
         fake_run, _ = create_coverage_command_runner(scope_text, [missed_text])
         with patch.object(inventory.subprocess, "run", side_effect=fake_run):
@@ -969,6 +1360,138 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         stores = [next(arg for arg in command if arg.endswith("workspace-store.db")) for command in commands]
         self.assertEqual(len(set(stores)), 3)
 
+    def test_trace_captures_syscall_families(self):
+        """REQ-SOP-RUNNER-018: process and network syscall families are traced together."""
+        record = {"corpus_source_checkout_path": str(self.root_path / "serde")}
+        _, audit_command, _ = measurements.build_corpus_measurement_commands(
+            record, self.root_path / "artifacts", Path("/frozen/parseltongue"), "syntax-spans"
+        )
+        self.assertIn("trace=%process,%network", audit_command)
+        self.assertIn("-yy", audit_command)
+
+    def test_execveat_spawn_is_forbidden(self):
+        """REQ-SOP-RUNNER-018: successful execveat descendants obey the spawn allowlist."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 clone(child_stack=NULL, flags=SIGCHLD) = 101\n'
+            '101 execveat(AT_FDCWD, "/usr/bin/cargo", ["cargo", "build"], 0) = 0\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertTrue(any("forbidden exec /usr/bin/cargo" in row for row in violations))
+
+    def test_internet_send_families_fail(self):
+        """REQ-SOP-RUNNER-018: IPv4 and IPv6 send syscall families fail the audit."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 sendto(3, "x", 1, 0, {sa_family=AF_INET, sin_port=htons(53)}, 16) = 1\n'
+            '100 sendmsg(3, {msg_name={sa_family=AF_INET6, sin6_port=htons(53)}}, 0) = 1\n'
+            '100 sendmmsg(3, [{msg_hdr={msg_name={sa_family=AF_INET, sin_port=htons(53)}}}], 1, 0) = 1\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertEqual(sum("forbidden network" in row for row in violations), 3)
+
+    def test_unaddressed_sends_require_proof(self):
+        """REQ-SOP-RUNNER-018: addressless sends fail without known local socket evidence."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 sendto(91, "x", 1, 0, NULL, 0) = 1\n'
+            '100 sendmsg(92, {msg_name=NULL, msg_iov=[{iov_base="x", iov_len=1}]}, 0) = 1\n'
+            '100 sendmmsg(93, [{msg_hdr={msg_name=NULL}}], 1, 0) = 1\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertEqual(sum("unproven network send" in row for row in violations), 3)
+
+    def test_socketpair_local_send_passes(self):
+        """REQ-SOP-RUNNER-018: known inherited AF_UNIX socketpair sends remain allowed."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 socketpair(AF_UNIX, SOCK_STREAM, 0, [3, 4]) = 0\n'
+            '100 clone(child_stack=NULL, flags=SIGCHLD) = 101\n'
+            '101 sendto(3<UNIX:[1234]>, "x", 1, 0, NULL, 0) = 1\n'
+            '101 sendmsg(4<UNIX:[1235]>, {msg_name=NULL}, 0) = 1\n'
+        )
+        self.assertEqual(auditor.audit_process_trace_events(trace, 100, binary), [])
+
+    def test_annotated_unix_fd_allowed(self):
+        """REQ-SOP-RUNNER-018: strace UNIX socket descriptors prove local addressless sends."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 sendto(4<UNIX-STREAM:[1234]>, "x", 1, 0, NULL, 0) = 1\n'
+        )
+        self.assertEqual(auditor.audit_process_trace_events(trace, 100, binary), [])
+
+    def test_stale_socket_proof_rejected(self):
+        """REQ-SOP-RUNNER-018: only per-event UNIX evidence allows addressless sends."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 socketpair(AF_UNIX, SOCK_STREAM, 0, [3, 4]) = 0\n'
+            '100 sendto(3, "x", 1, 0, NULL, 0) = 1\n'
+            '100 sendto(4<UNIX-STREAM:[1234]>, "x", 1, 0, NULL, 0) = 1\n'
+            '100 close(4) = 0\n'
+            '100 sendto(4, "x", 1, 0, NULL, 0) = 1\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertEqual(sum("unproven network send" in row for row in violations), 2)
+
+    def test_socketpair_inode_fd_untrusted(self):
+        """REQ-SOP-RUNNER-018: socketpair annotation inode digits never prove descriptor identity."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 socketpair(AF_UNIX, SOCK_STREAM, 0, '
+            '[3<UNIX-STREAM:[1234]>, 4<UNIX-STREAM:[5678]>]) = 0\n'
+            '100 sendto(1234, "x", 1, 0, NULL, 0) = 1\n'
+            '100 sendto(5678, "x", 1, 0, NULL, 0) = 1\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertEqual(sum("unproven network send" in row for row in violations), 2)
+
+    def test_execveat_relative_path_blocks(self):
+        """REQ-SOP-RUNNER-018: relative execveat identities cannot satisfy the allowlist."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 execveat(AT_FDCWD, "cargo", ["cargo", "metadata", "--offline"], 0) = 0\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertTrue(any("unresolved execveat path" in row for row in violations))
+
+    def test_failed_exec_payload_blocks(self):
+        """REQ-SOP-RUNNER-018: undecodable failed exec attempts remain explicit violations."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 execve("/usr/bin/cargo", [not-valid], []) = -1 ENOENT (No such file or directory)\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertTrue(any("undecodable exec argv" in row for row in violations))
+
+    def test_failed_forbidden_exec_blocks(self):
+        """REQ-SOP-RUNNER-018: forbidden exec attempts fail even when execve returns an error."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 execve("/bin/sh", ["sh", "-c", "true"], []) = -1 ENOENT (No such file or directory)\n'
+        )
+        violations = auditor.audit_process_trace_events(trace, 100, binary)
+        self.assertTrue(any("forbidden exec attempt /bin/sh" in row for row in violations))
+
+    def test_unix_sends_remain_allowed(self):
+        """REQ-SOP-RUNNER-018: local AF_UNIX socket traffic remains allowed."""
+        binary = "/frozen/parseltongue"
+        trace = (
+            f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+            '100 connect(3, {sa_family=AF_UNIX, sun_path="/run/local.sock"}, 24) = 0\n'
+            '100 sendmsg(3, {msg_name={sa_family=AF_UNIX, sun_path="/run/local.sock"}}, 0) = 1\n'
+        )
+        self.assertEqual(auditor.audit_process_trace_events(trace, 100, binary), [])
+
     def test_measurement_guard_wraps_commands(self):
         """REQ-SOP-RUNNER-004: subprocess probes invoke both identity-boundary callbacks."""
         executable = self.root_path / "fake-command"
@@ -983,6 +1506,150 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         )
         self.assertEqual([phase for phase, _ in phases], ["before", "after"])
         self.assertEqual(result["return_code"], 0)
+
+    def test_mapper_failure_skips_audits(self):
+        """REQ-SOP-RUNNER-020: mapper failure skips all later audit and publication commands."""
+        output = self.root_path / "mapper-failure-artifacts"
+        record = {
+            "corpus_repository_short_name": "serde",
+            "corpus_source_checkout_path": str(self.root_path / "serde"),
+        }
+        commands = []
+
+        def run_command(command_values, **_kwargs):
+            commands.append(list(command_values))
+            return subprocess.CompletedProcess(command_values, 1, "mapper failed", "")
+
+        with patch.object(measurements.subprocess, "run", side_effect=run_command):
+            summary = measurements.measure_corpus_production_stages(
+                record, output, Path("/frozen/parseltongue"), final_stage_kind="syntax-spans"
+            )
+        self.assertEqual(summary.get("production_mapper_status"), "FAIL")
+        self.assertEqual(summary.get("production_process_audit_status"), "NOT STARTED")
+        self.assertEqual(summary.get("production_target_audit_status"), "NOT STARTED")
+        self.assertEqual(summary.get("production_status_command_status"), "NOT STARTED")
+        self.assertEqual(summary.get("production_total_elapsed_seconds"), None)
+        self.assertIsNone(summary.get("production_coverage_banner_values"))
+        self.assertEqual(len(commands), 1)
+        persisted = json.loads((output / "production-stage-measurement-summary.json").read_text())
+        self.assertEqual(persisted["production_process_audit_status"], "NOT STARTED")
+
+    def test_process_failure_skips_status(self):
+        """REQ-SOP-RUNNER-020: process audit failure skips target and publication commands."""
+        output = self.root_path / "process-failure-artifacts"
+        binary = Path("/frozen/parseltongue")
+        record = {
+            "corpus_repository_short_name": "serde",
+            "corpus_source_checkout_path": str(self.root_path / "serde"),
+        }
+        commands = []
+
+        def run_command(command_values, **_kwargs):
+            commands.append(list(command_values))
+            if len(commands) == 1:
+                sample_path = Path(command_values[command_values.index("--memory-sample-output-path") + 1])
+                sample_path.write_text(json.dumps({
+                    "process_tree_elapsed_seconds": 1.25,
+                    "process_tree_peak_bytes": 2048,
+                    "sample_interval_millisecond_value": 10,
+                    "process_memory_sample_values": [{"elapsed_seconds": 0.01, "rss_bytes": 2048}],
+                }))
+            elif len(commands) == 2:
+                trace_path = Path(command_values[command_values.index("-o") + 1])
+                trace_path.write_text(
+                    f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+                    '100 socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP) = 3\n'
+                )
+            return subprocess.CompletedProcess(command_values, 0, "", "")
+
+        with patch.object(measurements.subprocess, "run", side_effect=run_command):
+            summary = measurements.measure_corpus_production_stages(
+                record, output, binary, final_stage_kind="syntax-spans"
+            )
+        self.assertEqual(summary.get("production_process_audit_status"), "FAIL")
+        self.assertEqual(summary.get("production_target_audit_status"), "NOT STARTED")
+        self.assertEqual(summary.get("production_status_command_status"), "NOT STARTED")
+        self.assertIsNone(summary.get("production_coverage_banner_values"))
+        self.assertEqual(len(commands), 2)
+        persisted = json.loads((output / "production-stage-measurement-summary.json").read_text())
+        self.assertEqual(persisted["production_target_audit_status"], "NOT STARTED")
+
+    def test_mapper_failure_retains_samples(self):
+        """REQ-SOP-RUNNER-020: failed mapper runs retain genuine completed telemetry."""
+        output = self.root_path / "mapper-failure-samples"
+        record = {
+            "corpus_repository_short_name": "serde",
+            "corpus_source_checkout_path": str(self.root_path / "serde"),
+        }
+        commands = []
+        sample = {
+            "process_tree_elapsed_seconds": 2.5,
+            "process_tree_peak_bytes": 4096,
+            "sample_interval_millisecond_value": 10,
+            "process_memory_sample_values": [{"elapsed_seconds": 0.01, "rss_bytes": 4096}],
+        }
+
+        def run_command(command_values, **_kwargs):
+            commands.append(list(command_values))
+            sample_path = Path(command_values[command_values.index("--memory-sample-output-path") + 1])
+            sample_path.write_text(json.dumps(sample))
+            return subprocess.CompletedProcess(command_values, 1, "mapper failed", "")
+
+        with patch.object(measurements.subprocess, "run", side_effect=run_command):
+            summary = measurements.measure_corpus_production_stages(
+                record, output, Path("/frozen/parseltongue"), final_stage_kind="syntax-spans"
+            )
+        self.assertEqual(summary["production_mapper_status"], "FAIL")
+        self.assertEqual(summary["production_total_elapsed_seconds"], 2.5)
+        self.assertEqual(summary["production_peak_rss_bytes"], 4096)
+        self.assertEqual(summary["production_memory_sample_count"], 1)
+        self.assertEqual(summary["production_process_audit_status"], "NOT STARTED")
+        self.assertEqual(len(commands), 1)
+
+    def test_target_failure_skips_status(self):
+        """REQ-SOP-RUNNER-020: failed target audit skips publication status retrieval."""
+        output = self.root_path / "target-failure-artifacts"
+        binary = Path("/frozen/parseltongue")
+        source_root = self.root_path / "serde"
+        record = {
+            "corpus_repository_short_name": "serde",
+            "corpus_source_checkout_path": str(source_root),
+        }
+        commands = []
+
+        def run_command(command_values, **_kwargs):
+            commands.append(list(command_values))
+            if len(commands) == 1:
+                sample_path = Path(command_values[command_values.index("--memory-sample-output-path") + 1])
+                sample_path.write_text(json.dumps({
+                    "process_tree_elapsed_seconds": 1.25,
+                    "process_tree_peak_bytes": 2048,
+                    "sample_interval_millisecond_value": 10,
+                    "process_memory_sample_values": [{"elapsed_seconds": 0.01, "rss_bytes": 2048}],
+                }))
+            elif len(commands) == 2:
+                trace_path = Path(command_values[command_values.index("-o") + 1])
+                trace_path.write_text(
+                    f'100 execve("{binary}", ["parseltongue"], []) = 0\n'
+                    '100 +++ exited with 0 +++\n'
+                )
+            elif len(commands) == 3:
+                trace_path = Path(command_values[command_values.index("-o") + 1])
+                trace_path.write_text(
+                    f'100 openat(AT_FDCWD, "{source_root / "target"}", O_RDONLY) = 3\n'
+                    '100 +++ exited with 0 +++\n'
+                )
+            return subprocess.CompletedProcess(command_values, 0, "", "")
+
+        with patch.object(measurements.subprocess, "run", side_effect=run_command):
+            summary = measurements.measure_corpus_production_stages(
+                record, output, binary, final_stage_kind="syntax-spans"
+            )
+        self.assertEqual(summary["production_target_audit_status"], "FAIL")
+        self.assertEqual(summary["production_status_command_status"], "NOT STARTED")
+        self.assertIsNone(summary["production_status_exit_code"])
+        self.assertIsNone(summary["production_coverage_banner_values"])
+        self.assertEqual(len(commands), 3)
 
     def test_rustc_suffix_path_fails(self):
         """REQ-SOP-RUNNER-014: only an exact rustc-info basename is target-exempt."""
@@ -1128,7 +1795,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         self.assertEqual(manifest["preflight"]["status"], "BLOCKED")
 
     def test_repository_s3_directory_isolated(self):
-        """REQ-SOP-RUNNER-004: S1/S2 artifacts stay separate from the fresh S3 directory."""
+        """REQ-SOP-RUNNER-004 and REQ-SOP-RUNNER-021: S1/S2 metadata preserves executed commands."""
         repository_name = "serde"
         report_root = self.root_path / "reports"
         artifact_run_directory = self.root_path / "artifacts" / "s3-layout"
@@ -1256,6 +1923,129 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
                          ["before", "after", "before", "after"])
         self.assertEqual(scope_events[1]["outcome"]["return_code"], 0)
         self.assertNotIn("stdout", scope_events[1]["outcome"])
+        s1_transition = next(
+            event for event in run_state["manifest"]["repositories"][repository_name]["events"]
+            if event["step"] == "S1" and event["status"] == "PASS"
+        )
+        s1_metadata = s1_transition["command_metadata"]
+        expected_s1_argv = [
+            ["/fixture/indexer", "cli", "index_repository", "--repo-path", str(source_root), "--mode", "full"],
+            ["/fixture/indexer", "cli", "list_projects"],
+            ["/fixture/indexer", "cli", "index_status", "--project", project_identifier,
+             "--diagnostics", "full", "--format", "json"],
+            ["/fixture/indexer", "cli", "get_graph_schema", "--project", project_identifier,
+             "--format", "json", "--diagnostics", "full", "--limit", "100", "--offset", "0"],
+        ]
+        self.assertEqual([event["argv"] for event in s1_metadata], expected_s1_argv)
+        self.assertTrue(all(event["cwd"] == str(Path.cwd()) for event in s1_metadata))
+        self.assertEqual([event["exit_result"]["return_code"] for event in s1_metadata], [0, 0, 0, 0])
+        self.assertFalse(any(
+            flag in event["argv"] for event in s1_metadata for flag in ("--manifest-path", "--corpus-root")
+        ))
+        s2_transition = next(
+            event for event in run_state["manifest"]["repositories"][repository_name]["events"]
+            if event["step"] == "S2" and event["status"] == "PASS"
+        )
+        s2_metadata = s2_transition["command_metadata"]
+        expected_s2_events = [
+            event for event in command_events
+            if event["phase"] == "after" and event["outcome"].get("stage") == "S2"
+        ]
+        self.assertEqual([event["argv"] for event in s2_metadata],
+                         [event["command"] for event in expected_s2_events])
+        self.assertTrue(all(event["cwd"] == str(Path.cwd()) for event in s2_metadata))
+        self.assertEqual([event["exit_result"]["return_code"] for event in s2_metadata],
+                         [event["outcome"]["return_code"] for event in expected_s2_events])
+        self.assertTrue(any("--scope-offset" in event["argv"] for event in s2_metadata))
+        self.assertTrue(any("--cursor" in event["argv"] for event in s2_metadata))
+
+    def test_runner_persists_skipped_states(self):
+        """REQ-SOP-RUNNER-020: runner manifest keeps failed mapper and skipped commands distinct."""
+        repository_name = "serde"
+        source_root = self.root_path / "corpora" / repository_name
+        source_root.mkdir(parents=True)
+        report_root = self.root_path / "reports"
+        artifact_run_directory = self.root_path / "artifacts" / "mapper-failure"
+        artifact_run_directory.mkdir(parents=True)
+        run_state = runner.create_persistent_run_report(
+            report_root, "mapper-failure", "M1", harness_only_flag=True
+        )
+        generation = "generation-a"
+        coverage_summary = {
+            "scope_literal_sop_pass": True,
+            "scope_coverage_entry_count": 0,
+            "missed_source_file_count": 0,
+            "index_generation_timestamp_value": generation,
+            "index_graph_node_count": 1,
+            "index_graph_edge_count": 1,
+            "index_partial_file_count": 0,
+            "index_unusable_file_count": 0,
+            "scope_truncated_informational": False,
+            "response_digest_manifest_path": "/fixture/coverage-digests.json",
+        }
+
+        def collect_coverage(_name, _report, _indexer, _project, _generation, _guard,
+                             on_metadata_complete, _raw, _digest, **_kwargs):
+            on_metadata_complete({"generation": generation})
+            return dict(coverage_summary)
+
+        measurement_summary = {
+            "production_mapper_exit_code": 1,
+            "production_mapper_status": "FAIL",
+            "production_measurement_status": "FAIL",
+            "production_process_audit_status": None,
+            "production_process_audit_exit": None,
+            "production_target_audit_status": None,
+            "production_target_audit_exit": None,
+            "production_status_command_status": None,
+            "production_status_exit_code": None,
+            "production_publication_status": None,
+            "production_memory_sample_count": 0,
+            "production_peak_rss_bytes": None,
+            "production_total_elapsed_seconds": None,
+            "production_memory_acceptance_status": "DEFERRED",
+            "production_coverage_banner_values": None,
+            "publication_stage_marker_result": None,
+            "production_artifact_directory": str(artifact_run_directory / repository_name / "production"),
+        }
+        execution_context = {
+            "artifact_run_directory": artifact_run_directory,
+            "corpus_roots": {repository_name: source_root},
+            "corpus_records": {repository_name: {
+                "corpus_repository_short_name": repository_name,
+                "corpus_source_checkout_path": str(source_root),
+            }},
+            "source_snapshots": {repository_name: {
+                "head_commit": "fixture-head", "source_tree_sha256": "b" * 64,
+            }},
+            "indexer_path": Path("/fixture/indexer"),
+            "mapper_identity": {"canonical_path": "/fixture/mapper", "sha256": "a" * 64},
+            "identity_guard": lambda *_arguments: None,
+            "b3_provider": "python-blake3:harness-fixture",
+            "b3_tool_identity": None,
+        }
+        with patch.object(runner, "run_fresh_index_stage", return_value={
+                 "command": ["/fixture/indexer", "cli", "index_repository", "--repo-path", str(source_root),
+                             "--mode", "full"],
+                 "result": {"status": "indexed", "indexed_at": generation, "nodes": 1, "edges": 1},
+             }), patch.object(runner.coverage_inventory, "collect_index_coverage_inventory",
+                              side_effect=collect_coverage), \
+                patch.object(runner, "calculate_b3_file_digest", return_value="a" * 64), \
+                patch.object(runner.production_measurements, "measure_corpus_production_stages",
+                             return_value=measurement_summary):
+            result = runner.execute_repository_sop_stages(
+                repository_name, run_state, execution_context, SimpleNamespace(milestone="M1")
+            )
+
+        self.assertEqual(result, "FAIL")
+        repository = run_state["manifest"]["repositories"][repository_name]
+        self.assertEqual(repository["steps"]["S3"], "FAIL")
+        self.assertEqual(repository["s3_measurements"]["production_mapper_status"], "FAIL")
+        self.assertIsNone(repository["s3_measurements"]["production_process_audit_status"])
+        self.assertIsNone(repository["s3_measurements"]["production_target_audit_status"])
+        self.assertIsNone(repository["s3_measurements"]["production_status_command_status"])
+        self.assertEqual(repository["s3_components"]["process_access_audit"], "NOT STARTED")
+        self.assertEqual(repository["s3_components"]["publication"], "NOT STARTED")
 
     def test_run_writes_artifact_manifest(self):
         """REQ-SOP-RUNNER-011: orchestration finalizes evidence after frozen-input mutation."""

@@ -70,6 +70,12 @@ def audit_process_trace_events(trace_source_text, mapper_process_identifier, map
     process_command_context_map = {mapper_process_identifier: "mapper"}
     process_audit_violation_rows = []
     mapper_execution_seen_flag = False
+    network_syscall_name_set = {
+        "socket", "socketpair", "connect", "bind", "listen", "accept", "accept4",
+        "send", "sendto", "sendmsg", "sendmmsg", "recv", "recvfrom", "recvmsg",
+        "recvmmsg", "shutdown", "getsockname", "getpeername", "getsockopt", "setsockopt",
+        "sockatmark",
+    }
 
     def read_process_command_context(process_identifier_number_value):
         visited_process_identifier_values = set()
@@ -82,47 +88,139 @@ def audit_process_trace_events(trace_source_text, mapper_process_identifier, map
                 return None
         return None
 
+    def read_process_descriptor_annotation(process_trace_event_text):
+        descriptor_match_value = re.match(r"[A-Za-z0-9_]+\(\s*\d+<([^>]*)>", process_trace_event_text)
+        return descriptor_match_value[1] if descriptor_match_value else None
+
     for process_identifier_number_value, process_trace_event_text in complete_trace_event_rows:
         process_command_context_kind = read_process_command_context(process_identifier_number_value)
         if process_command_context_kind is None:
+            trace_call_match_value = re.match(r"([A-Za-z0-9_]+)\(", process_trace_event_text)
+            if (trace_call_match_value and trace_call_match_value[1] in network_syscall_name_set
+                    or process_trace_event_text.startswith(("execve(", "execveat("))):
+                process_audit_violation_rows.append(
+                    f"{process_identifier_number_value}: unresolved process ancestry for syscall"
+                )
             continue
-        execution_argument_match_value = re.match(r'execve\(("(?:[^"\\]|\\.)*"), (\[.*?\]),', process_trace_event_text)
-        if execution_argument_match_value and re.search(r"= 0$", process_trace_event_text):
+        execution_at_flag = process_trace_event_text.startswith("execveat(")
+        execution_event_flag = execution_at_flag or process_trace_event_text.startswith("execve(")
+        if execution_event_flag:
+            execution_argument_match_value = re.match(
+                r'execve\(("(?:[^"\\]|\\.)*"),\s*(\[.*?\]),', process_trace_event_text
+            )
+            if execution_at_flag:
+                execution_argument_match_value = re.match(
+                    r'execveat\([^,]+,\s*("(?:[^"\\]|\\.)*"),\s*(\[.*?\]),',
+                    process_trace_event_text,
+                )
+            if execution_argument_match_value is None:
+                process_audit_violation_rows.append(
+                    f"{process_identifier_number_value}: undecodable execution attempt"
+                )
+                continue
             try:
                 command_executable_path_value = ast.literal_eval(execution_argument_match_value[1])
                 command_argument_vector_values = ast.literal_eval(execution_argument_match_value[2])
             except (SyntaxError, ValueError):
                 process_audit_violation_rows.append(f"{process_identifier_number_value}: undecodable exec argv")
                 continue
+            if (not isinstance(command_executable_path_value, str)
+                    or not command_executable_path_value
+                    or not isinstance(command_argument_vector_values, list)
+                    or not command_argument_vector_values
+                    or not all(isinstance(value, str) for value in command_argument_vector_values)):
+                process_audit_violation_rows.append(f"{process_identifier_number_value}: undecodable exec argv")
+                continue
+            if execution_at_flag and not os.path.isabs(command_executable_path_value):
+                process_audit_violation_rows.append(
+                    f"{process_identifier_number_value}: unresolved execveat path {command_executable_path_value!r}"
+                )
+                continue
+            execution_result_match_value = re.search(r"=\s*(-?\d+)(?:\s|$)", process_trace_event_text)
+            if execution_result_match_value is None:
+                process_audit_violation_rows.append(f"{process_identifier_number_value}: incomplete execution event")
+                continue
+            execution_succeeded_flag = int(execution_result_match_value[1]) == 0
             command_executable_short_name = os.path.basename(command_executable_path_value)
             command_argument_tail_values = command_argument_vector_values[1:]
             if process_identifier_number_value == mapper_process_identifier and not mapper_execution_seen_flag:
-                mapper_execution_seen_flag = True
+                mapper_execution_seen_flag = execution_succeeded_flag
                 if (command_executable_path_value != str(mapper_executable_path) if mapper_executable_path is not None
                         else command_executable_short_name != "parseltongue"):
                     process_audit_violation_rows.append("audited root is not parseltongue")
+                elif not execution_succeeded_flag:
+                    process_audit_violation_rows.append("mapper root exec attempt failed")
                 continue
             inherited_command_context_kind = process_command_context_kind
             if command_executable_short_name == "cargo" and command_argument_tail_values == ["metadata", "--offline"]:
                 if inherited_command_context_kind == "mapper" or (
                     process_command_context_map.get(process_identifier_number_value) == "cargo"
                 ):
-                    process_command_context_map[process_identifier_number_value] = "cargo"
+                    if execution_succeeded_flag:
+                        process_command_context_map[process_identifier_number_value] = "cargo"
                     continue
             elif command_executable_short_name == "rustc":
                 if inherited_command_context_kind in {"mapper", "direct-rustc"} and command_argument_tail_values in [
                     ["--print", "cfg"], ["--print", "sysroot"]
                 ]:
-                    process_command_context_map[process_identifier_number_value] = "direct-rustc"
+                    if execution_succeeded_flag:
+                        process_command_context_map[process_identifier_number_value] = "direct-rustc"
                     continue
                 if inherited_command_context_kind in {"cargo", "probe"} and check_rustc_discovery_arguments(command_argument_tail_values):
-                    process_command_context_map[process_identifier_number_value] = "probe"
+                    if execution_succeeded_flag:
+                        process_command_context_map[process_identifier_number_value] = "probe"
                     continue
-            process_audit_violation_rows.append(f"{process_identifier_number_value}: forbidden exec {command_executable_path_value} {command_argument_tail_values!r}")
-        elif process_trace_event_text.startswith(("execve(", "execveat(")) and " = -1 " not in process_trace_event_text:
-            process_audit_violation_rows.append(f"{process_identifier_number_value}: incomplete execution event")
-        if process_trace_event_text.startswith(("connect(", "sendto(", "sendmsg(")) and re.search(r"AF_INET6?\b", process_trace_event_text):
-            process_audit_violation_rows.append(f"{process_identifier_number_value}: forbidden network connection")
+            violation_kind_value = "forbidden exec" if execution_succeeded_flag else "forbidden exec attempt"
+            process_audit_violation_rows.append(
+                f"{process_identifier_number_value}: {violation_kind_value} "
+                f"{command_executable_path_value} {command_argument_tail_values!r}"
+            )
+
+        trace_call_match_value = re.match(r"([A-Za-z0-9_]+)\(", process_trace_event_text)
+        if trace_call_match_value and trace_call_match_value[1] in network_syscall_name_set:
+            network_syscall_name = trace_call_match_value[1]
+            family_values = re.findall(r"\b(AF_[A-Z0-9_]+)\b", process_trace_event_text)
+            descriptor_annotation_value = read_process_descriptor_annotation(
+                process_trace_event_text
+            )
+            is_internet_endpoint = (
+                any(value in {"AF_INET", "AF_INET6"} for value in family_values)
+                or bool(re.search(r"\b(?:TCP|UDP):\[", process_trace_event_text))
+                or bool(descriptor_annotation_value and re.search(
+                    r"\b(?:TCP|UDP):\[", descriptor_annotation_value
+                ))
+            )
+            if is_internet_endpoint:
+                process_audit_violation_rows.append(
+                    f"{process_identifier_number_value}: forbidden network syscall"
+                )
+            elif network_syscall_name in {"socket", "socketpair"}:
+                if "AF_UNIX" not in family_values:
+                    process_audit_violation_rows.append(
+                        f"{process_identifier_number_value}: unresolved network socket family"
+                    )
+            else:
+                descriptor_is_local = bool(
+                    descriptor_annotation_value
+                    and re.match(r"UNIX(?:[-:]|$)", descriptor_annotation_value)
+                )
+                has_local_address = (
+                    "AF_UNIX" in family_values
+                    and not (network_syscall_name in {"sendmsg", "sendmmsg"} and "msg_name=NULL" in process_trace_event_text)
+                    and not (network_syscall_name in {"sendto", "sendmsg", "sendmmsg"}
+                             and re.search(r"(?:msg_name=)?NULL", process_trace_event_text))
+                )
+                if descriptor_is_local or has_local_address:
+                    continue
+                else:
+                    violation_kind_value = (
+                        "unproven network send" if network_syscall_name in {
+                            "send", "sendto", "sendmsg", "sendmmsg",
+                        } else "unproven network syscall"
+                    )
+                    process_audit_violation_rows.append(
+                        f"{process_identifier_number_value}: {violation_kind_value}"
+                    )
         source_open_match_value = re.match(r'openat\([^,]+, ("(?:[^"\\]|\\.)*"), ([^)]*)\)', process_trace_event_text)
         if source_open_match_value and "O_WRONLY" not in source_open_match_value[2]:
             source_open_path_value = Path(ast.literal_eval(source_open_match_value[1]))

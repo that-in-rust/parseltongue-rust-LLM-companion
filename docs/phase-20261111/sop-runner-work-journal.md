@@ -321,6 +321,143 @@ Ran 43 tests in 0.068s
 OK
 ```
 
+### REQ-SOP-RUNNER-019 — paginated row identity
+
+- Contract: use endpoint-reported identities to reject missing identities, exact duplicates, and
+  conflicting content across S2 pages before the collector accepts the sequence.
+- SOP: S2 complete scope/missed-File pagination and §4 raw page evidence.
+- SPEC: REQ-RUST-001.2 offline graph/process boundary; REQ-RUST-003.1 source coverage.
+- Tests: `test_scope_duplicate_identity_blocks`, `test_scope_identity_missing_blocks`,
+  `test_scope_content_conflict_blocks`, `test_missed_duplicate_identity_blocks`,
+  `test_missed_identity_missing_blocks`.
+
+Endpoint grounding: installed `codebase-memory-mcp 0.12.1` `query_graph --help` documents `--graph
+<code|missed>`, `--max-rows`, `--cursor`, and compatibility `--offset`. A small local response from
+the existing indexed repository (no corpus) returned `columns:["f.file_path"]`, `rows:[[path],...],
+total:6, has_more:true, next_cursor:...`; a two-entry `check_index_coverage --scopes '["."]'` page
+returned scope entries shaped as `{path, kind, detail}` with `scope_total:26` and `next_offset:2`.
+Therefore the scope identity is `entry.path`; the missed query's only selected cell is `f.file_path`.
+Fixtures now match those observed wire shapes, not guessed string rows.
+
+STUB/RED: all four new identity regressions failed against the current validators (which only totaled
+rows). Exact output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_duplicate_identity_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_identity_missing_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_content_conflict_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_missed_duplicate_identity_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_missed_identity_missing_blocks
+Ran 5 tests in 0.004s
+FAILED (failures=5)
+AssertionError: CoverageInventoryBlockedError not raised
+```
+
+### REQ-SOP-RUNNER-020 — stage fail-fast state
+
+- Contract: a failed untraced mapper run prevents process/target/status commands; a failed process
+  audit prevents target/status commands. Persist observed outcomes and explicit `NOT STARTED` states,
+  with no fabricated timing, memory, or publication evidence.
+- SOP: S3 separate untraced measurement/process audit/target audit/status sequence; §3 verdict semantics.
+- SPEC: REQ-RUST-015.1 target/build-script boundary; REQ-RUST-020.1 generation isolation.
+- Tests: `test_mapper_failure_skips_audits`, `test_process_failure_skips_status`.
+
+STUB/RED: tests use a precise fake `subprocess.run` sequence and real helper output-directory/result
+files; no corpus or production executable is invoked. The helper continued after both observed failures
+and returned no explicit stage statuses. Exact output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status
+Ran 2 tests in 0.005s
+FAILED (failures=2)
+AssertionError: None != 'FAIL'
+AssertionError: None != 'FAIL'
+```
+
+GREEN: the measurement helper writes a per-repository artifact summary before execution and updates
+it with observed command exits/statuses. A nonzero untraced mapper return now exits before process,
+target, or status commands; a process-audit violation/incomplete result exits before target/status.
+Skipped stages retain `NOT STARTED`, return codes/timing/RSS/publication remain null unless observed,
+and the runner copies these statuses into its persistent manifest without relabeling skipped commands
+as failed. Component status and S3 failure/blocking follow the recorded observation.
+
+Focused fake-sequence checks:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status
+Ran 2 tests in 0.005s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states
+Ran 1 test in 0.005s
+OK
+```
+
+### REQ-SOP-RUNNER-021 — transition command metadata
+
+- Contract: S1/S2 transition manifests persist each executed command's exact argv, actual cwd, and
+  exit result; abbreviated display commands alone are insufficient. Page commands retain cursor,
+  offset, and project flags.
+- SOP: S1/S2 execution evidence and exact command provenance; §3 transition/measurement traceability.
+- SPEC: REQ-RUST-001.2 command/process evidence and REQ-RUST-020.1 generation-bound evidence.
+- Test: `test_repository_s3_directory_isolated` (also retains REQ-SOP-RUNNER-004 coverage).
+
+API check: installed `codebase-memory-mcp cli index_repository --help` requires `--repo-path` and
+supports `--mode`; it does not define `--manifest-path` or `--corpus-root`. Runner `--help` exposes
+`--corpus-manifest` and `--project-root`, and a Python-source search found neither requested flag.
+The implementation therefore records executed argv generically, including the supported S1
+`--repo-path` and actual S2 flags, without inventing unsupported options. Exact help result:
+
+```text
+--repo-path <string> [required]  Repository path
+--mode <full|moderate|fast|cross-repo-intelligence> [default: full]
+```
+
+STUB/RED: the integration test exercised real S1/S2 collection with fake subprocess results and
+failed because the S1 transition had only shortened `commands`, with no `command_metadata`:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
+Ran 1 test in 0.011s
+ERROR (errors=1)
+KeyError: 'command_metadata'
+```
+
+Follow-up review RED expanded REQ-018 to fail closed for addressless sends, unresolved `execveat`,
+failed/undecodable exec attempts, and demonstrated `-yy` decoding; REQ-020 now preserves genuine
+telemetry from a failed mapping command, skips publication after a failed target audit, and normalizes
+missing command exits as NOT STARTED. The existing S1/S2 harness test also checks transition metadata.
+The combined focused run exposed each missing behavior:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_trace_captures_syscall_families test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unaddressed_sends_require_proof test_sop_qualification_runner.SopQualificationRunnerContractTests.test_socketpair_local_send_passes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_relative_path_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_exec_payload_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_forbidden_exec_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_retains_samples test_sop_qualification_runner.SopQualificationRunnerContractTests.test_target_failure_skips_status test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
+Ran 10 tests in 0.024s
+FAILED (failures=8, errors=1)
+AssertionError: '-yy' not found in [... trace=%process,%network ...]
+AssertionError: 0 != 3
+AssertionError: False is not true
+AssertionError: None != 2.5
+AssertionError: 'PASS' != 'NOT STARTED'
+AssertionError: 'FAIL' != 'NOT STARTED'
+KeyError: 'command_metadata'
+```
+
+GREEN: scope pages now require a nonempty `path` identity and track complete entry content across
+pages, distinguishing exact repeats from conflicting records. Missed-query rows must match the observed
+single `f.file_path` column, contain one nonempty path, agree with the page's `returned` count and
+`total_relation == "eq"`, and be unique across pages. The collector already validates each received
+page before another cursor query; the new integration regression verifies a duplicate page is preserved
+raw and stops collection after its second query. Because the SOP query projects only `f.file_path`,
+conflicting extra payload for a missed-file identity is not representable in a valid response; unexpected
+columns/row widths block, while conflicting record content is checked on actual scope `{path, kind,
+detail}` entries.
+
+Focused validator outputs:
+
+```text
+Ran 5 tests in 0.001s
+OK
+
+Ran 1 test in 0.004s
+OK
+```
+
 Existing process-tree contract command:
 
 ```text
@@ -790,3 +927,317 @@ OK
 No refactor needed: the change is limited to `probe_toolchain_versions`, and the symlink regression covers
 both the invoked version name and separately recorded canonical path. GREEN commit:
 `b22b92358bb187a5e8ab5e24d8d401d4a9d2dd1d`; this checkpoint changes only the journal.
+
+### Output, lock, and publication safeguards — local REQ traceability and STUB
+
+This bounded batch adds only output-placement validation, explicit selected-lock freezing, and
+published-stage-map validation. These local identifiers document the tool behavior; they do not
+modify or claim to add rows to the shared SPEC verification matrix.
+
+- `REQ-SOP-RUNNER-015` maps to SOP revision R3 (persistent report/artifact locations) and SPEC
+  source snapshot exclusions at §0 / the source snapshot contract. Outputs must be canonical and
+  disjoint from project/corpus inputs except the exact project `hld-current-test-runs` report root;
+  source snapshots exclude only newly owned report/artifact run directories.
+- `REQ-SOP-RUNNER-016` maps to SPEC lock existence/hash checks at lines 41 and 58 and the frozen
+  source snapshot contract at line 337. Only selected serde/tokio top-level `Cargo.lock` files are
+  permitted as ignored/untracked inputs, with exact-byte identity and provenance retained.
+- `REQ-SOP-RUNNER-017` maps to SPEC publication/generation state at lines 390, 397, and 417–418.
+  A complete published-stage map and nonempty generation identity are required; legacy static
+  implementation statuses are not publication evidence.
+
+STUB plan: add pre-write canonical output-root validation and safe stderr failure, pass exact owned
+run directories to snapshots, whitelist only selected top-level locks in the snapshot/identity
+registry, and switch the publication validator to `stage_publication_status_values`. RED tests are
+tagged with the corresponding local REQ above and use four-word `test_` names. No mapper, source
+manifest, corpus, lockfile, or production file is changed.
+
+### Output, lock, and publication safeguards — RED
+
+Focused RED command (Python fixtures only; no Cargo, corpus, mapper, or production execution):
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_checkout_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_ancestor_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_subtree_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_ancestor_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_root_output_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_bypass_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_alias_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_safe_paths_validate test_sop_qualification_runner.SopQualificationRunnerContractTests.test_outputs_block_before_writes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_exclusions_detect_mutations test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_locks_are_frozen test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_modification_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_deletion_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unselected_lock_stays_blocked test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_accepts_complete test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_stages test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_generation test_sop_qualification_runner.SopQualificationRunnerContractTests.test_static_status_cannot_publish
+```
+
+Observed RED output:
+
+```text
+test_output_checkout_root_blocks ... FAIL
+test_output_source_ancestor_blocks ... FAIL
+test_output_source_subtree_blocks ... FAIL
+test_corpus_ancestor_root_blocks ... FAIL
+test_corpus_root_output_blocks ... FAIL
+test_output_symlink_bypass_blocks ... FAIL
+test_output_symlink_alias_blocks ... FAIL
+test_output_safe_paths_validate ... ok
+test_outputs_block_before_writes ... FAIL
+test_output_exclusions_detect_mutations ... ERROR
+test_selected_locks_are_frozen ... ERROR
+test_selected_lock_modification_fails ... ERROR
+test_selected_lock_deletion_fails ... ERROR
+test_unselected_lock_stays_blocked ... ok
+test_publication_map_accepts_complete ... FAIL
+test_publication_map_requires_stages ... ok
+test_publication_map_requires_generation ... ok
+test_static_status_cannot_publish ... FAIL
+Ran 18 tests in 0.278s
+FAILED (failures=10, errors=4)
+AssertionError: RunnerPreconditionBlockedError not raised
+AttributeError: module 'sop_qualification_runner' has no attribute 'build_owned_run_exclusions'
+RunnerPreconditionBlockedError: ignored untracked source inputs found in /tmp/tmptgu4nk9e/lock-serde: ['Cargo.lock']
+AssertionError: False is not true : coverage banner has no stage implementation statuses
+AssertionError: True is not false
+```
+
+The output-path RED confirms preflight accepted checkout/corpus ancestors, source descendants, and
+symlink aliases and wrote the fixture report. The selected-lock RED is the generic ignored-source
+rejection; the publication RED confirms legacy implementation statuses passed while the new map was
+ignored. Green implementation follows below.
+
+### Output, lock, and publication safeguards — GREEN
+
+Output roots are canonicalized and checked against the project root plus all five selected corpus
+roots before `create_persistent_run_report` or artifact-directory creation. Any symlink component
+blocks the root, reports are permitted only externally or at the exact project
+`hld-current-test-runs` root, and artifacts must be disjoint from every input root. Unsafe roots
+produce a BLOCKED JSON record on stderr with exit 2 and no report/artifact writes. Snapshot exclusions
+now contain only the exact new report and artifact run directories; a post-freeze ignored Rust source
+elsewhere beneath the report parent is detected.
+
+Snapshot/registry evidence now admits only the top-level `Cargo.lock` selected for serde or tokio.
+The exact file identity is included in both the lock registry and source snapshot digest, with Git
+provenance recorded as `ignored` or `untracked`; modification and deletion raise frozen-input FAIL.
+Other ignored/untracked inputs remain blocked. Publication validation now requires
+`stage_publication_status_values` with applicable stages marked `complete` and a nonempty published
+generation digest. Missing publication status (including legacy static implementation statuses) is
+BLOCKED, and incomplete stage values cannot PASS. The mapper and all non-scoped files remain
+untouched; full S3 prerequisites remain conservative.
+
+Focused GREEN command and output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_checkout_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_ancestor_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_subtree_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_ancestor_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_root_output_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_bypass_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_alias_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_safe_paths_validate test_sop_qualification_runner.SopQualificationRunnerContractTests.test_outputs_block_before_writes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_exclusions_detect_mutations test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_locks_are_frozen test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_modification_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_deletion_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unselected_lock_stays_blocked test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_accepts_complete test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_stages test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_generation test_sop_qualification_runner.SopQualificationRunnerContractTests.test_static_status_cannot_publish
+Ran 18 tests in 0.372s
+OK
+```
+
+After the publication-missing reason was made explicitly BLOCKED, its four focused regressions passed:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_accepts_complete test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_stages test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_generation test_sop_qualification_runner.SopQualificationRunnerContractTests.test_static_status_cannot_publish
+Ran 4 tests in 0.001s
+OK
+```
+
+Final scoped suites:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 92 tests in 0.944s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.341s
+OK
+```
+
+No Cargo command, lock regeneration, corpus run, mapper run, production build, or graph/index operation was performed.
+
+### Output, lock, and publication safeguards — REFACTOR checkpoint
+
+No refactor needed: the output validation and owned-run exclusion helpers are narrowly scoped, lock
+permission is explicit at the serde/tokio source-root boundary, and publication validation reuses
+the existing generation/tiling/count checks with the new publication map. GREEN commit:
+`c9d4c18da843e38c0b663f8abc6bd05667df8e69`. This is a separate journal-only checkpoint; subsequent
+review requests about other audit helpers remain out of scope.
+
+### REQ-SOP-RUNNER-018 — process/network syscall audit
+
+- Contract: trace the complete process and network syscall families; enforce execveat and Internet
+  send-family violations while retaining the SOP's permitted local AF_UNIX behavior.
+- SOP: S3 separate process-access audit and §0 production-child/network boundary.
+- SPEC: REQ-RUST-001.2 offline graph and process boundary; reject disallowed descendants/network.
+- Tests: `test_trace_captures_syscall_families`, `test_execveat_spawn_is_forbidden`,
+  `test_internet_send_families_fail`, `test_unix_sends_remain_allowed`.
+
+STUB/RED: tests were added before code changes. The real S3 command builder still named only
+`execve,connect,clone,clone3,fork,vfork`; successful `execveat` was classified merely as incomplete,
+and `sendmmsg` was not rejected. The AF_UNIX preservation regression already passed.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_trace_captures_syscall_families test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_spawn_is_forbidden test_sop_qualification_runner.SopQualificationRunnerContractTests.test_internet_send_families_fail test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unix_sends_remain_allowed
+Ran 4 tests in 0.003s
+FAILED (failures=3)
+test_unix_sends_remain_allowed ... ok
+AssertionError: 'trace=%process,%network' not found in [... trace=execve,connect,clone,clone3,fork,vfork ...]
+AssertionError: False is not true
+AssertionError: 2 != 3
+```
+
+GREEN: the S3 audit now requests strace's full `%process,%network` classes with `-f`, the parser
+classifies successful `execveat` with the same full-argv allowlist as `execve`, and socket/connect/
+sendto/sendmsg/sendmmsg events carrying AF_INET or AF_INET6 fail. AF_UNIX connect/sendmsg remains
+allowed. Focused output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_trace_captures_syscall_families test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_spawn_is_forbidden test_sop_qualification_runner.SopQualificationRunnerContractTests.test_internet_send_families_fail test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unix_sends_remain_allowed
+Ran 4 tests in 0.003s
+OK
+```
+
+### REQ-SOP-RUNNER-018 — UNIX-STREAM descriptor evidence RED
+
+The `-yy` annotated descriptor form `UNIX-STREAM:[...]` is positive evidence for an AF_UNIX endpoint,
+including addressless sends on inherited descriptors. The parser initially recognized only `UNIX:`;
+this focused regression was added before the format matcher changed.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_annotated_unix_fd_allowed
+Ran 1 test in 0.007s
+FAILED (failures=1)
+AssertionError: Lists differ: ['100: unproven network send'] != []
+```
+
+The first full process-tree contract run then exposed one stale assertion that expected the former
+hand-selected syscall list rather than the new complete strace classes. This was a test-contract
+failure, not an audit implementation failure:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.360s
+FAILED (failures=1)
+AssertionError: 'execve' not found in 'trace=%process,%network'
+```
+
+### Final bounded corrections — GREEN
+
+The production trace now asks strace for `trace=%process,%network` with `-yy`; strace's installed
+help documents `-yy, --decode-fds=all` as printing available file-descriptor information. The auditor
+rejects IPv4/IPv6 activity regardless of syscall success, unproven addressless network sends, unresolved
+relative/empty `execveat`, malformed exec payloads, and failed forbidden exec attempts. It preserves
+proved AF_UNIX socket/socketpair descriptors across the traced process ancestry and accepts documented
+`UNIX:` and `UNIX-STREAM:` descriptor annotations. The process-contract test now asserts the complete
+strace classes and `-yy`, replacing its obsolete selected-syscall expectation.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_trace_captures_syscall_families test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_spawn_is_forbidden test_sop_qualification_runner.SopQualificationRunnerContractTests.test_internet_send_families_fail test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unix_sends_remain_allowed test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unaddressed_sends_require_proof test_sop_qualification_runner.SopQualificationRunnerContractTests.test_socketpair_local_send_passes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_annotated_unix_fd_allowed test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_relative_path_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_exec_payload_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_forbidden_exec_blocks
+Ran 10 tests in 0.004s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.356s
+OK
+```
+
+S3 reads and persists any genuine memory sample before handling the mapper exit. A failed mapper remains
+FAIL while valid telemetry is retained; missing telemetry is BLOCKED/unavailable. Process-audit failure
+stops before target/status, target-audit failure stops before status/publication, and absent exits for
+unattempted runner components remain NOT STARTED rather than becoming FAIL. Focused fake-command results:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_retains_samples test_sop_qualification_runner.SopQualificationRunnerContractTests.test_target_failure_skips_status
+Ran 4 tests in 0.010s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states
+Ran 1 test in 0.005s
+OK
+```
+
+S1 and S2 transition manifests now carry exact captured `argv`, child `cwd`, and exit result, including
+each S2 page request. The actual S1 indexer uses `--repo-path`; installed help has no `--manifest-path`
+or `--corpus-root`. S2 scope pages use the supported `--scope-offset` (not `--offset`), project flags,
+and missed-page `--cursor`. An initially over-specific regression assertion for `--offset` was corrected
+after source inspection; the implementation and actual API shape were unchanged by that test correction.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
+Ran 1 test in 0.011s
+OK
+```
+
+Final scoped checks:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 113 tests in 1.172s
+OK
+
+Python AST syntax: 6 files parsed; test methods=119; non-four-word names=[]; missing journal traceability=[]; missing REQ tags=[]
+
+diff checks: exit 0, no output
+```
+
+### REQ-SOP-RUNNER-018 — no-refactor-needed checkpoint
+
+The fail-closed network correction and its regression tests were committed as GREEN in
+`6fd7c5a08` (`fix SOP audit and fail-fast evidence`). Review found no additional refactor needed: the
+local-IPC proof is per-event, socketpair data is not treated as FD provenance, and ambiguous sends remain
+unproven. No production, corpus, or unrelated files were changed. This checkpoint is journal-only; the
+runner/process tests above were run against the committed code before this entry.
+
+No corpus, mapper, production build, Rust gate, Cargo/lock regeneration, or graph refresh was run.
+Overall full milestone never PASS merely from S1-S3; M1 S10 and M2 S4/S5 are separate not-started/blocked
+gates until supplied and validated. Full S3 acceptance remains blocked pending current-run frozen-identity-bound
+fixture/build/P2/dependency/release evidence intake; R4/R5 remain component validators and S4/S5 unavailable.
+
+User R9 overrides memory: NO cap imposed by runner and NO memory acceptance gate until all-five S5; only
+measure actual effective DuckDB setting and sampled whole-tree RSS; final <=500 MB deferred.
+
+Future independent zcode source-grounded HLD-current audit S8/S9 is owned by parent on isolated branch.
+Do NOT implement it or edit shared docs. Existing deterministic S8 sample and S9 proofs unchanged. Keep
+S1–S3/M2 extension scope, don't wait for audit work. Missing later-stage exports always NOT STARTED/BLOCKED,
+never fixture-based corpus PASS.
+
+### REQ-SOP-RUNNER-018 — stale descriptor proof RED
+
+Final review identified that recursively trusting a descriptor created by `socketpair` can falsely allow
+an addressless send after close/reuse, and parsing the socketpair array is unnecessary. A new regression
+requires per-event AF_UNIX sockaddr or `-yy` UNIX annotation; bare socketpair numbers and a later reused
+number must remain unproven.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_stale_socket_proof_rejected
+Ran 1 test in 0.002s
+FAILED (failures=1)
+AssertionError: 0 != 2
+```
+
+### REQ-SOP-RUNNER-018 — per-event local IPC proof GREEN
+
+This final review correction supersedes the earlier descriptor-provenance wording above: no persistent
+FD map or ancestor lookup is used. AF_UNIX socket/socketpair creation does not authorize later sends.
+An addressless send is allowed only when that event itself has a `-yy` UNIX/UNIX-STREAM descriptor
+annotation; an explicit non-null AF_UNIX address remains allowed. The socketpair argument array is no
+longer parsed as descriptor identity, so close/reuse and decorated inode digits cannot become proof.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_stale_socket_proof_rejected
+Ran 1 test in 0.002s
+OK
+```
+
+Supplemental regression for decorated socketpair arguments confirms that inode digits are never parsed
+as FD identities:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_socketpair_inode_fd_untrusted
+Ran 1 test in 0.002s
+OK
+```
+
+Final verification after the stale-provenance and decorated-socketpair regressions:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 115 tests in 1.015s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.342s
+OK
+
+Python AST syntax: 6 files parsed; test methods=121; non-four-word names=[]; missing journal traceability=[]; missing REQ tags=[]
+
+diff checks: exit 0, no output
+```

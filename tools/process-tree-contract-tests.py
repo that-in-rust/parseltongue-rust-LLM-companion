@@ -50,6 +50,7 @@ class ProcessTreeContractTests(unittest.TestCase):
                     auditor.read_process_tree_residency(10, root)
 
     def test_measurement_audit_runs_separated(self):
+        """REQ-SOP-RUNNER-018: production audit traces all process and network syscalls."""
         record = {"corpus_source_checkout_path": "/source/repo"}
         measurement, audit, reads = driver.build_corpus_measurement_commands(record, Path("/evidence"))
         self.assertNotIn("strace", measurement)
@@ -57,8 +58,8 @@ class ProcessTreeContractTests(unittest.TestCase):
         self.assertEqual(audit[0], "strace")
         self.assertNotIn("sample", audit)
         self.assertNotIn("openat", audit[audit.index("-e") + 1])
-        self.assertIn("execve", audit[audit.index("-e") + 1])
-        self.assertIn("connect", audit[audit.index("-e") + 1])
+        self.assertEqual(audit[audit.index("-e") + 1], "trace=%process,%network")
+        self.assertIn("-yy", audit)
         self.assertNotEqual(measurement[measurement.index("--workspace-store-file-path") + 1],
                             audit[audit.index("--workspace-store-file-path") + 1])
         self.assertIn("-P", reads)

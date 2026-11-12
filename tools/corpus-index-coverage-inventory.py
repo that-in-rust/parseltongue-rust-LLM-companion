@@ -102,6 +102,7 @@ def validate_scope_response_pages(scope_pages, require_complete=True, expected_g
     generation = None
     expected_total = None
     accumulated_entries = 0
+    seen_scope_entry_content = {}
     seen_offsets = set()
     previous_offset = None
     for page_index, page in enumerate(scope_pages):
@@ -146,6 +147,17 @@ def validate_scope_response_pages(scope_pages, require_complete=True, expected_g
             raise CoverageInventoryBlockedError("scope totals changed between pages")
         if not isinstance(entries, list) or not isinstance(has_more, bool):
             raise CoverageInventoryBlockedError("scope entries or pagination marker is malformed")
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise CoverageInventoryBlockedError("scope entry is not an object")
+            entry_path = entry.get("path")
+            if not isinstance(entry_path, str) or not entry_path:
+                raise CoverageInventoryBlockedError("scope entry has no path identity")
+            if entry_path in seen_scope_entry_content:
+                if seen_scope_entry_content[entry_path] == entry:
+                    raise CoverageInventoryBlockedError(f"duplicate scope path identity: {entry_path}")
+                raise CoverageInventoryBlockedError(f"conflicting scope content for path: {entry_path}")
+            seen_scope_entry_content[entry_path] = entry
         seen_offsets.add(requested_offset)
         previous_offset = requested_offset
         accumulated_entries += len(entries)
@@ -188,12 +200,16 @@ def validate_missed_response_pages(missed_pages, expected_generation, require_co
         raise CoverageInventoryBlockedError("missed-File query returned no pages")
     expected_total = None
     accumulated_rows = 0
+    seen_missed_file_content = {}
     seen_cursors = set()
     previous_cursor = None
     for page_index, page in enumerate(missed_pages):
         response, boundary = unwrap_boundary_response(page)
         try:
+            columns = response["columns"]
             rows = response["rows"]
+            returned_rows = response["returned"]
+            total_relation = response["total_relation"]
             has_more = response["has_more"]
             page_total = response["total"]
         except (KeyError, TypeError) as error:
@@ -201,14 +217,30 @@ def validate_missed_response_pages(missed_pages, expected_generation, require_co
         native_generation = response.get("index_generation", response.get("indexed_at"))
         if native_generation is not None and native_generation != expected_generation:
             raise CoverageInventoryBlockedError("missed-File pages are not bound to the fresh index generation")
+        if columns != ["f.file_path"]:
+            raise CoverageInventoryBlockedError("missed-File query columns do not match the path identity contract")
         if not isinstance(rows, list) or not isinstance(has_more, bool):
             raise CoverageInventoryBlockedError("missed-File rows or pagination marker is malformed")
+        if (not isinstance(returned_rows, int) or isinstance(returned_rows, bool)
+                or returned_rows != len(rows) or total_relation != "eq"):
+            raise CoverageInventoryBlockedError("missed-File returned count or exact-total relation is malformed")
         if not isinstance(page_total, int) or isinstance(page_total, bool) or page_total < 0:
             raise CoverageInventoryBlockedError("missed-File total is malformed")
         if expected_total is None:
             expected_total = page_total
         elif expected_total != page_total:
             raise CoverageInventoryBlockedError("missed-File totals changed between pages")
+        for row in rows:
+            if not isinstance(row, list) or len(row) != 1:
+                raise CoverageInventoryBlockedError("missed-File row does not match the path-column shape")
+            file_path = row[0]
+            if not isinstance(file_path, str) or not file_path:
+                raise CoverageInventoryBlockedError("missed-File row has no path identity")
+            if file_path in seen_missed_file_content:
+                if seen_missed_file_content[file_path] == row:
+                    raise CoverageInventoryBlockedError(f"duplicate missed-File path identity: {file_path}")
+                raise CoverageInventoryBlockedError(f"conflicting missed-File content for path: {file_path}")
+            seen_missed_file_content[file_path] = row
         accumulated_rows += len(rows)
         if accumulated_rows > expected_total:
             raise CoverageInventoryBlockedError("missed-File rows exceed the stable total")

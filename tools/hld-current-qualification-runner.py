@@ -296,6 +296,7 @@ def record_persistent_run_transition(
     command_values: Sequence[str] = (),
     reason_text: str | None = None,
     clause_name: str | None = None,
+    command_metadata: Sequence[Mapping[str, Any]] | None = None,
 ) -> None:
     if status_value not in {"NOT STARTED", "PASS", "BLOCKED", "FAIL"}:
         raise ValueError(f"unsupported step status: {status_value}")
@@ -315,17 +316,23 @@ def record_persistent_run_transition(
         "reason": reason_text,
         "clause": clause_name,
     }
+    if command_metadata is not None:
+        event["command_metadata"] = [dict(value) for value in command_metadata]
     repository_state["events"].append(event)
     manifest_value["events"].append(event)
     if status_value in {"BLOCKED", "FAIL"} and repository_state["first_failed_clause"] is None:
         repository_state["first_failed_clause"] = clause_name or step_name
         repository_state["first_reason"] = reason_text or status_value
     rendered_reason = f" — {reason_text}" if reason_text else ""
+    rendered_metadata = (
+        f"\n  - Command metadata: `{json.dumps(list(command_metadata), sort_keys=True)}`"
+        if command_metadata is not None else ""
+    )
     append_persistent_report_entry(
         run_state,
         f"- [{event['timestamp']}] `{repository_name}` `{step_name}`: **{status_value}**{rendered_reason}\n"
         f"  - Clause: `{clause_name or 'not specified'}`\n"
-        f"  - Commands: `{json.dumps(list(command_values))}`",
+        f"  - Commands: `{json.dumps(list(command_values))}`{rendered_metadata}",
     )
     persist_run_manifest(run_state)
 
@@ -456,16 +463,42 @@ def path_is_excluded_from_snapshot(file_path: Path, excluded_paths: Sequence[Pat
                for excluded in excluded_paths)
 
 
+def build_owned_run_exclusions(report_run_directory: Path, artifact_run_directory: Path) -> list[Path]:
+    return [
+        Path(report_run_directory).resolve(strict=True),
+        Path(artifact_run_directory).resolve(strict=True),
+    ]
+
+
 def capture_frozen_source_snapshot(
-    project_root: Path, excluded_paths: Sequence[Path] = ()
+    project_root: Path,
+    excluded_paths: Sequence[Path] = (),
+    permitted_lock_paths: Sequence[Path] = (),
 ) -> Mapping[str, Any]:
     project_root = Path(project_root).resolve(strict=True)
     excluded_paths = tuple(Path(path).absolute() for path in excluded_paths)
+    permitted_lock_relative_paths = set()
+    for lock_path in permitted_lock_paths:
+        lock_path = Path(lock_path).absolute()
+        expected_lock_path = project_root / "Cargo.lock"
+        if lock_path != expected_lock_path or lock_path.is_symlink() or not lock_path.is_file():
+            raise RunnerPreconditionBlockedError(
+                f"permitted frozen lock must be the regular top-level Cargo.lock: {lock_path}"
+            )
+        permitted_lock_relative_paths.add("Cargo.lock")
+    lock_is_tracked = "Cargo.lock" in run_read_only_git_command(
+        project_root, ["ls-files", "--", "Cargo.lock"]
+    ).splitlines()
     status_text = run_read_only_git_command(project_root, ["status", "--porcelain=v1", "--untracked-files=all"])
     filtered_status_lines = []
     for status_line in status_text.splitlines():
         relative_path = status_line[3:].split(" -> ")[-1] if len(status_line) >= 4 else ""
-        if not path_is_excluded_from_snapshot(project_root / relative_path, excluded_paths):
+        permitted_untracked_lock = (
+            relative_path == "Cargo.lock" and relative_path in permitted_lock_relative_paths and not lock_is_tracked
+        )
+        if not permitted_untracked_lock and not path_is_excluded_from_snapshot(
+            project_root / relative_path, excluded_paths
+        ):
             filtered_status_lines.append(status_line)
     if filtered_status_lines:
         raise RunnerPreconditionBlockedError(
@@ -515,12 +548,16 @@ def capture_frozen_source_snapshot(
         })
     untracked_text = run_read_only_git_command(project_root, ["ls-files", "--others", "--exclude-standard", "-z"])
     untracked_source_paths = []
+    untracked_relative_paths = set()
     for relative in untracked_text.split("\0"):
         if not relative:
             continue
         relative_path = Path(relative)
+        untracked_relative_paths.add(relative_path.as_posix())
         absolute_path = project_root / relative_path
         if path_is_excluded_from_snapshot(absolute_path, excluded_paths):
+            continue
+        if relative_path.as_posix() in permitted_lock_relative_paths:
             continue
         if relative_path.suffix.lower() in SOURCE_SUFFIXES or relative_path.name in {
             "Cargo.toml", "Cargo.lock", "Makefile", "Justfile",
@@ -534,13 +571,17 @@ def capture_frozen_source_snapshot(
         project_root, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]
     )
     ignored_source_paths = []
+    ignored_relative_paths = set()
     for relative in ignored_text.split("\0"):
         if not relative:
             continue
         relative_path = Path(relative)
+        ignored_relative_paths.add(relative_path.as_posix())
         if any(part in GENERATED_SOURCE_DIRECTORY_NAMES for part in relative_path.parts):
             continue
         if path_is_excluded_from_snapshot(project_root / relative_path, excluded_paths):
+            continue
+        if relative_path.as_posix() in permitted_lock_relative_paths:
             continue
         under_vendor_or_build = any(part in {"vendor", "build"} for part in relative_path.parts)
         if under_vendor_or_build or relative_path.suffix.lower() in SOURCE_SUFFIXES or relative_path.name in {
@@ -552,13 +593,33 @@ def capture_frozen_source_snapshot(
             f"ignored untracked source inputs found in {project_root}: {ignored_source_paths[:5]}"
         )
     tracked_records.sort(key=lambda row: row["path"])
+    permitted_lock_records = {}
+    for relative_path in sorted(permitted_lock_relative_paths):
+        if relative_path in tracked_relative_paths:
+            provenance = "tracked"
+        elif relative_path in ignored_relative_paths:
+            provenance = "ignored"
+        elif relative_path in untracked_relative_paths:
+            provenance = "untracked"
+        else:
+            raise RunnerPreconditionBlockedError(
+                f"selected Cargo.lock Git provenance is unavailable: {project_root / relative_path}"
+            )
+        permitted_lock_records[relative_path] = {
+            "provenance": provenance,
+            "identity": capture_frozen_file_identity(project_root / relative_path),
+        }
     tree_digest = hashlib.sha256(
-        json.dumps(tracked_records, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            {"tracked_files": tracked_records, "permitted_lock_files": permitted_lock_records},
+            sort_keys=True, separators=(",", ":"),
+        ).encode()
     ).hexdigest()
     return {
         "root_path": str(project_root),
         "head_commit": head_commit,
         "tracked_source_file_count": len(tracked_records),
+        "permitted_lock_files": permitted_lock_records,
         "source_tree_sha256": tree_digest,
         "clean": True,
     }
@@ -1050,6 +1111,107 @@ def parse_pin_manifest_records(manifest_path: Path) -> Mapping[str, Mapping[str,
     return result
 
 
+def canonicalize_output_root_path(path_value: Path) -> Path:
+    candidate = Path(path_value).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    current_path = Path(candidate.anchor)
+    for component in candidate.parts[1:]:
+        if component == "..":
+            current_path = current_path.parent
+            continue
+        if component in {"", "."}:
+            continue
+        next_path = current_path / component
+        if next_path.is_symlink():
+            raise RunnerPreconditionBlockedError(f"output root contains a symlink component: {path_value}")
+        current_path = next_path
+    try:
+        return candidate.resolve(strict=False)
+    except (OSError, RuntimeError) as error:
+        raise RunnerPreconditionBlockedError(f"output root cannot be canonicalized: {path_value}: {error}") from error
+
+
+def source_output_paths_overlap(first_path: Path, second_path: Path) -> bool:
+    return first_path == second_path or first_path in second_path.parents or second_path in first_path.parents
+
+
+def validate_output_root_paths(
+    report_root: Path,
+    artifact_root: Path,
+    project_root: Path,
+    corpus_roots: Mapping[str, Path],
+) -> Mapping[str, Path]:
+    project_path = Path(project_root).resolve(strict=True)
+    corpus_paths = {name: Path(path).resolve(strict=False) for name, path in corpus_roots.items()}
+    report_path = canonicalize_output_root_path(report_root)
+    artifact_path = canonicalize_output_root_path(artifact_root)
+    default_report_path = project_path / "hld-current-test-runs"
+    source_paths = [project_path, *corpus_paths.values()]
+    if report_path == default_report_path:
+        overlapping_corpora = [
+            name for name, corpus_path in corpus_paths.items()
+            if source_output_paths_overlap(report_path, corpus_path)
+        ]
+        if overlapping_corpora:
+            raise RunnerPreconditionBlockedError(
+                f"default report root overlaps pinned corpus sources: {overlapping_corpora}"
+            )
+    else:
+        overlapping_sources = [
+            str(source_path) for source_path in source_paths
+            if source_output_paths_overlap(report_path, source_path)
+        ]
+        if overlapping_sources:
+            raise RunnerPreconditionBlockedError(
+                f"report root must be external or exactly {default_report_path}; overlaps {overlapping_sources}"
+            )
+    overlapping_artifact_sources = [
+        str(source_path) for source_path in source_paths
+        if source_output_paths_overlap(artifact_path, source_path)
+    ]
+    if overlapping_artifact_sources:
+        raise RunnerPreconditionBlockedError(
+            f"artifact root must be outside project and corpus sources; overlaps {overlapping_artifact_sources}"
+        )
+    if source_output_paths_overlap(report_path, artifact_path):
+        raise RunnerPreconditionBlockedError("report and artifact roots must not overlap")
+    return {"report_root": report_path, "artifact_root": artifact_path}
+
+
+def resolve_output_source_roots(arguments: argparse.Namespace) -> Mapping[str, Path]:
+    records = parse_pin_manifest_records(Path(arguments.corpus_manifest))
+    overrides = parse_project_root_overrides(arguments.project_root)
+    source_roots = {}
+    for repository_name, record in records.items():
+        root_value = overrides.get(repository_name, record.get("corpus_source_checkout_path"))
+        if not isinstance(root_value, (Path, str)) or not str(root_value):
+            raise RunnerPreconditionBlockedError(
+                f"pinned source checkout path is missing for {repository_name}"
+            )
+        try:
+            source_roots[repository_name] = Path(root_value).expanduser().resolve(strict=False)
+        except (OSError, RuntimeError) as error:
+            raise RunnerPreconditionBlockedError(
+                f"pinned source checkout cannot be canonicalized for {repository_name}: {error}"
+            ) from error
+    return source_roots
+
+
+def validate_run_output_paths(arguments: argparse.Namespace) -> Mapping[str, Path]:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", arguments.run_id):
+        raise RunnerPreconditionBlockedError("run identifier must be a safe, unique path component")
+    output_paths = validate_output_root_paths(
+        arguments.report_root,
+        arguments.artifact_root,
+        PROJECT_ROOT,
+        resolve_output_source_roots(arguments),
+    )
+    arguments.report_root = output_paths["report_root"]
+    arguments.artifact_root = output_paths["artifact_root"]
+    return output_paths
+
+
 def capture_identity_registry(
     project_root: Path,
     manifest_paths: Sequence[Path],
@@ -1066,9 +1228,17 @@ def capture_identity_registry(
         lock_path = corpus_root / "Cargo.lock"
         lock_files[str(lock_path.absolute())] = capture_optional_frozen_file_identity(lock_path)
     source_roots = {str(project_root.resolve()): Path(project_root).resolve()}
-    source_roots.update({str(root.resolve()): root.resolve() for root in corpus_roots.values()})
+    permitted_lock_paths_by_root = {}
+    for repository_name, root in corpus_roots.items():
+        root_path = root.resolve()
+        root_key = str(root_path)
+        source_roots[root_key] = root_path
+        if repository_name in {"serde", "tokio"}:
+            permitted_lock_paths_by_root[root_key] = [root_path / "Cargo.lock"]
     source_snapshots = {
-        root_key: capture_frozen_source_snapshot(root_path, excluded_paths)
+        root_key: capture_frozen_source_snapshot(
+            root_path, excluded_paths, permitted_lock_paths_by_root.get(root_key, ())
+        )
         for root_key, root_path in source_roots.items()
     }
     for executable_identity in executable_identities:
@@ -1077,6 +1247,10 @@ def capture_identity_registry(
         "frozen_files": frozen_files,
         "lock_files": lock_files,
         "source_snapshots": source_snapshots,
+        "permitted_lock_paths_by_root": {
+            root_key: [str(path) for path in paths]
+            for root_key, paths in permitted_lock_paths_by_root.items()
+        },
         "excluded_paths": [str(Path(path).absolute()) for path in excluded_paths],
     }
 
@@ -1087,9 +1261,12 @@ def verify_identity_registry(registry: Mapping[str, Any]) -> None:
     for identity in registry["lock_files"].values():
         verify_optional_frozen_file_identity(identity)
     excluded_paths = [Path(path) for path in registry["excluded_paths"]]
+    permitted_lock_paths_by_root = registry.get("permitted_lock_paths_by_root", {})
     for root_path, expected_snapshot in registry["source_snapshots"].items():
         try:
-            current_snapshot = capture_frozen_source_snapshot(Path(root_path), excluded_paths)
+            current_snapshot = capture_frozen_source_snapshot(
+                Path(root_path), excluded_paths, permitted_lock_paths_by_root.get(root_path, ())
+            )
         except RunnerPreconditionBlockedError as error:
             raise RunnerFrozenInputMutationError(
                 f"frozen source snapshot can no longer be verified: {root_path}: {error}"
@@ -1169,18 +1346,46 @@ def finalize_s3_component_qualification(
 def validate_s3_measurement_result(summary: Mapping[str, Any], repository_name: str) -> None:
     if not isinstance(summary, Mapping):
         raise RunnerPreconditionBlockedError("S3 measurement summary is malformed")
-    if summary.get("production_mapper_exit_code") != 0:
+    mapper_exit_code = summary.get("production_mapper_exit_code")
+    mapper_status = summary.get("production_mapper_status")
+    if mapper_status == "FAIL" or mapper_exit_code is not None and mapper_exit_code != 0:
         raise RunnerContractViolationError("untraced mapper measurement subprocess did not succeed")
-    if summary.get("production_process_audit_exit") != 0:
-        raise RunnerContractViolationError("process access audit subprocess did not succeed")
-    if summary.get("production_target_audit_exit") != 0:
-        raise RunnerContractViolationError("filtered target audit subprocess did not succeed")
-    if summary.get("production_status_exit_code") != 0:
-        raise RunnerContractViolationError("published coverage status command did not succeed")
+    if mapper_status in {"BLOCKED", "NOT STARTED"} or mapper_exit_code is None:
+        raise RunnerPreconditionBlockedError("untraced mapper measurement was not completed")
     if summary.get("production_memory_sample_error"):
         raise RunnerPreconditionBlockedError(summary["production_memory_sample_error"])
     if summary.get("production_memory_sample_count", 0) <= 0 or not isinstance(summary.get("production_peak_rss_bytes"), int):
         raise RunnerPreconditionBlockedError("whole-tree RSS sampling produced no usable measurements")
+    process_audit_status = summary.get("production_process_audit_status")
+    process_audit_exit = summary.get("production_process_audit_exit")
+    if process_audit_status == "FAIL":
+        raise RunnerContractViolationError("process access audit observed forbidden behavior")
+    if process_audit_status in {"BLOCKED", "NOT STARTED"} or process_audit_exit is None:
+        raise RunnerPreconditionBlockedError(
+            f"process access audit is {(process_audit_status or 'NOT STARTED').lower()}"
+        )
+    if process_audit_exit != 0:
+        raise RunnerContractViolationError("process access audit subprocess did not succeed")
+    target_audit_status = summary.get("production_target_audit_status")
+    target_audit_exit = summary.get("production_target_audit_exit")
+    if target_audit_status == "FAIL":
+        raise RunnerContractViolationError("filtered target audit observed forbidden access")
+    if target_audit_status in {"BLOCKED", "NOT STARTED"} or target_audit_exit is None:
+        raise RunnerPreconditionBlockedError(
+            f"filtered target audit is {(target_audit_status or 'NOT STARTED').lower()}"
+        )
+    if target_audit_exit != 0:
+        raise RunnerContractViolationError("filtered target audit subprocess did not succeed")
+    publication_status = summary.get("production_publication_status")
+    status_exit_code = summary.get("production_status_exit_code")
+    if publication_status == "FAIL":
+        raise RunnerContractViolationError("publication status command or stage validation failed")
+    if publication_status in {"BLOCKED", "NOT STARTED"} or status_exit_code is None:
+        raise RunnerPreconditionBlockedError(
+            f"publication status is {(publication_status or 'NOT STARTED').lower()}"
+        )
+    if status_exit_code != 0:
+        raise RunnerContractViolationError("published coverage status command did not succeed")
     if (not summary.get("production_trace_nonempty") or not summary.get("production_target_trace_nonempty")):
         raise RunnerPreconditionBlockedError("one or more process trace files are empty")
     if (summary.get("production_process_trace_complete") is not True
@@ -1351,11 +1556,11 @@ def prepare_execution_context(
     expected_commits = pin_summary["corpus_commit_by_repository"]
     if set(expected_commits) != set(DEFAULT_REPOSITORY_ORDER):
         raise RunnerPreconditionBlockedError("corpus manifest does not include exactly five pinned repositories")
-    excluded_paths = [Path(arguments.report_root).expanduser().absolute(),
-                      Path(arguments.artifact_root).expanduser().absolute()]
+    excluded_paths = build_owned_run_exclusions(run_state["run_directory"], artifact_run_directory)
     source_snapshots = {}
     for repository_name, source_root in corpus_roots.items():
-        snapshot = capture_frozen_source_snapshot(source_root, excluded_paths)
+        permitted_locks = [source_root / "Cargo.lock"] if repository_name in {"serde", "tokio"} else []
+        snapshot = capture_frozen_source_snapshot(source_root, excluded_paths, permitted_locks)
         if snapshot["head_commit"] != expected_commits[repository_name]:
             raise RunnerContractViolationError(f"{repository_name} source HEAD differs from its pinned commit")
         source_snapshots[repository_name] = snapshot
@@ -1524,6 +1729,7 @@ def create_external_command_event_recorder(command_journal_path: Path):
     if command_journal_path.exists():
         raise RunnerPreconditionBlockedError(f"refusing to reuse command journal {command_journal_path}")
     event_count = 0
+    events = []
 
     def record_command_event(phase, command_values, outcome):
         nonlocal event_count
@@ -1533,6 +1739,7 @@ def create_external_command_event_recorder(command_journal_path: Path):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "phase": phase,
             "command": [str(value) for value in command_values],
+            "cwd": str(Path.cwd()),
             "outcome": dict(outcome),
         }
         serialized = json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n"
@@ -1546,8 +1753,27 @@ def create_external_command_event_recorder(command_journal_path: Path):
         with command_journal_path.open("a", encoding="utf-8") as journal:
             journal.write(serialized)
         event_count += 1
+        events.append(event)
 
+    record_command_event.events = events
     return record_command_event
+
+
+def collect_transition_command_metadata(command_event_callback, step_name):
+    command_events = getattr(command_event_callback, "events", ())
+    return [
+        {
+            "argv": list(event["command"]),
+            "cwd": event["cwd"],
+            "exit_result": {
+                "return_code": event["outcome"].get("return_code"),
+                "status": event["outcome"].get("status"),
+                "exception_type": event["outcome"].get("exception_type"),
+            },
+        }
+        for event in command_events
+        if event["phase"] == "after" and event.get("outcome", {}).get("stage") == step_name
+    ]
 
 
 def execute_repository_sop_stages(
@@ -1565,6 +1791,13 @@ def execute_repository_sop_stages(
     source_root = execution_context["corpus_roots"][repository_name]
     current_step = "S1"
     current_commands: list[str] = []
+    metadata_complete = False
+
+    def transition_command_evidence():
+        command_metadata = collect_transition_command_metadata(command_event_callback, current_step)
+        command_values = [json.dumps(value["argv"]) for value in command_metadata] or current_commands
+        return command_values, command_metadata or None
+
     try:
         current_commands = [json.dumps([
             str(execution_context["indexer_path"]), "cli", "index_repository",
@@ -1588,29 +1821,25 @@ def execute_repository_sop_stages(
             "index_result_status": index_result["result"].get("status"),
         }, indent=2) + "\n")
         current_step = "S1"
-        metadata_commands = [
-            str(execution_context["indexer_path"]) + " cli list_projects",
-            str(execution_context["indexer_path"]) + " cli index_status --diagnostics full --format json",
-            str(execution_context["indexer_path"]) + " cli get_graph_schema --format json --diagnostics full",
-        ]
-        current_commands = [json.dumps(index_result["command"]), *metadata_commands]
+        current_commands = [json.dumps(index_result["command"])]
 
         def record_index_metadata_complete(metadata_result):
-            nonlocal current_step, current_commands
+            nonlocal current_step, current_commands, metadata_complete
+            s1_command_metadata = collect_transition_command_metadata(command_event_callback, "S1")
+            current_commands = [json.dumps(value["argv"]) for value in s1_command_metadata]
             record_persistent_run_transition(
                 run_state, repository_name, "S1", "PASS", current_commands,
                 f"fresh full generation {metadata_result['generation']} has matching status/schema metadata",
                 "S1.fresh-full-index-and-metadata",
+                command_metadata=s1_command_metadata,
             )
+            metadata_complete = True
             current_step = "S2"
-            current_commands = [
-                str(execution_context["indexer_path"]) + " cli check_index_coverage --scopes [\".\"]",
-                str(execution_context["indexer_path"]) + " cli query_graph --graph missed --query MATCH (f:File) RETURN f.file_path",
-                str(execution_context["indexer_path"]) + " cli index_status (final generation check)",
-            ]
+            current_commands = []
 
         def record_s2_command_event(phase, command_values, outcome):
-            command_event_callback(phase, command_values, {"stage": "S2", **outcome})
+            command_stage = "S2" if metadata_complete else "S1"
+            command_event_callback(phase, command_values, {"stage": command_stage, **outcome})
 
         coverage_summary = coverage_inventory.collect_index_coverage_inventory(
             repository_name,
@@ -1635,12 +1864,15 @@ def execute_repository_sop_stages(
         run_state["manifest"]["repositories"][repository_name]["coverage_summary"] = coverage_summary
         coverage_summary["commands_jsonl_path"] = str(command_journal_path.resolve())
         run_state["manifest"]["repositories"][repository_name]["coverage_summary"] = coverage_summary
+        s2_command_metadata = collect_transition_command_metadata(command_event_callback, "S2")
+        current_commands = [json.dumps(value["argv"]) for value in s2_command_metadata]
         record_persistent_run_transition(
             run_state, repository_name, "S2", "PASS", current_commands,
             f"scope entries={coverage_summary['scope_coverage_entry_count']}; "
             f"missed File rows={coverage_summary['missed_source_file_count']}; "
             f"generation={coverage_summary['index_generation_timestamp_value']}",
             "S2.complete-stable-pagination",
+            command_metadata=s2_command_metadata,
         )
         append_persistent_report_entry(
             run_state,
@@ -1690,18 +1922,46 @@ def execute_repository_sop_stages(
         production_summary_path.write_text(json.dumps(measurement_summary, indent=2) + "\n")
         run_state["manifest"]["repositories"][repository_name]["s3_measurements"] = measurement_summary
         repository_components = run_state["manifest"]["repositories"][repository_name]["s3_components"]
-        repository_components["mapping"] = (
-            "PASS" if measurement_summary.get("production_mapper_exit_code") == 0 else "FAIL"
-        )
-        repository_components["measurement"] = (
-            "PASS" if measurement_summary.get("production_memory_sample_count", 0) > 0
-            and isinstance(measurement_summary.get("production_peak_rss_bytes"), int)
-            and isinstance(measurement_summary.get("production_total_elapsed_seconds"), (int, float))
-            else "BLOCKED"
-        )
-        if (measurement_summary.get("production_process_audit_exit") != 0
-                or measurement_summary.get("production_target_audit_exit") != 0):
+        mapper_status = measurement_summary.get("production_mapper_status")
+        mapper_exit = measurement_summary.get("production_mapper_exit_code")
+        if mapper_status in {"PASS", "FAIL", "BLOCKED", "NOT STARTED"}:
+            repository_components["mapping"] = mapper_status
+        elif mapper_exit is None:
+            repository_components["mapping"] = "NOT STARTED"
+        else:
+            repository_components["mapping"] = "PASS" if mapper_exit == 0 else "FAIL"
+        measurement_status = measurement_summary.get("production_measurement_status")
+        if measurement_status in {"PASS", "FAIL", "BLOCKED", "NOT STARTED"}:
+            repository_components["measurement"] = measurement_status
+        elif mapper_exit is None:
+            repository_components["measurement"] = "NOT STARTED"
+        elif (measurement_summary.get("production_memory_sample_count", 0) > 0
+              and isinstance(measurement_summary.get("production_peak_rss_bytes"), int)
+              and isinstance(measurement_summary.get("production_total_elapsed_seconds"), (int, float))):
+            repository_components["measurement"] = "PASS"
+        else:
+            repository_components["measurement"] = "BLOCKED"
+        process_audit_status = measurement_summary.get("production_process_audit_status")
+        target_audit_status = measurement_summary.get("production_target_audit_status")
+        process_audit_exit = measurement_summary.get("production_process_audit_exit")
+        target_audit_exit = measurement_summary.get("production_target_audit_exit")
+        if process_audit_status in {"FAIL", "BLOCKED"}:
+            repository_components["process_access_audit"] = process_audit_status
+        elif target_audit_status in {"FAIL", "BLOCKED"}:
+            repository_components["process_access_audit"] = target_audit_status
+        elif (process_audit_status == "NOT STARTED" or target_audit_status == "NOT STARTED"
+              or process_audit_status is None and process_audit_exit is None
+              or target_audit_status is None and target_audit_exit is None):
+            repository_components["process_access_audit"] = "NOT STARTED"
+        elif process_audit_exit is not None and process_audit_exit != 0 or (
+            target_audit_exit is not None and target_audit_exit != 0
+        ):
             repository_components["process_access_audit"] = "FAIL"
+        elif (process_audit_status == "PASS" and target_audit_status == "PASS"
+              and process_audit_exit == 0 and target_audit_exit == 0):
+            repository_components["process_access_audit"] = "PASS"
+        elif process_audit_exit is None or target_audit_exit is None:
+            repository_components["process_access_audit"] = "BLOCKED"
         elif (not measurement_summary.get("production_trace_nonempty")
                 or not measurement_summary.get("production_process_trace_complete")
                 or not measurement_summary.get("production_target_trace_nonempty")
@@ -1713,7 +1973,12 @@ def execute_repository_sop_stages(
         else:
             repository_components["process_access_audit"] = "PASS"
         marker_result = measurement_summary.get("publication_stage_marker_result")
-        if measurement_summary.get("production_status_exit_code") != 0:
+        publication_status = measurement_summary.get("production_publication_status")
+        if publication_status in {"PASS", "BLOCKED", "FAIL", "NOT STARTED"}:
+            repository_components["publication"] = publication_status
+        elif measurement_summary.get("production_status_exit_code") is None:
+            repository_components["publication"] = "NOT STARTED"
+        elif measurement_summary.get("production_status_exit_code") != 0:
             repository_components["publication"] = "FAIL"
         elif isinstance(marker_result, Mapping) and marker_result.get("pass") is True:
             repository_components["publication"] = "PASS"
@@ -1738,35 +2003,42 @@ def execute_repository_sop_stages(
     except RunnerFrozenInputMutationError as error:
         run_state["manifest"]["input_integrity_status"] = "FAIL"
         run_state["manifest"]["input_integrity_reason"] = str(error)
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "FAIL", current_commands, str(error),
-            f"{current_step}.frozen-input-mutation",
+            run_state, repository_name, current_step, "FAIL", transition_commands, str(error),
+            f"{current_step}.frozen-input-mutation", command_metadata=transition_metadata,
         )
         return "FAIL"
     except RunnerContractViolationError as error:
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "FAIL", current_commands, str(error),
-            f"{current_step}.observed-contract-violation",
+            run_state, repository_name, current_step, "FAIL", transition_commands, str(error),
+            f"{current_step}.observed-contract-violation", command_metadata=transition_metadata,
         )
         return "FAIL"
     except (RunnerPreconditionBlockedError, coverage_inventory.CoverageInventoryBlockedError) as error:
         if current_step == "S1" and run_state["manifest"]["repositories"][repository_name]["steps"]["S1"] == "PASS":
             current_step = "S2"
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "BLOCKED", current_commands, str(error),
-            f"{current_step}.missing-or-incomplete-evidence",
+            run_state, repository_name, current_step, "BLOCKED", transition_commands, str(error),
+            f"{current_step}.missing-or-incomplete-evidence", command_metadata=transition_metadata,
         )
         return "BLOCKED"
     except KeyboardInterrupt:
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "BLOCKED", current_commands,
+            run_state, repository_name, current_step, "BLOCKED", transition_commands,
             "execution interrupted before the current stage completed", f"{current_step}.interrupted",
+            command_metadata=transition_metadata,
         )
         raise
     except Exception as error:
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "BLOCKED", current_commands,
+            run_state, repository_name, current_step, "BLOCKED", transition_commands,
             f"unexpected {type(error).__name__}: {error}", f"{current_step}.runner-exception",
+            command_metadata=transition_metadata,
         )
         return "BLOCKED"
 
@@ -2022,6 +2294,7 @@ def execute_qualification_run(
 
 
 def run_persistent_qualification_plan(arguments: argparse.Namespace) -> Mapping[str, Any]:
+    validate_run_output_paths(arguments)
     run_state = create_persistent_run_report(
         arguments.report_root,
         arguments.run_id,
@@ -2053,6 +2326,9 @@ def main(argument_values: Sequence[str] | None = None) -> int:
     except KeyboardInterrupt:
         print(json.dumps({"overall_status": "BLOCKED", "reason": "interrupted"}))
         return 130
+    except (RunnerPreconditionBlockedError, RunnerContractViolationError) as error:
+        print(json.dumps({"overall_status": "BLOCKED", "reason": str(error)}), file=sys.stderr)
+        return 2
     print(json.dumps(result, indent=2, default=json_default_value))
     if result["overall_status"] == "FAIL":
         return 1
