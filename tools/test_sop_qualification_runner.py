@@ -1063,6 +1063,30 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         self.assertEqual(versions["rustc"]["version"], "unavailable")
         self.assertEqual(versions["cargo"]["version"], "unavailable")
 
+    def test_rustup_shims_preserve_invocation(self):
+        """REQ-SOP-RUNNER-009: cargo and rustc shims retain their PATH invocation names."""
+        binary_directory = self.root_path / "rustup-bin"
+        binary_directory.mkdir()
+        shim_path = binary_directory / "rustup"
+        shim_path.write_text(
+            "#!/bin/sh\n"
+            "invoked=${0##*/}\n"
+            "printf '%s shim-version\\n' \"$invoked\"\n"
+        )
+        shim_path.chmod(0o755)
+        cargo_path = binary_directory / "cargo"
+        rustc_path = binary_directory / "rustc"
+        cargo_path.symlink_to(shim_path.name)
+        rustc_path.symlink_to(shim_path.name)
+
+        with patch.dict(os.environ, {"PATH": str(binary_directory)}):
+            versions = runner.probe_toolchain_versions()
+
+        for tool_name, invocation_path in (("cargo", cargo_path), ("rustc", rustc_path)):
+            self.assertEqual(versions[tool_name]["version"], f"{tool_name} shim-version")
+            self.assertEqual(versions[tool_name]["path"], str(invocation_path))
+            self.assertEqual(versions[tool_name]["canonical_path"], str(shim_path.resolve()))
+
     def test_planning_creates_truthful_report(self):
         """REQ-SOP-RUNNER-001: planning persists statuses without mapper or oracle execution."""
         arguments = runner.build_runner_argument_parser().parse_args([

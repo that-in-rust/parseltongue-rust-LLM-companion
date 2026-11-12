@@ -82,21 +82,26 @@ def probe_toolchain_versions() -> Mapping[str, Mapping[str, Any]]:
     for tool_name in ("rustc", "cargo"):
         executable_path = shutil.which(tool_name)
         if not executable_path:
-            versions[tool_name] = {"path": None, "version": "unavailable", "return_code": None}
+            versions[tool_name] = {
+                "path": None, "canonical_path": None,
+                "version": "unavailable", "return_code": None,
+            }
             continue
         canonical_path = str(Path(executable_path).resolve())
         try:
-            result = subprocess.run([canonical_path, "--version"], text=True,
+            result = subprocess.run([executable_path, "--version"], text=True,
                                     capture_output=True, check=False)
         except OSError as error:
             versions[tool_name] = {
-                "path": canonical_path, "version": "unavailable", "return_code": None,
+                "path": executable_path, "canonical_path": canonical_path,
+                "version": "unavailable", "return_code": None,
                 "error": str(error),
             }
             continue
         version_text = result.stdout.strip() or result.stderr.strip() or "unavailable"
         versions[tool_name] = {
-            "path": canonical_path,
+            "path": executable_path,
+            "canonical_path": canonical_path,
             "version": version_text if result.returncode == 0 else "unavailable",
             "return_code": result.returncode,
             "error": result.stderr.strip() if result.returncode != 0 else None,

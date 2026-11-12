@@ -157,7 +157,7 @@ requirement coverage. Each entry maps to the existing SOP and SPEC clauses it op
 - SOP: §1 P1–P5; S3 fixture/build/dependency and production-map gates; §3 verdict.
 - SPEC: REQ-RUST-010.2, REQ-RUST-015.1, REQ-RUST-020.1.
 - Tests: `test_s3_component_never_qualifies`, `test_component_completion_continues_corpus`,
-  `test_toolchain_versions_are_recorded`.
+  `test_toolchain_versions_are_recorded`, `test_rustup_shims_preserve_invocation`.
 
 ### REQ-SOP-RUNNER-010
 
@@ -750,3 +750,37 @@ path_total=5; path_returned=5; each status=no_recorded_issue; each freshness=met
 
 Scoped coverage is explicitly a best-effort signal, not a completeness guarantee. The first index command
 attempt mistakenly passed unsupported `--format json` and exited 1; the exact command above succeeded.
+
+### Toolchain shim dispatch correction — STUB / RED
+
+REQ-SOP-RUNNER-009: execute `cargo --version` and `rustc --version` through the PATH-selected invocation
+paths so rustup-style symlink dispatch is preserved, while recording each resolved canonical executable
+path separately. The focused regression `test_rustup_shims_preserve_invocation` uses real cargo/rustc
+symlinks to one executable that prints its invoked basename; it is REQ-tagged and four words after `test_`.
+The expected RED result will show the current canonical-path invocation returning `rustup` rather than
+the requested `cargo`/`rustc` identity.
+
+RED checkpoint:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_rustup_shims_preserve_invocation
+Ran 1 test in 0.004s
+FAILED (failures=1)
+AssertionError: 'rustup shim-version' != 'cargo shim-version'
+```
+
+### Toolchain shim dispatch correction — GREEN
+
+`probe_toolchain_versions` now executes the PATH-selected path and records it in `path`, with the resolved
+target separately in `canonical_path`. The real symlink regression observes cargo/rustc identity through
+the shim and checks both returned paths.
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_rustup_shims_preserve_invocation
+Ran 1 test in 0.004s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py' -v
+Ran 74 tests in 0.580s
+OK
+```
