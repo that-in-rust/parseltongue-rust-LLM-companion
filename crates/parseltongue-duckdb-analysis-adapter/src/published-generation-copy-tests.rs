@@ -150,6 +150,49 @@ fn append_namespace_fixture_value(source: &mut Source, table: &str, value: serde
     rows.sort_by(|left, right| left.stage_row_record_key.cmp(&right.stage_row_record_key));
 }
 
+fn append_compilation_fixture(
+    source: &mut Source,
+    unit: &serde_json::Value,
+    graph: serde_json::Value,
+) -> serde_json::Value {
+    let root = json!({"scope_compilation_unit_key":unit,"scope_semantic_path_parts":[]});
+    let prelude =
+        json!({"scope_compilation_unit_key":unit,"scope_semantic_path_parts":["@prelude"]});
+    [vec![],vec!["@prelude"],vec!["@extern"]].into_iter().for_each(|parts|{
+        append_namespace_fixture_value(source,"syntax-namespace-input-scopes",json!({"scope_module_identity_key":{"scope_compilation_unit_key":unit,"scope_semantic_path_parts":parts},"scope_parent_identity_key":null,"scope_parent_lookup_flag":false,"scope_module_boundary_flag":parts.is_empty(),"scope_implicit_prelude_key":if parts.is_empty(){prelude.clone()}else{serde_json::Value::Null},"scope_cargo_unit_key":graph["unit_compilation_identity_key"]}));
+    });
+    append_namespace_fixture_value(source, "crate-dependency-graph-table", graph);
+    root
+}
+
+#[test]
+fn frozen_compilation_dependency_alias_rules() {
+    ["2015","2018"].into_iter().for_each(|edition|[false,true].into_iter().for_each(|declared|[false,true].into_iter().for_each(|implicit|{
+        let directory=tempfile::tempdir().unwrap();
+        let store=DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(&directory.path().join("analysis.duckdb"),directory.path(),64*1024*1024).unwrap();
+        let mut source=namespace_source_fixture();
+        let original:serde_json::Value=serde_json::from_str(&source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text).unwrap();
+        let unit=&original["scope_module_identity_key"]["scope_compilation_unit_key"];
+        let dependency=json!({"unit_cargo_package_identifier":"dep-package","unit_cargo_target_name":"dep","unit_cargo_target_kind":"lib","unit_compilation_role_kind":"target","unit_configuration_digest_full":"1".repeat(64)});
+        source.records.get_mut("crate-dependency-graph-table").unwrap().clear();
+        source.records.get_mut("syntax-namespace-input-scopes").unwrap().clear();
+        let root=append_compilation_fixture(&mut source,unit,json!({"unit_compilation_identity_key":"fixture-unit","unit_rust_edition_value":edition,"unit_no_core_flag":true,"unit_no_std_flag":true,"unit_implicit_prelude_flag":implicit,"unit_normal_dependency_rows":[{"dependency_alias_name_value":"dep_alias","dependency_cargo_package_identifier":"dep-package","dependency_compilation_role_kind":"target"}]}));
+        let dependency_root=append_compilation_fixture(&mut source,&dependency,json!({"unit_compilation_identity_key":"dep-unit","unit_rust_edition_value":"2018","unit_no_core_flag":true,"unit_no_std_flag":true,"unit_implicit_prelude_flag":false,"unit_normal_dependency_rows":[]}));
+        let target=json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":"DependencyThing"});
+        append_namespace_fixture_value(&mut source,"syntax-namespace-input-items",json!({"binding_lexical_scope_key":dependency_root,"binding_resolved_name_text":"Thing","binding_namespace_kind_value":"type","binding_target_identity_key":target,"binding_target_child_scope":null,"binding_visibility_scope_kind":{"visibility_scope_kind_value":"public"},"binding_selection_priority_kind":"declaration","binding_import_evidence_keys":[],"binding_target_metadata_value":{"target_symbol_kind_value":"Struct"}}));
+        if declared {
+            append_namespace_fixture_value(&mut source,"syntax-namespace-input-externs",json!({"extern_declaration_scope_key":root,"extern_declaration_source_name":"dep_alias","extern_declaration_alias_name":"renamed","extern_declaration_visibility":{"visibility_scope_kind_value":"public"},"extern_declaration_attributes":[],"extern_declaration_source_path":"/fixture/lib.rs","extern_declaration_source_start":0}));
+        }
+        append_namespace_fixture_value(&mut source,"syntax-namespace-input-paths",json!({"path_site_occurrence_key":{"site":"dependency-path"},"path_lexical_scope_key":root,"path_source_segment_rows":[{"kind":"name","name":if declared {"renamed"}else{"dep_alias"}},{"kind":"name","name":"Thing"}],"path_requested_namespace_kind":"Type","path_resolution_source_kind":"Signature","path_unavailable_reason_kind":null,"path_source_metadata_value":{}}));
+        store.copy_published_stage_rows(&source,&scope(),NAMESPACE_SOURCE_TABLE_NAMES,&RunCancelFlagValue::default()).unwrap();
+        store.normalize_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        store.link_frozen_namespace_units(&scope(),&RunCancelFlagValue::default()).unwrap();
+        store.resolve_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        let count:usize=store._connection.lock().unwrap().query_row("SELECT count(*) FROM \"namespace-path-candidate-records\" WHERE request_key=? AND target_key=? AND state='resolved'",duckdb::params![json!({"site":"dependency-path"}).to_string(),target.to_string()],|row|row.get(0)).unwrap();
+        assert_eq!(count,usize::from(declared || (edition!="2015" && implicit)),"edition={edition} declared={declared} implicit={implicit}");
+    })));
+}
+
 #[test]
 fn frozen_namespace_sql_resolution_contract() {
     let directory = tempfile::tempdir().unwrap();
