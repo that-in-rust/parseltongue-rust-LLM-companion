@@ -108,6 +108,20 @@ pub trait AnalysisTableStorePort: Send + Sync {
 }
 
 pub trait ItemMacroExpansionPort: Send + Sync {
+    fn expand_next_resolved_macro_items(
+        &self,
+    ) -> Result<
+        Option<parseltongue_core_row_types::NameExpansionRoundRows>,
+        parseltongue_core_row_types::NameResolutionStageError,
+    > {
+        Err(
+            parseltongue_core_row_types::NameResolutionStageError::Input(
+                parseltongue_core_row_types::StageInputMissingError {
+                    error_context_detail_text: "ordered macro expansion not implemented".into(),
+                },
+            ),
+        )
+    }
     fn expand_resolved_macro_items(
         &self,
         query: &parseltongue_core_row_types::NameMacroExpansionQuery<'_>,
@@ -118,6 +132,19 @@ pub trait ItemMacroExpansionPort: Send + Sync {
 }
 
 pub trait ResolvedMacroLookupPort: Send + Sync {
+    fn read_macro_invocation_binding_record(
+        &self,
+        _request_key: &str,
+    ) -> Result<Option<StageTableRowRecord>, parseltongue_core_row_types::NameResolutionStageError>
+    {
+        Err(
+            parseltongue_core_row_types::NameResolutionStageError::Input(
+                parseltongue_core_row_types::StageInputMissingError {
+                    error_context_detail_text: "frozen macro lookup not implemented".into(),
+                },
+            ),
+        )
+    }
     fn read_resolved_builtin_macro(
         &self,
         scope: &parseltongue_core_row_types::NameResolutionScopeKey,
