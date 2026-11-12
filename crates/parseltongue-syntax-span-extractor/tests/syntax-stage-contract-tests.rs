@@ -105,6 +105,29 @@ fn test_sysroot_final_trait_methods() {
 }
 
 #[test]
+fn test_sysroot_const_closure_support() {
+    let binding = ra_ap_syntax::SourceFile::parse(
+        "fn f() { let _ = const move |a| a; }",
+        ra_ap_syntax::Edition::Edition2024,
+    );
+    assert!(binding.errors().is_empty(), "{:?}", binding.errors());
+    let control = ra_ap_syntax::SourceFile::parse(
+        "fn f() { move |a| a }",
+        ra_ap_syntax::Edition::Edition2024,
+    );
+    assert!(control.errors().is_empty(), "{:?}", control.errors());
+    let source = ra_ap_syntax::SourceFile::parse(
+        "fn f() { const move |a| a }",
+        ra_ap_syntax::Edition::Edition2024,
+    );
+    assert!(
+        source.errors().is_empty(),
+        "pinned parser: {:?}",
+        source.errors()
+    );
+}
+
+#[test]
 fn test_cfg_comments_keep_semantics() {
     let enabled = BTreeSet::from(["unix".into(), "feature=\"selected\"".into()]);
     for source in [

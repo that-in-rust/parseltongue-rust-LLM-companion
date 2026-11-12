@@ -33,6 +33,11 @@ def build_corpus_measurement_commands(record, output):
     return measurement, audit, reads
 
 
+def audit_recorded_process_events(text, binary):
+    root = re.search(r'^([0-9]+) execve[(]' + re.escape(json.dumps(str(binary))) + ',', text, re.M)
+    return auditor.audit_process_trace_events(text, int(root[1]) if root else 0, binary)
+
+
 def measure_corpus_production_stages(record):
     output = ROOT / record["corpus_evidence_directory_path"]
     if suffix := os.environ.get("PARSELTONGUE_CORPUS_RUN_DIRECTORY"):
@@ -56,8 +61,7 @@ def measure_corpus_production_stages(record):
     with (output / "production-audit-output-log.txt").open("w") as stdout, (output / "production-audit-error-log.txt").open("w") as stderr:
         audited = subprocess.run(audit_command, cwd=ROOT, env=environment, stdout=stdout, stderr=stderr, check=False)
     text = trace.read_text()
-    root = re.search(r'^(\d+) execve\("[^"]*/parseltongue"', text, re.M)
-    violations = auditor.audit_process_trace_events(text, int(root[1]) if root else 0)
+    violations = audit_recorded_process_events(text, binary)
     with (output / "production-target-output-log.txt").open("w") as stdout, (output / "production-target-error-log.txt").open("w") as stderr:
         reads = subprocess.run(read_command, cwd=ROOT, env=environment, stdout=stdout, stderr=stderr, check=False)
     target_violations = [line for line in (output / "production-target-access-audit.txt").read_text().splitlines()

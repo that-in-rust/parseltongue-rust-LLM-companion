@@ -16,6 +16,13 @@ driver_spec.loader.exec_module(driver)
 
 
 class ProcessTreeContractTests(unittest.TestCase):
+    def test_frozen_mapper_root_identity(self):
+        trace='100 execve("/frozen/renamed-cli", ["renamed-cli"], []) = 0\n'
+        self.assertEqual(driver.audit_recorded_process_events(trace,Path("/frozen/renamed-cli")),[])
+        self.assertTrue(driver.audit_recorded_process_events(trace,Path("/other/renamed-cli")))
+        self.assertTrue(driver.audit_recorded_process_events("",Path("/frozen/renamed-cli")))
+        self.assertTrue(auditor.audit_process_trace_events(trace,100))
+
     def test_tree_walk_stays_local(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

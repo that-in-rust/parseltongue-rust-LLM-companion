@@ -321,3 +321,15 @@ Record:
 - Per-repo PASS/FAIL/BLOCKED, first failed clause, overall verdict and follow-up defects.
 
 A planned harness/test/command is not an observed passing result. Preserve output evidence for every claimed gate.
+
+### M1 parser requalification scope
+
+When re-running S3 for a parser pin while M2 is incomplete, pass
+--mapping-final-stage-kind syntax-spans. The default remains name-resolution.
+The banner must show only the three M1 stages complete and leave later stages
+not yet implemented; do not count that run as M2/S5 evidence.
+Freeze one executable across all repositories and record its digest.
+The process auditor must bind that exact configured path, not infer identity from
+the filename. Reanalyse saved traces only with that explicit identity; never rewrite
+traces or ignore unfinished events. A repeat audit may replace an incomplete capture
+only if the failed capture and the repeat's evidence are both retained.

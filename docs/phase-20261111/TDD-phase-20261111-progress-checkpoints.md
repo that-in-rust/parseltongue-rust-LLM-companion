@@ -1110,3 +1110,35 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   bypassing the wrapper reproduces expected fn, trait or impl at 14..14; removing only
   const parses. No workaround applied. Full reachability evidence and scope decision
   will be recorded after the required all-five M1 rerun.
+
+## Parser alignment S3 completion and const-closure compatibility RED
+
+- Parser source alignment GREEN is committed/pushed as 21535ea3b.
+  Native checkout remains clean at 2a362a41a8eb6e090f1a12d9b712df85af6f0c33.
+- All-five M1 measurements and separate audits are complete. Source tiling holds,
+  all command exits are zero, and every process/target audit passes with the
+  exact configured frozen executable. Peak memory is below 2 GiB on all five.
+  See the appended report section for all counts/deltas/time/RSS and qualifications.
+  Rust-analyzer deltas: files +5, spans +118, fields +207, body sites +885.
+  All four other corpora have zero count deltas.
+- The renamed frozen binary exposed a driver root-PID basename assumption.
+  Corrected it to match the configured executable path exactly; all child/argv/network
+  checks remain unchanged. Tests: Ran 6 tests in 0.326s / OK.
+  Original traces were reanalysed, not rewritten. Serde's first capture contains an
+  unfinished ???? event and remains failed; a fresh cold-cache audit passed.
+- New RED test_sysroot_const_closure_support calls native SourceFile::parse directly:
+  ordinary move tail and const-move let initializer pass; const-move tail fails with
+  SyntaxError("expected fn, trait or impl", 14..14), 0 passed / 1 failed.
+  Native default CLI fixture fails at core/src/ops/try_trait.rs offset 16948.
+- Reachability is verified: selected sysroot's core lib enables const_closures;
+  its unconditional ops module unconditionally loads try_trait; wrap_mut_1 has the
+  exact tail closure. expressions.rs stmt dispatches items::opt_item before expr_stmt;
+  items.rs consumes const whenever the next token is not a brace, misclassifying move.
+  atom.rs closure_expr already supports const, as the let-initializer control proves.
+  This is not a missing prelude binding or a Parseltongue token-wrapper defect.
+- Scope decision needed: authorize a small, jointly pinned parser/oracle source
+  grammar fix for statement-position const closures. The newest upstream master
+  alone cannot parse this selected toolchain's core. Do not strip tokens, suppress
+  errors, or silently select an older sysroot. No external checkout edits made.
+- Sysroot GREEN/REFACTOR and manifests/differ/S5 remain incomplete. Preserve the
+  seven existing uncommitted sysroot files. No agreement numerator/denominator exists.

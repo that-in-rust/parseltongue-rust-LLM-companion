@@ -60,7 +60,7 @@ def check_rustc_discovery_arguments(command_argument_tail_values):
     )
 
 
-def audit_process_trace_events(trace_source_text, mapper_process_identifier):
+def audit_process_trace_events(trace_source_text, mapper_process_identifier, mapper_executable_path=None):
     complete_trace_event_rows, pending_trace_event_rows = read_complete_trace_events(trace_source_text)
     process_parent_identifier_map = {}
     for process_identifier_number_value, process_trace_event_text in complete_trace_event_rows:
@@ -98,7 +98,8 @@ def audit_process_trace_events(trace_source_text, mapper_process_identifier):
             command_argument_tail_values = command_argument_vector_values[1:]
             if process_identifier_number_value == mapper_process_identifier and not mapper_execution_seen_flag:
                 mapper_execution_seen_flag = True
-                if command_executable_short_name != "parseltongue":
+                if (command_executable_path_value != str(mapper_executable_path) if mapper_executable_path is not None
+                        else command_executable_short_name != "parseltongue"):
                     process_audit_violation_rows.append("audited root is not parseltongue")
                 continue
             inherited_command_context_kind = process_command_context_kind

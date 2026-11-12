@@ -267,3 +267,111 @@ a library-form example, benchmarks, inactive modules and an active empty module.
 unchanged production code: ten byte-inventory files, exactly three requested closure files.
 An initial test-harness failure held the store open while spawning the status subprocess; dropping
 that handle before the subprocess fixed the test setup, not production behavior.
+
+## Parser/oracle pin alignment and all-five M1 requalification
+
+The earlier source pin lacked final associated functions. The newest fetched upstream
+master, 2a362a41a8eb6e090f1a12d9b712df85af6f0c33, has the final_assoc_fn grammar case.
+Production syntax/parser now link directly to the same clean checkout as the oracle.
+No checkout sources or Rust tokens were patched. The original nameres/MBe adaptations
+retain the older origin recorded in their notices.
+
+New rust-analyzer qualification: cargo fetch --locked and cargo check --workspace
+--locked both exited 0; the latter printed Finished dev profile in 32.16s.
+The oracle was rebuilt; 16 tests pass. Its build manifest records the updated source
+and executable digest. This is not an S5 export or agreement denominator.
+
+An explicit --mapping-final-stage-kind syntax-spans requalifies M1 without invoking
+unfinished M2 sysroot/name-resolution work. Default mapping still requests name-resolution.
+All five ran one frozen executable (SHA-256):
+74020376084baab65187049d9b2b5237705ab19c591f8ccb735a02cdf79e3c01.
+The executable was frozen from the working tree containing pending M2 code; that code
+is bypassed by the explicit M1 stage limit. The frozen binary and source-stage outputs
+are retained, rather than implying the entire working tree was a completed M2 commit.
+
+Evidence: <repo>/parser-aligned-m1-measurements/. Measurements were untraced;
+process/network and exact-target-path audits ran separately against different stores.
+All mapper/status/audit commands exited 0; all five tiling identities hold;
+all five process and filtered-target audits pass; all RSS values remain below 2 GiB.
+
+```text
+rust-analyzer:
+  files 5707; spans 120245; fields 256414; body sites 656858
+  deltas from prior S3: +5 / +118 / +207 / +885
+  untraced wall 189.166s; peak process-tree RSS 0.608 GiB
+ripgrep:
+  files 1039; spans 21434; fields 40231; body sites 106389
+  deltas: 0 / 0 / 0 / 0
+  untraced wall 31.012s; peak process-tree RSS 0.174 GiB
+tokio:
+  files 1239; spans 8632; fields 18581; body sites 27492
+  deltas: 0 / 0 / 0 / 0
+  untraced wall 10.643s; peak process-tree RSS 0.126 GiB
+serde:
+  files 354; spans 4150; fields 5848; body sites 19735
+  deltas: 0 / 0 / 0 / 0
+  untraced wall 3.850s; peak process-tree RSS 0.096 GiB
+cargo-modules:
+  files 5597; spans 114015; fields 258302; body sites 636893
+  deltas: 0 / 0 / 0 / 0
+  untraced wall 175.098s; peak process-tree RSS 0.565 GiB
+```
+
+Rust-analyzer's deltas combine a corpus repin and parser alignment; they are not
+attributed solely to parser changes. The previous baseline used
+6e37b2d62127d445d77069031b416c48c9b0b4f2. The four unchanged corpora have zero count deltas.
+Timings are observations, not proof of a parser speedup; rust-analyzer remains slightly
+above the approximate three-minute target. The filtered target audit remains exact-path,
+not recursive; the previous source-traversal-guard qualification still applies.
+
+Audit corrections: the original driver assumed the filename parseltongue and could not
+identify the renamed frozen executable. It now binds the exact configured executable
+path, with normal/mismatch/empty trace contracts, without relaxing any child-process
+or network rule. Saved traces were reanalysed, not rewritten. Serde's first trace also
+had an unfinished ???? syscall event in a rustc discovery thread; it remains a failed
+trace. A fresh cold-discovery-cache process audit exited 0 and passed unchanged strict
+event checks. The repeat trace and initial violation are retained in its audit result.
+
+The updated rust-analyzer S1/S2 inventory reconciles one fresh generation:
+38655 nodes; 231440 edges; 296 scope findings across 15 pages;
+286 missed Files across two pages. Every page is saved beside the new S3 evidence.
+The earlier cargo-modules/ripgrep source-closure outcome remains unchanged: byte
+inventory is not active closure; tests fixtures contribute no closure files or spans.
+Their newly rerun S3 counts above match the prior counts exactly.
+
+M1 working-tree checks: 102 passed, 0 failed, 3 manual profiles ignored, with the pending
+native M2 sysroot test filtered. Final-associated-function direct-parser/extractor
+regression passes. Later const-closure syntax regression is explicitly RED, below.
+Production Clippy all targets/features with -D warnings passed; formatting checks passed.
+Dependency gates include native hir/ide/base-db names as well as ra_ap variants.
+Python audit contracts: Ran 6 tests in 0.326s / OK.
+
+## M2 sysroot blocker after accepting final associated functions
+
+The newest upstream parser still rejects a const closure in statement/tail position:
+fn f() { const move |a| a }. Ordinary move closure and a const closure in a let
+initializer both parse. This is an item-versus-expression disambiguation defect,
+not absence of const-closure grammar.
+
+The native sysroot fixture advances past clone.rs, then fails:
+```text
+WorkspaceNotCompilingError: .../core/src/ops/try_trait.rs offset 16948: expected fn, trait or impl
+pinned parser: [SyntaxError("expected fn, trait or impl", 14..14)]
+test result: FAILED. 0 passed; 1 failed;
+```
+
+Reachability: default full mapping selects M2 and the fixture demands sysroot support;
+core/src/lib.rs enables const_closures and unconditionally declares ops;
+ops/mod.rs unconditionally declares try_trait; wrap_mut_1 has the const move tail.
+The observed native discovery failure names that exact file/range. A direct call to
+the same checkout's SourceFile::parse bypasses Parseltongue and reproduces the failure.
+expressions.rs dispatches statement parsing through items::opt_item first;
+items.rs treats const followed by anything except a brace as an item modifier, then
+errors at move. atom.rs accepts const closures in expression context, matching the
+successful let-initializer countercheck.
+
+No token rewrite, error suppression, older sysroot substitution or source fork was used.
+Continuing requires an authorized parser/oracle grammar fix with both pinned together,
+or an explicit toolchain change. Upstream-master pin alignment alone cannot clear this
+second compatibility defect. Sysroot GREEN/REFACTOR, exact manifests, differ and all-five
+S5 remain BLOCKED/unmeasured, never 100 percent or an empty passing denominator.
