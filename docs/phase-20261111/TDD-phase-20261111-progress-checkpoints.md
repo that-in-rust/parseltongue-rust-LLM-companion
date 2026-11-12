@@ -1671,3 +1671,18 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   KL1. Unresolved PRIMARY-visible sites are nonmatches; no empty-target
   equality shortcut. M2 proc-dependent exclusions need oracle evidence and
   remain separately reported. Known oracle errors block affected scoring.
+
+### Canonical path comparison RED
+
+- New CLI contracts cover exact/deduplicated paths, Turso publication,
+  immutable source generation, empty denominator N/A, unresolved nonmatches,
+  M2 proc exclusion without excusing wrong extracted targets, scope/source
+  errors and source/output alias rejection.
+- Log: /home/ubuntu/m2-path-comparison-red-tests.log. Three scoring contracts
+  fail at the intended comparison STUB; explicit-error contract passes.
+- Additional full M2 writers use the identical frozen mapper:
+  ripgrep shell 448968; tokio shell 7aa41a. Each owns only its repository's
+  s5-primary-path-agreement directory/store. Serde remains shell ce054b.
+- Comparison publication design: independent Turso sidecar with its own
+  comparison generation and source-snapshot reference. Never append analysis
+  facts to, or replace publication of, the frozen mapping database.
