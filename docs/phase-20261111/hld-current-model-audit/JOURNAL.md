@@ -1,0 +1,246 @@
+# Journal — HLD-current model audit packet
+
+Append-only. This packet is documentation/setup only; no Rust code or
+production HLD was changed.
+
+## 2026-11-12 — documentation packet start
+
+- Base: `31397b39deaa098fdcbb9fcf8e527e4de81d6efb`; isolated branch/worktree.
+- Contract: `REQ-RUST-025.0`; named future validator tests remain PENDING.
+- Source pin checked: serde `aa7913ad0211fef960df68e7812a6211145a888c`;
+  source checkout clean. Bounded Pass A scope only; no production HLD export
+  was supplied, so Pass B is BLOCKED/NOT STARTED.
+- Skills applied: `rust-executable-specs-01` (Spec/Review/Reliability order)
+  and `idiomatic-rust-coder-01` (TDD STUB→RED→GREEN→REFACTOR). Exact named
+  TDD plugin was not available in plugin search; root/scoped AGENTS retains
+  its required loop. Documentation validation is structural, not TDD RED/GREEN.
+- zcode has not yet been invoked. Record its eventual prompt/output/stderr/time
+  artifacts, requested and actually reported model identity, or actual auth
+  failure in the separate persistent run directory.
+
+## 2026-11-12 — structural checks and zcode launch retries
+
+- The preceding zcode-not-invoked statement is historical for the packet-start
+  entry only. The bounded model request was attempted three times after the
+  docs-only packet was pushed. No model response was received; no Pass A
+  candidate or actual model identity exists. Authentication remains
+  unverified, and Pass B remains BLOCKED/NOT STARTED.
+- Structural validation output recorded at packet completion:
+
+  JSON_SCHEMA: Draft-07 valid; NOT_STARTED, frozen draft comparison and fully gated PASS records accepted
+  SCHEMA_GATES: rejected Pass-A production rows, FROZEN without hash/time, comparison before freeze/export, PASS with S9 NOT_RUN, PASS without export, evidence missing byte_end
+  STRUCTURE: 4 local links resolve; 4 unique REQ definitions; 11 four-word PENDING tests map to fixtures
+  DIFF_CHECK: exit 0
+  SCOPE_CHECK: exactly 8 requested docs changed; root AGENTS.md unchanged
+
+- Docs-only packet commit/push: b7517cdd6511350a5ebb32f64157e16e0c4b860f
+  on devin/1794502340-hld-model-audit. The packet worktree was clean after
+  push. No mapper, comparator, or SOP-runner files were accessed or changed.
+- Zcode/CLI diagnostic facts: Claude Code 2.1.319; wrapper SHA-256
+  f0dadaf2abf5fd3c7581a9d333ff43bff3c6a6c347ae30bb54bc403608d97ca3;
+  CLI SHA-256
+  dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed.
+  The wrapper exports the Z.AI Anthropic endpoint
+  https://api.z.ai/api/anthropic and model defaults OPUS/SONNET=glm-5.3,
+  HAIKU=glm-5.3-flash; credential values were never read or printed.
+  Installed CLI help says --model accepts an alias such as sonnet/opus or a
+  full model name. --restricted ignores user/project/local settings; this
+  launch still receives the wrapper's environment mapping.
+- Official documentation consulted:
+  https://docs.z.ai/devpack/latest-model lists GLM-5.3 and GLM-5.3-Flash
+  for all plan tiers, gives glm-5.3 as a model example, and documents the
+  Claude Code endpoint above.
+  https://docs.z.ai/devpack/tool/claude documents
+  ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, and
+  ANTHROPIC_DEFAULT_HAIKU_MODEL custom-model mappings; its GLM-5.3 example
+  maps OPUS/SONNET to glm-5.3.
+- Attempt 1 — launch 2026-11-12T17:11:59Z, shell 444685, CLI
+  --model glm-5.3, prompt SHA-256
+  b9380130db7dd736a1a2be92039e7fee67e4e6f48874edd0eb7a0b88910980e8.
+  Stderr was exactly
+  [claude-code:unrecognized_model] {"model":"glm-5.3","query_source":"sdk"}.
+  Stdout was empty (SHA-256
+  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855),
+  stderr SHA-256
+  089dbf616da27f2f327878d5fb2ed70fd63a63b259b7c648536429d4b1c68609;
+  time file was empty. Shell stopped after the error; no exit code or elapsed
+  time was captured. Attempt metadata:
+  /home/ubuntu/zcode-runs/20261112-hld-current-model-audit/run-metadata.json
+  (SHA-256
+  ebd9a3e0b3b281c30bebe3d532d7e55fa68a3843f586cd4784dda4d21fbe073e).
+  Output/stderr/time paths are zcode-output.json, zcode-stderr.log, and
+  zcode-time.txt in that run directory.
+- Attempt 2 — launch 2026-11-12T17:17:01Z, shell a87479, --model sonnet
+  using the wrapper's ANTHROPIC_DEFAULT_SONNET_MODEL=glm-5.3 mapping. The
+  identical SDK-tagged model error occurred; stdout was empty, stderr was 74
+  bytes with the same SHA-256 as attempt 1, and the time file was empty.
+  Attempt artifacts: retry-02-metadata.json (SHA-256
+  ad444cfec3143fb648c4d5153bd2ec2be32bf5b669d88da110231a37600ebad6),
+  retry-02-result.json (SHA-256
+  d8be16d105ff71c2bc0a2a41db34af37a730f62e6dba30581942d161defb3bfe),
+  retry-02-zcode-output.json, retry-02-zcode-stderr.log, and
+  retry-02-zcode-time.txt.
+- Attempt 3 — launch 2026-11-12T17:18:56Z, shell 43fadf, --model opus
+  with per-process ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5.3. The identical
+  SDK-tagged model error occurred; stdout was empty, stderr was 74 bytes with
+  the same SHA-256, and the time file was empty. Attempt artifacts:
+  retry-03-metadata.json (SHA-256
+  2caf3c2598ba2a874273f174129297637f389e211bd1698472f8f08eb50897c4),
+  retry-03-result.json (SHA-256
+  30fb01965ab35f2b4456da20b81fdcb313d4440dd2b68a79c4f1b4a828cb6d80),
+  retry-03-zcode-output.json, retry-03-zcode-stderr.log, and
+  retry-03-zcode-time.txt.
+- The unchanged prompt and source/code-graph record remain at
+  /home/ubuntu/zcode-runs/20261112-hld-current-model-audit/; prompt SHA-256 is
+  b9380130db7dd736a1a2be92039e7fee67e4e6f48874edd0eb7a0b88910980e8,
+  and serde-codegraph-index-summary.md SHA-256 is
+  0d5c71e1b422e29bf943beadb7bf700ed14ef9b3412ad5f4b12dd38cfb4bf563.
+- Diagnosis boundary: direct-name and both documented alias-mapping launches
+  all resolved to the configured glm-5.3 string, then emitted unrecognized_model
+  with query_source=sdk. Official docs say that model and endpoint are
+  supported. This output does not establish whether the rejection came from
+  Claude Code's SDK validation or the provider, and is not an authentication
+  result. Do not change/downgrade the model or claim authentication until a
+  supported model request returns. No debug logging was enabled because it
+  could expose authorization data.
+- Historical timing limitation: launch timestamps above were printed by the
+  harness; /usr/bin/time -v files are zero bytes because each shell was
+  stopped after the immediate error, so elapsed durations and exit codes are
+  unavailable. Each error was observed in a 10-second check window before
+  stopping. No zcode run artifacts contain credentials.
+
+## 2026-11-12 — attempt-06 bounded repair and warning correction
+
+**Factual correction for attempt 05:** the SDK-tagged
+[claude-code:unrecognized_model] warning for model glm-5.3 was nonfatal in
+that execution. Claude Code exited naturally with code 0 after 4:47.74 (CLI
+duration 287,331 ms); stream-json recorded result:success, is_error=false,
+stop_reason=end_turn, 21 turns and zero permission denials. Its 11,384,627-byte
+stdout SHA-256 was
+5578984b006a5b13db19588ce9f9fa4ccdd4edbeec5a019a6484beafeea3f87b;
+the 74-byte stderr SHA-256 was
+089dbf616da27f2f327878d5fb2ed70fd63a63b259b7c648536429d4b1c68609;
+time-file SHA-256 was
+97455425bd9087a9d0eb00a295a2ee381126df836ae9ff49e46b3c888ba58b2e.
+This establishes nonfatality only for attempt 05. The CLI system:init
+reported glm-5.3; it is not an independent provider attestation.
+
+**Attempt 06 repair result:** the original attempt-05 candidate remains
+unchanged. The read-only repair used requested model glm-5.3, Claude Code
+2.1.319, verbose stream-json, plan/restricted permissions and a 600-second
+external timeout; the repair prompt argument SHA-256 was
+11a8537f550cb7e59b52de0c1d31370aad47071c5492b4aa27902df3da53d94c.
+It ended naturally after 7:44.62 with exit code 1, not by external timeout.
+The stream result was error_max_budget_usd (18 turns, reported cost
+$1.197664 against configured $1.00); permission denials were empty. The
+terminal result text was empty, but a complete JSON block occurred in the
+assistant text events and was preserved as
+/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/repaired-candidate.json.
+Its SHA-256 was
+47994d18b874349c076801780bc1b966d7fd8f4366c45db84d060d966cf451e4.
+Attempt-06 stdout was 17,255,236 bytes, SHA-256
+67a9f9bee9e1d1542b1a45d72b2ca40b3b388e92d4e684611d7152dadd2fc40c;
+stderr SHA-256 was
+089dbf616da27f2f327878d5fb2ed70fd63a63b259b7c648536429d4b1c68609;
+time-file SHA-256 was
+867d38edf7070ba799b67e28d686ee14763fe0d3e75dad76336ce8945efc28aa.
+No prompt process remained.
+
+The model repaired schema object shapes, EV-03/EV-08 byte ranges and excerpt
+digests, and the undefined evidence references. It still placed noncanonical
+compilation/occurrence placeholders in candidate rows. To avoid treating those
+as keys, a separate reviewer-normalized artifact was produced at
+/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/reviewed-candidate.json,
+SHA-256
+a4b801efa5654dba79aa7ade1389a3a06a602920c8a33df69f5129b28cee1cb0.
+It emits zero keyed nodes/edges and accounts for all 22 node claims and 19 edge
+claims under U-10/U-11 as unresolved claim data. The model-generated
+repaired-candidate.json remains preserved separately.
+
+Final reviewed-artifact validation: Draft-07 has exactly one error,
+/source_pin/config_sha256 UNAVAILABLE_NO_CANONICAL_CONFIGURATION_DIGEST does
+not match the required lowercase 64-hex digest pattern. No canonical normalized
+compilation-configuration digest exists in the inspected SPEC/contracts or pin
+manifest; the root Cargo.toml digest is not that identity and was not
+substituted. All 8/8 source-evidence byte/line ranges and source/excerpt
+SHA-256 values match pinned serde HEAD
+aa7913ad0211fef960df68e7812a6211145a888c; all 8/8 examined-scope hashes and
+line ranges match; all evidence IDs are unique and there are zero undefined
+evidence-ID references or all-zero digest placeholders. Coverage is only 8/8 declared
+file/range scopes and is explicitly non-exhaustive. Pass A remains DRAFT,
+freeze NOT_FROZEN, Pass B NOT_STARTED, PRIMARY/S8/S9 NOT_RUN, and repository
+verdict NOT_RUN. No production HLD rows were read and no acceptance or
+complete-golden-table claim is made.
+
+## 2026-11-12 — scoped serde configuration bundle repair
+
+Corrects the previous reviewed-artifact note that `source_pin.config_sha256`
+was unavailable. It now means SHA-256 of the separate immutable audit
+configuration bundle, not a mapper per-unit BLAKE3 digest or
+`RunGenerationDigestValue`. Canonical bytes are UTF-8 JSON with recursively
+sorted object keys, compact separators, `ensure_ascii=false`, and a final LF.
+Bundle: `/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/configuration-bundle.json`,
+10,678 bytes, SHA-256
+`0ee963301861e80ee866485360860ef850b7bb0b8b671da11ce54fac1ca4eebc`.
+
+Read-only inputs: source HEAD `aa7913ad0211fef960df68e7812a6211145a888c`;
+ignored/untracked Cargo.lock SHA-256
+`839a2f8b9d252c5dc6b93495aa8d54f9ba8cf5679a0f82dcdaaf12bbe6d7361f`;
+resolver 2; rustc `1.99.1 (58cf8f9c3 2026-10-13)` on
+`x86_64-unknown-linux-gnu`; cargo `1.99.1 (5f94df478 2026-08-27)`. Commands
+were `cargo metadata --offline --locked --no-deps --format-version 1`,
+`rustc --print cfg`, `rustc -vV`, and `cargo -V`; no build or build script
+ran. The bounded normal default-feature closure is serde lib (`std`) to
+serde_core lib (`result`, `std`). `serde_derive`, `serde_derive_internals`,
+`test_suite`, tests/dev/examples, build-script targets, and other workspace
+units are excluded.
+
+The bundle uses the loader's compact serde JSON input tuple
+`[unit_target_cfg_values, unit_enabled_feature_values,
+unit_rust_edition_value, unit_compilation_role_kind]`. Observed per-unit
+BLAKE3-256 values: serde
+`4f196ed2521fa6997a7a133d072b5444083ae0abad064b7aa088fead73ce2361`; serde_core
+`06b40a1accc1b41975f5e022da6f6a53e8cb3417e203f241f5f72c886`. No occurrence
+key, macro expansion output, or production claim was added. Historical
+qualification toolchain/target/ignored-lock provenance and compiler-dependent
+macro/build-script outputs remain unknown.
+
+Updated only the reviewer-normalized candidate, preserving raw model output:
+`/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/reviewed-candidate.json`,
+SHA-256
+`059cd3fe95d9ac0eb186221fc0bb82647e89fb429169ab9651e9cb3da6202d34`.
+Its config hash matches the bundle. Draft-07 validation has zero errors;
+source file/excerpt hashes and byte/line ranges match 8/8; evidence IDs are
+unique with zero missing references. It remains DRAFT/NOT_FROZEN, Pass B
+NOT_STARTED, with zero keyed nodes/edges and unresolved U-02/U-10/U-11. No
+production HLD rows or model were used.
+
+```text
+BLAKE3_TEST_VECTORS=PASS empty,abc
+CANONICAL_BYTES_REPEAT=PASS byte-identical; no internal whitespace; final LF
+DRAFT_SCHEMA=valid; errors=0
+CONFIG_CANONICAL=valid; bytes=10678; SHA256=0ee963301861e80ee866485360860ef850b7bb0b8b671da11ce54fac1ca4eebc; candidate_match=True
+PER_UNIT_DIGESTS=valid exact serde-json tuple + BLAKE3
+EVIDENCE=valid; ranges_and_file_hashes=8/8; unique_ids=True; missing_references=0
+KEYED_CLAIMS=nodes=0 edges=0; U-02/U-10/U-11 unresolved
+SOURCE_STATE=unchanged; Cargo.lock SHA256=839a2f8b9d252c5dc6b93495aa8d54f9ba8cf5679a0f82dcdaaf12bbe6d7361f; git_status=clean
+```
+
+Digest transcription correction: the observed `serde_core`
+`unit_configuration_digest_full` is
+`06b40a1accc1b41975d244925f5e022da6f6a53e8cb3417e203f241f5f72c886`.
+This value is the one in the canonical bundle and reviewed-candidate
+validation; the preceding per-unit digest transcription is superseded.
+
+## 2026-11-12 — maintained BLAKE3 library verification
+
+The two bundle per-unit digests were checked using the cached, maintained Rust
+`blake3` crate. Exact tool output:
+
+```text
+BLAKE3_IMPLEMENTATION=Rust crate blake3 1.8.7; prebuilt rlib libblake3-25faf5a8dc074bf7.rlib
+BLAKE3_RLIB_SHA256=125348c1487d3c266152f6c96aeaac6fedadbe5e6717a6e3fc0b2f57d8110fc0
+serde: expected=4f196ed2521fa6997a7a133d072b5444083ae0abad064b7aa088fead73ce2361 actual=4f196ed2521fa6997a7a133d072b5444083ae0abad064b7aa088fead73ce2361 match=True
+serde_core: expected=06b40a1accc1b41975d244925f5e022da6f6a53e8cb3417e203f241f5f72c886 actual=06b40a1accc1b41975d244925f5e022da6f6a53e8cb3417e203f241f5f72c886 match=True
+OFFLINE_CACHED_LIBRARY_CHECK=PASS; only tiny stdin verifier compiled, no workspace build/tests
+```
