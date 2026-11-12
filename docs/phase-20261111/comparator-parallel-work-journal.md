@@ -312,3 +312,88 @@ Proc-macro empty PRIMARY follow-up verification
   - `index_status --project home-ubuntu-repos-parseltongue-rust-LLM-companion --diagnostics summary --format json`: `status=ready`, matching 23,033 nodes and 43,906 edges, six best-effort parse-partial files, zero parse-unusable files, and doc-links status `ok`; 17 intentionally ignored files were classified by design. The index coverage report is best-effort, not a completeness guarantee.
   - `manage_adr --project home-ubuntu-repos-parseltongue-rust-LLM-companion --mode update` returned `status=updated`; read-back reported `content_complete=true`, `total_lines=29`.
   - Indexing used persistence false; `.codebase-memory` remains absent. The final graph refresh is repeated after this journal update so the external graph covers this record too.
+
+### Comparator requirement ownership correction: REQ-RUST-026
+
+The independent model audit reserves `REQ-RUST-025.0` (audit branch commit `24fc7466`). Comparator requirements are `REQ-RUST-026.0` through `REQ-RUST-026.5`. Active comparator test doc-tags in `oracle-path-comparison-core.rs`, `oracle-path-comparison-storage.rs`, and `oracle-comparison-contract-tests.rs` are updated to the comparator-owned identifiers below. Earlier journal entries and their original 025 identifiers remain unchanged as historical records; this appended matrix is authoritative for current comparator test tags. No shared SPEC was edited.
+
+#### Authoritative comparator requirements
+
+- **REQ-RUST-026.0 — persisted evidence validation:** Validate source scope, mapped unit configuration and context resolution, persisted oracle envelope and required arrays, actual `oracle_proc_macro_rows` producer entries, typed enum/boolean/namespace values, and required evidence strings. Reject malformed/failed macro evidence, ambiguous or unmapped site units, invalid ranges/provenance, and invalid reason or classification values before publication; never fabricate a production classification.
+- **REQ-RUST-026.1 — semantic identity and canonicalization:** Match the producer semantic-unit digest exactly as `[cfg, features, edition, role]` with no alternate digest shapes; distinguish host/target roles. Normalize package-relative paths from persisted roots, preserve site context and expansion provenance, canonicalize target kind/namespaces and builtin identity, merge split namespace evidence for identical targets, collapse exact duplicates, and reject conflicting duplicates.
+- **REQ-RUST-026.2 — PRIMARY partition and score semantics:** Assign each PRIMARY raw row one explicit partition/reason while reconciling duplicates. Score only known module-scope sites; keep deferred and unknown classifications explicit, with unknown blocked even when a reason exists. Only PRIMARY `cfg_inactive` excludes from the PRIMARY denominator; production and SECONDARY reasons remain evidence. Preserve mismatch precedence over exclusions. Actual proc-macro evidence excludes an empty PRIMARY answer only for empty or absent production, never a wrong nonempty target. An empty denominator reports N/A.
+- **REQ-RUST-026.3 — non-PRIMARY evidence visibility:** Keep production-only paths separately visible without changing the PRIMARY denominator. Preserve SECONDARY-only KL1 and same-site changed-target evidence. A production-only site that also appears in SECONDARY remains visible in the production-only count as well as in SECONDARY evidence.
+- **REQ-RUST-026.4 — scoped, stable, cancellation-safe publication:** Carry source generation and attempt through copied, canonical, and evidence DuckDB rows; qualify joins, filters, and ordering by both; verify per-table counts and scope-framed digests. Recheck source stability during reads and before publication. Validate/cancel before publication and ensure source changes or in-flight write cancellation preserve the prior agreement generation. Persist to the distinct registered Turso agreement store, never mutating source evidence; repeated oracle changes must not expose stale rows.
+- **REQ-RUST-026.5 — deterministic semantic export:** Produce deterministic semantic rows and summaries across supported thread counts, separating operational attempt identity from semantic export identity.
+
+#### Authoritative REQ-RUST-026 test matrix
+
+Each listed active test doc-tag is located under every matching requirement identifier. Tests with duplicate names in different test modules/crates are separately active tests; the shared name is listed once per requirement.
+
+**REQ-RUST-026.0**
+- `test_ambiguous_unit_contexts_fail`
+- `test_invalid_context_kind_rejected`
+- `test_invalid_reason_enum_rejected`
+- `test_invalid_proc_flag_rejected`
+- `test_invalid_namespace_enum_rejected`
+- `test_unit_configuration_contracts_fail`
+- `test_unmapped_site_units_rejected`
+- `test_site_provenance_entries_validated`
+- `test_site_evidence_required_values`
+- `test_macro_failure_blocks_publish`
+- `test_malformed_macro_record_rejected`
+- `test_scope_oracle_errors_block`
+
+**REQ-RUST-026.1**
+- `test_site_context_identity_distinct`
+- `test_exact_duplicates_collapse_rows`
+- `test_conflicting_duplicate_payloads_fail`
+- `test_expansion_provenance_separates_sites`
+- `test_package_paths_normalize_lexically`
+- `test_malformed_target_ranges_fail`
+- `test_target_namespaces_are_canonicalized`
+- `test_builtin_target_names_canonicalize`
+- `test_builtin_namespace_changes_identity`
+- `test_split_target_namespaces_merge`
+- `test_role_changes_semantic_digest`
+- `test_exact_comparison_publishes_turso`
+
+**REQ-RUST-026.2**
+- `test_unknown_scope_is_blocked`
+- `test_proc_wrong_target_mismatch`
+- `test_proc_empty_answer_excluded`
+- `test_proc_empty_primary_exclusions` — latest regression covers empty and absent production; wrong-target guard remains `test_proc_wrong_target_mismatch`.
+- `test_blocked_partition_reconciles_duplicates`
+- `test_enum_variant_module_scored`
+- `test_primary_classes_partition_once`
+- `test_empty_denominator_is_na`
+- `test_unresolved_targets_remain_mismatch`
+- `test_persisted_known_answer_matrix`
+- `test_production_cfg_keeps_mismatch`
+- `test_secondary_cfg_preserves_match`
+- `test_cfg_wrong_target_mismatch`
+- `test_unknown_cfg_remains_blocked`
+- `test_primary_cfg_excludes_scored`
+
+**REQ-RUST-026.3**
+- `test_extra_production_secondary_counts`
+- `test_production_only_rows_visible`
+- `test_changed_targets_persist_semantically`
+- `test_persisted_known_answer_matrix`
+
+**REQ-RUST-026.4**
+- `test_exact_comparison_publishes_turso`
+- `test_persisted_known_answer_matrix`
+- `test_scope_oracle_errors_block`
+- `test_oracle_agreement_registry_roundtrip`
+- `test_cancel_prevents_agreement_publish`
+- `test_source_changes_after_reads`
+- `test_source_changes_before_publish`
+- `test_write_cancellation_preserves_generation`
+- `test_source_unpublished_generation_fails`
+
+**REQ-RUST-026.5**
+- `test_thread_counts_export_identically`
+- `test_persisted_known_answer_matrix`
+
+This correction changes requirement doc-tags and this journal only; it makes no comparator behavior changes. Structural traceability checks and `git diff --check` are recorded with the follow-up commit; no builds or tests are run for a doc-tag-only change.

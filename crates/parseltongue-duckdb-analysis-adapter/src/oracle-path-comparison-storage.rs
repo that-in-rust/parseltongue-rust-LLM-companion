@@ -1042,7 +1042,7 @@ mod oracle_path_comparison_sql_tests {
         .unwrap()
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.2
     #[test]
     fn test_proc_wrong_target_mismatch() {
         let production = vec![build_test_site_value(
@@ -1067,7 +1067,7 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(result["agreement_mismatched_path_count"], 1);
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.2
     #[test]
     fn test_proc_empty_answer_excluded() {
         let production = vec![build_test_site_value(
@@ -1095,7 +1095,7 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(evidence[0]["agreement_partition_kind"], "proc-excluded");
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.2
     #[test]
     fn test_proc_empty_primary_exclusions() {
         let primary = vec![build_test_site_value(
@@ -1132,7 +1132,7 @@ mod oracle_path_comparison_sql_tests {
         );
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.3
     #[test]
     fn test_extra_production_secondary_counts() {
         let production = vec![build_test_site_value(
@@ -1156,7 +1156,7 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(evidence[0]["agreement_secondary_only_flag"], true);
     }
 
-    /// REQ-RUST-025.2, REQ-RUST-025.3
+    /// REQ-RUST-026.2
     #[test]
     fn test_blocked_partition_reconciles_duplicates() {
         let mut blocked =
@@ -1176,7 +1176,7 @@ mod oracle_path_comparison_sql_tests {
         );
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.2
     #[test]
     fn test_enum_variant_module_scored() {
         let production = vec![build_test_site_value(
@@ -1198,7 +1198,7 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(result["agreement_match_count_value"], 1);
     }
 
-    /// REQ-RUST-025.2, REQ-RUST-025.3
+    /// REQ-RUST-026.2
     #[test]
     fn test_primary_classes_partition_once() {
         let primary = vec![
@@ -1229,7 +1229,7 @@ mod oracle_path_comparison_sql_tests {
         );
     }
 
-    /// REQ-RUST-025.3
+    /// REQ-RUST-026.2
     #[test]
     fn test_empty_denominator_is_na() {
         let (_, result) = build_test_comparison_result(1, &[], &[], &[]);
@@ -1238,7 +1238,7 @@ mod oracle_path_comparison_sql_tests {
         assert!(result["agreement_exact_match_rate"].is_null());
     }
 
-    /// REQ-RUST-025.4
+    /// REQ-RUST-026.5
     #[test]
     fn test_thread_counts_export_identically() {
         let production = vec![build_test_site_value(
@@ -1262,7 +1262,7 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(single.1["agreement_secondary_changed_path_count"], 1);
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.3
     #[test]
     fn test_production_only_rows_visible() {
         let production = vec![build_test_site_value(

@@ -707,7 +707,7 @@ mod oracle_path_normalization_tests {
         })
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_site_context_identity_distinct() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -721,7 +721,7 @@ mod oracle_path_normalization_tests {
         assert_ne!(sites[0].site_key, sites[1].site_key);
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_exact_duplicates_collapse_rows() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -731,7 +731,7 @@ mod oracle_path_normalization_tests {
         assert_eq!(sites[0].duplicate_count, 2);
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_conflicting_duplicate_payloads_fail() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -745,7 +745,7 @@ mod oracle_path_normalization_tests {
         ));
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_expansion_provenance_separates_sites() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -756,7 +756,7 @@ mod oracle_path_normalization_tests {
         assert_eq!(sites.len(), 2);
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_ambiguous_unit_contexts_fail() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -767,7 +767,7 @@ mod oracle_path_normalization_tests {
         ));
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_package_paths_normalize_lexically() {
         assert_eq!(
@@ -780,7 +780,7 @@ mod oracle_path_normalization_tests {
         );
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.1
     #[test]
     fn test_malformed_target_ranges_fail() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -789,7 +789,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.2
+    /// REQ-RUST-026.2
     #[test]
     fn test_unknown_scope_is_blocked() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -799,7 +799,7 @@ mod oracle_path_normalization_tests {
         assert_eq!(sites[0].classification, "blocked");
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_target_namespaces_are_canonicalized() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -814,7 +814,7 @@ mod oracle_path_normalization_tests {
         assert_eq!(sites[0].duplicate_count, 2);
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_builtin_target_names_canonicalize() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -829,7 +829,7 @@ mod oracle_path_normalization_tests {
         assert!(sites[0].targets_json.contains("u32"));
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_builtin_namespace_changes_identity() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -854,7 +854,7 @@ mod oracle_path_normalization_tests {
         ));
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_split_target_namespaces_merge() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -870,7 +870,7 @@ mod oracle_path_normalization_tests {
         assert!(matches!(sites, Ok(sites) if sites.len() == 1 && sites[0].duplicate_count == 2));
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_invalid_context_kind_rejected() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -879,7 +879,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_invalid_reason_enum_rejected() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -888,7 +888,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_invalid_proc_flag_rejected() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -897,7 +897,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_invalid_namespace_enum_rejected() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -906,7 +906,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_unit_configuration_contracts_fail() {
         for (field, value) in [
@@ -923,7 +923,7 @@ mod oracle_path_normalization_tests {
         }
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_unmapped_site_units_rejected() {
         let mut unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -932,7 +932,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_site_provenance_entries_validated() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -941,7 +941,7 @@ mod oracle_path_normalization_tests {
         assert!(canonicalize_site_evidence_rows(&[site], &[unit], true).is_err());
     }
 
-    /// REQ-RUST-025.0
+    /// REQ-RUST-026.0
     #[test]
     fn test_site_evidence_required_values() {
         let unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
@@ -958,7 +958,7 @@ mod oracle_path_normalization_tests {
         }
     }
 
-    /// REQ-RUST-025.1
+    /// REQ-RUST-026.1
     #[test]
     fn test_role_changes_semantic_digest() {
         let target_unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");

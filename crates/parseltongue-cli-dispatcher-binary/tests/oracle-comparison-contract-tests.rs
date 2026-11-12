@@ -473,7 +473,7 @@ fn canonicalize_persisted_export_rows(export: &[u8]) -> Vec<Value> {
     rows
 }
 
-/// REQ-RUST-025.1, REQ-RUST-025.4
+/// REQ-RUST-026.1, REQ-RUST-026.4
 #[test]
 fn test_exact_comparison_publishes_turso() {
     let fixture = build_oracle_comparison_fixture();
@@ -520,7 +520,7 @@ fn test_exact_comparison_publishes_turso() {
     );
 }
 
-/// REQ-RUST-025.2, REQ-RUST-025.3, REQ-RUST-025.4
+/// REQ-RUST-026.2, REQ-RUST-026.3, REQ-RUST-026.4
 #[test]
 fn test_persisted_known_answer_matrix() {
     let fixture = build_oracle_comparison_matrix_fixture();
@@ -586,7 +586,7 @@ fn test_persisted_known_answer_matrix() {
     assert!(changed_export.contains(",9,15,"));
 }
 
-/// REQ-RUST-025.4
+/// REQ-RUST-026.3
 #[test]
 fn test_changed_targets_persist_semantically() {
     let fixture = build_oracle_comparison_fixture();
@@ -612,7 +612,7 @@ fn test_changed_targets_persist_semantically() {
     assert!(evidence.contains(",11,16,"));
 }
 
-/// REQ-RUST-025.2, REQ-RUST-025.3
+/// REQ-RUST-026.2
 #[test]
 fn test_empty_denominator_is_na() {
     let fixture = build_oracle_comparison_fixture();
@@ -626,7 +626,7 @@ fn test_empty_denominator_is_na() {
     assert_eq!(result["agreement_secondary_only_count"], 1);
 }
 
-/// REQ-RUST-025.2
+/// REQ-RUST-026.2
 #[test]
 fn test_unresolved_targets_remain_mismatch() {
     let fixture = build_oracle_comparison_fixture();
@@ -650,7 +650,7 @@ fn test_unresolved_targets_remain_mismatch() {
     assert_eq!(result["agreement_proc_excluded_count"], 0);
 }
 
-/// REQ-RUST-025.0, REQ-RUST-025.4
+/// REQ-RUST-026.0, REQ-RUST-026.4
 #[test]
 fn test_scope_oracle_errors_block() {
     let fixture = build_oracle_comparison_fixture();
@@ -695,7 +695,7 @@ fn test_scope_oracle_errors_block() {
     assert!(String::from_utf8_lossy(&same.stderr).contains("cannot mutate source"));
 }
 
-/// REQ-RUST-025.0
+/// REQ-RUST-026.0
 #[test]
 fn test_macro_failure_blocks_publish() {
     let fixture = build_oracle_comparison_fixture();
@@ -710,7 +710,7 @@ fn test_macro_failure_blocks_publish() {
     assert!(!run_oracle_comparison_fixture(&fixture).status.success());
 }
 
-/// REQ-RUST-025.0
+/// REQ-RUST-026.0
 #[test]
 fn test_malformed_macro_record_rejected() {
     let fixture = build_oracle_comparison_fixture();
@@ -724,7 +724,7 @@ fn test_malformed_macro_record_rejected() {
     assert!(!run_oracle_comparison_fixture(&fixture).status.success());
 }
 
-/// REQ-RUST-025.4
+/// REQ-RUST-026.4
 #[test]
 fn test_oracle_agreement_registry_roundtrip() {
     let directory = tempfile::tempdir().unwrap();
@@ -793,7 +793,7 @@ fn test_oracle_agreement_registry_roundtrip() {
     );
 }
 
-/// REQ-RUST-025.4
+/// REQ-RUST-026.4
 #[test]
 fn test_cancel_prevents_agreement_publish() {
     let fixture = build_oracle_comparison_fixture();
@@ -819,7 +819,7 @@ fn test_cancel_prevents_agreement_publish() {
     assert_eq!(agreement.read_workspace_publication_scope().unwrap(), None);
 }
 
-/// REQ-RUST-025.4
+/// REQ-RUST-026.4
 #[test]
 fn test_source_changes_after_reads() {
     let fixture = build_oracle_comparison_fixture();
@@ -854,7 +854,7 @@ fn test_source_changes_after_reads() {
     );
 }
 
-/// REQ-RUST-025.4
+/// REQ-RUST-026.4
 #[test]
 fn test_source_changes_before_publish() {
     let fixture = build_oracle_comparison_fixture();
@@ -890,7 +890,7 @@ fn test_source_changes_before_publish() {
     );
 }
 
-/// REQ-RUST-025.4
+/// REQ-RUST-026.4
 #[test]
 fn test_write_cancellation_preserves_generation() {
     let fixture = build_oracle_comparison_fixture();
@@ -926,7 +926,7 @@ fn test_write_cancellation_preserves_generation() {
     );
 }
 
-/// REQ-RUST-025.0
+/// REQ-RUST-026.4
 #[test]
 fn test_source_unpublished_generation_fails() {
     let directory = tempfile::tempdir().unwrap();
@@ -949,7 +949,7 @@ fn test_source_unpublished_generation_fails() {
     assert_eq!(agreement.read_workspace_publication_scope().unwrap(), None);
 }
 
-/// REQ-RUST-025.2
+/// REQ-RUST-026.2
 #[test]
 fn test_production_cfg_keeps_mismatch() {
     let fixture = build_oracle_comparison_fixture_with_matrix(
@@ -970,7 +970,7 @@ fn test_production_cfg_keeps_mismatch() {
     );
 }
 
-/// REQ-RUST-025.2
+/// REQ-RUST-026.2
 #[test]
 fn test_secondary_cfg_preserves_match() {
     let fixture = build_oracle_comparison_fixture();
@@ -992,7 +992,7 @@ fn test_secondary_cfg_preserves_match() {
     assert!(evidence.contains("cfg_inactive"));
 }
 
-/// REQ-RUST-025.2
+/// REQ-RUST-026.2
 #[test]
 fn test_cfg_wrong_target_mismatch() {
     let fixture =
@@ -1005,7 +1005,7 @@ fn test_cfg_wrong_target_mismatch() {
     assert_eq!(result["agreement_cfg_excluded_path_count"], 0);
 }
 
-/// REQ-RUST-025.2
+/// REQ-RUST-026.2
 #[test]
 fn test_unknown_cfg_remains_blocked() {
     let fixture = build_oracle_comparison_fixture();
@@ -1019,7 +1019,7 @@ fn test_unknown_cfg_remains_blocked() {
     assert_eq!(result["agreement_cfg_excluded_path_count"], 0);
 }
 
-/// REQ-RUST-025.2
+/// REQ-RUST-026.2
 #[test]
 fn test_primary_cfg_excludes_scored() {
     let fixture = build_oracle_comparison_fixture_with_matrix(false, None, Some(json!([])), None);
