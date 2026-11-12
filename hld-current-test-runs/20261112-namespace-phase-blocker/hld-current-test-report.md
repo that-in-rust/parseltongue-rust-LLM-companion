@@ -197,3 +197,91 @@ Clippy:        Finished `release` profile [optimized] target(s) in 0.30s
 Formatting/diff checks exited zero. The editor rust-analyzer PID 1804565 was
 resumed with SIGCONT and verified Sl after native work; the old requested PID
 1532439 no longer exists. No mapper/profile process is left running.
+
+## Follow-up: cheaper hypotheses before batching (REQ-RUST-024.7)
+
+H1/H2 use the exact retained INSERT and transaction rollback. Frozen Turso
+generation/attempt and 1288490188-byte cap above are unchanged. Runtime
+settings report version v2.0.0, memory_limit display 1.1 GiB, and
+preserve_insertion_order=false. Production constructor already disabled
+insertion-order preservation; H1 explicitly reapplied it, not a new fix.
+
+```text
+H1: threads=2, preserve_insertion_order=false
+result: OOM, failed to pin block of size 256.0 KiB
+phase_seconds: 5.354
+sampled_tree_peak_bytes: 1412620288
+
+H2: threads=1, preserve_insertion_order=false
+result: OOM, failed to pin block of size 256.0 KiB
+phase_seconds: 9.034
+sampled_tree_peak_bytes: 1394860032
+```
+
+Neither is sufficient. H3/H4 remain next; no batching implemented. A
+preflight concurrent source open was rejected by the local Turso file lock;
+no SQL ran in that preflight and subsequent probes were serialized.
+
+Consumed-order audit: source copy orders by generation/attempt/table/row;
+binding digests include scope/name/namespace/target/evidence; final scope,
+binding and path exports order by their entire distinct/grouping keys with
+explicit nullable ordering. No consumed export relies on physical insertion
+order. Existing single-vs-multithread export test is included in the green
+suite below.
+
+### Measured allocator explanation for copy/normalization RSS
+
+The retained frozen native probe was separately run under heaptrack, with
+peak-time flamegraphs (`--flamegraph-cost-type=peak`), not sums of unrelated
+per-stack maxima. Exclusive classification gives managed-buffer stacks
+precedence, then BaseAppender/duckdb_appender_ stacks, then remaining
+DuckDB. Outer Turso visitor frames calling C++ appenders are not assigned
+again to Turso. All these allocations are inside the native probe process.
+
+```text
+copy_peak_live_heap_bytes:                  1262101424
+  DuckDB_StandardBufferManager_stacks:      1112667672
+  DuckDB_nonmanaged_appender_stacks:         142303607
+  other_DuckDB_stacks:                        7055449
+  Turso_exclusive_stacks:                         176
+  other_heap:                                   74520
+
+normalization_peak_live_heap_bytes:         1906553385
+  DuckDB_StandardBufferManager_stacks:      1096399504
+  DuckDB_nonmanaged_appender_stacks:         802144141
+  other_DuckDB_stacks:                        7929508
+  Turso_exclusive_stacks:                         176
+  other_heap:                                   80056
+```
+
+The large normalization excess is C++ `duckdb::BaseAppender::FlushChunk`
+→ `ColumnDataCollection::Append` → `ColumnDataCopy` →
+`ArenaAllocator::AllocateNewBlock` → `Allocator::DefaultAllocate`, outside
+managed-buffer allocation stacks. The normalizer holds fourteen appenders
+and flushes them at its sink's end. It is not hundreds of MB of retained
+Rust JSON rows or a separate Turso process. Copy's live heap remains below
+the configured cap; the cap governs DuckDB tracked memory, not process RSS.
+The prior before/after duckdb_memory readings were not peaks. Residual RSS
+contains mappings/allocator bookkeeping/retention; its exact split remains
+unassigned. Profiled RSS (1.34/1.96 GB, including heaptrack overhead) is not
+substituted for unprofiled peaks or treated as exact residual accounting.
+
+Full compressed traces, peak-time stacks, exclusive category JSON and top
+ten full-stack CSVs are under the existing home artifact directory's
+`namespace-insertion-hypothesis-results/` child. H1/H2 settings, errors and
+10 ms process samples are retained there too.
+
+### Diagnostic/fixture GREEN (not CLI/SOP completion)
+
+Real-Turso fixture now writes ordinary span work followed by an empty
+completion marker; production completion-marker guard is untouched.
+
+```text
+test result: ok. 56 passed; 0 failed; ... finished in 7.97s
+release binary/example: Finished `release` profile [optimized] target(s) in 9.12s
+all-target release Clippy: Finished `release` profile [optimized] target(s) in 1.28s
+```
+
+Formatting and diff checks exit zero. CLI GREEN, fresh all-five S1/S2/S3,
+serde M2, comparator and all-five S5 are still unfinished. During follow-up
+native work rust-analyzer PID 1804565 is paused again, to resume afterward.

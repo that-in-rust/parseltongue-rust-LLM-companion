@@ -2778,3 +2778,75 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Current task remains BLOCKED at the candidate INSERT, not at copy or
   normalization. Root fix, serde M2 qualification, comparator and all-five
   S5 require the next narrower request-batching/equality step. No GUI changed.
+
+### User-directed cheaper hypotheses before batching — REQ-RUST-024.7
+
+- User supersedes batching-first recommendation: H1 insertion order, H2
+  one thread, H3 materialized SELECT then INSERT, H4 recursion/state width.
+  Test independently at the same cap; batching only if these fail.
+- Delivery + Reliability modes, L3 adapter diagnostics only; preserve L1/L2
+  shapes and existing resolver semantics until a measured smaller fix wins.
+- H1 source precondition discovered: constructor already sets
+  preserve_insertion_order=false and threads=2. Add effective runtime
+  settings to telemetry; explicitly SET false for H1 rather than call this
+  an untested proposed improvement.
+- Export audit: source copy ORDER BY generation/attempt/table/row_key;
+  binding digest ORDER BY generation/attempt/scope/name/namespace/target/evidence;
+  final binding/path/scope exports include all projected/grouping keys and
+  explicit NULL placement. Table insertion order is not the export contract.
+- Probe-settings STUB release check:
+  `Finished release profile [optimized] target(s) in 0.75s`.
+- Fresh allocator evidence: run existing frozen probe under heaptrack for
+  copy and normalization, retaining peak-time stack traces and accounting
+  separately for profiler overhead. No allocator attribution inferred yet.
+- User explicitly authorizes repairing the preexisting real-Turso handoff
+  fixture. Its existing RED is recorded above; write span rows as ordinary
+  work, followed by an empty completion marker, preserving all assertions.
+
+### Probe settings GREEN; handoff fixture GREEN; measured H1/H2
+
+- REQ-RUST-024.7 RED: `test_namespace_probe_settings_limits` hit
+  `not yet implemented: bounded namespace probe settings`;
+  `test result: FAILED. 0 passed; 1 failed; ... 55 filtered out`.
+- GREEN: effective settings telemetry, bounded 1/2-thread diagnostic setter,
+  source/after-open Linux smaps snapshots in the native example. Existing
+  completion-marker guard unchanged; fixture now writes ordinary work first
+  and an empty __complete__ marker second. Existing assertions unchanged.
+- `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 timeout
+  --signal=TERM --kill-after=5s 180s cargo test --release
+  -p parseltongue-cli-dispatcher-binary
+  -p parseltongue-duckdb-analysis-adapter --lib`:
+  `test result: ok. 56 passed; 0 failed; ... finished in 7.97s`.
+- Two-package all-target release Clippy:
+  `Finished release profile [optimized] target(s) in 1.28s`.
+  Release binary/example build: `Finished release profile [optimized]
+  target(s) in 9.12s`. Formatting/diff checks exit zero.
+- Runtime engine reports v2.0.0 (crate version remains pinned); memory_limit
+  1.1 GiB display is the unchanged configured 1288490188 bytes.
+- H1: explicit SET preserve_insertion_order=false, threads=2, same retained
+  INSERT, rollback-safe: OOM in 5.354s, sampled tree peak 1412620288 bytes.
+  Baseline already false; this is not a new production improvement.
+- H2: threads=1, insertion order still false, same INSERT: OOM in 9.034s,
+  sampled tree peak 1394860032 bytes. Does not solve the failure; do not
+  change the production default merely for a 17.8 MB failed-query reduction.
+- A preflight H1 launch encountered the profiling process's local Turso
+  file lock. No query ran; serialize all source-opening probes thereafter.
+- Allocator evidence: peak-time heaptrack flamegraphs (not sum of separate
+  stack maxima), separate processes, same frozen generation/cap/settings.
+  Copy: 1262101424 live heap bytes, including 1112667672 through DuckDB
+  StandardBufferManager and 142303607 through non-managed BaseAppender
+  stacks. Normalization: 1906553385 live heap bytes, 1096399504 managed
+  DuckDB buffer stacks plus 802144141 BaseAppender stacks. Both have only
+  176 bytes in Turso-exclusive stacks at that heap peak. Outer Turso visitor
+  frames must not be counted twice as Turso-owned C++ appender allocations.
+- This measures the large excess as DuckDB C++ appender/ColumnDataCollection
+  ArenaAllocator allocations, not Rust payload buffering or a separate Turso
+  process. Residual RSS includes mappings/allocator overhead; exact remaining
+  bytes are not assigned without evidence. Profiled RSS includes profiler
+  overhead and is not substituted for native run peaks.
+- Durable artifacts: namespace-insertion-hypothesis-results/ beneath the
+  existing home artifact directory; peak-category JSON, top-stack CSV,
+  full peak-time stacks and compressed heaptrack traces retained.
+- No refactor needed for this diagnostic group: one validated setter and
+  one settings query, no resolver semantics or shared types changed. H3/H4
+  next; batching is not authorized until both have also failed.

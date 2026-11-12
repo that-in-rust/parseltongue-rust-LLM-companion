@@ -21,11 +21,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         .read_analysis_input_publication_scope()?
         .ok_or("no frozen native input")?;
     eprintln!("frozen_native_scope={scope:?}");
+    eprintln!(
+        "event=after-turso-open residency={}",
+        read_native_residency_snapshot()
+    );
+    if phase == "source" {
+        return Ok(());
+    }
     let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
         Path::new(database),
         Path::new(directory),
         1_288_490_188,
     )?;
+    let threads = std::env::var("PARSELTONGUE_NAMESPACE_PROBE_THREADS")
+        .map_or(Ok(2), |value| value.parse::<u32>())?;
+    analysis.configure_namespace_probe_settings(threads)?;
+    eprintln!(
+        "event=after-duckdb-open residency={}",
+        read_native_residency_snapshot()
+    );
     let cancel = RunCancelFlagValue::default();
     let count = match phase.as_str() {
         "copy" => {
@@ -62,10 +76,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 },
             )?;
             println!("{}", rows.join("\n"));
+            eprintln!(
+                "event=after-phase residency={}",
+                read_native_residency_snapshot()
+            );
             return Ok(());
         }
         _ => return Err("unknown namespace phase".into()),
     };
     println!("phase={phase} rows_or_rounds={count}");
+    eprintln!(
+        "event=after-phase residency={}",
+        read_native_residency_snapshot()
+    );
     Ok(())
+}
+
+fn read_native_residency_snapshot() -> serde_json::Value {
+    std::fs::read_to_string("/proc/self/smaps_rollup").map_or_else(
+        |error| serde_json::json!({"measurement_error":error.to_string()}),
+        |value| serde_json::json!({"pid":std::process::id(),"smaps_rollup":value}),
+    )
 }

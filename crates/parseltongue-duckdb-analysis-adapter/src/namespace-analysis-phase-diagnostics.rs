@@ -28,6 +28,30 @@ mod tests {
     use super::*;
     use std::error::Error;
 
+    /// REQ-RUST-024.7
+    #[test]
+    fn test_namespace_probe_settings_limits() {
+        let directory = tempfile::tempdir().unwrap();
+        let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+            &directory.path().join("probe.duckdb"),
+            directory.path(),
+            1288490188,
+        )
+        .unwrap();
+        for threads in [1, 2] {
+            analysis
+                .configure_namespace_probe_settings(threads)
+                .unwrap();
+            let memory = analysis.read_namespace_memory_usage().unwrap();
+            assert_eq!(memory["settings"]["threads"], threads);
+            assert_eq!(memory["settings"]["preserve_insertion_order"], false);
+            assert_eq!(memory["settings"]["memory_limit"], "1.1 GiB");
+            assert!(memory["settings"]["version"].is_string());
+        }
+        assert!(analysis.configure_namespace_probe_settings(0).is_err());
+        assert!(analysis.configure_namespace_probe_settings(3).is_err());
+    }
+
     /// REQ-RUST-024.6
     #[test]
     fn test_namespace_phase_failure_context() {
@@ -219,6 +243,28 @@ pub enum NamespaceAnalysisPhaseKind {
 }
 
 impl DuckdbAnalysisStoreAdapter {
+    pub fn configure_namespace_probe_settings(
+        &self,
+        threads: u32,
+    ) -> Result<(), StoreBackendFailureError> {
+        if !(1..=2).contains(&threads) {
+            return Err(super::build_analysis_error(
+                "namespace probe threads must be one or two",
+            ));
+        }
+        let connection = self
+            ._connection
+            .lock()
+            .map_err(super::build_analysis_error)?;
+        connection
+            .execute_batch("SET preserve_insertion_order=false")
+            .map_err(super::build_analysis_error)?;
+        connection
+            .execute("SET threads = ?", [threads])
+            .map(|_| ())
+            .map_err(super::build_analysis_error)
+    }
+
     pub fn explain_namespace_insert_plan(
         &self,
         query: &str,
@@ -300,6 +346,9 @@ impl DuckdbAnalysisStoreAdapter {
             "SELECT coalesce(sum(memory_usage_bytes),0)::UBIGINT,coalesce(sum(temporary_storage_bytes),0)::UBIGINT FROM duckdb_memory()",
             [], |row| Ok((row.get(0)?,row.get(1)?)),
         ).map_err(super::build_analysis_error)?;
+        let (threads, insertion_order, limit, version):(u64,bool,String,String)=connection.query_row(
+            "SELECT current_setting('threads')::UBIGINT,current_setting('preserve_insertion_order')::BOOLEAN,current_setting('memory_limit'),version()",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)),
+        ).map_err(super::build_analysis_error)?;
         let mut statement = connection.prepare("SELECT database_name,database_size,memory_usage,memory_limit FROM pragma_database_size() ORDER BY database_name").map_err(super::build_analysis_error)?;
         let databases = statement
             .query_map([], |row| {
@@ -312,7 +361,7 @@ impl DuckdbAnalysisStoreAdapter {
             .collect::<Result<Vec<_>, _>>()
             .map_err(super::build_analysis_error)?;
         Ok(
-            serde_json::json!({"memory_usage_bytes":memory,"temporary_storage_bytes":temporary,"databases":databases}),
+            serde_json::json!({"memory_usage_bytes":memory,"temporary_storage_bytes":temporary,"databases":databases,"settings":{"threads":threads,"preserve_insertion_order":insertion_order,"memory_limit":limit,"version":version}}),
         )
     }
 }

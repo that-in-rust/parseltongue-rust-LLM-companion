@@ -1100,6 +1100,7 @@ fn test_duckdb_thread_export_determinism() {
     assert_eq!(exports[0], exports[1]);
 }
 
+/// REQ-RUST-024.1
 #[test]
 fn test_turso_published_appender_handoff() {
     let directory = tempfile::tempdir().unwrap();
@@ -1117,6 +1118,20 @@ fn test_turso_published_appender_handoff() {
         stage_row_payload_text: "{\"source\":\"identity\"}".into(),
     }];
     for stage in ["crate-graph", "source-ingest", "syntax-spans"] {
+        if stage == "syntax-spans" {
+            source
+                .write_stage_table_unit(
+                    &StageUnitWriteRequest {
+                        stage_run_scope_value: &scope,
+                        stage_owner_name_value: stage,
+                        stage_unit_work_key: "fixture-source",
+                        stage_input_stage_names: &[],
+                        stage_unit_output_rows: &records,
+                    },
+                    &cancel,
+                )
+                .unwrap();
+        }
         source
             .write_stage_table_unit(
                 &StageUnitWriteRequest {
@@ -1124,11 +1139,7 @@ fn test_turso_published_appender_handoff() {
                     stage_owner_name_value: stage,
                     stage_unit_work_key: "__complete__",
                     stage_input_stage_names: &[],
-                    stage_unit_output_rows: if stage == "syntax-spans" {
-                        &records
-                    } else {
-                        &[]
-                    },
+                    stage_unit_output_rows: &[],
                 },
                 &cancel,
             )

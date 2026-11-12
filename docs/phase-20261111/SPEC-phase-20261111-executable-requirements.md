@@ -856,3 +856,24 @@ the original failure when observation fails; `test_namespace_query_explain_rows`
 and `test_namespace_query_explain_error` cover normal/empty/error operator
 profiling; `test_namespace_insert_plan_rollback` proves diagnostic insertion
 profiles leave preexisting candidate rows unchanged on success and error.
+
+## REQ-RUST-024.7 — namespace-insertion-hypothesis-probes
+
+WHEN diagnosing bounded namespace insertion, rollback-safe probes SHALL
+report effective DuckDB version, threads, preserve_insertion_order and memory
+limit, compare one setting at a time, and retain the frozen source. Probe
+threads SHALL be limited to one or two and insertion-order preservation SHALL
+remain disabled. The selected production correction SHALL preserve complete
+small-fixture exports and finish resolution at 1288490188 bytes. Copy and
+normalization RSS attribution SHALL distinguish measured allocator stacks
+from tracked DuckDB bytes and from unassigned process RSS.
+
+Verification matrix addition:
+
+```text
+req_id: REQ-RUST-024.7
+test_id: test_namespace_probe_settings_limits
+test_type: unit
+assertion: effective false insertion order, threads 1/2 only, cap unchanged
+metric: exact current_setting values and rejected invalid thread counts
+```
