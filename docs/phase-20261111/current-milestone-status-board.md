@@ -2,19 +2,21 @@
 
 Rewritten in place after every run report. History lives in the TDD journal and run reports.
 
-Last updated: 2026-11-12 · Latest report: `hld-current-test-runs/20261112-namespace-phase-blocker/hld-current-test-report.md` — measured resolution INSERT blocker, not an all-five qualification.
+Last updated: 2026-11-12 · Frozen release: `/home/ubuntu/parseltongue-mapper-frozen-release`, SHA-256 `1719d2f2de1d70b7e57eed6e7dc6b1988f99fbe3b60b2513732e37f94804cd33`. No all-five qualification exists; prior baseline measurements remain historical, not current native/serde replays.
 
 ```text
  MILESTONE  STATE
  M0  core types, Turso store            code done; SOP S3 skeleton subset not re-run on current digest
  M1  ingest, crate graph, spans         code done; S1/S2/S3 historical PASS (old digest) → re-run pending
- M2  name resolution (DuckDB SQL)       BLOCKED: native CLI release fixture hits DuckDB cap
-       done   Turso→DuckDB Appender copy + digest checks; bounded DuckDB constructor
+ M2  name resolution (DuckDB SQL)       mapper implementation in place: measured-only default + publication receipts; all-five S5 prerequisite pending
+       done   Turso→DuckDB Appender copy + digest checks; measured DuckDB constructor
        done   non-monotone SQL resolution, preludes, extern aliases, textual macro scope, macro alternation
        done   oracle path partition (module-scope scored at M2; type-relative deferred)
        done   indexed frozen visibility + distinct namespace cleanup indexes (focused tests GREEN)
        done   typed copy/normalization/resolution failures, memory telemetry, retained replay and rollback-safe EXPLAIN
-       open   original CLI WIP remains uncommitted; native fixture fails at ~1.2 GiB DuckDB cap
+       done   CLI receipt proofs reconcile published rows; 20 CLI contract tests and 64 adapter tests pass
+       done   fmt, workspace clippy, and optimized release build; full workspace split gate has the comparator-owned failures documented in TDD
+       open   sysroot integration test still running (shell 5fba81); full native/serde mapping not started
        open   comparator · serde M2 qualification · all-five S5
  M3  proc-macro shapes                  not started
  M4–M6 signatures, impls, bodies, methods  not started
@@ -24,9 +26,9 @@ Last updated: 2026-11-12 · Latest report: `hld-current-test-runs/20261112-names
 
 ```text
  SOP STEP  LATEST RESULT ON CURRENT DIGEST
- S1  structural index        not-started (all five pins/clean tracked sources checked only)
- S2  coverage inventory      not-started
- S3  fixture/production map  shared prerequisite FAIL: retained native fixture 305.41s; independent resolution OOM
+ S1  structural index        full codebase-memory index ready: 22,913 nodes / 42,999 edges; generation matches
+ S2  coverage inventory      CLI src/tests have no recorded issues; adapter src has four SQL parse-partial files; scoped query complete, untruncated
+S3  fixture/production map  native full mapping and serde mapping not started in this handoff; sysroot CLI integration test remains active
                              serde/rust-analyzer/ripgrep/tokio/cargo-modules corpus runs BLOCKED
  S4  oracle exports          raw path exports exist (counts only); manifests pending
  S5  per-site comparison     not-run (comparator not implemented)
@@ -48,6 +50,6 @@ C++ non-managed BaseAppender stacks, not Rust JSON/Turso buffering. Full adapter
 suite now GREEN (57 tests); invalid completion-marker handoff fixture repaired.
 
 Next actions:
-1. Finish H4 integer-ID narrowing/equality investigation before considering batching. H1/H2/H3 and tested H4 rewrites failed; no selected production correction or new full-run attempt. Batching remains conditional on H4 failure.
-2. Finish CLI GREEN/REFACTOR, then frozen-release serde-first all-five S1/S2/S3 with auditor and peaks/times.
-3. serde M2 qualification → SQL comparator → fresh all-five S5; R7 matrix/typed-error follow-up remains open.
+1. Collect the running sysroot test result, then complete scoped index coverage and GREEN/REFACTOR commits.
+2. When directed, run the required full native mapping followed by pinned-serde mapping with measured default, memory tags, process-tree peak RSS, elapsed time and rounds. Do not start either from this handoff.
+3. Comparator and all-five S5 remain separately owned/pending; enforce ≤500 MB only after the all-five S5 correctness milestone.

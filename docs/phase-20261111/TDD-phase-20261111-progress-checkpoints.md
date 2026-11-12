@@ -3004,3 +3004,179 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   unwrap only in test modules and move impl before tests. No production lint
   suppression. Native baseline residency evidence remains valid at its
   original recorded cap but is not current-policy M2/SOP qualification.
+- User decision R9 (2026-11-12): remove interim memory cap now; no RSS gate
+  before all-five S5. Started REQ-RUST-024.9 constructor TDD: test compares
+  effective adapter memory_limit against an independent DuckDB default and
+  confirms phase diagnostics report it. Compatibility cap parameters must
+  be ignored. Previous 62-test PASS and 1.39s Clippy precede this constructor
+  phase and do not validate it.
+
+### REQ-RUST-024.9 constructor STUB — first check blocked by missing pin
+
+- Added constructor policy assertions for the independent DuckDB default,
+  extension/external-access flags, canonical spill path, file backing, empty
+  diagnostics and invalid run-directory errors. The handoff patch already
+  contained a measured constructor; a temporary legacy 1,288,490,188-byte
+  cap is used only as the STUB behavior for the assertion RED.
+- STUB compile-check command:
+  `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo check -p parseltongue-duckdb-analysis-adapter --tests`
+- Exit 101, environment prerequisite failure (not a RED):
+  `error: failed to load manifest for workspace member /home/ubuntu/repos/parseltongue-rust-LLM-companion/crates/parseltongue-syntax-span-extractor`
+  `failed to read /home/ubuntu/repos/rust-tools/rust-analyzer/crates/parser/Cargo.toml`
+  `No such file or directory (os error 2)`.
+- Restored the source pin from the checked-in parser bundle at
+  `tools/parser-source-fork-bundle.bundle`; HEAD is
+  `bf6b2099d6351c37039b01447a9bb64f9a54a586`, parent is the recorded upstream
+  `2a362a41a8eb6e090f1a12d9b712df85af6f0c33`, and tracked status is clean.
+  The upstream URL did not advertise the fork commit, so the manifest bundle
+  was used rather than substituting another revision. Repeat STUB check next.
+
+### REQ-RUST-024.9 constructor STUB — compile-check PASS
+
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo check -p parseltongue-duckdb-analysis-adapter --tests`
+- Output:
+  `Checking duckdb v1.20000.1`
+  `Checking parseltongue-duckdb-analysis-adapter v0.1.0 (/home/ubuntu/repos/parseltongue-rust-LLM-companion/crates/parseltongue-duckdb-analysis-adapter)`
+  `Finished `dev` profile [unoptimized] target(s) in 11m 11s`
+- Exit 0. The measured-constructor signatures and test assertions compile
+  against the temporary legacy-cap policy; proceed to assertion RED.
+
+### REQ-RUST-024.9 constructor RED — genuine default-setting assertion
+
+- Test: `test_namespace_constructor_uses_default`.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-duckdb-analysis-adapter test_namespace_constructor_uses_default -- --nocapture`
+- Output:
+  `assertion `left == right` failed`
+  `left: "1.1 GiB"`
+  `right: "25.0 GiB"`
+  `test namespace_memory_limit_contract::tests::test_namespace_constructor_uses_default ... FAILED`
+  `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 63 filtered out`
+- Exit 101. This is the intended assertion RED: the old explicit cap differs
+  from the independently opened DuckDB default; no compile failure or timeout.
+
+### REQ-RUST-024.9 constructor GREEN attempt — spill setting blocked
+
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-duckdb-analysis-adapter -- --nocapture`
+- Result: 34 passed, 30 failed. The shared constructor error was:
+  `Permission Error: Modifying the temp_directory has been disabled by configuration`.
+- `enable_external_access(false)` took effect at connection startup, so the
+  constructor's later SQL `SET temp_directory` was rejected. Keep external
+  access disabled from startup and move the run-local spill setting into the
+  DuckDB config before opening the file-backed connection. This is a failed
+  GREEN attempt, not a pass; repeat the adapter suite after that fix.
+
+### REQ-RUST-024.10 receipt verifier STUB — compile-check PASS
+
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo check -p parseltongue-cli-dispatcher-binary --tests`
+- Output: `Checking parseltongue-cli-dispatcher-binary v0.1.0 (/home/ubuntu/repos/parseltongue-rust-LLM-companion/crates/parseltongue-cli-dispatcher-binary)`
+  `Finished `dev` profile [unoptimized] target(s) in 27.24s`
+- Exit 0. The new REQ-RUST-024.10 verifier call sites compile with the helper
+  stub returning zero; run the nonempty fixture for assertion RED.
+
+### REQ-RUST-024.10 receipt verifier RED — nonempty Turso product fixture
+
+- Test: `test_persisted_resolution_path_answers`.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests test_persisted_resolution_path_answers -- --exact`
+- Output:
+  `test test_persisted_resolution_path_answers ... FAILED`
+  `assertion failed: product_count > 0`
+  `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 20 filtered out`
+- Exit 101. This is the intended assertion RED: the verifier stub reports no
+  independently checked published product rows. Implement the Turso-row count,
+  uniqueness and ordered BLAKE3 leaf comparison, including zero-row proofs.
+
+### REQ-RUST-024.10 CLI contract suite — missing rust-src diagnosed
+
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests`
+- Output: `test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out`
+  `Error: Store(StoreBackendFailureError { error_context_detail_text: "CrateGraphLoadError: matching sysroot sources unavailable: CrateGraphLoadError: No such file or directory (os error 2)" })`
+- The failing `test_lang_items_in_sysroot` reaches sysroot source loading; the
+  active stable sysroot lacked `lib/rustlib/src/rust/library`, while SOP P3
+  requires matching sysroot sources. Installed the matching component with
+  `rustup component add rust-src --toolchain stable-x86_64-unknown-linux-gnu`
+  (`info: downloading component rust-src`); verified core, alloc and std source
+  directories under that active sysroot. A dedicated test retry is running;
+  no pass is inferred yet.
+
+### REQ-RUST-024.9 constructor GREEN — adapter suite PASS
+
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-duckdb-analysis-adapter -- --nocapture`
+- Output: `test result: ok. 64 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.47s`
+- The constructor reports DuckDB's independent default (`25.0 GiB` in this
+  environment), verifies the canonical run-local spill path, file backing,
+  external-access denial and disabled extension settings. The temporary cap
+  seam used for RED was removed. This completes constructor GREEN; its
+  function-name cleanup remains in the pending REFACTOR gate.
+
+### REQ-RUST-024.10 receipt verifier GREEN — 20-test CLI subset
+
+- The STUB/RED above exercised only the new test-helper stub and its assertion;
+  it is not evidence of a production receipt-publication failure.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests`
+- Receipt tests passed in that run:
+  `test test_empty_resolution_stage_rows ... ok`
+  `test test_persisted_resolution_path_answers ... ok`
+  `test test_stage_rerun_is_identical ... ok`
+- Suite summary was `test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out` because the separate `test_lang_items_in_sysroot` could not find the absent rust-src component (see preceding environment diagnosis). Therefore this is the 20-test receipt/CLI subset GREEN, not a full CLI-suite pass. The test helper independently checks the published Turso table set, exact counts, unique keys, and ordered BLAKE3 row-leaf digests, including the empty path table.
+
+### Workspace test split gate — comparator target is outside mapper scope
+
+- Initial command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test --workspace -- --skip test_lang_items_in_sysroot`
+- It stopped at `oracle-comparison-contract-tests`: 1 passed and 3 failed with
+  `StoreBackendFailureError { error_context_detail_text: "oracle path comparison not implemented" }`.
+  The failing tests are `test_unresolved_and_wrong_targets_fail`,
+  `test_empty_primary_is_not_success`, and `test_exact_comparison_publishes_turso`.
+- This is the known comparator stub owned outside MAPPER scope; no comparator
+  file or test was changed. Because this run stopped at the first failing test
+  binary, a `--no-fail-fast` workspace run excluding only the already-running
+  `test_lang_items_in_sysroot` is in progress; it is the full-workspace split
+  gate and must be reported separately from the earlier command.
+
+### REFACTOR quality checks — formatting and lints
+
+- Ran `cargo fmt --all`, followed by `cargo fmt --all -- --check`; both exited
+  0. The check produced no diff.
+- Ran `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo clippy --workspace --all-targets -- -D warnings`
+  after the four-word facade constant rename. Exit 0; output ended with
+  `Finished `dev` profile [unoptimized] target(s) in 0.35s`.
+- Cargo still warns that stable Cargo ignores `lints.cargo` in the pinned
+  rust-analyzer manifests; this does not prevent Rust clippy from completing.
+
+### Workspace split gate — completed with out-of-scope/environment failures
+
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test --workspace --no-fail-fast -- --skip test_lang_items_in_sysroot`
+- The complete run exited 101. Mapper-relevant results included 20/20 CLI
+  contract tests (one sysroot test filtered), 64/64 adapter tests, and passing
+  stage-export, worker, syntax, storage and macro-expander suites. The only
+  assertion failures were the three comparator tests, each reporting
+  `oracle path comparison not implemented`; comparator remains out of MAPPER
+  scope. Two dependency-build-gate tests also failed because offline metadata
+  could not download `android_system_properties v0.1.6`.
+- Warmed the locked Cargo cache with `cargo fetch --locked`; the failing target
+  then passed on retry:
+  `test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s`.
+  The workspace command was not rerun; its recorded failure remains, with the
+  environment-only dependency target verified separately.
+
+### REFACTOR and frozen release artifact
+
+- Renamed new facade constants to `NAMESPACE_OUTPUT_BATCH_BYTES` and
+  `NAMESPACE_RECEIPT_TABLE_NAME`; helper, type and test names in the touched
+  facade/test files satisfy the four-word rule. No unrelated rename was made.
+- Errors continue through the existing `StoreBackendFailureError` boundary;
+  it carries free-text context and is not claimed to provide typed provenance.
+- Command: `CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo build --release`
+- Output: `Finished `release` profile [optimized] target(s) in 24m 14s`.
+  Release executable: `target/release/parseltongue`, 100,410,184 bytes.
+  Frozen copy: `/home/ubuntu/parseltongue-mapper-frozen-release`, same size and
+  SHA-256 `1719d2f2de1d70b7e57eed6e7dc6b1988f99fbe3b60b2513732e37f94804cd33`.
+
+### Codebase-memory refresh and scoped coverage
+
+- `codebase-memory-mcp 0.12.1 cli index_repository --repo-path /home/ubuntu/repos/parseltongue-rust-LLM-companion --mode full` returned `status: indexed`, 22,913 nodes and 42,999 edges (expected counts matched); index status is `ready`, root path exact, generation `2026-11-12T18:33:37Z`.
+- Scoped `check_index_coverage` covered CLI `src`, CLI `tests`, and adapter `src`; page was untruncated. CLI scopes had zero recorded issues. Adapter scope had four `parse_partial` SQL sources: `namespace-final-binding-products.sql` line 12, `namespace-final-path-products.sql` line 8, `namespace-macro-candidate-lookup.sql` lines 14–15, and `namespace-path-candidate-derivation.sql` lines 39–67. None is modified by this mapper change. This is a best-effort structural signal, not proof of completeness.
+
+### Sysroot CLI semantic test remains active
+
+- Retry command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests test_lang_items_in_sysroot -- --exact`.
+- Shell `5fba81`, child PID 42940; latest observation elapsed 1:06:22, still running with no test-harness output. It has the fixture's `store.db` open and the run-local `namespace-resolution-analysis-data.duckdb` open (2,396,532,736 bytes, last modified 18:33:57); no result is inferred. Leave it running.
