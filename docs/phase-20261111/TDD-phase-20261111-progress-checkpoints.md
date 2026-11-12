@@ -1258,3 +1258,17 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Sysroot GREEN/REFACTOR not committed. Exact oracle manifests, differ and S5
   remain unimplemented/unmeasured. No live mapper remains. Logs under /home/ubuntu/
   m2-sysroot-cli-contracts-green.log and m2-attribute-token-spacing-red.log.
+
+## Native macro declaration continuation STUB — 2026-11-12
+
+- AST metadata fixes legal spaced attributes; full syntax suite passes.
+- Native integration advances to InvalidMacroDefinitionError: expected semicolon.
+  Added source/byte diagnostics: core/src/marker.rs at byte 1726, marker_impls
+  declared with macro (not macro_rules), multi-rule comma delimiters.
+- The existing facade selects parse_macro2 only when a single-rule argument pattern
+  exists, conflating multi-rule macro declarations with legacy macro_rules.
+  Pinned MBe already implements parse_macro2(None, body) with comma delimiters.
+- Add explicit macro_declaration_style_flag to the pure expansion input (required
+  shared type change: optional pattern cannot represent this distinction). STUB
+  constructors default false; next RED exercises declaration multi-rules.
+- No further upstream parser defect: existing pinned grammar accepts the source.

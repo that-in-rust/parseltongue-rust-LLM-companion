@@ -10,6 +10,7 @@ fn build_macro_expansion_fixture(
     arguments: &str,
 ) -> DeclarativeMacroExpansionInput {
     DeclarativeMacroExpansionInput {
+        macro_declaration_style_flag: false,
         macro_definition_source_text: definition.into(),
         macro_pattern_source_text: None,
         macro_argument_source_text: arguments.into(),

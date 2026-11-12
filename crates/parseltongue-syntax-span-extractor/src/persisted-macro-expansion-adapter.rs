@@ -181,6 +181,7 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                 };
                 let expanded = expand_declarative_macro_items(
                     &DeclarativeMacroExpansionInput {
+                        macro_declaration_style_flag: false,
                         macro_definition_source_text:
                             super::name_resolution_record_codec::read_record_string_value(
                                 &definition,
@@ -205,7 +206,11 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                     if error == MacroExpansionFailureKind::Cancelled {
                         NameResolutionStageError::Cancelled
                     } else {
-                        build_macro_expansion_error(error)
+                        build_macro_expansion_error(format!(
+                            "{error}; source={} byte={}",
+                            definition["macro_source_absolute_path"],
+                            definition["macro_source_range_start"]
+                        ))
                     }
                 })?;
                 let delta = state

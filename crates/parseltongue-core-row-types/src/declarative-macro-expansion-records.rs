@@ -2,6 +2,7 @@ use crate::{RustSourceEditionKind, SpanByteRangeValue};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeclarativeMacroExpansionInput {
+    pub macro_declaration_style_flag: bool,
     pub macro_definition_source_text: String,
     pub macro_pattern_source_text: Option<String>,
     pub macro_argument_source_text: String,
