@@ -520,6 +520,98 @@ fn test_exact_comparison_publishes_turso() {
     );
 }
 
+/// REQ-RUST-026.4
+#[test]
+fn test_comparison_telemetry_survives_publication() {
+    let fixture = build_oracle_comparison_fixture();
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    let operational = &result["agreement_operational_identity"];
+    let settings = &operational["duckdb_settings"];
+    for setting in [
+        "memory_limit",
+        "temp_directory",
+        "enable_external_access",
+        "autoload_known_extensions",
+        "autoinstall_known_extensions",
+        "allow_community_extensions",
+        "threads",
+    ] {
+        assert!(
+            settings[setting].is_string()
+                || settings[setting].is_boolean()
+                || settings[setting].is_number(),
+            "{setting}"
+        );
+    }
+    assert_eq!(settings["enable_external_access"], false);
+    assert_eq!(settings["autoload_known_extensions"], false);
+    assert_eq!(settings["autoinstall_known_extensions"], false);
+    assert_eq!(settings["allow_community_extensions"], false);
+    assert_eq!(settings["threads"], 1);
+    for snapshot in [
+        "duckdb_memory_before_analysis",
+        "duckdb_memory_after_analysis",
+    ] {
+        assert!(operational[snapshot].is_array(), "{snapshot}");
+        assert!(
+            operational[snapshot]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|record| {
+                    record["tag"].is_string()
+                        && record["memory_usage_bytes"].is_number()
+                        && record["temporary_storage_bytes"].is_number()
+                })
+        );
+    }
+    let spill_path = settings["temp_directory"].as_str().unwrap();
+    assert!(!Path::new(spill_path).exists());
+    let table_evidence = result["agreement_source_copy_table_evidence"]
+        .as_array()
+        .unwrap();
+    assert_eq!(table_evidence.len(), 2);
+    for table in table_evidence {
+        assert_eq!(table["expected_row_count"], table["observed_row_count"]);
+        assert_eq!(
+            table["expected_framed_digest_full"],
+            table["observed_framed_digest_full"]
+        );
+        assert_eq!(
+            table["source_scope_generation_value"],
+            table["observed_source_scope_generation_value"]
+        );
+        assert_eq!(
+            table["source_scope_attempt_sequence_value"],
+            table["observed_source_scope_attempt_sequence_value"]
+        );
+    }
+
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let scope = agreement
+        .read_workspace_publication_scope()
+        .unwrap()
+        .unwrap();
+    let summary = agreement
+        .read_stage_table_rows(&scope, "oracle-edge-agreement-table")
+        .unwrap()
+        .into_iter()
+        .find(|row| row.stage_row_record_key == "summary")
+        .unwrap();
+    let persisted: Value = serde_json::from_str(&summary.stage_row_payload_text).unwrap();
+    assert_eq!(
+        persisted["agreement_operational_identity"],
+        result["agreement_operational_identity"]
+    );
+    assert_eq!(
+        persisted["agreement_source_copy_table_evidence"],
+        result["agreement_source_copy_table_evidence"]
+    );
+}
+
 /// REQ-RUST-026.2, REQ-RUST-026.3, REQ-RUST-026.4
 #[test]
 fn test_persisted_known_answer_matrix() {
@@ -693,6 +785,85 @@ fn test_scope_oracle_errors_block() {
     );
     assert!(!same.status.success());
     assert!(String::from_utf8_lossy(&same.stderr).contains("cannot mutate source"));
+}
+
+/// REQ-RUST-026.0
+#[test]
+fn test_oracle_envelope_flags_strict() {
+    let fixture = build_oracle_comparison_fixture();
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let source =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.source.to_str().unwrap())
+            .unwrap();
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let previous_scope = seed_existing_agreement_generation(&agreement);
+    let original_primary: Value =
+        serde_json::from_slice(&fs::read(&fixture.primary).unwrap()).unwrap();
+    let original_secondary: Value =
+        serde_json::from_slice(&fs::read(&fixture.secondary).unwrap()).unwrap();
+    let mut invalid_case_count = 0;
+    for configuration in ["PRIMARY", "SECONDARY"] {
+        let expected_build_scripts = configuration == "SECONDARY";
+        for (field, expected) in [
+            ("oracle_build_scripts_flag", expected_build_scripts),
+            ("oracle_proc_macros_flag", true),
+        ] {
+            for invalid_value_kind in ["missing", "null", "wrong-boolean", "wrong-type"] {
+                let mut primary = original_primary.clone();
+                let mut secondary = original_secondary.clone();
+                let envelope = if configuration == "PRIMARY" {
+                    &mut primary
+                } else {
+                    &mut secondary
+                };
+                match invalid_value_kind {
+                    "missing" => {
+                        envelope.as_object_mut().unwrap().remove(field);
+                    }
+                    "null" => envelope[field] = Value::Null,
+                    "wrong-boolean" => envelope[field] = json!(!expected),
+                    "wrong-type" => envelope[field] = json!("true"),
+                    _ => unreachable!(),
+                }
+                fs::write(&fixture.primary, primary.to_string()).unwrap();
+                fs::write(&fixture.secondary, secondary.to_string()).unwrap();
+                let comparison = compare_oracle_path_sites(
+                    &source,
+                    &fixture.primary,
+                    &fixture.secondary,
+                    &agreement,
+                    &RunCancelFlagValue::default(),
+                );
+                match comparison {
+                    Err(OracleComparisonFailureError::InvalidEnvelope {
+                        configuration: actual_configuration,
+                        field: actual_field,
+                    }) => {
+                        assert_eq!(actual_configuration, configuration);
+                        assert_eq!(actual_field, field);
+                    }
+                    other => panic!(
+                        "{configuration} {field} {invalid_value_kind} must be rejected before publication: {other:?}"
+                    ),
+                }
+                assert_eq!(
+                    agreement.read_workspace_publication_scope().unwrap(),
+                    Some(previous_scope.clone())
+                );
+                let rows = agreement
+                    .read_stage_table_rows(&previous_scope, "oracle-edge-agreement-table")
+                    .unwrap();
+                assert!(
+                    rows.iter()
+                        .any(|row| row.stage_row_record_key == "site/preexisting")
+                );
+                invalid_case_count += 1;
+            }
+        }
+    }
+    assert_eq!(invalid_case_count, 16);
 }
 
 /// REQ-RUST-026.0

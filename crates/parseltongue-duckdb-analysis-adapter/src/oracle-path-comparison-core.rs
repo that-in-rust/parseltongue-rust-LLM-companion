@@ -44,6 +44,14 @@ pub enum OracleComparisonFailureError {
     SourceCopyDigestMismatch,
     #[error("unsupported DuckDB thread count {threads}")]
     UnsupportedThreadCount { threads: usize },
+    #[error("DuckDB setting {setting} expected {expected}, got {observed}")]
+    DuckdbSettingMismatch {
+        setting: String,
+        expected: String,
+        observed: String,
+    },
+    #[error("could not create comparison spill directory: {0}")]
+    TempDirectory(#[source] std::io::Error),
     #[error("DuckDB comparison failed: {0}")]
     Duckdb(#[from] duckdb::Error),
     #[error("could not read oracle input {path}: {source}")]

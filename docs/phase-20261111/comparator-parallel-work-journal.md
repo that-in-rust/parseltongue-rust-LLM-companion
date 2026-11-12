@@ -397,3 +397,205 @@ Each listed active test doc-tag is located under every matching requirement iden
 - `test_persisted_known_answer_matrix`
 
 This correction changes requirement doc-tags and this journal only; it makes no comparator behavior changes. Structural traceability checks and `git diff --check` are recorded with the follow-up commit; no builds or tests are run for a doc-tag-only change.
+
+### REQ-RUST-026.4 R4 DuckDB lifecycle and telemetry correction
+
+REQ-RUST-026.4 RED
+  - Added `test_comparison_connection_settings_are_verified` and `test_comparison_telemetry_survives_publication` before implementation changes.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_comparison_connection_settings_are_verified -- --nocapture`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out`; both connections read the shared `.tmp` path instead of unique spill directories.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_comparison_telemetry_survives_publication -- --nocapture`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out`; returned operational identity lacks `memory_limit` settings/telemetry.
+
+REQ-RUST-026.4 GREEN
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture --test-threads=1`: `test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+  - Runtime read-back confirmed `memory_limit`, `temp_directory`, `enable_external_access`, `autoload_known_extensions`, `autoinstall_known_extensions`, `allow_community_extensions`, and `threads`; no memory limit override was added.
+
+### R4 authoritative test mapping update
+
+**REQ-RUST-026.4 — isolated lifecycle, settings, telemetry, and copy evidence**
+- `test_comparison_connection_settings_are_verified`
+- `test_comparison_context_cleanup_after_sql_error`
+- `test_comparison_context_cleanup_after_cancel`
+- `test_comparison_telemetry_survives_publication`
+- `test_write_cancellation_preserves_generation`
+- `test_duckdb_rows_preserve_scope`
+
+**REQ-RUST-026.5 — semantic determinism across supported thread counts**
+- `test_thread_counts_export_identically`
+- `test_published_comparisons_threads_are_deterministic`
+
+### REQ-RUST-026.2/026.3 PRIMARY oracle-source-blocking correction
+
+REQ-RUST-026.2/026.3 RED
+  - Added `test_external_source_missing_blocks_match_rate`, `test_primary_valid_oracle_missing_production`, `test_primary_source_missing_beats_production_cfg`, `test_production_reason_does_not_excuse_wrong_target`, and `test_secondary_reasons_do_not_affect_primary`; updated `test_primary_classes_partition_once` to require distinct oracle-source and unknown-blocked partitions.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: FAILED. 38 passed; 4 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - The RED failures showed PRIMARY `external_source_missing` scored as mismatch, failed to override production cfg, remained eligible in the class-partition test, and SECONDARY `cfg_inactive` incorrectly became the authoritative reason. The valid-oracle/missing-production and wrong-target regressions already passed, preserving their nonmatch/mismatch behavior.
+
+REQ-RUST-026.2/026.3 GREEN
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - `git diff --check`: exit code 0.
+  - The 201-site regression publishes 200 exact matches plus one PRIMARY `external_source_missing`; status and denominator status are BLOCKED, rates are null, both blocked partitions remain distinct, and raw partition totals reconcile. Production-missing remains an eligible zero-match nonmatch; PRIMARY source-missing overrides production cfg; SECONDARY-only cfg/build reasons remain separately recorded without changing PRIMARY authoritative reason.
+
+### PRIMARY source-blocking authoritative test mapping update
+
+**REQ-RUST-026.2 — oracle availability and PRIMARY-visible reason precedence**
+- `test_external_source_missing_blocks_match_rate`
+- `test_primary_valid_oracle_missing_production`
+- `test_primary_source_missing_beats_production_cfg`
+- `test_production_reason_does_not_excuse_wrong_target`
+- `test_secondary_reasons_do_not_affect_primary`
+- `test_primary_classes_partition_once`
+- `test_production_cfg_keeps_mismatch`
+- `test_secondary_cfg_preserves_match`
+- `test_unknown_cfg_remains_blocked`
+- `test_cfg_wrong_target_mismatch`
+
+**REQ-RUST-026.3 — disjoint blocked partitions and raw reconciliation**
+- `test_external_source_missing_blocks_match_rate`
+- `test_primary_classes_partition_once`
+- `test_blocked_partition_reconciles_duplicates`
+
+### REQ-RUST-026.0 strict oracle-envelope boolean correction
+
+REQ-RUST-026.0 RED
+  - Added `test_oracle_envelope_flags_strict`, covering missing, null, wrong-boolean, and wrong-type values for both boolean fields in PRIMARY and SECONDARY envelopes. Each case requires typed `InvalidEnvelope` and verifies the prior agreement scope and seeded row remain unchanged.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_oracle_envelope_flags_strict -- --nocapture --test-threads=1`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 20 filtered out`.
+  - The first malformed case showed PRIMARY `oracle_build_scripts_flag` could be omitted and comparison still returned `Ok(...)`, published a new agreement generation, and replaced the prior publication.
+
+REQ-RUST-026.0 GREEN
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_oracle_envelope_flags_strict -- --nocapture --test-threads=1`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out`.
+  - All 16 invalid envelope-field cases now return `InvalidEnvelope` with the expected configuration and field before publication; the existing generation scope and seeded agreement row remain readable after every case.
+
+**REQ-RUST-026.0 — strict envelope and prepublication validation test mapping update**
+- `test_oracle_envelope_flags_strict`
+- `test_macro_failure_blocks_publish`
+- `test_malformed_macro_record_rejected`
+
+### Final focused comparator gate set
+
+- `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+- `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture --test-threads=1`: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+- `cargo fmt --all -- --check`: `Exit code: 0`.
+- `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 2.14s`; `Exit code: 0`.
+- `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 6.65s`; `Exit code: 0`.
+- `git diff --check`: `Exit code: 0`.
+- Workspace tests were not rerun; the previously reported stage-export namespace stub remains outside comparator ownership.
+
+REQ-RUST-026.4 REFACTOR
+  - Workspace Clippy initially found needless extra references in comparator `Connection` calls and the lifecycle settings test. Removed only those redundant borrows; no scoring behavior or public interface changed. The final workspace Clippy gate passed.
+
+### Final authoritative REQ-RUST-026 requirement/test matrix
+
+**REQ-RUST-026.0**
+- `test_ambiguous_unit_contexts_fail`
+- `test_invalid_context_kind_rejected`
+- `test_invalid_reason_enum_rejected`
+- `test_invalid_proc_flag_rejected`
+- `test_invalid_namespace_enum_rejected`
+- `test_unit_configuration_contracts_fail`
+- `test_unmapped_site_units_rejected`
+- `test_site_provenance_entries_validated`
+- `test_site_evidence_required_values`
+- `test_oracle_envelope_flags_strict`
+- `test_scope_oracle_errors_block`
+- `test_malformed_macro_record_rejected`
+- `test_macro_failure_blocks_publish`
+
+**REQ-RUST-026.1**
+- `test_site_context_identity_distinct`
+- `test_exact_duplicates_collapse_rows`
+- `test_conflicting_duplicate_payloads_fail`
+- `test_expansion_provenance_separates_sites`
+- `test_package_paths_normalize_lexically`
+- `test_malformed_target_ranges_fail`
+- `test_target_namespaces_are_canonicalized`
+- `test_builtin_target_names_canonicalize`
+- `test_builtin_namespace_changes_identity`
+- `test_split_target_namespaces_merge`
+- `test_role_changes_semantic_digest`
+- `test_exact_comparison_publishes_turso`
+
+**REQ-RUST-026.2**
+- `test_unknown_scope_is_blocked`
+- `test_proc_wrong_target_mismatch`
+- `test_proc_empty_answer_excluded`
+- `test_proc_empty_primary_exclusions`
+- `test_blocked_partition_reconciles_duplicates`
+- `test_enum_variant_module_scored`
+- `test_primary_classes_partition_once`
+- `test_external_source_blocked_rate`
+- `test_primary_missing_production_nonmatch`
+- `test_source_blocked_preserves_cfg`
+- `test_production_reason_keeps_mismatch`
+- `test_secondary_reason_nonimpact_primary`
+- `test_empty_denominator_is_na`
+- `test_unresolved_targets_remain_mismatch`
+- `test_production_cfg_keeps_mismatch`
+- `test_secondary_cfg_preserves_match`
+- `test_cfg_wrong_target_mismatch`
+- `test_unknown_cfg_remains_blocked`
+- `test_primary_cfg_excludes_scored`
+- `test_persisted_known_answer_matrix`
+
+**REQ-RUST-026.3**
+- `test_extra_production_secondary_counts`
+- `test_production_only_rows_visible`
+- `test_primary_classes_partition_once`
+- `test_external_source_blocked_rate`
+- `test_changed_targets_persist_semantically`
+- `test_persisted_known_answer_matrix`
+
+**REQ-RUST-026.4**
+- `test_published_comparison_is_deterministic`
+- `test_comparison_settings_are_verified`
+- `test_context_cleanup_sql_error`
+- `test_context_cleanup_after_cancel`
+- `test_exact_comparison_publishes_turso`
+- `test_comparison_telemetry_survives_publication`
+- `test_persisted_known_answer_matrix`
+- `test_scope_oracle_errors_block`
+- `test_oracle_agreement_registry_roundtrip`
+- `test_cancel_prevents_agreement_publish`
+- `test_source_changes_after_reads`
+- `test_source_changes_before_publish`
+- `test_write_cancellation_preserves_generation`
+- `test_source_unpublished_generation_fails`
+
+**REQ-RUST-026.5**
+- `test_published_comparison_is_deterministic`
+- `test_thread_counts_export_identically`
+
+REQ-RUST-026.0 REFACTOR
+  - Reviewed the strict-envelope boolean check and table-driven regression after GREEN; the presence-plus-exact-boolean expression and typed prepublication error need no further refactor. GREEN implementation and regression commit: `dd94be791b4320e3b89797af26ba0b4acf039015`.
+
+### Review corrections: causal precedence and invocation-local cancellation
+
+REQ-RUST-026.2 RED
+  - `test_source_blocked_preserves_cfg` now checks that PRIMARY external-source absence still blocks with a null rate, while the authoritative causal reason follows SOP precedence (`cfg_inactive`) and the explicit oracle-source partition reason remains `external_source_missing`.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_source_blocked_preserves_cfg -- --nocapture`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 103 filtered out`; assertion output was `left: String("external_source_missing")`, `right: "cfg_inactive"`.
+
+REQ-RUST-026.2 GREEN
+  - Removed only the PRIMARY external-source special case from authoritative-reason precedence; the blocked status and explicit `oracle-source-blocked` partition/reason remain independent. PRIMARY-visible causal precedence uses PRIMARY plus production only and leaves SECONDARY reasons non-authoritative.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_source_blocked_preserves_cfg -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out`.
+  - `test_primary_missing_production_nonmatch` covers both absent production and an empty production row carrying `external_source_missing`; with valid PRIMARY evidence both remain eligible nonmatches (`eligible=1`, `blocked=0`, rate `0.0`). `cargo test -p parseltongue-duckdb-analysis-adapter test_primary_missing_production_nonmatch -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out`.
+
+REQ-RUST-026.4 REVIEW CORRECTION
+  - Removed the shared before/after TMPDIR directory-set snapshot from `test_write_cancellation_preserves_generation`; it still checks real write-path cancellation and preservation of the prior agreement generation. `test_context_cleanup_after_cancel` separately observes this invocation's spill path while its live context is cancelled, then verifies cleanup after the context drops. No global TMPDIR mutation or suite serialization is used.
+
+### Final review-correction gates
+
+- `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 4.01s`.
+- `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture --test-threads=1`: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.26s`.
+- `cargo fmt --all -- --check`: `Exit code: 0`.
+- `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 10.71s`; `Exit code: 0`.
+- `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 7.36s`; `Exit code: 0`.
+- Workspace tests were not rerun; the previously reported namespace-pipeline stub remains outside comparator ownership.
+
+### Default-parallel CLI verification and refactor checkpoint
+
+- Command: `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture` (default test-harness parallelism; no `--test-threads=1`).
+- Output: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.85s`.
+- `test_write_cancellation_preserves_generation` passed with its invocation-wide TMPDIR snapshot removed; `test_context_cleanup_after_cancel` retains the direct live-context cleanup assertion.
+
+REQ-RUST-026.4 REFACTOR
+  - No further refactor needed. Default-parallel publication cancellation passed, the prior agreement generation remains protected, and per-invocation spill cleanup is checked by the isolated context guard test. No global TMPDIR mutation or suite serialization was introduced.
