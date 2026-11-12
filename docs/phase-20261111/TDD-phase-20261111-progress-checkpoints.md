@@ -746,3 +746,13 @@ not a nonexistent TRAIT_ALIAS enum variant; the prior string arm was unreachable
 Scope labels and stored rows retain their existing representation. No feature expansion.
 Fmt check exited zero; focused Clippy -D warnings finished in 0.53s. CLI contracts:
 6 passed (1.37s); syntax contracts: 11 passed. The GREEN limitations above still apply.
+
+### M2 oracle attached-database regression — RED
+
+A minimal local use of E::A inside an enum-pattern function reproduces the all-five
+PRIMARY export crash: test_local_enum_path_inference, 0 passed / 1 failed (28.57s),
+at the pinned hir-ty interner's "Tried to use attached db, but no db is attached".
+This verifies a reachable inference path, not a speculative dependency issue.
+Environment diagnosis: active/default stable cargo/rustc 1.99.1 is loaded. The repeated
+upstream "unused manifest key lints.cargo" warning comes from the pinned workspace's
+nightly-only Cargo lint table, not an unloaded repo environment. No SDK config changed.

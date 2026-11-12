@@ -1429,6 +1429,33 @@ mod oracle_path_contract_tests {
     }
 
     #[test]
+    fn test_local_enum_path_inference() {
+        let directory = tempfile::tempdir().unwrap();
+        create_oracle_workspace_fixture(
+            directory.path(),
+            &[
+                (
+                    "Cargo.toml",
+                    "[package]\nname=\"attached\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+                ),
+                (
+                    "src/lib.rs",
+                    "pub enum E { A(u8) } pub fn inspect(value:E)->u8 { use E::A; match value { A(inner)=>inner } }",
+                ),
+            ],
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let import = rows
+            .iter()
+            .find(|row| row["path_site_source_text"] == "E::A")
+            .unwrap();
+        let targets = import["path_target_symbol_rows"].as_array().unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0]["target_symbol_kind_value"], "Variant");
+    }
+
+    #[test]
     fn test_empty_oracle_paths_succeed() {
         let directory = tempfile::tempdir().unwrap();
         create_oracle_workspace_fixture(
