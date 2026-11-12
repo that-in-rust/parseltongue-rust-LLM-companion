@@ -897,3 +897,14 @@ with -D warnings, formatting and diff checks passed. No new subprocess path was 
 The pure engine's source/provenance remains the bridge; all expanded evidence is committed
 with its crate fixed point. Built-in item support is next, then sysroot/preludes/lang
 items, exact mapped oracle units and all-five S5. No agreement rate is claimed yet.
+
+### M2 built-in macro arguments — STUB
+
+Added dependency-free typed built-in inputs/results and a pure expansion signature in
+the macro port. Nested macro lookup is an explicit read-only port so a user macro named
+concat cannot silently be treated as the compiler builtin. Environment rows distinguish
+known-present, known-absent and unavailable data; this avoids pretending option_env is
+None merely because an arbitrary process environment key was not supplied.
+Offline macro-port cargo check passed in 0.42s. Next RED covers supported builtins,
+metadata-only environment inputs, scope shadowing, malformed/empty arguments and stage
+include publication. No filesystem/process/environment access is added to L2.

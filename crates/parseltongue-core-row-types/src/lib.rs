@@ -10,6 +10,9 @@ pub use name_resolution_stage_records::*;
 #[path = "declarative-macro-expansion-records.rs"]
 mod declarative_macro_expansion_records;
 pub use declarative_macro_expansion_records::*;
+#[path = "builtin-macro-expansion-records.rs"]
+mod builtin_macro_expansion_records;
+pub use builtin_macro_expansion_records::*;
 
 #[path = "configuration-expression-truth-values.rs"]
 mod configuration_expression_truth_values;

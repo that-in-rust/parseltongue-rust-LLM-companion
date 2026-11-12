@@ -14,6 +14,9 @@ mod macro_expansion_rule_engine;
 #[path = "macro-token-parser-input.rs"]
 mod macro_token_parser_input;
 pub use declarative_expansion_source_facade::expand_declarative_macro_items;
+#[path = "builtin-expansion-argument-rules.rs"]
+mod builtin_expansion_argument_rules;
+pub use builtin_expansion_argument_rules::{BuiltinMacroLookupPort, expand_builtin_macro_items};
 
 #[cfg(test)]
 #[path = "declarative-expansion-contract-tests.rs"]
