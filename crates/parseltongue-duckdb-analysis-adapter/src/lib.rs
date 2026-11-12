@@ -109,6 +109,8 @@ mod namespace_default_prelude_inputs;
 #[path = "namespace-frozen-macro-lookups.rs"]
 mod namespace_frozen_macro_lookups;
 pub use namespace_frozen_macro_lookups::FrozenNamespaceMacroLookup;
+#[path = "namespace-final-output-records.rs"]
+mod namespace_final_output_records;
 #[path = "namespace-frozen-identity-codec.rs"]
 mod namespace_frozen_identity_codec;
 #[path = "namespace-unit-link-inputs.rs"]
