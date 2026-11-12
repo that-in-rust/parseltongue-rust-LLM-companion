@@ -11,6 +11,10 @@ use frozen_stage_snapshot_rules::{
     build_snapshot_unit_visibility, resolve_snapshot_read_scope, seal_snapshot_publication,
 };
 
+#[cfg(test)]
+#[path = "frozen-visibility-query-tests.rs"]
+mod frozen_visibility_query_tests;
+
 const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("crate-dependency-graph-table", "crate-graph"),
     ("workspace-config-state-records", "crate-graph"),

@@ -2451,3 +2451,47 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   resumed with SIGCONT and verified `Sl` (previously `Tl`). Parser patch
   SHA-256 was rechecked as
   `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.
+
+### Native CLI hang investigation — existing visibility seam STUB
+
+- Bug scope: REQ-RUST-020.1 / REQ-RUST-024.1. Keep the existing
+  `build_crate_visibility_clause` / `build_snapshot_unit_visibility` signatures;
+  no artificial todo is inserted into an already implemented persistence seam.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo check -p parseltongue-turso-store-adapter`.
+  Output: `Finished dev profile [unoptimized] target(s) in 0.54s`.
+- The old contract test left orphan mapper PID 1747046 running after its parent
+  was killed. A fresh GDB stack at 31 minutes, saved in
+  `/home/ubuntu/cli-native-orphan-stacks.log`, reached
+  `count_stage_table_rows -> copy_generation -> copy_published_stage_rows ->
+  refresh_frozen_inputs -> run_namespace_analysis_pipeline`, not DuckDB SQL.
+  SIGTERM requested cancellation but did not interrupt its count; SIGKILL
+  stopped the already-over-time orphan. No completed qualification is claimed.
+- The missing-cleanup-index hypothesis is rejected: schema initialization
+  already creates generation/attempt/work-unit indexes, and the current stack
+  had advanced from namespace writes to frozen-copy counts. The leading
+  reachable candidate is correlated two-owner IN predicates losing the final
+  composite marker-key equality. Next: assert the actual pinned Turso query
+  plans before changing the predicates; preserve snapshot/atomic visibility.
+- Stable Cargo/rustc 1.99.1 is loaded. The parser/syntax fork's `lints.cargo`
+  warning is a nightly-only manifest feature, not a missing local environment;
+  no pinned upstream manifest or toolchain is changed to suppress it.
+- VS Code rust-analyzer PIDs 1532439, 1782164 and 1797409 are temporarily
+  SIGSTOPed during native builds and must be resumed when they finish.
+
+### Native CLI visibility query RED
+
+- REQ-RUST-024.1: `test_frozen_visibility_marker_probes`;
+  REQ-RUST-020.1: `test_namespace_completion_marker_probes`.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 timeout --signal=TERM --kill-after=5s 120s cargo test -p parseltongue-turso-store-adapter --lib marker_probes -- --nocapture`.
+- Exact output: `test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.11s`.
+- Pinned Turso EXPLAIN QUERY PLAN proves both correlated IN predicates lose
+  the marker-key part of their primary-key lookup:
+  `SEARCH completed USING COVERING INDEX sqlite_autoindex_stage-run-generation-records_1 (run_generation_digest_value=? AND stage_attempt_sequence_value=?)`;
+  `SEARCH frozen USING INDEX sqlite_autoindex_frozen-stage-unit-memberships_1 (generation_key=? AND source_attempt_key=?)`.
+  The equality-based `frozen_completion` probe uses all three key columns.
+- The actual orphan stack reaches this count query through the frozen Appender
+  handoff, and `Some(revision)` activates both membership predicates in the
+  SQL builder. Thus the poor plan is reachable in the reported native case;
+  its exact fraction of total wall time is not yet measured. Next: replace
+  two-owner IN with two independent, full-key EXISTS probes, then run the
+  semantics suite and a bounded native CLI reproduction.
