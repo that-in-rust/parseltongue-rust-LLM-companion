@@ -5,7 +5,7 @@ use super::{
 };
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
-use ra_ap_syntax::{AstNode, Edition, SyntaxNode, ast};
+use ra_ap_syntax::{AstNode, Edition, SyntaxKind, SyntaxNode, ast};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -365,7 +365,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "target_symbol_kind_value":kind,"target_compilation_scope_record":self.build_compilation_scope_record(scope),
         }));
         let inherited = node.parent().is_some_and(|parent| {
-            format!("{:?}", parent.kind()) == "ASSOC_ITEM_LIST"
+            parent.kind() == SyntaxKind::ASSOC_ITEM_LIST
                 && parent
                     .parent()
                     .is_some_and(|owner| ast::Trait::can_cast(owner.kind()))
@@ -493,7 +493,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         if !check_node_configuration_active(node, &self.projection_target_cfg_values)? {
             return Ok(());
         }
-        let kind = format!("{:?}", node.kind());
+        let kind = node.kind();
         let name = node
             .children()
             .find_map(ast::Name::cast)
@@ -544,35 +544,21 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 &child,
             );
         }
-        let item_kind = match kind.as_str() {
-            "FN" => Some(("Function", NamespaceBindingKindValue::Value)),
-            "STRUCT" => Some(("Struct", NamespaceBindingKindValue::Type)),
-            "ENUM" => Some(("Enum", NamespaceBindingKindValue::Type)),
-            "UNION" => Some(("Union", NamespaceBindingKindValue::Type)),
-            "TRAIT" | "TRAIT_ALIAS" => Some(("Trait", NamespaceBindingKindValue::Type)),
-            "TYPE_ALIAS" => Some(("TypeAlias", NamespaceBindingKindValue::Type)),
-            "CONST" => Some(("Const", NamespaceBindingKindValue::Value)),
-            "STATIC" => Some(("Static", NamespaceBindingKindValue::Value)),
-            "VARIANT" => Some(("Variant", NamespaceBindingKindValue::Type)),
-            "MACRO_RULES" | "MACRO_DEF" => Some(("Macro", NamespaceBindingKindValue::Macro)),
-            "TYPE_PARAM" => Some(("TypeParam", NamespaceBindingKindValue::Type)),
-            "CONST_PARAM" => Some(("ConstParam", NamespaceBindingKindValue::Value)),
-            _ => None,
-        };
+        let item_kind = read_syntax_symbol_kind(kind);
         let needs_scope = matches!(
-            kind.as_str(),
-            "FN" | "STRUCT"
-                | "ENUM"
-                | "UNION"
-                | "TRAIT"
-                | "TRAIT_ALIAS"
-                | "IMPL"
-                | "BLOCK_EXPR"
-                | "TYPE_ALIAS"
-                | "TYPE_PARAM"
+            kind,
+            SyntaxKind::FN
+                | SyntaxKind::STRUCT
+                | SyntaxKind::ENUM
+                | SyntaxKind::UNION
+                | SyntaxKind::TRAIT
+                | SyntaxKind::IMPL
+                | SyntaxKind::BLOCK_EXPR
+                | SyntaxKind::TYPE_ALIAS
+                | SyntaxKind::TYPE_PARAM
         );
         let nested = if needs_scope {
-            Some(self.build_child_projection_scope(scope, &kind, node, file, false))
+            Some(self.build_child_projection_scope(scope, &format!("{kind:?}"), node, file, false))
         } else {
             None
         };
@@ -594,7 +580,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             if (label == "Struct"
                 && !node
                     .children()
-                    .any(|child| format!("{:?}", child.kind()) == "RECORD_FIELD_LIST"))
+                    .any(|child| child.kind() == SyntaxKind::RECORD_FIELD_LIST))
                 || label == "Variant"
             {
                 self.register_source_symbol_binding(
@@ -608,13 +594,13 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             }
         }
         let active = nested.as_ref().unwrap_or(scope);
-        if matches!(kind.as_str(), "TRAIT" | "IMPL") {
+        if matches!(kind, SyntaxKind::TRAIT | SyntaxKind::IMPL) {
             self.register_source_symbol_binding(
                 node,
                 file,
                 active,
                 (
-                    if kind == "TRAIT" {
+                    if kind == SyntaxKind::TRAIT {
                         "TypeParam"
                     } else {
                         "SelfType"
@@ -625,10 +611,10 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 Some(active.clone()),
             )?;
         }
-        if matches!(kind.as_str(), "TYPE_PARAM" | "TRAIT") {
+        if matches!(kind, SyntaxKind::TYPE_PARAM | SyntaxKind::TRAIT) {
             let bounds = node
                 .children()
-                .filter(|child| format!("{:?}", child.kind()) == "TYPE_BOUND_LIST")
+                .filter(|child| child.kind() == SyntaxKind::TYPE_BOUND_LIST)
                 .flat_map(|list| list.children())
                 .filter_map(|bound| bound.descendants().find_map(ast::Path::cast))
                 .collect::<Vec<_>>();
@@ -739,6 +725,26 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             self.visit_namespace_syntax_node(&child, active, directory, file)?;
         }
         Ok(())
+    }
+}
+
+fn read_syntax_symbol_kind(kind: SyntaxKind) -> Option<(&'static str, NamespaceBindingKindValue)> {
+    match kind {
+        SyntaxKind::FN => Some(("Function", NamespaceBindingKindValue::Value)),
+        SyntaxKind::STRUCT => Some(("Struct", NamespaceBindingKindValue::Type)),
+        SyntaxKind::ENUM => Some(("Enum", NamespaceBindingKindValue::Type)),
+        SyntaxKind::UNION => Some(("Union", NamespaceBindingKindValue::Type)),
+        SyntaxKind::TRAIT => Some(("Trait", NamespaceBindingKindValue::Type)),
+        SyntaxKind::TYPE_ALIAS => Some(("TypeAlias", NamespaceBindingKindValue::Type)),
+        SyntaxKind::CONST => Some(("Const", NamespaceBindingKindValue::Value)),
+        SyntaxKind::STATIC => Some(("Static", NamespaceBindingKindValue::Value)),
+        SyntaxKind::VARIANT => Some(("Variant", NamespaceBindingKindValue::Type)),
+        SyntaxKind::MACRO_RULES | SyntaxKind::MACRO_DEF => {
+            Some(("Macro", NamespaceBindingKindValue::Macro))
+        }
+        SyntaxKind::TYPE_PARAM => Some(("TypeParam", NamespaceBindingKindValue::Type)),
+        SyntaxKind::CONST_PARAM => Some(("ConstParam", NamespaceBindingKindValue::Value)),
+        _ => None,
     }
 }
 

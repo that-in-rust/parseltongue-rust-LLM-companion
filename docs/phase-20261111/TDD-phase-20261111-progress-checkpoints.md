@@ -737,3 +737,12 @@ Semantics::resolve_path_per_ns -> analyze_impl -> infer_query -> infer_pat -> re
 The pinned HIR exports attach_db; add an enum-pattern/local-use regression and use its
 documented attached context before rerunning the oracle. Those failed exports are artifacts,
 not measurements of agreement; no denominator exists.
+
+### M2 persisted stage wiring — REFACTOR (initial source projection subset)
+
+Replaced stringly typed syntax-kind dispatch with the pinned parser's SyntaxKind enum and
+extracted the pure declaration-kind/namespace classifier. Parser trait aliases use TRAIT,
+not a nonexistent TRAIT_ALIAS enum variant; the prior string arm was unreachable.
+Scope labels and stored rows retain their existing representation. No feature expansion.
+Fmt check exited zero; focused Clippy -D warnings finished in 0.53s. CLI contracts:
+6 passed (1.37s); syntax contracts: 11 passed. The GREEN limitations above still apply.
