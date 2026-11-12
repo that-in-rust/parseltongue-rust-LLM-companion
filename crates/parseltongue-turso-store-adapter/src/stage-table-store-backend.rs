@@ -55,6 +55,10 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ),
     ("stage-run-generation-records", "markers"),
     (
+        "legacy-macro-scope-records",
+        "syntax-namespace-input-records",
+    ),
+    (
         "legacy-macro-source-events",
         "syntax-namespace-input-records",
     ),

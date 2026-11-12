@@ -129,6 +129,11 @@ pub(super) fn build_unit_compilation_key(
 }
 
 impl<'a> CrateSyntaxProjectionState<'a> {
+    pub(super) fn read_legacy_lookup_updates(
+        &mut self,
+    ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
+        Ok(Vec::new())
+    }
     pub(super) fn build_crate_projection_state(
         unit: Value,
         workspace: &Value,
@@ -866,7 +871,6 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             &directory,
             &file,
         )?;
-        let input = &self.projection_resolution_input_rows;
         let content = blake3::hash(source.as_bytes()).to_hex().to_string();
         self.projection_source_store_port
             .write_file_content_bytes(&content, source.as_bytes())?;
@@ -876,6 +880,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 rows.push(row?);
                 Ok::<_, StoreBackendFailureError>(())
             })?;
+        rows.extend(self.read_legacy_lookup_updates()?);
         rows.push(super::build_syntax_output_record("file-source-text-table",path.clone(),json!({
             "file_source_absolute_path":path,"file_content_digest_full":content,"file_source_byte_count":source.len(),"file_expansion_provenance_chain":chain,
         })));
@@ -884,6 +889,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "macro_virtual_source_path":path,"macro_expanded_source_text":source,"macro_token_origin_rows":origins,
             "macro_matched_arm_index":expanded.macro_matched_arm_index,"macro_resolution_state_kind":"expanded",
         })));
+        let input = &self.projection_resolution_input_rows;
         Ok(NameExpansionRoundRows {
             expansion_module_scope_rows: input.name_module_scope_rows
                 [before.module_scope_row_count..]

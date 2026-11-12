@@ -169,11 +169,12 @@ pub(super) fn namespace_input_row_records<'a>(
 }
 
 fn persist_projection_input_rows(
-    projection: &CrateSyntaxProjectionState<'_>,
+    projection: &mut CrateSyntaxProjectionState<'_>,
     scope: &StageRunScopeValue,
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
 ) -> Result<usize, StoreBackendFailureError> {
+    let legacy = projection.read_legacy_lookup_updates()?;
     let input = &projection.projection_resolution_input_rows;
     let prefix = format!(
         "crate/{}",
@@ -185,6 +186,7 @@ fn persist_projection_input_rows(
         .to_hex()
     );
     let pending = namespace_input_row_records(projection, &MacroProjectionRowOffsets::default())
+        .chain(legacy.into_iter().map(Ok))
         .try_fold(
             NamespaceInputPendingRows::default(),
             |mut pending, record| {
@@ -236,7 +238,7 @@ pub fn persist_namespace_syntax_inputs(
                 unit, &workspace, store, scope, cancel,
             )?;
             projection.project_unit_source_root()?;
-            persist_projection_input_rows(&projection, scope, store, cancel)
+            persist_projection_input_rows(&mut projection, scope, store, cancel)
                 .map(|rows| count + rows)
         })?;
     store.write_stage_table_unit(
