@@ -278,6 +278,7 @@ pub(super) fn export_configured_semantic_paths(
                 "site_source_range_start":u32::from(range.range.start()),
                 "site_source_range_end":u32::from(range.range.end()),
                 "path_site_source_text":path.syntax().text().to_string(),
+                "path_lookup_scope_kind":read_oracle_lookup_scope(module,&path,&semantics,shared),
                 "site_path_context_kind":if path.syntax().ancestors().any(|node|ast::Use::can_cast(node.kind())) {"import"} else {"signature"},
                 "path_target_symbol_rows":targets,
                 "path_unresolved_reason_kind":reason.map(read_oracle_reason_label),
@@ -359,6 +360,15 @@ fn read_oracle_context_key(module: Module, semantics: &Semantics<'_, RootDatabas
         source.value.node().kind(),
         source.value.node().text_range()
     )
+}
+
+fn read_oracle_lookup_scope(
+    _module: Module,
+    _path: &ast::Path,
+    _semantics: &Semantics<'_, RootDatabase>,
+    _shared: bool,
+) -> &'static str {
+    "unknown"
 }
 
 fn build_oracle_path_targets(
