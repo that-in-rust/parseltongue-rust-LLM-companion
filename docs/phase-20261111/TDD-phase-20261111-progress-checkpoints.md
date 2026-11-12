@@ -763,7 +763,7 @@ The external exporter now runs its semantic traversal inside the pinned HIR atta
 context. No production dependency or SDK file changed. All 16 oracle tests passed
 (60.89s), release build finished in 3.02s, Clippy -D warnings in 0.93s; fmt check passed.
 The same corpus probe now exits zero on all five. Raw original-source path counts:
-rust-analyzer 114199; ripgrep 7847; tokio 22274; serde 7610; cargo-modules 1369.
+rust-analyzer 88104; ripgrep 7847; tokio 22274; serde 7610; cargo-modules 1369.
 These are current-harness export counts, NOT S5 denominators, rates or gate results.
 Artifacts: each repo's m2-primary-path-exports directory; original failed outputs preserved
 as m2-primary-unattached-exports. The probe records executable SHA-256 and pending
