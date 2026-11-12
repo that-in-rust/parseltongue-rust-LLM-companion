@@ -1,5 +1,9 @@
 //! Offline semantic oracle; never linked into the production mapper.
 
+#[path = "mapped-oracle-export-facade.rs"]
+mod mapped_oracle_export_facade;
+pub use mapped_oracle_export_facade::{OracleConfigurationKindValue, export_mapped_semantic_paths};
+
 #[path = "primary-path-export-rows.rs"]
 mod primary_path_export_rows;
 #[path = "primary-workspace-loader-adapter.rs"]

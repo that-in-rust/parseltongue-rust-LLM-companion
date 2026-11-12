@@ -22,8 +22,12 @@ use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
+
+#[path = "published-stage-export-facade.rs"]
+mod published_stage_export_facade;
 
 fn build_pipeline_stage_error(message: impl std::fmt::Display) -> StoreBackendFailureError {
     StoreBackendFailureError {
@@ -733,6 +737,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 | "--workspace-store-file-path"
                 | "--worker-thread-count-value"
                 | "--mapping-final-stage-kind"
+                | "--stage-owned-table-name"
+                | "--stage-row-filter-value"
         ) {
             return Err(format!("unknown flag {}", args[index]).into());
         }
@@ -742,13 +748,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = flags
         .get("--workspace-store-file-path")
         .ok_or("missing --workspace-store-file-path")?;
-    if command == "status-coverage-banner-show" && !Path::new(path).is_file() {
+    let exporting = matches!(
+        command.as_str(),
+        "export-published-stage-rows" | "export-mapped-unit-manifest"
+    );
+    if (command == "status-coverage-banner-show" || exporting) && !Path::new(path).is_file() {
         return Err("workspace store does not exist".into());
     }
     let store = TursoWorkspaceStoreAdapter::open_turso_workspace_store(path)?;
-    store.initialize_workspace_stage_schema()?;
+    if !exporting {
+        store.initialize_workspace_stage_schema()?;
+    }
     let result = match command.as_str() {
         "status-coverage-banner-show" => build_workspace_coverage_banner(&store)?,
+        "export-mapped-unit-manifest" => {
+            published_stage_export_facade::read_published_unit_manifest(&store)?
+        }
+        "export-published-stage-rows" => {
+            let table = flags
+                .get("--stage-owned-table-name")
+                .ok_or("missing --stage-owned-table-name")?;
+            let stdout = std::io::stdout();
+            let mut output = BufWriter::new(stdout.lock());
+            published_stage_export_facade::write_published_stage_rows(
+                &store,
+                table,
+                flags.get("--stage-row-filter-value").map(String::as_str),
+                &mut output,
+            )?;
+            output.flush()?;
+            return Ok(());
+        }
         "map-workspace-full-run" => {
             let root = Path::new(
                 flags

@@ -1411,3 +1411,18 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   rewrite physical paths or hide export failures.
 - No exact manifests, differ or S5 measurements exist yet. S6/S7 reminder is
   task 4; use project root matching, schema inspection and complete pagination.
+
+## Exact mapped-unit manifests STUB — 2026-11-12
+
+- CLI seams: export-published-stage-rows (table plus optional textual filter)
+  and export-mapped-unit-manifest. Both require an existing store; export
+  routes do not initialize or mutate the stage schema. Implementations
+  currently return typed not-implemented errors.
+- Offline harness seam: export_mapped_semantic_paths with explicit
+  PRIMARY/SECONDARY configuration and manifest. CLI accepts the manifest and
+  optional proc-macro cache. Legacy qualified raw export remains separate.
+- STUB checks: production CLI cargo check Finished dev in 1.11 seconds;
+  isolated oracle cargo check --release Finished release in 26.81 seconds.
+- Next RED covers generation-bearing empty exports, normal-dependency unit
+  selection/source closure, unknown tables/unpublished stores, exact cfg/edition,
+  and explicit missing/duplicate/malformed oracle inputs.
