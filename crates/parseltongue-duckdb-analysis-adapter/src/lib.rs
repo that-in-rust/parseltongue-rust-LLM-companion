@@ -108,6 +108,10 @@ pub use namespace_import_endpoint_rounds::resolve_import_endpoint_rounds;
 mod namespace_scope_relation_records;
 pub use namespace_scope_relation_records::materialize_scope_relations;
 
+#[path = "namespace-path-candidate-records.rs"]
+mod namespace_path_candidate_records;
+pub use namespace_path_candidate_records::recompute_path_candidates;
+
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
 pub fn resolve_crate_name_bindings(
