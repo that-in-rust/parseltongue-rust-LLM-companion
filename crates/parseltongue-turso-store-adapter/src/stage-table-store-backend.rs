@@ -5,6 +5,12 @@ use parseltongue_core_row_types::{
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 
+#[path = "frozen-stage-snapshot-rules.rs"]
+mod frozen_stage_snapshot_rules;
+use frozen_stage_snapshot_rules::{
+    build_snapshot_unit_visibility, resolve_snapshot_read_scope, seal_snapshot_publication,
+};
+
 const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("crate-dependency-graph-table", "crate-graph"),
     ("workspace-config-state-records", "crate-graph"),
@@ -102,20 +108,24 @@ pub fn retry_bounded_store_write<T>(
     Err(build_store_backend_error("unreachable retry state"))
 }
 
-fn build_crate_visibility_clause(table: &str) -> String {
+fn build_crate_visibility_clause(table: &str, revision: Option<i64>) -> String {
     let owner = STAGE_OWNED_TABLE_NAMES
         .iter()
         .find(|(name, _)| *name == table)
         .map(|(_, owner)| *owner)
         .filter(|owner| *owner == "syntax-namespace-input-records")
         .unwrap_or("name-resolution");
+    let frozen_completion=revision.map(|revision|format!("AND EXISTS (SELECT 1 FROM \"frozen-stage-unit-memberships\" AS frozen_completion
+        WHERE frozen_completion.generation_key=completed.run_generation_digest_value AND frozen_completion.source_attempt_key=completed.stage_attempt_sequence_value
+            AND frozen_completion.stage_marker_key=completed.stage_row_record_key AND frozen_completion.publication_revision<={revision})")).unwrap_or_default();
+    let snapshot_visibility = build_snapshot_unit_visibility(table, revision);
     format!(
         r#"("{table}".stage_unit_work_key NOT LIKE 'crate/%/pending/%' OR EXISTS (
         SELECT 1 FROM "stage-run-generation-records" AS completed
         WHERE completed.run_generation_digest_value="{table}".run_generation_digest_value
         AND completed.stage_attempt_sequence_value="{table}".stage_attempt_sequence_value
         AND completed.stage_row_record_key='__marker__/{owner}/' ||
-            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1)))"#
+            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1) {frozen_completion})) AND {snapshot_visibility}"#
     )
 }
 
@@ -147,6 +157,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             }
             connection.execute("CREATE TABLE IF NOT EXISTS \"file-source-content-records\" (file_content_digest_full TEXT PRIMARY KEY, file_source_content_bytes BLOB NOT NULL)", ()).await?;
             connection.execute("CREATE TABLE IF NOT EXISTS \"workspace-generation-publication-manifest\" (manifest_singleton_key_value INTEGER PRIMARY KEY, run_generation_digest_value TEXT NOT NULL, stage_attempt_sequence_value TEXT NOT NULL)", ()).await?;
+            connection.execute("CREATE TABLE IF NOT EXISTS \"frozen-stage-publication-records\" (generation_key TEXT NOT NULL,attempt_key TEXT NOT NULL,source_attempt_key TEXT NOT NULL,publication_revision INTEGER NOT NULL,PRIMARY KEY(generation_key,attempt_key))",()).await?;
+            connection.execute("CREATE TABLE IF NOT EXISTS \"frozen-stage-unit-memberships\" (generation_key TEXT NOT NULL,source_attempt_key TEXT NOT NULL,stage_marker_key TEXT NOT NULL,publication_revision INTEGER NOT NULL,PRIMARY KEY(generation_key,source_attempt_key,stage_marker_key))",()).await?;
             Ok::<_,turso::Error>(())
         }).map_err(build_store_backend_error)
     }
@@ -184,6 +196,18 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             let transaction = connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
             let result = async {
                 let scope = request.stage_run_scope_value;
+                let mut snapshot=transaction.query("SELECT 1 FROM \"frozen-stage-publication-records\" WHERE generation_key=? AND attempt_key=? AND source_attempt_key<>attempt_key",
+                    turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                if snapshot.next().await?.is_some() {return Err(turso::Error::Misuse("frozen snapshot scopes are read-only".into()));}
+                drop(snapshot);
+                let shared_owners=STAGE_OWNED_TABLE_NAMES.iter().map(|(_,owner)|*owner).filter(|owner|STAGE_OWNED_TABLE_NAMES.iter().any(|(table,_)|
+                    check_table_stage_access(table,request.stage_owner_name_value) && check_table_stage_access(table,owner))).collect::<std::collections::BTreeSet<_>>();
+                let parameters=std::iter::once(scope.run_generation_digest_value.clone()).chain(std::iter::once(scope.stage_attempt_sequence_value.clone()))
+                    .chain(shared_owners.iter().map(|owner|format!("__marker__/{owner}/{}",request.stage_unit_work_key))).collect::<Vec<_>>();
+                let placeholders=std::iter::repeat_n("?",shared_owners.len()).collect::<Vec<_>>().join(",");
+                let mut sealed=transaction.query(format!("SELECT 1 FROM \"frozen-stage-unit-memberships\" WHERE generation_key=? AND source_attempt_key=? AND stage_marker_key IN ({placeholders})"),parameters).await?;
+                if sealed.next().await?.is_some() {return Err(turso::Error::Misuse("published stage unit is immutable".into()));}
+                drop(sealed);
                 for input in request.stage_input_stage_names {
                     let mut rows = transaction.query("SELECT 1 FROM \"stage-run-generation-records\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_row_record_key=?",
                         turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),format!("__marker__/{input}/__complete__")]).await?;
@@ -241,7 +265,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async {
             let connection = self.store_database_handle_value.connect()?;
-            let mut rows = connection.query(format!("SELECT stage_row_record_key,stage_row_payload_text FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {} ORDER BY stage_row_record_key",build_crate_visibility_clause(table)),
+            let (scope,revision)=resolve_snapshot_read_scope(&connection,scope).await?;
+            let mut rows = connection.query(format!("SELECT stage_row_record_key,stage_row_payload_text FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {} ORDER BY stage_row_record_key",build_crate_visibility_clause(table,revision)),
                 turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
             let mut records = Vec::new();
             while let Some(row) = rows.next().await? {
@@ -259,7 +284,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async{
             let connection=self.store_database_handle_value.connect()?;
-            let mut rows=connection.query(format!(r#"SELECT COUNT(*) FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {}"#,build_crate_visibility_clause(table)),
+            let (scope,revision)=resolve_snapshot_read_scope(&connection,scope).await?;
+            let mut rows=connection.query(format!(r#"SELECT COUNT(*) FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {}"#,build_crate_visibility_clause(table,revision)),
                 turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
             let count:i64=rows.next().await?.ok_or(turso::Error::QueryReturnedNoRows)?.get(0)?;
             usize::try_from(count).map_err(|error|turso::Error::ConversionFailure(error.to_string()))
@@ -275,7 +301,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async{
             let connection=self.store_database_handle_value.connect().map_err(build_store_backend_error)?;
-            let mut rows=connection.query(format!(r#"SELECT stage_row_record_key,stage_row_payload_text FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {} ORDER BY stage_row_record_key"#,build_crate_visibility_clause(table)),
+            let (scope,revision)=resolve_snapshot_read_scope(&connection,scope).await.map_err(build_store_backend_error)?;
+            let mut rows=connection.query(format!(r#"SELECT stage_row_record_key,stage_row_payload_text FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {} ORDER BY stage_row_record_key"#,build_crate_visibility_clause(table,revision)),
                 turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await.map_err(build_store_backend_error)?;
             let mut count=0;
             while let Some(row)=rows.next().await.map_err(build_store_backend_error)? {
@@ -300,6 +327,10 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                 let mut connection=self.store_database_handle_value.connect()?;
                 let transaction=connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
                 let result=async{
+                    let mut frozen=transaction.query("SELECT 1 FROM \"frozen-stage-publication-records\" WHERE generation_key=? AND attempt_key=?",
+                        turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                    if frozen.next().await?.is_some() {return Err(turso::Error::Misuse("published generations cannot be renamed".into()));}
+                    drop(frozen);
                     for table in ["span-reference-text-table","span-byte-ownership-ranges","field-signature-detail-table","body-site-reference-table"]{
                         let mut rows=transaction.query(format!(r#"SELECT 1 FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? LIMIT 1"#),
                             turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
@@ -378,16 +409,21 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                     if rows.next().await?.is_none() { return Err(turso::Error::Misuse(format!("StageInputMissingError: {stage}"))); }
                 }
                 if scope.run_generation_digest_value!=generation {
+                let mut frozen=transaction.query("SELECT 1 FROM \"frozen-stage-publication-records\" WHERE generation_key=? AND attempt_key=?",
+                    turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                if frozen.next().await?.is_some() {return Err(turso::Error::Misuse("published generations cannot be renamed".into()));}
+                drop(frozen);
                 for (table,_) in STAGE_OWNED_TABLE_NAMES {
                     transaction.execute(format!("UPDATE \"{table}\" SET run_generation_digest_value=? WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=?"),
                         turso::params![generation.to_owned(),scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
                 }
                 }
                 check_stage_cancel_requested(cancel)?;
+                let published=seal_snapshot_publication(&transaction,&StageRunScopeValue {run_generation_digest_value:generation.into(),stage_attempt_sequence_value:scope.stage_attempt_sequence_value.clone()}).await?;
                 transaction.execute("INSERT OR REPLACE INTO \"workspace-generation-publication-manifest\" VALUES (1,?,?)",
-                    turso::params![generation.to_owned(),scope.stage_attempt_sequence_value.clone()]).await?;
+                    turso::params![generation.to_owned(),published.stage_attempt_sequence_value.clone()]).await?;
                 check_stage_cancel_requested(cancel)?;
-                Ok(StageRunScopeValue { run_generation_digest_value:generation.into(),stage_attempt_sequence_value:scope.stage_attempt_sequence_value.clone() })
+                Ok(published)
             }.await;
             match result { Ok(value) => { transaction.commit().await?; Ok(value) }, Err(error) => { let _ = transaction.rollback().await; Err(error) } }
         })

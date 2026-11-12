@@ -2008,3 +2008,45 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   macro additions and the 8192-changing-round boundary. The macro test ports
   simulate expansions even without a macro binding; production persisted macro
   expansion only processes expansion_resolved_macro_rows. Preserve that guard.
+
+### DuckDB resolution accuracy and immutable source publications
+
+- SQL strata, scope ancestry, path roots and typed contract bridge are committed
+  through `f19c685a6`. The eleven moved resolver contracts passed together:
+  `test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 24.37s`.
+- Accuracy RED `18f3ab216` captured raw import aliases and restricted reexport
+  leaks. GREEN `92b6dad9f` adds per-binding visibility, importer filtering and
+  raw alias normalization. Latest adapter run (the unchanged 8192 macro-limit
+  fixture excluded) printed:
+  `test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 39.79s`.
+  Adapter all-target Clippy completed successfully in 0.40s.
+- Frozen-publication RED `d796d2402` proved that the existing Turso publication
+  pointer did not freeze its rows: a published work unit could be overwritten,
+  and a private chunk became visible after a future completion marker appeared.
+- The corresponding GREEN uses `frozen-stage-publication-records` and
+  `frozen-stage-unit-memberships`, sealed atomically with publication. Existing
+  work units cannot be rewritten (including through a different stage sharing
+  their tables). New work units can accumulate without changing older published
+  views. Republishing assigns a new snapshot attempt suffix `/frozen/N` while
+  preserving the generation key. Reads/counts/visits resolve the snapshot to
+  immutable work-unit memberships; future completion markers cannot expose old
+  private chunks. Frozen scopes cannot be renamed or used as write scopes.
+  No payload-table duplication or in-memory snapshot is required.
+- Final source-publication checks:
+  `test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.70s`.
+  Real pinned-Turso to DuckDB handoff:
+  `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.24s`.
+  Turso all-target Clippy completed successfully in 0.57s. The external pinned
+  syntax manifest still emits its known nightly-only `lints.cargo` warning.
+- Still required: textual macro scope facts and production macro alternation;
+  raw frozen-input SQL projection and CLI wiring (do not use the typed contract
+  facade to rematerialize an entire repository); process/network audit;
+  functional-Rust REFACTOR; serde M2 peak/wall/rounds; exact oracle manifests;
+  SQL comparator and all-five S5 module/type-relative splits and disagreements.
+  No S5 measurements exist. PID 1532439 is currently stopped during native
+  build work; resume it when builds finish. Available disk was 7.6 GiB; existing
+  oracle build caches and old e2e databases account for most usage.
+- Parser/oracle identity remains fork `bf6b2099d6351c37039b01447a9bb64f9a54a586`,
+  based on `2a362a41a8eb6e090f1a12d9b712df85af6f0c33`, with reviewable patch
+  `tools/parser-const-closure-statements.patch`, SHA-256
+  `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.

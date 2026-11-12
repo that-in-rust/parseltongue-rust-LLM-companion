@@ -41,6 +41,9 @@ fn published_snapshots_are_frozen_while_new_units_accumulate() {
     assert!(
         write_fixture_stage_rows(&store, &scope, "syntax-spans", "first", &[], &[changed]).is_err()
     );
+    assert!(
+        write_fixture_stage_rows(&store, &scope, "name-resolution", "first", &[], &[]).is_err()
+    );
     let mut second_row = row.clone();
     second_row.stage_row_record_key = "second".into();
     write_fixture_stage_rows(&store, &scope, "syntax-spans", "second", &[], &[second_row]).unwrap();
@@ -84,6 +87,31 @@ fn published_snapshots_are_frozen_while_new_units_accumulate() {
         })
         .unwrap();
     assert_eq!(visited, 1);
+    assert!(
+        store
+            .publish_workspace_generation_manifest(
+                &first,
+                "renamed",
+                &RunCancelFlagValue::default()
+            )
+            .is_err()
+    );
+    assert!(
+        store
+            .prepare_workspace_generation_scope(&first, "renamed", &RunCancelFlagValue::default())
+            .is_err()
+    );
+    assert!(
+        write_fixture_stage_rows(
+            &store,
+            &second,
+            "syntax-spans",
+            "read-only-snapshot",
+            &[],
+            &[]
+        )
+        .is_err()
+    );
 }
 
 #[test]
