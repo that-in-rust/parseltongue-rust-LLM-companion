@@ -1,7 +1,8 @@
 # Scoped agent instructions — HLD-current model audit
 
 These instructions apply only inside `hld-current-model-audit/`. Root
-`AGENTS.md` remains authoritative and unchanged.
+`AGENTS.md` remains authoritative; this audit-scoped guidance does not
+modify it.
 
 ## Scope and authority
 

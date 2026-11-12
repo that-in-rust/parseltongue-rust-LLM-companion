@@ -2,19 +2,19 @@
 
 Rewritten in place after every run report. History lives in the TDD journal and run reports.
 
-Last updated: 2026-11-12 · Latest report: `hld-current-test-runs/20261112-namespace-phase-blocker/hld-current-test-report.md` — measured resolution INSERT blocker, not an all-five qualification.
+Last updated: 2026-11-12 · Latest measurement: `~/hld-current-test-artifacts/20261112-namespace-phase-probes/namespace-projection-lifecycle-controls/baseline-copy-storage-snapshot.log`; no all-five qualification exists.
 
 ```text
  MILESTONE  STATE
  M0  core types, Turso store            code done; SOP S3 skeleton subset not re-run on current digest
  M1  ingest, crate graph, spans         code done; S1/S2/S3 historical PASS (old digest) → re-run pending
- M2  name resolution (DuckDB SQL)       BLOCKED: native CLI release fixture hits DuckDB cap
+ M2  name resolution (DuckDB SQL)       in progress: measured-only memory default; all-five S5 prerequisite pending
        done   Turso→DuckDB Appender copy + digest checks; bounded DuckDB constructor
        done   non-monotone SQL resolution, preludes, extern aliases, textual macro scope, macro alternation
        done   oracle path partition (module-scope scored at M2; type-relative deferred)
        done   indexed frozen visibility + distinct namespace cleanup indexes (focused tests GREEN)
        done   typed copy/normalization/resolution failures, memory telemetry, retained replay and rollback-safe EXPLAIN
-       open   original CLI WIP remains uncommitted; native fixture fails at ~1.2 GiB DuckDB cap
+       open   original CLI WIP remains uncommitted; unbounded native copy/resolution replay required
        open   comparator · serde M2 qualification · all-five S5
  M3  proc-macro shapes                  not started
  M4–M6 signatures, impls, bodies, methods  not started
@@ -26,10 +26,10 @@ Last updated: 2026-11-12 · Latest report: `hld-current-test-runs/20261112-names
  SOP STEP  LATEST RESULT ON CURRENT DIGEST
  S1  structural index        not-started (all five pins/clean tracked sources checked only)
  S2  coverage inventory      not-started
- S3  fixture/production map  shared prerequisite FAIL: retained native fixture 305.41s; independent resolution OOM
+S3  fixture/production map  historical shared prerequisite FAIL: retained native fixture 305.41s; independent resolution OOM at superseded interim cap
                              serde/rust-analyzer/ripgrep/tokio/cargo-modules corpus runs BLOCKED
  S4  oracle exports          raw path exports exist (counts only); manifests pending
- S5  per-site comparison     not-run (comparator not implemented)
+ S5  per-site comparison     not-run (comparator code assembled here; qualification pending)
  S6–S10                      not-run
 ```
 
@@ -48,6 +48,6 @@ C++ non-managed BaseAppender stacks, not Rust JSON/Turso buffering. Full adapter
 suite now GREEN (57 tests); invalid completion-marker handoff fixture repaired.
 
 Next actions:
-1. Finish H4 integer-ID narrowing/equality investigation before considering batching. H1/H2/H3 and tested H4 rewrites failed; no selected production correction or new full-run attempt. Batching remains conditional on H4 failure.
-2. Finish CLI GREEN/REFACTOR, then frozen-release serde-first all-five S1/S2/S3 with auditor and peaks/times.
-3. serde M2 qualification → SQL comparator → fresh all-five S5; R7 matrix/typed-error follow-up remains open.
+1. Finish measured-only memory-constructor TDD, then run native copy/normalization/resolution without a cap; record RSS, elapsed, DuckDB tags and effective default. Existing 1.2 GiB OOM is not current-policy evidence.
+2. Finish CLI GREEN/REFACTOR, then frozen-release serde-first all-five S1/S2/S3 with process auditor and peaks/times.
+3. serde M2 qualification → SQL comparator → fresh all-five S5; enforce ≤500 MB only after the all-five S5 correctness milestone.

@@ -933,6 +933,25 @@ assertion: row/byte thresholds flush and reset, including oversized row
 metric: 1024 rows or 1048576 value bytes
 ```
 
+## REQ-RUST-024.9 — correctness-memory-observation-only
+
+Until all-five DuckDB S5 results exist, the correctness-workspace constructor
+SHALL NOT set an explicit DuckDB memory_limit. The effective default
+current_setting('memory_limit'), per-phase DuckDB memory tags, elapsed time and
+whole-process-tree peak RSS are reported; run-local spilling, bundled-only
+extensions and external-access denial remain required. No interim RSS/cap
+gate is enforced. After all-five S5, enforce whole-process-tree peak RSS
+≤500,000,000 bytes. Compatibility callers passing the former cap parameter
+must not restore an implicit limit.
+
+```text
+req_id: REQ-RUST-024.9
+test_id: test_namespace_constructor_uses_default
+test_type: unit
+assertion: adapter effective memory_limit equals the independent DuckDB default and telemetry reports it
+metric: exact setting equality, no explicit cap
+```
+
 ## REQ-RUST-025.0 — independent-source-grounded-hld-current-audit
 
 WHEN an independent model audits one pinned repository's HLD current, THEN
@@ -1037,3 +1056,134 @@ test_type: fixture
 assertion: source_pin.config_sha256 hashes the canonical immutable config bundle, not a unit or generation digest
 metric: exact bundle SHA-256 and per-unit mapper BLAKE3 inputs
 ```
+
+## REQ-RUST-026.0 — comparator-persisted-evidence-validation
+
+WHEN the comparator validates a persisted oracle export for a source scope,
+THEN it SHALL validate source scope, mapped unit configuration and context
+resolution, the persisted oracle envelope and required arrays, actual
+`oracle_proc_macro_rows` producer entries, typed enum/boolean/namespace
+values, and required evidence strings. It SHALL reject malformed or failed
+macro evidence, ambiguous or unmapped site units, invalid ranges/provenance,
+and invalid reason or classification values before publication, and SHALL
+never fabricate a production classification.
+
+## REQ-RUST-026.1 — comparator-semantic-identity-canonicalization
+
+WHEN the comparator canonicalizes semantic identities, THEN it SHALL match
+the producer semantic-unit digest exactly as `[cfg, features, edition, role]`
+with no alternate digest shapes; distinguish host/target roles; normalize
+package-relative paths from persisted roots; preserve site context and
+expansion provenance; canonicalize target kind/namespaces and builtin
+identity; merge split namespace evidence for identical targets; collapse exact
+duplicates; and reject conflicting duplicates.
+
+## REQ-RUST-026.2 — comparator-primary-partition-semantics
+
+WHEN the comparator partitions PRIMARY rows against production, THEN it SHALL
+assign each PRIMARY raw row one explicit partition/reason while reconciling
+duplicates; score only known module-scope sites; keep deferred and unknown
+classifications explicit, with unknown blocked even when a reason exists;
+exclude from the PRIMARY denominator only PRIMARY `cfg_inactive`; retain
+production and SECONDARY reasons as evidence; preserve mismatch precedence
+over exclusions; and use actual proc-macro evidence to exclude an empty PRIMARY
+answer only when production is empty or absent, never for a wrong nonempty
+target. An empty denominator SHALL report N/A.
+
+## REQ-RUST-026.3 — comparator-secondary-evidence-visibility
+
+WHEN the comparator reports production-only and SECONDARY differences, THEN it
+SHALL retain production-only paths separately without changing the PRIMARY
+denominator; preserve SECONDARY-only KL1 and same-site changed-target evidence;
+and keep a production-only site that also appears in SECONDARY visible in both
+the production-only count and SECONDARY evidence.
+
+## REQ-RUST-026.4 — comparator-cancellation-safe-publication
+
+WHEN the comparator builds or publishes an agreement generation, THEN it SHALL
+carry source generation and attempt through copied, canonical, and evidence
+DuckDB rows; qualify joins, filters, and ordering by both; verify per-table
+counts and scope-framed digests; recheck source stability during reads and
+before publication; and validate or cancel before publication. Source changes
+or in-flight write cancellation SHALL preserve the prior agreement generation.
+It SHALL persist to the distinct registered Turso agreement store without
+mutating source evidence or exposing stale rows after repeated oracle changes.
+
+## REQ-RUST-026.5 — comparator-deterministic-semantic-export
+
+WHEN the comparator exports semantic results under supported thread counts,
+THEN it SHALL produce deterministic semantic rows and summaries across those
+counts and SHALL separate operational attempt identity from semantic export
+identity.
+
+### Authoritative REQ-RUST-026 test matrix
+
+Each listed active test doc-tag is located under every matching requirement
+identifier. Tests with duplicate names in different test modules/crates are
+separately active tests; the shared name is listed once per requirement.
+
+**REQ-RUST-026.0**
+- `test_ambiguous_unit_contexts_fail`
+- `test_invalid_context_kind_rejected`
+- `test_invalid_reason_enum_rejected`
+- `test_invalid_proc_flag_rejected`
+- `test_invalid_namespace_enum_rejected`
+- `test_unit_configuration_contracts_fail`
+- `test_unmapped_site_units_rejected`
+- `test_site_provenance_entries_validated`
+- `test_site_evidence_required_values`
+- `test_macro_failure_blocks_publish`
+- `test_malformed_macro_record_rejected`
+- `test_scope_oracle_errors_block`
+
+**REQ-RUST-026.1**
+- `test_site_context_identity_distinct`
+- `test_exact_duplicates_collapse_rows`
+- `test_conflicting_duplicate_payloads_fail`
+- `test_expansion_provenance_separates_sites`
+- `test_package_paths_normalize_lexically`
+- `test_malformed_target_ranges_fail`
+- `test_target_namespaces_are_canonicalized`
+- `test_builtin_target_names_canonicalize`
+- `test_builtin_namespace_changes_identity`
+- `test_split_target_namespaces_merge`
+- `test_role_changes_semantic_digest`
+- `test_exact_comparison_publishes_turso`
+
+**REQ-RUST-026.2**
+- `test_unknown_scope_is_blocked`
+- `test_proc_wrong_target_mismatch`
+- `test_proc_empty_answer_excluded`
+- `test_proc_empty_primary_exclusions` — latest regression covers empty and absent production; wrong-target guard remains `test_proc_wrong_target_mismatch`.
+- `test_blocked_partition_reconciles_duplicates`
+- `test_enum_variant_module_scored`
+- `test_primary_classes_partition_once`
+- `test_empty_denominator_is_na`
+- `test_unresolved_targets_remain_mismatch`
+- `test_persisted_known_answer_matrix`
+- `test_production_cfg_keeps_mismatch`
+- `test_secondary_cfg_preserves_match`
+- `test_cfg_wrong_target_mismatch`
+- `test_unknown_cfg_remains_blocked`
+- `test_primary_cfg_excludes_scored`
+
+**REQ-RUST-026.3**
+- `test_extra_production_secondary_counts`
+- `test_production_only_rows_visible`
+- `test_changed_targets_persist_semantically`
+- `test_persisted_known_answer_matrix`
+
+**REQ-RUST-026.4**
+- `test_exact_comparison_publishes_turso`
+- `test_persisted_known_answer_matrix`
+- `test_scope_oracle_errors_block`
+- `test_oracle_agreement_registry_roundtrip`
+- `test_cancel_prevents_agreement_publish`
+- `test_source_changes_after_reads`
+- `test_source_changes_before_publish`
+- `test_write_cancellation_preserves_generation`
+- `test_source_unpublished_generation_fails`
+
+**REQ-RUST-026.5**
+- `test_thread_counts_export_identically`
+- `test_persisted_known_answer_matrix`

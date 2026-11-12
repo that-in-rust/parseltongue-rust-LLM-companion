@@ -3004,3 +3004,18 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   unwrap only in test modules and move impl before tests. No production lint
   suppression. Native baseline residency evidence remains valid at its
   original recorded cap but is not current-policy M2/SOP qualification.
+- User decision R9 (2026-11-12): remove interim memory cap now; no RSS gate
+  before all-five S5. Started REQ-RUST-024.9 constructor TDD: test compares
+  effective adapter memory_limit against an independent DuckDB default and
+  confirms phase diagnostics report it. Compatibility cap parameters must
+  be ignored. Previous 62-test PASS and 1.39s Clippy precede this constructor
+  phase and do not validate it.
+
+### Parent integration review checkpoint — 2026-11-12
+
+- Assembly base: 31397b39deaa098fdcbb9fcf8e527e4de81d6efb; selected runner 001c18a99b1724164fefca325a9a53cf2fd184ab, comparator 4099e31905104b599963e5d0332b185234b7775a, and audit 24fc7466f32a26e1357f340dfe928efb6a09ef1b.
+- The selected runner records the PATH-selected cargo/rustc shim-dispatch correction. The other requested runner review items (ignored lockfile policy, output-root freeze exclusions, fail-fast handling after a failed mapping, publication-marker truthfulness, and process/index evidence coverage) remain for descendant review; this assembly does not treat them as resolved.
+- Delivered comparator behavior includes R4 source-scope stability rechecks during reads and before publication, cancellation-safe publication, and PRIMARY proc-macro-dependent empty-answer exclusion when production is empty or missing, while retaining wrong-target mismatch precedence. This delivered behavior is distinct from the outstanding PRIMARY missing-source handling below and is not a qualification result.
+- Pending comparator descendants: RAII-managed run-local spill-directory cleanup; reporting effective DuckDB settings, including current_setting('memory_limit'), and duckdb_memory() telemetry; classifying PRIMARY external_source_missing as BLOCKED with a null rate; isolating SECONDARY reasons from PRIMARY scoring; and validating required persisted oracle-envelope flags.
+- Mapper handoff is pending; no root mapper code or untracked namespace-memory contract was ported. The REQ-RUST-024.9 test_namespace_constructor_uses_default test is absent here pending mapper delivery.
+- Documentation assembly only. No build, corpus run, qualification run, acceptance, or milestone completion is claimed. Next: parent review, then integrate comparator descendants, mapper handoff, and runner descendants when delivered.
