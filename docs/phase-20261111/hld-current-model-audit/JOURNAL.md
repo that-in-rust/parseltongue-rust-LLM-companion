@@ -108,3 +108,66 @@ production HLD was changed.
   stopped after the immediate error, so elapsed durations and exit codes are
   unavailable. Each error was observed in a 10-second check window before
   stopping. No zcode run artifacts contain credentials.
+
+## 2026-11-12 — attempt-06 bounded repair and warning correction
+
+**Factual correction for attempt 05:** the SDK-tagged
+[claude-code:unrecognized_model] warning for model glm-5.3 was nonfatal in
+that execution. Claude Code exited naturally with code 0 after 4:47.74 (CLI
+duration 287,331 ms); stream-json recorded result:success, is_error=false,
+stop_reason=end_turn, 21 turns and zero permission denials. Its 11,384,627-byte
+stdout SHA-256 was
+5578984b006a5b13db19588ce9f9fa4ccdd4edbeec5a019a6484beafeea3f87b;
+the 74-byte stderr SHA-256 was
+089dbf616da27f2f327878d5fb2ed70fd63a63b259b7c648536429d4b1c68609;
+time-file SHA-256 was
+97455425bd9087a9d0eb00a295a2ee381126df836ae9ff49e46b3c888ba58b2e.
+This establishes nonfatality only for attempt 05. The CLI system:init
+reported glm-5.3; it is not an independent provider attestation.
+
+**Attempt 06 repair result:** the original attempt-05 candidate remains
+unchanged. The read-only repair used requested model glm-5.3, Claude Code
+2.1.319, verbose stream-json, plan/restricted permissions and a 600-second
+external timeout; the repair prompt argument SHA-256 was
+11a8537f550cb7e59b52de0c1d31370aad47071c5492b4aa27902df3da53d94c.
+It ended naturally after 7:44.62 with exit code 1, not by external timeout.
+The stream result was error_max_budget_usd (18 turns, reported cost
+$1.197664 against configured $1.00); permission denials were empty. The
+terminal result text was empty, but a complete JSON block occurred in the
+assistant text events and was preserved as
+/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/repaired-candidate.json.
+Its SHA-256 was
+47994d18b874349c076801780bc1b966d7fd8f4366c45db84d060d966cf451e4.
+Attempt-06 stdout was 17,255,236 bytes, SHA-256
+67a9f9bee9e1d1542b1a45d72b2ca40b3b388e92d4e684611d7152dadd2fc40c;
+stderr SHA-256 was
+089dbf616da27f2f327878d5fb2ed70fd63a63b259b7c648536429d4b1c68609;
+time-file SHA-256 was
+867d38edf7070ba799b67e28d686ee14763fe0d3e75dad76336ce8945efc28aa.
+No prompt process remained.
+
+The model repaired schema object shapes, EV-03/EV-08 byte ranges and excerpt
+digests, and the undefined evidence references. It still placed noncanonical
+compilation/occurrence placeholders in candidate rows. To avoid treating those
+as keys, a separate reviewer-normalized artifact was produced at
+/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/reviewed-candidate.json,
+SHA-256
+a4b801efa5654dba79aa7ade1389a3a06a602920c8a33df69f5129b28cee1cb0.
+It emits zero keyed nodes/edges and accounts for all 22 node claims and 19 edge
+claims under U-10/U-11 as unresolved claim data. The model-generated
+repaired-candidate.json remains preserved separately.
+
+Final reviewed-artifact validation: Draft-07 has exactly one error,
+/source_pin/config_sha256 UNAVAILABLE_NO_CANONICAL_CONFIGURATION_DIGEST does
+not match the required lowercase 64-hex digest pattern. No canonical normalized
+compilation-configuration digest exists in the inspected SPEC/contracts or pin
+manifest; the root Cargo.toml digest is not that identity and was not
+substituted. All 8/8 source-evidence byte/line ranges and source/excerpt
+SHA-256 values match pinned serde HEAD
+aa7913ad0211fef960df68e7812a6211145a888c; all 8/8 examined-scope hashes and
+line ranges match; all evidence IDs are unique and there are zero undefined
+evidence-ID references or all-zero digest placeholders. Coverage is only 8/8 declared
+file/range scopes and is explicitly non-exhaustive. Pass A remains DRAFT,
+freeze NOT_FROZEN, Pass B NOT_STARTED, PRIMARY/S8/S9 NOT_RUN, and repository
+verdict NOT_RUN. No production HLD rows were read and no acceptance or
+complete-golden-table claim is made.
