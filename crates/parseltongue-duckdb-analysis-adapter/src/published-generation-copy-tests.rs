@@ -253,6 +253,89 @@ fn frozen_macro_candidate_lookups() {
 }
 
 #[test]
+fn final_namespace_products_contract() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    assert!(
+        store
+            .visit_frozen_namespace_products(&scope(), &mut |_| Ok(()))
+            .is_err()
+    );
+    let mut source = namespace_source_fixture();
+    let graph = &mut source
+        .records
+        .get_mut("crate-dependency-graph-table")
+        .unwrap()[0];
+    let mut value: serde_json::Value = serde_json::from_str(&graph.stage_row_payload_text).unwrap();
+    value[parseltongue_core_row_types::MAPPED_TARGET_FLAG_FIELD] = json!(true);
+    graph.stage_row_payload_text = value.to_string();
+    store
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    store
+        .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    let mut rows = Vec::new();
+    let count = store
+        .visit_frozen_namespace_products(&scope(), &mut |row| {
+            rows.push(row.clone());
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(count, rows.len());
+    assert!(rows.iter().all(|row| {
+        [
+            "module-scope-binding-table",
+            "name-resolution-scope-records",
+            "path-resolution-site-records",
+        ]
+        .contains(&row.stage_owned_table_name.as_str())
+    }));
+    let path = rows
+        .iter()
+        .find(|row| row.stage_owned_table_name == "path-resolution-site-records")
+        .unwrap();
+    let path: serde_json::Value = serde_json::from_str(&path.stage_row_payload_text).unwrap();
+    assert_eq!(path["path_resolution_state_kind"], "resolved");
+    assert_eq!(
+        path["path_target_symbol_rows"][0]["target_symbol_kind_value"],
+        "Struct"
+    );
+    assert_eq!(
+        path["path_target_symbol_rows"][0]["target_namespace_kind_values"],
+        json!(["type"])
+    );
+    assert!(
+        store
+            .visit_frozen_namespace_products(&scope(), &mut |_| Err(build_analysis_error(
+                "output rejected"
+            )))
+            .is_err()
+    );
+    let mut again = Vec::new();
+    store
+        .visit_frozen_namespace_products(&scope(), &mut |row| {
+            again.push(row.clone());
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(rows, again);
+}
+
+#[test]
 fn frozen_namespace_generation_integrity() {
     let directory = tempfile::tempdir().unwrap();
     let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
