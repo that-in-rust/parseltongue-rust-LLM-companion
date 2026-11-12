@@ -3308,3 +3308,83 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   remain pending. No all-five PASS is claimed.
 - Comparator and runner descendants are intentionally not integrated; separate
   review follows.
+
+### Runner/comparator descendant integration and gate checkpoint — 2026-11-12
+
+- Preserved complete histories without rebase, squash, or force: runner tip
+  `5a8b6e8d73b35fdfcbbef81ec82e2f29c6cc4200` is in merge `5a6903250caf97a89873ac0a7fc97198edd97109`; comparator tip
+  `4dca8b34ab6ea53ac230138d78c1afd9dc7b5f3d` is in merge
+  `df1ddb1b652fc7672b3f0d1deb820219f1ac7138`; final comparator follow-up
+  `c2e971409b43d028d0e2ce2c92119cb709c79fc3` is in merge
+  `0f1fd73e0d655c2874fda09d5fb7d2f4e344db10`. Ancestry checks passed for
+  all three delivered tips. The runner journal reconciliation is commit
+  `00037826db3c75e0600ffc0b0ef553c81851eb67`.
+- `sop-runner-work-journal.md` retains the exact 43,457-byte base prefix from
+  `001c18a99b1724164fefca325a9a53cf2fd184ab` (SHA-256
+  `2a9061a4a33f79250bb54c22640ececd46567f6ea952efe8114ecc1349f1f6d6`).
+  The 451 descendant-added lines are appended after the explicit reconciliation
+  note; historical claims were not rewritten.
+- Synchronized only the REQ-RUST-026 test matrix in SPEC to the final comparator
+  journal and source names. Unique test counts are 026.0=13, 026.1=12,
+  026.2=20, 026.3=6, 026.4=15, 026.5=2; R9
+  `test_database_backing_uses_file` is included under 026.4. REQ-RUST-025 and
+  the 026 normative contracts were unchanged. Matrix names resolve to Rust
+  test functions; `git diff --check` and structural traceability passed.
+- Runner component check:
+  `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p
+  'test_sop_qualification_runner.py'` → `Ran 115 tests in 0.766s`, `OK`.
+  `PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py` →
+  `Ran 6 tests in 0.317s`, `OK`. These component tests do not implement full S3
+  intake, S4, or S5.
+- `cargo fmt --all -- --check`: exit 0, no output.
+  `env -u CXXFLAGS -u CARGO_PROFILE_DEV_DEBUG
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 cargo clippy --workspace --all-targets --all-features
+  --locked --offline -- -D warnings`: exit 0; `Finished dev profile
+  [unoptimized + debuginfo] target(s) in 3.97s` (wall 4.04s; max RSS
+  363,804 kB). Expected/max was 30/60s.
+- Workspace test command used the same debug target/environment and
+  `cargo test --workspace --all-targets --all-features --locked --offline --
+  --skip test_lang_items_in_sysroot`, expected/max 60/120s. It exited 124 at
+  120.00s while compiling dependencies; Cargo printed `Compiling libduckdb-sys`
+  and no test-harness result was reached. Maximum RSS was 2,340,704 kB, with no
+  memory cap. The command excluded only `test_lang_items_in_sysroot`, but the
+  test never ran; it remains explicitly pending. The lead confirmed this test
+  asserts M2 path resolution and lang-item rows and must not be weakened.
+- The all-target/all-feature workspace debug build was not run: the timed-out
+  test gate reached `libduckdb-sys`, and further debug compilation could require
+  an unverified bundled native build. The debug DuckDB archive remained at 2,669,525,464
+  bytes with its prior timestamp; no successful new archive or test result is
+  inferred. No further debug build was attempted under the no-C++-rebuild
+  constraint.
+- Workspace release build command used
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo build
+  --workspace --release --locked --offline`, expected/max 30/60s. It exited 0;
+  output: `Finished release profile [optimized] target(s) in 11.47s` (wall
+  11.51s; max RSS 656,964 kB). The cached DuckDB archive remained SHA-256
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`.
+  The resulting executable SHA-256 is
+  `117ab2e4c76adad4bee0accaa732aa2e0371411e2394b3cc9656b4a0aa4fe4e0`.
+  The prior `cd7d8ce0` executable was preserved externally with SHA-256
+  `4e0a357645fb742d691eb7c9766835566d79183ac1655c4040c19c288d04a7f1`.
+- Read-only readiness inventory: all five corpus roots and HEAD pins match the
+  manifest. Their lock SHA-256 values remain rust-analyzer
+  `9d1b42bad86228f8d443beb37a9573e75b289168ac57e12b9952564c51aee104`, ripgrep
+  `bf918d72d563dd706beacb4e258106102c14fbc2f85272f1f749a5044e3c3f43`, tokio
+  `8272d405007e68962fa41bacc68f20e0eb44d6516e636f28657dc4505ae0756e`, serde
+  `839a2f8b9d252c5dc6b93495aa8d54f9ba8cf5679a0f82dcdaaf12bbe6d7361f`, and
+  cargo-modules
+  `3a5a6fa813deedc074deb5019421956702d78a353394171020d70315d279b12a`. Serde
+  and tokio prepared locks remain present and ignored; the only observed corpus
+  source worktree item is the pre-existing untracked `cargo-modules/.cgcignore`.
+  Stable Rust 1.99.1 `rust-src` is installed and core/alloc/std sources exist.
+  `strace`, Cargo/rustc, Python, and process utilities are available, but both
+  Python `blake3` and `b3sum` are missing; runner code requires one and would
+  block preflight. No runner invocation or run directory was created.
+- The integration source remains unqualified: no corpus or production/oracle
+  export/comparison run, no memory cap, no frozen release, no all-five PASS,
+  and no push/PR. Full S3 intake/S4/S5 remain blocked/unimplemented; the native
+  copy/resolution diagnostic is unresolved. Gate logs, timings, cache evidence,
+  and the preserved binary are under
+  `/home/ubuntu/hld-current-test-artifacts/20261112T200343Z-descendant-integrated-gates/`.

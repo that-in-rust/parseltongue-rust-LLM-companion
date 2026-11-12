@@ -1264,9 +1264,10 @@ separately active tests; the shared name is listed once per requirement.
 - `test_unmapped_site_units_rejected`
 - `test_site_provenance_entries_validated`
 - `test_site_evidence_required_values`
-- `test_macro_failure_blocks_publish`
-- `test_malformed_macro_record_rejected`
+- `test_oracle_envelope_flags_strict`
 - `test_scope_oracle_errors_block`
+- `test_malformed_macro_record_rejected`
+- `test_macro_failure_blocks_publish`
 
 **REQ-RUST-026.1**
 - `test_site_context_identity_distinct`
@@ -1290,23 +1291,36 @@ separately active tests; the shared name is listed once per requirement.
 - `test_blocked_partition_reconciles_duplicates`
 - `test_enum_variant_module_scored`
 - `test_primary_classes_partition_once`
+- `test_external_source_blocked_rate`
+- `test_primary_missing_production_nonmatch`
+- `test_source_blocked_preserves_cfg`
+- `test_production_reason_keeps_mismatch`
+- `test_secondary_reason_nonimpact_primary`
 - `test_empty_denominator_is_na`
 - `test_unresolved_targets_remain_mismatch`
-- `test_persisted_known_answer_matrix`
 - `test_production_cfg_keeps_mismatch`
 - `test_secondary_cfg_preserves_match`
 - `test_cfg_wrong_target_mismatch`
 - `test_unknown_cfg_remains_blocked`
 - `test_primary_cfg_excludes_scored`
+- `test_persisted_known_answer_matrix`
 
 **REQ-RUST-026.3**
 - `test_extra_production_secondary_counts`
 - `test_production_only_rows_visible`
+- `test_primary_classes_partition_once`
+- `test_external_source_blocked_rate`
 - `test_changed_targets_persist_semantically`
 - `test_persisted_known_answer_matrix`
 
 **REQ-RUST-026.4**
+- `test_database_backing_uses_file`
+- `test_published_comparison_is_deterministic`
+- `test_comparison_settings_are_verified`
+- `test_context_cleanup_sql_error`
+- `test_context_cleanup_after_cancel`
 - `test_exact_comparison_publishes_turso`
+- `test_comparison_telemetry_survives_publication`
 - `test_persisted_known_answer_matrix`
 - `test_scope_oracle_errors_block`
 - `test_oracle_agreement_registry_roundtrip`
@@ -1317,5 +1331,5 @@ separately active tests; the shared name is listed once per requirement.
 - `test_source_unpublished_generation_fails`
 
 **REQ-RUST-026.5**
+- `test_published_comparison_is_deterministic`
 - `test_thread_counts_export_identically`
-- `test_persisted_known_answer_matrix`
