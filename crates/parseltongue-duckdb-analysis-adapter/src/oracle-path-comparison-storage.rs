@@ -105,6 +105,7 @@ pub(super) fn compare_oracle_path_sites_with_threads(
         .collect::<Vec<_>>());
     result["agreement_operational_identity"] = json!({
         "duckdb_settings": context.runtime_settings,
+        "duckdb_database_backing": context.database_backing,
         "duckdb_memory_before_analysis": context.memory_before_analysis,
         "duckdb_memory_after_analysis": read_duckdb_memory_records(connection)?,
     });
@@ -494,6 +495,7 @@ fn verify_duckdb_source_copy(
 struct OraclePathComparisonContextValue {
     connection: Connection,
     _spill_directory: TempDir,
+    database_backing: Value,
     runtime_settings: Value,
     memory_before_analysis: Vec<Value>,
 }
@@ -509,6 +511,9 @@ fn build_isolated_comparison_context(
         .tempdir()
         .map_err(OracleComparisonFailureError::TempDirectory)?;
     let spill_path = spill_directory.path().to_string_lossy().into_owned();
+    let database_path = spill_directory
+        .path()
+        .join("oracle-path-comparison-database.duckdb");
     let config = Config::default()
         .with("temp_directory", spill_path.clone())
         .and_then(|config| config.enable_external_access(false))
@@ -516,11 +521,12 @@ fn build_isolated_comparison_context(
         .and_then(|config| config.with("autoload_known_extensions", "false"))
         .and_then(|config| config.with("allow_community_extensions", "false"))
         .map_err(OracleComparisonFailureError::Duckdb)?;
-    let connection = Connection::open_in_memory_with_flags(config)
+    let connection = Connection::open_with_flags(&database_path, config)
         .map_err(OracleComparisonFailureError::Duckdb)?;
     connection
         .execute_batch(&format!("SET threads = {threads};"))
         .map_err(OracleComparisonFailureError::Duckdb)?;
+    let database_backing = read_duckdb_database_backing(&connection, &database_path)?;
     let settings = read_duckdb_setting_values(&connection)?;
     for (name, expected) in [
         ("temp_directory", spill_path.as_str()),
@@ -571,9 +577,45 @@ fn build_isolated_comparison_context(
     Ok(OraclePathComparisonContextValue {
         connection,
         _spill_directory: spill_directory,
+        database_backing,
         runtime_settings,
         memory_before_analysis,
     })
+}
+
+fn read_duckdb_database_backing(
+    connection: &Connection,
+    expected_database_path: &Path,
+) -> Result<Value, OracleComparisonFailureError> {
+    let (database_name, observed_database_path) = connection
+        .query_row("PRAGMA database_list", [], |row| {
+            Ok((row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?))
+        })
+        .map_err(OracleComparisonFailureError::Duckdb)?;
+    let expected = expected_database_path.to_string_lossy().into_owned();
+    let observed_database_path = observed_database_path.ok_or_else(|| {
+        OracleComparisonFailureError::DuckdbDatabaseBackingMismatch {
+            expected: expected.clone(),
+            observed: "NULL database file path".into(),
+        }
+    })?;
+    let observed_path = Path::new(&observed_database_path);
+    if observed_path != expected_database_path || !observed_path.is_file() {
+        return Err(
+            OracleComparisonFailureError::DuckdbDatabaseBackingMismatch {
+                expected,
+                observed: format!(
+                    "{observed_database_path} (is_file={})",
+                    observed_path.is_file()
+                ),
+            },
+        );
+    }
+    Ok(json!({
+        "database_name_value": database_name,
+        "database_file_path": observed_database_path,
+        "file_backed_flag": true,
+    }))
 }
 
 fn read_duckdb_setting_values(
@@ -1528,8 +1570,14 @@ mod oracle_path_comparison_sql_tests {
             .as_str()
             .unwrap()
             .to_owned();
+        let first_database_path = first_result["agreement_operational_identity"]
+            ["duckdb_database_backing"]["database_file_path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         let first_export = read_published_semantic_export_bytes(&fixture.agreement, &first_result);
         assert!(!Path::new(&first_path).exists());
+        assert!(!Path::new(&first_database_path).exists());
 
         let second_result = compare_oracle_path_sites_with_threads(
             &fixture.source,
@@ -1545,9 +1593,16 @@ mod oracle_path_comparison_sql_tests {
             .as_str()
             .unwrap()
             .to_owned();
+        let second_database_path = second_result["agreement_operational_identity"]
+            ["duckdb_database_backing"]["database_file_path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         assert_eq!(second_settings["threads"], 2);
         assert_ne!(first_path, second_path);
+        assert_ne!(first_database_path, second_database_path);
         assert!(!Path::new(&second_path).exists());
+        assert!(!Path::new(&second_database_path).exists());
         assert_eq!(
             first_result["agreement_semantic_export_digest_full"],
             second_result["agreement_semantic_export_digest_full"]
@@ -2021,6 +2076,19 @@ mod oracle_path_comparison_sql_tests {
         let second_context = build_isolated_comparison_context(2).unwrap();
         let first = &first_context.connection;
         let second = &second_context.connection;
+        let first_database_path = first_context.database_backing["database_file_path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let second_database_path = second_context.database_backing["database_file_path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_ne!(first_database_path, second_database_path);
+        assert!(Path::new(&first_database_path).is_file());
+        assert!(Path::new(&second_database_path).is_file());
+        assert_eq!(first_context.database_backing["file_backed_flag"], true);
+        assert_eq!(second_context.database_backing["file_backed_flag"], true);
         let read_setting = |connection: &Connection, name: &str| {
             read_duckdb_setting_values(connection).unwrap()[name].clone()
         };
@@ -2049,13 +2117,55 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.4
     #[test]
+    fn test_database_backing_uses_file() {
+        let database_file_path = {
+            let context = build_isolated_comparison_context(1).unwrap();
+            let database_file_path = context
+                .connection
+                .query_row("PRAGMA database_list", [], |row| {
+                    row.get::<_, Option<String>>(2)
+                })
+                .unwrap()
+                .unwrap_or_default();
+            assert!(
+                !database_file_path.is_empty(),
+                "DuckDB main database has no backing file"
+            );
+            assert_eq!(
+                context.database_backing["database_file_path"],
+                database_file_path
+            );
+            assert_eq!(context.database_backing["file_backed_flag"], true);
+            assert!(!database_file_path.is_empty());
+            assert!(Path::new(&database_file_path).is_file());
+            assert_eq!(
+                Path::new(&database_file_path).parent(),
+                Some(Path::new(
+                    context.runtime_settings["temp_directory"].as_str().unwrap()
+                ))
+            );
+            database_file_path
+        };
+        assert!(!Path::new(&database_file_path).exists());
+    }
+
+    /// REQ-RUST-026.4
+    #[test]
     fn test_context_cleanup_sql_error() {
         let spill_path;
+        let database_file_path;
         {
             let context = build_isolated_comparison_context(1).unwrap();
             spill_path =
                 Path::new(context.runtime_settings["temp_directory"].as_str().unwrap()).to_owned();
+            database_file_path = Path::new(
+                context.database_backing["database_file_path"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .to_owned();
             assert!(spill_path.exists());
+            assert!(database_file_path.is_file());
             assert!(
                 context
                     .connection
@@ -2064,16 +2174,25 @@ mod oracle_path_comparison_sql_tests {
             );
         }
         assert!(!spill_path.exists());
+        assert!(!database_file_path.exists());
     }
 
     /// REQ-RUST-026.4
     #[test]
     fn test_context_cleanup_after_cancel() {
         let spill_path;
+        let database_file_path;
         {
             let context = build_isolated_comparison_context(1).unwrap();
             spill_path =
                 Path::new(context.runtime_settings["temp_directory"].as_str().unwrap()).to_owned();
+            database_file_path = Path::new(
+                context.database_backing["database_file_path"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .to_owned();
+            assert!(database_file_path.is_file());
             assert!(
                 context
                     .connection
@@ -2089,6 +2208,7 @@ mod oracle_path_comparison_sql_tests {
             assert!(spill_path.exists());
         }
         assert!(!spill_path.exists());
+        assert!(!database_file_path.exists());
     }
 
     /// REQ-RUST-024.2

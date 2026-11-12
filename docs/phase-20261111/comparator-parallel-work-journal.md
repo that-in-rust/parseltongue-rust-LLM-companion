@@ -599,3 +599,39 @@ REQ-RUST-026.4 REVIEW CORRECTION
 
 REQ-RUST-026.4 REFACTOR
   - No further refactor needed. Default-parallel publication cancellation passed, the prior agreement generation remains protected, and per-invocation spill cleanup is checked by the isolated context guard test. No global TMPDIR mutation or suite serialization was introduced.
+
+### R9 file-backed comparator context
+
+REQ-RUST-026.4 STUB
+  - Added the four-word test scaffold `test_database_backing_uses_file` without changing the comparison interface or production path. The regression will read DuckDB's `PRAGMA database_list` result rather than infer backing from configuration.
+  - `cargo check -p parseltongue-duckdb-analysis-adapter --tests`: `Finished dev profile [unoptimized + debuginfo] target(s) in 1.38s`; `Exit code: 0`.
+
+REQ-RUST-026.4 RED
+  - The regression was made to require a non-null DuckDB-reported main database file, an existing file under this context's owned directory, and cleanup after drop. Current in-memory backing reports NULL for the `file` column.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_database_backing_uses_file -- --nocapture`: panic `DuckDB main database has no backing file`; `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 104 filtered out`.
+
+REQ-RUST-026.4 GREEN
+  - Replaced the in-memory open with `Connection::open_with_flags` for a database file inside the invocation-owned `TempDir`. DuckDB `PRAGMA database_list` read-back is checked against that file and its live existence; backing evidence is added only to `agreement_operational_identity`.
+  - Preserved security/spill configuration and effective setting checks, left `memory_limit` at DuckDB's default, and retained connection-before-TempDir field order.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_database_backing_uses_file -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 0.12s`.
+
+REQ-RUST-026.4 REFACTOR
+  - Isolated DuckDB's actual database identity/path validation in `read_duckdb_database_backing`, with a typed `DuckdbDatabaseBackingMismatch` error. No further refactor was needed; no facade, scoring, source/agreement interface, or shared document changed.
+  - The checked-in SOP snapshot lists R1-R8; the parent-provided R9 file-backed requirement also appears in SPEC §REQ-RUST-024.8. Shared SPEC/SOP files were not edited.
+
+REQ-RUST-026.4 R9 test matrix addition
+  | Requirement | Test | Evidence |
+  | --- | --- | --- |
+  | REQ-RUST-026.4 | `test_database_backing_uses_file` | DuckDB-reported file path is non-null, matches operational identity, exists under the owned directory while live, and is removed after drop. |
+  | REQ-RUST-026.4 | `test_comparison_settings_are_verified` | Two live contexts have distinct existing database files; security, thread, spill, and default memory settings remain verified. |
+  | REQ-RUST-026.4 | `test_context_cleanup_sql_error`, `test_context_cleanup_after_cancel` | The owned database file and directory are removed after SQL error and cancellation. |
+  | REQ-RUST-026.4 | `test_comparison_telemetry_survives_publication` | Actual backing metadata is nested under operational identity and survives persisted publication. |
+  | REQ-RUST-026.4, REQ-RUST-026.5 | `test_published_comparison_is_deterministic` | Thread-1/thread-2 backing paths differ and are cleaned up while semantic export bytes and digest remain identical. |
+
+REQ-RUST-026.4 R9 final verification
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 2.88s`.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.54s` (default test-harness parallelism).
+  - `cargo fmt --all -- --check`: no diagnostics; `Exit code: 0`.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.89s`; `Exit code: 0`.
+  - `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 6.08s`; `Exit code: 0`.
+  - Clippy initially rejected `expect()` in the new test (`clippy::expect-used`); the regression now asserts the read-back path is nonempty without `expect`, and the workspace clippy gate passed. The initial fmt check found formatting-only differences, fixed with `cargo fmt --all`, followed by the passing fmt check above.
