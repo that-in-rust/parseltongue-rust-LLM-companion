@@ -68,6 +68,7 @@ pub fn expand_declarative_macro_items(
         macro_matched_arm_index: arm,
     };
     render_macro_output_tokens(tokens.iter(), &mut output)?;
+    check_macro_expansion_cancelled(cancel)?;
     Ok(output)
 }
 

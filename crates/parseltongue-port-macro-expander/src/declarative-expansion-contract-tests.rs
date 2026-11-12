@@ -172,6 +172,54 @@ fn test_macro_cancellation_errors() {
 }
 
 #[test]
+fn test_macro_expression_precedence() {
+    let output =
+        read_macro_expansion_fixture("{($value:expr)=>{pub const VALUE:u8=2*$value;};}", "(1+2)");
+    assert_eq!(
+        normalize_macro_output_text(&output.macro_expanded_source_text),
+        "pubconstVALUE:u8=2*(1+2);"
+    );
+}
+
+#[test]
+fn test_macro_defining_crate() {
+    let input = build_macro_expansion_fixture("{()=>{pub type Alias=$crate::Shared;};}", "()");
+    let output = expand_declarative_macro_items(&input, &RunCancelFlagValue::default()).unwrap();
+    assert!(output.macro_expanded_source_text.contains("$crate"));
+    let crate_token = output
+        .macro_token_origin_rows
+        .iter()
+        .find(|row| {
+            let (start, end) = row.token_output_byte_range.read_source_range_pair();
+            &output.macro_expanded_source_text[start as usize..end as usize] == "$crate"
+        })
+        .unwrap();
+    assert_eq!(
+        crate_token.token_source_origin_kind,
+        MacroSourceOriginKind::Definition
+    );
+}
+
+#[test]
+fn test_macro_unicode_provenance() {
+    let input = build_macro_expansion_fixture("{($name:ident)=>{pub struct $name;};}", "(Éclair)");
+    let output = expand_declarative_macro_items(&input, &RunCancelFlagValue::default()).unwrap();
+    let captured = output
+        .macro_token_origin_rows
+        .iter()
+        .find(|row| {
+            let (start, end) = row.token_output_byte_range.read_source_range_pair();
+            &output.macro_expanded_source_text[start as usize..end as usize] == "Éclair"
+        })
+        .unwrap();
+    let (start, end) = captured.token_original_byte_range.read_source_range_pair();
+    assert_eq!(
+        &input.macro_argument_source_text[start as usize..end as usize],
+        "Éclair"
+    );
+}
+
+#[test]
 fn test_macro_dependencies_exclude_salsa() {
     let output = Command::new(env!("CARGO"))
         .current_dir(env!("CARGO_MANIFEST_DIR"))

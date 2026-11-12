@@ -818,3 +818,27 @@ and a single-pattern match. Next: group matcher scratch state, simplify the bran
 span record primitives and finalize the pure engine. Persisted item expansion, hygiene-aware
 virtual files, built-ins/sysroot/lang items and the differ/S5 remain pending. The existing
 DB-backed item port still explicitly errors; no successful corpus mapper or S5 gate is claimed.
+
+### M2 declarative macro expander — REFACTOR
+
+Grouped borrowed NFA scratch references into MacroMatchingScratchState and simplified the
+single-pattern branch, without changing arm or repetition ordering. Added final cancellation
+check after rendering, safe span identity/edition roundtrip and cross-anchor/fixup join tests,
+plus expression precedence, $crate definition origin and UTF-8 token-range fixtures.
+
+Verification after the last Rust edit: fmt --all --check exited zero; focused Clippy with
+all targets and -D warnings finished successfully (1.01s). Macro contracts 12 passed (0.10s);
+span compatibility 2 passed; copied parser doctest 1 passed. No unchecked unwrap/expect,
+salsa reference or unsafe block in the copied production modules or safe span component.
+The earlier L1 identity (3 passed) and existing dependency/runtime gates (3 passed) have
+unchanged inputs since their successful run; the macro tree gate also passes in this suite.
+
+Next integration boundary: replace PendingItemMacroPort in
+crates/parseltongue-syntax-span-extractor/src/name-resolution-stage-adapter.rs with a
+pure-source adapter around expand_declarative_macro_items. Its token origins distinguish
+definition versus invocation source and retain byte ranges; the adapter must join them to
+real compilation units, module scopes, invocation IDs and persisted span/field evidence.
+Do not treat plain rendered $crate as ordinary parseable source: retain its definition crate
+through the syntax bridge/normalization. Add virtual file/provenance and expanded evidence
+rows atomically with the crate fixed point. Built-ins, sysroot/lang items, complete generic/
+impl projection, exact PRIMARY/SECONDARY configuration and differ/S5 still remain.

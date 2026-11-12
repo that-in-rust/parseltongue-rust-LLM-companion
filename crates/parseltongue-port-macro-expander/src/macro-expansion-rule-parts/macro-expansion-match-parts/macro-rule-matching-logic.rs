@@ -370,20 +370,33 @@ struct MatchState<'t> {
 /// - `eof_items`: the set of items that would be valid if this was the EOF.
 /// - `bb_items`: the set of items that are waiting for the black-box parser.
 /// - `error_items`: the set of items in errors, used for error-resilient parsing
+struct MacroMatchingScratchState<'scope, 'tokens> {
+    matching_result_state_value: &'scope mut Match<'tokens>,
+    bindings_builder_state_value: &'scope mut BindingsBuilder<'tokens>,
+    current_match_state_rows: &'scope mut SmallVec<[MatchState<'tokens>; 1]>,
+    parser_match_state_rows: &'scope mut SmallVec<[MatchState<'tokens>; 1]>,
+    pending_match_state_rows: &'scope mut Vec<MatchState<'tokens>>,
+    complete_match_state_rows: &'scope mut SmallVec<[MatchState<'tokens>; 1]>,
+    error_match_state_rows: &'scope mut SmallVec<[MatchState<'tokens>; 1]>,
+}
+
 #[inline]
 fn match_loop_inner<'t>(
     ctx_edition: impl Copy + Fn(span::SyntaxContext) -> span::Edition,
     src: TtIter<'t>,
     stack: &[TtIter<'t>],
-    res: &mut Match<'t>,
-    bindings_builder: &mut BindingsBuilder<'t>,
-    cur_items: &mut SmallVec<[MatchState<'t>; 1]>,
-    bb_items: &mut SmallVec<[MatchState<'t>; 1]>,
-    next_items: &mut Vec<MatchState<'t>>,
-    eof_items: &mut SmallVec<[MatchState<'t>; 1]>,
-    error_items: &mut SmallVec<[MatchState<'t>; 1]>,
+    scratch: MacroMatchingScratchState<'_, 't>,
     delim_span: tt::DelimSpan,
 ) {
+    let MacroMatchingScratchState {
+        matching_result_state_value: res,
+        bindings_builder_state_value: bindings_builder,
+        current_match_state_rows: cur_items,
+        parser_match_state_rows: bb_items,
+        pending_match_state_rows: next_items,
+        complete_match_state_rows: eof_items,
+        error_match_state_rows: error_items,
+    } = scratch;
     macro_rules! try_push {
         ($items: expr, $it:expr) => {
             if $it.is_error {
@@ -677,13 +690,15 @@ fn match_loop<'t>(
             ctx_edition,
             src.clone(),
             &stack,
-            &mut res,
-            &mut bindings_builder,
-            &mut cur_items,
-            &mut bb_items,
-            &mut next_items,
-            &mut eof_items,
-            &mut error_items,
+            MacroMatchingScratchState {
+                matching_result_state_value: &mut res,
+                bindings_builder_state_value: &mut bindings_builder,
+                current_match_state_rows: &mut cur_items,
+                parser_match_state_rows: &mut bb_items,
+                pending_match_state_rows: &mut next_items,
+                complete_match_state_rows: &mut eof_items,
+                error_match_state_rows: &mut error_items,
+            },
             span,
         );
         stdx::always!(cur_items.is_empty());
@@ -834,23 +849,19 @@ fn match_meta_var<'t>(
             // rustc [explicitly checks the next token][1].
             // [0]: https://github.com/rust-lang/rust/issues/86730
             // [1]: https://github.com/rust-lang/rust/blob/f0c4da499/compiler/rustc_expand/src/mbe/macro_parser.rs#L576
-            match input.peek() {
-                Some(TtElement::Leaf(tt::Leaf::Ident(it))) => {
-                    let is_err = if it.kind != tt::IdentKind::Raw
-                        && matches!(expr, ExprKind::Expr2021)
-                    {
-                        it.sym == sym::underscore || it.sym == sym::let_ || it.sym == sym::const_
-                    } else {
-                        it.sym == sym::let_
-                    };
-                    if is_err {
-                        return ExpandResult::only_err(ExpandError::new(
-                            it.span,
-                            ExpandErrorKind::NoMatchingRule,
-                        ));
-                    }
+            if let Some(TtElement::Leaf(tt::Leaf::Ident(it))) = input.peek() {
+                let is_err = if it.kind != tt::IdentKind::Raw && matches!(expr, ExprKind::Expr2021)
+                {
+                    it.sym == sym::underscore || it.sym == sym::let_ || it.sym == sym::const_
+                } else {
+                    it.sym == sym::let_
+                };
+                if is_err {
+                    return ExpandResult::only_err(ExpandError::new(
+                        it.span,
+                        ExpandErrorKind::NoMatchingRule,
+                    ));
                 }
-                _ => {}
             };
             return expect_fragment(
                 ctx_edition,

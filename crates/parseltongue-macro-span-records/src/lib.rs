@@ -38,7 +38,8 @@ pub struct EditionedFileId(u32);
 impl EditionedFileId {
     pub const MAX_FILE_ID: u32 = 0x007f_ffff;
     pub const fn new(file: FileId, edition: Edition) -> Self {
-        Self((file.index() & Self::MAX_FILE_ID) | ((edition as u32) << 23))
+        assert!(file.index() <= Self::MAX_FILE_ID);
+        Self(file.index() | ((edition as u32) << 23))
     }
     pub const fn current_edition(file: FileId) -> Self {
         Self::new(file, Edition::CURRENT)
@@ -131,6 +132,12 @@ impl Span {
         other: Self,
         differing_anchor: impl FnOnce(Self, Self) -> Option<Self>,
     ) -> Option<Self> {
+        if self.anchor.ast_id == FIXUP_ERASED_FILE_AST_ID_MARKER {
+            return Some(other);
+        }
+        if other.anchor.ast_id == FIXUP_ERASED_FILE_AST_ID_MARKER {
+            return Some(self);
+        }
         if self.anchor != other.anchor {
             return differing_anchor(self, other);
         }
@@ -151,5 +158,73 @@ impl std::fmt::Display for Span {
             self.range,
             self.ctx
         )
+    }
+}
+
+#[cfg(test)]
+mod span_compatibility_contract_tests {
+    use super::*;
+    #[test]
+    fn test_span_identity_roundtrip() {
+        for edition in [
+            Edition::Edition2015,
+            Edition::Edition2018,
+            Edition::Edition2021,
+            Edition::Edition2024,
+        ] {
+            for file in [0, 1, EditionedFileId::MAX_FILE_ID] {
+                let identity = EditionedFileId::new(FileId::from_raw(file), edition);
+                assert_eq!(identity.file_id().index(), file);
+                assert_eq!(identity.edition(), edition);
+                assert_eq!(EditionedFileId::from_raw(identity.as_u32()), identity);
+                assert_eq!(SyntaxContext::root(edition).edition(), edition);
+            }
+        }
+    }
+    #[test]
+    fn test_span_join_boundaries() {
+        let initial = Span {
+            range: TextRange::new(0.into(), 1.into()),
+            anchor: SpanAnchor {
+                file_id: EditionedFileId::new(FileId::from_raw(0), Edition::Edition2024),
+                ast_id: ROOT_ERASED_FILE_AST_ID,
+            },
+            ctx: SyntaxContext::root(Edition::Edition2024),
+        };
+        let next = Span {
+            range: TextRange::new(2.into(), 3.into()),
+            ..initial
+        };
+        assert_eq!(
+            initial.join(next, |_, _| None).map(|span| span.range),
+            Some(TextRange::new(0.into(), 3.into()))
+        );
+        let foreign = Span {
+            anchor: SpanAnchor {
+                file_id: EditionedFileId::new(FileId::from_raw(1), Edition::Edition2024),
+                ..initial.anchor
+            },
+            ..next
+        };
+        assert_eq!(initial.join(foreign, |_, _| None), None);
+        let fixup = Span {
+            anchor: SpanAnchor {
+                ast_id: FIXUP_ERASED_FILE_AST_ID_MARKER,
+                ..initial.anchor
+            },
+            ..initial
+        };
+        assert_eq!(fixup.join(foreign, |_, _| None), Some(foreign));
+        assert_eq!(foreign.join(fixup, |_, _| None), Some(foreign));
+        assert_eq!(
+            initial.join(
+                Span {
+                    ctx: SyntaxContext::root(Edition::Edition2021),
+                    ..next
+                },
+                |_, _| None
+            ),
+            None
+        );
     }
 }
