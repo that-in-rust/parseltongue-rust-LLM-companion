@@ -1686,3 +1686,22 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Comparison publication design: independent Turso sidecar with its own
   comparison generation and source-snapshot reference. Never append analysis
   facts to, or replace publication of, the frozen mapping database.
+
+#### RED fixture correction and verified output
+
+- Correction to the preceding RED entry: its first execution did not reach
+  the STUB. The new fixture omitted Cargo.lock; load_workspace_crate_graph
+  reads it before metadata (lib.rs:106-107), causing four setup failures with
+  CrateGraphLoadError: No such file or directory (os error 2). Added offline
+  generate-lockfile to the fixture, matching existing CLI contracts.
+- Corrected run: 1 passed / 3 failed (0.28s); all three failures now show
+  oracle path comparison not implemented. Log remains
+  /home/ubuntu/m2-path-comparison-red-tests.log.
+- Writer shell pair for ripgrep/tokio: 7aa41a and 448968. The asynchronous
+  launch output did not label their association; use repository logs and
+  mapper PIDs 1353631 (ripgrep), 1353632 (tokio), rather than assuming the
+  association in the preceding entry. Serde mapper PID 1335853, shell ce054b.
+- At the last observation serde had run 14m / RSS 4,386,984 KiB; ripgrep/tokio
+  6m26s / RSS 3,610,668 and 3,485,264 KiB. These are live observations, not
+  final performance/peak measurements or S5 results. All were in the
+  name-resolution stage; no additional writer has touched their stores.

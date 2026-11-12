@@ -42,6 +42,16 @@ fn build_oracle_comparison_fixture() -> OracleComparisonTestFixture {
     )
     .unwrap();
     let source = directory.path().join("source.db");
+    let lock = Command::new(env!("CARGO"))
+        .current_dir(directory.path())
+        .args(["generate-lockfile", "--offline"])
+        .output()
+        .unwrap();
+    assert!(
+        lock.status.success(),
+        "{}",
+        String::from_utf8_lossy(&lock.stderr)
+    );
     let mapped = run_comparison_cli_command(
         &source,
         "map-workspace-full-run",
