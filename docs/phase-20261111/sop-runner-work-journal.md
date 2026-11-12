@@ -321,143 +321,6 @@ Ran 43 tests in 0.068s
 OK
 ```
 
-### REQ-SOP-RUNNER-019 — paginated row identity
-
-- Contract: use endpoint-reported identities to reject missing identities, exact duplicates, and
-  conflicting content across S2 pages before the collector accepts the sequence.
-- SOP: S2 complete scope/missed-File pagination and §4 raw page evidence.
-- SPEC: REQ-RUST-001.2 offline graph/process boundary; REQ-RUST-003.1 source coverage.
-- Tests: `test_scope_duplicate_identity_blocks`, `test_scope_identity_missing_blocks`,
-  `test_scope_content_conflict_blocks`, `test_missed_duplicate_identity_blocks`,
-  `test_missed_identity_missing_blocks`.
-
-Endpoint grounding: installed `codebase-memory-mcp 0.12.1` `query_graph --help` documents `--graph
-<code|missed>`, `--max-rows`, `--cursor`, and compatibility `--offset`. A small local response from
-the existing indexed repository (no corpus) returned `columns:["f.file_path"]`, `rows:[[path],...],
-total:6, has_more:true, next_cursor:...`; a two-entry `check_index_coverage --scopes '["."]'` page
-returned scope entries shaped as `{path, kind, detail}` with `scope_total:26` and `next_offset:2`.
-Therefore the scope identity is `entry.path`; the missed query's only selected cell is `f.file_path`.
-Fixtures now match those observed wire shapes, not guessed string rows.
-
-STUB/RED: all four new identity regressions failed against the current validators (which only totaled
-rows). Exact output:
-
-```text
-PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_duplicate_identity_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_identity_missing_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_content_conflict_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_missed_duplicate_identity_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_missed_identity_missing_blocks
-Ran 5 tests in 0.004s
-FAILED (failures=5)
-AssertionError: CoverageInventoryBlockedError not raised
-```
-
-### REQ-SOP-RUNNER-020 — stage fail-fast state
-
-- Contract: a failed untraced mapper run prevents process/target/status commands; a failed process
-  audit prevents target/status commands. Persist observed outcomes and explicit `NOT STARTED` states,
-  with no fabricated timing, memory, or publication evidence.
-- SOP: S3 separate untraced measurement/process audit/target audit/status sequence; §3 verdict semantics.
-- SPEC: REQ-RUST-015.1 target/build-script boundary; REQ-RUST-020.1 generation isolation.
-- Tests: `test_mapper_failure_skips_audits`, `test_process_failure_skips_status`.
-
-STUB/RED: tests use a precise fake `subprocess.run` sequence and real helper output-directory/result
-files; no corpus or production executable is invoked. The helper continued after both observed failures
-and returned no explicit stage statuses. Exact output:
-
-```text
-PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status
-Ran 2 tests in 0.005s
-FAILED (failures=2)
-AssertionError: None != 'FAIL'
-AssertionError: None != 'FAIL'
-```
-
-GREEN: the measurement helper writes a per-repository artifact summary before execution and updates
-it with observed command exits/statuses. A nonzero untraced mapper return now exits before process,
-target, or status commands; a process-audit violation/incomplete result exits before target/status.
-Skipped stages retain `NOT STARTED`, return codes/timing/RSS/publication remain null unless observed,
-and the runner copies these statuses into its persistent manifest without relabeling skipped commands
-as failed. Component status and S3 failure/blocking follow the recorded observation.
-
-Focused fake-sequence checks:
-
-```text
-PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status
-Ran 2 tests in 0.005s
-OK
-
-PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states
-Ran 1 test in 0.005s
-OK
-```
-
-### REQ-SOP-RUNNER-021 — transition command metadata
-
-- Contract: S1/S2 transition manifests persist each executed command's exact argv, actual cwd, and
-  exit result; abbreviated display commands alone are insufficient. Page commands retain cursor,
-  offset, and project flags.
-- SOP: S1/S2 execution evidence and exact command provenance; §3 transition/measurement traceability.
-- SPEC: REQ-RUST-001.2 command/process evidence and REQ-RUST-020.1 generation-bound evidence.
-- Test: `test_repository_s3_directory_isolated` (also retains REQ-SOP-RUNNER-004 coverage).
-
-API check: installed `codebase-memory-mcp cli index_repository --help` requires `--repo-path` and
-supports `--mode`; it does not define `--manifest-path` or `--corpus-root`. Runner `--help` exposes
-`--corpus-manifest` and `--project-root`, and a Python-source search found neither requested flag.
-The implementation therefore records executed argv generically, including the supported S1
-`--repo-path` and actual S2 flags, without inventing unsupported options. Exact help result:
-
-```text
---repo-path <string> [required]  Repository path
---mode <full|moderate|fast|cross-repo-intelligence> [default: full]
-```
-
-STUB/RED: the integration test exercised real S1/S2 collection with fake subprocess results and
-failed because the S1 transition had only shortened `commands`, with no `command_metadata`:
-
-```text
-PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
-Ran 1 test in 0.011s
-ERROR (errors=1)
-KeyError: 'command_metadata'
-```
-
-Follow-up review RED expanded REQ-018 to fail closed for addressless sends, unresolved `execveat`,
-failed/undecodable exec attempts, and demonstrated `-yy` decoding; REQ-020 now preserves genuine
-telemetry from a failed mapping command, skips publication after a failed target audit, and normalizes
-missing command exits as NOT STARTED. The existing S1/S2 harness test also checks transition metadata.
-The combined focused run exposed each missing behavior:
-
-```text
-PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_trace_captures_syscall_families test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unaddressed_sends_require_proof test_sop_qualification_runner.SopQualificationRunnerContractTests.test_socketpair_local_send_passes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_relative_path_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_exec_payload_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_forbidden_exec_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_retains_samples test_sop_qualification_runner.SopQualificationRunnerContractTests.test_target_failure_skips_status test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
-Ran 10 tests in 0.024s
-FAILED (failures=8, errors=1)
-AssertionError: '-yy' not found in [... trace=%process,%network ...]
-AssertionError: 0 != 3
-AssertionError: False is not true
-AssertionError: None != 2.5
-AssertionError: 'PASS' != 'NOT STARTED'
-AssertionError: 'FAIL' != 'NOT STARTED'
-KeyError: 'command_metadata'
-```
-
-GREEN: scope pages now require a nonempty `path` identity and track complete entry content across
-pages, distinguishing exact repeats from conflicting records. Missed-query rows must match the observed
-single `f.file_path` column, contain one nonempty path, agree with the page's `returned` count and
-`total_relation == "eq"`, and be unique across pages. The collector already validates each received
-page before another cursor query; the new integration regression verifies a duplicate page is preserved
-raw and stops collection after its second query. Because the SOP query projects only `f.file_path`,
-conflicting extra payload for a missed-file identity is not representable in a valid response; unexpected
-columns/row widths block, while conflicting record content is checked on actual scope `{path, kind,
-detail}` entries.
-
-Focused validator outputs:
-
-```text
-Ran 5 tests in 0.001s
-OK
-
-Ran 1 test in 0.004s
-OK
-```
-
 Existing process-tree contract command:
 
 ```text
@@ -927,6 +790,148 @@ OK
 No refactor needed: the change is limited to `probe_toolchain_versions`, and the symlink regression covers
 both the invoked version name and separately recorded canonical path. GREEN commit:
 `b22b92358bb187a5e8ab5e24d8d401d4a9d2dd1d`; this checkpoint changes only the journal.
+
+### Runner journal integration reconciliation — 2026-11-12
+
+The journal bytes from runner base 001c18a99b1724164fefca325a9a53cf2fd184ab are retained verbatim as this file prefix. The delivered runner tip 5a8b6e8d73b35fdfcbbef81ec82e2f29c6cc4200 inserted two new history blocks (451 added lines) before older entries. To preserve append-only history, those blocks are recorded below the unchanged prefix and this note, in descendant-diff order. All added line content is retained; no historical text or claims were rewritten or removed.
+
+### REQ-SOP-RUNNER-019 — paginated row identity
+
+- Contract: use endpoint-reported identities to reject missing identities, exact duplicates, and
+  conflicting content across S2 pages before the collector accepts the sequence.
+- SOP: S2 complete scope/missed-File pagination and §4 raw page evidence.
+- SPEC: REQ-RUST-001.2 offline graph/process boundary; REQ-RUST-003.1 source coverage.
+- Tests: `test_scope_duplicate_identity_blocks`, `test_scope_identity_missing_blocks`,
+  `test_scope_content_conflict_blocks`, `test_missed_duplicate_identity_blocks`,
+  `test_missed_identity_missing_blocks`.
+
+Endpoint grounding: installed `codebase-memory-mcp 0.12.1` `query_graph --help` documents `--graph
+<code|missed>`, `--max-rows`, `--cursor`, and compatibility `--offset`. A small local response from
+the existing indexed repository (no corpus) returned `columns:["f.file_path"]`, `rows:[[path],...],
+total:6, has_more:true, next_cursor:...`; a two-entry `check_index_coverage --scopes '["."]'` page
+returned scope entries shaped as `{path, kind, detail}` with `scope_total:26` and `next_offset:2`.
+Therefore the scope identity is `entry.path`; the missed query's only selected cell is `f.file_path`.
+Fixtures now match those observed wire shapes, not guessed string rows.
+
+STUB/RED: all four new identity regressions failed against the current validators (which only totaled
+rows). Exact output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_duplicate_identity_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_identity_missing_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_scope_content_conflict_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_missed_duplicate_identity_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_missed_identity_missing_blocks
+Ran 5 tests in 0.004s
+FAILED (failures=5)
+AssertionError: CoverageInventoryBlockedError not raised
+```
+
+### REQ-SOP-RUNNER-020 — stage fail-fast state
+
+- Contract: a failed untraced mapper run prevents process/target/status commands; a failed process
+  audit prevents target/status commands. Persist observed outcomes and explicit `NOT STARTED` states,
+  with no fabricated timing, memory, or publication evidence.
+- SOP: S3 separate untraced measurement/process audit/target audit/status sequence; §3 verdict semantics.
+- SPEC: REQ-RUST-015.1 target/build-script boundary; REQ-RUST-020.1 generation isolation.
+- Tests: `test_mapper_failure_skips_audits`, `test_process_failure_skips_status`.
+
+STUB/RED: tests use a precise fake `subprocess.run` sequence and real helper output-directory/result
+files; no corpus or production executable is invoked. The helper continued after both observed failures
+and returned no explicit stage statuses. Exact output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status
+Ran 2 tests in 0.005s
+FAILED (failures=2)
+AssertionError: None != 'FAIL'
+AssertionError: None != 'FAIL'
+```
+
+GREEN: the measurement helper writes a per-repository artifact summary before execution and updates
+it with observed command exits/statuses. A nonzero untraced mapper return now exits before process,
+target, or status commands; a process-audit violation/incomplete result exits before target/status.
+Skipped stages retain `NOT STARTED`, return codes/timing/RSS/publication remain null unless observed,
+and the runner copies these statuses into its persistent manifest without relabeling skipped commands
+as failed. Component status and S3 failure/blocking follow the recorded observation.
+
+Focused fake-sequence checks:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_skips_audits test_sop_qualification_runner.SopQualificationRunnerContractTests.test_process_failure_skips_status
+Ran 2 tests in 0.005s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states
+Ran 1 test in 0.005s
+OK
+```
+
+### REQ-SOP-RUNNER-021 — transition command metadata
+
+- Contract: S1/S2 transition manifests persist each executed command's exact argv, actual cwd, and
+  exit result; abbreviated display commands alone are insufficient. Page commands retain cursor,
+  offset, and project flags.
+- SOP: S1/S2 execution evidence and exact command provenance; §3 transition/measurement traceability.
+- SPEC: REQ-RUST-001.2 command/process evidence and REQ-RUST-020.1 generation-bound evidence.
+- Test: `test_repository_s3_directory_isolated` (also retains REQ-SOP-RUNNER-004 coverage).
+
+API check: installed `codebase-memory-mcp cli index_repository --help` requires `--repo-path` and
+supports `--mode`; it does not define `--manifest-path` or `--corpus-root`. Runner `--help` exposes
+`--corpus-manifest` and `--project-root`, and a Python-source search found neither requested flag.
+The implementation therefore records executed argv generically, including the supported S1
+`--repo-path` and actual S2 flags, without inventing unsupported options. Exact help result:
+
+```text
+--repo-path <string> [required]  Repository path
+--mode <full|moderate|fast|cross-repo-intelligence> [default: full]
+```
+
+STUB/RED: the integration test exercised real S1/S2 collection with fake subprocess results and
+failed because the S1 transition had only shortened `commands`, with no `command_metadata`:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
+Ran 1 test in 0.011s
+ERROR (errors=1)
+KeyError: 'command_metadata'
+```
+
+Follow-up review RED expanded REQ-018 to fail closed for addressless sends, unresolved `execveat`,
+failed/undecodable exec attempts, and demonstrated `-yy` decoding; REQ-020 now preserves genuine
+telemetry from a failed mapping command, skips publication after a failed target audit, and normalizes
+missing command exits as NOT STARTED. The existing S1/S2 harness test also checks transition metadata.
+The combined focused run exposed each missing behavior:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_trace_captures_syscall_families test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unaddressed_sends_require_proof test_sop_qualification_runner.SopQualificationRunnerContractTests.test_socketpair_local_send_passes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_execveat_relative_path_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_exec_payload_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_failed_forbidden_exec_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_mapper_failure_retains_samples test_sop_qualification_runner.SopQualificationRunnerContractTests.test_target_failure_skips_status test_sop_qualification_runner.SopQualificationRunnerContractTests.test_runner_persists_skipped_states test_sop_qualification_runner.SopQualificationRunnerContractTests.test_repository_s3_directory_isolated
+Ran 10 tests in 0.024s
+FAILED (failures=8, errors=1)
+AssertionError: '-yy' not found in [... trace=%process,%network ...]
+AssertionError: 0 != 3
+AssertionError: False is not true
+AssertionError: None != 2.5
+AssertionError: 'PASS' != 'NOT STARTED'
+AssertionError: 'FAIL' != 'NOT STARTED'
+KeyError: 'command_metadata'
+```
+
+GREEN: scope pages now require a nonempty `path` identity and track complete entry content across
+pages, distinguishing exact repeats from conflicting records. Missed-query rows must match the observed
+single `f.file_path` column, contain one nonempty path, agree with the page's `returned` count and
+`total_relation == "eq"`, and be unique across pages. The collector already validates each received
+page before another cursor query; the new integration regression verifies a duplicate page is preserved
+raw and stops collection after its second query. Because the SOP query projects only `f.file_path`,
+conflicting extra payload for a missed-file identity is not representable in a valid response; unexpected
+columns/row widths block, while conflicting record content is checked on actual scope `{path, kind,
+detail}` entries.
+
+Focused validator outputs:
+
+```text
+Ran 5 tests in 0.001s
+OK
+
+Ran 1 test in 0.004s
+OK
+```
+
 
 ### Output, lock, and publication safeguards — local REQ traceability and STUB
 
