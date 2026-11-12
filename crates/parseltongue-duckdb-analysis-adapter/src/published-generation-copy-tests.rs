@@ -82,6 +82,129 @@ fn frozen_namespace_normalization_contract() {
 }
 
 #[test]
+fn frozen_macro_candidate_lookups() {
+    use parseltongue_core_row_types::*;
+    use parseltongue_table_store_traits::ResolvedMacroLookupPort;
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    let mut source = namespace_source_fixture();
+    let original: serde_json::Value = serde_json::from_str(
+        &source.records["syntax-namespace-input-items"][0].stage_row_payload_text,
+    )
+    .unwrap();
+    let root = original["binding_lexical_scope_key"].clone();
+    let target = json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":"fixture-macro"});
+    let mut binding = original;
+    binding["binding_resolved_name_text"] = json!("Macro");
+    binding["binding_namespace_kind_value"] = json!("macro");
+    binding["binding_target_identity_key"] = target.clone();
+    binding["binding_target_metadata_value"] =
+        json!({"target_symbol_kind_value":"BuiltinMacro","target_builtin_name_value":"stringify"});
+    append_namespace_fixture_value(&mut source, "syntax-namespace-input-items", binding);
+    let request = json!({"site":"macro-lookup"});
+    append_namespace_fixture_value(
+        &mut source,
+        "syntax-namespace-input-macros",
+        json!({"invocation_site_occurrence_key":request,"invocation_lexical_scope_key":root,"invocation_macro_path_segments":[{"kind":"name","name":"Macro"}],"invocation_argument_source_text":"value"}),
+    );
+    store
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    store
+        .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    let lookup = store.frozen_namespace_macro_lookup(scope());
+    let value: serde_json::Value = serde_json::from_str(
+        &lookup
+            .read_macro_invocation_binding_record(&request.to_string())
+            .unwrap()
+            .unwrap()
+            .stage_row_payload_text,
+    )
+    .unwrap();
+    assert_eq!(value["binding_target_identity_key"], target);
+    assert!(
+        lookup
+            .read_macro_invocation_binding_record("missing")
+            .unwrap()
+            .is_none()
+    );
+    let typed_root = NameResolutionScopeKey {
+        scope_compilation_unit_key: CrateCompilationUnitKey {
+            unit_cargo_package_identifier: "fixture".into(),
+            unit_cargo_target_name: "fixture".into(),
+            unit_cargo_target_kind: "lib".into(),
+            unit_compilation_role_kind: CompilationUnitRoleKind::Target,
+            unit_configuration_digest_full: [0; 32],
+        },
+        scope_semantic_path_parts: vec![],
+    };
+    assert_eq!(
+        lookup
+            .read_resolved_builtin_macro(&typed_root, &[NamePathSegmentKind::Name("Macro".into())])
+            .unwrap(),
+        Some("stringify".into())
+    );
+    assert_eq!(
+        lookup
+            .read_resolved_builtin_macro(
+                &typed_root,
+                &[NamePathSegmentKind::Name("Missing".into())]
+            )
+            .unwrap(),
+        None
+    );
+    assert!(
+        lookup
+            .read_macro_target_metadata(&NameSymbolTargetKey::Builtin("missing".into()))
+            .unwrap()
+            .is_none()
+    );
+    let metadata = lookup
+        .read_macro_target_metadata(&NameSymbolTargetKey::Builtin("fixture-macro".into()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&metadata.stage_row_payload_text).unwrap()["target_builtin_name_value"],
+        "stringify"
+    );
+    lookup
+        .replace_frozen_lookup_scope(StageRunScopeValue {
+            run_generation_digest_value: "other".into(),
+            ..scope()
+        })
+        .unwrap();
+    assert!(
+        lookup
+            .read_macro_invocation_binding_record(&request.to_string())
+            .unwrap()
+            .is_none()
+    );
+    lookup.replace_frozen_lookup_scope(scope()).unwrap();
+    let connection = store._connection.lock().unwrap();
+    connection.execute("INSERT INTO \"namespace-target-source-records\" SELECT generation_key,attempt_key,target_key,child_scope,'{}',scope_identity FROM \"namespace-target-source-records\" WHERE target_key=?",[target.to_string()]).unwrap();
+    drop(connection);
+    assert!(
+        lookup
+            .read_macro_target_metadata(&NameSymbolTargetKey::Builtin("fixture-macro".into()))
+            .is_err()
+    );
+}
+
+#[test]
 fn frozen_namespace_generation_integrity() {
     let directory = tempfile::tempdir().unwrap();
     let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
