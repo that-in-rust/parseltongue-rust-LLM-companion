@@ -3,6 +3,7 @@ members = [
     "crates/parseltongue-core-row-types",
     "crates/parseltongue-table-store-traits",
     "crates/parseltongue-turso-store-adapter",
+    "crates/parseltongue-duckdb-analysis-adapter",
     "crates/parseltongue-crate-graph-loader",
     "crates/parseltongue-syntax-span-extractor",
     "crates/parseltongue-stage-worker-scheduler",

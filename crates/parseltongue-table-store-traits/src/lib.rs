@@ -76,6 +76,23 @@ pub trait StageTableStorePort: Send + Sync {
     ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError>;
 }
 
+/// Analysis reads a frozen published generation; it never replaces the write store.
+pub trait AnalysisTableStorePort: Send + Sync {
+    fn copy_published_stage_rows(
+        &self,
+        source: &dyn StageTableStorePort,
+        scope: &StageRunScopeValue,
+        tables: &[&str],
+        cancel: &RunCancelFlagValue,
+    ) -> Result<usize, StoreBackendFailureError>;
+
+    fn count_analysis_stage_rows(
+        &self,
+        scope: &StageRunScopeValue,
+        table: &str,
+    ) -> Result<usize, StoreBackendFailureError>;
+}
+
 use parseltongue_core_row_types::{
     RunGenerationDigestValue, SemanticOccurrenceKeyValue, StoreBackendFailureError,
 };

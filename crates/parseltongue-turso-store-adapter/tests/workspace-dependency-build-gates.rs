@@ -2,7 +2,7 @@ use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use std::{error::Error, path::Path, process::Command};
 
 #[test]
-fn test_no_analysis_crates_linked() -> Result<(), Box<dyn Error>> {
+fn test_no_forbidden_semantic_dependencies() -> Result<(), Box<dyn Error>> {
     let workspace_root_directory_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace_metadata_command_output = Command::new(env!("CARGO"))
         .current_dir(workspace_root_directory_path)
@@ -59,6 +59,22 @@ fn test_no_analysis_crates_linked() -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|package| package["name"] == "turso" && package["version"] == "0.9.0-pre.5")
     );
+    assert!(
+        workspace_metadata_package_rows
+            .iter()
+            .any(|package| package["name"] == "duckdb" && package["version"] == "1.20000.1")
+    );
+    let analysis = workspace_metadata_package_rows
+        .iter()
+        .find(|package| package["name"] == "parseltongue-duckdb-analysis-adapter")
+        .ok_or("missing analysis adapter")?;
+    let duckdb = analysis["dependencies"]
+        .as_array()
+        .ok_or("missing analysis dependencies")?
+        .iter()
+        .find(|dependency| dependency["name"] == "duckdb")
+        .ok_or("missing DuckDB dependency")?;
+    assert_eq!(duckdb["features"], serde_json::json!(["bundled"]));
     assert!(
         !workspace_metadata_package_rows
             .iter()

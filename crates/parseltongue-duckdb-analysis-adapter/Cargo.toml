@@ -1,0 +1,17 @@
+[package]
+name = "parseltongue-duckdb-analysis-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
+parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" }
+duckdb = { version = "=1.20000.1", features = ["bundled"] }
+
+[dev-dependencies]
+parseltongue-turso-store-adapter = { path = "../parseltongue-turso-store-adapter" }
+tempfile = "3"
+
+[lints]
+workspace = true
