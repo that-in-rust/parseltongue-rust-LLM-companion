@@ -87,6 +87,127 @@ pub(super) fn encode_resolution_scope_value(scope: &NameResolutionScopeKey) -> V
     json!({"scope_compilation_unit_key":encode_compilation_unit_value(&scope.scope_compilation_unit_key),"scope_semantic_path_parts":scope.scope_semantic_path_parts})
 }
 
+pub(super) fn decode_resolution_scope_value(
+    value: &Value,
+) -> Result<NameResolutionScopeKey, StoreBackendFailureError> {
+    Ok(NameResolutionScopeKey {
+        scope_compilation_unit_key: decode_compilation_unit_value(
+            &value["scope_compilation_unit_key"],
+        )?,
+        scope_semantic_path_parts: serde_json::from_value(
+            value["scope_semantic_path_parts"].clone(),
+        )
+        .map_err(build_name_projection_error)?,
+    })
+}
+
+fn decode_occurrence_identity_value(
+    value: &Value,
+) -> Result<SemanticOccurrenceKeyValue, StoreBackendFailureError> {
+    let range = &value["span_byte_range_value"];
+    let read_offset = |index: usize| {
+        range[index]
+            .as_u64()
+            .ok_or_else(|| build_name_projection_error("invalid occurrence offset"))
+    };
+    let provenance = value["span_expansion_provenance_chain"]
+        .as_array()
+        .ok_or_else(|| build_name_projection_error("occurrence provenance absent"))?
+        .iter()
+        .map(|digest| {
+            decode_digest_hex_value(
+                digest
+                    .as_str()
+                    .ok_or_else(|| build_name_projection_error("invalid provenance digest"))?,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+        &decode_compilation_unit_value(&value["unit_compilation_identity_key"])?,
+        read_record_string_value(value, "span_source_file_path")?,
+        SpanByteRangeValue::try_from((read_offset(0)?, read_offset(1)?))
+            .map_err(build_name_projection_error)?,
+        decode_digest_hex_value(read_record_string_value(value, "span_content_digest_full")?)?
+            .into(),
+        &provenance,
+    )
+    .map_err(build_name_projection_error)
+}
+
+fn decode_symbol_target_value(
+    value: &Value,
+) -> Result<NameSymbolTargetKey, StoreBackendFailureError> {
+    match read_record_string_value(value, "target_identity_variant_kind")? {
+        "definition" => decode_occurrence_identity_value(&value["target_semantic_occurrence_key"])
+            .map(NameSymbolTargetKey::Definition),
+        "generic" => Ok(NameSymbolTargetKey::GenericParameter(
+            decode_occurrence_identity_value(&value["target_semantic_occurrence_key"])?,
+            read_record_string_value(value, "target_parameter_name_value")?.into(),
+        )),
+        "builtin" => Ok(NameSymbolTargetKey::Builtin(
+            read_record_string_value(value, "target_builtin_name_value")?.into(),
+        )),
+        "crate" => decode_compilation_unit_value(&value["target_compilation_unit_key"])
+            .map(NameSymbolTargetKey::CrateRoot),
+        _ => Err(build_name_projection_error("invalid target identity kind")),
+    }
+}
+
+pub(super) fn decode_macro_binding_value(
+    value: &Value,
+) -> Result<NameResolvedBindingRow, StoreBackendFailureError> {
+    if value["binding_namespace_kind_value"] != "macro" {
+        return Err(build_name_projection_error("macro namespace required"));
+    }
+    let visibility = &value["binding_visibility_scope_kind"];
+    Ok(NameResolvedBindingRow {
+        binding_lexical_scope_key: decode_resolution_scope_value(
+            &value["binding_lexical_scope_key"],
+        )?,
+        binding_resolved_name_text: read_record_string_value(value, "binding_resolved_name_text")?
+            .into(),
+        binding_namespace_kind_value: NamespaceBindingKindValue::Macro,
+        binding_target_identity_key: decode_symbol_target_value(
+            &value["binding_target_identity_key"],
+        )?,
+        binding_target_child_scope: (!value["binding_target_child_scope"].is_null())
+            .then(|| decode_resolution_scope_value(&value["binding_target_child_scope"]))
+            .transpose()?,
+        binding_visibility_scope_kind: match read_record_string_value(
+            visibility,
+            "visibility_scope_kind_value",
+        )? {
+            "public" => NameBindingVisibilityKind::Public,
+            "invisible" => NameBindingVisibilityKind::Invisible,
+            "restricted" => NameBindingVisibilityKind::Restricted(decode_resolution_scope_value(
+                &visibility["visibility_restricted_scope_key"],
+            )?),
+            _ => return Err(build_name_projection_error("invalid macro visibility")),
+        },
+        binding_selection_priority_kind: match read_record_string_value(
+            value,
+            "binding_selection_priority_kind",
+        )? {
+            "builtin" => NameBindingPriorityKind::Builtin,
+            "prelude" => NameBindingPriorityKind::Prelude,
+            "glob" => NameBindingPriorityKind::Glob,
+            "explicit" => NameBindingPriorityKind::Explicit,
+            "declaration" => NameBindingPriorityKind::Declaration,
+            _ => {
+                return Err(build_name_projection_error(
+                    "invalid macro binding priority",
+                ));
+            }
+        },
+        binding_import_evidence_keys: value["binding_import_evidence_keys"]
+            .as_array()
+            .ok_or_else(|| build_name_projection_error("macro evidence absent"))?
+            .iter()
+            .map(decode_occurrence_identity_value)
+            .collect::<Result<_, _>>()?,
+    })
+}
+
 pub(super) fn encode_occurrence_identity_value(occurrence: &SemanticOccurrenceKeyValue) -> Value {
     let parts = occurrence.read_semantic_occurrence_parts();
     let range = parts.span_byte_range_value.read_source_range_pair();

@@ -131,6 +131,33 @@ pub(super) fn build_unit_compilation_key(
 }
 
 impl<'a> CrateSyntaxProjectionState<'a> {
+    pub(super) fn read_ordered_pending_invocations(
+        &self,
+        completed: &BTreeSet<SemanticOccurrenceKeyValue>,
+    ) -> Result<Vec<NameMacroInvocationRow>, StoreBackendFailureError> {
+        let mut pending = self
+            .projection_resolution_input_rows
+            .name_macro_invocation_rows
+            .iter()
+            .filter(|row| !completed.contains(&row.invocation_site_occurrence_key))
+            .map(|row| {
+                self.projection_macro_source_rows
+                    .get(&row.invocation_site_occurrence_key)
+                    .map(|context| (context.macro_legacy_order_prefix.clone(), row.clone()))
+                    .ok_or_else(|| {
+                        build_name_projection_error("macro invocation source context absent")
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        pending.sort_by(|left, right| {
+            left.0.cmp(&right.0).then_with(|| {
+                left.1
+                    .invocation_site_occurrence_key
+                    .cmp(&right.1.invocation_site_occurrence_key)
+            })
+        });
+        Ok(pending.into_iter().map(|(_, row)| row).collect())
+    }
     pub(super) fn read_legacy_lookup_updates(
         &mut self,
     ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {

@@ -6,11 +6,17 @@ use parseltongue_port_macro_expander::{
 use parseltongue_table_store_traits::{
     ItemMacroExpansionPort, ResolvedMacroLookupPort, StageTableStorePort,
 };
-use std::{cell::RefCell, collections::BTreeMap, sync::Mutex};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+    sync::Mutex,
+};
 
 pub(super) struct PersistedItemMacroPort<'a> {
     projection_source_state_lock: Mutex<CrateSyntaxProjectionState<'a>>,
     resolved_macro_lookup_port: &'a dyn ResolvedMacroLookupPort,
+    completed_invocations_lock: Mutex<BTreeSet<SemanticOccurrenceKeyValue>>,
+    expansion_operation_lock: Mutex<()>,
 }
 
 struct ResolvedBuiltinMacroLookup<'a, 'b> {
@@ -135,10 +141,95 @@ pub fn prepare_macro_expansion_port<'a>(
     Ok(PersistedItemMacroPort {
         projection_source_state_lock: Mutex::new(projection),
         resolved_macro_lookup_port: lookup,
+        completed_invocations_lock: Mutex::new(BTreeSet::new()),
+        expansion_operation_lock: Mutex::new(()),
     })
 }
 
 impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
+    fn expand_next_resolved_macro_items(
+        &self,
+    ) -> Result<Option<NameExpansionRoundRows>, NameResolutionStageError> {
+        use super::syntax_namespace_record_codec::{
+            decode_macro_binding_value, encode_occurrence_identity_value,
+        };
+        let _operation = self
+            .expansion_operation_lock
+            .lock()
+            .map_err(build_macro_expansion_error)?;
+        let next = {
+            let state = self
+                .projection_source_state_lock
+                .lock()
+                .map_err(build_macro_expansion_error)?;
+            if state
+                .projection_cancel_flag_value
+                .check_stage_work_cancelled()
+            {
+                return Err(NameResolutionStageError::Cancelled);
+            }
+            let completed = self
+                .completed_invocations_lock
+                .lock()
+                .map_err(build_macro_expansion_error)?;
+            let pending = state
+                .read_ordered_pending_invocations(&completed)
+                .map_err(build_macro_expansion_error)?;
+            let next = pending.into_iter().try_fold(None, |found, invocation| {
+                if found.is_some() {
+                    return Ok(found);
+                }
+                self.resolved_macro_lookup_port
+                    .read_macro_invocation_binding_record(
+                        &encode_occurrence_identity_value(
+                            &invocation.invocation_site_occurrence_key,
+                        )
+                        .to_string(),
+                    )?
+                    .map(|record| {
+                        let value = serde_json::from_str(&record.stage_row_payload_text)
+                            .map_err(build_macro_expansion_error)?;
+                        decode_macro_binding_value(&value)
+                            .map(|binding| Some((invocation, binding)))
+                            .map_err(build_macro_expansion_error)
+                    })
+                    .unwrap_or(Ok(None))
+            })?;
+            next.map(|(invocation, binding)| {
+                let input = &state.projection_resolution_input_rows;
+                (
+                    NameResolutionInputRows {
+                        unit_compilation_identity_key: input.unit_compilation_identity_key.clone(),
+                        unit_rust_edition_kind: input.unit_rust_edition_kind,
+                        unit_extern_prelude_key: input.unit_extern_prelude_key.clone(),
+                        name_shared_namespace_rows: vec![],
+                        name_module_scope_rows: vec![],
+                        name_symbol_binding_rows: vec![],
+                        name_import_request_rows: vec![],
+                        name_signature_path_rows: vec![],
+                        name_macro_invocation_rows: vec![],
+                    },
+                    invocation,
+                    binding,
+                )
+            })
+        };
+        next.map(|(input, invocation, binding)| {
+            let key = invocation.invocation_site_occurrence_key.clone();
+            let round = self.expand_resolved_macro_items(&NameMacroExpansionQuery {
+                expansion_input_record_rows: &input,
+                expansion_known_binding_rows: &[],
+                expansion_pending_invocation_rows: std::slice::from_ref(&invocation),
+                expansion_resolved_macro_rows: vec![(key.clone(), binding)],
+            })?;
+            self.completed_invocations_lock
+                .lock()
+                .map_err(build_macro_expansion_error)?
+                .insert(key);
+            Ok(round)
+        })
+        .transpose()
+    }
     fn expand_resolved_macro_items(
         &self,
         query: &NameMacroExpansionQuery<'_>,
