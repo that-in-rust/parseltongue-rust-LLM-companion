@@ -281,7 +281,7 @@ fn test_duckdb_thread_export_determinism() {
         store.copy_published_stage_rows(&source(),&scope(),&["fixture-source-input-records"],&RunCancelFlagValue::default()).unwrap();
         let connection = store._connection.lock().unwrap();
         let mut statement = connection.prepare("SELECT generation_key,attempt_key,table_name,row_key,payload FROM \"frozen-generation-source-records\" ORDER BY generation_key,attempt_key,table_name,row_key").unwrap();
-        statement.query_map([],|row| Ok((0..5).map(|column|row.get::<_,String>(column)).collect::<Result<Vec<_>,_>>()?)).unwrap().collect::<Result<Vec<_>,_>>().unwrap()
+        statement.query_map([],|row| (0..5).map(|column|row.get::<_,String>(column)).collect::<Result<Vec<_>,_>>()).unwrap().collect::<Result<Vec<_>,_>>().unwrap()
     });
     assert_eq!(exports[0], exports[1]);
 }
