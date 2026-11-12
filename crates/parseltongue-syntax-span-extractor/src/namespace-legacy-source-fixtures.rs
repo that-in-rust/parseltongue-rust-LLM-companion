@@ -145,9 +145,28 @@ fn projected_virtual_macro_scope() {
         macro_token_origin_rows: vec![],
         macro_matched_arm_index: 0,
     };
-    state
+    let delta = state
         .project_macro_expansion_rows(&invocation, &definition, &expanded)
         .unwrap();
+    let items = delta
+        .expansion_semantic_output_rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "syntax-namespace-input-items")
+        .collect::<Vec<_>>();
+    assert!(!items.is_empty());
+    assert!(items.iter().all(|row|serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["binding_target_metadata_value"].is_object()));
+    assert!(
+        delta
+            .expansion_semantic_output_rows
+            .iter()
+            .any(|row| row.stage_owned_table_name == "legacy-macro-source-events")
+    );
+    assert!(
+        !delta
+            .expansion_semantic_output_rows
+            .iter()
+            .any(|row| row.stage_owned_table_name == "syntax-namespace-input-macros")
+    );
     let mut rows = Vec::new();
     crate::visit_legacy_macro_scope_records(
         &state.projection_legacy_source_event_rows,
