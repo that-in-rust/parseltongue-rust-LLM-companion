@@ -136,6 +136,15 @@ fn persist_projection_input_rows(
         .iter()
         .cloned()
         .map(Ok);
+    let legacy = projection
+        .projection_legacy_source_event_rows
+        .iter()
+        .map(|row| {
+            Ok(build_namespace_input_record(
+                "legacy-macro-source-events",
+                row.clone(),
+            ))
+        });
     let prefix = format!(
         "crate/{}",
         blake3::hash(
@@ -152,6 +161,7 @@ fn persist_projection_input_rows(
         .chain(macros)
         .chain(externs)
         .chain(lang)
+        .chain(legacy)
         .try_fold(
             NamespaceInputPendingRows::default(),
             |mut pending, record| {

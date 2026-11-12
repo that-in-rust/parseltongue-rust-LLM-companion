@@ -54,6 +54,10 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
         "syntax-namespace-input-records",
     ),
     ("stage-run-generation-records", "markers"),
+    (
+        "legacy-macro-source-events",
+        "syntax-namespace-input-records",
+    ),
 ];
 
 fn check_table_stage_access(table: &str, stage: &str) -> bool {

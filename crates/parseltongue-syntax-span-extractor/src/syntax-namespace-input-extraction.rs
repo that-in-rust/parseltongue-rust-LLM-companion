@@ -18,6 +18,7 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_path_metadata_rows: BTreeMap<SemanticOccurrenceKeyValue, Value>,
     pub(super) projection_lang_definition_rows: Vec<StageTableRowRecord>,
     pub(super) projection_extern_declaration_rows: Vec<Value>,
+    pub(super) projection_legacy_source_event_rows: Vec<Value>,
     projection_macro_source_rows:
         BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
     projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
@@ -200,6 +201,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             projection_path_metadata_rows: BTreeMap::new(),
             projection_lang_definition_rows: Vec::new(),
             projection_extern_declaration_rows: Vec::new(),
+            projection_legacy_source_event_rows: Vec::new(),
             projection_macro_source_rows: BTreeMap::new(),
             projection_macro_failure_rows: BTreeMap::new(),
             projection_source_store_port: store,
