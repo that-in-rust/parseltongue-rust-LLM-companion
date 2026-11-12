@@ -27,6 +27,9 @@ mod syntax_namespace_input_persistence;
 mod syntax_namespace_record_codec;
 pub use persisted_macro_expansion_adapter::prepare_macro_expansion_port;
 pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
+#[path = "legacy-macro-scope-records.rs"]
+mod legacy_macro_scope_records;
+pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
 #[path = "sysroot-prelude-context-rules.rs"]
 mod sysroot_prelude_context_rules;
 pub use sysroot_prelude_context_rules::{
