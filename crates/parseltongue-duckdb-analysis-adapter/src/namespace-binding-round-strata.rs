@@ -8,7 +8,16 @@ pub fn recompute_binding_round(
     let transaction = connection
         .unchecked_transaction()
         .map_err(build_analysis_error)?;
-    transaction
+    let digest = recompute_binding_rows(&transaction, scope)?;
+    transaction.commit().map_err(build_analysis_error)?;
+    Ok(digest)
+}
+
+pub(super) fn recompute_binding_rows(
+    connection: &duckdb::Connection,
+    scope: &StageRunScopeValue,
+) -> Result<String, StoreBackendFailureError> {
+    connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS \"namespace-binding-round-results\" (
         generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,scope_key VARCHAR NOT NULL,
@@ -17,9 +26,9 @@ pub fn recompute_binding_round(
         PRIMARY KEY(generation_key,attempt_key,scope_key,name,namespace,target_key,evidence_key));",
         )
         .map_err(build_analysis_error)?;
-    transaction.execute("DELETE FROM \"namespace-binding-round-results\" WHERE generation_key=? AND attempt_key=?",
+    connection.execute("DELETE FROM \"namespace-binding-round-results\" WHERE generation_key=? AND attempt_key=?",
         duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
-    transaction.execute("INSERT INTO \"namespace-binding-round-results\"
+    connection.execute("INSERT INTO \"namespace-binding-round-results\"
         WITH ranked AS (
             SELECT DISTINCT *,max(priority) OVER (PARTITION BY generation_key,attempt_key,scope_key,name,namespace) AS selected_priority
             FROM \"namespace-binding-round-inputs\" WHERE generation_key=? AND attempt_key=?
@@ -32,7 +41,7 @@ pub fn recompute_binding_round(
         duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
     let mut hasher = blake3::Hasher::new();
     {
-        let mut statement = transaction.prepare("SELECT generation_key,attempt_key,scope_key,name,namespace,target_key,priority,evidence_key,state
+        let mut statement = connection.prepare("SELECT generation_key,attempt_key,scope_key,name,namespace,target_key,priority,evidence_key,state
             FROM \"namespace-binding-round-results\" WHERE generation_key=? AND attempt_key=?
             ORDER BY generation_key,attempt_key,scope_key,name,namespace,target_key,evidence_key")
             .map_err(build_analysis_error)?;
@@ -56,7 +65,6 @@ pub fn recompute_binding_round(
             })?;
         }
     }
-    transaction.commit().map_err(build_analysis_error)?;
     Ok(hasher.finalize().to_hex().to_string())
 }
 

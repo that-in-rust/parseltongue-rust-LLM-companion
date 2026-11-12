@@ -1,15 +1,53 @@
-use super::build_analysis_error;
+use super::{
+    FIXED_POINT_LIMIT, build_analysis_error, namespace_binding_round_strata::recompute_binding_rows,
+};
 use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StoreBackendFailureError,
 };
 
 pub fn resolve_import_endpoint_rounds(
-    _connection: &duckdb::Connection,
-    _scope: &StageRunScopeValue,
-    _cancel: &RunCancelFlagValue,
+    connection: &duckdb::Connection,
+    scope: &StageRunScopeValue,
+    cancel: &RunCancelFlagValue,
 ) -> Result<usize, StoreBackendFailureError> {
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(build_analysis_error)?;
+    if cancel.check_stage_work_cancelled() {
+        return Err(build_analysis_error("analysis resolution cancelled"));
+    }
+    transaction.execute_batch("CREATE TABLE IF NOT EXISTS \"namespace-binding-round-inputs\" AS SELECT * FROM \"namespace-binding-declaration-records\" WHERE false")
+        .map_err(build_analysis_error)?;
+    transaction.execute("DELETE FROM \"namespace-binding-round-inputs\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+    transaction.execute("INSERT INTO \"namespace-binding-round-inputs\" SELECT * FROM \"namespace-binding-declaration-records\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+    let mut previous = recompute_binding_rows(&transaction, scope)?;
+    for round in 0..=FIXED_POINT_LIMIT {
+        if cancel.check_stage_work_cancelled() {
+            return Err(build_analysis_error("analysis resolution cancelled"));
+        }
+        transaction.execute("DELETE FROM \"namespace-binding-round-inputs\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+        transaction.execute("INSERT INTO \"namespace-binding-round-inputs\"
+            SELECT * FROM \"namespace-binding-declaration-records\" WHERE generation_key=? AND attempt_key=?
+            UNION ALL
+            SELECT i.generation_key,i.attempt_key,i.importer_scope,
+                CASE WHEN i.is_glob OR i.alias_name='' THEN b.name ELSE i.alias_name END,
+                b.namespace,b.target_key,CASE WHEN i.is_glob THEN 2 ELSE 3 END,i.import_key
+            FROM \"namespace-import-endpoint-records\" i
+            JOIN \"namespace-binding-round-results\" b ON b.generation_key=i.generation_key AND b.attempt_key=i.attempt_key
+                AND b.scope_key=i.source_scope AND (i.is_glob OR b.name=i.source_name)
+            WHERE i.generation_key=? AND i.attempt_key=? AND (i.is_glob OR b.state='resolved')
+                AND (i.is_glob OR i.alias_name<>'_')",
+            duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value,scope.run_generation_digest_value,scope.stage_attempt_sequence_value])
+            .map_err(build_analysis_error)?;
+        let digest = recompute_binding_rows(&transaction, scope)?;
+        if digest == previous {
+            transaction.commit().map_err(build_analysis_error)?;
+            return Ok(round);
+        }
+        previous = digest;
+    }
     Err(build_analysis_error(
-        "import endpoint fixed point not implemented",
+        "NameResolutionStuckError: import fixed point exceeded 8192 changing rounds",
     ))
 }
 
@@ -34,7 +72,7 @@ mod tests {
             namespace VARCHAR,target_key VARCHAR,priority INTEGER,evidence_key VARCHAR);
             CREATE TABLE \"namespace-import-endpoint-records\" (
             generation_key VARCHAR,attempt_key VARCHAR,import_key VARCHAR,importer_scope VARCHAR,
-            source_scope VARCHAR,source_name VARCHAR,alias_name VARCHAR,glob BOOLEAN);",
+            source_scope VARCHAR,source_name VARCHAR,alias_name VARCHAR,is_glob BOOLEAN);",
             )
             .unwrap();
         connection
