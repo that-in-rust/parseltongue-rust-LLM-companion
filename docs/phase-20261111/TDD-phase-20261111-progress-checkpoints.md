@@ -2627,3 +2627,107 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   match. `git diff --check` returned zero. Full candidate source identity is
   `73a3c66c7cc422f96e252c742b9c062c458eec2a` plus the saved CLI patch.
   The report and status board record the unmet prerequisite, not five runs.
+
+### Phase diagnostics STUB — REQ-RUST-024.6
+
+- User authorized the smaller retained-input investigation at the SAME cap.
+- Delivery/reliability mode: L3 thiserror phase enum, generic measured phase
+  boundary, original port error retained as source; no core type changes.
+- STUB added before forced-failure tests. No architecture or pin changes.
+- Next: cargo check, then RED forcing copy/normalization/resolution failures;
+  GREEN memory queries and CLI propagation, retain native fixture and replay.
+
+### Phase diagnostics RED — REQ-RUST-024.6
+
+- STUB check: requested environment, `cargo check --release -p parseltongue-cli-dispatcher-binary -p parseltongue-duckdb-analysis-adapter`:
+  `Finished release profile [optimized] target(s) in 55.45s`.
+- Adapter-only check selected a different host-serde feature graph and
+  rebuilt bundled C++; stopped it, then selected both roots to reuse release
+  objects. The queued timeout waiting for its build lock was NOT a RED.
+- Actual RED: `timeout --signal=TERM --kill-after=5s 180s cargo test --release -p parseltongue-cli-dispatcher-binary -p parseltongue-duckdb-analysis-adapter --lib namespace_analysis_phase_diagnostics -- --nocapture`:
+  `test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.03s`.
+  Both failed at `not yet implemented: typed namespace phase diagnostics`.
+- GREEN candidate preserves phase variants through CLI propagation, samples
+  before/after memory (NOT peaks), elapsed/status and database sizes. Optional
+  fixture retention changes cleanup only; semantic assertions are unchanged.
+
+### Phase diagnostics GREEN and native capture — REQ-RUST-024.6
+
+- Initial focused diagnostics: `test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.04s`.
+- Added telemetry-poison preservation coverage. Full adapter library check:
+  `test result: FAILED. 51 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.66s`.
+  The three new diagnostic tests pass. Existing real-Turso handoff fixture
+  fails with `Turso store: stage completion markers cannot own output rows`.
+  Verified preexisting in HEAD: fixture sends records with work key
+  `__complete__`; unchanged backend unconditionally rejects this at lines
+  234–235. No test assertions or production guard changed to hide it.
+- Release CLI + retained replay example build: `Finished release profile [optimized] target(s) in 11.25s`.
+- Native capture used the optional persistent fixture parent
+  `/home/ubuntu/hld-current-test-artifacts/20261112-namespace-phase-probes/`.
+  Retained input: `.tmpHNrSfz/store.db`; analysis input pointer identifies an
+  immutable frozen generation. Native semantic assertions were unchanged.
+- Exact emitted phase times and post-phase memory samples (NOT peaks):
+  copy 38.150s, 627834880 bytes; normalization 31.630s, 393871104 bytes;
+  resolution FAIL 64.816s, 21917152 bytes after rollback,
+  temporary_storage_bytes=958103552. Cap remained 1288490188 bytes.
+- This capture identifies RESOLUTION, but its immediate error is ENOSPC:
+  `IO Error: Could not write file ... No space left on device`.
+  It does not yet identify the initial OOM query. Do not conflate these.
+- Environment recovery before separate replay: only 2.4 GiB disk free after
+  retaining input + working analysis. Retire 25 GiB reproducible target/debug
+  cache, preserving its CLI binary under the new artifact directory. Pause
+  the editor rust-analyzer PID 1804565 to avoid cache regeneration; resume
+  after build/probe work. No source, retained input, reports or release
+  cache is removed. No RAM tuning or cap change.
+
+### Separate replay and operator diagnostic STUB → RED → GREEN
+
+- Same frozen scope, separate processes and unchanged 1288490188-byte cap:
+  copy PASS 281680 rows, 35.398s, post-phase DuckDB 628883456 bytes,
+  sampled tree peak 1323495424 bytes, tree elapsed 35.548s;
+  normalization PASS 281680 rows, 31.469s, post-phase DuckDB 371326720 bytes,
+  sampled tree peak 1936781312 bytes, tree elapsed 31.652s.
+- Resolution FAIL 32.273s with the original DuckDB 1.1 GiB/1.1 GiB OOM;
+  post-rollback DuckDB 98104432 bytes (NOT peak), temporary storage
+  443777024 bytes. Unit links, scope cycle validation, scope relations and
+  round 1 all complete. Failure is inside round 2 path-candidate work.
+  This disproves copy/normalization and scope-cycle validation as the
+  immediate failing operation in this retained replay.
+- Add generic EXPLAIN / EXPLAIN ANALYZE probe at the same cap, parameterized
+  by the frozen generation and attempt, retaining the operator plan text.
+  STUB release check: `Finished release profile [optimized] target(s) in 0.79s`.
+  RED normal/empty/error query fixtures fail at the explicit operator stub:
+  `test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.04s`.
+  GREEN diagnostics subset (three phase tests plus two query tests):
+  `test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.04s`.
+- Clippy found a redundant Result map-or-identity and a must-use retention
+  path. Replace with unwrap_or_else (non-panicking) and explicitly discard
+  TempDir::keep's returned path; semantic fixture assertions unchanged.
+- EXPLAIN input is the production recursive path-derivation SELECT with
+  its two session temp inputs represented by equivalent scoped CTEs;
+  this excludes INSERT/index cost and must not be called the complete
+  failing INSERT plan. Native query/index root cause remains unverified.
+
+- EXPLAIN ANALYZE SELECT completed at the unchanged cap: 3.676s including
+  probe overhead, sampled tree peak 1402781696 bytes. JSON operator profile:
+  133 operators, recursive walk 493552 rows, final projection 62554 rows,
+  peak_buffer_memory=1289658512, peak_temp_dir_size=603357184 bytes.
+  All operator counts/sizes/times are mechanically exported to
+  `failing-query-operator-cardinalities.csv` in the retained artifact folder.
+  Largest scan: lexical-parent relation 204440 rows / 300143456 intermediate
+  bytes; lexical seed join 221297 rows / 148172004 bytes. No scopes×prelude
+  names cartesian blow-up appears in this plan; prelude lookup is keyed by
+  each request's first segment. This is not a measured success for INSERT.
+- Repeat resolution with immediate pre-INSERT memory samples: rounds 1–2
+  complete, round 3 INSERT derivation OOM after 72.936s. ART_INDEX is only
+  87293952 bytes before rounds 1–2 and 114819072 before round 3. This
+  disproves a claim that a near-cap ART index alone is the root cause.
+  Full SELECT itself peaks at approximately the entire cap. A cold SELECT
+  after reopen and an INSERT during live resolution have different resident
+  working sets; do not treat the SELECT profile as proof of exact INSERT cost.
+- Next cut: bound request-local path evaluation into deterministic batches.
+  All recursive walks, rank/ambiguity windows and final DISTINCT sets are
+  partitioned by request_key; batches must keep every row for one request
+  together and preserve full generation/attempt filtering. Filter ancestor
+  visibility probes to active request scopes. Prove unbatched-vs-batched
+  semantic equality and actual native success before claiming a root fix.

@@ -2204,6 +2204,7 @@ dependencies = [
  "parseltongue-turso-store-adapter",
  "serde_json",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]

@@ -45,6 +45,8 @@ pub fn recompute_path_candidates(
         .map_err(build_analysis_error)?;
     transaction.execute("DELETE FROM \"namespace-path-candidate-records\" WHERE generation_key=? AND attempt_key=?",
         duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+    eprintln!("stage=namespace-path-derivation event=started total_and_art_index_bytes={:?}",
+        transaction.query_row("SELECT coalesce(sum(memory_usage_bytes),0)::UBIGINT,coalesce(sum(memory_usage_bytes) FILTER (WHERE tag='ART_INDEX'),0)::UBIGINT FROM duckdb_memory()",[],|row| Ok((row.get::<_,u64>(0)?,row.get::<_,u64>(1)?))));
     transaction
         .execute_batch(&format!(
             "INSERT INTO \"namespace-path-candidate-records\" {}",

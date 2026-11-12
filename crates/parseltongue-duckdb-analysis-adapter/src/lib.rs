@@ -19,6 +19,12 @@ pub struct DuckdbAnalysisStoreAdapter {
     _connection: Mutex<duckdb::Connection>,
 }
 
+#[path = "namespace-analysis-phase-diagnostics.rs"]
+mod namespace_analysis_phase_diagnostics;
+pub use namespace_analysis_phase_diagnostics::{
+    NamespaceAnalysisPhaseError, NamespaceAnalysisPhaseKind,
+};
+
 impl DuckdbAnalysisStoreAdapter {
     pub fn open_bounded_analysis_store(
         database: &Path,

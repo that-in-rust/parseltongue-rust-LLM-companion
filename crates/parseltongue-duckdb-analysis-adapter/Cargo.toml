@@ -10,6 +10,7 @@ parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" 
 duckdb = { version = "=1.20000.1", features = ["bundled"] }
 blake3 = "1"
 serde_json = "1"
+thiserror = "2"
 
 [dev-dependencies]
 parseltongue-turso-store-adapter = { path = "../parseltongue-turso-store-adapter" }

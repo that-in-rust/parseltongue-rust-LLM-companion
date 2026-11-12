@@ -26,6 +26,7 @@ pub fn materialize_scope_relations(
             "StageInputMissingError: missing or cross-unit parent scope",
         ));
     }
+    eprintln!("stage=namespace-resolution-query query=scope-cycle-check event=started");
     let cyclic: usize = transaction.query_row("WITH RECURSIVE walk AS (
         SELECT scope_key,scope_key AS current_scope,[scope_key] AS trail,false AS cyclic
         FROM \"namespace-active-scope-records\"
@@ -34,6 +35,7 @@ pub fn materialize_scope_relations(
         FROM walk w JOIN \"namespace-active-scope-records\" p ON p.scope_key=w.current_scope
         WHERE NOT w.cyclic AND p.parent_scope IS NOT NULL
     ) SELECT count(*) FROM walk WHERE cyclic",[],|row|row.get(0)).map_err(build_analysis_error)?;
+    eprintln!("stage=namespace-resolution-query query=scope-cycle-check event=complete");
     if cyclic != 0 {
         return Err(build_analysis_error(
             "StageInputMissingError: cyclic scope parents",

@@ -100,6 +100,7 @@ pub(super) fn copy_generation(
     let count = tables.into_iter().try_fold(0, |total, table| {
         check_cancel(cancel)?;
         let expected_count = source.count_stage_table_rows(scope, table)?;
+        eprintln!("stage=namespace-copy-table table={table} event=appending expected_rows={expected_count}");
         let mut hasher = blake3::Hasher::new();
         let mut previous_key: Option<String> = None;
         let mut count = 0;
@@ -135,6 +136,7 @@ pub(super) fn copy_generation(
             appender.flush().map_err(build_analysis_error)?;
         }
         let digest = hasher.finalize().to_hex().to_string();
+        eprintln!("stage=namespace-copy-table table={table} event=verifying rows={count}");
         if expected_count != count
             || table_digest(&transaction, scope, table)? != (count, digest.clone())
         {
@@ -154,6 +156,7 @@ pub(super) fn copy_generation(
                 ],
             )
             .map_err(build_analysis_error)?;
+        eprintln!("stage=namespace-copy-table table={table} event=verified rows={count}");
         Ok(total + count)
     })?;
     check_cancel(cancel)?;

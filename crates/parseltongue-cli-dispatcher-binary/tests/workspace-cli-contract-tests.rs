@@ -651,11 +651,23 @@ fn test_builtin_nested_macro_shadowing() {
 
 #[test]
 fn test_lang_items_in_sysroot() {
-    let directory = tempfile::tempdir().unwrap();
-    let root = directory.path().join("workspace");
+    let retained = std::env::var_os("PARSELTONGUE_NATIVE_FIXTURE_DIRECTORY");
+    let temporary = retained
+        .as_ref()
+        .map_or_else(tempfile::tempdir, tempfile::tempdir_in)
+        .unwrap();
+    let directory = temporary.path().to_path_buf();
+    let _guard = if retained.is_some() {
+        let _ = temporary.keep();
+        None
+    } else {
+        Some(temporary)
+    };
+    eprintln!("native_fixture_directory={}", directory.display());
+    let root = directory.join("workspace");
     create_workspace_source_fixture(&root);
     fs::write(root.join("src/lib.rs"),"pub fn build(_:Option<Vec<u8>>,_:core::ops::Range<u8>)->std::string::String{String::new()}").unwrap();
-    let database = directory.path().join("store.db");
+    let database = directory.join("store.db");
     let output = run_workspace_mapping_fixture(&root, &database, "2");
     assert!(
         output.status.success(),

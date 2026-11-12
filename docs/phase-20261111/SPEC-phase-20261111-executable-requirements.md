@@ -835,3 +835,18 @@ When a known qualifier already proves type-relative lookup, that path stays
 in the deferred partition even if another component remains unresolved.
 M2 agreement scores the module-scope partition only; report type-relative
 counts for M4–M6, unknown counts and proc-macro exclusions separately.
+
+## REQ-RUST-024.6 — namespace-analysis-phase-diagnostics
+
+WHEN copying, normalizing or resolving a frozen generation fails, the L3
+analysis boundary SHALL return a distinct thiserror phase variant with the
+original error as its source, not flatten the phase into a text-only store
+error. Every phase SHALL emit start/completion status, elapsed seconds and
+DuckDB memory/temporary-storage byte counts from duckdb_memory(), together
+with database sizes from pragma_database_size(). Telemetry failure SHALL
+not replace the original phase failure. Retained native fixture input SHALL
+support separate phase replay at 1,288,490,188 bytes without re-ingestion.
+
+Verification: `test_namespace_phase_failure_context` forces each phase to
+fail and checks its variant/source; `test_namespace_phase_empty_success`
+checks empty success and real memory diagnostics.
