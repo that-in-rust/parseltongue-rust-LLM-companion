@@ -4,6 +4,10 @@
 mod oracle_artifact_cache_facade;
 pub use oracle_artifact_cache_facade::build_oracle_artifact_cache;
 
+#[cfg(test)]
+#[path = "oracle-artifact-contract-tests.rs"]
+mod oracle_artifact_contract_tests;
+
 #[path = "mapped-oracle-export-facade.rs"]
 mod mapped_oracle_export_facade;
 pub use mapped_oracle_export_facade::{OracleConfigurationKindValue, export_mapped_semantic_paths};
