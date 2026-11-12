@@ -13,6 +13,8 @@ mod crate_syntax_namespace_projection;
 mod name_resolution_record_codec;
 #[path = "name-resolution-stage-adapter.rs"]
 mod name_resolution_stage_adapter;
+#[path = "persisted-macro-expansion-adapter.rs"]
+mod persisted_macro_expansion_adapter;
 pub use name_resolution_stage_adapter::run_persisted_name_resolution;
 
 fn parse_compatible_rust_syntax(

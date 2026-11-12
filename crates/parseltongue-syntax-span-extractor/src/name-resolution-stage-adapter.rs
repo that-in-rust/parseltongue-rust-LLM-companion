@@ -1,25 +1,13 @@
 use super::{
     crate_syntax_namespace_projection::{CrateSyntaxProjectionState, build_unit_compilation_key},
     name_resolution_record_codec::*,
+    persisted_macro_expansion_adapter::PersistedItemMacroPort,
 };
 use parseltongue_core_row_types::*;
-use parseltongue_port_name_resolver::{ItemMacroExpansionPort, resolve_crate_name_bindings};
+use parseltongue_port_name_resolver::resolve_crate_name_bindings;
 use parseltongue_table_store_traits::StageTableStorePort;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
-
-struct PendingItemMacroPort;
-impl ItemMacroExpansionPort for PendingItemMacroPort {
-    fn expand_resolved_macro_items(
-        &self,
-        _: &NameMacroExpansionQuery<'_>,
-    ) -> Result<NameExpansionRoundRows, NameResolutionStageError> {
-        Err(NameResolutionStageError::Input(StageInputMissingError {
-            error_context_detail_text:
-                "StageInputMissingError: real macro expansion adapter is not implemented".into(),
-        }))
-    }
-}
 
 fn read_name_stage_records(
     store: &dyn StageTableStorePort,
@@ -322,12 +310,11 @@ pub fn run_persisted_name_resolution(
         )?;
         append_library_namespace_inputs(&mut projector, unit, &units, store, scope)?;
         projector.project_unit_source_root()?;
-        let output = resolve_crate_name_bindings(
-            &projector.projection_resolution_input_rows,
-            &PendingItemMacroPort,
-            stage_cancel_flag_value,
-        )
-        .map_err(build_name_projection_error)?;
+        let input = projector.projection_resolution_input_rows.clone();
+        let macro_port = PersistedItemMacroPort::build_persisted_macro_port(projector);
+        let output = resolve_crate_name_bindings(&input, &macro_port, stage_cancel_flag_value)
+            .map_err(build_name_projection_error)?;
+        let projector = macro_port.finish_persisted_macro_port()?;
         let prefix = format!("crate/{ready}");
         let rows = build_resolved_crate_records(&projector, output, &prefix)?;
         total += store.write_stage_table_unit(

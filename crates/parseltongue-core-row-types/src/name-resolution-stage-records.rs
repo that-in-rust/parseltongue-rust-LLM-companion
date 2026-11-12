@@ -169,6 +169,7 @@ pub struct NameMacroExpansionQuery<'a> {
     pub expansion_input_record_rows: &'a NameResolutionInputRows,
     pub expansion_known_binding_rows: &'a [NameResolvedBindingRow],
     pub expansion_pending_invocation_rows: &'a [NameMacroInvocationRow],
+    pub expansion_resolved_macro_rows: Vec<(SemanticOccurrenceKeyValue, NameResolvedBindingRow)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

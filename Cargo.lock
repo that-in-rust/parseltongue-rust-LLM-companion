@@ -1746,6 +1746,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "parseltongue-core-row-types",
+ "parseltongue-port-macro-expander",
  "parseltongue-port-name-resolver",
  "parseltongue-table-store-traits",
  "ra_ap_parser",

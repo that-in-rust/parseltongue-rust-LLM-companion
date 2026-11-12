@@ -460,12 +460,37 @@ pub(crate) fn run_crate_resolution_rounds(
                     state, bindings,
                 )));
             }
+            let lookup = ScopeBindingLookupState::build_namespace_lookup_rows(
+                &state.round_pending_input_rows,
+                &bindings,
+            );
+            let resolved = state
+                .round_pending_input_rows
+                .name_macro_invocation_rows
+                .iter()
+                .filter_map(|invocation| {
+                    match lookup.resolve_scope_name_path(
+                        &invocation.invocation_lexical_scope_key,
+                        &invocation.invocation_macro_path_segments,
+                        NameNamespaceFilterKind::Macro,
+                        NameResolutionPathKind::Signature,
+                    ) {
+                        ResolvedPathLookupKind::Resolved(rows) => {
+                            rows.into_iter().next().map(|binding| {
+                                (invocation.invocation_site_occurrence_key.clone(), binding)
+                            })
+                        }
+                        _ => None,
+                    }
+                })
+                .collect();
             let delta = port.expand_resolved_macro_items(&NameMacroExpansionQuery {
                 expansion_input_record_rows: &state.round_pending_input_rows,
                 expansion_known_binding_rows: &bindings,
                 expansion_pending_invocation_rows: &state
                     .round_pending_input_rows
                     .name_macro_invocation_rows,
+                expansion_resolved_macro_rows: resolved,
             })?;
             check_resolution_work_cancelled(cancel)?;
             let (mut next, changed) = merge_expansion_round_state(state, delta)?;

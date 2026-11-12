@@ -842,3 +842,14 @@ Do not treat plain rendered $crate as ordinary parseable source: retain its defi
 through the syntax bridge/normalization. Add virtual file/provenance and expanded evidence
 rows atomically with the crate fixed point. Built-ins, sysroot/lang items, complete generic/
 impl projection, exact PRIMARY/SECONDARY configuration and differ/S5 still remain.
+
+### M2 persisted macro adapter — STUB
+
+Replaced the PendingItemMacroPort wiring with a typed PersistedItemMacroPort owning the
+source projection behind a mutex (the expansion trait is Send + Sync). Expansion remains
+todo until RED. The resolver now supplies resolved macro bindings using its existing
+namespace/path lookup after import settling; expansion does not duplicate lookup policy.
+The stage retains its existing one-transaction-per-crate publication boundary.
+Offline cargo check for the syntax extractor passed (2.48s). Next RED: generated item/path
+answers, nested invocation provenance, cross-crate $crate hygiene, empty expansion, expanded
+span/field rows and failure preserving the previously published generation.
