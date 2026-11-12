@@ -9,6 +9,17 @@ pub(super) fn build_name_projection_error(
     }
 }
 
+pub(super) fn encode_unresolved_reason_value(reason: SiteUnresolvedReasonKind) -> &'static str {
+    match reason {
+        SiteUnresolvedReasonKind::CfgInactive => "cfg_inactive",
+        SiteUnresolvedReasonKind::BuildScript => "build_script",
+        SiteUnresolvedReasonKind::ProcMacro => "proc_macro",
+        SiteUnresolvedReasonKind::ExternalSourceMissing => "external_source_missing",
+        SiteUnresolvedReasonKind::UnknownReceiver => "unknown_receiver",
+        SiteUnresolvedReasonKind::TraitSolverNeeded => "trait_solver_needed",
+    }
+}
+
 pub(super) fn read_record_string_value<'a>(
     value: &'a Value,
     key: &str,

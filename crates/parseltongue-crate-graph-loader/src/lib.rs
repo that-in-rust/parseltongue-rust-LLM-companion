@@ -368,7 +368,13 @@ pub fn load_workspace_crate_graph(
             };
             let mapped = selected && role == "target";
             let version = read_json_string_field(package, "version")?;
-            let components: Vec<_> = version.split(['.', '-']).collect();
+            let without_build = version
+                .split_once('+')
+                .map(|(value, _)| value)
+                .unwrap_or(version);
+            let (release, prerelease) =
+                without_build.split_once('-').unwrap_or((without_build, ""));
+            let components: Vec<_> = release.split('.').collect();
             let mut unit = json!({
                 "unit_cargo_package_identifier":id,"unit_cargo_package_source":package["source"],
                 "unit_cargo_target_name":target["name"],"unit_cargo_target_kind":kind,
@@ -382,10 +388,16 @@ pub fn load_workspace_crate_graph(
                     "CARGO_PKG_VERSION_MAJOR":components.first().copied().unwrap_or(""),
                     "CARGO_PKG_VERSION_MINOR":components.get(1).copied().unwrap_or(""),
                     "CARGO_PKG_VERSION_PATCH":components.get(2).copied().unwrap_or(""),
-                    "CARGO_PKG_VERSION_PRE":version.split_once('-').map(|(_,pre)|pre).unwrap_or(""),
+                    "CARGO_PKG_VERSION_PRE":prerelease,
                     "CARGO_MANIFEST_DIR":package_root,"CARGO_CRATE_NAME":target["name"].as_str().unwrap_or("").replace('-',"_"),
                     "CARGO_PKG_DESCRIPTION":package["description"].as_str().unwrap_or(""),
-                    "CARGO_PKG_LICENSE":package["license"].as_str().unwrap_or("")
+                    "CARGO_PKG_LICENSE":package["license"].as_str().unwrap_or(""),
+                    "CARGO_PKG_AUTHORS":package["authors"].as_array().map(|rows|rows.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(":")).unwrap_or_default(),
+                    "CARGO_PKG_HOMEPAGE":package["homepage"].as_str().unwrap_or(""),
+                    "CARGO_PKG_REPOSITORY":package["repository"].as_str().unwrap_or(""),
+                    "CARGO_PKG_LICENSE_FILE":package["license_file"].as_str().unwrap_or(""),
+                    "CARGO_PKG_README":package["readme"].as_str().unwrap_or(""),
+                    "CARGO_PKG_RUST_VERSION":package["rust_version"].as_str().unwrap_or("")
                 }
             });
             let key = blake3::hash(

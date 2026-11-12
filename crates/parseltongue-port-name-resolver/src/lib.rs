@@ -14,6 +14,28 @@ mod scope_path_resolution_rules;
 
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
+pub fn resolve_macro_path_binding(
+    input: &NameResolutionInputRows,
+    bindings: &[parseltongue_core_row_types::NameResolvedBindingRow],
+    scope: &parseltongue_core_row_types::NameResolutionScopeKey,
+    path: &[parseltongue_core_row_types::NamePathSegmentKind],
+) -> Option<parseltongue_core_row_types::NameResolvedBindingRow> {
+    match scope_path_resolution_rules::ScopeBindingLookupState::build_namespace_lookup_rows(
+        input, bindings,
+    )
+    .resolve_scope_name_path(
+        scope,
+        path,
+        parseltongue_core_row_types::NameNamespaceFilterKind::Macro,
+        parseltongue_core_row_types::NameResolutionPathKind::Signature,
+    ) {
+        scope_path_resolution_rules::ResolvedPathLookupKind::Resolved(rows) => {
+            rows.into_iter().next()
+        }
+        _ => None,
+    }
+}
+
 pub trait ItemMacroExpansionPort: Send + Sync {
     fn expand_resolved_macro_items(
         &self,

@@ -18,6 +18,7 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_path_metadata_rows: BTreeMap<SemanticOccurrenceKeyValue, Value>,
     projection_macro_source_rows:
         BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
+    projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
     projection_unit_record_value: Value,
     projection_workspace_root_path: PathBuf,
     projection_source_file_rows: BTreeMap<String, String>,
@@ -33,6 +34,7 @@ struct NamespaceSourceFileContext {
     source_crlf_removed_offsets: Vec<usize>,
     source_macro_crate_bindings: BTreeMap<usize, CrateCompilationUnitKey>,
     source_expansion_provenance_rows: Vec<[u8; 32]>,
+    source_original_directory_path: PathBuf,
 }
 
 struct MacroInvocationSourceContext {
@@ -41,6 +43,7 @@ struct MacroInvocationSourceContext {
     macro_invocation_directory_path: PathBuf,
     macro_argument_crate_bindings: BTreeMap<usize, CrateCompilationUnitKey>,
     macro_source_provenance_rows: Vec<[u8; 32]>,
+    macro_invocation_source_directory: PathBuf,
 }
 
 struct MacroProjectionRowOffsets {
@@ -193,6 +196,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             projection_target_metadata_rows: BTreeMap::new(),
             projection_path_metadata_rows: BTreeMap::new(),
             projection_macro_source_rows: BTreeMap::new(),
+            projection_macro_failure_rows: BTreeMap::new(),
             projection_source_store_port: store,
             projection_cancel_flag_value: cancel,
         };
@@ -220,6 +224,49 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 });
         }
         Ok(result)
+    }
+
+    fn seed_native_macro_bindings(&mut self) -> Result<(), StoreBackendFailureError> {
+        let prelude = self
+            .projection_resolution_input_rows
+            .name_module_scope_rows
+            .iter()
+            .find(|row| row.scope_module_identity_key.scope_semantic_path_parts == ["@prelude"])
+            .map(|row| row.scope_module_identity_key.clone())
+            .ok_or_else(|| build_name_projection_error("builtin prelude scope absent"))?;
+        if self
+            .projection_resolution_input_rows
+            .name_symbol_binding_rows
+            .iter()
+            .any(|row| {
+                row.binding_lexical_scope_key == prelude
+                    && row.binding_target_identity_key == NameSymbolTargetKey::Builtin("cfg".into())
+            })
+        {
+            return Ok(());
+        }
+        ["cfg", "include", "concat", "stringify", "env", "option_env"]
+            .into_iter()
+            .for_each(|name| {
+                let target = NameSymbolTargetKey::Builtin(name.into());
+                self.projection_target_metadata_rows.insert(
+                target.clone(),
+                json!({"target_builtin_name_value":name,"target_symbol_kind_value":"BuiltinMacro"}),
+            );
+                self.projection_resolution_input_rows
+                    .name_symbol_binding_rows
+                    .push(NameResolvedBindingRow {
+                        binding_lexical_scope_key: prelude.clone(),
+                        binding_resolved_name_text: name.into(),
+                        binding_namespace_kind_value: NamespaceBindingKindValue::Macro,
+                        binding_target_identity_key: target,
+                        binding_target_child_scope: None,
+                        binding_visibility_scope_kind: NameBindingVisibilityKind::Public,
+                        binding_selection_priority_kind: NameBindingPriorityKind::Prelude,
+                        binding_import_evidence_keys: vec![],
+                    });
+            });
+        Ok(())
     }
 
     pub(super) fn build_compilation_scope_record(&self, scope: &NameResolutionScopeKey) -> Value {
@@ -424,6 +471,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 "macro_definition_unit_key":encode_compilation_unit_value(&self.projection_resolution_input_rows.unit_compilation_identity_key),
                 "macro_definition_edition_kind":self.projection_unit_record_value["unit_rust_edition_value"],
                 "macro_definition_crate_rows":crates,
+                "macro_builtin_identifier_text":super::collect_effective_node_attributes(node,&self.projection_target_cfg_values)?.iter().any(|attribute|attribute=="rustc_builtin_macro").then_some(name),
             });
         }
         let inherited = node.parent().is_some_and(|parent| {
@@ -498,6 +546,122 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         self.visit_namespace_source_file(&root, &scope)
     }
 
+    pub(super) fn build_builtin_expansion_input(
+        &self,
+        invocation: &NameMacroInvocationRow,
+        name: &str,
+    ) -> Result<BuiltinMacroExpansionInput, StoreBackendFailureError> {
+        let environment: BTreeMap<String, String> = serde_json::from_value(
+            self.projection_unit_record_value["unit_metadata_environment_values"].clone(),
+        )
+        .map_err(build_name_projection_error)?;
+        let mut rows = environment
+            .into_iter()
+            .map(|(key, value)| (key, Some(value)))
+            .collect::<BTreeMap<_, _>>();
+        rows.insert(
+            "CARGO_BIN_NAME".into(),
+            (self.projection_unit_record_value["unit_cargo_target_kind"] == "bin").then(|| {
+                self.projection_unit_record_value["unit_cargo_target_name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .into()
+            }),
+        );
+        Ok(BuiltinMacroExpansionInput {
+            macro_builtin_identifier_text: name.into(),
+            macro_argument_source_text: invocation.invocation_argument_source_text.clone(),
+            macro_invocation_edition_kind: self
+                .projection_resolution_input_rows
+                .unit_rust_edition_kind,
+            macro_compilation_cfg_values: self.projection_target_cfg_values.clone(),
+            macro_metadata_environment_rows: rows,
+        })
+    }
+
+    pub(super) fn record_unavailable_macro_reason(
+        &mut self,
+        invocation: &NameMacroInvocationRow,
+        reason: SiteUnresolvedReasonKind,
+        detail: String,
+    ) -> NameExpansionRoundRows {
+        self.projection_macro_failure_rows
+            .insert(invocation.invocation_site_occurrence_key.clone(), detail);
+        NameExpansionRoundRows {
+            expansion_unavailable_reason_rows: vec![(
+                invocation.invocation_site_occurrence_key.clone(),
+                reason,
+            )],
+            ..Default::default()
+        }
+    }
+
+    pub(super) fn build_unresolved_macro_value(
+        &self,
+        key: &SemanticOccurrenceKeyValue,
+        reason: SiteUnresolvedReasonKind,
+    ) -> Value {
+        json!({
+            "macro_invocation_identity_record":encode_occurrence_identity_value(key),
+            "macro_resolution_state_kind":"unresolved","macro_unresolved_reason_kind":encode_unresolved_reason_value(reason),
+            "macro_unresolved_detail_text":self.projection_macro_failure_rows.get(key).map(String::as_str).unwrap_or("macro binding or expansion source unavailable"),
+        })
+    }
+
+    pub(super) fn project_builtin_include_rows(
+        &mut self,
+        invocation: &NameMacroInvocationRow,
+        requested: &str,
+    ) -> Result<NameExpansionRoundRows, StoreBackendFailureError> {
+        let context = self
+            .projection_macro_source_rows
+            .get(&invocation.invocation_site_occurrence_key)
+            .ok_or_else(|| build_name_projection_error("include context absent"))?;
+        let candidate = context.macro_invocation_source_directory.join(requested);
+        if candidate
+            .components()
+            .any(|part| part.as_os_str() == "target")
+        {
+            return Ok(self.record_unavailable_macro_reason(
+                invocation,
+                SiteUnresolvedReasonKind::BuildScript,
+                "include source in target/ is forbidden".into(),
+            ));
+        }
+        let path = NativeCanonicalSourcePort
+            .read_canonical_source_path(&candidate)
+            .map(|path| path.to_string_lossy().into_owned());
+        let Some((path, digest)) = path.as_ref().and_then(|path| {
+            self.projection_source_file_rows
+                .get(path)
+                .map(|digest| (path, digest))
+        }) else {
+            return Ok(self.record_unavailable_macro_reason(
+                invocation,
+                SiteUnresolvedReasonKind::ExternalSourceMissing,
+                format!("include source not ingested: {requested}"),
+            ));
+        };
+        let source = String::from_utf8(
+            self.projection_source_store_port
+                .read_file_content_bytes(digest)?,
+        )
+        .map_err(build_name_projection_error)?;
+        let definition = json!({
+            "macro_definition_unit_key":encode_compilation_unit_value(&self.projection_resolution_input_rows.unit_compilation_identity_key),
+            "macro_definition_crate_rows":[],"macro_source_absolute_path":path,"macro_source_range_start":0,"macro_included_source_path":path,
+        });
+        self.project_macro_expansion_rows(
+            invocation,
+            &definition,
+            &DeclarativeMacroExpansionOutput {
+                macro_expanded_source_text: source,
+                macro_token_origin_rows: vec![],
+                macro_matched_arm_index: 0,
+            },
+        )
+    }
+
     pub(super) fn project_macro_expansion_rows(
         &mut self,
         invocation: &NameMacroInvocationRow,
@@ -522,7 +686,20 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         .join("expanded.rs")
         .to_string_lossy()
         .into_owned();
-        let directory = context.macro_invocation_directory_path.clone();
+        let included = definition["macro_included_source_path"].as_str();
+        let source_directory = if let Some(path) = included {
+            Path::new(path)
+                .parent()
+                .ok_or_else(|| build_name_projection_error("include parent absent"))?
+                .to_owned()
+        } else {
+            context.macro_invocation_source_directory.clone()
+        };
+        let directory = if included.is_some() {
+            source_directory.clone()
+        } else {
+            context.macro_invocation_directory_path.clone()
+        };
         let source = &expanded.macro_expanded_source_text;
         let default_unit = decode_compilation_unit_value(&definition["macro_definition_unit_key"])?;
         let crates = source
@@ -596,7 +773,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             )));
         }
         let file = NamespaceSourceFileContext {
-            source_file_absolute_path: path.clone(),
+            source_file_absolute_path: included.unwrap_or(&path).into(),
             source_file_original_text: source.clone(),
             source_crlf_removed_offsets: source
                 .match_indices("\r\n")
@@ -605,6 +782,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 .collect(),
             source_macro_crate_bindings: crates,
             source_expansion_provenance_rows: provenance.clone(),
+            source_original_directory_path: source_directory,
         };
         let chain = provenance
             .iter()
@@ -612,7 +790,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             .collect::<Vec<_>>();
         let syntax = super::extract_file_syntax_core(
             &super::SyntaxFileInputData {
-                file_source_absolute_path: path.clone(),
+                file_source_absolute_path: file.source_file_absolute_path.clone(),
                 file_source_content_bytes: source.as_bytes().to_vec(),
                 unit_compilation_identity_key: read_record_string_value(
                     &self.projection_unit_record_value,
@@ -731,6 +909,10 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             source_crlf_removed_offsets: removed,
             source_macro_crate_bindings: BTreeMap::new(),
             source_expansion_provenance_rows: vec![],
+            source_original_directory_path: Path::new(path)
+                .parent()
+                .ok_or_else(|| build_name_projection_error("source directory absent"))?
+                .to_owned(),
         };
         let parent = Path::new(path)
             .parent()
@@ -979,10 +1161,17 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 });
         }
         if let Some(call) = ast::MacroCall::cast(node.clone())
-            && !node
-                .parent()
-                .is_some_and(|parent| ast::MacroExpr::can_cast(parent.kind()))
+            && node.parent().is_some_and(|parent| {
+                matches!(
+                    parent.kind(),
+                    SyntaxKind::SOURCE_FILE
+                        | SyntaxKind::ITEM_LIST
+                        | SyntaxKind::ASSOC_ITEM_LIST
+                        | SyntaxKind::EXTERN_ITEM_LIST
+                )
+            })
         {
+            self.seed_native_macro_bindings()?;
             let occurrence = self.build_source_occurrence_key(file, node)?;
             let argument = call.token_tree();
             let start = argument
@@ -1002,6 +1191,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     macro_invocation_directory_path: directory.into(),
                     macro_argument_crate_bindings: file.source_macro_crate_bindings.clone(),
                     macro_source_provenance_rows: file.source_expansion_provenance_rows.clone(),
+                    macro_invocation_source_directory: file.source_original_directory_path.clone(),
                 },
             );
             self.projection_resolution_input_rows

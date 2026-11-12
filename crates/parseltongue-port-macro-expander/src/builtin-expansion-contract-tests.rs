@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use super::{BuiltinMacroLookupPort, expand_builtin_macro_items};
 use parseltongue_core_row_types::*;
 

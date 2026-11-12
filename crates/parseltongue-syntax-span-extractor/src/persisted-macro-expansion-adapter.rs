@@ -3,12 +3,117 @@ use super::{
     name_resolution_record_codec::build_name_projection_error,
 };
 use parseltongue_core_row_types::*;
-use parseltongue_port_macro_expander::expand_declarative_macro_items;
-use parseltongue_port_name_resolver::ItemMacroExpansionPort;
-use std::sync::Mutex;
+use parseltongue_port_macro_expander::{
+    BuiltinMacroLookupPort, expand_builtin_macro_items, expand_declarative_macro_items,
+};
+use parseltongue_port_name_resolver::{ItemMacroExpansionPort, resolve_macro_path_binding};
+use std::{collections::BTreeMap, sync::Mutex};
 
 pub(super) struct PersistedItemMacroPort<'a> {
     projection_source_state_lock: Mutex<CrateSyntaxProjectionState<'a>>,
+}
+
+struct ResolvedBuiltinMacroLookup<'a, 'b> {
+    expansion_query_record_rows: &'a NameMacroExpansionQuery<'b>,
+    invocation_lexical_scope_key: &'a NameResolutionScopeKey,
+    projection_target_metadata_rows: &'a BTreeMap<NameSymbolTargetKey, serde_json::Value>,
+}
+
+impl BuiltinMacroLookupPort for ResolvedBuiltinMacroLookup<'_, '_> {
+    fn read_builtin_macro_name(&self, path: &[NamePathSegmentKind]) -> Option<String> {
+        let query = self.expansion_query_record_rows;
+        let binding = resolve_macro_path_binding(
+            query.expansion_input_record_rows,
+            query.expansion_known_binding_rows,
+            self.invocation_lexical_scope_key,
+            path,
+        )?;
+        read_macro_builtin_name(&binding, self.projection_target_metadata_rows)
+    }
+}
+
+fn read_macro_builtin_name(
+    binding: &NameResolvedBindingRow,
+    metadata: &BTreeMap<NameSymbolTargetKey, serde_json::Value>,
+) -> Option<String> {
+    let value = metadata.get(&binding.binding_target_identity_key)?;
+    if value["target_symbol_kind_value"] == "BuiltinMacro" {
+        value["target_builtin_name_value"]
+            .as_str()
+            .map(str::to_owned)
+    } else {
+        value["target_macro_definition_record"]["macro_builtin_identifier_text"]
+            .as_str()
+            .map(str::to_owned)
+    }
+}
+
+fn expand_builtin_stage_rows(
+    state: &mut CrateSyntaxProjectionState<'_>,
+    query: &NameMacroExpansionQuery<'_>,
+    invocation: &NameMacroInvocationRow,
+    name: &str,
+) -> Result<NameExpansionRoundRows, NameResolutionStageError> {
+    let input = state
+        .build_builtin_expansion_input(invocation, name)
+        .map_err(build_macro_expansion_error)?;
+    let lookup = ResolvedBuiltinMacroLookup {
+        expansion_query_record_rows: query,
+        invocation_lexical_scope_key: &invocation.invocation_lexical_scope_key,
+        projection_target_metadata_rows: &state.projection_target_metadata_rows,
+    };
+    match expand_builtin_macro_items(&input, &lookup, state.projection_cancel_flag_value).map_err(
+        |error| {
+            if error == MacroExpansionFailureKind::Cancelled {
+                NameResolutionStageError::Cancelled
+            } else {
+                build_macro_expansion_error(error)
+            }
+        },
+    )? {
+        BuiltinMacroExpansionOutput::Include(path) => state
+            .project_builtin_include_rows(invocation, &path)
+            .map_err(build_macro_expansion_error),
+        BuiltinMacroExpansionOutput::Unavailable(reason, detail) => {
+            Ok(state.record_unavailable_macro_reason(invocation, reason, detail))
+        }
+        BuiltinMacroExpansionOutput::Expression(_) => Ok(state.record_unavailable_macro_reason(
+            invocation,
+            SiteUnresolvedReasonKind::ExternalSourceMissing,
+            format!("builtin {name} produces an expression, not items"),
+        )),
+    }
+}
+
+fn merge_expansion_round_rows(
+    mut round: NameExpansionRoundRows,
+    delta: NameExpansionRoundRows,
+) -> NameExpansionRoundRows {
+    round
+        .expansion_module_scope_rows
+        .extend(delta.expansion_module_scope_rows);
+    round
+        .expansion_symbol_binding_rows
+        .extend(delta.expansion_symbol_binding_rows);
+    round
+        .expansion_import_request_rows
+        .extend(delta.expansion_import_request_rows);
+    round
+        .expansion_signature_path_rows
+        .extend(delta.expansion_signature_path_rows);
+    round
+        .expansion_macro_invocation_rows
+        .extend(delta.expansion_macro_invocation_rows);
+    round
+        .expansion_completed_invocation_keys
+        .extend(delta.expansion_completed_invocation_keys);
+    round
+        .expansion_unavailable_reason_rows
+        .extend(delta.expansion_unavailable_reason_rows);
+    round
+        .expansion_semantic_output_rows
+        .extend(delta.expansion_semantic_output_rows);
+    round
 }
 
 impl<'a> PersistedItemMacroPort<'a> {
@@ -37,7 +142,7 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
             .map_err(build_macro_expansion_error)?;
         query.expansion_resolved_macro_rows.iter().try_fold(
             NameExpansionRoundRows::default(),
-            |mut round, (key, binding)| {
+            |round, (key, binding)| {
                 if state
                     .projection_cancel_flag_value
                     .check_stage_work_cancelled()
@@ -51,6 +156,12 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                     .ok_or_else(|| {
                         build_macro_expansion_error("resolved macro invocation missing")
                     })?;
+                if let Some(name) =
+                    read_macro_builtin_name(binding, &state.projection_target_metadata_rows)
+                {
+                    let delta = expand_builtin_stage_rows(&mut state, query, invocation, &name)?;
+                    return Ok(merge_expansion_round_rows(round, delta));
+                }
                 let definition = state
                     .projection_target_metadata_rows
                     .get(&binding.binding_target_identity_key)
@@ -100,31 +211,7 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                 let delta = state
                     .project_macro_expansion_rows(invocation, &definition, &expanded)
                     .map_err(build_macro_expansion_error)?;
-                round
-                    .expansion_module_scope_rows
-                    .extend(delta.expansion_module_scope_rows);
-                round
-                    .expansion_symbol_binding_rows
-                    .extend(delta.expansion_symbol_binding_rows);
-                round
-                    .expansion_import_request_rows
-                    .extend(delta.expansion_import_request_rows);
-                round
-                    .expansion_signature_path_rows
-                    .extend(delta.expansion_signature_path_rows);
-                round
-                    .expansion_macro_invocation_rows
-                    .extend(delta.expansion_macro_invocation_rows);
-                round
-                    .expansion_completed_invocation_keys
-                    .extend(delta.expansion_completed_invocation_keys);
-                round
-                    .expansion_unavailable_reason_rows
-                    .extend(delta.expansion_unavailable_reason_rows);
-                round
-                    .expansion_semantic_output_rows
-                    .extend(delta.expansion_semantic_output_rows);
-                Ok(round)
+                Ok(merge_expansion_round_rows(round, delta))
             },
         )
     }

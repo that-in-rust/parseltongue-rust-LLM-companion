@@ -921,3 +921,32 @@ The test cancellation method spelling was corrected before collecting the RED re
 The metadata extension adds a failing graph contract: CARGO_PKG_AUTHORS is Null rather
 than First:Second; the same case covers homepage, repository, license/readme paths,
 rust-version and prerelease/build metadata separation. This is RED before the loader edit.
+
+### M2 built-in macro arguments — GREEN
+
+Pure expansion supports cfg, concat, stringify, env and option_env; include returns a
+path request to L3. Nested builtins use settled macro-namespace bindings, not text-only
+dispatch. Unsupported macros and unavailable environment inputs have explicit reasons;
+OUT_DIR is build_script. Known absence is distinct from unavailable process environment.
+The graph loader supplies documented CARGO_PKG fields, including authors and correct
+prerelease/build separation. No arbitrary process environment values are read.
+
+The persisted adapter expands includes from immutable ingested bytes, preserves caller
+cfg/unit context, records virtual source and expanded evidence, and emits final unresolved
+macro rows only after resolution converges. Relative include bases preserve the original
+call-site source directory across virtual expansions. A rustc lab with separate physical
+definition/caller files rejected a definition-directory target and accepted the caller
+target (metadata output under /home/ubuntu; /dev/null required an unwritable /dev temp).
+The probe does not establish a separate cross-crate case.
+
+Item callbacks now exclude type macros. Builtin prelude rows are seeded only when an
+item invocation is visited: an initial eager seed broke the empty baseline (25 versus
+19 bindings); lazy seeding restores the unchanged existing contract, without editing it.
+The new test module follows the existing test-only unwrap lint allowance.
+
+Checks: pure macro 18 tests + 1 doctest; CLI 13; graph 9; resolver 8; syntax 11 all pass.
+Affected all-target/all-feature Clippy -D warnings passed in 3.00s; fmt and diff checks
+are clean. Logs: /home/ubuntu/m2-builtin-*-green*.log. Builtin argument nesting over 128
+is explicitly unavailable, not invented output. Next: refactor argument parsing and
+expand edge/shadowing checks, then sysroot/preludes/lang items, exact oracle manifest,
+differ and all-five S5. No S5 measurement exists.

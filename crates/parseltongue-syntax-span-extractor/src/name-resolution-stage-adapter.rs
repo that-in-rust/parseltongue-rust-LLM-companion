@@ -248,6 +248,18 @@ fn build_resolved_crate_records(
             value,
         ));
     }
+    rows.extend(
+        output
+            .resolved_unavailable_reason_rows
+            .iter()
+            .map(|(key, reason)| {
+                build_name_stage_record(
+                    "macro-expanded-item-table",
+                    prefix,
+                    projector.build_unresolved_macro_value(key, *reason),
+                )
+            }),
+    );
     rows.extend(output.resolved_semantic_output_rows);
     Ok(rows)
 }
