@@ -393,3 +393,14 @@ R7 development-process gates (checked per run, recorded in the report):
 
 R8 memory: see "S10 memory revision" — ≤500 MB whole-tree peak, enforced
 after all-five DuckDB S5 exists; interim DuckDB cap ≈1.2 GiB.
+
+### SOP revision — optional source-grounded HLD-current model audit (2026-11-12)
+
+The independent, two-pass HLD-current audit in
+`docs/phase-20261111/hld-current-model-audit/SOP.md` may supplement S8/S9.
+It never reads production HLD rows in Pass A; it freezes a source/config-derived
+expected artifact before Pass B. It does not change S8's deterministic sample,
+PRIMARY denominators, thresholds, or per-repository verdicts. Model findings
+are non-authoritative; source-confirmed false edges fail, unresolved disputes
+block, and missing production HLD output is BLOCKED/NOT STARTED, not success.
+The root AGENTS.md and production architecture are unchanged.

@@ -932,3 +932,96 @@ test_type: unit
 assertion: row/byte thresholds flush and reset, including oversized row
 metric: 1024 rows or 1048576 value bytes
 ```
+
+## REQ-RUST-025.0 — independent-source-grounded-hld-current-audit
+
+WHEN an independent model audits one pinned repository's HLD current, THEN
+Pass A SHALL derive candidate nodes and dependencies from pinned source and
+configuration without reading production HLD rows; record byte/line evidence,
+canonical compilation and occurrence keys, examined scopes, exclusions,
+unknowns and coverage limits; and freeze the canonical expected artifact digest
+before Pass B. Pass B SHALL compare that frozen artifact with the matching
+generation's production HLD current rows, including false/missing edges,
+effective visibility, reexports, private-chain cycles/diamonds/self-edges,
+provenance and deduplicated file/folder roll-ups.
+
+Each repository SHALL be reported separately. A missing production export is
+BLOCKED/NOT STARTED. Model results are non-authoritative candidate evidence:
+model agreement SHALL NOT pass a gate or alter the PRIMARY denominator;
+source-confirmed false edges SHALL fail, and unresolved disputes SHALL block
+the scoped audit. The existing deterministic PRIMARY and S8/S9 acceptance
+rules remain authoritative. The S8 sample algorithm is unchanged; source-first
+supplementary samples SHALL cover possible missing edges. Denominators and
+sampling limits SHALL be explicit, and no complete-golden-table claim is
+allowed without exhaustive independently verified coverage.
+
+Verification matrix additions — all planned tests are PENDING and do not yet
+exist in the source tree:
+
+```text
+req_id: REQ-RUST-025.0
+test_id: test_pass_a_source_only
+test_type: fixture
+assertion: Pass A uses source/config evidence only, with no production HLD rows
+metric: every candidate key has a pinned source digest and line range
+
+req_id: REQ-RUST-025.0
+test_id: test_frozen_artifact_digest_integrity
+test_type: fixture
+assertion: Pass B cannot begin with a missing or changed frozen Pass A digest
+metric: exact SHA-256 over canonical expected-artifact bytes
+
+req_id: REQ-RUST-025.0
+test_id: test_false_edge_has_evidence
+test_type: fixture
+assertion: a source-confirmed extra HLD row is reported as false
+metric: exact false-edge keys and source evidence references
+
+req_id: REQ-RUST-025.0
+test_id: test_missing_edge_source_first
+test_type: fixture
+assertion: source-selected expectations detect an absent production edge
+metric: exact missing-edge keys, including source-first sample count
+
+req_id: REQ-RUST-025.0
+test_id: test_unresolved_dispute_blocks_audit
+test_type: fixture
+assertion: unsupported or disputed evidence blocks, never passes
+metric: blocked finding count and explicit causal reason
+
+req_id: REQ-RUST-025.0
+test_id: test_source_digest_mismatch_blocks
+test_type: fixture
+assertion: an input source/config digest mismatch blocks comparison
+metric: expected and observed SHA-256 values
+
+req_id: REQ-RUST-025.0
+test_id: test_cycle_no_fake_self
+test_type: fixture
+assertion: cycle traversal terminates without inventing a self-edge
+metric: exact canonical edge-key set
+
+req_id: REQ-RUST-025.0
+test_id: test_diamond_dedup_keeps_paths
+test_type: fixture
+assertion: a diamond yields one HLD key and retains every evidence path
+metric: unique row count and distinct path/evidence counts
+
+req_id: REQ-RUST-025.0
+test_id: test_rollup_counts_unique_rows
+test_type: fixture
+assertion: file/folder roll-ups count deduplicated HLD rows, not paths
+metric: exact grouped row counts
+
+req_id: REQ-RUST-025.0
+test_id: test_missing_export_blocks_audit
+test_type: fixture
+assertion: absent HLD current export is BLOCKED/NOT STARTED
+metric: zero comparisons and a non-success disposition
+
+req_id: REQ-RUST-025.0
+test_id: test_s8_sample_algorithm_unchanged
+test_type: contract
+assertion: the supplementary model audit does not alter SOP S8 sampling
+metric: identical seed, algorithm, keys and deterministic sample count
+```
