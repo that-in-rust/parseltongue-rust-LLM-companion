@@ -676,3 +676,58 @@ REQ-RUST-027.0 REFACTOR
 - Added `set -e` as the first statement in the S4 shell block so a failed manifest/cache command, paired export, or frozen-input checksum stops before comparison.
 - Prelaunch build budget: estimated 10 minutes expected, hard maximum 20 minutes per compilation invocation. The metadata, focused test, and clippy commands in this run stopped at dependency resolution; no compilation or build was launched. The execution tool's 4m40 timeout clamp is a tool wait limit, not evidence that a 20-minute build limit was enforced.
 - Use an explicit shell `timeout 1200s` for any future compilation invocation. No command was run under that timeout for this documentation-only follow-up; no dependency fetch, corpus run, or other gate was repeated.
+
+### REQ-RUST-027.0 — post-handoff runtime validation
+
+Dependency preparation (outside qualification)
+  - Ran the expressly authorized network preparation command `cargo fetch --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml`, wrapped by `/usr/bin/timeout 1200s` and `/usr/bin/time`. Result: `elapsed_seconds=0.56 exit_code=0`; output included `Updating crates.io index`, `Downloading crates ...`, and `Downloaded la-arena v0.3.1`. Cargo emitted the known upstream `lints.cargo` manifest warnings; this fetch did not compile or qualify the harness.
+  - Before fetch and after fetch, HEAD was `f1e61976064008f1b001862b3a92cfa23242d8f4`, branch was `devin/1794501872-comparator-parallel-work`, and `git status --porcelain=v1` was empty. The following SHA-256 digests were identical before fetch, after fetch, and after all gates:
+
+```text
+07792bcb211b2d137af8012e6ad110a6b8087d7868ca136db545c9596dff8e45  Cargo.lock
+289cebd2b9d53b1030f32f0d91a701f9df799acd6c6412df410cb217df666e1e  tools/oracle-semantic-export-harness/Cargo.lock
+e2c96a147e2096544fd4ef8d23477bd435a5c2aa972b9a226d7dbb20847d65c5  docs/phase-20261111/parser-source-pin-manifest.json
+4eed63352738951e1f3ac5de03769ae184409c6e8d7ae470948c4ff0ec98fc03  docs/phase-20261111/corpus-source-pin-manifest.json
+64444e2abaaecd1a9688af595c70d7ad51e28686e6ae9446f0e6f561e9497781  docs/phase-20261111/oracle-source-build-manifest.json
+```
+
+REQ-RUST-027.0 STUB / RED setup
+  - Kept the `build_oracle_source_manifest` API and tagged `test_oracle_capability_reports_paths` from `f1e61976064008f1b001862b3a92cfa23242d8f4`. Created `/home/ubuntu/repos/oracle-capability-red-worktree` detached at that exact commit; its `../../../rust-tools/rust-analyzer` resolves to `/home/ubuntu/repos/rust-tools/rust-analyzer`.
+  - In that isolated worktree only, reverted the production `oracle_export_support_kind` literal to `provenance_only`; retained the new test's expected `mapped_semantic_paths` value. The verified RED worktree diff was one line in `tools/oracle-semantic-export-harness/src/lib.rs`. The pinned rust-analyzer checkout remained clean.
+  - Reused the existing shared `/home/ubuntu/repos/parseltongue-rust-LLM-companion/target` (`CARGO_TARGET_DIR`); no competing Cargo/rustc process was present when selected. RED, GREEN, all-tests, clippy, and release-build invocations each used `/usr/bin/timeout 1200s` and `/usr/bin/time`. No memory limit or build tuning was added.
+
+REQ-RUST-027.0 RED — actual post-handoff assertion failure
+  - Command: `cargo test --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml test_oracle_capability_reports_paths -- --nocapture` in the isolated RED worktree.
+  - Actual runtime output:
+
+```text
+assertion `left == right` failed
+  left: String("provenance_only")
+ right: "mapped_semantic_paths"
+test oracle_manifest_contract_tests::test_oracle_capability_reports_paths ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s
+error: test failed, to rerun pass `--lib`
+elapsed_seconds=60.92 exit_code=101
+```
+
+REQ-RUST-027.0 GREEN — unchanged `f1e6197` source
+  - Focused command: `cargo test --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml test_oracle_capability_reports_paths -- --nocapture`.
+  - Output: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s`; `/usr/bin/time`: `elapsed_seconds=3.89 exit_code=0`.
+  - All harness tests: `cargo test --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml`.
+  - Output: `test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 157.61s`; main binary and doc-test targets each reported zero tests and success. `/usr/bin/time`: `elapsed_seconds=158.13 exit_code=0`.
+
+REQ-RUST-027.0 final harness gates
+  - `cargo fmt --manifest-path tools/oracle-semantic-export-harness/Cargo.toml -- --check`: no diagnostics; exit 0; `/usr/bin/time` `elapsed_seconds=0.12`.
+  - `cargo clippy --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 32.72s`; exit 0; `/usr/bin/time` `elapsed_seconds=32.79`.
+  - `cargo build --offline --locked --release --manifest-path tools/oracle-semantic-export-harness/Cargo.toml`: `Finished release profile [optimized] target(s) in 1m 29s`; exit 0; `/usr/bin/time` `elapsed_seconds=89.46`.
+  - Every compilation invocation completed below the enforced 1200-second shell limit. Cargo emitted this repeated upstream warning:
+
+```text
+warning: /home/ubuntu/repos/rust-tools/rust-analyzer/crates/hir-expand/Cargo.toml: unused manifest key `lints.cargo` (may be supported in a future version)
+```
+
+    The active toolchain was `stable-x86_64-unknown-linux-gnu`, Cargo/rustc 1.99.1; the pinned rust-analyzer checkout remained clean. No toolchain or pinned checkout change was made.
+
+REQ-RUST-027.0 REFACTOR / scope checkpoint
+  - No further refactor was needed; no production source, scoring, resolver, provenance behavior, pins, lockfiles, static executable manifest, or digest changed. The only main-worktree change for this validation is this append-only journal evidence.
+  - This validates the harness manifest capability contract only. No production mapper, serde corpus/export, final executable freeze, or S4/S5 qualification run was performed. Complete stdout/stderr and timing files are retained at `/home/ubuntu/oracle-capability-validation-f1e6197`.
