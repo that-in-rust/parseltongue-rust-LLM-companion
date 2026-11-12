@@ -97,6 +97,31 @@ fn test_macro_empty_expansion() {
 }
 
 #[test]
+fn test_macro_declaration_comma_rules() {
+    let mut input = build_macro_expansion_fixture(
+        "{(first)=>{pub struct First;}, (second)=>{pub struct Second;},}",
+        "(second)",
+    );
+    input.macro_declaration_style_flag = true;
+    let output = expand_declarative_macro_items(&input, &RunCancelFlagValue::default()).unwrap();
+    assert!(output.macro_expanded_source_text.contains("Second"));
+    input.macro_definition_source_text = "{()=>{},}".into();
+    input.macro_argument_source_text = "()".into();
+    assert!(
+        expand_declarative_macro_items(&input, &RunCancelFlagValue::default())
+            .unwrap()
+            .macro_expanded_source_text
+            .trim()
+            .is_empty()
+    );
+    input.macro_declaration_style_flag = false;
+    assert!(matches!(
+        expand_declarative_macro_items(&input, &RunCancelFlagValue::default()),
+        Err(MacroExpansionFailureKind::InvalidDefinition(_))
+    ));
+}
+
+#[test]
 fn test_macro_documentation_token_origins() {
     for docs in [
         "/// hello",
