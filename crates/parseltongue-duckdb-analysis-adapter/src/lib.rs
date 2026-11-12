@@ -71,22 +71,30 @@ fn build_analysis_error(message: impl std::fmt::Display) -> StoreBackendFailureE
 impl AnalysisTableStorePort for DuckdbAnalysisStoreAdapter {
     fn copy_published_stage_rows(
         &self,
-        _source: &dyn StageTableStorePort,
-        _scope: &StageRunScopeValue,
-        _tables: &[&str],
-        _cancel: &RunCancelFlagValue,
+        source: &dyn StageTableStorePort,
+        scope: &StageRunScopeValue,
+        tables: &[&str],
+        cancel: &RunCancelFlagValue,
     ) -> Result<usize, StoreBackendFailureError> {
-        todo!("frozen generation Appender copy")
+        frozen_generation_appender_copy::copy_generation(self, source, scope, tables, cancel)
     }
 
     fn count_analysis_stage_rows(
         &self,
-        _scope: &StageRunScopeValue,
-        _table: &str,
+        scope: &StageRunScopeValue,
+        table: &str,
     ) -> Result<usize, StoreBackendFailureError> {
-        todo!("frozen generation analysis count")
+        let connection = self._connection.lock().map_err(build_analysis_error)?;
+        connection.query_row(
+            "SELECT row_count FROM \"frozen-generation-table-manifests\" WHERE generation_key=? AND attempt_key=? AND table_name=? ORDER BY generation_key,attempt_key,table_name",
+            duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value,table],
+            |row| row.get::<_, usize>(0),
+        ).map_err(build_analysis_error)
     }
 }
+
+#[path = "frozen-generation-appender-copy.rs"]
+mod frozen_generation_appender_copy;
 
 pub const FIXED_POINT_LIMIT: usize = 8192;
 

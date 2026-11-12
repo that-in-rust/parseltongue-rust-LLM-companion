@@ -41,6 +41,11 @@ fn test_bounded_constructor_policy() {
     assert!(memory.contains("GiB"));
     assert!(connection.execute_batch("INSTALL httpfs").is_err());
     assert!(connection.execute_batch("LOAD httpfs").is_err());
+    assert!(
+        connection
+            .execute_batch("SET enable_external_access=true")
+            .is_err()
+    );
 }
 
 #[test]
