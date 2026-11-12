@@ -905,3 +905,11 @@ OK
 ```
 
 No Cargo command, lock regeneration, corpus run, mapper run, production build, or graph/index operation was performed.
+
+### Output, lock, and publication safeguards — REFACTOR checkpoint
+
+No refactor needed: the output validation and owned-run exclusion helpers are narrowly scoped, lock
+permission is explicit at the serde/tokio source-root boundary, and publication validation reuses
+the existing generation/tiling/count checks with the new publication map. GREEN commit:
+`c9d4c18da843e38c0b663f8abc6bd05667df8e69`. This is a separate journal-only checkpoint; subsequent
+review requests about other audit helpers remain out of scope.
