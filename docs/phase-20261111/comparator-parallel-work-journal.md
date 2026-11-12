@@ -243,3 +243,5 @@ REQ-RUST-025.4
 
 REQ-RUST-025.5
   - `test_thread_counts_export_identically`, `test_persisted_known_answer_matrix`.
+
+Refactor commit: `6c2420a64` (`refactor: isolate oracle comparison storage`), following GREEN commit `42db82b29`. No push was made.
