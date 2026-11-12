@@ -171,3 +171,76 @@ file/range scopes and is explicitly non-exhaustive. Pass A remains DRAFT,
 freeze NOT_FROZEN, Pass B NOT_STARTED, PRIMARY/S8/S9 NOT_RUN, and repository
 verdict NOT_RUN. No production HLD rows were read and no acceptance or
 complete-golden-table claim is made.
+
+## 2026-11-12 — scoped serde configuration bundle repair
+
+Corrects the previous reviewed-artifact note that `source_pin.config_sha256`
+was unavailable. It now means SHA-256 of the separate immutable audit
+configuration bundle, not a mapper per-unit BLAKE3 digest or
+`RunGenerationDigestValue`. Canonical bytes are UTF-8 JSON with recursively
+sorted object keys, compact separators, `ensure_ascii=false`, and a final LF.
+Bundle: `/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/configuration-bundle.json`,
+10,678 bytes, SHA-256
+`0ee963301861e80ee866485360860ef850b7bb0b8b671da11ce54fac1ca4eebc`.
+
+Read-only inputs: source HEAD `aa7913ad0211fef960df68e7812a6211145a888c`;
+ignored/untracked Cargo.lock SHA-256
+`839a2f8b9d252c5dc6b93495aa8d54f9ba8cf5679a0f82dcdaaf12bbe6d7361f`;
+resolver 2; rustc `1.99.1 (58cf8f9c3 2026-10-13)` on
+`x86_64-unknown-linux-gnu`; cargo `1.99.1 (5f94df478 2026-08-27)`. Commands
+were `cargo metadata --offline --locked --no-deps --format-version 1`,
+`rustc --print cfg`, `rustc -vV`, and `cargo -V`; no build or build script
+ran. The bounded normal default-feature closure is serde lib (`std`) to
+serde_core lib (`result`, `std`). `serde_derive`, `serde_derive_internals`,
+`test_suite`, tests/dev/examples, build-script targets, and other workspace
+units are excluded.
+
+The bundle uses the loader's compact serde JSON input tuple
+`[unit_target_cfg_values, unit_enabled_feature_values,
+unit_rust_edition_value, unit_compilation_role_kind]`. Observed per-unit
+BLAKE3-256 values: serde
+`4f196ed2521fa6997a7a133d072b5444083ae0abad064b7aa088fead73ce2361`; serde_core
+`06b40a1accc1b41975f5e022da6f6a53e8cb3417e203f241f5f72c886`. No occurrence
+key, macro expansion output, or production claim was added. Historical
+qualification toolchain/target/ignored-lock provenance and compiler-dependent
+macro/build-script outputs remain unknown.
+
+Updated only the reviewer-normalized candidate, preserving raw model output:
+`/home/ubuntu/zcode-runs/20261112-hld-current-model-audit/attempt-06-draft-repair/reviewed-candidate.json`,
+SHA-256
+`059cd3fe95d9ac0eb186221fc0bb82647e89fb429169ab9651e9cb3da6202d34`.
+Its config hash matches the bundle. Draft-07 validation has zero errors;
+source file/excerpt hashes and byte/line ranges match 8/8; evidence IDs are
+unique with zero missing references. It remains DRAFT/NOT_FROZEN, Pass B
+NOT_STARTED, with zero keyed nodes/edges and unresolved U-02/U-10/U-11. No
+production HLD rows or model were used.
+
+```text
+BLAKE3_TEST_VECTORS=PASS empty,abc
+CANONICAL_BYTES_REPEAT=PASS byte-identical; no internal whitespace; final LF
+DRAFT_SCHEMA=valid; errors=0
+CONFIG_CANONICAL=valid; bytes=10678; SHA256=0ee963301861e80ee866485360860ef850b7bb0b8b671da11ce54fac1ca4eebc; candidate_match=True
+PER_UNIT_DIGESTS=valid exact serde-json tuple + BLAKE3
+EVIDENCE=valid; ranges_and_file_hashes=8/8; unique_ids=True; missing_references=0
+KEYED_CLAIMS=nodes=0 edges=0; U-02/U-10/U-11 unresolved
+SOURCE_STATE=unchanged; Cargo.lock SHA256=839a2f8b9d252c5dc6b93495aa8d54f9ba8cf5679a0f82dcdaaf12bbe6d7361f; git_status=clean
+```
+
+Digest transcription correction: the observed `serde_core`
+`unit_configuration_digest_full` is
+`06b40a1accc1b41975d244925f5e022da6f6a53e8cb3417e203f241f5f72c886`.
+This value is the one in the canonical bundle and reviewed-candidate
+validation; the preceding per-unit digest transcription is superseded.
+
+## 2026-11-12 — maintained BLAKE3 library verification
+
+The two bundle per-unit digests were checked using the cached, maintained Rust
+`blake3` crate. Exact tool output:
+
+```text
+BLAKE3_IMPLEMENTATION=Rust crate blake3 1.8.7; prebuilt rlib libblake3-25faf5a8dc074bf7.rlib
+BLAKE3_RLIB_SHA256=125348c1487d3c266152f6c96aeaac6fedadbe5e6717a6e3fc0b2f57d8110fc0
+serde: expected=4f196ed2521fa6997a7a133d072b5444083ae0abad064b7aa088fead73ce2361 actual=4f196ed2521fa6997a7a133d072b5444083ae0abad064b7aa088fead73ce2361 match=True
+serde_core: expected=06b40a1accc1b41975d244925f5e022da6f6a53e8cb3417e203f241f5f72c886 actual=06b40a1accc1b41975d244925f5e022da6f6a53e8cb3417e203f241f5f72c886 match=True
+OFFLINE_CACHED_LIBRARY_CHECK=PASS; only tiny stdin verifier compiled, no workspace build/tests
+```

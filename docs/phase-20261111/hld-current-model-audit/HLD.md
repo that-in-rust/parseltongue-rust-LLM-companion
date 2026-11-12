@@ -124,3 +124,24 @@ claimed by this packet.
 - Which serde compilation target/feature set matches the eventual production
   generation after workspace feature resolution?
 - Who performs final source adjudication for model-flagged edges and unknowns?
+
+### Serde configuration-bundle identity
+
+For the bounded pilot, `source_pin.config_sha256` is SHA-256 of the separate
+immutable canonical configuration-bundle artifact, distinct from each unit's
+BLAKE3 `unit_configuration_digest_full` and from
+`RunGenerationDigestValue`. The bundle's UTF-8 JSON uses recursively sorted
+object keys, compact separators, `ensure_ascii=false`, and a final LF; unit
+arrays follow `CrateCompilationUnitKey` field order and unordered cfg/features
+are sorted. The artifact records the pin, lockfile, resolver, exact tool
+versions, host-target policy, selected per-unit key fields, and the bounded
+default-feature serde-lib to serde_core-lib closure.
+
+The per-unit BLAKE3 input is the loader's compact serde JSON array
+`[unit_target_cfg_values, unit_enabled_feature_values,
+unit_rust_edition_value, unit_compilation_role_kind]`. Metadata collection is
+offline/locked/no-deps plus `rustc --print cfg`; build scripts and target
+outputs are not run or read. Other workspace units are explicitly excluded.
+This configuration observation does not establish the historical qualification
+environment, macro/build-script expansion outputs, or any occurrence key.
+The reviewed draft therefore remains DRAFT/NOT_FROZEN with zero keyed claims.

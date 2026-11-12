@@ -16,6 +16,7 @@ REQ-RUST-025.0 status is **PENDING** until implemented and run.
 | `test_rollup_counts_unique_rows` | duplicate paths plus a distinct HLD edge | file/folder counts equal deduplicated HLD rows | PENDING |
 | `test_missing_export_blocks_audit` | no matching-generation HLD current export | BLOCKED/NOT STARTED; zero comparisons is not success | PENDING |
 | `test_s8_sample_algorithm_unchanged` | fixed product keys and recorded seed | exact existing S8 algorithm/keys remain unchanged | PENDING |
+| `test_config_bundle_digest_contract` | canonical immutable configuration bundle and exact per-unit mapper inputs | `source_pin.config_sha256` equals bundle SHA-256; both per-unit BLAKE3 values use the exact loader tuple | PENDING |
 
 Additional source fixtures must include positive/negative effective visibility,
 body-item exclusion, private parents, aliases and globs; all expectations need

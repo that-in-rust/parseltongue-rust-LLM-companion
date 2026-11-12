@@ -94,3 +94,30 @@ executable/prompt/model identities and hashes; model identity is the actual
 reported value or `null`. A model-confirmed claim still requires deterministic
 source/PRIMARY adjudication. A missing HLD export or unresolved dispute is
 BLOCKED/NOT STARTED, never a model PASS.
+
+## Serde configuration bundle
+
+For the bounded serde pilot, `source_pin.config_sha256` is SHA-256 of the
+separate immutable audit configuration bundle, not a per-unit BLAKE3 digest or
+`RunGenerationDigestValue`. Canonical bytes are UTF-8 JSON with recursively
+lexicographic object keys, no insignificant whitespace, `ensure_ascii=false`,
+and one final LF. Sort unit arrays by the source `CrateCompilationUnitKey`
+field order; sort unordered cfg and feature arrays lexicographically.
+
+The bundle records the pinned commit and Cargo.lock SHA-256, resolver, exact
+`rustc -vV` and `cargo -V`, host/target policy, and the selected per-unit key
+and configuration fields. Per-unit `unit_configuration_digest_full` remains
+BLAKE3 of the compact serde JSON tuple `[unit_target_cfg_values,
+unit_enabled_feature_values, unit_rust_edition_value,
+unit_compilation_role_kind]`. Collect metadata only with
+`cargo metadata --offline --locked --no-deps` and `rustc --print cfg`; do not
+run build scripts or read target outputs.
+
+This pilot derives only the normal default-feature `serde` lib to `serde_core`
+lib closure: `serde` enables `std`; its normal `serde_core` dependency enables
+`result`, and `serde/std` enables `serde_core/std`. Tests, dev dependencies,
+examples, build-script targets, `serde_derive`, `serde_derive_internals`,
+`test_suite`, and other workspace units are excluded. The bundle does not
+establish compiler-dependent build-script or macro expansion output and does
+not create occurrence keys. Keep candidate rows empty until each source
+occurrence and its provenance are independently proved.

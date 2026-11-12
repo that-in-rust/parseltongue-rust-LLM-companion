@@ -955,6 +955,12 @@ supplementary samples SHALL cover possible missing edges. Denominators and
 sampling limits SHALL be explicit, and no complete-golden-table claim is
 allowed without exhaustive independently verified coverage.
 
+For the bounded source audit, `source_pin.config_sha256` SHALL equal SHA-256 of
+the separate immutable canonical audit configuration bundle. It SHALL NOT be
+the mapper's per-unit BLAKE3 digest or `RunGenerationDigestValue`; the bundle
+SHALL preserve the selected policy, exact tool inputs, and per-unit key and
+configuration fields without inventing occurrence keys.
+
 Verification matrix additions — all planned tests are PENDING and do not yet
 exist in the source tree:
 
@@ -1024,4 +1030,10 @@ test_id: test_s8_sample_algorithm_unchanged
 test_type: contract
 assertion: the supplementary model audit does not alter SOP S8 sampling
 metric: identical seed, algorithm, keys and deterministic sample count
+
+req_id: REQ-RUST-025.0
+test_id: test_config_bundle_digest_contract
+test_type: fixture
+assertion: source_pin.config_sha256 hashes the canonical immutable config bundle, not a unit or generation digest
+metric: exact bundle SHA-256 and per-unit mapper BLAKE3 inputs
 ```
