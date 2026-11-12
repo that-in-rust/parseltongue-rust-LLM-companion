@@ -14,9 +14,7 @@ pub const NAMESPACE_SOURCE_TABLE_NAMES: &[&str] = &[
     "syntax-namespace-input-paths",
     "syntax-namespace-input-macros",
     "syntax-namespace-input-externs",
-    "legacy-macro-source-events",
     "legacy-macro-scope-records",
-    "lang-item-definition-table",
 ];
 
 impl DuckdbAnalysisStoreAdapter {
@@ -85,6 +83,8 @@ impl DuckdbAnalysisStoreAdapter {
                 scope,
                 graph: BTreeMap::new(),
                 editions: BTreeMap::new(),
+                budget:
+                    super::namespace_appender_batch_budget::NamespaceAppenderBatchBudget::default(),
             };
             let count=NAMESPACE_SOURCE_TABLE_NAMES.iter().try_fold(0,|total,table|{
                 let (expected,digest):(usize,String)=reader.query_row("SELECT row_count,content_digest FROM \"frozen-generation-table-manifests\" WHERE generation_key=? AND attempt_key=? AND table_name=? ORDER BY generation_key,attempt_key,table_name",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value,table],|row|Ok((row.get(0)?,row.get(1)?))).map_err(build_analysis_error)?;
@@ -139,6 +139,10 @@ impl DuckdbAnalysisStoreAdapter {
             )
             .map_err(build_analysis_error)?;
         transaction.commit().map_err(build_analysis_error)?;
+        drop(reader);
+        connection
+            .execute_batch("CHECKPOINT")
+            .map_err(build_analysis_error)?;
         Ok(count)
     }
 }
@@ -200,6 +204,7 @@ struct NamespaceSourceAppender<'a> {
     scope: &'a StageRunScopeValue,
     graph: BTreeMap<String, Value>,
     editions: BTreeMap<String, i32>,
+    budget: super::namespace_appender_batch_budget::NamespaceAppenderBatchBudget,
 }
 
 impl NamespaceSourceAppender<'_> {
@@ -208,6 +213,17 @@ impl NamespaceSourceAppender<'_> {
         table: &str,
         values: Vec<SqlValue>,
     ) -> Result<(), StoreBackendFailureError> {
+        let bytes = self.scope.run_generation_digest_value.len()
+            + self.scope.stage_attempt_sequence_value.len()
+            + values
+                .iter()
+                .map(|value| match value {
+                    SqlValue::Text(text) => text.len(),
+                    SqlValue::Blob(bytes) => bytes.len(),
+                    SqlValue::List(values) => values.len() * 8,
+                    _ => 8,
+                })
+                .sum::<usize>();
         self.appenders
             .get_mut(table)
             .ok_or_else(|| build_analysis_error("namespace appender absent"))?
@@ -219,7 +235,13 @@ impl NamespaceSourceAppender<'_> {
                 .into_iter()
                 .chain(values),
             ))
-            .map_err(build_analysis_error)
+            .map_err(build_analysis_error)?;
+        if self.budget.record_appender_row_budget(bytes) {
+            self.appenders
+                .values_mut()
+                .try_for_each(|appender| appender.flush().map_err(build_analysis_error))?;
+        }
+        Ok(())
     }
 
     fn edition(&self, scope: &Value) -> Result<i32, StoreBackendFailureError> {

@@ -21,6 +21,8 @@ pub struct DuckdbAnalysisStoreAdapter {
 
 #[path = "namespace-analysis-phase-diagnostics.rs"]
 mod namespace_analysis_phase_diagnostics;
+#[path = "namespace-storage-size-diagnostics.rs"]
+mod namespace_storage_size_diagnostics;
 pub use namespace_analysis_phase_diagnostics::{
     NamespaceAnalysisPhaseError, NamespaceAnalysisPhaseKind,
 };
@@ -103,6 +105,10 @@ impl AnalysisTableStorePort for DuckdbAnalysisStoreAdapter {
 
 #[path = "frozen-generation-appender-copy.rs"]
 mod frozen_generation_appender_copy;
+#[path = "namespace-appender-batch-budget.rs"]
+mod namespace_appender_batch_budget;
+#[path = "namespace-source-column-projection.rs"]
+mod namespace_source_column_projection;
 
 #[path = "frozen-namespace-source-codec.rs"]
 mod frozen_namespace_source_codec;

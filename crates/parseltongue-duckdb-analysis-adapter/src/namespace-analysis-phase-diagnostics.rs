@@ -426,8 +426,10 @@ impl DuckdbAnalysisStoreAdapter {
             .map_err(super::build_analysis_error)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(super::build_analysis_error)?;
+        let tags =
+            super::namespace_storage_size_diagnostics::read_namespace_memory_tags(&connection)?;
         Ok(
-            serde_json::json!({"memory_usage_bytes":memory,"temporary_storage_bytes":temporary,"databases":databases,"settings":{"threads":threads,"preserve_insertion_order":insertion_order,"memory_limit":limit,"version":version}}),
+            serde_json::json!({"memory_usage_bytes":memory,"temporary_storage_bytes":temporary,"databases":databases,"tags":tags,"settings":{"threads":threads,"preserve_insertion_order":insertion_order,"memory_limit":limit,"version":version}}),
         )
     }
 }

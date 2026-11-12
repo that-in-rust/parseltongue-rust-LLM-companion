@@ -81,6 +81,91 @@ fn frozen_namespace_normalization_contract() {
     assert_eq!(generation, scope().run_generation_digest_value);
 }
 
+/// REQ-RUST-024.8
+#[test]
+fn test_namespace_copy_projection_columns() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("projected.duckdb"),
+        directory.path(),
+        1288490188,
+    )
+    .unwrap();
+    let mut source = namespace_source_fixture();
+    source.records.values_mut().flatten().for_each(|row| {
+        let mut payload: serde_json::Value =
+            serde_json::from_str(&row.stage_row_payload_text).unwrap();
+        payload["unused_raw_source_text"] = json!("x".repeat(100000));
+        row.stage_row_payload_text = payload.to_string();
+    });
+    assert_eq!(
+        store
+            .copy_published_stage_rows(
+                &source,
+                &scope(),
+                NAMESPACE_SOURCE_TABLE_NAMES,
+                &RunCancelFlagValue::default()
+            )
+            .unwrap(),
+        4
+    );
+    let connection = store._connection.lock().unwrap();
+    let mut statement=connection.prepare("SELECT table_name,payload FROM \"frozen-generation-source-records\" ORDER BY generation_key,attempt_key,table_name,row_key").unwrap();
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(rows.len(), 4);
+    for (table, payload) in rows {
+        let value: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        assert!(value.get("unused_raw_source_text").is_none(), "{table}");
+        if table == "syntax-namespace-input-items" {
+            assert!(value["binding_target_metadata_value"].is_object());
+            assert!(value.get("binding_import_evidence_keys").is_none());
+        }
+    }
+}
+
+/// REQ-RUST-024.8
+#[test]
+fn test_namespace_projected_product_equality() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut source = namespace_source_fixture();
+    let graph = &mut source
+        .records
+        .get_mut("crate-dependency-graph-table")
+        .unwrap()[0];
+    let mut value: serde_json::Value = serde_json::from_str(&graph.stage_row_payload_text).unwrap();
+    value[parseltongue_core_row_types::MAPPED_TARGET_FLAG_FIELD] = json!(true);
+    value["unused_source_text"] = json!("x".repeat(20000));
+    graph.stage_row_payload_text = value.to_string();
+    let exports=[false,true].map(|projected|{
+        let store=DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(&directory.path().join(if projected{"projected.duckdb"}else{"full.duckdb"}),directory.path(),1288490188).unwrap();
+        store.copy_published_stage_rows(&source,&scope(),NAMESPACE_SOURCE_TABLE_NAMES,&RunCancelFlagValue::default()).unwrap();
+        if !projected {
+            let connection=store._connection.lock().unwrap();
+            for table in NAMESPACE_SOURCE_TABLE_NAMES {
+                let mut hasher=blake3::Hasher::new();
+                for row in &source.records[*table] {
+                    connection.execute("UPDATE \"frozen-generation-source-records\" SET payload=? WHERE generation_key=? AND attempt_key=? AND table_name=? AND row_key=?",duckdb::params![row.stage_row_payload_text,scope().run_generation_digest_value,scope().stage_attempt_sequence_value,table,row.stage_row_record_key]).unwrap();
+                    super::frozen_generation_appender_copy::hash_record(&mut hasher,row);
+                }
+                connection.execute("UPDATE \"frozen-generation-table-manifests\" SET content_digest=? WHERE generation_key=? AND attempt_key=? AND table_name=?",duckdb::params![hasher.finalize().to_hex().to_string(),scope().run_generation_digest_value,scope().stage_attempt_sequence_value,table]).unwrap();
+            }
+        }
+        store.normalize_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        store.resolve_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        let mut rows=Vec::new();
+        store.visit_frozen_namespace_products(&scope(),&mut |row|{rows.push(row.clone());Ok(())}).unwrap();
+        assert!(rows.iter().any(|row|row.stage_owned_table_name=="path-resolution-site-records"));
+        rows
+    });
+    assert_eq!(exports[0], exports[1]);
+}
+
 #[test]
 fn frozen_macro_candidate_lookups() {
     use parseltongue_core_row_types::*;
@@ -800,14 +885,15 @@ fn frozen_namespace_normalization_empty_and_errors() {
             stage_row_record_key: "bad".into(),
             stage_row_payload_text: "null".into(),
         });
-    store
+    let error = store
         .copy_published_stage_rows(
             &source,
             &invalid,
             NAMESPACE_SOURCE_TABLE_NAMES,
             &RunCancelFlagValue::default(),
         )
-        .unwrap();
+        .unwrap_err();
+    assert!(error.to_string().contains("must be an object"));
     assert!(
         store
             .normalize_frozen_namespace_rows(&invalid, &RunCancelFlagValue::default())

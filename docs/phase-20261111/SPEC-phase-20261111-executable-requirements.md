@@ -885,3 +885,50 @@ test_type: unit
 assertion: unconstrained CTAS followed by constrained INSERT; rollback on normal, empty and constraint-error cases
 metric: original candidate rows unchanged; both successful operator profiles returned
 ```
+
+## REQ-RUST-024.8 — bounded-projected-namespace-handoff
+
+WHEN copying published namespace inputs, the adapter SHALL copy only declared
+consumed columns/tables, retain compilation/source identities and required
+macro/product metadata, and verify row count plus length-framed content digest
+of exactly the projected rows on both sides of the Appender transfer (R4).
+Unknown non-namespace table copies retain their existing full-row contract.
+All namespace appenders SHALL flush at bounded row/byte intervals and be
+dropped before CHECKPOINT after a committed copy/normalization. The native
+analysis database SHALL be file-backed. Diagnostics SHALL distinguish live
+post-phase tag residency from peak allocations and report database paths,
+physical storage segments and logical column byte widths. Small-fixture
+resolution products SHALL remain identical across handoff policy changes.
+
+Verification additions:
+
+```text
+req_id: REQ-RUST-024.8
+test_id: test_namespace_storage_snapshot_contents
+test_type: unit
+assertion: file-backed path, ordered tag/table/column/segment measurements
+metric: exact payload logical byte length and populated database path
+```
+
+```text
+req_id: REQ-RUST-024.8
+test_id: test_namespace_source_projection_identity
+test_type: unit
+assertion: declared columns preserve identity/metadata; generic rows byte-exact; invalid objects rejected
+metric: exact projected JSON and unchanged row key
+req_id: REQ-RUST-024.8
+test_id: test_namespace_copy_projection_columns
+test_type: integration
+assertion: full-source count accepted while undeclared data never stored
+metric: four rows verified through projected count/digest handoff
+req_id: REQ-RUST-024.8
+test_id: test_namespace_projected_product_equality
+test_type: integration
+assertion: independently reconstructed full-row handoff exports exactly the same resolved products
+metric: byte-identical nonempty ordered products
+req_id: REQ-RUST-024.8
+test_id: test_namespace_appender_batch_limits
+test_type: unit
+assertion: row/byte thresholds flush and reset, including oversized row
+metric: 1024 rows or 1048576 value bytes
+```

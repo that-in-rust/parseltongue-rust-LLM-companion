@@ -104,6 +104,7 @@ pub(super) fn copy_generation(
         let mut hasher = blake3::Hasher::new();
         let mut previous_key: Option<String> = None;
         let mut count = 0;
+        let mut budget=super::namespace_appender_batch_budget::NamespaceAppenderBatchBudget::default();
         {
             let mut appender = transaction
                 .appender("frozen-generation-source-records")
@@ -119,6 +120,7 @@ pub(super) fn copy_generation(
                         "source rows must have a unique total-key order",
                     ));
                 }
+                let row=super::namespace_source_column_projection::project_namespace_source_record(row)?;
                 appender
                     .append_row(duckdb::params![
                         scope.run_generation_digest_value,
@@ -128,6 +130,7 @@ pub(super) fn copy_generation(
                         row.stage_row_payload_text
                     ])
                     .map_err(build_analysis_error)?;
+                if budget.record_appender_row_budget(row.stage_row_payload_text.len()+row.stage_row_record_key.len()+table.len()+scope.run_generation_digest_value.len()+scope.stage_attempt_sequence_value.len()) {appender.flush().map_err(build_analysis_error)?;}
                 hash_record(&mut hasher, &row);
                 previous_key = Some(row.stage_row_record_key);
                 count += 1;
@@ -168,5 +171,8 @@ pub(super) fn copy_generation(
         ));
     }
     transaction.commit().map_err(build_analysis_error)?;
+    connection
+        .execute_batch("CHECKPOINT")
+        .map_err(build_analysis_error)?;
     Ok(count)
 }

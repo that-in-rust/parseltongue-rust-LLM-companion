@@ -2930,3 +2930,77 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Stop H4 rewrite tuning as already journaled; integer-ID narrowing remains
   the next untested separate step, not permission to batch. Resume editor
   rust-analyzer after probes/builds; no native mapper left running.
+
+### New priority: projected copy, actual residency and appender lifecycle
+
+- REQ-RUST-024.8 appended. Defer integer-ID work until projection/lifecycle
+  evidence and fresh three-phase replay. User's proposed full-pool cause
+  must be measured, not assumed: prior 1.11 GB was at copy heap peak, not
+  live post-copy. Prior standalone resolution starts with 1 MiB tracked
+  memory yet OOMs; this is already a control against residual-copy memory
+  being necessary. Inspect live tags, storage and file path explicitly.
+- Native and CLI stores are file-backed: native retained
+  separate-namespace-analysis-state.duckdb and CLI
+  <run>/<generation>/<attempt>/namespace-resolution-analysis-data.duckdb.
+  No production constructor changed and no cap adjustment made.
+- Storage-snapshot STUB release check 0.77s, RED one failure at todo,
+  GREEN one test passed in 0.07s. Added checkpoint STUB release check 0.80s
+  and RED at checkpoint todo before implementing CHECKPOINT.
+- Snapshot reports path, database block counts, ordered memory tags,
+  per-column UTF-8 VARCHAR byte sums, physical storage segment metadata,
+  per-table raw payload bytes and bounded-page JSON field-size histograms.
+  estimated_size is explicitly row count, not bytes. Shared blocks are
+  not summed as exact independent table allocations.
+- Existing copy appenders already flush/drop per table. Normalizer holds
+  fourteen appenders until its sink ends. Two copied namespace source tables
+  (legacy events and lang items) are explicitly ignored by normalization;
+  identify and remove them from the current namespace input set, not from
+  Turso or future-stage generic copy contracts.
+- Baseline copy/checkpoint/snapshot launched before any copy policy change;
+  home artifacts namespace-projection-lifecycle-controls/ retain evidence.
+
+### Baseline residency control: file-backed, not a nearly full inherited pool
+
+- Baseline copy 33.794s, 281680 rows, database path
+  namespace-projection-lifecycle-controls/baseline-copy-namespace-inputs.duckdb.
+  PRAGMA database_size: 632.2 MiB, 262144-byte blocks, 2529 used blocks,
+  zero free blocks and WAL 0 bytes after commit.
+- Actual post-copy managed memory is 627572736 bytes, entirely BASE_TABLE;
+  all other tags including ART_INDEX and IN_MEMORY_TABLE are zero. Explicit
+  CHECKPOINT completes immediately and leaves exactly 627572736 BASE_TABLE
+  bytes. CHECKPOINT persists data; it does not promise emptying clean cache.
+- Thus 1.11 GB was a peak, not live post-copy. A previous standalone failing
+  INSERT starts with just 1 MiB tracked memory. Residual copy pool occupancy
+  is not required for the known resolution failure. Continue requested
+  projection/flush controls, but do not label the proposed cause confirmed.
+- Raw payload bytes: paths 253687804, items 126132299, scopes 112092937,
+  ignored legacy events 47524022; other tables smaller. Largest JSON fields
+  are path source metadata 121484311 (export provenance), path site keys
+  57988143, path scope keys 48959622, item target metadata 44463485 (includes
+  macro definitions), scope keys 37589403 and parent keys 32917544.
+  No file-source-text/span-reference-text tables are copied by namespace
+  analysis. Opaque macro/product metadata is consumed and must be retained
+  for exact output equality, not mistaken for unused raw text.
+- Projection STUB check 0.79s; RED run 39 passed, 2 failed (projection todo
+  and undeclared fields still copied). Declare consumed top-level columns;
+  omit two ignored tables only from namespace input set. Other generic table
+  copies stay byte-exact. Digest precisely projected rows on both sides;
+  raw Turso identities/rows remain untouched.
+- Appender budget STUB check 0.85s; enforce 1024 rows or 1 MiB estimated
+  values across normalized appenders, plus a single oversized row allowance.
+
+### User interrupt: no interim cap until all-five S5 (2026-11-12)
+
+- Projection/budget work is already GREEN-able in minutes: 62 tests passed
+  in 7.71s, including full-versus-projected nonempty resolved exports.
+  Finish this bounded phase; do not conduct further RAM optimization or old
+  capped native retries. Native proof of the projection/flush policy remains
+  deferred. Next phase removes explicit production memory_limit entirely,
+  retaining effective-limit/RSS reporting, spill and extension restrictions.
+- Projection validation rejects non-object namespace payloads earlier at
+  copy, not normalization. The malformed-input fixture now asserts the copy
+  error and still asserts failed normalization/no normalized manifest.
+- Clippy surfaced test-only unwrap lint and items-after-test-module; allow
+  unwrap only in test modules and move impl before tests. No production lint
+  suppression. Native baseline residency evidence remains valid at its
+  original recorded cap but is not current-policy M2/SOP qualification.

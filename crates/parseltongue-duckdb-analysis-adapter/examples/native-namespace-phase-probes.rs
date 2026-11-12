@@ -41,16 +41,31 @@ fn main() -> Result<(), Box<dyn Error>> {
         read_native_residency_snapshot()
     );
     let cancel = RunCancelFlagValue::default();
+    if phase == "storage" {
+        println!("{}", analysis.read_namespace_storage_usage()?);
+        return Ok(());
+    }
     let count = match phase.as_str() {
-        "copy" => {
-            analysis.measure_namespace_phase_work(NamespaceAnalysisPhaseKind::Copy, || {
-                analysis.copy_published_stage_rows(
-                    &source,
-                    &scope,
-                    NAMESPACE_SOURCE_TABLE_NAMES,
-                    &cancel,
-                )
-            })?
+        "copy" | "copy-checkpoint" => {
+            let count =
+                analysis.measure_namespace_phase_work(NamespaceAnalysisPhaseKind::Copy, || {
+                    analysis.copy_published_stage_rows(
+                        &source,
+                        &scope,
+                        NAMESPACE_SOURCE_TABLE_NAMES,
+                        &cancel,
+                    )
+                })?;
+            if phase == "copy-checkpoint" {
+                let started = std::time::Instant::now();
+                analysis.checkpoint_namespace_analysis_store()?;
+                eprintln!(
+                    "event=after-checkpoint elapsed_seconds={:.3} memory={}",
+                    started.elapsed().as_secs_f64(),
+                    analysis.read_namespace_memory_usage()?
+                );
+            }
+            count
         }
         "normalization" => analysis
             .measure_namespace_phase_work(NamespaceAnalysisPhaseKind::Normalization, || {
@@ -87,6 +102,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => return Err("unknown namespace phase".into()),
     };
     println!("phase={phase} rows_or_rounds={count}");
+    if std::env::var_os("PARSELTONGUE_NAMESPACE_PROBE_STORAGE").is_some() {
+        eprintln!(
+            "storage_snapshot={}",
+            analysis.read_namespace_storage_usage()?
+        );
+    }
     eprintln!(
         "event=after-phase residency={}",
         read_native_residency_snapshot()
