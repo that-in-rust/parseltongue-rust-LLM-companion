@@ -11,6 +11,138 @@ fn make_fixture_store_adapter() -> TursoWorkspaceStoreAdapter {
 }
 
 #[test]
+fn published_snapshots_are_frozen_while_new_units_accumulate() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("frozen");
+    complete_fixture_stage_set(&store, &scope);
+    let row = StageTableRowRecord {
+        stage_owned_table_name: "span-reference-text-table".into(),
+        stage_row_record_key: "first".into(),
+        stage_row_payload_text: "first".into(),
+    };
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-spans",
+        "first",
+        &[],
+        std::slice::from_ref(&row),
+    )
+    .unwrap();
+    let first = store
+        .publish_workspace_generation_manifest(
+            &scope,
+            &scope.run_generation_digest_value,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    let mut changed = row.clone();
+    changed.stage_row_payload_text = "changed".into();
+    assert!(
+        write_fixture_stage_rows(&store, &scope, "syntax-spans", "first", &[], &[changed]).is_err()
+    );
+    let mut second_row = row.clone();
+    second_row.stage_row_record_key = "second".into();
+    write_fixture_stage_rows(&store, &scope, "syntax-spans", "second", &[], &[second_row]).unwrap();
+    assert_eq!(
+        store
+            .count_stage_table_rows(&first, "span-reference-text-table")
+            .unwrap(),
+        1
+    );
+    let second = store
+        .publish_workspace_generation_manifest(
+            &scope,
+            &scope.run_generation_digest_value,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    assert_ne!(first, second);
+    assert_eq!(
+        store
+            .count_stage_table_rows(&second, "span-reference-text-table")
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        store
+            .count_stage_table_rows(&first, "span-reference-text-table")
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store
+            .read_stage_table_rows(&first, "span-reference-text-table")
+            .unwrap(),
+        vec![row]
+    );
+    let mut visited = 0;
+    store
+        .visit_stage_table_rows(&first, "span-reference-text-table", &mut |_| {
+            visited += 1;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(visited, 1);
+}
+
+#[test]
+fn frozen_private_chunks_do_not_appear_after_future_completion() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("frozen-private");
+    complete_fixture_stage_set(&store, &scope);
+    let row = StageTableRowRecord {
+        stage_owned_table_name: "syntax-namespace-input-scopes".into(),
+        stage_row_record_key: "pending".into(),
+        stage_row_payload_text: "{}".into(),
+    };
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-namespace-input-records",
+        "crate/frozen/pending/0",
+        &[],
+        &[row],
+    )
+    .unwrap();
+    let first = store
+        .publish_workspace_generation_manifest(
+            &scope,
+            &scope.run_generation_digest_value,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-namespace-input-records",
+        "crate/frozen",
+        &[],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        store
+            .count_stage_table_rows(&first, "syntax-namespace-input-scopes")
+            .unwrap(),
+        0
+    );
+    let second = store
+        .publish_workspace_generation_manifest(
+            &scope,
+            &scope.run_generation_digest_value,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .count_stage_table_rows(&second, "syntax-namespace-input-scopes")
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
 fn test_unpublished_crate_chunks_hidden() {
     let store = make_fixture_store_adapter();
     let scope = make_fixture_stage_scope("bounded-crate");
