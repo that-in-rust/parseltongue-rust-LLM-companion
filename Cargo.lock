@@ -2196,6 +2196,7 @@ dependencies = [
 name = "parseltongue-duckdb-analysis-adapter"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "duckdb",
  "parseltongue-core-row-types",
  "parseltongue-table-store-traits",

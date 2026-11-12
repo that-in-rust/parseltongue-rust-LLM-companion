@@ -113,3 +113,7 @@ mod row_resolution_contract_tests;
 #[cfg(test)]
 #[path = "bounded-constructor-policy-tests.rs"]
 mod bounded_constructor_policy_tests;
+
+#[cfg(test)]
+#[path = "published-generation-copy-tests.rs"]
+mod published_generation_copy_tests;
