@@ -153,6 +153,9 @@ fn namespace_delta_empty_and_invalid_metadata() {
     )
     .collect::<Result<Vec<_>, _>>();
     assert!(invalid.is_err());
+    assert!(state.read_legacy_lookup_updates().unwrap().is_empty());
+    state.projection_legacy_source_event_rows.push(Value::Null);
+    assert!(state.read_legacy_lookup_updates().is_err());
 }
 
 #[test]
@@ -173,6 +176,13 @@ fn projected_virtual_macro_scope() {
     )
     .unwrap();
     state.project_unit_source_root().unwrap();
+    let initial = state.read_legacy_lookup_updates().unwrap();
+    assert!(!initial.is_empty());
+    assert!(initial.iter().all(|row| {
+        serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["legacy_scope_revision"]
+            == 0
+    }));
+    assert!(state.read_legacy_lookup_updates().unwrap().is_empty());
     let invocation = state
         .projection_resolution_input_rows
         .name_macro_invocation_rows[0]
@@ -206,6 +216,21 @@ fn projected_virtual_macro_scope() {
             .iter()
             .any(|row| row.stage_owned_table_name == "syntax-namespace-input-macros")
     );
+    let updates = delta
+        .expansion_semantic_output_rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "legacy-macro-scope-records")
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .collect::<Vec<_>>();
+    assert!(!updates.is_empty());
+    assert!(
+        updates
+            .iter()
+            .all(|row| row["legacy_macro_name_text"] == "generated"
+                && row["legacy_scope_revision"] == 1
+                && !row["legacy_target_identity_key"].is_null())
+    );
+    assert!(state.read_legacy_lookup_updates().unwrap().is_empty());
     let mut rows = Vec::new();
     crate::visit_legacy_macro_scope_records(
         &state.projection_legacy_source_event_rows,
