@@ -115,6 +115,8 @@ fn test_macro_declaration_comma_rules() {
             .is_empty()
     );
     input.macro_declaration_style_flag = false;
+    input.macro_definition_source_text = "{(first)=>{}, (second)=>{},}".into();
+    input.macro_argument_source_text = "(second)".into();
     assert!(matches!(
         expand_declarative_macro_items(&input, &RunCancelFlagValue::default()),
         Err(MacroExpansionFailureKind::InvalidDefinition(_))

@@ -140,6 +140,26 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
             .projection_source_state_lock
             .lock()
             .map_err(build_macro_expansion_error)?;
+        if std::env::var_os("PARSELTONGUE_PROFILE_MACRO_ROUNDS").is_some() {
+            eprintln!(
+                "stage=macro-round pending={} resolved={} scopes={} bindings={} imports={} paths={}",
+                query.expansion_pending_invocation_rows.len(),
+                query.expansion_resolved_macro_rows.len(),
+                query
+                    .expansion_input_record_rows
+                    .name_module_scope_rows
+                    .len(),
+                query.expansion_known_binding_rows.len(),
+                query
+                    .expansion_input_record_rows
+                    .name_import_request_rows
+                    .len(),
+                query
+                    .expansion_input_record_rows
+                    .name_signature_path_rows
+                    .len()
+            );
+        }
         query.expansion_resolved_macro_rows.iter().try_fold(
             NameExpansionRoundRows::default(),
             |round, (key, binding)| {
@@ -156,6 +176,17 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                     .ok_or_else(|| {
                         build_macro_expansion_error("resolved macro invocation missing")
                     })?;
+                if std::env::var_os("PARSELTONGUE_PROFILE_MACRO_ROUNDS").is_some()
+                    && query.expansion_resolved_macro_rows.len() <= 16
+                {
+                    eprintln!(
+                        "stage=macro-item name={} argument_digest={} argument_bytes={}",
+                        binding.binding_resolved_name_text,
+                        blake3::hash(invocation.invocation_argument_source_text.as_bytes())
+                            .to_hex(),
+                        invocation.invocation_argument_source_text.len()
+                    );
+                }
                 if let Some(name) =
                     read_macro_builtin_name(binding, &state.projection_target_metadata_rows)
                 {
@@ -181,7 +212,8 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                 };
                 let expanded = expand_declarative_macro_items(
                     &DeclarativeMacroExpansionInput {
-                        macro_declaration_style_flag: false,
+                        macro_declaration_style_flag: definition["macro_declaration_style_flag"]
+                            == true,
                         macro_definition_source_text:
                             super::name_resolution_record_codec::read_record_string_value(
                                 &definition,

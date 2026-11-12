@@ -264,6 +264,108 @@ fn test_macro_empty_virtual_file() {
 }
 
 #[test]
+fn test_macro_declarations_publish_rows() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"),
+        "#![feature(decl_macro)] macro make { (first)=>{pub struct First;}, (second)=>{pub struct Second;}, } make!(second); pub fn take(_:Second){}").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        read_published_table_fixture(&database, "path-resolution-site-records")
+            .iter()
+            .any(|row| row["path_site_source_text"] == "Second"
+                && row["path_resolution_state_kind"] == "resolved")
+    );
+}
+
+#[test]
+fn test_flags_without_sysroot_support() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::create_dir_all(root.join("defs/src")).unwrap();
+    fs::write(
+        root.join("defs/Cargo.toml"),
+        "[package]\nname=\"defs\"\nversion=\"0.1.0\"\nedition=\"2021\"\n",
+    )
+    .unwrap();
+    fs::write(root.join("defs/src/lib.rs"), "#![no_std] pub struct Item;").unwrap();
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        format!("{manifest}\n[dependencies]\ndep={{path=\"defs\",package=\"defs\"}}\n"),
+    )
+    .unwrap();
+    fs::write(root.join("src/lib.rs"), "#![no_std] #![no_implicit_prelude] extern crate dep as local; pub fn take(_:local::Item,_:u8){}").unwrap();
+    assert!(
+        Command::new(env!("CARGO"))
+            .current_dir(&root)
+            .args(["generate-lockfile", "--offline"])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let units = read_published_table_fixture(&database, "crate-dependency-graph-table");
+    assert!(
+        units
+            .iter()
+            .all(|unit| unit["unit_sysroot_context_flag"] != true)
+    );
+    let unit = units
+        .iter()
+        .find(|unit| unit["unit_package_root_path"] == root.to_str().unwrap())
+        .unwrap();
+    assert_eq!(unit["unit_no_std_flag"], true);
+    assert_eq!(unit["unit_implicit_prelude_flag"], false);
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    for name in ["local::Item", "u8"] {
+        assert!(
+            paths.iter().any(|row| row["path_site_source_text"] == name
+                && row["path_resolution_state_kind"] == "resolved"),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn test_grouped_self_import_rules() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"), "pub mod defs {pub enum Choice {First}} use defs::Choice::{self as Alias, First}; pub fn take(_:Alias,_:defs::Choice){}").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    for name in ["defs::Choice", "Alias"] {
+        assert!(
+            paths.iter().any(|row| row["path_site_source_text"] == name
+                && row["path_resolution_state_kind"] == "resolved"),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn test_nested_macro_crate_provenance() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
@@ -552,7 +654,12 @@ fn test_lang_items_in_sysroot() {
         String::from_utf8_lossy(&output.stderr)
     );
     let paths = read_published_table_fixture(&database, "path-resolution-site-records");
-    for name in ["Option", "Vec", "core::ops::Range", "std::string::String"] {
+    for name in [
+        "Option<Vec<u8>>",
+        "Vec<u8>",
+        "core::ops::Range<u8>",
+        "std::string::String",
+    ] {
         let row = paths.iter().find(|row| {
             row["path_site_source_text"] == name
                 && row["site_compilation_scope_record"]["unit_cargo_target_name"] == "fixture"
@@ -563,19 +670,25 @@ fn test_lang_items_in_sysroot() {
         );
     }
     let langs = read_published_table_fixture(&database, "lang-item-definition-table");
-    for name in ["sized", "copy", "owned_box"] {
+    for name in [
+        "sized",
+        "copy",
+        "owned_box",
+        "panic_in_cleanup",
+        "coerce_pointee_validated",
+    ] {
         assert!(
             langs.iter().any(|row| row["lang_item_source_name"] == name),
             "{name}"
         );
     }
+    assert!(
+        langs
+            .iter()
+            .all(|row| row["lang_definition_provenance_chain"].is_array())
+    );
 }
 
-#[test]
-fn test_mapping_stage_selection_contract() {
-    let directory = tempfile::tempdir().unwrap();
-    let root = directory.path().join("workspace");
-    create_workspace_source_fixture(&root);
 #[test]
 fn test_path_attributes_follow_source() {
     let directory = tempfile::tempdir().unwrap();
@@ -608,6 +721,11 @@ fn test_path_attributes_follow_source() {
     );
 }
 
+#[test]
+fn test_mapping_stage_selection_contract() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
     let database = directory.path().join("store.db");
     let run = |stage: &str| {
         Command::new(env!("CARGO_BIN_EXE_parseltongue"))

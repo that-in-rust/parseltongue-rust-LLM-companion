@@ -16,6 +16,8 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_resolution_input_rows: NameResolutionInputRows,
     pub(super) projection_target_metadata_rows: BTreeMap<NameSymbolTargetKey, Value>,
     pub(super) projection_path_metadata_rows: BTreeMap<SemanticOccurrenceKeyValue, Value>,
+    pub(super) projection_lang_definition_rows: Vec<StageTableRowRecord>,
+    pub(super) projection_available_extern_rows: BTreeMap<String, NameResolvedBindingRow>,
     projection_macro_source_rows:
         BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
     projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
@@ -195,6 +197,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             projection_active_file_paths: BTreeSet::new(),
             projection_target_metadata_rows: BTreeMap::new(),
             projection_path_metadata_rows: BTreeMap::new(),
+            projection_lang_definition_rows: Vec::new(),
+            projection_available_extern_rows: BTreeMap::new(),
             projection_macro_source_rows: BTreeMap::new(),
             projection_macro_failure_rows: BTreeMap::new(),
             projection_source_store_port: store,
@@ -467,6 +471,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 .get_mut(&target)
                 .ok_or_else(|| build_name_projection_error("macro metadata missing"))?["target_macro_definition_record"] = json!({
                 "macro_definition_source_text":source,"macro_pattern_source_text":pattern,
+                "macro_declaration_style_flag":node.kind() == SyntaxKind::MACRO_DEF,
                 "macro_source_absolute_path":file.source_file_absolute_path,"macro_source_range_start":start,
                 "macro_definition_unit_key":encode_compilation_unit_value(&self.projection_resolution_input_rows.unit_compilation_identity_key),
                 "macro_definition_edition_kind":self.projection_unit_record_value["unit_rust_edition_value"],
@@ -950,6 +955,65 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         if !check_node_configuration_active(node, &self.projection_target_cfg_values)? {
             return Ok(());
         }
+        if self.projection_unit_record_value["unit_sysroot_context_flag"] == true {
+            for attribute in
+                super::collect_effective_node_attributes(node, &self.projection_target_cfg_values)?
+            {
+                if let Some(name) = attribute
+                    .strip_prefix("lang")
+                    .and_then(|value| value.trim().strip_prefix('='))
+                    .and_then(|value| super::decode_rust_string_literal(value.trim()))
+                    && !name.is_empty()
+                {
+                    let occurrence = self.build_source_occurrence_key(file, node)?;
+                    let value = json!({"lang_item_source_name":name,
+                        "lang_name_support_kind":if super::check_recognized_lang_item(&name){"recognized"}else{"unknown"},
+                        "lang_definition_provenance_chain":file.source_expansion_provenance_rows.iter().map(|value|blake3::Hash::from(*value).to_hex().to_string()).collect::<Vec<_>>(),
+                        "lang_definition_target_key":encode_occurrence_identity_value(&occurrence),
+                        "lang_definition_scope_record":self.build_compilation_scope_record(scope),
+                        "lang_definition_source_path":file.source_file_absolute_path,
+                        "lang_definition_range_start":restore_source_byte_offset(node.text_range().start(),&file.source_crlf_removed_offsets),
+                        "lang_definition_range_end":restore_source_byte_offset(node.text_range().end(),&file.source_crlf_removed_offsets),
+                        "lang_incoherent_type_flag":super::collect_effective_node_attributes(node,&self.projection_target_cfg_values)?.iter().any(|value|value=="rustc_has_incoherent_inherent_impls"),
+                        "lang_incoherent_impl_flag":super::collect_effective_node_attributes(node,&self.projection_target_cfg_values)?.iter().any(|value|value=="rustc_allow_incoherent_impl")
+                    });
+                    self.projection_lang_definition_rows
+                        .push(StageTableRowRecord {
+                            stage_owned_table_name: "lang-item-definition-table".into(),
+                            stage_row_record_key: format!(
+                                "lang/{}",
+                                blake3::hash(value.to_string().as_bytes()).to_hex()
+                            ),
+                            stage_row_payload_text: value.to_string(),
+                        });
+                }
+            }
+        }
+        if let Some(declaration) = ast::ExternCrate::cast(node.clone()) {
+            let source_name = declaration
+                .name_ref()
+                .map(|name| name.text().trim_start_matches("r#").to_owned())
+                .unwrap_or_else(|| "self".into());
+            let alias = declaration
+                .rename()
+                .and_then(|rename| rename.syntax().children().find_map(ast::Name::cast))
+                .map(|name| name.text().trim_start_matches("r#").to_owned())
+                .unwrap_or_else(|| source_name.clone());
+            if let Some(mut binding) = self
+                .projection_available_extern_rows
+                .get(&source_name)
+                .cloned()
+            {
+                binding.binding_lexical_scope_key = scope.clone();
+                binding.binding_resolved_name_text = alias;
+                binding.binding_selection_priority_kind = NameBindingPriorityKind::Declaration;
+                binding.binding_visibility_scope_kind =
+                    self.build_node_visibility_kind(node, scope);
+                self.projection_resolution_input_rows
+                    .name_symbol_binding_rows
+                    .push(binding);
+            }
+        }
         let kind = node.kind();
         let name = node
             .children()
@@ -981,7 +1045,15 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             let candidates = if let Some(path) =
                 read_effective_module_path(node, &self.projection_target_cfg_values)?
             {
-                vec![directory.join(path)]
+                let inline = node.ancestors().skip(1).any(|ancestor| {
+                    ast::Module::cast(ancestor).is_some_and(|module| module.item_list().is_some())
+                });
+                let base = if inline {
+                    directory
+                } else {
+                    &file.source_original_directory_path
+                };
+                vec![base.join(path)]
             } else {
                 vec![
                     directory.join(format!("{name}.rs")),

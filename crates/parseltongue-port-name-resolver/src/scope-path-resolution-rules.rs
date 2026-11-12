@@ -17,6 +17,23 @@ pub(crate) struct ScopeBindingLookupState<'a> {
 }
 
 impl<'a> ScopeBindingLookupState<'a> {
+    pub(crate) fn collect_scope_binding_rows(
+        &self,
+        scope: &NameResolutionScopeKey,
+        requester: &NameResolutionScopeKey,
+    ) -> Vec<NameResolvedBindingRow> {
+        self.lookup_symbol_binding_rows
+            .get(scope)
+            .into_iter()
+            .flat_map(|names| names.values())
+            .flatten()
+            .filter(|row| {
+                check_binding_scope_visible(&row.binding_visibility_scope_kind, requester)
+            })
+            .map(|row| (*row).clone())
+            .collect()
+    }
+
     pub(crate) fn build_namespace_lookup_rows(
         input: &'a NameResolutionInputRows,
         bindings: &'a [NameResolvedBindingRow],
@@ -176,6 +193,17 @@ impl<'a> ScopeBindingLookupState<'a> {
         filter: NameNamespaceFilterKind,
         kind: NameResolutionPathKind,
     ) -> ResolvedPathLookupKind {
+        let (segments, filter) = if kind == NameResolutionPathKind::Import
+            && segments.len() > 1
+            && segments.last() == Some(&NamePathSegmentKind::SelfModule)
+        {
+            (
+                &segments[..segments.len() - 1],
+                NameNamespaceFilterKind::Type,
+            )
+        } else {
+            (segments, filter)
+        };
         if segments.is_empty() {
             return ResolvedPathLookupKind::Missing;
         }

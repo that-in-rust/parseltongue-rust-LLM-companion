@@ -113,19 +113,107 @@ fn append_library_namespace_inputs(
                 "unit_rust_edition_value":dependency["unit_rust_edition_value"],"unit_module_path_values":[],
             }
         }));
+        let binding = NameResolvedBindingRow {
+            binding_lexical_scope_key: external.clone(),
+            binding_resolved_name_text: alias.clone(),
+            binding_namespace_kind_value: NamespaceBindingKindValue::Type,
+            binding_target_identity_key: target,
+            binding_target_child_scope: Some(root),
+            binding_visibility_scope_kind: NameBindingVisibilityKind::Public,
+            binding_selection_priority_kind: NameBindingPriorityKind::Prelude,
+            binding_import_evidence_keys: vec![],
+        };
+        projector
+            .projection_available_extern_rows
+            .insert(alias.clone(), binding.clone());
+        let system = dependency["unit_sysroot_context_flag"] == true;
+        let implicit = unit["unit_implicit_prelude_flag"] != false
+            && (!system
+                || (alias == "core" && unit["unit_no_core_flag"] != true)
+                || (alias == "std" && unit["unit_no_std_flag"] != true));
+        if implicit {
+            projector
+                .projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .push(binding.clone());
+            if system
+                && alias == "std"
+                && projector
+                    .projection_resolution_input_rows
+                    .unit_rust_edition_kind
+                    == RustSourceEditionKind::Edition2015
+            {
+                let mut local = binding;
+                local
+                    .binding_lexical_scope_key
+                    .scope_semantic_path_parts
+                    .clear();
+                projector
+                    .projection_resolution_input_rows
+                    .name_symbol_binding_rows
+                    .push(local);
+            }
+        }
+        let selected = if unit["unit_no_std_flag"] == true {
+            "core"
+        } else {
+            "std"
+        };
+        if system
+            && alias == selected
+            && unit["unit_no_core_flag"] != true
+            && unit["unit_implicit_prelude_flag"] != false
+        {
+            let name = format!(
+                "rust_{}",
+                unit["unit_rust_edition_value"]
+                    .as_str()
+                    .ok_or_else(|| build_name_projection_error("edition missing"))?
+            );
+            let dependency_unit_key = build_unit_compilation_key(dependency)?;
+            let source_scope = projector
+                .projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .iter()
+                .find(|row| {
+                    row.binding_lexical_scope_key.scope_compilation_unit_key == dependency_unit_key
+                        && row.binding_lexical_scope_key.scope_semantic_path_parts == ["prelude"]
+                        && row.binding_resolved_name_text == name
+                })
+                .and_then(|row| row.binding_target_child_scope.clone())
+                .ok_or_else(|| {
+                    build_name_projection_error(format!(
+                        "sysroot edition prelude unavailable: {alias}::{name}"
+                    ))
+                })?;
+            let standard = projector
+                .projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .iter()
+                .filter(|row| {
+                    row.binding_lexical_scope_key == source_scope
+                        && row.binding_visibility_scope_kind == NameBindingVisibilityKind::Public
+                })
+                .cloned()
+                .map(|mut row| {
+                    row.binding_lexical_scope_key = NameResolutionScopeKey {
+                        scope_compilation_unit_key: own.clone(),
+                        scope_semantic_path_parts: vec!["@prelude".into()],
+                    };
+                    row.binding_selection_priority_kind = NameBindingPriorityKind::Prelude;
+                    row
+                })
+                .collect::<Vec<_>>();
+            projector
+                .projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .extend(standard);
+        }
+    }
+    if unit["unit_implicit_prelude_flag"] == false {
         projector
             .projection_resolution_input_rows
-            .name_symbol_binding_rows
-            .push(NameResolvedBindingRow {
-                binding_lexical_scope_key: external.clone(),
-                binding_resolved_name_text: alias,
-                binding_namespace_kind_value: NamespaceBindingKindValue::Type,
-                binding_target_identity_key: target,
-                binding_target_child_scope: Some(root),
-                binding_visibility_scope_kind: NameBindingVisibilityKind::Public,
-                binding_selection_priority_kind: NameBindingPriorityKind::Prelude,
-                binding_import_evidence_keys: vec![],
-            });
+            .unit_extern_prelude_key = None;
     }
     Ok(())
 }
@@ -261,6 +349,7 @@ fn build_resolved_crate_records(
             }),
     );
     rows.extend(output.resolved_semantic_output_rows);
+    rows.extend(projector.projection_lang_definition_rows.clone());
     Ok(rows)
 }
 
@@ -289,7 +378,9 @@ pub fn run_persisted_name_resolution(
         .collect::<Result<BTreeMap<_, _>, StoreBackendFailureError>>()?;
     let mut pending = units
         .iter()
-        .filter(|(_, unit)| unit["unit_mapped_target_flag"] == true)
+        .filter(|(_, unit)| {
+            unit["unit_mapped_target_flag"] == true || unit["unit_sysroot_context_flag"] == true
+        })
         .map(|(key, _)| key.clone())
         .collect::<BTreeSet<_>>();
     let mut completed = BTreeSet::new();
@@ -323,6 +414,16 @@ pub fn run_persisted_name_resolution(
         append_library_namespace_inputs(&mut projector, unit, &units, store, scope)?;
         projector.project_unit_source_root()?;
         let input = projector.projection_resolution_input_rows.clone();
+        if std::env::var_os("PARSELTONGUE_PROFILE_MACRO_ROUNDS").is_some() {
+            eprintln!(
+                "stage=name-projection-complete unit={ready} scopes={} bindings={} imports={} paths={} macros={}",
+                input.name_module_scope_rows.len(),
+                input.name_symbol_binding_rows.len(),
+                input.name_import_request_rows.len(),
+                input.name_signature_path_rows.len(),
+                input.name_macro_invocation_rows.len()
+            );
+        }
         let macro_port = PersistedItemMacroPort::build_persisted_macro_port(projector);
         let output = resolve_crate_name_bindings(&input, &macro_port, stage_cancel_flag_value)
             .map_err(build_name_projection_error)?;

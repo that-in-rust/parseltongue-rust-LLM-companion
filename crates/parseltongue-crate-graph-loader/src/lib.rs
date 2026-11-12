@@ -486,11 +486,16 @@ pub fn ingest_workspace_source_files(
     for row in graph {
         let unit: Value =
             serde_json::from_str(&row.stage_row_payload_text).map_err(build_graph_stage_failure)?;
-        if unit["unit_mapped_target_flag"] == true {
-            roots.insert(PathBuf::from(read_json_string_field(
-                &unit,
-                "unit_package_root_path",
-            )?));
+        if unit["unit_mapped_target_flag"] == true || unit["unit_sysroot_context_flag"] == true {
+            let package = PathBuf::from(read_json_string_field(&unit, "unit_package_root_path")?);
+            roots.insert(if unit["unit_sysroot_context_flag"] == true {
+                package
+                    .parent()
+                    .ok_or_else(|| build_graph_stage_failure("sysroot library parent missing"))?
+                    .to_owned()
+            } else {
+                package
+            });
         }
     }
     let mut files = BTreeSet::new();

@@ -3,12 +3,13 @@ use parseltongue_core_row_types::{
     StoreBackendFailureError,
 };
 use parseltongue_crate_graph_loader::{
-    OfflineWorkspaceCommandRunner, ingest_requested_source_file, ingest_workspace_source_files,
-    load_workspace_crate_graph,
+    OfflineWorkspaceCommandRunner, extend_sysroot_crate_graph, ingest_requested_source_file,
+    ingest_workspace_source_files, load_workspace_crate_graph,
 };
 use parseltongue_stage_worker_scheduler::map_bounded_stage_workers;
 use parseltongue_syntax_span_extractor::{
-    SyntaxFileInputData, extract_file_syntax_rows, run_persisted_name_resolution,
+    SyntaxFileInputData, check_sysroot_context_needed, extract_file_syntax_rows,
+    read_unit_prelude_configuration, run_persisted_name_resolution,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
@@ -167,7 +168,7 @@ fn run_persisted_syntax_stage(
         })
         .collect::<Result<_, StoreBackendFailureError>>()?;
     for (key, unit) in &units {
-        if unit["unit_mapped_target_flag"] != true {
+        if unit["unit_mapped_target_flag"] != true && unit["unit_sysroot_context_flag"] != true {
             continue;
         }
         let path = Path::new(read_required_json_string(unit, "unit_source_root_path")?)
@@ -501,6 +502,102 @@ fn compute_workspace_generation_digest(
     })?;
     Ok(digest.finalize().to_hex().to_string())
 }
+fn prepare_sysroot_staging_scope(
+    store: &dyn StageTableStorePort,
+    scope: &StageRunScopeValue,
+    cancel: &RunCancelFlagValue,
+    workers: usize,
+) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+    let files = read_stage_json_records(store, scope, "file-source-text-table")?
+        .into_iter()
+        .map(|value| {
+            Ok((
+                read_required_json_string(&value, "file_source_absolute_path")?.to_owned(),
+                value,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreBackendFailureError>>()?;
+    let requests = read_stage_json_records(store, scope, "syntax-file-work-requests")?;
+    let needed = requests.iter().try_fold(false, |needed, request| {
+        if needed {
+            return Ok(true);
+        }
+        let path = read_required_json_string(request, "file_source_absolute_path")?;
+        let file = files
+            .get(path)
+            .ok_or_else(|| build_pipeline_stage_error("reached source missing"))?;
+        let bytes = store.read_file_content_bytes(read_required_json_string(
+            file,
+            "file_content_digest_full",
+        )?)?;
+        Ok::<_, StoreBackendFailureError>(check_sysroot_context_needed(
+            std::str::from_utf8(&bytes).map_err(build_pipeline_stage_error)?,
+        ))
+    })?;
+    let graph = store.read_stage_table_rows(scope, "crate-dependency-graph-table")?;
+    let contexts=graph.iter().filter_map(|row|{
+        let unit=serde_json::from_str::<Value>(&row.stage_row_payload_text);
+        match unit{
+            Ok(unit) if unit["unit_mapped_target_flag"]==true=>Some(Ok((row,unit))),
+            Ok(_)=>None,Err(error)=>Some(Err(build_pipeline_stage_error(error)))
+        }
+    }).map(|entry|{
+        let (row,unit)=entry?;
+        let path=read_required_json_string(&unit,"unit_source_root_path")?;
+        let file=files.get(path).ok_or_else(||build_pipeline_stage_error(format!("crate root missing: {path}")))?;
+        let bytes=store.read_file_content_bytes(read_required_json_string(file,"file_content_digest_full")?)?;
+        let request=serde_json::json!({"file_source_absolute_path":path,"unit_compilation_identity_key":row.stage_row_record_key,
+            "file_module_directory_path":read_file_module_directory(Path::new(path))?,"file_parse_context_kind":"items","file_expansion_provenance_chain":[]});
+        let flags=read_unit_prelude_configuration(&build_syntax_file_input(&request,&unit,bytes)?)?;
+        Ok((row.stage_row_record_key.clone(),flags))
+    }).collect::<Result<BTreeMap<_,_>,StoreBackendFailureError>>()?;
+    if !needed {
+        let graph = graph
+            .into_iter()
+            .map(|mut row| {
+                if let Some(flags) = contexts.get(&row.stage_row_record_key) {
+                    let mut value: Value = serde_json::from_str(&row.stage_row_payload_text)
+                        .map_err(build_pipeline_stage_error)?;
+                    value["unit_no_std_flag"] = json!(flags.unit_no_std_flag);
+                    value["unit_no_core_flag"] = json!(flags.unit_no_core_flag);
+                    value["unit_implicit_prelude_flag"] = json!(flags.unit_implicit_prelude_flag);
+                    row.stage_row_payload_text = value.to_string();
+                }
+                Ok(row)
+            })
+            .collect::<Result<Vec<_>, StoreBackendFailureError>>()?;
+        let graph = graph
+            .into_iter()
+            .chain(store.read_stage_table_rows(scope, "workspace-config-state-records")?)
+            .collect::<Vec<_>>();
+        write_pipeline_stage_unit(store, scope, "crate-graph", "workspace", &graph, cancel)?;
+        return Ok(scope.clone());
+    }
+    let graph = graph
+        .into_iter()
+        .chain(store.read_stage_table_rows(scope, "workspace-config-state-records")?)
+        .collect::<Vec<_>>();
+    let graph = extend_sysroot_crate_graph(&graph, &contexts)?;
+    let next = StageRunScopeValue {
+        run_generation_digest_value: format!(
+            "staging-sysroot/{}",
+            scope.stage_attempt_sequence_value
+        ),
+        stage_attempt_sequence_value: scope.stage_attempt_sequence_value.clone(),
+    };
+    write_pipeline_stage_unit(store, &next, "crate-graph", "workspace", &graph, cancel)?;
+    write_pipeline_stage_unit(store, &next, "crate-graph", "__complete__", &[], cancel)?;
+    ingest_workspace_source_files(&next, store, cancel)?;
+    write_pipeline_stage_unit(store, &next, "source-ingest", "__complete__", &[], cancel)?;
+    run_persisted_syntax_stage(
+        store,
+        &next,
+        cancel,
+        workers,
+        SyntaxStageOperationKind::Discovery,
+    )?;
+    Ok(next)
+}
 fn run_workspace_mapping_pipeline(
     root: &Path,
     store: &dyn StageTableStorePort,
@@ -567,6 +664,11 @@ fn run_workspace_mapping_pipeline(
         "stage=source-closure elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
+    let scope = if final_stage == MappingFinalStageKind::NameResolution {
+        prepare_sysroot_staging_scope(store, &scope, cancel, workers)?
+    } else {
+        scope
+    };
     let generation = compute_workspace_generation_digest(store, &scope)?;
     let started = std::time::Instant::now();
     let scope = store.prepare_workspace_generation_scope(&scope, &generation, cancel)?;

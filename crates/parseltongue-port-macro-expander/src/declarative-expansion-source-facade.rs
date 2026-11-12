@@ -32,8 +32,8 @@ pub fn expand_declarative_macro_items(
         .map(|pattern| build_macro_source_tokens(pattern, definition_edition, 0))
         .transpose()
         .map_err(MacroExpansionFailureKind::InvalidDefinition)?;
-    let rules = if let Some(pattern) = &pattern {
-        DeclarativeMacro::parse_macro2(Some(pattern), &definition, SyntaxContext::edition)
+    let rules = if input.macro_declaration_style_flag || pattern.is_some() {
+        DeclarativeMacro::parse_macro2(pattern.as_ref(), &definition, SyntaxContext::edition)
     } else {
         DeclarativeMacro::parse_macro_rules(&definition, SyntaxContext::edition)
     };

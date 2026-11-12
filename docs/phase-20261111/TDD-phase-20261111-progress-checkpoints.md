@@ -1320,3 +1320,36 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   tools/parser-const-closure-statements.patch SHA-256 remains
   89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa.
 - No sysroot GREEN claim; no oracle mapped-unit manifest or S5 rate yet.
+
+## Native sysroot publication GREEN — 2026-11-12
+
+- Fixed terminal grouped-self imports in L2 import lookup. They resolve the
+  prefix in the type namespace only. The persisted portable fixture and pure
+  type-versus-constructor regression now pass. This clears the previously
+  verified Option::{self,...} failure in installed std/core preludes.
+- Persisted crate-root no_std/no_core/no_implicit_prelude flags even when the
+  reached closure has no sysroot demand; no support units are added there.
+  Explicit renamed extern crates and primitive u8 resolve in that branch.
+- Committing the preserved sysroot implementation: independent core/alloc/std
+  source contexts, active-closure demand, separate augmented staging, edition
+  preludes, explicit extern aliases, retained discovered lang attributes and
+  incoherent flags, provenance, and atomic per-crate name publication. Support
+  units remain unmapped. Also preserves source-relative path and macro-decl
+  fixes required to reach native publication, plus opt-in round diagnostics.
+- Checks, all on the same final source:
+  - L2 release suite: 9 passed, 0 failed (0.07 seconds).
+  - Portable release CLI: 20 passed, 0 failed, native case filtered (0.98 s).
+  - Native release CLI test_lang_items_in_sysroot: 1 passed, 0 failed,
+    20 filtered (1202.91 s). It checks Option, Vec, core::ops::Range,
+    std::string::String, five discovered lang names, and provenance arrays.
+  - Focused all-target Clippy -D warnings: Finished dev in 0.78 seconds.
+  - cargo fmt --all and git diff --check: exit zero.
+- Earlier unchanged graph contracts (9+3), syntax contracts (17), and pure
+  macro contracts (22 plus one doctest) remain passing; not rerun.
+- Runtime is still large. No M2 performance envelope claim is made. Next
+  REFACTOR removes repeated owned grouping-key clones in pure normalization,
+  preserving precedence, merge order, visibility and canonical output.
+- Exact mapped-unit manifests, PRIMARY/SECONDARY differ and all-five S5 remain
+  pending. Additional lead reminder recorded: when reaching S6/S7 use
+  codebase-memory list_projects, match root_path, inspect schema, then consume
+  complete paginated coverage per SOP; continue strict phase checkpoints.

@@ -167,17 +167,8 @@ fn derive_import_binding_rows(
                     .iter()
                     .filter_map(|row| row.binding_target_child_scope.as_ref())
                     .flat_map(|scope| {
-                        bindings
-                            .iter()
-                            .filter(move |row| &row.binding_lexical_scope_key == scope)
+                        lookup.collect_scope_binding_rows(scope, &request.import_lexical_scope_key)
                     })
-                    .filter(|row| {
-                        crate::namespace_binding_normalization_rules::check_binding_scope_visible(
-                            &row.binding_visibility_scope_kind,
-                            &request.import_lexical_scope_key,
-                        )
-                    })
-                    .cloned()
                     .collect()
             } else {
                 targets
