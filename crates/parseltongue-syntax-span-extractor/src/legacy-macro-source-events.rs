@@ -1,6 +1,6 @@
 use parseltongue_core_row_types::StoreBackendFailureError;
-use ra_ap_syntax::SyntaxNode;
-use serde_json::Value;
+use ra_ap_syntax::{AstNode, SyntaxKind, SyntaxNode, T, ast};
+use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
 pub struct LegacyMacroNodeEvents {
@@ -9,11 +9,11 @@ pub struct LegacyMacroNodeEvents {
 }
 
 pub fn read_legacy_node_events(
-    _node: &SyntaxNode,
-    _prefix: &[u64],
-    _unit: &Value,
-    _cfg: &BTreeSet<String>,
-    _read_key: &dyn Fn(&SyntaxNode, bool) -> Result<Value, StoreBackendFailureError>,
+    node: &SyntaxNode,
+    prefix: &[u64],
+    unit: &Value,
+    cfg: &BTreeSet<String>,
+    read_key: &dyn Fn(&SyntaxNode, bool) -> Result<Value, StoreBackendFailureError>,
 ) -> Result<LegacyMacroNodeEvents, StoreBackendFailureError> {
     todo!("ordered legacy macro source events")
 }
@@ -39,7 +39,7 @@ mod tests {
             rows.extend(events.after_node_rows);
         }
         let mut rows = Vec::new();
-        walk(&parsed.syntax(), prefix, &mut rows);
+        walk(&parsed.syntax_node(), prefix, &mut rows);
         rows
     }
     fn requests(events: &[Value]) -> Vec<Value> {
@@ -129,7 +129,7 @@ mod tests {
         );
         let parsed = ra_ap_syntax::SourceFile::parse("m!();", Edition::Edition2024);
         let call = parsed
-            .syntax()
+            .syntax_node()
             .descendants()
             .find(|node| node.kind() == SyntaxKind::MACRO_CALL)
             .unwrap();
