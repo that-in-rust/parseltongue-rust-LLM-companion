@@ -2554,3 +2554,34 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   native latency or any production RAM-budget failure.
 - Next: finish the original CLI WIP only after the bounded native check,
   then freeze the release executable for the serde-first SOP run.
+
+### Native contract bounded debug attempts — release isolation next
+
+- The 600s whole CLI check ended with exit 124 at
+  `test test_lang_items_in_sysroot ...`; the preceding nine tests passed.
+  This was NOT a CLI GREEN. Log:
+  `/home/ubuntu/cli-native-frozen-visibility-green.log`.
+- A second bounded isolated native check used command-line-only
+  `profile.dev.package.turso_core.debug-assertions=false` and
+  `profile.dev.package.turso_core.opt-level=1`, with the requested
+  CARGO_BUILD_JOBS=2, CARGO_PROFILE_DEV_DEBUG=0 and CXXFLAGS=-g0.
+  Build completed in 1m 28s. The exact native test also timed out at 600s,
+  exit 124, without a passing result. This is a diagnostic profile variant,
+  not a substitute default-profile pass. Logs:
+  `/home/ubuntu/cli-native-profile-{build,contract}.log`.
+- The sampled second child was still progressing (756 MiB store, observed
+  parent RSS 818324 KiB at 8m05s); these observations are NOT whole-tree
+  peaks or an SOP resource qualification. The debug-validation cost alone
+  is therefore insufficient to explain/fix the full bounded native check.
+- Re-plan before a third native attempt: use the required release build to
+  distinguish unoptimized extraction cost from analysis failure. Do not add
+  workspace profiles or change the upstream pin, semantics, test assertions
+  or DuckDB cap. Stop rather than tune again if that bounded check fails.
+- The three terminated temporary fixture stores were disposable pre-SOP
+  debug scratch, not qualification artifacts. Their logs, stacks, plans and
+  CPU profile remain under /home/ubuntu; scratch databases are removed to
+  make room for the release build. No e2e/oracle artifacts were removed.
+- Full GREEN output for the focused adapter gate, recorded verbatim:
+  `test result: ok. 5 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.72s`
+  `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.18s`
+  `test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s`.
