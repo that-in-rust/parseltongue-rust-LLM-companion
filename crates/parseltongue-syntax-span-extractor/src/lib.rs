@@ -7,6 +7,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "crate-syntax-namespace-projection.rs"]
+mod crate_syntax_namespace_projection;
+#[path = "name-resolution-record-codec.rs"]
+mod name_resolution_record_codec;
 #[path = "name-resolution-stage-adapter.rs"]
 mod name_resolution_stage_adapter;
 pub use name_resolution_stage_adapter::run_persisted_name_resolution;

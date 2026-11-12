@@ -37,6 +37,12 @@ pub struct SpanByteRangeValue {
     span_byte_end_offset: u64,
 }
 
+impl SpanByteRangeValue {
+    pub fn read_source_range_pair(&self) -> (u64, u64) {
+        (self.span_byte_start_offset, self.span_byte_end_offset)
+    }
+}
+
 impl TryFrom<(u64, u64)> for SpanByteRangeValue {
     type Error = CoreRowValidationError;
 
@@ -77,7 +83,25 @@ pub struct SemanticOccurrenceKeyValue {
     span_expansion_provenance_chain: Vec<[u8; 32]>,
 }
 
+pub struct SemanticOccurrencePartsValue<'a> {
+    pub unit_compilation_identity_key: &'a CrateCompilationUnitKey,
+    pub span_source_file_path: &'a str,
+    pub span_byte_range_value: &'a SpanByteRangeValue,
+    pub span_content_digest_full: &'a SpanDigestIdValue,
+    pub span_expansion_provenance_chain: &'a [[u8; 32]],
+}
+
 impl SemanticOccurrenceKeyValue {
+    pub fn read_semantic_occurrence_parts(&self) -> SemanticOccurrencePartsValue<'_> {
+        SemanticOccurrencePartsValue {
+            unit_compilation_identity_key: &self.unit_compilation_identity_key,
+            span_source_file_path: &self.span_source_file_path,
+            span_byte_range_value: &self.span_byte_range_value,
+            span_content_digest_full: &self.span_content_digest_full,
+            span_expansion_provenance_chain: &self.span_expansion_provenance_chain,
+        }
+    }
+
     pub fn build_semantic_occurrence_key(
         unit_compilation_identity_key: &CrateCompilationUnitKey,
         span_source_file_path: &str,

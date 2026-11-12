@@ -707,3 +707,33 @@ The new Turso fixture fails before schema writes because publication incorrectly
 without its declared name-resolution stage: 0 passed, 1 failed (0.08s). It additionally
 requires one atomic crate transaction spanning bindings and expanded spans, rollback of
 duplicate-key writes, and unchanged old publication until the complete new stage is sealed.
+
+### M2 persisted stage wiring — GREEN (initial source projection subset)
+
+The L3 adapter now reads persisted graph/configuration/file bytes and completed dependency
+scopes/bindings, constructs per-unit parser-derived scopes, symbols, imports and signature
+paths, resolves dependencies library-first, and commits each complete crate in one Concurrent
+transaction. JSON codecs preserve full unit/occurrence digests without adding L1 dependencies.
+Turso owns five new M2 tables, permits crate-namespaced expanded syntax/file/request rows in
+the same atomic write, and rejects publication missing any declared stage completion marker.
+The CLI invokes the adapter and derives its name-resolution banner from the persisted marker.
+
+Checks: fmt check exited zero; focused Clippy -D warnings finished in 0.53s.
+CLI 6 passed (1.36s), syntax 11 passed, resolver 8 passed (0.26s), core 3 passed.
+Turso stage contracts 15 passed (4.54s); dependency/runtime gates 3 passed (0.20s);
+adapter MVCC smoke 1 passed and persistence profiles 2 passed / 3 ignored.
+Existing include-expression and build-script-reason fixtures still pass; expression macros
+are not incorrectly sent to an item-only expander. The old M1 banner assertion now requires
+the explicitly implemented name-resolution stage rather than its retired placeholder.
+
+This is NOT M2 completion: the current item-macro port intentionally returns a typed error;
+no real MBe, proc-macro cache, sysroot/language-item projection, where-bound/inherent impl
+completion or expanded rows are claimed. Macro/expanded/lang tables are schema/publication
+support only. Parser projection still needs integration with persisted span/field evidence.
+No production corpus mapping/S5 verdict has been attempted with this incomplete adapter.
+The external current-harness PRIMARY collection failed on all five with exit 101:
+"Tried to use attached db, but no db is attached". A serde diagnostic backtrace reaches
+Semantics::resolve_path_per_ns -> analyze_impl -> infer_query -> infer_pat -> resolve_variant.
+The pinned HIR exports attach_db; add an enum-pattern/local-use regression and use its
+documented attached context before rerunning the oracle. Those failed exports are artifacts,
+not measurements of agreement; no denominator exists.

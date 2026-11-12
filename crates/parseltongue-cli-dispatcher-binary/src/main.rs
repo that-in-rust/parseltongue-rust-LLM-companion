@@ -453,6 +453,10 @@ fn build_workspace_coverage_banner(
     })?;
     let reasons:Vec<_>=reasons.into_iter().map(|(unit,(inactive,build_script))|
         json!({"unit_compilation_identity_key":unit,"unit_unresolved_reason_counts":{"cfg_inactive":inactive,"build_script":build_script}})).collect();
+    let name_resolution_complete = store
+        .read_stage_table_rows(&scope, "stage-run-generation-records")?
+        .iter()
+        .any(|row| row.stage_row_record_key == "__marker__/name-resolution/__complete__");
     Ok(
         json!({"run_generation_digest_value":scope.run_generation_digest_value,
         "source_file_record_count":files.len(),"syntax_span_record_count":span_count,
@@ -461,7 +465,7 @@ fn build_workspace_coverage_banner(
         "build_script_unresolved_count":build_script,
         "crate_unresolved_reason_counts":reasons,
         "stage_implementation_status_values":{"crate-graph":"complete","source-ingest":"complete","syntax-spans":"complete",
-            "name-resolution":"not yet implemented","macro-expansion":"not yet implemented","proc-macro-shapes":"not yet implemented",
+            "name-resolution":if name_resolution_complete {"complete"} else {"not yet implemented"},"macro-expansion":"not yet implemented","proc-macro-shapes":"not yet implemented",
             "signature-lowering":"not yet implemented","call-resolution":"not yet implemented","visibility-hld":"not yet implemented"}}),
     )
 }

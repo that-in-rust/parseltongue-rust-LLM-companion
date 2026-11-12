@@ -132,6 +132,36 @@ fn test_persisted_resolution_path_answers() {
 }
 
 #[test]
+fn test_empty_resolution_stage_rows() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"), "").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    assert_eq!(
+        store
+            .count_stage_table_rows(&scope, "path-resolution-site-records")
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        store
+            .count_stage_table_rows(&scope, "module-scope-binding-table")
+            .unwrap(),
+        19
+    );
+}
+
+#[test]
 fn test_fixture_projects_remain_unmapped() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
@@ -230,7 +260,7 @@ fn test_stage_rerun_is_identical() {
     assert_eq!(first["source_tiling_identity_holds"], true);
     assert_eq!(
         first["stage_implementation_status_values"]["name-resolution"],
-        "not yet implemented"
+        "complete"
     );
     let output = run_workspace_mapping_fixture(&root, &database, "4");
     assert!(

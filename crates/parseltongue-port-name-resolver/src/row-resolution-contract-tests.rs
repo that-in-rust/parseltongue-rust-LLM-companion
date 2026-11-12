@@ -134,6 +134,7 @@ fn build_fixture_import_request(
         import_binding_alias_text: alias.map(str::to_owned),
         import_glob_expansion_flag: glob,
         import_visibility_scope_kind: NameBindingVisibilityKind::Public,
+        import_resolution_source_kind: NameResolutionPathKind::Import,
     }
 }
 

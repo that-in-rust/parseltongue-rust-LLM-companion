@@ -15,8 +15,29 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("body-site-reference-table", "syntax-spans"),
     ("module-source-closure-requests", "syntax-spans"),
     ("syntax-file-work-requests", "syntax-spans"),
+    ("module-scope-binding-table", "name-resolution"),
+    ("name-resolution-scope-records", "name-resolution"),
+    ("path-resolution-site-records", "name-resolution"),
+    ("macro-expanded-item-table", "name-resolution"),
+    ("lang-item-definition-table", "name-resolution"),
     ("stage-run-generation-records", "markers"),
 ];
+
+fn check_table_stage_access(table: &str, stage: &str) -> bool {
+    STAGE_OWNED_TABLE_NAMES
+        .iter()
+        .any(|(name, owner)| *name == table && *owner == stage)
+        || (stage == "name-resolution"
+            && matches!(
+                table,
+                "span-reference-text-table"
+                    | "field-signature-detail-table"
+                    | "body-site-reference-table"
+                    | "file-source-text-table"
+                    | "module-source-closure-requests"
+                    | "syntax-file-work-requests"
+            ))
+}
 
 fn check_stage_cancel_requested(cancel: &RunCancelFlagValue) -> Result<(), turso::Error> {
     if cancel.check_stage_work_cancelled() {
@@ -90,13 +111,19 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         request: &StageUnitWriteRequest<'_>,
         cancel: &RunCancelFlagValue,
     ) -> Result<usize, StoreBackendFailureError> {
+        if request.stage_owner_name_value == "name-resolution"
+            && !request.stage_unit_output_rows.is_empty()
+            && !request.stage_unit_work_key.starts_with("crate/")
+        {
+            return Err(build_store_backend_error(
+                "name-resolution work keys require the crate/ namespace",
+            ));
+        }
         for row in request.stage_unit_output_rows {
-            let owner = STAGE_OWNED_TABLE_NAMES
-                .iter()
-                .find(|(name, _)| *name == row.stage_owned_table_name)
-                .map(|(_, owner)| *owner);
-            if owner != Some(request.stage_owner_name_value)
-                || row.stage_row_record_key.starts_with("__marker__/")
+            if !check_table_stage_access(
+                &row.stage_owned_table_name,
+                request.stage_owner_name_value,
+            ) || row.stage_row_record_key.starts_with("__marker__/")
             {
                 return Err(build_store_backend_error(
                     "stage output table access denied",
@@ -120,16 +147,16 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                 }
                 let setup=started.elapsed().as_secs_f64();
                 let cleanup_started=std::time::Instant::now();
-                for (table,owner) in STAGE_OWNED_TABLE_NAMES {
-                    if *owner == request.stage_owner_name_value {
+                for (table,_) in STAGE_OWNED_TABLE_NAMES {
+                    if check_table_stage_access(table,request.stage_owner_name_value) {
                         transaction.execute(format!("DELETE FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_unit_work_key=?"),
                             turso::params![scope.run_generation_digest_value.clone(), scope.stage_attempt_sequence_value.clone(), request.stage_unit_work_key.to_owned()]).await?;
                     }
                 }
                 let cleanup=cleanup_started.elapsed().as_secs_f64();
                 let insert_started=std::time::Instant::now();
-                for (table,owner) in STAGE_OWNED_TABLE_NAMES {
-                    if *owner != request.stage_owner_name_value { continue; }
+                for (table,_) in STAGE_OWNED_TABLE_NAMES {
+                    if !check_table_stage_access(table,request.stage_owner_name_value) { continue; }
                     let rows: Vec<_> = request.stage_unit_output_rows.iter().filter(|row|row.stage_owned_table_name==*table).collect();
                     for batch in rows.chunks(self.stage_insert_batch_limit.get()) {
                         check_stage_cancel_requested(cancel)?;
@@ -283,7 +310,23 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             let mut connection = self.store_database_handle_value.connect()?;
             let transaction = connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
             let result = async {
-                for stage in ["crate-graph","source-ingest","syntax-spans"] {
+                let mut required=std::collections::BTreeSet::from(["crate-graph".to_owned(),"source-ingest".to_owned(),"syntax-spans".to_owned()]);
+                let mut configuration_rows=transaction.query("SELECT stage_row_payload_text FROM \"workspace-config-state-records\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_row_record_key='workspace'",
+                    turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                if let Some(row)=configuration_rows.next().await? {
+                    let configuration:serde_json::Value=serde_json::from_str(&row.get::<String>(0)?).map_err(|error|turso::Error::Misuse(error.to_string()))?;
+                    if let Some(stages)=configuration.get("workspace_required_stage_names") {
+                        for stage in stages.as_array().ok_or_else(||turso::Error::Misuse("invalid required stage list".into()))? {
+                            let stage=stage.as_str().ok_or_else(||turso::Error::Misuse("invalid required stage name".into()))?;
+                            if !STAGE_OWNED_TABLE_NAMES.iter().any(|(_,owner)|*owner==stage && stage!="markers") {
+                                return Err(turso::Error::Misuse(format!("unsupported required stage {stage}")));
+                            }
+                            required.insert(stage.to_owned());
+                        }
+                    }
+                }
+                drop(configuration_rows);
+                for stage in required {
                     let mut rows = transaction.query("SELECT 1 FROM \"stage-run-generation-records\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_row_record_key=?",
                         turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone(),format!("__marker__/{stage}/__complete__")]).await?;
                     if rows.next().await?.is_none() { return Err(turso::Error::Misuse(format!("StageInputMissingError: {stage}"))); }

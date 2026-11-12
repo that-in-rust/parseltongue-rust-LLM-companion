@@ -97,9 +97,10 @@ pub struct NameImportRequestRow {
     pub import_binding_alias_text: Option<String>,
     pub import_glob_expansion_flag: bool,
     pub import_visibility_scope_kind: NameBindingVisibilityKind,
+    pub import_resolution_source_kind: NameResolutionPathKind,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum NameResolutionPathKind {
     Import,
     Signature,

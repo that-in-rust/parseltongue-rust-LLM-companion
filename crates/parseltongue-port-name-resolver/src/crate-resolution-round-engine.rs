@@ -157,7 +157,7 @@ fn derive_import_binding_rows(
                 &request.import_lexical_scope_key,
                 &request.import_path_segment_rows,
                 NameNamespaceFilterKind::Any,
-                NameResolutionPathKind::Import,
+                request.import_resolution_source_kind,
             );
             let ResolvedPathLookupKind::Resolved(targets) = resolved else {
                 return Vec::new();
