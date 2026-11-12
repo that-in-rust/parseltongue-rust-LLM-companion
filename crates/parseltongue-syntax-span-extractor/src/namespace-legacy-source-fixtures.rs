@@ -65,6 +65,115 @@ fn unit() -> Value {
         "unit_compilation_identity_key":"fixture-unit"})
 }
 
+struct NamespacePersistenceFixture {
+    source: LegacyMacroFixtureStore,
+    units: Vec<Value>,
+    written: std::sync::Mutex<Vec<StageTableRowRecord>>,
+}
+
+impl StageTableStorePort for NamespacePersistenceFixture {
+    fn initialize_workspace_stage_schema(&self) -> Result<(), StoreBackendFailureError> {
+        Ok(())
+    }
+    fn write_stage_table_unit(
+        &self,
+        request: &StageUnitWriteRequest<'_>,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<usize, StoreBackendFailureError> {
+        if cancel.check_stage_work_cancelled() {
+            return Err(build_name_projection_error("cancelled"));
+        }
+        self.written
+            .lock()
+            .unwrap()
+            .extend_from_slice(request.stage_unit_output_rows);
+        Ok(request.stage_unit_output_rows.len())
+    }
+    fn read_stage_table_rows(
+        &self,
+        scope: &StageRunScopeValue,
+        table: &str,
+    ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
+        let values = match table {
+            "workspace-config-state-records" => {
+                vec![json!({"workspace_source_root_path":"/fixture"})]
+            }
+            "crate-dependency-graph-table" => self.units.clone(),
+            _ => return self.source.read_stage_table_rows(scope, table),
+        };
+        Ok(values
+            .into_iter()
+            .enumerate()
+            .map(|(index, value)| StageTableRowRecord {
+                stage_owned_table_name: table.into(),
+                stage_row_record_key: index.to_string(),
+                stage_row_payload_text: value.to_string(),
+            })
+            .collect())
+    }
+    fn write_file_content_bytes(
+        &self,
+        digest: &str,
+        bytes: &[u8],
+    ) -> Result<bool, StoreBackendFailureError> {
+        self.source.write_file_content_bytes(digest, bytes)
+    }
+    fn read_file_content_bytes(&self, digest: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
+        self.source.read_file_content_bytes(digest)
+    }
+    fn publish_workspace_generation_manifest(
+        &self,
+        scope: &StageRunScopeValue,
+        generation: &str,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        self.source
+            .publish_workspace_generation_manifest(scope, generation, cancel)
+    }
+    fn read_workspace_publication_scope(
+        &self,
+    ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
+        Ok(None)
+    }
+}
+
+#[test]
+fn mapped_unit_namespace_persistence() {
+    [(true,false),(false,true),(false,false)].into_iter().for_each(|(mapped,sysroot)|{
+        let mut metadata=unit();
+        metadata["unit_mapped_target_flag"]=json!(mapped);
+        metadata["unit_sysroot_context_flag"]=json!(sysroot);
+        let fixture=NamespacePersistenceFixture{source:LegacyMacroFixtureStore{source:"pub struct Persisted;".into()},units:vec![metadata],written:Default::default()};
+        let count=crate::persist_namespace_syntax_inputs(&StageRunScopeValue{run_generation_digest_value:"generation".into(),stage_attempt_sequence_value:"attempt".into()},&fixture,&RunCancelFlagValue::default()).unwrap();
+        let written=fixture.written.lock().unwrap();
+        assert_eq!(count>0,mapped||sysroot);
+        assert_eq!(written.iter().filter(|row|row.stage_owned_table_name=="syntax-namespace-input-items").any(|row|serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["binding_resolved_name_text"]=="Persisted"),mapped||sysroot);
+    });
+    let fixture = NamespacePersistenceFixture {
+        source: LegacyMacroFixtureStore {
+            source: "fn {".into(),
+        },
+        units: vec![{
+            let mut value = unit();
+            value["unit_mapped_target_flag"] = json!(true);
+            value
+        }],
+        written: Default::default(),
+    };
+    assert!(
+        crate::persist_namespace_syntax_inputs(
+            &StageRunScopeValue {
+                run_generation_digest_value: "generation".into(),
+                stage_attempt_sequence_value: "attempt".into()
+            },
+            &fixture,
+            &RunCancelFlagValue::default()
+        )
+        .is_err()
+    );
+    assert!(fixture.written.lock().unwrap().is_empty());
+}
+
 fn project(source: &str) -> Vec<Value> {
     let store = LegacyMacroFixtureStore {
         source: source.into(),
