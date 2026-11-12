@@ -348,3 +348,27 @@ loaded. Repeated warning is pinned parser/syntax Cargo metadata:
 `unused manifest key lints.cargo (may be supported in a future version)`;
 Cargo says nightly `-Zcargo-lints` is required. Owned-crate checks/Clippy
 still finish. No unsafe toolchain/pin change made to silence the warning.
+
+### H3 control: postpone DELETE until after materialization
+
+The initial H3 deleted target rows first, matching production. To disprove
+DELETE/undo residency as necessary, the diagnostic now materializes before
+DELETE. A regression SELECT errors if original rows are missing during CTAS;
+it was RED with `source deleted before materialization`, then GREEN.
+
+```text
+H3 CTAS before any DELETE/INSERT: OOM
+CTAS_seconds: 4.586
+phase_seconds: 4.655
+sampled_tree_peak_bytes: 1384583168
+
+test result: ok. 57 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.43s
+release example: Finished `release` profile [optimized] target(s) in 6.75s
+all-target release Clippy: Finished `release` profile [optimized] target(s) in 1.20s
+CLI release build: Finished `release` profile [optimized] target(s) in 4.59s
+```
+
+This CTAS fails without executing either target mutation. Production resolver
+is unchanged. Input SHA256 remains exactly the original e5e03f0…48b224.
+Frozen probe revisions and artifact digest manifest are retained in the home
+artifact child directory. Editor PID 1804565 resumed after native work.

@@ -169,6 +169,7 @@ mod tests {
         for query in [
             "SELECT ? AS generation_key,? AS attempt_key,'replacement' AS target_key",
             "SELECT ? AS generation_key,? AS attempt_key,'replacement' AS target_key WHERE false",
+            "SELECT ? AS generation_key,? AS attempt_key,CASE WHEN EXISTS(SELECT 1 FROM \"namespace-path-candidate-records\" WHERE target_key='original') THEN 'replacement' ELSE error('source deleted before materialization') END AS target_key",
         ] {
             assert_eq!(
                 analysis
@@ -287,12 +288,14 @@ impl DuckdbAnalysisStoreAdapter {
         let transaction = connection
             .unchecked_transaction()
             .map_err(super::build_analysis_error)?;
-        transaction.execute("DELETE FROM \"namespace-path-candidate-records\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(super::build_analysis_error)?;
         let queries=[
             format!("CREATE OR REPLACE TEMP TABLE \"namespace-materialized-path-candidates\" AS {query}"),
             "INSERT INTO \"namespace-path-candidate-records\" SELECT * FROM \"namespace-materialized-path-candidates\" WHERE generation_key=? AND attempt_key=?".into(),
         ];
         let plans=queries.iter().enumerate().try_fold(Vec::new(),|mut plans,(index,query)|{
+            if index==1 {
+                transaction.execute("DELETE FROM \"namespace-path-candidate-records\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(super::build_analysis_error)?;
+            }
             eprintln!("stage=namespace-materialization-probe operation={index} event=started");
             let started=std::time::Instant::now();
             let result=read_namespace_explain_rows(&transaction,query,scope,true);

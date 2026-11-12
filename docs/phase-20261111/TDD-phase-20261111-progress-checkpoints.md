@@ -2905,3 +2905,28 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   in a future version)` and requires nightly -Zcargo-lints. This is pinned
   upstream manifest metadata, not an unloaded workspace. Do not change the
   toolchain/pin incidentally; owned package gates above finish successfully.
+
+### H3 replan: disprove DELETE-before-CTAS residency as necessary cause
+
+- Initial H3 matched production by deleting before CTAS. A cheaper remaining
+  explanation was DELETE/undo/index residency, not target INSERT itself.
+  Cut H3 smaller before handing off integer-ID design: materialize first,
+  delete only immediately before INSERT, still within rollback transaction.
+- RED strengthens the same rollback test with a SELECT that explicitly
+  errors unless original candidates remain readable during CTAS:
+  `Invalid Input Error: source deleted before materialization`;
+  `test result: FAILED. 0 passed; 1 failed; ... 56 filtered out; ... 0.05s`.
+- GREEN postpones DELETE, no production resolver changes:
+  `test result: ok. 57 passed; 0 failed; ... finished in 8.43s`.
+  Example build 6.75s; all-target release Clippy 1.20s; CLI release build
+  4.59s; formatting and diff checks exit zero. No refactor needed beyond
+  this ordering correction in the diagnostic helper.
+- Native CTAS still OOMs before DELETE/INSERT: CTAS 4.586s, phase 4.655s,
+  sampled tree peak 1384583168 bytes. DELETE/index undo residency is not
+  required for the failing CTAS. It may still contribute to other plans;
+  this is not an allocation profile of the failed operation.
+- Original frozen SHA256 rechecked identical; preserve both probe executable
+  revisions and refreshed artifact digest manifest under the home folder.
+- Stop H4 rewrite tuning as already journaled; integer-ID narrowing remains
+  the next untested separate step, not permission to batch. Resume editor
+  rust-analyzer after probes/builds; no native mapper left running.
