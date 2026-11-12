@@ -814,3 +814,24 @@ Until those S5 results exist, prioritize correctness and do not optimize RAM.
 Retain the current approximately 1.2 GiB DuckDB cap, record measured tree
 peaks, wall time and resolution rounds, and label the historical 2 GiB gate
 and current engine settings as interim, not final memory acceptance.
+
+### S5 semantic path partition — published classification rule
+
+The oracle publishes `path_lookup_scope_kind` on every exported path row.
+`module-scope` means its semantic targets are module-bound definitions or
+builtin leaves, and each resolved qualifier is a module/crate or enum.
+Enum variants remain module-scope; enum qualification alone is not an
+associated-type lookup. `type-relative` means the oracle identifies a generic
+type/const parameter, Self, an associated-item container, or qualification
+through a non-module/non-enum type or trait. Generic parameter names alone
+are in this deferred partition. Their namespaces must match the path context:
+a same-spelled const parameter cannot capture a type-namespace definition.
+The rule uses HIR resolution, semantic generic ownership and associated-item
+containers, never capitalization, path spelling or suffix heuristics.
+
+Missing, unsupported or conflicting semantic classification is `unknown`,
+retained and reported BLOCKED rather than silently included or discarded.
+When a known qualifier already proves type-relative lookup, that path stays
+in the deferred partition even if another component remains unresolved.
+M2 agreement scores the module-scope partition only; report type-relative
+counts for M4–M6, unknown counts and proc-macro exclusions separately.

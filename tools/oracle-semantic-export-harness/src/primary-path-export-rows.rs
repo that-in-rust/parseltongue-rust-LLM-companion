@@ -280,7 +280,7 @@ pub(super) fn export_configured_semantic_paths(
                 "site_source_range_start":u32::from(range.range.start()),
                 "site_source_range_end":u32::from(range.range.end()),
                 "path_site_source_text":path.syntax().text().to_string(),
-                "path_lookup_scope_kind":read_oracle_lookup_scope(module,&path,&semantics,shared),
+                "path_lookup_scope_kind":read_oracle_lookup_scope(module,&path,&semantics,shared).read_scope_kind_label(),
                 "site_path_context_kind":if path.syntax().ancestors().any(|node|ast::Use::can_cast(node.kind())) {"import"} else {"signature"},
                 "path_target_symbol_rows":targets,
                 "path_unresolved_reason_kind":reason.map(read_oracle_reason_label),
@@ -364,18 +364,35 @@ fn read_oracle_context_key(module: Module, semantics: &Semantics<'_, RootDatabas
     )
 }
 
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+enum OracleLookupScopeKind {
+    ModuleScope,
+    TypeRelative,
+    Unknown,
+}
+
+impl OracleLookupScopeKind {
+    fn read_scope_kind_label(self) -> &'static str {
+        match self {
+            Self::ModuleScope => "module-scope",
+            Self::TypeRelative => "type-relative",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 fn read_oracle_lookup_scope(
     module: Module,
     path: &ast::Path,
     semantics: &Semantics<'_, RootDatabase>,
     shared: bool,
-) -> &'static str {
+) -> OracleLookupScopeKind {
     let paths: Vec<_> = std::iter::successors(Some(path.clone()), ast::Path::qualifier).collect();
     if paths.iter().any(|path| {
         resolve_oracle_associated_paths(module, path, semantics).is_some()
             || shared && check_oracle_generic_lookup(module, path, semantics)
     }) {
-        return "type-relative";
+        return OracleLookupScopeKind::TypeRelative;
     }
     let categories: BTreeSet<_> = paths
         .iter()
@@ -416,30 +433,33 @@ fn read_oracle_lookup_scope(
                                     ModuleDef::Module(_) | ModuleDef::Adt(Adt::Enum(_))
                                 )
                         {
-                            "type-relative"
+                            OracleLookupScopeKind::TypeRelative
                         } else {
-                            "module-scope"
+                            OracleLookupScopeKind::ModuleScope
                         }
                     }
                     PathResolution::TypeParam(_)
                     | PathResolution::ConstParam(_)
-                    | PathResolution::SelfType(_) => "type-relative",
-                    _ => "unknown",
+                    | PathResolution::SelfType(_) => OracleLookupScopeKind::TypeRelative,
+                    _ => OracleLookupScopeKind::Unknown,
                 })
                 .collect();
             if kinds.len() == 1 {
-                kinds.into_iter().next().unwrap_or("unknown")
+                kinds
+                    .into_iter()
+                    .next()
+                    .unwrap_or(OracleLookupScopeKind::Unknown)
             } else {
-                "unknown"
+                OracleLookupScopeKind::Unknown
             }
         })
         .collect();
-    if categories.contains("type-relative") {
-        "type-relative"
-    } else if categories.contains("unknown") {
-        "unknown"
+    if categories.contains(&OracleLookupScopeKind::TypeRelative) {
+        OracleLookupScopeKind::TypeRelative
+    } else if categories.contains(&OracleLookupScopeKind::Unknown) {
+        OracleLookupScopeKind::Unknown
     } else {
-        "module-scope"
+        OracleLookupScopeKind::ModuleScope
     }
 }
 
@@ -1040,18 +1060,19 @@ fn resolve_oracle_module_paths(
     if names.is_empty() {
         return Some(vec![(ModuleDef::Module(module), "type")]);
     }
-    for end in 1..names.len() {
-        if !module
-            .resolve_mod_path(database, names[..end].iter().cloned())?
-            .any(|item| {
-                matches!(
-                    item,
-                    ItemInNs::Types(ModuleDef::Module(_) | ModuleDef::Adt(Adt::Enum(_)))
-                )
+    if !(1..names.len()).all(|end| {
+        module
+            .resolve_mod_path(database, names[..end].iter().cloned())
+            .is_some_and(|mut items| {
+                items.any(|item| {
+                    matches!(
+                        item,
+                        ItemInNs::Types(ModuleDef::Module(_) | ModuleDef::Adt(Adt::Enum(_)))
+                    )
+                })
             })
-        {
-            return None;
-        }
+    }) {
+        return None;
     }
     let definitions: Vec<_> = module
         .resolve_mod_path(database, names)?

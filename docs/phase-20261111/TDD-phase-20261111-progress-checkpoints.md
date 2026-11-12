@@ -1,3 +1,50 @@
+### Semantic oracle partition and compliance continuation (2026-11-12)
+
+- User resource revision: final whole-tree RSS target is 500 MB, deferred
+  until end-to-end DuckDB M2 and all-five S5. Do not optimize RAM before
+  that correctness milestone. Keep the approximately 1.2 GiB DuckDB cap
+  and record actual peaks. SPEC/SOP append-only revision: `97df665d0`.
+- `dcc6eb581` added the oracle scope-category STUB; `b9f569acc` added its
+  RED fixture. The RED exposed rejection of enum-qualified paths in shared
+  contexts before reaching the category assertion. A second focused RED
+  showed a const parameter capturing a same-spelled type-namespace item.
+- `a26ba7975` is oracle partition GREEN: HIR/container-based classification,
+  enum qualification, retained unresolved shared rows, and namespace-aware
+  generic fallback. Full oracle library suite: `33 passed; 0 failed`,
+  `101.83s`; all-target Clippy finished successfully in `1m 27s`.
+- Oracle REFACTOR replaces intermediate category strings with a private
+  enum and uses a prefix-validation combinator. Full oracle suite:
+  `33 passed; 0 failed`, `111.70s`; all-target Clippy finished in `0.58s`.
+  Logs: `/home/ubuntu/oracle-scope-partition-refactor-tests.log` and
+  `/home/ubuntu/oracle-scope-partition-refactor-clippy.log`.
+- The CLI facade remains uncommitted pending the complete 21-test suite.
+  Current run: shell `80ae1f`, log
+  `/home/ubuntu/namespace-cli-publication-green-fourth.log`; the native
+  sysroot child PID is `1747046`. The first nine cases passed; the native
+  case was still running at the last observation, not a completed M2 result.
+- `c75dbd4e7` preserves an equality probe when both completion-owner choices
+  are identical. Turso contracts then printed `22 passed; 0 failed` in
+  `2.98s`; four-package all-target Clippy finished in `1.46s`.
+- CPU evidence is in `/home/ubuntu/namespace-native-root-full-stack.log`
+  and `/home/ubuntu/namespace-native-root-cpu-top.log`: the earlier native
+  child was executing Turso row reads from persisted syntax extraction.
+  A later stack in `/home/ubuntu/namespace-native-late-full-stack.log`
+  shows namespace-input flushing through Turso writes. This is progress
+  evidence, not allocation attribution or a wall-time qualification.
+- The finalized heaptrack trace is partial allocator coverage only:
+  `/home/ubuntu/native-m2-allocation-sample.zst` and
+  `/home/ubuntu/native-m2-allocation-top-stacks.log`. It reports a 404.40 KB
+  tracked peak versus 143.23 MB RSS including instrumentation; pinned
+  Turso uses a mimalloc global allocator. Do not claim whole-Rust top-ten
+  allocation evidence from this trace. Profiling children were stopped.
+- Process-compliance corrections are queued after the oracle phase:
+  requirement/test matrix plus existence checking and test doc tags;
+  persistent SOP report layout and corrected fork pin; a single frozen
+  release executable for fresh all-five M1-applicable S1/S2/S3 audits;
+  typed L2/L3 error refactors outside frozen runs; then serde M2,
+  comparator and all-five S5 in fresh SOP runs without production edits.
+- `rust-executable-specs-01` was re-invoked and its playbook/gates read.
+  No all-five S5, fresh M1 SOP requalification, or S6/S7 is claimed.
 # TDD phase-20261111 progress checkpoints
 
 ## M0 scope and contracts
@@ -2050,6 +2097,53 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   based on `2a362a41a8eb6e090f1a12d9b712df85af6f0c33`, with reviewable patch
   `tools/parser-const-closure-statements.patch`, SHA-256
   `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.
+
+## Frozen namespace output and CLI continuation (2026-11-12)
+
+- Final namespace output STUB `aa6ec8e7a`, RED `4028db903`, GREEN
+  `51f081e76` are pushed. The exporter streams only mapped-unit scopes,
+  bindings, and path answers, with target metadata, namespace groups,
+  unresolved/ambiguous states, visibility, and complete evidence values.
+  It requires a completed SQL fixed-point manifest. Internal binding-round,
+  candidate, and context relations are not exported to Turso.
+- Final exporter checks: the adapter's 48 contracts passed in 44.77s;
+  adapter all-target Clippy finished successfully in 0.64s. The new contract
+  covers normal, empty, premature, repeated, and visitor-error output.
+- Disposable DuckDB cache reset and unresolved-macro completion STUB
+  `63c184874`, RED `52a6b1c8b` are pushed. Their two focused GREEN checks
+  each passed one test (3.19s and 0.00s). The reset discards only unpublished
+  DuckDB working relations and checkpoints the file, retaining constructor
+  policy. Immutable Turso snapshot revisions are retained separately.
+- CLI implementation is working-tree code, not yet GREEN or committed:
+  publish complete analysis input, Appender copy/count/digest validation,
+  normalization and SQL fixed point, dependency-ordered one-unit Rust macro
+  projection, ordered one-invocation expansion barriers, atomic private
+  expansion writes, fresh immutable snapshots, and final product streaming.
+  Final products are verified against a new frozen Turso snapshot with
+  per-table ordered row-leaf BLAKE3 counts/digests. A separate analysis receipt
+  records database location, input scope, digest, SQL rounds, macro progress,
+  product proofs, and elapsed time. Workspace publication remains in the
+  outer pipeline, after name-resolution completion.
+- CLI integration exposed two backend issues, now covered by new contracts:
+  a new stage's empty `__complete__` marker was rejected because another
+  frozen stage shares its output tables; and private namespace chunks written
+  by name-resolution were hidden behind the original namespace-input owner's
+  completion marker. Empty completion markers now cannot own rows or delete
+  another stage's rows, while their own frozen markers remain immutable.
+  Namespace chunks accept the authorized name-resolution parent marker and
+  preserve old frozen-snapshot visibility. Latest Turso suite: 22 passed,
+  0 failed, 34.44s. Focused CLI empty and generated-include fixtures passed
+  (2.46s and 5.36s).
+- Earlier full CLI attempts were stopped during the expensive native-sysroot
+  fixture after exposing these integration failures. The current full CLI
+  suite is running in `/home/ubuntu/namespace-cli-publication-green-third.log`
+  (shell `0f5288`). Do not claim native CLI GREEN from the focused checks.
+- Latest all-target four-package Clippy output is
+  `/home/ubuntu/namespace-cli-clippy-final-third.log` (shell `6bd15a`).
+- No serde M2 RSS, wall, or round qualification, exact oracle manifests,
+  SQL comparator, or all-five S5 numbers exist yet. Process/extension/network
+  audit and S6/S7 remain outstanding. The 1.2 GiB DuckDB cap is not evidence
+  of a measured process-tree budget pass.
 
 ### Frozen namespace normalization — GREEN
 
