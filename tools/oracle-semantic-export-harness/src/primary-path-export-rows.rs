@@ -2,7 +2,9 @@ use crate::mapped_oracle_export_facade::{
     OracleConfigurationKindValue, append_mapped_context_records, apply_mapped_unit_configuration,
     check_mapped_compilation_record, read_manifest_unit_records,
 };
-use hir::{Adt, HasSource, ItemInNs, Module, ModuleDef, Name, PathResolution, Semantics};
+use hir::{
+    Adt, AsAssocItem, HasSource, ItemInNs, Module, ModuleDef, Name, PathResolution, Semantics,
+};
 use ide_db::RootDatabase;
 use parseltongue_core_row_types::SiteUnresolvedReasonKind;
 use project_model::{
@@ -363,12 +365,122 @@ fn read_oracle_context_key(module: Module, semantics: &Semantics<'_, RootDatabas
 }
 
 fn read_oracle_lookup_scope(
-    _module: Module,
-    _path: &ast::Path,
-    _semantics: &Semantics<'_, RootDatabase>,
-    _shared: bool,
+    module: Module,
+    path: &ast::Path,
+    semantics: &Semantics<'_, RootDatabase>,
+    shared: bool,
 ) -> &'static str {
-    "unknown"
+    let paths: Vec<_> = std::iter::successors(Some(path.clone()), ast::Path::qualifier).collect();
+    if paths.iter().any(|path| {
+        resolve_oracle_associated_paths(module, path, semantics).is_some()
+            || shared && check_oracle_generic_lookup(module, path, semantics)
+    }) {
+        return "type-relative";
+    }
+    let categories: BTreeSet<_> = paths
+        .iter()
+        .enumerate()
+        .map(|(index, path)| {
+            let resolutions: Vec<_> = if shared {
+                resolve_oracle_module_paths(module, path, semantics.db)
+                    .into_iter()
+                    .flatten()
+                    .map(|(definition, _)| PathResolution::Def(definition))
+                    .collect()
+            } else {
+                read_oracle_namespace_paths(path, semantics)
+                    .into_iter()
+                    .map(|(_, resolution)| resolution)
+                    .collect()
+            };
+            let kinds: BTreeSet<_> = resolutions
+                .into_iter()
+                .map(|resolution| match resolution {
+                    PathResolution::Def(definition) => {
+                        let associated = match definition {
+                            ModuleDef::Function(definition) => {
+                                definition.as_assoc_item(semantics.db).is_some()
+                            }
+                            ModuleDef::Const(definition) => {
+                                definition.as_assoc_item(semantics.db).is_some()
+                            }
+                            ModuleDef::TypeAlias(definition) => {
+                                definition.as_assoc_item(semantics.db).is_some()
+                            }
+                            _ => false,
+                        };
+                        if associated
+                            || index > 0
+                                && !matches!(
+                                    definition,
+                                    ModuleDef::Module(_) | ModuleDef::Adt(Adt::Enum(_))
+                                )
+                        {
+                            "type-relative"
+                        } else {
+                            "module-scope"
+                        }
+                    }
+                    PathResolution::TypeParam(_)
+                    | PathResolution::ConstParam(_)
+                    | PathResolution::SelfType(_) => "type-relative",
+                    _ => "unknown",
+                })
+                .collect();
+            if kinds.len() == 1 {
+                kinds.into_iter().next().unwrap_or("unknown")
+            } else {
+                "unknown"
+            }
+        })
+        .collect();
+    if categories.contains("type-relative") {
+        "type-relative"
+    } else if categories.contains("unknown") {
+        "unknown"
+    } else {
+        "module-scope"
+    }
+}
+
+fn check_oracle_generic_lookup(
+    module: Module,
+    path: &ast::Path,
+    semantics: &Semantics<'_, RootDatabase>,
+) -> bool {
+    if path.qualifier().is_some() {
+        return false;
+    }
+    let owners = collect_oracle_generic_owners(module, path, semantics);
+    match path.segment().and_then(|segment| segment.kind()) {
+        Some(ast::PathSegmentKind::Name(name)) => owners
+            .into_iter()
+            .flat_map(|owner| owner.params(semantics.db))
+            .any(|parameter| {
+                parameter.name(semantics.db) == Name::new_root(name.text())
+                    && check_oracle_generic_namespace(parameter, path)
+            }),
+        Some(ast::PathSegmentKind::SelfTypeKw) => owners
+            .into_iter()
+            .any(|owner| matches!(owner, hir::GenericDef::Impl(_) | hir::GenericDef::Trait(_))),
+        _ => false,
+    }
+}
+
+fn check_oracle_generic_namespace(parameter: hir::GenericParam, path: &ast::Path) -> bool {
+    let imported = path
+        .syntax()
+        .ancestors()
+        .any(|node| ast::UseTree::can_cast(node.kind()));
+    let value = path
+        .syntax()
+        .parent()
+        .is_some_and(|node| ast::PathExpr::can_cast(node.kind()));
+    !imported
+        && matches!(
+            (parameter, value),
+            (hir::GenericParam::TypeParam(_), false) | (hir::GenericParam::ConstParam(_), true)
+        )
 }
 
 fn build_oracle_path_targets(
@@ -433,12 +545,7 @@ fn build_oracle_path_targets(
             .collect::<Result<Vec<_>, _>>()
             .map(|targets| targets.into_iter().flatten().collect());
     }
-    let range = semantics.original_range(path.syntax());
-    Err(build_oracle_export_error(format!(
-        "module-scoped API cannot resolve shared-context path {} in {}",
-        path.syntax().text(),
-        files.file_path(range.file_id.file_id(semantics.db))
-    )))
+    Ok(Vec::new())
 }
 
 fn read_oracle_namespace_paths<'db>(
@@ -695,7 +802,9 @@ fn resolve_oracle_generic_target(
     let parameter = owners
         .iter()
         .flat_map(|definition| definition.params(semantics.db))
-        .find(|parameter| parameter.name(semantics.db) == name);
+        .find(|parameter| {
+            parameter.name(semantics.db) == name && check_oracle_generic_namespace(*parameter, path)
+        });
     if parameter.is_none()
         && name == Name::new_root("Self")
         && let Some(definition) = owners.into_iter().find_map(|definition| match definition {
@@ -934,7 +1043,12 @@ fn resolve_oracle_module_paths(
     for end in 1..names.len() {
         if !module
             .resolve_mod_path(database, names[..end].iter().cloned())?
-            .any(|item| matches!(item, ItemInNs::Types(ModuleDef::Module(_))))
+            .any(|item| {
+                matches!(
+                    item,
+                    ItemInNs::Types(ModuleDef::Module(_) | ModuleDef::Adt(Adt::Enum(_)))
+                )
+            })
         {
             return None;
         }
@@ -1471,6 +1585,29 @@ mod oracle_path_contract_tests {
                     .any(|target| target["target_symbol_kind_value"] == kind)
             );
         }
+    }
+
+    #[test]
+    fn test_const_generic_namespace() {
+        let directory = tempfile::tempdir().unwrap();
+        create_shared_scope_fixture(
+            directory.path(),
+            "pub struct Item; pub struct Wrap<const Item: usize>(pub Item);",
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        let paths: Vec<_> = rows
+            .iter()
+            .filter(|row| row["path_site_source_text"] == "Item")
+            .collect();
+        assert!(!paths.is_empty());
+        assert!(
+            paths
+                .iter()
+                .all(|row| row["path_lookup_scope_kind"] == "module-scope"
+                    && row["path_target_symbol_rows"][0]["target_symbol_kind_value"] == "Struct"),
+            "{paths:?}"
+        );
     }
 
     #[test]
