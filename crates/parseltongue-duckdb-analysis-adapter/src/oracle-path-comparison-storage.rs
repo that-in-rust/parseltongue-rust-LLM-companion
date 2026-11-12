@@ -70,19 +70,19 @@ pub(super) fn compare_oracle_path_sites_with_threads(
         verify_duckdb_source_copy(connection, &source_scope, &graph_rows, &path_rows, cancel)?;
     let source_digest = source_copy_evidence.aggregate_source_digest.clone();
     load_canonical_comparison_rows(
-        &connection,
+        connection,
         &source_scope,
         &production_oracle_site_rows,
         &primary_oracle_site_rows,
         &secondary_oracle_site_rows,
     )?;
-    score_canonical_comparison_rows(&connection)?;
+    score_canonical_comparison_rows(connection)?;
     check_comparison_cancellation_flag(cancel)?;
     if source.read_workspace_publication_scope()?.as_ref() != Some(&source_scope) {
         return Err(OracleComparisonFailureError::SourceChanged);
     }
     let (mut site_results, mut result) = read_canonical_comparison_results(
-        &connection,
+        connection,
         &source_scope,
         &source_digest,
         &primary_digest,
@@ -164,9 +164,7 @@ fn read_validated_oracle_envelope(
         ("oracle_build_scripts_flag", expected_build_scripts),
         ("oracle_proc_macros_flag", true),
     ] {
-        if let Some(value) = envelope.get(field)
-            && value.as_bool() != Some(expected)
-        {
+        if envelope.get(field).and_then(Value::as_bool) != Some(expected) {
             return Err(OracleComparisonFailureError::InvalidEnvelope {
                 configuration: expected_kind.into(),
                 field: field.into(),
@@ -2003,11 +2001,11 @@ mod oracle_path_comparison_sql_tests {
         let read_setting = |connection: &Connection, name: &str| {
             read_duckdb_setting_values(connection).unwrap()[name].clone()
         };
-        let first_spill_path = read_setting(&first, "temp_directory");
-        let second_spill_path = read_setting(&second, "temp_directory");
+        let first_spill_path = read_setting(first, "temp_directory");
+        let second_spill_path = read_setting(second, "temp_directory");
         assert_ne!(first_spill_path, second_spill_path);
         assert!(Path::new(&first_spill_path).exists());
-        for connection in [&first, &second] {
+        for connection in [first, second] {
             for setting in [
                 "enable_external_access",
                 "autoload_known_extensions",
@@ -2019,11 +2017,11 @@ mod oracle_path_comparison_sql_tests {
         }
         let default = Connection::open_in_memory().unwrap();
         assert_eq!(
-            read_setting(&first, "memory_limit"),
+            read_setting(first, "memory_limit"),
             read_setting(&default, "memory_limit")
         );
-        assert_eq!(read_setting(&first, "threads"), "1");
-        assert_eq!(read_setting(&second, "threads"), "2");
+        assert_eq!(read_setting(first, "threads"), "1");
+        assert_eq!(read_setting(second, "threads"), "2");
     }
 
     /// REQ-RUST-026.4
@@ -2163,9 +2161,9 @@ mod oracle_path_comparison_sql_tests {
             false,
             "",
         )];
-        load_canonical_comparison_rows(&connection, &source_scope, &production, &primary, &primary)
+        load_canonical_comparison_rows(connection, &source_scope, &production, &primary, &primary)
             .unwrap();
-        score_canonical_comparison_rows(&connection).unwrap();
+        score_canonical_comparison_rows(connection).unwrap();
         for (table, expected_count) in [
             ("oracle_source_copy_rows", 2),
             ("production_oracle_site_rows", 1),
@@ -2227,9 +2225,9 @@ mod oracle_path_comparison_sql_tests {
                 [],
             )
             .unwrap();
-        score_canonical_comparison_rows(&connection).unwrap();
+        score_canonical_comparison_rows(connection).unwrap();
         let (evidence, result) = read_canonical_comparison_results(
-            &connection,
+            connection,
             &source_scope,
             "source-digest",
             "primary-digest",

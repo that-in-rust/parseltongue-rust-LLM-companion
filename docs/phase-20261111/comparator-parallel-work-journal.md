@@ -454,3 +454,113 @@ REQ-RUST-026.2/026.3 GREEN
 - `test_external_source_missing_blocks_match_rate`
 - `test_primary_classes_partition_once`
 - `test_blocked_partition_reconciles_duplicates`
+
+### REQ-RUST-026.0 strict oracle-envelope boolean correction
+
+REQ-RUST-026.0 RED
+  - Added `test_oracle_envelope_flags_strict`, covering missing, null, wrong-boolean, and wrong-type values for both boolean fields in PRIMARY and SECONDARY envelopes. Each case requires typed `InvalidEnvelope` and verifies the prior agreement scope and seeded row remain unchanged.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_oracle_envelope_flags_strict -- --nocapture --test-threads=1`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 20 filtered out`.
+  - The first malformed case showed PRIMARY `oracle_build_scripts_flag` could be omitted and comparison still returned `Ok(...)`, published a new agreement generation, and replaced the prior publication.
+
+REQ-RUST-026.0 GREEN
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_oracle_envelope_flags_strict -- --nocapture --test-threads=1`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out`.
+  - All 16 invalid envelope-field cases now return `InvalidEnvelope` with the expected configuration and field before publication; the existing generation scope and seeded agreement row remain readable after every case.
+
+**REQ-RUST-026.0 — strict envelope and prepublication validation test mapping update**
+- `test_oracle_envelope_flags_strict`
+- `test_macro_failure_blocks_publish`
+- `test_malformed_macro_record_rejected`
+
+### Final focused comparator gate set
+
+- `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+- `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture --test-threads=1`: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+- `cargo fmt --all -- --check`: `Exit code: 0`.
+- `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 2.14s`; `Exit code: 0`.
+- `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 6.65s`; `Exit code: 0`.
+- `git diff --check`: `Exit code: 0`.
+- Workspace tests were not rerun; the previously reported stage-export namespace stub remains outside comparator ownership.
+
+REQ-RUST-026.4 REFACTOR
+  - Workspace Clippy initially found needless extra references in comparator `Connection` calls and the lifecycle settings test. Removed only those redundant borrows; no scoring behavior or public interface changed. The final workspace Clippy gate passed.
+
+### Final authoritative REQ-RUST-026 requirement/test matrix
+
+**REQ-RUST-026.0**
+- `test_ambiguous_unit_contexts_fail`
+- `test_invalid_context_kind_rejected`
+- `test_invalid_reason_enum_rejected`
+- `test_invalid_proc_flag_rejected`
+- `test_invalid_namespace_enum_rejected`
+- `test_unit_configuration_contracts_fail`
+- `test_unmapped_site_units_rejected`
+- `test_site_provenance_entries_validated`
+- `test_site_evidence_required_values`
+- `test_oracle_envelope_flags_strict`
+- `test_scope_oracle_errors_block`
+- `test_malformed_macro_record_rejected`
+- `test_macro_failure_blocks_publish`
+
+**REQ-RUST-026.1**
+- `test_site_context_identity_distinct`
+- `test_exact_duplicates_collapse_rows`
+- `test_conflicting_duplicate_payloads_fail`
+- `test_expansion_provenance_separates_sites`
+- `test_package_paths_normalize_lexically`
+- `test_malformed_target_ranges_fail`
+- `test_target_namespaces_are_canonicalized`
+- `test_builtin_target_names_canonicalize`
+- `test_builtin_namespace_changes_identity`
+- `test_split_target_namespaces_merge`
+- `test_role_changes_semantic_digest`
+- `test_exact_comparison_publishes_turso`
+
+**REQ-RUST-026.2**
+- `test_unknown_scope_is_blocked`
+- `test_proc_wrong_target_mismatch`
+- `test_proc_empty_answer_excluded`
+- `test_proc_empty_primary_exclusions`
+- `test_blocked_partition_reconciles_duplicates`
+- `test_enum_variant_module_scored`
+- `test_primary_classes_partition_once`
+- `test_external_source_missing_blocks_match_rate`
+- `test_primary_valid_oracle_missing_production`
+- `test_primary_source_missing_beats_production_cfg`
+- `test_production_reason_does_not_excuse_wrong_target`
+- `test_secondary_reasons_do_not_affect_primary`
+- `test_empty_denominator_is_na`
+- `test_unresolved_targets_remain_mismatch`
+- `test_production_cfg_keeps_mismatch`
+- `test_secondary_cfg_preserves_match`
+- `test_cfg_wrong_target_mismatch`
+- `test_unknown_cfg_remains_blocked`
+- `test_primary_cfg_excludes_scored`
+- `test_persisted_known_answer_matrix`
+
+**REQ-RUST-026.3**
+- `test_extra_production_secondary_counts`
+- `test_production_only_rows_visible`
+- `test_primary_classes_partition_once`
+- `test_external_source_missing_blocks_match_rate`
+- `test_changed_targets_persist_semantically`
+- `test_persisted_known_answer_matrix`
+
+**REQ-RUST-026.4**
+- `test_published_comparisons_threads_are_deterministic`
+- `test_comparison_connection_settings_are_verified`
+- `test_comparison_context_cleanup_after_sql_error`
+- `test_comparison_context_cleanup_after_cancel`
+- `test_exact_comparison_publishes_turso`
+- `test_comparison_telemetry_survives_publication`
+- `test_persisted_known_answer_matrix`
+- `test_scope_oracle_errors_block`
+- `test_oracle_agreement_registry_roundtrip`
+- `test_cancel_prevents_agreement_publish`
+- `test_source_changes_after_reads`
+- `test_source_changes_before_publish`
+- `test_write_cancellation_preserves_generation`
+- `test_source_unpublished_generation_fails`
+
+**REQ-RUST-026.5**
+- `test_published_comparisons_threads_are_deterministic`
+- `test_thread_counts_export_identically`

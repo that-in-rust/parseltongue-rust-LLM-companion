@@ -789,6 +789,85 @@ fn test_scope_oracle_errors_block() {
 
 /// REQ-RUST-026.0
 #[test]
+fn test_oracle_envelope_flags_strict() {
+    let fixture = build_oracle_comparison_fixture();
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let source =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.source.to_str().unwrap())
+            .unwrap();
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let previous_scope = seed_existing_agreement_generation(&agreement);
+    let original_primary: Value =
+        serde_json::from_slice(&fs::read(&fixture.primary).unwrap()).unwrap();
+    let original_secondary: Value =
+        serde_json::from_slice(&fs::read(&fixture.secondary).unwrap()).unwrap();
+    let mut invalid_case_count = 0;
+    for configuration in ["PRIMARY", "SECONDARY"] {
+        let expected_build_scripts = configuration == "SECONDARY";
+        for (field, expected) in [
+            ("oracle_build_scripts_flag", expected_build_scripts),
+            ("oracle_proc_macros_flag", true),
+        ] {
+            for invalid_value_kind in ["missing", "null", "wrong-boolean", "wrong-type"] {
+                let mut primary = original_primary.clone();
+                let mut secondary = original_secondary.clone();
+                let envelope = if configuration == "PRIMARY" {
+                    &mut primary
+                } else {
+                    &mut secondary
+                };
+                match invalid_value_kind {
+                    "missing" => {
+                        envelope.as_object_mut().unwrap().remove(field);
+                    }
+                    "null" => envelope[field] = Value::Null,
+                    "wrong-boolean" => envelope[field] = json!(!expected),
+                    "wrong-type" => envelope[field] = json!("true"),
+                    _ => unreachable!(),
+                }
+                fs::write(&fixture.primary, primary.to_string()).unwrap();
+                fs::write(&fixture.secondary, secondary.to_string()).unwrap();
+                let comparison = compare_oracle_path_sites(
+                    &source,
+                    &fixture.primary,
+                    &fixture.secondary,
+                    &agreement,
+                    &RunCancelFlagValue::default(),
+                );
+                match comparison {
+                    Err(OracleComparisonFailureError::InvalidEnvelope {
+                        configuration: actual_configuration,
+                        field: actual_field,
+                    }) => {
+                        assert_eq!(actual_configuration, configuration);
+                        assert_eq!(actual_field, field);
+                    }
+                    other => panic!(
+                        "{configuration} {field} {invalid_value_kind} must be rejected before publication: {other:?}"
+                    ),
+                }
+                assert_eq!(
+                    agreement.read_workspace_publication_scope().unwrap(),
+                    Some(previous_scope.clone())
+                );
+                let rows = agreement
+                    .read_stage_table_rows(&previous_scope, "oracle-edge-agreement-table")
+                    .unwrap();
+                assert!(
+                    rows.iter()
+                        .any(|row| row.stage_row_record_key == "site/preexisting")
+                );
+                invalid_case_count += 1;
+            }
+        }
+    }
+    assert_eq!(invalid_case_count, 16);
+}
+
+/// REQ-RUST-026.0
+#[test]
 fn test_macro_failure_blocks_publish() {
     let fixture = build_oracle_comparison_fixture();
     let mut failed = fixture.primary_value.clone();
