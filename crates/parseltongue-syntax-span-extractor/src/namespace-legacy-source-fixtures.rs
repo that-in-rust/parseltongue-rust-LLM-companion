@@ -1,5 +1,156 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
+use parseltongue_table_store_traits::{ItemMacroExpansionPort, ResolvedMacroLookupPort};
+
+#[derive(Default)]
+struct OrderedMacroFixtureLookup {
+    bindings: std::sync::Mutex<BTreeMap<String, Value>>,
+    requests: std::sync::Mutex<BTreeMap<String, String>>,
+    fail: std::sync::atomic::AtomicBool,
+}
+
+impl OrderedMacroFixtureLookup {
+    fn accept_namespace_fixture_rows(&self, rows: &[StageTableRowRecord]) {
+        rows.iter().for_each(|row| {
+            let value: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            if row.stage_owned_table_name == "syntax-namespace-input-items"
+                && value["binding_namespace_kind_value"] == "macro"
+            {
+                self.bindings.lock().unwrap().insert(
+                    value["binding_resolved_name_text"].as_str().unwrap().into(),
+                    value,
+                );
+            } else if row.stage_owned_table_name == "syntax-namespace-input-macros" {
+                self.requests.lock().unwrap().insert(
+                    value["invocation_site_occurrence_key"].to_string(),
+                    value["invocation_macro_path_segments"][0]["name"]
+                        .as_str()
+                        .unwrap()
+                        .into(),
+                );
+            }
+        });
+    }
+}
+
+impl ResolvedMacroLookupPort for OrderedMacroFixtureLookup {
+    fn read_macro_invocation_binding_record(
+        &self,
+        key: &str,
+    ) -> Result<Option<StageTableRowRecord>, NameResolutionStageError> {
+        if self.fail.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(NameResolutionStageError::Cancelled);
+        }
+        Ok(self
+            .requests
+            .lock()
+            .unwrap()
+            .get(key)
+            .and_then(|name| self.bindings.lock().unwrap().get(name).cloned())
+            .map(|value| StageTableRowRecord {
+                stage_owned_table_name: "namespace-macro-binding-records".into(),
+                stage_row_record_key: key.into(),
+                stage_row_payload_text: value.to_string(),
+            }))
+    }
+    fn read_resolved_builtin_macro(
+        &self,
+        _: &NameResolutionScopeKey,
+        _: &[NamePathSegmentKind],
+    ) -> Result<Option<String>, NameResolutionStageError> {
+        Ok(None)
+    }
+    fn read_macro_target_metadata(
+        &self,
+        target: &NameSymbolTargetKey,
+    ) -> Result<Option<StageTableRowRecord>, NameResolutionStageError> {
+        let key = encode_symbol_target_value(target);
+        Ok(self
+            .bindings
+            .lock()
+            .unwrap()
+            .values()
+            .find(|value| value["binding_target_identity_key"] == key)
+            .map(|value| StageTableRowRecord {
+                stage_owned_table_name: "namespace-macro-metadata-records".into(),
+                stage_row_record_key: key.to_string(),
+                stage_row_payload_text: value["binding_target_metadata_value"].to_string(),
+            }))
+    }
+}
+
+#[test]
+fn ordered_macro_expansion_barriers() {
+    let store=LegacyMacroFixtureStore{source:"macro_rules! make {()=>{macro_rules! nested {()=>{pub struct Made;}} nested!();}} make!(); macro_rules! later {()=>{pub struct Later;}} later!();".into()};
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let initial = crate::syntax_namespace_input_persistence::namespace_input_row_records(
+        &projection,
+        &MacroProjectionRowOffsets::default(),
+    )
+    .collect::<Result<Vec<_>, _>>()
+    .unwrap();
+    let lookup = OrderedMacroFixtureLookup::default();
+    lookup.accept_namespace_fixture_rows(&initial);
+    drop(projection);
+    let port =
+        crate::prepare_macro_expansion_port(unit(), &workspace, &store, &scope, &cancel, &lookup)
+            .unwrap();
+    lookup
+        .fail
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    assert!(port.expand_next_resolved_macro_items().is_err());
+    lookup
+        .fail
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    let first = port.expand_next_resolved_macro_items().unwrap().unwrap();
+    assert_eq!(first.expansion_completed_invocation_keys.len(), 1);
+    assert_eq!(first.expansion_macro_invocation_rows.len(), 1);
+    lookup.accept_namespace_fixture_rows(&first.expansion_semantic_output_rows);
+    let second = port.expand_next_resolved_macro_items().unwrap().unwrap();
+    assert!(second.expansion_semantic_output_rows.iter().any(|row|row.stage_owned_table_name=="syntax-namespace-input-items" && serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["binding_resolved_name_text"]=="Made"));
+    lookup.accept_namespace_fixture_rows(&second.expansion_semantic_output_rows);
+    let third = port.expand_next_resolved_macro_items().unwrap().unwrap();
+    assert!(third.expansion_semantic_output_rows.iter().any(|row|row.stage_owned_table_name=="syntax-namespace-input-items" && serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["binding_resolved_name_text"]=="Later"));
+    assert!(port.expand_next_resolved_macro_items().unwrap().is_none());
+    cancel.request_stage_work_cancellation();
+    assert!(port.expand_next_resolved_macro_items().is_err());
+}
+
+#[test]
+fn ordered_macro_expansion_empty() {
+    let store = LegacyMacroFixtureStore {
+        source: String::new(),
+    };
+    let lookup = OrderedMacroFixtureLookup::default();
+    let cancel = RunCancelFlagValue::default();
+    let port = crate::prepare_macro_expansion_port(
+        unit(),
+        &json!({"workspace_source_root_path":"/fixture"}),
+        &store,
+        &StageRunScopeValue {
+            run_generation_digest_value: "generation".into(),
+            stage_attempt_sequence_value: "attempt".into(),
+        },
+        &cancel,
+        &lookup,
+    )
+    .unwrap();
+    assert!(port.expand_next_resolved_macro_items().unwrap().is_none());
+}
 
 struct LegacyMacroFixtureStore {
     source: String,
