@@ -148,6 +148,55 @@ impl ItemMacroExpansionPort for FixtureEmptyMacroPort {
     }
 }
 
+#[test]
+fn test_grouped_self_import_namespace() {
+    let mut input = build_fixture_resolver_input(&[&[]]);
+    input.name_symbol_binding_rows = vec![
+        build_fixture_name_binding(&[], "Chosen", NamespaceBindingKindValue::Type, 1),
+        build_fixture_name_binding(&[], "Chosen", NamespaceBindingKindValue::Value, 1),
+    ];
+    input.name_import_request_rows = vec![build_fixture_import_request(
+        &[],
+        &["Chosen", "self"],
+        Some("Alias"),
+        false,
+        2,
+    )];
+    input.name_signature_path_rows = vec![
+        build_fixture_path_request(&[], &["Alias"], NameNamespaceFilterKind::Type, 3),
+        build_fixture_path_request(&[], &["Alias"], NameNamespaceFilterKind::Value, 4),
+    ];
+    let output = resolve_crate_name_bindings(
+        &input,
+        &FixtureEmptyMacroPort,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    let type_answer = output
+        .resolved_signature_path_rows
+        .iter()
+        .find(|row| row.path_site_occurrence_key == build_fixture_symbol_occurrence(3))
+        .unwrap();
+    assert_eq!(
+        type_answer.path_resolution_state_kind,
+        NamePathAnswerKind::Resolved
+    );
+    assert_eq!(type_answer.path_resolved_target_rows.len(), 1);
+    assert_eq!(
+        type_answer.path_resolved_target_rows[0].binding_namespace_kind_value,
+        NamespaceBindingKindValue::Type
+    );
+    let value_answer = output
+        .resolved_signature_path_rows
+        .iter()
+        .find(|row| row.path_site_occurrence_key == build_fixture_symbol_occurrence(4))
+        .unwrap();
+    assert_eq!(
+        value_answer.path_resolution_state_kind,
+        NamePathAnswerKind::Unresolved
+    );
+}
+
 fn run_fixture_name_resolution(input: &NameResolutionInputRows) -> NameResolutionOutputRows {
     resolve_crate_name_bindings(
         input,

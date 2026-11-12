@@ -1294,3 +1294,29 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Refactor candidate replaces full-binding-vector scans for each glob import
   with the existing scope lookup index. Eight resolver contracts pass; Clippy
   passes. It does not change candidate visibility or precedence.
+
+## Native prelude grouped-self RED — 2026-11-12
+
+- Full release CLI suite: 18 passed, 1 failed in 1297.67 seconds. Mapping now
+  completes and publishes, but Option<Vec<u8>> remains external_source_missing.
+- Verified reachable source: both installed core/src/prelude/v1.rs:47 and
+  std/src/prelude/v1.rs:41 import Option with Option::{self, None, Some}.
+  Projection preserves grouped self as a terminal SelfModule path segment;
+  L2 only handles SelfModule in the prefix, rejecting it in the name tail.
+- New pure regression test_grouped_self_import_namespace fails Unresolved versus
+  Resolved. It also requires self imports to select only the type namespace,
+  not a tuple constructor's value namespace. A portable persisted alias fixture
+  reproduces the same failure independently of sysroot loading.
+- Diff review found a separate reachable configuration gap: no sysroot demand
+  returns before crate attributes are persisted. A no_std/no_implicit_prelude
+  crate using an explicit renamed dependency and u8 publishes null flags.
+  Portable suite: 18 passed, these two new cases failed, native case filtered.
+- Safely losslessly compressed historical m1-prepared-final-measurements and
+  parser-aligned-m1-measurements store images/sidecars with gzip -1n. gzip -t
+  passed. Latest const-patched stores, all logs, traces and JSON evidence remain
+  unchanged. Restore any historical image with gzip -d FILE.gz. Available disk
+  is now 32 GiB; diagnostic publication is about 4 GiB.
+- Pinned parser checkout remains clean at bf6b2099d6351c37039b01447a9bb64f9a54a586.
+  tools/parser-const-closure-statements.patch SHA-256 remains
+  89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa.
+- No sysroot GREEN claim; no oracle mapped-unit manifest or S5 rate yet.
