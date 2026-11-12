@@ -37,6 +37,19 @@ fn test_module_raw_identifier_paths() {
 }
 
 #[test]
+fn test_attribute_token_spacing_rules() {
+    for source in [
+        "# [allow(dead_code)] pub struct Local;",
+        "# ! [no_std] pub struct Local;",
+    ] {
+        assert!(
+            extract_file_syntax_rows(&make_syntax_file_input(source.as_bytes())).is_ok(),
+            "{source}"
+        );
+    }
+}
+
+#[test]
 fn test_sysroot_prelude_context_flags() {
     let normal = read_unit_prelude_configuration(&make_syntax_file_input(b"")).unwrap();
     assert!(

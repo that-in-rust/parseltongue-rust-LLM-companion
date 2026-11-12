@@ -1234,3 +1234,27 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Native all-CLI release test shell e94f0c, log
   /home/ubuntu/m2-sysroot-cli-contracts-green.log. Graph/syntax shell 2b20d0, log
   /home/ubuntu/m2-sysroot-graph-syntax-green.log. Distinct fixture stores only.
+
+## Native integration continuation checkpoint — 2026-11-12
+
+- Pushes verified: ae0a9ad62 (patched S3), 702bd7032 (module/prelude RED),
+  0069f4ee5 (doc macro RED), d67318e81 (doc macro GREEN).
+- Last all-CLI release run: 17 passed, 1 failed in 133.29s. Only native
+  test_lang_items_in_sysroot fails, now with WorkspaceNotCompilingError:
+  WorkspaceNotCompilingError: invalid attribute source. Source discovery and
+  extraction complete (618 contexts, 358595 rows). No further parser defect found.
+- Leading explanation (not yet verified on the native failing attribute):
+  MBe TT renderer emits legal whitespace between # and [. The extractor's
+  collect_effective_node_attributes uses textual strip_prefix("#[") / "#![",
+  rejecting legal token spacing. Focused test_attribute_token_spacing_rules is
+  the next RED; replace textual delimiter stripping with ast::Attr::meta syntax.
+  Keep source bytes/ranges unchanged. Then rerun native integration.
+- Graph contracts: 9 + 3 passed. Syntax contracts before new spacing RED:
+  16 passed. Macro contracts: 21 passed + 1 doctest; Clippy passed.
+- Seven sysroot GREEN files remain uncommitted. They additionally fix source-
+  relative path overrides, demand for AsRef/AsMut/prelude memory functions, and
+  retention of reached lang attributes absent from the old recognition whitelist.
+  Lang rows now carry provenance and recognized/unknown support separately.
+- Sysroot GREEN/REFACTOR not committed. Exact oracle manifests, differ and S5
+  remain unimplemented/unmeasured. No live mapper remains. Logs under /home/ubuntu/
+  m2-sysroot-cli-contracts-green.log and m2-attribute-token-spacing-red.log.
