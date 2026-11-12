@@ -285,3 +285,67 @@ fn test_duckdb_thread_export_determinism() {
     });
     assert_eq!(exports[0], exports[1]);
 }
+
+#[test]
+fn test_turso_published_appender_handoff() {
+    let directory = tempfile::tempdir().unwrap();
+    let source =
+        parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter::open_turso_workspace_store(
+            ":memory:",
+        )
+        .unwrap();
+    source.initialize_workspace_stage_schema().unwrap();
+    let scope = scope();
+    let cancel = RunCancelFlagValue::default();
+    let records = [StageTableRowRecord {
+        stage_owned_table_name: "span-reference-text-table".into(),
+        stage_row_record_key: "source/λ".into(),
+        stage_row_payload_text: "{\"source\":\"identity\"}".into(),
+    }];
+    for stage in ["crate-graph", "source-ingest", "syntax-spans"] {
+        source
+            .write_stage_table_unit(
+                &StageUnitWriteRequest {
+                    stage_run_scope_value: &scope,
+                    stage_owner_name_value: stage,
+                    stage_unit_work_key: "__complete__",
+                    stage_input_stage_names: &[],
+                    stage_unit_output_rows: if stage == "syntax-spans" {
+                        &records
+                    } else {
+                        &[]
+                    },
+                },
+                &cancel,
+            )
+            .unwrap();
+    }
+    let published = source
+        .publish_workspace_generation_manifest(&scope, &scope.run_generation_digest_value, &cancel)
+        .unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.db"),
+        directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    assert_eq!(
+        store
+            .copy_published_stage_rows(&source, &published, &["span-reference-text-table"], &cancel)
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store
+            .count_analysis_stage_rows(&published, "span-reference-text-table")
+            .unwrap(),
+        source
+            .count_stage_table_rows(&published, "span-reference-text-table")
+            .unwrap()
+    );
+    let connection = store._connection.lock().unwrap();
+    let payload: String = connection.query_row(
+        "SELECT payload FROM \"frozen-generation-source-records\" ORDER BY generation_key,attempt_key,table_name,row_key",[],|row|row.get(0),
+    ).unwrap();
+    assert_eq!(payload, records[0].stage_row_payload_text);
+}
