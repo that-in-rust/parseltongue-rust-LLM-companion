@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -187,6 +188,286 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary_directory.cleanup()
+
+    def build_output_validation_fixture(self):
+        project_root = self.root_path / "output-project"
+        project_root.mkdir()
+        corpus_roots = {}
+        manifest_records = []
+        for repository_name in runner.DEFAULT_REPOSITORY_ORDER:
+            corpus_root = self.root_path / "output-corpora" / repository_name
+            corpus_root.mkdir(parents=True)
+            corpus_roots[repository_name] = corpus_root
+            manifest_records.append({
+                "corpus_repository_short_name": repository_name,
+                "corpus_source_checkout_path": str(corpus_root),
+            })
+        manifest_path = self.root_path / "output-corpus-manifest.json"
+        manifest_path.write_text(json.dumps(manifest_records))
+        return project_root, corpus_roots, manifest_path
+
+    def run_output_validation_plan(self, project_root, manifest_path, report_root, artifact_root, run_id):
+        argument_values = [
+            "--run-id", run_id, "--milestone", "M1", "--mode", "plan",
+            "--corpus-manifest", str(manifest_path), "--report-root", str(report_root),
+        ]
+        if artifact_root is not None:
+            argument_values.extend(["--artifact-root", str(artifact_root)])
+        arguments = runner.build_runner_argument_parser().parse_args(argument_values)
+        with patch.object(runner, "PROJECT_ROOT", project_root):
+            return runner.run_persistent_qualification_plan(arguments)
+
+    def build_corpus_lock_fixture(self, repository_name, ignored):
+        source_root = self.root_path / f"lock-{repository_name}"
+        file_values = {
+            "Cargo.toml": f"[package]\nname='{repository_name}'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        }
+        if ignored:
+            file_values[".gitignore"] = "Cargo.lock\n"
+        create_committed_git_repository(source_root, file_values)
+        lock_path = source_root / "Cargo.lock"
+        lock_path.write_bytes(f"# {repository_name} frozen lock\n".encode())
+        return source_root, lock_path
+
+    def build_selected_lock_fixture(self):
+        project_root = self.root_path / "lock-project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='runner-fixture'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        serde_root, serde_lock = self.build_corpus_lock_fixture("serde", True)
+        tokio_root, tokio_lock = self.build_corpus_lock_fixture("tokio", False)
+        return project_root, serde_root, serde_lock, tokio_root, tokio_lock
+
+    def build_complete_publication_banner(self):
+        return {
+            "run_generation_digest_value": "published-generation-sha256",
+            "source_tiling_identity_holds": True,
+            "source_file_record_count": 1,
+            "stage_publication_status_values": {
+                "crate-graph": "complete",
+                "source-ingest": "complete",
+                "syntax-spans": "complete",
+                "name-resolution": "complete",
+            },
+        }
+
+    def test_output_checkout_root_blocks(self):
+        """REQ-SOP-RUNNER-015: reject checkout-root report output before persistence."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        run_id = "checkout-root-output"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, project_root, self.root_path / "artifacts", run_id
+            )
+        self.assertFalse((project_root / run_id).exists())
+
+    def test_output_source_ancestor_blocks(self):
+        """REQ-SOP-RUNNER-015: reject report roots that are ancestors of project sources."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        report_root = project_root.parent
+        run_id = "project-ancestor-output"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, self.root_path / "artifacts", run_id
+            )
+        self.assertFalse((report_root / run_id).exists())
+
+    def test_output_source_subtree_blocks(self):
+        """REQ-SOP-RUNNER-015: reject artifact roots within project source subtrees."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        report_root = self.root_path / "safe-reports"
+        artifact_root = project_root / "src"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, artifact_root, "source-subtree-output"
+            )
+        self.assertFalse((report_root / "source-subtree-output").exists())
+
+    def test_corpus_ancestor_root_blocks(self):
+        """REQ-SOP-RUNNER-015: reject artifact roots that are corpus ancestors."""
+        project_root, corpus_roots, manifest_path = self.build_output_validation_fixture()
+        artifact_root = corpus_roots["serde"].parent
+        report_root = self.root_path / "safe-reports"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, artifact_root, "corpus-ancestor-output"
+            )
+        self.assertFalse((report_root / "corpus-ancestor-output").exists())
+
+    def test_corpus_root_output_blocks(self):
+        """REQ-SOP-RUNNER-015: reject report output at a pinned corpus root."""
+        project_root, corpus_roots, manifest_path = self.build_output_validation_fixture()
+        report_root = corpus_roots["serde"]
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, self.root_path / "artifacts", "corpus-root-output"
+            )
+        self.assertFalse((report_root / "corpus-root-output").exists())
+
+    def test_output_symlink_bypass_blocks(self):
+        """REQ-SOP-RUNNER-015: reject symlink aliases into source trees."""
+        project_root, corpus_roots, manifest_path = self.build_output_validation_fixture()
+        output_alias = self.root_path / "artifact-source-alias"
+        output_alias.symlink_to(corpus_roots["serde"], target_is_directory=True)
+        report_root = self.root_path / "safe-reports"
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_root, output_alias, "symlink-source-output"
+            )
+        self.assertFalse((report_root / "symlink-source-output").exists())
+
+    def test_output_symlink_alias_blocks(self):
+        """REQ-SOP-RUNNER-015: reject symlink-equivalent external report roots."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        external_target = self.root_path / "external-report-target"
+        external_target.mkdir()
+        report_alias = self.root_path / "external-report-alias"
+        report_alias.symlink_to(external_target, target_is_directory=True)
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            self.run_output_validation_plan(
+                project_root, manifest_path, report_alias, self.root_path / "artifacts", "symlink-alias-output"
+            )
+        self.assertFalse((external_target / "symlink-alias-output").exists())
+
+    def test_output_safe_paths_validate(self):
+        """REQ-SOP-RUNNER-015: accept the exact default report root and external roots."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        default_report_root = project_root / "hld-current-test-runs"
+        default_result = self.run_output_validation_plan(
+            project_root, manifest_path, default_report_root, None, "valid-default-output"
+        )
+        self.assertEqual(default_result["overall_status"], "NOT STARTED")
+        self.assertTrue((default_report_root / "valid-default-output").is_dir())
+        external_result = self.run_output_validation_plan(
+            project_root, manifest_path, self.root_path / "external-reports",
+            self.root_path / "external-artifacts", "valid-external-output",
+        )
+        self.assertEqual(external_result["overall_status"], "NOT STARTED")
+
+    def test_outputs_block_before_writes(self):
+        """REQ-SOP-RUNNER-015: report unsafe output configuration to stderr without writes."""
+        project_root, _, manifest_path = self.build_output_validation_fixture()
+        artifact_root = self.root_path / "unsafe-artifacts"
+        stderr = StringIO()
+        argument_values = [
+            "--run-id", "unsafe-before-write", "--milestone", "M1", "--mode", "plan",
+            "--corpus-manifest", str(manifest_path), "--report-root", str(project_root),
+            "--artifact-root", str(artifact_root),
+        ]
+        with patch.object(runner, "PROJECT_ROOT", project_root), patch.object(runner.sys, "stderr", stderr):
+            return_code = runner.main(argument_values)
+        self.assertEqual(return_code, 2)
+        self.assertEqual(json.loads(stderr.getvalue())["overall_status"], "BLOCKED")
+        self.assertFalse((project_root / "unsafe-before-write").exists())
+        self.assertFalse(artifact_root.exists())
+
+    def test_output_exclusions_detect_mutations(self):
+        """REQ-SOP-RUNNER-015: only owned run directories are excluded from source snapshots."""
+        source_root = self.root_path / "snapshot-output-project"
+        create_committed_git_repository(source_root, {
+            ".gitignore": "hld-current-test-runs/\n",
+            "Cargo.toml": "[package]\nname='fixture'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        report_run_directory = source_root / "hld-current-test-runs" / "owned-run"
+        artifact_run_directory = self.root_path / "artifact-runs" / "owned-run"
+        report_run_directory.mkdir(parents=True)
+        artifact_run_directory.mkdir(parents=True)
+        (report_run_directory / "hld-current-test-report.md").write_text("owned report\n")
+        exclusions = runner.build_owned_run_exclusions(report_run_directory, artifact_run_directory)
+        self.assertEqual(exclusions, [report_run_directory.resolve(), artifact_run_directory.resolve()])
+        registry = runner.capture_identity_registry(source_root, [], {}, exclusions, [])
+        unexpected_source = source_root / "hld-current-test-runs" / "unowned-run" / "src" / "rogue.rs"
+        unexpected_source.parent.mkdir(parents=True)
+        unexpected_source.write_text("pub fn rogue() {}\n")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_selected_locks_are_frozen(self):
+        """REQ-SOP-RUNNER-016: selected ignored and untracked Cargo.lock bytes enter identity evidence."""
+        project_root, serde_root, serde_lock, tokio_root, tokio_lock = self.build_selected_lock_fixture()
+        registry = runner.capture_identity_registry(
+            project_root, [], {"serde": serde_root, "tokio": tokio_root}, [], []
+        )
+        expected_provenance = ((serde_root, serde_lock, "ignored"), (tokio_root, tokio_lock, "untracked"))
+        for source_root, lock_path, provenance in expected_provenance:
+            snapshot = registry["source_snapshots"][str(source_root.resolve())]
+            lock_evidence = snapshot["permitted_lock_files"]["Cargo.lock"]
+            self.assertEqual(lock_evidence["provenance"], provenance)
+            self.assertEqual(lock_evidence["identity"]["sha256"], hashlib.sha256(lock_path.read_bytes()).hexdigest())
+            self.assertEqual(registry["lock_files"][str(lock_path.absolute())]["sha256"],
+                             hashlib.sha256(lock_path.read_bytes()).hexdigest())
+
+    def test_selected_lock_modification_fails(self):
+        """REQ-SOP-RUNNER-016: selected ignored lock mutation fails frozen identity checks."""
+        project_root, serde_root, serde_lock, tokio_root, _ = self.build_selected_lock_fixture()
+        registry = runner.capture_identity_registry(
+            project_root, [], {"serde": serde_root, "tokio": tokio_root}, [], []
+        )
+        serde_lock.write_bytes(b"changed selected lock\n")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_selected_lock_deletion_fails(self):
+        """REQ-SOP-RUNNER-016: selected untracked lock deletion fails frozen identity checks."""
+        project_root, serde_root, _, tokio_root, tokio_lock = self.build_selected_lock_fixture()
+        registry = runner.capture_identity_registry(
+            project_root, [], {"serde": serde_root, "tokio": tokio_root}, [], []
+        )
+        tokio_lock.unlink()
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_unselected_lock_stays_blocked(self):
+        """REQ-SOP-RUNNER-016: ignored Cargo.lock files outside the explicit allowlist stay blocked."""
+        project_root = self.root_path / "unselected-lock-project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='runner-fixture'\nversion='0.1.0'\n",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        ripgrep_root, _ = self.build_corpus_lock_fixture("ripgrep", True)
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            runner.capture_identity_registry(project_root, [], {"ripgrep": ripgrep_root}, [], [])
+
+    def test_publication_map_accepts_complete(self):
+        """REQ-SOP-RUNNER-017: complete publication statuses pass with a generation digest."""
+        result = measurements.validate_publication_stage_markers(
+            self.build_complete_publication_banner(), "name-resolution"
+        )
+        self.assertTrue(result["pass"], result["reason"])
+
+    def test_publication_map_requires_stages(self):
+        """REQ-SOP-RUNNER-017: incomplete published stage values cannot pass."""
+        banner = self.build_complete_publication_banner()
+        banner["stage_publication_status_values"]["syntax-spans"] = "staged"
+        result = measurements.validate_publication_stage_markers(banner, "source-ingest")
+        self.assertFalse(result["pass"])
+
+    def test_publication_map_requires_generation(self):
+        """REQ-SOP-RUNNER-017: publication completion requires its published generation identity."""
+        banner = self.build_complete_publication_banner()
+        banner.pop("run_generation_digest_value")
+        result = measurements.validate_publication_stage_markers(banner, "source-ingest")
+        self.assertFalse(result["pass"])
+
+    def test_static_status_cannot_publish(self):
+        """REQ-SOP-RUNNER-017: static implementation completion and vacuous tiling do not qualify publication."""
+        banner = {
+            "run_generation_digest_value": "published-generation-sha256",
+            "source_tiling_identity_holds": True,
+            "source_file_record_count": 3,
+            "stage_implementation_status_values": {
+                "crate-graph": "complete",
+                "source-ingest": "complete",
+                "syntax-spans": "complete",
+                "name-resolution": "complete",
+            },
+        }
+        result = measurements.validate_publication_stage_markers(banner, "name-resolution")
+        self.assertFalse(result["pass"])
+        self.assertIn("missing", result["reason"])
 
     def test_report_initializes_repo_states(self):
         """REQ-SOP-RUNNER-001: initialize five repositories as NOT STARTED."""

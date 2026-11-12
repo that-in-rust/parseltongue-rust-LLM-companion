@@ -456,16 +456,42 @@ def path_is_excluded_from_snapshot(file_path: Path, excluded_paths: Sequence[Pat
                for excluded in excluded_paths)
 
 
+def build_owned_run_exclusions(report_run_directory: Path, artifact_run_directory: Path) -> list[Path]:
+    return [
+        Path(report_run_directory).resolve(strict=True),
+        Path(artifact_run_directory).resolve(strict=True),
+    ]
+
+
 def capture_frozen_source_snapshot(
-    project_root: Path, excluded_paths: Sequence[Path] = ()
+    project_root: Path,
+    excluded_paths: Sequence[Path] = (),
+    permitted_lock_paths: Sequence[Path] = (),
 ) -> Mapping[str, Any]:
     project_root = Path(project_root).resolve(strict=True)
     excluded_paths = tuple(Path(path).absolute() for path in excluded_paths)
+    permitted_lock_relative_paths = set()
+    for lock_path in permitted_lock_paths:
+        lock_path = Path(lock_path).absolute()
+        expected_lock_path = project_root / "Cargo.lock"
+        if lock_path != expected_lock_path or lock_path.is_symlink() or not lock_path.is_file():
+            raise RunnerPreconditionBlockedError(
+                f"permitted frozen lock must be the regular top-level Cargo.lock: {lock_path}"
+            )
+        permitted_lock_relative_paths.add("Cargo.lock")
+    lock_is_tracked = "Cargo.lock" in run_read_only_git_command(
+        project_root, ["ls-files", "--", "Cargo.lock"]
+    ).splitlines()
     status_text = run_read_only_git_command(project_root, ["status", "--porcelain=v1", "--untracked-files=all"])
     filtered_status_lines = []
     for status_line in status_text.splitlines():
         relative_path = status_line[3:].split(" -> ")[-1] if len(status_line) >= 4 else ""
-        if not path_is_excluded_from_snapshot(project_root / relative_path, excluded_paths):
+        permitted_untracked_lock = (
+            relative_path == "Cargo.lock" and relative_path in permitted_lock_relative_paths and not lock_is_tracked
+        )
+        if not permitted_untracked_lock and not path_is_excluded_from_snapshot(
+            project_root / relative_path, excluded_paths
+        ):
             filtered_status_lines.append(status_line)
     if filtered_status_lines:
         raise RunnerPreconditionBlockedError(
@@ -515,12 +541,16 @@ def capture_frozen_source_snapshot(
         })
     untracked_text = run_read_only_git_command(project_root, ["ls-files", "--others", "--exclude-standard", "-z"])
     untracked_source_paths = []
+    untracked_relative_paths = set()
     for relative in untracked_text.split("\0"):
         if not relative:
             continue
         relative_path = Path(relative)
+        untracked_relative_paths.add(relative_path.as_posix())
         absolute_path = project_root / relative_path
         if path_is_excluded_from_snapshot(absolute_path, excluded_paths):
+            continue
+        if relative_path.as_posix() in permitted_lock_relative_paths:
             continue
         if relative_path.suffix.lower() in SOURCE_SUFFIXES or relative_path.name in {
             "Cargo.toml", "Cargo.lock", "Makefile", "Justfile",
@@ -534,13 +564,17 @@ def capture_frozen_source_snapshot(
         project_root, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]
     )
     ignored_source_paths = []
+    ignored_relative_paths = set()
     for relative in ignored_text.split("\0"):
         if not relative:
             continue
         relative_path = Path(relative)
+        ignored_relative_paths.add(relative_path.as_posix())
         if any(part in GENERATED_SOURCE_DIRECTORY_NAMES for part in relative_path.parts):
             continue
         if path_is_excluded_from_snapshot(project_root / relative_path, excluded_paths):
+            continue
+        if relative_path.as_posix() in permitted_lock_relative_paths:
             continue
         under_vendor_or_build = any(part in {"vendor", "build"} for part in relative_path.parts)
         if under_vendor_or_build or relative_path.suffix.lower() in SOURCE_SUFFIXES or relative_path.name in {
@@ -552,13 +586,33 @@ def capture_frozen_source_snapshot(
             f"ignored untracked source inputs found in {project_root}: {ignored_source_paths[:5]}"
         )
     tracked_records.sort(key=lambda row: row["path"])
+    permitted_lock_records = {}
+    for relative_path in sorted(permitted_lock_relative_paths):
+        if relative_path in tracked_relative_paths:
+            provenance = "tracked"
+        elif relative_path in ignored_relative_paths:
+            provenance = "ignored"
+        elif relative_path in untracked_relative_paths:
+            provenance = "untracked"
+        else:
+            raise RunnerPreconditionBlockedError(
+                f"selected Cargo.lock Git provenance is unavailable: {project_root / relative_path}"
+            )
+        permitted_lock_records[relative_path] = {
+            "provenance": provenance,
+            "identity": capture_frozen_file_identity(project_root / relative_path),
+        }
     tree_digest = hashlib.sha256(
-        json.dumps(tracked_records, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            {"tracked_files": tracked_records, "permitted_lock_files": permitted_lock_records},
+            sort_keys=True, separators=(",", ":"),
+        ).encode()
     ).hexdigest()
     return {
         "root_path": str(project_root),
         "head_commit": head_commit,
         "tracked_source_file_count": len(tracked_records),
+        "permitted_lock_files": permitted_lock_records,
         "source_tree_sha256": tree_digest,
         "clean": True,
     }
@@ -1050,6 +1104,107 @@ def parse_pin_manifest_records(manifest_path: Path) -> Mapping[str, Mapping[str,
     return result
 
 
+def canonicalize_output_root_path(path_value: Path) -> Path:
+    candidate = Path(path_value).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    current_path = Path(candidate.anchor)
+    for component in candidate.parts[1:]:
+        if component == "..":
+            current_path = current_path.parent
+            continue
+        if component in {"", "."}:
+            continue
+        next_path = current_path / component
+        if next_path.is_symlink():
+            raise RunnerPreconditionBlockedError(f"output root contains a symlink component: {path_value}")
+        current_path = next_path
+    try:
+        return candidate.resolve(strict=False)
+    except (OSError, RuntimeError) as error:
+        raise RunnerPreconditionBlockedError(f"output root cannot be canonicalized: {path_value}: {error}") from error
+
+
+def source_output_paths_overlap(first_path: Path, second_path: Path) -> bool:
+    return first_path == second_path or first_path in second_path.parents or second_path in first_path.parents
+
+
+def validate_output_root_paths(
+    report_root: Path,
+    artifact_root: Path,
+    project_root: Path,
+    corpus_roots: Mapping[str, Path],
+) -> Mapping[str, Path]:
+    project_path = Path(project_root).resolve(strict=True)
+    corpus_paths = {name: Path(path).resolve(strict=False) for name, path in corpus_roots.items()}
+    report_path = canonicalize_output_root_path(report_root)
+    artifact_path = canonicalize_output_root_path(artifact_root)
+    default_report_path = project_path / "hld-current-test-runs"
+    source_paths = [project_path, *corpus_paths.values()]
+    if report_path == default_report_path:
+        overlapping_corpora = [
+            name for name, corpus_path in corpus_paths.items()
+            if source_output_paths_overlap(report_path, corpus_path)
+        ]
+        if overlapping_corpora:
+            raise RunnerPreconditionBlockedError(
+                f"default report root overlaps pinned corpus sources: {overlapping_corpora}"
+            )
+    else:
+        overlapping_sources = [
+            str(source_path) for source_path in source_paths
+            if source_output_paths_overlap(report_path, source_path)
+        ]
+        if overlapping_sources:
+            raise RunnerPreconditionBlockedError(
+                f"report root must be external or exactly {default_report_path}; overlaps {overlapping_sources}"
+            )
+    overlapping_artifact_sources = [
+        str(source_path) for source_path in source_paths
+        if source_output_paths_overlap(artifact_path, source_path)
+    ]
+    if overlapping_artifact_sources:
+        raise RunnerPreconditionBlockedError(
+            f"artifact root must be outside project and corpus sources; overlaps {overlapping_artifact_sources}"
+        )
+    if source_output_paths_overlap(report_path, artifact_path):
+        raise RunnerPreconditionBlockedError("report and artifact roots must not overlap")
+    return {"report_root": report_path, "artifact_root": artifact_path}
+
+
+def resolve_output_source_roots(arguments: argparse.Namespace) -> Mapping[str, Path]:
+    records = parse_pin_manifest_records(Path(arguments.corpus_manifest))
+    overrides = parse_project_root_overrides(arguments.project_root)
+    source_roots = {}
+    for repository_name, record in records.items():
+        root_value = overrides.get(repository_name, record.get("corpus_source_checkout_path"))
+        if not isinstance(root_value, (Path, str)) or not str(root_value):
+            raise RunnerPreconditionBlockedError(
+                f"pinned source checkout path is missing for {repository_name}"
+            )
+        try:
+            source_roots[repository_name] = Path(root_value).expanduser().resolve(strict=False)
+        except (OSError, RuntimeError) as error:
+            raise RunnerPreconditionBlockedError(
+                f"pinned source checkout cannot be canonicalized for {repository_name}: {error}"
+            ) from error
+    return source_roots
+
+
+def validate_run_output_paths(arguments: argparse.Namespace) -> Mapping[str, Path]:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", arguments.run_id):
+        raise RunnerPreconditionBlockedError("run identifier must be a safe, unique path component")
+    output_paths = validate_output_root_paths(
+        arguments.report_root,
+        arguments.artifact_root,
+        PROJECT_ROOT,
+        resolve_output_source_roots(arguments),
+    )
+    arguments.report_root = output_paths["report_root"]
+    arguments.artifact_root = output_paths["artifact_root"]
+    return output_paths
+
+
 def capture_identity_registry(
     project_root: Path,
     manifest_paths: Sequence[Path],
@@ -1066,9 +1221,17 @@ def capture_identity_registry(
         lock_path = corpus_root / "Cargo.lock"
         lock_files[str(lock_path.absolute())] = capture_optional_frozen_file_identity(lock_path)
     source_roots = {str(project_root.resolve()): Path(project_root).resolve()}
-    source_roots.update({str(root.resolve()): root.resolve() for root in corpus_roots.values()})
+    permitted_lock_paths_by_root = {}
+    for repository_name, root in corpus_roots.items():
+        root_path = root.resolve()
+        root_key = str(root_path)
+        source_roots[root_key] = root_path
+        if repository_name in {"serde", "tokio"}:
+            permitted_lock_paths_by_root[root_key] = [root_path / "Cargo.lock"]
     source_snapshots = {
-        root_key: capture_frozen_source_snapshot(root_path, excluded_paths)
+        root_key: capture_frozen_source_snapshot(
+            root_path, excluded_paths, permitted_lock_paths_by_root.get(root_key, ())
+        )
         for root_key, root_path in source_roots.items()
     }
     for executable_identity in executable_identities:
@@ -1077,6 +1240,10 @@ def capture_identity_registry(
         "frozen_files": frozen_files,
         "lock_files": lock_files,
         "source_snapshots": source_snapshots,
+        "permitted_lock_paths_by_root": {
+            root_key: [str(path) for path in paths]
+            for root_key, paths in permitted_lock_paths_by_root.items()
+        },
         "excluded_paths": [str(Path(path).absolute()) for path in excluded_paths],
     }
 
@@ -1087,9 +1254,12 @@ def verify_identity_registry(registry: Mapping[str, Any]) -> None:
     for identity in registry["lock_files"].values():
         verify_optional_frozen_file_identity(identity)
     excluded_paths = [Path(path) for path in registry["excluded_paths"]]
+    permitted_lock_paths_by_root = registry.get("permitted_lock_paths_by_root", {})
     for root_path, expected_snapshot in registry["source_snapshots"].items():
         try:
-            current_snapshot = capture_frozen_source_snapshot(Path(root_path), excluded_paths)
+            current_snapshot = capture_frozen_source_snapshot(
+                Path(root_path), excluded_paths, permitted_lock_paths_by_root.get(root_path, ())
+            )
         except RunnerPreconditionBlockedError as error:
             raise RunnerFrozenInputMutationError(
                 f"frozen source snapshot can no longer be verified: {root_path}: {error}"
@@ -1351,11 +1521,11 @@ def prepare_execution_context(
     expected_commits = pin_summary["corpus_commit_by_repository"]
     if set(expected_commits) != set(DEFAULT_REPOSITORY_ORDER):
         raise RunnerPreconditionBlockedError("corpus manifest does not include exactly five pinned repositories")
-    excluded_paths = [Path(arguments.report_root).expanduser().absolute(),
-                      Path(arguments.artifact_root).expanduser().absolute()]
+    excluded_paths = build_owned_run_exclusions(run_state["run_directory"], artifact_run_directory)
     source_snapshots = {}
     for repository_name, source_root in corpus_roots.items():
-        snapshot = capture_frozen_source_snapshot(source_root, excluded_paths)
+        permitted_locks = [source_root / "Cargo.lock"] if repository_name in {"serde", "tokio"} else []
+        snapshot = capture_frozen_source_snapshot(source_root, excluded_paths, permitted_locks)
         if snapshot["head_commit"] != expected_commits[repository_name]:
             raise RunnerContractViolationError(f"{repository_name} source HEAD differs from its pinned commit")
         source_snapshots[repository_name] = snapshot
@@ -2022,6 +2192,7 @@ def execute_qualification_run(
 
 
 def run_persistent_qualification_plan(arguments: argparse.Namespace) -> Mapping[str, Any]:
+    validate_run_output_paths(arguments)
     run_state = create_persistent_run_report(
         arguments.report_root,
         arguments.run_id,
@@ -2053,6 +2224,9 @@ def main(argument_values: Sequence[str] | None = None) -> int:
     except KeyboardInterrupt:
         print(json.dumps({"overall_status": "BLOCKED", "reason": "interrupted"}))
         return 130
+    except (RunnerPreconditionBlockedError, RunnerContractViolationError) as error:
+        print(json.dumps({"overall_status": "BLOCKED", "reason": str(error)}), file=sys.stderr)
+        return 2
     print(json.dumps(result, indent=2, default=json_default_value))
     if result["overall_status"] == "FAIL":
         return 1

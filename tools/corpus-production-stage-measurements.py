@@ -64,9 +64,9 @@ def invoke_production_stage_command(command_values, output_directory, output_pre
 def validate_publication_stage_markers(banner, final_stage_kind):
     if not isinstance(banner, dict):
         return {"pass": False, "reason": "coverage banner is unavailable", "required_stages": []}
-    stage_values = banner.get("stage_implementation_status_values")
+    stage_values = banner.get("stage_publication_status_values")
     if not isinstance(stage_values, dict):
-        return {"pass": False, "reason": "coverage banner has no stage implementation statuses", "required_stages": []}
+        return {"pass": False, "reason": "coverage banner is missing stage publication statuses", "required_stages": []}
     required_stages = ["crate-graph", "source-ingest", "syntax-spans"]
     if final_stage_kind == "name-resolution":
         required_stages.append("name-resolution")

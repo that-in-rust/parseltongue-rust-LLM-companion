@@ -790,3 +790,118 @@ OK
 No refactor needed: the change is limited to `probe_toolchain_versions`, and the symlink regression covers
 both the invoked version name and separately recorded canonical path. GREEN commit:
 `b22b92358bb187a5e8ab5e24d8d401d4a9d2dd1d`; this checkpoint changes only the journal.
+
+### Output, lock, and publication safeguards — local REQ traceability and STUB
+
+This bounded batch adds only output-placement validation, explicit selected-lock freezing, and
+published-stage-map validation. These local identifiers document the tool behavior; they do not
+modify or claim to add rows to the shared SPEC verification matrix.
+
+- `REQ-SOP-RUNNER-015` maps to SOP revision R3 (persistent report/artifact locations) and SPEC
+  source snapshot exclusions at §0 / the source snapshot contract. Outputs must be canonical and
+  disjoint from project/corpus inputs except the exact project `hld-current-test-runs` report root;
+  source snapshots exclude only newly owned report/artifact run directories.
+- `REQ-SOP-RUNNER-016` maps to SPEC lock existence/hash checks at lines 41 and 58 and the frozen
+  source snapshot contract at line 337. Only selected serde/tokio top-level `Cargo.lock` files are
+  permitted as ignored/untracked inputs, with exact-byte identity and provenance retained.
+- `REQ-SOP-RUNNER-017` maps to SPEC publication/generation state at lines 390, 397, and 417–418.
+  A complete published-stage map and nonempty generation identity are required; legacy static
+  implementation statuses are not publication evidence.
+
+STUB plan: add pre-write canonical output-root validation and safe stderr failure, pass exact owned
+run directories to snapshots, whitelist only selected top-level locks in the snapshot/identity
+registry, and switch the publication validator to `stage_publication_status_values`. RED tests are
+tagged with the corresponding local REQ above and use four-word `test_` names. No mapper, source
+manifest, corpus, lockfile, or production file is changed.
+
+### Output, lock, and publication safeguards — RED
+
+Focused RED command (Python fixtures only; no Cargo, corpus, mapper, or production execution):
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_checkout_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_ancestor_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_subtree_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_ancestor_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_root_output_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_bypass_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_alias_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_safe_paths_validate test_sop_qualification_runner.SopQualificationRunnerContractTests.test_outputs_block_before_writes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_exclusions_detect_mutations test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_locks_are_frozen test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_modification_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_deletion_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unselected_lock_stays_blocked test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_accepts_complete test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_stages test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_generation test_sop_qualification_runner.SopQualificationRunnerContractTests.test_static_status_cannot_publish
+```
+
+Observed RED output:
+
+```text
+test_output_checkout_root_blocks ... FAIL
+test_output_source_ancestor_blocks ... FAIL
+test_output_source_subtree_blocks ... FAIL
+test_corpus_ancestor_root_blocks ... FAIL
+test_corpus_root_output_blocks ... FAIL
+test_output_symlink_bypass_blocks ... FAIL
+test_output_symlink_alias_blocks ... FAIL
+test_output_safe_paths_validate ... ok
+test_outputs_block_before_writes ... FAIL
+test_output_exclusions_detect_mutations ... ERROR
+test_selected_locks_are_frozen ... ERROR
+test_selected_lock_modification_fails ... ERROR
+test_selected_lock_deletion_fails ... ERROR
+test_unselected_lock_stays_blocked ... ok
+test_publication_map_accepts_complete ... FAIL
+test_publication_map_requires_stages ... ok
+test_publication_map_requires_generation ... ok
+test_static_status_cannot_publish ... FAIL
+Ran 18 tests in 0.278s
+FAILED (failures=10, errors=4)
+AssertionError: RunnerPreconditionBlockedError not raised
+AttributeError: module 'sop_qualification_runner' has no attribute 'build_owned_run_exclusions'
+RunnerPreconditionBlockedError: ignored untracked source inputs found in /tmp/tmptgu4nk9e/lock-serde: ['Cargo.lock']
+AssertionError: False is not true : coverage banner has no stage implementation statuses
+AssertionError: True is not false
+```
+
+The output-path RED confirms preflight accepted checkout/corpus ancestors, source descendants, and
+symlink aliases and wrote the fixture report. The selected-lock RED is the generic ignored-source
+rejection; the publication RED confirms legacy implementation statuses passed while the new map was
+ignored. Green implementation follows below.
+
+### Output, lock, and publication safeguards — GREEN
+
+Output roots are canonicalized and checked against the project root plus all five selected corpus
+roots before `create_persistent_run_report` or artifact-directory creation. Any symlink component
+blocks the root, reports are permitted only externally or at the exact project
+`hld-current-test-runs` root, and artifacts must be disjoint from every input root. Unsafe roots
+produce a BLOCKED JSON record on stderr with exit 2 and no report/artifact writes. Snapshot exclusions
+now contain only the exact new report and artifact run directories; a post-freeze ignored Rust source
+elsewhere beneath the report parent is detected.
+
+Snapshot/registry evidence now admits only the top-level `Cargo.lock` selected for serde or tokio.
+The exact file identity is included in both the lock registry and source snapshot digest, with Git
+provenance recorded as `ignored` or `untracked`; modification and deletion raise frozen-input FAIL.
+Other ignored/untracked inputs remain blocked. Publication validation now requires
+`stage_publication_status_values` with applicable stages marked `complete` and a nonempty published
+generation digest. Missing publication status (including legacy static implementation statuses) is
+BLOCKED, and incomplete stage values cannot PASS. The mapper and all non-scoped files remain
+untouched; full S3 prerequisites remain conservative.
+
+Focused GREEN command and output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_checkout_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_ancestor_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_source_subtree_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_ancestor_root_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_corpus_root_output_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_bypass_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_symlink_alias_blocks test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_safe_paths_validate test_sop_qualification_runner.SopQualificationRunnerContractTests.test_outputs_block_before_writes test_sop_qualification_runner.SopQualificationRunnerContractTests.test_output_exclusions_detect_mutations test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_locks_are_frozen test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_modification_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_selected_lock_deletion_fails test_sop_qualification_runner.SopQualificationRunnerContractTests.test_unselected_lock_stays_blocked test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_accepts_complete test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_stages test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_generation test_sop_qualification_runner.SopQualificationRunnerContractTests.test_static_status_cannot_publish
+Ran 18 tests in 0.372s
+OK
+```
+
+After the publication-missing reason was made explicitly BLOCKED, its four focused regressions passed:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_accepts_complete test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_stages test_sop_qualification_runner.SopQualificationRunnerContractTests.test_publication_map_requires_generation test_sop_qualification_runner.SopQualificationRunnerContractTests.test_static_status_cannot_publish
+Ran 4 tests in 0.001s
+OK
+```
+
+Final scoped suites:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 92 tests in 0.944s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.341s
+OK
+```
+
+No Cargo command, lock regeneration, corpus run, mapper run, production build, or graph/index operation was performed.
