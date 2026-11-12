@@ -28,6 +28,7 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("module-scope-binding-table", "name-resolution"),
     ("name-resolution-scope-records", "name-resolution"),
     ("path-resolution-site-records", "name-resolution"),
+    ("oracle-edge-agreement-table", "oracle-agreement"),
     ("analysis-resolution-receipt-records", "name-resolution"),
     ("macro-expanded-item-table", "name-resolution"),
     (

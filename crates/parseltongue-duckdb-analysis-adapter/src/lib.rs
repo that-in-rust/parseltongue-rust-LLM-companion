@@ -26,6 +26,12 @@ mod namespace_storage_size_diagnostics;
 pub use namespace_analysis_phase_diagnostics::{
     NamespaceAnalysisPhaseError, NamespaceAnalysisPhaseKind,
 };
+#[path = "oracle-path-comparison-core.rs"]
+mod oracle_path_comparison_core;
+#[path = "oracle-path-comparison-l3.rs"]
+mod oracle_path_comparison_l3;
+pub use oracle_path_comparison_core::OracleComparisonFailureError;
+pub use oracle_path_comparison_l3::compare_oracle_path_sites;
 
 impl DuckdbAnalysisStoreAdapter {
     pub fn open_bounded_analysis_store(
