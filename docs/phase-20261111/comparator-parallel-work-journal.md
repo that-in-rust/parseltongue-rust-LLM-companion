@@ -564,3 +564,6 @@ REQ-RUST-026.4 REFACTOR
 **REQ-RUST-026.5**
 - `test_published_comparisons_threads_are_deterministic`
 - `test_thread_counts_export_identically`
+
+REQ-RUST-026.0 REFACTOR
+  - Reviewed the strict-envelope boolean check and table-driven regression after GREEN; the presence-plus-exact-boolean expression and typed prepublication error need no further refactor. GREEN implementation and regression commit: `dd94be791b4320e3b89797af26ba0b4acf039015`.
