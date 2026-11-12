@@ -1474,6 +1474,37 @@ mod oracle_path_contract_tests {
     }
 
     #[test]
+    fn test_semantic_lookup_partition() {
+        let directory = tempfile::tempdir().unwrap();
+        create_shared_scope_fixture(
+            directory.path(),
+            "pub trait Bound { type Assoc; } pub enum Choice { Variant } use Choice::Variant; pub struct Wrap<T: Bound>(pub T, pub T::Assoc, pub <T as Bound>::Assoc, pub Missing);",
+        );
+        let rows =
+            export_primary_semantic_paths(&build_oracle_fixture_config(directory.path())).unwrap();
+        for (path, kind) in [
+            ("Bound", "module-scope"),
+            ("Choice::Variant", "module-scope"),
+            ("T", "type-relative"),
+            ("T::Assoc", "type-relative"),
+            ("<T as Bound>::Assoc", "type-relative"),
+            ("Missing", "unknown"),
+        ] {
+            let matching: Vec<_> = rows
+                .iter()
+                .filter(|row| row["path_site_source_text"] == path)
+                .collect();
+            assert!(!matching.is_empty(), "{path}");
+            assert!(
+                matching
+                    .iter()
+                    .all(|row| row["path_lookup_scope_kind"] == kind),
+                "{path}: {matching:?}"
+            );
+        }
+    }
+
+    #[test]
     fn test_complete_associated_types() {
         let directory = tempfile::tempdir().unwrap();
         let source = "pub trait Bound { type Assoc; } pub struct Wrap<T: Bound>(pub T, pub T::Assoc, pub <T as Bound>::Assoc);";
