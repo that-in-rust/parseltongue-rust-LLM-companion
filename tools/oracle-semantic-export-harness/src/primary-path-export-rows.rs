@@ -189,7 +189,7 @@ pub(super) fn export_configured_semantic_paths(
     let _server = loaded.oracle_macro_server_handle;
     let macro_loading = loaded.oracle_macro_loading_rows;
     let source_omissions = loaded.oracle_source_omission_rows;
-    let build_script_deltas = if let Some(manifest) = mapped_manifest {
+    let mut build_script_deltas = if let Some(manifest) = mapped_manifest {
         apply_mapped_unit_configuration(
             &mut database,
             &vfs,
@@ -201,6 +201,11 @@ pub(super) fn export_configured_semantic_paths(
     } else {
         Vec::new()
     };
+    crate::oracle_build_script_deltas::append_generated_source_records(
+        &mut build_script_deltas,
+        &database,
+        &vfs,
+    )?;
     let export_attached_path_rows = || {
         let semantics = Semantics::new(&database);
         let modules: Vec<_> = hir::Crate::all(&database)

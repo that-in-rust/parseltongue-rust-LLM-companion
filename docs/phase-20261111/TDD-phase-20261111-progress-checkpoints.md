@@ -1630,3 +1630,20 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   Verify recorded inputs against public per-crate cfg/env, then add only
   recorded cfg atoms to the manifest baseline. Collect generated-source
   digests from the loaded VFS, not a second filesystem read.
+
+### SECONDARY recorded-script deltas GREEN
+
+- SECONDARY verifies recorded cfg atoms, canonical env hash/names and OUT_DIR
+  against the actual public per-crate cfg/env before adding just those cfgs
+  to the exact PRIMARY manifest baseline. Wrong/stale inputs fail explicitly.
+- Emits per-unit KL1 delta records with baseline semantic identity, cfgs,
+  env hash/names, output path and generated-source BLAKE3 identities from
+  loaded database text. Env values are not exported. PRIMARY remains unchanged.
+- New paired fixture verifies PRIMARY-unresolved / SECONDARY-resolved paths
+  plus generated include source identity and unchanged publication/unit count.
+- Full affected harness: 31 passed / 0 failed (9.85s). Release all-target
+  clippy -D warnings passed (3.74s). Logs:
+  /home/ubuntu/m2-secondary-script-green-tests.log and
+  /home/ubuntu/m2-secondary-script-green-clippy.log. Diff check passed.
+- Remaining before S5: exact expansion/proc provenance, CPU/table-backed
+  differ and full corpus mapping/export/measurement. No S5 number yet exists.
