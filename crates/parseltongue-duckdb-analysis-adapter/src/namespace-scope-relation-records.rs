@@ -2,10 +2,109 @@ use super::build_analysis_error;
 use parseltongue_core_row_types::{StageRunScopeValue, StoreBackendFailureError};
 
 pub fn materialize_scope_relations(
-    _connection: &duckdb::Connection,
-    _scope: &StageRunScopeValue,
+    connection: &duckdb::Connection,
+    scope: &StageRunScopeValue,
 ) -> Result<(), StoreBackendFailureError> {
-    Err(build_analysis_error("scope relation SQL not implemented"))
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(build_analysis_error)?;
+    transaction
+        .execute(
+            "CREATE OR REPLACE TEMP TABLE \"namespace-active-scope-records\" AS
+        SELECT * FROM \"namespace-scope-context-records\" WHERE generation_key=? AND attempt_key=?",
+            duckdb::params![
+                scope.run_generation_digest_value,
+                scope.stage_attempt_sequence_value
+            ],
+        )
+        .map_err(build_analysis_error)?;
+    let missing: usize = transaction.query_row("SELECT count(*) FROM \"namespace-active-scope-records\" c
+        LEFT JOIN \"namespace-active-scope-records\" p ON c.parent_scope=p.scope_key AND c.unit_key=p.unit_key
+        WHERE c.parent_scope IS NOT NULL AND p.scope_key IS NULL",[],|row|row.get(0)).map_err(build_analysis_error)?;
+    if missing != 0 {
+        return Err(build_analysis_error(
+            "StageInputMissingError: missing or cross-unit parent scope",
+        ));
+    }
+    let cyclic: usize = transaction.query_row("WITH RECURSIVE walk AS (
+        SELECT scope_key,scope_key AS current_scope,[scope_key] AS trail,false AS cyclic
+        FROM \"namespace-active-scope-records\"
+        UNION ALL
+        SELECT w.scope_key,p.parent_scope,list_append(w.trail,p.parent_scope),list_contains(w.trail,p.parent_scope)
+        FROM walk w JOIN \"namespace-active-scope-records\" p ON p.scope_key=w.current_scope
+        WHERE NOT w.cyclic AND p.parent_scope IS NOT NULL
+    ) SELECT count(*) FROM walk WHERE cyclic",[],|row|row.get(0)).map_err(build_analysis_error)?;
+    if cyclic != 0 {
+        return Err(build_analysis_error(
+            "StageInputMissingError: cyclic scope parents",
+        ));
+    }
+    transaction.execute_batch("CREATE TABLE IF NOT EXISTS \"namespace-scope-ancestor-records\" (
+        generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,scope_key VARCHAR NOT NULL,
+        ancestor_scope VARCHAR NOT NULL,depth INTEGER NOT NULL,
+        PRIMARY KEY(generation_key,attempt_key,scope_key,ancestor_scope));
+        CREATE TABLE IF NOT EXISTS \"namespace-lexical-parent-records\" (
+        generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,scope_key VARCHAR NOT NULL,
+        ancestor_scope VARCHAR NOT NULL,depth INTEGER NOT NULL,
+        PRIMARY KEY(generation_key,attempt_key,scope_key,ancestor_scope));
+        CREATE TABLE IF NOT EXISTS \"namespace-scope-module-records\" (
+        generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,scope_key VARCHAR NOT NULL,module_scope VARCHAR NOT NULL,
+        PRIMARY KEY(generation_key,attempt_key,scope_key));
+        CREATE TABLE IF NOT EXISTS \"namespace-module-parent-records\" (
+        generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,scope_key VARCHAR NOT NULL,parent_module VARCHAR NOT NULL,
+        PRIMARY KEY(generation_key,attempt_key,scope_key));").map_err(build_analysis_error)?;
+    [
+        "namespace-scope-ancestor-records",
+        "namespace-lexical-parent-records",
+        "namespace-scope-module-records",
+        "namespace-module-parent-records",
+    ]
+    .into_iter()
+    .try_for_each(|table| {
+        transaction
+            .execute(
+                &format!("DELETE FROM \"{table}\" WHERE generation_key=? AND attempt_key=?"),
+                duckdb::params![
+                    scope.run_generation_digest_value,
+                    scope.stage_attempt_sequence_value
+                ],
+            )
+            .map_err(build_analysis_error)?;
+        Ok::<_, StoreBackendFailureError>(())
+    })?;
+    transaction.execute_batch("INSERT INTO \"namespace-scope-ancestor-records\"
+        WITH RECURSIVE ancestry AS (
+            SELECT generation_key,attempt_key,scope_key,scope_key AS ancestor_scope,0 AS depth FROM \"namespace-active-scope-records\"
+            UNION ALL
+            SELECT a.generation_key,a.attempt_key,a.scope_key,p.parent_scope,a.depth+1
+            FROM ancestry a JOIN \"namespace-active-scope-records\" p ON p.scope_key=a.ancestor_scope
+            WHERE p.parent_scope IS NOT NULL
+        ) SELECT * FROM ancestry;
+        INSERT INTO \"namespace-lexical-parent-records\"
+        WITH RECURSIVE lexical AS (
+            SELECT generation_key,attempt_key,scope_key,scope_key AS ancestor_scope,0 AS depth FROM \"namespace-active-scope-records\"
+            UNION ALL
+            SELECT a.generation_key,a.attempt_key,a.scope_key,p.parent_scope,a.depth+1
+            FROM lexical a JOIN \"namespace-active-scope-records\" p ON p.scope_key=a.ancestor_scope
+            WHERE p.parent_scope IS NOT NULL AND p.parent_lookup
+        ) SELECT * FROM lexical;
+        INSERT INTO \"namespace-scope-module-records\"
+            SELECT a.generation_key,a.attempt_key,a.scope_key,a.ancestor_scope FROM \"namespace-scope-ancestor-records\" a
+            JOIN \"namespace-active-scope-records\" s ON s.scope_key=a.ancestor_scope
+                AND s.generation_key=a.generation_key AND s.attempt_key=a.attempt_key
+            WHERE s.module_boundary
+            QUALIFY row_number() OVER (PARTITION BY a.generation_key,a.attempt_key,a.scope_key ORDER BY a.depth,a.ancestor_scope)=1;
+        INSERT INTO \"namespace-module-parent-records\"
+            SELECT a.generation_key,a.attempt_key,a.scope_key,a.ancestor_scope FROM \"namespace-scope-ancestor-records\" a
+            JOIN \"namespace-active-scope-records\" s ON s.scope_key=a.ancestor_scope
+                AND s.generation_key=a.generation_key AND s.attempt_key=a.attempt_key
+            JOIN \"namespace-active-scope-records\" c ON c.scope_key=a.scope_key
+                AND c.generation_key=a.generation_key AND c.attempt_key=a.attempt_key
+            WHERE s.module_boundary AND c.module_boundary AND a.depth>0
+            QUALIFY row_number() OVER (PARTITION BY a.generation_key,a.attempt_key,a.scope_key ORDER BY a.depth,a.ancestor_scope)=1;")
+        .map_err(build_analysis_error)?;
+    transaction.commit().map_err(build_analysis_error)?;
+    Ok(())
 }
 
 #[cfg(test)]
