@@ -789,3 +789,32 @@ Fixtures cover macro_rules arm selection, macro-2 input, nested/optional repetit
 Rust type/expression/path/item fragments, empty output, invalid definition/invocation and
 no-match errors, definition-versus-invocation token ranges, 2021/2024 expression semantics
 and cancellation. Generated normal-case item text must parse with the pinned parser.
+
+### M2 declarative macro expander — GREEN
+
+The pinned matcher/transcriber/parser-input files have been mechanically copied by
+tools/adapt-macro-expansion-sources.py into four-word source paths. Database arguments
+became explicit edition callbacks. A pure lexer/TT facade now invokes the copied engine and
+renders source plus per-token original/output byte ranges. All nine contracts pass (0.06s),
+plus the copied parser doctest. Core's three identity tests and the three existing runtime/
+dependency gates pass. The complete production workspace dependency gate retains L1 zero
+dependencies and no salsa/HIR/IDE/base-db. No unchecked unwrap/expect or unsafe block in the
+port. Cancellation and malformed/no-match failures return typed errors without partial output.
+
+To avoid unsafe construction of the upstream salsa-free opaque SyntaxContext, a minimal
+compatible ra_ap_span package lives in crates/parseltongue-macro-span-records and is patched
+through the root Cargo manifest. It has safe span/file/context primitives and no salsa,
+using only the already-pinned parser's Edition/TextRange/TextSize. TT/intern/stdx/parser
+are pinned at 0.0.362; cargo fetch provisioned TT/intern/cov-mark dependencies successfully.
+No upstream checkout was modified. TT compiles against the small compatibility surface.
+
+One newly authored RED expectation was corrected against the pinned transcriber: nontrivial
+expr fragments are deliberately parenthesized (wrap_in_parens in the copied transcriber) to
+preserve precedence. The fixture now expects that authoritative expansion, rather than
+changing the algorithm to drop protective parentheses. No existing pre-M2 test was altered.
+
+Initial Clippy identifies two REFACTOR items in copied matching code: 11 scratch arguments
+and a single-pattern match. Next: group matcher scratch state, simplify the branch, verify
+span record primitives and finalize the pure engine. Persisted item expansion, hygiene-aware
+virtual files, built-ins/sysroot/lang items and the differ/S5 remain pending. The existing
+DB-backed item port still explicitly errors; no successful corpus mapper or S5 gate is claimed.

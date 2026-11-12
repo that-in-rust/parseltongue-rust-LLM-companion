@@ -1,0 +1,16 @@
+[package]
+name = "ra_ap_span"
+version = "0.0.362"
+edition.workspace = true
+license.workspace = true
+description = "Database-free safe span records for the copied declarative macro engine"
+
+[dependencies]
+ra_ap_syntax = "=0.0.362"
+
+[features]
+default = []
+in-rust-tree = []
+
+[lints]
+workspace = true

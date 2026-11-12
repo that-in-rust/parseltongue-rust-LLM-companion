@@ -6,9 +6,18 @@ license.workspace = true
 
 [dependencies]
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
-
-[dev-dependencies]
 ra_ap_syntax = "=0.0.362"
+parser = { package = "ra_ap_parser", version = "=0.0.362" }
+tt = { package = "ra_ap_tt", version = "=0.0.362" }
+span = { package = "ra_ap_span", version = "=0.0.362", default-features = false }
+intern = { package = "ra_ap_intern", version = "=0.0.362" }
+stdx = { package = "ra_ap_stdx", version = "=0.0.362" }
+ra-ap-rustc_lexer = { version = "0.180", default-features = false }
+rustc-hash = "2"
+smallvec = "1"
+arrayvec = "0.7"
+bitflags = "2"
+cov-mark = "2"
 
 [lints]
 workspace = true

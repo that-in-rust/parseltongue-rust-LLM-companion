@@ -1,14 +1,19 @@
+extern crate ra_ap_rustc_lexer as rustc_lexer;
+
+#[cfg(test)]
 use parseltongue_core_row_types::{
     DeclarativeMacroExpansionInput, DeclarativeMacroExpansionOutput, MacroExpansionFailureKind,
     RunCancelFlagValue,
 };
 
-pub fn expand_declarative_macro_items(
-    _macro_expansion_input_rows: &DeclarativeMacroExpansionInput,
-    _stage_cancel_flag_value: &RunCancelFlagValue,
-) -> Result<DeclarativeMacroExpansionOutput, MacroExpansionFailureKind> {
-    todo!()
-}
+#[path = "declarative-expansion-source-facade.rs"]
+mod declarative_expansion_source_facade;
+#[allow(dead_code)]
+#[path = "macro-expansion-rule-engine.rs"]
+mod macro_expansion_rule_engine;
+#[path = "macro-token-parser-input.rs"]
+mod macro_token_parser_input;
+pub use declarative_expansion_source_facade::expand_declarative_macro_items;
 
 #[cfg(test)]
 #[path = "declarative-expansion-contract-tests.rs"]

@@ -83,7 +83,7 @@ fn test_macro_fragment_matching() {
     );
     let normalized = normalize_macro_output_text(&output.macro_expanded_source_text);
     assert!(normalized.contains("pubtypeChosen=Option<(u8,u16)>;"));
-    assert!(normalized.contains("pubconstVALUE:Option<(u8,u16)>=Some((1,2));"));
+    assert!(normalized.contains("pubconstVALUE:Option<(u8,u16)>=(Some((1,2)));"));
     assert!(normalized.contains("pubstructInput;"));
     assert!(normalized.contains("pubfnsample<T:std::fmt::Debug>(){}"));
 }

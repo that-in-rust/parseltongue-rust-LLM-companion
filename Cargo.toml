@@ -9,6 +9,7 @@ members = [
     "crates/parseltongue-cli-dispatcher-binary",
     "crates/parseltongue-port-name-resolver",
     "crates/parseltongue-port-macro-expander",
+    "crates/parseltongue-macro-span-records",
 ]
 resolver = "3"
 exclude = ["tools/oracle-semantic-export-harness"]
@@ -24,3 +25,6 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+[patch.crates-io]
+ra_ap_span = { path = "crates/parseltongue-macro-span-records" }
