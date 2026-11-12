@@ -1272,3 +1272,25 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   shared type change: optional pattern cannot represent this distinction). STUB
   constructors default false; next RED exercises declaration multi-rules.
 - No further upstream parser defect: existing pinned grammar accepts the source.
+
+## AST metadata attribute GREEN — 2026-11-12
+
+- collect_effective_node_attributes now reads ast::Attr::meta, preserving source
+  bytes/ranges and accepting legal whitespace around attribute punctuation.
+- /home/ubuntu/m2-attribute-ast-green.log: syntax contracts 17 passed, zero failed.
+  Native mapping advances through all 618 sysroot/user extraction contexts and
+  core namespace projection; the old textual-delimiter error is no longer reached.
+- Macro declaration GREEN uses parse_macro2(None, body) when the explicit syntax
+  declaration flag is true. Pure contracts: 22 passed plus one doctest. The portable
+  persisted CLI declaration case passes (1 passed, 18 filtered). Complete native
+  publication is still under verification, not GREEN.
+- Storage exhaustion was diagnosed: root filesystem 124 GiB, zero available.
+  Safely removed only disposable dev build caches and an orphaned failed-test
+  temporary store (cargo clean --profile dev for the five affected packages).
+  Recovered 13 GiB without deleting corpus evidence or source fixtures.
+- Native profile: /home/ubuntu/m2-native-indexed-profile.log; input fixture and
+  diagnostic store remain /home/ubuntu/m2-native-resolver-fixture and
+  /home/ubuntu/m2-native-resolver-store.db. No S5 denominator/rate exists yet.
+- Refactor candidate replaces full-binding-vector scans for each glob import
+  with the existing scope lookup index. Eight resolver contracts pass; Clippy
+  passes. It does not change candidate visibility or precedence.

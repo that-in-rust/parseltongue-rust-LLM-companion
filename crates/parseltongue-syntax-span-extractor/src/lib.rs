@@ -248,13 +248,10 @@ fn collect_effective_node_attributes(
     node.children()
         .filter_map(ast::Attr::cast)
         .try_fold(Vec::new(), |mut attributes, attribute| {
-            let text = attribute.syntax().text().to_string();
-            let text = text
-                .trim()
-                .strip_prefix("#![")
-                .or_else(|| text.trim().strip_prefix("#["))
-                .and_then(|s| s.strip_suffix(']'))
+            let meta = attribute
+                .meta()
                 .ok_or_else(|| build_syntax_stage_failure("invalid attribute source"))?;
+            let text = meta.syntax().text().to_string();
             attributes.extend(expand_effective_attribute_values(text.trim(), cfg)?);
             Ok(attributes)
         })
