@@ -139,6 +139,115 @@ fn frozen_namespace_generation_integrity() {
     assert_eq!(count, 0);
 }
 
+fn append_namespace_fixture_value(source: &mut Source, table: &str, value: serde_json::Value) {
+    let payload = value.to_string();
+    let rows = source.records.get_mut(table).unwrap();
+    rows.push(StageTableRowRecord {
+        stage_owned_table_name: table.into(),
+        stage_row_record_key: blake3::hash(payload.as_bytes()).to_hex().to_string(),
+        stage_row_payload_text: payload,
+    });
+    rows.sort_by(|left, right| left.stage_row_record_key.cmp(&right.stage_row_record_key));
+}
+
+#[test]
+fn frozen_namespace_sql_resolution_contract() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        64 * 1024 * 1024,
+    )
+    .unwrap();
+    assert!(
+        store
+            .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+            .is_err()
+    );
+    let mut source = namespace_source_fixture();
+    store
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    let report = store
+        .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    assert_eq!(report.binding_set_digest_value.len(), 64);
+    assert!(report.fixed_point_round_count > 0);
+    let count:usize=store._connection.lock().unwrap().query_row("SELECT count(*) FROM \"namespace-path-candidate-records\" WHERE namespace='type' AND state='resolved'",[],|row|row.get(0)).unwrap();
+    assert_eq!(count, 1);
+    let cancelled = RunCancelFlagValue::default();
+    cancelled.request_stage_work_cancellation();
+    assert!(
+        store
+            .resolve_frozen_namespace_rows(&scope(), &cancelled)
+            .is_err()
+    );
+    let empty = StageRunScopeValue {
+        run_generation_digest_value: "empty".into(),
+        ..scope()
+    };
+    source.published = Some(empty.clone());
+    source.records.values_mut().for_each(Vec::clear);
+    store
+        .copy_published_stage_rows(
+            &source,
+            &empty,
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&empty, &RunCancelFlagValue::default())
+        .unwrap();
+    assert_eq!(
+        store
+            .resolve_frozen_namespace_rows(&empty, &RunCancelFlagValue::default())
+            .unwrap()
+            .fixed_point_round_count,
+        1
+    );
+}
+
+#[test]
+fn frozen_namespace_latest_textual_lookup() {
+    [false,true].into_iter().for_each(|null_latest|{
+        let directory=tempfile::tempdir().unwrap();
+        let store=DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(&directory.path().join("analysis.duckdb"),directory.path(),64*1024*1024).unwrap();
+        let mut source=namespace_source_fixture();
+        let scope_row:serde_json::Value=serde_json::from_str(&source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text).unwrap();
+        let root=&scope_row["scope_module_identity_key"];
+        let target=|name:&str|json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":name});
+        ["old","new","module"].into_iter().for_each(|name|{
+            append_namespace_fixture_value(&mut source,"syntax-namespace-input-items",json!({"binding_lexical_scope_key":root,"binding_resolved_name_text":"m","binding_namespace_kind_value":"macro","binding_target_identity_key":target(name),"binding_target_child_scope":null,"binding_visibility_scope_kind":{"visibility_scope_kind_value":"restricted","visibility_restricted_scope_key":root},"binding_selection_priority_kind":"declaration","binding_import_evidence_keys":[],"binding_target_metadata_value":{"target_symbol_kind_value":"Macro","target_macro_definition_record":{"macro_declaration_style_flag":name=="module"}}}));
+        });
+        append_namespace_fixture_value(&mut source,"syntax-namespace-input-macros",json!({"invocation_site_occurrence_key":{"site":"macro"},"invocation_lexical_scope_key":root,"invocation_macro_path_segments":[{"kind":"name","name":"m"}],"invocation_macro_input_text":""}));
+        append_namespace_fixture_value(&mut source,"syntax-namespace-input-imports",json!({"import_site_occurrence_key":{"site":"import"},"import_lexical_scope_key":root,"import_path_segment_rows":[{"kind":"name","name":"m"}],"import_binding_alias_text":"Alias","import_glob_expansion_flag":false,"import_visibility_scope_kind":{"visibility_scope_kind_value":"public"}}));
+        ["macro","import"].into_iter().for_each(|site|{
+            [(1,target("old")),(2,if null_latest {serde_json::Value::Null}else{target("new")})].into_iter().for_each(|(revision,target)|{
+                append_namespace_fixture_value(&mut source,"legacy-macro-scope-records",json!({"legacy_lookup_identity_key":format!("lookup-{site}"),"legacy_source_site_key":{"site":site},"legacy_macro_name_text":"m","legacy_target_identity_key":target,"legacy_scope_revision_value":revision,"legacy_source_order_parts":[10,4]}));
+            });
+        });
+        store.copy_published_stage_rows(&source,&scope(),NAMESPACE_SOURCE_TABLE_NAMES,&RunCancelFlagValue::default()).unwrap();
+        store.normalize_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        store.resolve_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        let connection=store._connection.lock().unwrap();
+        let resolved:String=connection.query_row("SELECT target_key FROM \"namespace-path-candidate-records\" WHERE request_key=? AND namespace='macro' ORDER BY generation_key,attempt_key,request_key,target_key,namespace,binding_scope,binding_name",[json!({"site":"macro"}).to_string()],|row|row.get(0)).unwrap();
+        assert_eq!(resolved,target(if null_latest {"module"}else{"new"}).to_string());
+        let imported:String=connection.query_row("SELECT target_key FROM \"namespace-binding-round-results\" WHERE name='Alias' ORDER BY generation_key,attempt_key,scope_key,name,namespace,target_key,evidence_key",[],|row|row.get(0)).unwrap();
+        assert_eq!(imported,resolved);
+        let private:usize=connection.query_row("SELECT count(*) FROM \"namespace-binding-declaration-records\" WHERE target_key IN (?,?)",duckdb::params![target("old").to_string(),target("new").to_string()],|row|row.get(0)).unwrap();
+        assert_eq!(private,0);
+    });
+}
+
 #[test]
 fn frozen_namespace_normalization_empty_and_errors() {
     let directory = tempfile::tempdir().unwrap();
