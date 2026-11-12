@@ -264,6 +264,87 @@ fn test_macro_empty_virtual_file() {
 }
 
 #[test]
+fn test_nested_macro_crate_provenance() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::create_dir_all(root.join("defs/src")).unwrap();
+    fs::write(
+        root.join("defs/Cargo.toml"),
+        "[package]\nname=\"defs\"\nversion=\"0.1.0\"\nedition=\"2021\"\n",
+    )
+    .unwrap();
+    fs::write(root.join("defs/src/lib.rs"),"pub struct Original; #[macro_export] macro_rules! outer {($name:ident)=>{macro_rules! inner {()=>{pub struct $name {pub field:$crate::Original}};} inner!();};}").unwrap();
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        format!("{manifest}\n[dependencies]\ndefs={{path=\"defs\"}}\n"),
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub struct Original; defs::outer!(Éclair); pub fn take(_:Éclair){}",
+    )
+    .unwrap();
+    assert!(
+        Command::new(env!("CARGO"))
+            .current_dir(&root)
+            .args(["generate-lockfile", "--offline"])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let macros = read_published_table_fixture(&database, "macro-expanded-item-table");
+    assert_eq!(macros.len(), 2);
+    assert!(macros.iter().any(|row| {
+        row["macro_invocation_provenance_chain"]
+            .as_array()
+            .unwrap()
+            .len()
+            == 2
+    }));
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    let path = paths
+        .iter()
+        .find(|row| {
+            row["path_site_source_text"].as_str().is_some_and(|text| {
+                text.chars()
+                    .filter(|ch| !ch.is_whitespace())
+                    .collect::<String>()
+                    == "$crate::Original"
+            })
+        })
+        .unwrap();
+    assert_eq!(path["path_resolution_state_kind"], "resolved");
+    assert!(
+        path["path_target_symbol_rows"][0]["target_source_file_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("/defs/src/lib.rs")
+    );
+    assert_eq!(
+        path["site_expansion_provenance_chain"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let generated = paths
+        .iter()
+        .find(|row| row["path_site_source_text"] == "Éclair")
+        .unwrap();
+    assert_eq!(generated["path_resolution_state_kind"], "resolved");
+}
+
+#[test]
 fn test_persisted_resolution_path_answers() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");

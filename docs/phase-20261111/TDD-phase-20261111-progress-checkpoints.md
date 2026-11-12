@@ -885,3 +885,15 @@ new nested module, confirming not to override ordinary captured paths to caller 
 
 Next REFACTOR: factor token provenance and projection offsets; add further hygiene
 contracts. Built-ins, sysroot/preludes/lang items, exact oracle units and S5 remain pending.
+
+### M2 persisted macro adapter — REFACTOR
+
+Replaced positional projection counters with typed named offsets. Added a two-crate,
+two-round regression with a captured UTF-8 identifier and $crate propagated through a
+generated macro definition. It resolves the original foreign type despite a caller
+shadow with the same spelling, and records both invocation IDs.
+CLI contracts: 10 passed; syntax contracts: 11 passed. Focused all-target Clippy
+with -D warnings, formatting and diff checks passed. No new subprocess path was added.
+The pure engine's source/provenance remains the bridge; all expanded evidence is committed
+with its crate fixed point. Built-in item support is next, then sysroot/preludes/lang
+items, exact mapped oracle units and all-five S5. No agreement rate is claimed yet.

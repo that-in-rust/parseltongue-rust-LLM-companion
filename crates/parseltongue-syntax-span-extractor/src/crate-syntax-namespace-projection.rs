@@ -43,6 +43,24 @@ struct MacroInvocationSourceContext {
     macro_source_provenance_rows: Vec<[u8; 32]>,
 }
 
+struct MacroProjectionRowOffsets {
+    module_scope_row_count: usize,
+    symbol_binding_row_count: usize,
+    import_request_row_count: usize,
+    signature_path_row_count: usize,
+    macro_invocation_row_count: usize,
+}
+
+fn read_projection_row_offsets(input: &NameResolutionInputRows) -> MacroProjectionRowOffsets {
+    MacroProjectionRowOffsets {
+        module_scope_row_count: input.name_module_scope_rows.len(),
+        symbol_binding_row_count: input.name_symbol_binding_rows.len(),
+        import_request_row_count: input.name_import_request_rows.len(),
+        signature_path_row_count: input.name_signature_path_rows.len(),
+        macro_invocation_row_count: input.name_macro_invocation_rows.len(),
+    }
+}
+
 trait SourcePathCanonicalPort {
     fn read_canonical_source_path(&self, path: &Path) -> Option<PathBuf>;
 }
@@ -624,13 +642,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             json!({"token_output_byte_range":[output.0,output.1],"token_original_byte_range":[start+original.0,start+original.1],"token_source_origin_kind":kind,"token_source_absolute_path":path})
         }).collect::<Vec<_>>();
         let input = &self.projection_resolution_input_rows;
-        let before = (
-            input.name_module_scope_rows.len(),
-            input.name_symbol_binding_rows.len(),
-            input.name_import_request_rows.len(),
-            input.name_signature_path_rows.len(),
-            input.name_macro_invocation_rows.len(),
-        );
+        let before = read_projection_row_offsets(input);
         self.visit_namespace_syntax_node(
             &parsed.syntax_node(),
             &invocation.invocation_lexical_scope_key,
@@ -651,11 +663,21 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "macro_matched_arm_index":expanded.macro_matched_arm_index,"macro_resolution_state_kind":"expanded",
         })));
         Ok(NameExpansionRoundRows {
-            expansion_module_scope_rows: input.name_module_scope_rows[before.0..].to_vec(),
-            expansion_symbol_binding_rows: input.name_symbol_binding_rows[before.1..].to_vec(),
-            expansion_import_request_rows: input.name_import_request_rows[before.2..].to_vec(),
-            expansion_signature_path_rows: input.name_signature_path_rows[before.3..].to_vec(),
-            expansion_macro_invocation_rows: input.name_macro_invocation_rows[before.4..].to_vec(),
+            expansion_module_scope_rows: input.name_module_scope_rows
+                [before.module_scope_row_count..]
+                .to_vec(),
+            expansion_symbol_binding_rows: input.name_symbol_binding_rows
+                [before.symbol_binding_row_count..]
+                .to_vec(),
+            expansion_import_request_rows: input.name_import_request_rows
+                [before.import_request_row_count..]
+                .to_vec(),
+            expansion_signature_path_rows: input.name_signature_path_rows
+                [before.signature_path_row_count..]
+                .to_vec(),
+            expansion_macro_invocation_rows: input.name_macro_invocation_rows
+                [before.macro_invocation_row_count..]
+                .to_vec(),
             expansion_completed_invocation_keys: vec![
                 invocation.invocation_site_occurrence_key.clone(),
             ],
