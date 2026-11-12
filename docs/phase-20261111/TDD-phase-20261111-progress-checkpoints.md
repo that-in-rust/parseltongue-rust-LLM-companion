@@ -1855,3 +1855,43 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   behind shared resolver contracts, alternating Rust macro expansion. Compare
   serde binding equality, rounds, runtime and RSS against the in-memory
   resolver before selecting the implementation and resuming all-five S5.
+
+### User-approved DuckDB architecture supersedes memory work
+
+- Stopped all profiling/mapping processes. No further in-memory optimization
+  or Turso-SQL spike is authorized. The interrupted DHAT capture ended during
+  syntax work: 170,991,552 peak live bytes, not a full-M2 qualification.
+- Parked the coupled unfinished namespace/publication work in
+  /home/ubuntu/parked-memory-resolver-changes.patch (SHA-256
+  cb5d15b49a76457df93d5148ea479ccc15e50dabdd227ff1fafbd42b3053ae8e).
+- 685fa8b6e is the DuckDB adapter STUB: latest stable duckdb 1.20000.1,
+  bundled, L3 adapter behind AnalysisTableStorePort. Constructor, Appender
+  snapshot and count APIs remain deliberate STUBs. Build check printed:
+  Finished `dev` profile [unoptimized] target(s) in 8m 46s.
+  Command used CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0
+  to bound build resources; runtime memory policy is not implemented yet.
+- 932e9263c appends the architecture/PRD revisions, Mermaid diagram, ownership,
+  named required RED cases, non-monotone full-set rounds, denominator partition,
+  count/digest handoff, deterministic exports and 1.2 GiB engine limit.
+- ec2090c3a444b651e6f95c117effcb9f9bb1ebe2 is the isolated user-approved
+  deletion of archive/, tests/, dependency_queries/, entity_queries/,
+  experiments/ and scripts/. Reference scan of README, AGENTS, gitignore,
+  Cargo, vscode, phase docs and tools found only valid external-corpus tests/
+  mentions, not links into the removed trees. Research and older docs untouched.
+  Post-deletion workspace check and tests are running in shell fb1fb0:
+  /home/ubuntu/legacy-deletion-check-records.log and
+  /home/ubuntu/legacy-deletion-test-records.log. Tests exclude the superseded
+  in-memory resolver crate's existing RED work and the known over-budget native
+  test_lang_items_in_sysroot; these exclusions are not a full-suite pass.
+- Mandatory next work, before resolver SQL: remove the obsolete profiler CLI
+  features/tests/tools, delete the old resolver crate but MOVE its contract
+  cases to DuckDB, remove old in-memory orchestration and preserve/move syntax
+  scope/import/item/visibility extraction. Inspect old comparator patch before
+  deleting it. Then re-index codebase-memory and verify dangling references.
+- Scope discovery found another old resolver dependency beyond the primary
+  caller: persisted-macro-expansion-adapter.rs uses resolve_macro_path_binding
+  for nested built-in lookup. This must move behind the SQL lookup port, not
+  be retained as an in-memory fallback. Macro expansion itself is retained.
+- Remaining work: adapter RED/GREEN/REFACTOR and process audit; complete source
+  cleanup; DuckDB resolver contract GREEN; serde measurement; SQL comparator;
+  all-five S5 and S6/S7. No S5 denominator or agreement is measured.
