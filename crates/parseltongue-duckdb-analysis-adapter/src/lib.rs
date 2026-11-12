@@ -115,6 +115,8 @@ mod namespace_final_output_records;
 mod namespace_frozen_identity_codec;
 #[path = "namespace-unit-link-inputs.rs"]
 mod namespace_unit_link_inputs;
+#[path = "namespace-working-cache-reset.rs"]
+mod namespace_working_cache_reset;
 
 #[path = "namespace-binding-round-strata.rs"]
 mod namespace_binding_round_strata;

@@ -108,6 +108,20 @@ pub trait AnalysisTableStorePort: Send + Sync {
 }
 
 pub trait ItemMacroExpansionPort: Send + Sync {
+    fn finish_unresolved_macro_items(
+        &self,
+    ) -> Result<
+        parseltongue_core_row_types::NameExpansionRoundRows,
+        parseltongue_core_row_types::NameResolutionStageError,
+    > {
+        Err(
+            parseltongue_core_row_types::NameResolutionStageError::Input(
+                parseltongue_core_row_types::StageInputMissingError {
+                    error_context_detail_text: "unresolved macro completion not implemented".into(),
+                },
+            ),
+        )
+    }
     fn expand_next_resolved_macro_items(
         &self,
     ) -> Result<
