@@ -40,7 +40,7 @@ pub fn extend_sysroot_crate_graph(
         let key=blake3::hash(json!([&package_id,edition,&cfg,blake3::hash(&source_bytes).to_hex().as_str()]).to_string().as_bytes()).to_hex().to_string();
         Ok((name, json!({
             "unit_cargo_package_identifier":package_id,"unit_cargo_target_name":name,"unit_cargo_target_kind":"lib",
-            "unit_compilation_role_kind":"target","unit_mapped_target_flag":false,"unit_sysroot_context_flag":true,
+            "unit_compilation_role_kind":"target",(parseltongue_core_row_types::MAPPED_TARGET_FLAG_FIELD):false,"unit_sysroot_context_flag":true,
             "unit_compilation_identity_key":key,"unit_rust_edition_value":edition,"unit_source_root_path":source,
             "unit_package_root_path":package,"unit_target_cfg_values":cfg,"unit_enabled_feature_values":[],
             "unit_sysroot_manifest_digest":digest,"unit_metadata_environment_values":{},"unit_normal_dependency_rows":[],

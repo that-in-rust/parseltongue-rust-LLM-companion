@@ -5,8 +5,8 @@
 )]
 
 use parseltongue_core_row_types::{
-    RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
-    StoreBackendFailureError, evaluate_cfg_expression_truth,
+    MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord,
+    StageUnitWriteRequest, StoreBackendFailureError, evaluate_cfg_expression_truth,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 #[path = "sysroot-compilation-context-rows.rs"]
@@ -387,7 +387,7 @@ pub fn load_workspace_crate_graph(
             let mut unit = json!({
                 "unit_cargo_package_identifier":id,"unit_cargo_package_source":package["source"],
                 "unit_cargo_target_name":target["name"],"unit_cargo_target_kind":kind,
-                "unit_compilation_role_kind":role,"unit_mapped_target_flag":mapped,
+                "unit_compilation_role_kind":role,(MAPPED_TARGET_FLAG_FIELD):mapped,
                 "unit_source_root_path":target["src_path"],"unit_package_root_path":package_root,
                 "unit_rust_edition_value":target["edition"],"unit_enabled_feature_values":features,
                 "unit_target_cfg_values":cfg,"unit_normal_dependency_rows":dependencies,
@@ -492,7 +492,7 @@ pub fn ingest_workspace_source_files(
     let roots = graph.into_iter().try_fold(roots, |mut roots, row| {
         let unit: Value =
             serde_json::from_str(&row.stage_row_payload_text).map_err(build_graph_stage_failure)?;
-        if unit["unit_mapped_target_flag"] == true || unit["unit_sysroot_context_flag"] == true {
+        if unit[MAPPED_TARGET_FLAG_FIELD] == true || unit["unit_sysroot_context_flag"] == true {
             let package = PathBuf::from(read_json_string_field(&unit, "unit_package_root_path")?);
             roots.insert(if unit["unit_sysroot_context_flag"] == true {
                 package

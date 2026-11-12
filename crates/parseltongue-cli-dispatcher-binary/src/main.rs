@@ -5,8 +5,8 @@
 )]
 
 use parseltongue_core_row_types::{
-    RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
-    StoreBackendFailureError,
+    MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord,
+    StageUnitWriteRequest, StoreBackendFailureError,
 };
 use parseltongue_crate_graph_loader::{
     OfflineWorkspaceCommandRunner, extend_sysroot_crate_graph, ingest_requested_source_file,
@@ -181,7 +181,7 @@ fn run_persisted_syntax_stage(
         })
         .collect::<Result<_, StoreBackendFailureError>>()?;
     for (key, unit) in &units {
-        if unit["unit_mapped_target_flag"] != true && unit["unit_sysroot_context_flag"] != true {
+        if unit[MAPPED_TARGET_FLAG_FIELD] != true && unit["unit_sysroot_context_flag"] != true {
             continue;
         }
         let path = Path::new(read_required_json_string(unit, "unit_source_root_path")?)
@@ -551,7 +551,7 @@ fn prepare_sysroot_staging_scope(
     let contexts=graph.iter().filter_map(|row|{
         let unit=serde_json::from_str::<Value>(&row.stage_row_payload_text);
         match unit{
-            Ok(unit) if unit["unit_mapped_target_flag"]==true=>Some(Ok((row,unit))),
+            Ok(unit) if unit[MAPPED_TARGET_FLAG_FIELD]==true=>Some(Ok((row,unit))),
             Ok(_)=>None,Err(error)=>Some(Err(build_pipeline_stage_error(error)))
         }
     }).map(|entry|{

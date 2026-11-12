@@ -231,7 +231,7 @@ pub fn persist_namespace_syntax_inputs(
     let count = read_namespace_input_values(store, scope, "crate-dependency-graph-table")?
         .into_iter()
         .filter(|unit| {
-            unit["unit_is_mapped_target_flag"] == true || unit["unit_sysroot_context_flag"] == true
+            unit[MAPPED_TARGET_FLAG_FIELD] == true || unit["unit_sysroot_context_flag"] == true
         })
         .try_fold(0, |count, unit| {
             let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(

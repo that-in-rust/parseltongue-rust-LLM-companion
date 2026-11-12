@@ -6,6 +6,8 @@
 
 //! Dependency-free semantic identities and typed stage boundaries.
 
+pub const MAPPED_TARGET_FLAG_FIELD: &str = "unit_mapped_target_flag";
+
 #[path = "stage-pipeline-row-types.rs"]
 mod stage_pipeline_row_types;
 pub use stage_pipeline_row_types::*;
