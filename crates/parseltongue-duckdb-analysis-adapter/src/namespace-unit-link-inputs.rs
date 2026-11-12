@@ -182,7 +182,7 @@ pub(super) fn link_namespace_unit_rows(
         WHERE e.alias_name<>'_' AND (d.target_key IS NOT NULL OR e.source_name='self');").map_err(build_analysis_error)?;
     ["namespace-binding-declaration-records","namespace-declaration-visibility-records"].iter().try_for_each(|table|transaction.execute(&format!("DELETE FROM \"{table}\" WHERE generation_key=? AND attempt_key=? AND starts_with(evidence_key,'namespace-unit-link-evidence/')"),duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map(|_|()).map_err(build_analysis_error))?;
     transaction.execute_batch("INSERT INTO \"namespace-binding-declaration-records\" SELECT DISTINCT * EXCLUDE(visibility_scope) FROM \"namespace-derived-extern-bindings\"; INSERT INTO \"namespace-declaration-visibility-records\" SELECT DISTINCT * FROM \"namespace-derived-extern-bindings\";").map_err(build_analysis_error)?;
-    let count = transaction
+    let count: usize = transaction
         .query_row(
             "SELECT count(*) FROM \"namespace-derived-extern-bindings\"",
             [],
@@ -191,7 +191,8 @@ pub(super) fn link_namespace_unit_rows(
         .map_err(build_analysis_error)?;
     check_cancel(cancel)?;
     transaction.commit().map_err(build_analysis_error)?;
-    Ok(count)
+    super::namespace_default_prelude_inputs::prepare_default_prelude_inputs(connection, scope)
+        .map(|prelude| count + prelude)
 }
 
 fn read_text<'a>(value: &'a Value, key: &str) -> Result<&'a str, StoreBackendFailureError> {
