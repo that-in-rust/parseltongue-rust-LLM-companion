@@ -45,10 +45,15 @@ pub(super) fn read_manifest_unit_records(
         .ok_or_else(|| build_oracle_export_error("invalid manifest unit records"))
 }
 
-fn validate_mapped_unit_manifest(
+pub(super) fn validate_mapped_unit_manifest(
     request: &OracleWorkspaceExportConfig,
     manifest: &Value,
 ) -> Result<(), OracleSemanticExportError> {
+    if !request.oracle_default_features_flag || !request.oracle_enabled_feature_values.is_empty() {
+        return Err(build_oracle_export_error(
+            "manifest Cargo options differ from fixed mapping policy",
+        ));
+    }
     if manifest["manifest_format_version_value"] != 1 {
         return Err(build_oracle_export_error("unsupported manifest version"));
     }

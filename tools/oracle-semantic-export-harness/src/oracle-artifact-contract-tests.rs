@@ -109,8 +109,54 @@ pub fn make(_: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_
 }
 
 #[test]
+fn test_script_cache_hashes_environment() {
+    let (directory, request, manifest) = build_artifact_test_fixture(false);
+    fs::write(
+        directory.path().join("build.rs"),
+        r#"
+fn main() {
+    println!("cargo:rustc-cfg=generated");
+    println!("cargo:rustc-env=VISIBLE_VALUE=value-should-not-be-recorded");
+}
+"#,
+    )
+    .unwrap();
+    let cache = build_oracle_artifact_cache(&request, &manifest).unwrap();
+    let script = &cache["cache_build_script_rows"][0];
+    assert_eq!(script["script_emitted_cfg_values"], json!(["generated"]));
+    assert_eq!(script["script_emitted_env_names"], json!(["VISIBLE_VALUE"]));
+    assert_eq!(
+        script["script_emitted_env_digest"].as_str().unwrap().len(),
+        64
+    );
+    assert!(!cache.to_string().contains("value-should-not-be-recorded"));
+}
+
+#[test]
+fn test_binary_only_artifact_cache() {
+    let (directory, request, mut manifest) = build_artifact_test_fixture(false);
+    let source = "fn main() {}";
+    fs::remove_file(directory.path().join("src/lib.rs")).unwrap();
+    fs::write(directory.path().join("src/main.rs"), source).unwrap();
+    let unit = &mut manifest["manifest_unit_context_rows"][0];
+    unit["unit_cargo_target_kind"] = json!("bin");
+    unit["unit_semantic_identity_record"]["unit_cargo_target_kind"] = json!("bin");
+    unit["unit_source_root_path"] = json!(directory.path().join("src/main.rs"));
+    unit["unit_source_closure_rows"][0]["file_source_absolute_path"] =
+        json!(directory.path().join("src/main.rs"));
+    unit["unit_source_closure_rows"][0]["file_content_digest_full"] =
+        json!(blake3::hash(source.as_bytes()).to_hex().to_string());
+    let cache = build_oracle_artifact_cache(&request, &manifest).unwrap();
+    assert_eq!(cache["cache_macro_artifact_rows"], json!([]));
+}
+
+#[test]
 fn test_cached_macro_loads_primary() {
     let (directory, mut request, manifest) = build_artifact_test_fixture(true);
+    assert!(
+        export_mapped_semantic_paths(&request, &manifest, OracleConfigurationKindValue::Primary)
+            .is_err()
+    );
     let cache = build_oracle_artifact_cache(&request, &manifest).unwrap();
     assert_eq!(
         cache["cache_scope_identity_record"],

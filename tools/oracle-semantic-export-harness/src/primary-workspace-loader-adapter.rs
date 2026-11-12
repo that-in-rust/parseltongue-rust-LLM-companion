@@ -16,6 +16,7 @@ pub(super) fn load_primary_workspace_database(
     workspace: ProjectWorkspace,
     configuration: &CargoConfig,
     exclusions: &[vfs::AbsPathBuf],
+    cached_macros: &std::collections::BTreeMap<String, vfs::AbsPathBuf>,
 ) -> Result<OracleLoadedWorkspaceState, OracleSemanticExportError> {
     let (sender, receiver) = crossbeam_channel::unbounded();
     let mut loader = vfs_notify::NotifyHandle::spawn(sender);
@@ -49,7 +50,10 @@ pub(super) fn load_primary_workspace_database(
     let macros: ProcMacrosBuilder = macros
         .into_iter()
         .map(|(krate, path)| {
-            let loaded = path.and_then(|(_, path)| match &server {
+            let source=files.file_path(graph[krate].basic.root_file_id).to_string();
+            let cached=cached_macros.get(&source);
+            let path=match cached {Some(path)=>Ok(path.clone()),None=>path.map(|(_,path)|path)};
+            let loaded = path.and_then(|path| match &server {
                 Some(server) => load_cargo::load_proc_macro(server, &path, &[]),
                 None => Err(ProcMacroLoadingError::ProcMacroSrvError(
                     "no sysroot proc-macro server".into(),
@@ -58,6 +62,7 @@ pub(super) fn load_primary_workspace_database(
             macro_loading.push(serde_json::json!({
                 "macro_source_root_path":files.file_path(graph[krate].basic.root_file_id).to_string(),
                 "macro_loading_status_value":if loaded.is_ok() {"loaded"} else {"failed"},
+                "macro_loading_origin_kind":if cached.is_some() {"cached"} else {"workspace"},
                 "macro_loading_error_text":loaded.as_ref().err().map(ToString::to_string),
             }));
             (krate, loaded)

@@ -1570,3 +1570,30 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   source-root-to-dylib mappings before load_proc_macro; do not populate
   workspace build-script cfg/env/OUT_DIR in PRIMARY. This avoids modifying
   the external rust-analyzer checkout or its private build-output types.
+
+### Oracle artifact-cache input GREEN
+
+- Added offline, locked normal-target Cargo preparation with compiler-version
+  validation. This is an explicit offline-teacher route, not a production
+  mapper subprocess or a PRIMARY build-script configuration change.
+- Cache binds publication scope, parser/compiler, exact host-proc-macro unit
+  and semantic identities/features, absolute dylib path and BLAKE3 bytes.
+  Required missing, duplicate, ambiguous, stale and tampered cache inputs
+  fail explicitly. Loader substitutes only verified dylib paths and emits
+  cached/workspace loading origin; PRIMARY still disables build scripts.
+- Retained build-script cfgs, env names plus canonical env-value digest, and
+  generated output directory as preparation observations. Env values are
+  never written into cache JSON. They are not applied to PRIMARY.
+- Found/fixed normal-target preparation edge case: explicit --lib --bins
+  rejects a binary-only workspace. Failing fixture printed
+  "no library targets found"; use Cargo check's default lib+bin selection
+  with --workspace, --offline and --locked instead.
+- Full affected oracle harness: 26 passed / 0 failed, 9.13s. Final preparation
+  contracts after binary-only and hashed-env additions: 6 passed / 0 failed,
+  2.78s. Release all-target clippy -D warnings passed (0.45s); diff check
+  passed. Logs: /home/ubuntu/m2-oracle-cache-green-tests.log,
+  /home/ubuntu/m2-oracle-cache-final-tests.log,
+  /home/ubuntu/m2-oracle-cache-clippy.log. External checkout remains clean.
+- S5 is still unmeasured. Next: SECONDARY exact-baseline cfg plus verified
+  build-script deltas, invocation/expansion provenance and proc exclusions,
+  the differ, full all-five runs, then S6/S7 complete codebase-memory coverage.

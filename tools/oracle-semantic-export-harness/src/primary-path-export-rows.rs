@@ -57,11 +57,8 @@ pub(super) fn export_configured_semantic_paths(
     mapped_manifest: Option<&Value>,
     kind: OracleConfigurationKindValue,
 ) -> Result<Value, OracleSemanticExportError> {
-    if request.oracle_macro_cache_manifest.is_some() {
-        return Err(build_oracle_export_error(
-            "cached proc-macro injection is not implemented",
-        ));
-    }
+    let artifact_cache =
+        crate::oracle_artifact_cache_facade::read_oracle_artifact_cache(request, mapped_manifest)?;
     let root = request
         .workspace_source_root_path
         .canonicalize()
@@ -180,6 +177,7 @@ pub(super) fn export_configured_semantic_paths(
         workspace,
         &configuration,
         &exclusions,
+        &artifact_cache.oracle_cached_macro_paths,
     )?;
     let mut database = loaded.oracle_database_owned_value;
     let vfs = loaded.oracle_source_virtual_files;
@@ -285,6 +283,7 @@ pub(super) fn export_configured_semantic_paths(
         "oracle_path_export_rows":rows,
         "oracle_proc_macro_rows":macro_loading,
         "oracle_source_omission_rows":source_omissions,
+        "oracle_cached_script_rows":artifact_cache.oracle_recorded_script_rows,
     }))
 }
 
