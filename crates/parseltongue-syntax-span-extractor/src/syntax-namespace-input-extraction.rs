@@ -12,6 +12,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(test)]
+#[path = "namespace-legacy-source-fixtures.rs"]
+mod namespace_legacy_source_fixtures;
+
 pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_resolution_input_rows: NameResolutionInputRows,
     pub(super) projection_target_metadata_rows: BTreeMap<NameSymbolTargetKey, Value>,
