@@ -780,3 +780,12 @@ span's opaque SyntaxContext exposes only an unsafe constructor. Preserve the no-
 by using a compatible minimal safe span representation if TT needs it; do not enable salsa.
 RED will cover item/repetition/fragment expansion, empty output, malformed/no-match errors,
 token provenance, edition boundaries, cancellation and the explicit no-salsa macro tree gate.
+
+### M2 declarative macro expander — RED
+
+All eight behavior fixtures fail at the intended entry-point todo; the macro-specific
+dependency-tree gate already passes. Summary: 1 passed / 8 failed (0.06s).
+Fixtures cover macro_rules arm selection, macro-2 input, nested/optional repetition,
+Rust type/expression/path/item fragments, empty output, invalid definition/invocation and
+no-match errors, definition-versus-invocation token ranges, 2021/2024 expression semantics
+and cancellation. Generated normal-case item text must parse with the pinned parser.

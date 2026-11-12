@@ -9,3 +9,7 @@ pub fn expand_declarative_macro_items(
 ) -> Result<DeclarativeMacroExpansionOutput, MacroExpansionFailureKind> {
     todo!()
 }
+
+#[cfg(test)]
+#[path = "declarative-expansion-contract-tests.rs"]
+mod declarative_expansion_contract_tests;

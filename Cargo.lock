@@ -1692,6 +1692,7 @@ name = "parseltongue-port-macro-expander"
 version = "0.1.0"
 dependencies = [
  "parseltongue-core-row-types",
+ "ra_ap_syntax",
 ]
 
 [[package]]
