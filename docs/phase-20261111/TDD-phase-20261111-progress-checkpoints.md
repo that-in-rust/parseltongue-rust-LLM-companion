@@ -2163,6 +2163,11 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   add a production persistence regression before CLI integration.
 - CLI publication/macro alternation, complete process audit, M2 resource
   qualification, exact manifests, SQL comparator and all-five S5 remain pending.
+- Final existing contract/accuracy subset on the candidate SQL:
+  `test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 38.90s`.
+  All-target adapter Clippy: `Finished dev profile [unoptimized] target(s) in 0.50s`.
+  This does not supersede the failing new standard-prelude fixture above.
+  Native checks are complete; rust-analyzer PID 1532439 was sent SIGCONT.
 
 ### Ordered textual macro source facts — continuation
 
