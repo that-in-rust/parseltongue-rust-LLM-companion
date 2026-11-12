@@ -16,6 +16,11 @@ mod name_resolution_stage_adapter;
 #[path = "persisted-macro-expansion-adapter.rs"]
 mod persisted_macro_expansion_adapter;
 pub use name_resolution_stage_adapter::run_persisted_name_resolution;
+#[path = "sysroot-prelude-context-rules.rs"]
+mod sysroot_prelude_context_rules;
+pub use sysroot_prelude_context_rules::{
+    check_recognized_lang_item, check_sysroot_context_needed, read_unit_prelude_configuration,
+};
 
 fn parse_compatible_rust_syntax(
     source: &str,

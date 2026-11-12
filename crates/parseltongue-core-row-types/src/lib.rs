@@ -13,6 +13,9 @@ pub use declarative_macro_expansion_records::*;
 #[path = "builtin-macro-expansion-records.rs"]
 mod builtin_macro_expansion_records;
 pub use builtin_macro_expansion_records::*;
+#[path = "unit-prelude-configuration-records.rs"]
+mod unit_prelude_configuration_records;
+pub use unit_prelude_configuration_records::*;
 
 #[path = "configuration-expression-truth-values.rs"]
 mod configuration_expression_truth_values;

@@ -967,3 +967,23 @@ Formatting and diff checks passed. Earlier graph/resolver/syntax passes remain v
 their implementation inputs were unchanged in this refactor. Reindexed the repository:
 26,869 nodes / 58,402 edges; six unrelated query files have best-effort partial parses,
 zero unusable files. Sysroot/preludes/lang items are next. No S5 rate is claimed.
+
+### M2 sysroot/prelude contexts — STUB
+
+Added typed no_std/no_core/implicit-prelude input and signatures for sysroot graph
+extension, source-context flags, demand detection and pinned lang-item recognition.
+Offline graph/syntax check passed (1.06s); final syntax signature check passed (0.34s).
+The active toolchain is /home/ubuntu/.rustup/toolchains/stable-x86_64-unknown-linux-gnu;
+matching rust-src/library contains core, alloc and std (all editions read from Cargo.toml).
+An assumed version-named directory did not exist; the returned sysroot path does.
+
+Implementation plan: detect standard-library demand from reached closure files (not
+unreachable byte inventory) before final generation preparation. If needed, extend the
+graph with semantic-support sysroot units, preserving target cfg and independent
+features/editions. Restart staging in a separate scope before preparing the final
+generation so no old closure-unit rows can leak after graph augmentation. Ingest the
+library source tree as bytes; only active module roots enter semantic closure. Sysroot
+units support resolution but are excluded from mapped user-unit S5 denominators.
+Empty/local-only inputs need not instantiate std; existing empty contracts remain valid.
+Prelude imports honor crate-level cfg_attr, no_std, no_core and no_implicit_prelude.
+Lang-item rows use the pinned hir-def recognized names, never a hard-coded count of 169.

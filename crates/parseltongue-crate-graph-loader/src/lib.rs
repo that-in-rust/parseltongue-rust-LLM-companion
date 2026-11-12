@@ -3,11 +3,14 @@ use parseltongue_core_row_types::{
     StoreBackendFailureError, evaluate_cfg_expression_truth,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
+#[path = "sysroot-compilation-context-rows.rs"]
+mod sysroot_compilation_context_rows;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
+pub use sysroot_compilation_context_rows::extend_sysroot_crate_graph;
 
 pub trait WorkspaceCommandRunPort {
     fn run_workspace_command_output(
