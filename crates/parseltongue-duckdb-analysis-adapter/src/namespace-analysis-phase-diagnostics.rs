@@ -151,6 +151,38 @@ mod tests {
                 .contains("original failure")
         );
     }
+    /// REQ-RUST-024.7
+    #[test]
+    fn test_namespace_materialization_probe_rollback() {
+        let directory = tempfile::tempdir().unwrap();
+        let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+            &directory.path().join("probe.duckdb"),
+            directory.path(),
+            1288490188,
+        )
+        .unwrap();
+        analysis._connection.lock().unwrap().execute_batch("CREATE TABLE \"namespace-path-candidate-records\" (generation_key VARCHAR,attempt_key VARCHAR,target_key VARCHAR PRIMARY KEY); INSERT INTO \"namespace-path-candidate-records\" VALUES ('same','same','original');").unwrap();
+        let scope = parseltongue_core_row_types::StageRunScopeValue {
+            run_generation_digest_value: "same".into(),
+            stage_attempt_sequence_value: "same".into(),
+        };
+        for query in [
+            "SELECT ? AS generation_key,? AS attempt_key,'replacement' AS target_key",
+            "SELECT ? AS generation_key,? AS attempt_key,'replacement' AS target_key WHERE false",
+        ] {
+            assert_eq!(
+                analysis
+                    .explain_namespace_materialized_insert(query, &scope)
+                    .unwrap()
+                    .len(),
+                2
+            );
+        }
+        assert!(analysis.explain_namespace_materialized_insert("SELECT ? AS generation_key,? AS attempt_key,'duplicate' AS target_key FROM range(2)",&scope).is_err());
+        let targets:String=analysis._connection.lock().unwrap().query_row("SELECT string_agg(target_key,',' ORDER BY target_key) FROM \"namespace-path-candidate-records\"",[],|row|row.get(0)).unwrap();
+        assert_eq!(targets, "original");
+    }
+
     /// REQ-RUST-024.6
     #[test]
     fn test_namespace_insert_plan_rollback() {
@@ -243,6 +275,37 @@ pub enum NamespaceAnalysisPhaseKind {
 }
 
 impl DuckdbAnalysisStoreAdapter {
+    pub fn explain_namespace_materialized_insert(
+        &self,
+        query: &str,
+        scope: &parseltongue_core_row_types::StageRunScopeValue,
+    ) -> Result<Vec<String>, StoreBackendFailureError> {
+        let connection = self
+            ._connection
+            .lock()
+            .map_err(super::build_analysis_error)?;
+        let transaction = connection
+            .unchecked_transaction()
+            .map_err(super::build_analysis_error)?;
+        transaction.execute("DELETE FROM \"namespace-path-candidate-records\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(super::build_analysis_error)?;
+        let queries=[
+            format!("CREATE OR REPLACE TEMP TABLE \"namespace-materialized-path-candidates\" AS {query}"),
+            "INSERT INTO \"namespace-path-candidate-records\" SELECT * FROM \"namespace-materialized-path-candidates\" WHERE generation_key=? AND attempt_key=?".into(),
+        ];
+        let plans=queries.iter().enumerate().try_fold(Vec::new(),|mut plans,(index,query)|{
+            eprintln!("stage=namespace-materialization-probe operation={index} event=started");
+            let started=std::time::Instant::now();
+            let result=read_namespace_explain_rows(&transaction,query,scope,true);
+            eprintln!("stage=namespace-materialization-probe operation={index} event=finished status={} elapsed_seconds={:.3}",if result.is_ok(){"complete"}else{"failed"},started.elapsed().as_secs_f64());
+            plans.extend(result?);
+            Ok::<_,StoreBackendFailureError>(plans)
+        })?;
+        transaction
+            .rollback()
+            .map_err(super::build_analysis_error)?;
+        Ok(plans)
+    }
+
     pub fn configure_namespace_probe_settings(
         &self,
         threads: u32,

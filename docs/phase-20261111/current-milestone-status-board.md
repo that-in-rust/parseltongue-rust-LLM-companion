@@ -39,7 +39,15 @@ Resolution fails at candidate INSERT in round 2 (32.273s / 1482792960 bytes) or 
 INSERT EXPLAIN ANALYZE independently OOMs at 4.884s. SELECT-only profile has 133 operator counts; no complete INSERT profile.
 Specific join/index root cause is unresolved; no speculative fix. Final 500 MB acceptance remains deferred.
 
+Follow-up hypotheses: H1 already false; explicit SET false OOM 5.354s / 1412620288 bytes.
+H2 threads=1 OOM 9.034s / 1394860032 bytes. H3 unconstrained CTAS itself OOM
+6.610s / 1409286144 bytes before target INSERT. H4 UNION DISTINCT OOM 3.324s /
+1417895936 bytes; removing unused lookahead join OOM 4.807s / 1621385216 bytes.
+Allocator attribution is measured: normalization's peak has 802144141 bytes in
+C++ non-managed BaseAppender stacks, not Rust JSON/Turso buffering. Full adapter
+suite now GREEN (57 tests); invalid completion-marker handoff fixture repaired.
+
 Next actions:
-1. Narrow RED regression for request-local bounded path batches; compare complete exports and prove native success at the same cap. No fourth untargeted full-run attempt.
+1. Finish H4 integer-ID narrowing/equality investigation before considering batching. H1/H2/H3 and tested H4 rewrites failed; no selected production correction or new full-run attempt. Batching remains conditional on H4 failure.
 2. Finish CLI GREEN/REFACTOR, then frozen-release serde-first all-five S1/S2/S3 with auditor and peaks/times.
 3. serde M2 qualification → SQL comparator → fresh all-five S5; R7 matrix/typed-error follow-up remains open.

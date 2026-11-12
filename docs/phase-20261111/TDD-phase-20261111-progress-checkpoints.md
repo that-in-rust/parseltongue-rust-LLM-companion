@@ -2850,3 +2850,58 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - No refactor needed for this diagnostic group: one validated setter and
   one settings query, no resolver semantics or shared types changed. H3/H4
   next; batching is not authorized until both have also failed.
+
+### H3 materialization STUB → RED → GREEN; H3/H4 native failures
+
+- Probe/fixture GREEN committed and pushed as 536165c51. CLI WIP preserved
+  using an additional retained stash before pull --rebase; restored by
+  stash apply, never dropped.
+- REQ-RUST-024.7 STUB release check: `Finished release profile [optimized]
+  target(s) in 0.91s`. RED test
+  `test_namespace_materialization_probe_rollback`:
+  `test result: FAILED. 0 passed; 1 failed; ... 56 filtered out; ... 0.03s`.
+- GREEN adds transaction-scoped unconstrained CTAS then INSERT, separate
+  operation timers, and rollback. Test covers normal, empty and target-PK
+  failure with original rows preserved; target constraints are not weakened.
+  `test result: ok. 57 passed; 0 failed; ... finished in 8.60s`.
+  Release example build `Finished release profile [optimized] target(s)
+  in 6.13s`; all-target release Clippy `Finished release profile [optimized]
+  target(s) in 1.47s`. Formatting and diff checks exit zero.
+- H3 fails in operation 0 (CTAS, 5.926s) before target INSERT is reached;
+  phase 6.610s, tree peak 1409286144 bytes. Target index/constraint
+  maintenance is not required to reproduce this cap failure. This does not
+  identify the complete allocator profile of either failed insertion.
+- H4 inspection: recursive state carries request/current-scope/target/
+  namespace/binding-scope/binding-name VARCHAR values plus position/rank;
+  no list/trail state. Seeds and recursive branches use UNION ALL, finished
+  uses DISTINCT/UNION. Recursive depth is bounded by path segment positions.
+- Isolated H4 recursive UNION DISTINCT replacement: OOM in 3.324s,
+  tree peak 1417895936 bytes. Isolated unused lookahead LEFT JOIN removal:
+  OOM in 4.807s, tree peak 1621385216 bytes. No production SQL changed.
+- USING KEY must retain distinct targets/namespaces/binding scopes to
+  preserve ambiguity. A full-eight-column key cannot narrow those strings;
+  a request-only key would silently overwrite different candidates. Test
+  full-state USING KEY independently, then stop after three H4 query attempts.
+- Integer-ID dictionaries with text joined after recursion remain untested.
+  Defining-segment text can itself be a scope identity; visibility markers
+  must not become NULL/public during mapping. Do not equate failure of
+  DISTINCT/full-state keys with failure of narrower integer-ID state.
+- No batching, no smallest passing correction, no full-run/CLI GREEN or S5
+  claim. Next cut is H4 integer-ID equality and bounded native proof; these
+  probes are diagnostic evidence, not an all-five SOP run.
+- No refactor needed: CTAS/INSERT share the existing EXPLAIN reader, one
+  transaction boundary, explicit lifecycle test, no shared types or resolver
+  semantics changed.
+
+### H4 stop-rule checkpoint
+
+- Full-state USING KEY (all eight columns), recursive UNION DISTINCT:
+  same OOM in 3.195s, tree peak 1438150656 bytes. Three H4 query rewrites
+  have now failed; stop and cut the remaining integer-ID investigation
+  into a separate equality-tested step. H4 narrowing is not disproved;
+  batching has not started. No additional full native replay attempted.
+- Repeated parser/syntax warning diagnosed against the reviewed blueprint:
+  stable Cargo reports `unused manifest key lints.cargo (may be supported
+  in a future version)` and requires nightly -Zcargo-lints. This is pinned
+  upstream manifest metadata, not an unloaded workspace. Do not change the
+  toolchain/pin incidentally; owned package gates above finish successfully.

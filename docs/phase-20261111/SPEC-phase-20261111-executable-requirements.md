@@ -877,3 +877,11 @@ test_type: unit
 assertion: effective false insertion order, threads 1/2 only, cap unchanged
 metric: exact current_setting values and rejected invalid thread counts
 ```
+
+```text
+req_id: REQ-RUST-024.7
+test_id: test_namespace_materialization_probe_rollback
+test_type: unit
+assertion: unconstrained CTAS followed by constrained INSERT; rollback on normal, empty and constraint-error cases
+metric: original candidate rows unchanged; both successful operator profiles returned
+```

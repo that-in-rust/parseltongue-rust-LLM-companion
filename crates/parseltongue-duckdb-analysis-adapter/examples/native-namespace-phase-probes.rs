@@ -63,12 +63,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 })?
                 .fixed_point_round_count
         }
-        "explain" | "plan" | "insert" => {
+        "explain" | "plan" | "insert" | "materialize" => {
             let query = std::fs::read_to_string(rest.first().ok_or("missing SQL file")?)?;
             let rows = analysis.measure_namespace_phase_work(
                 NamespaceAnalysisPhaseKind::Resolution,
                 || {
-                    if phase == "insert" {
+                    if phase == "materialize" {
+                        analysis.explain_namespace_materialized_insert(&query, &scope)
+                    } else if phase == "insert" {
                         analysis.explain_namespace_insert_plan(&query, &scope)
                     } else {
                         analysis.explain_namespace_query_plan(&query, &scope, phase == "explain")

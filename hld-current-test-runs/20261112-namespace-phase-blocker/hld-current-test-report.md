@@ -285,3 +285,66 @@ all-target release Clippy: Finished `release` profile [optimized] target(s) in 1
 Formatting and diff checks exit zero. CLI GREEN, fresh all-five S1/S2/S3,
 serde M2, comparator and all-five S5 are still unfinished. During follow-up
 native work rust-analyzer PID 1804565 is paused again, to resume afterward.
+
+## H3/H4 follow-up: materialization and recursion remain blocked
+
+Same scope, retained database, rollback and cap; threads=2 and insertion
+order false for each independent query experiment:
+
+```text
+H3 unconstrained CTAS:
+  CTAS_seconds: 5.926 (operation 0 fails)
+  phase_seconds: 6.610
+  tree_peak_bytes: 1409286144
+  result: OOM before target INSERT
+
+H4 recursive UNION DISTINCT (only recursive outer UNION changed):
+  phase_seconds: 3.324
+  tree_peak_bytes: 1417895936
+  result: OOM
+
+H4 unused lookahead LEFT JOIN removed (otherwise original query):
+  phase_seconds: 4.807
+  tree_peak_bytes: 1621385216
+  result: OOM
+
+H4 USING KEY with all eight state columns, recursive UNION DISTINCT:
+  phase_seconds: 3.195
+  tree_peak_bytes: 1438150656
+  result: OOM
+```
+
+Each error is `failed to pin block of size 256.0 KiB (1.1 GiB/1.1 GiB
+used)`. H3 shows target constraints/index maintenance is not necessary for
+this failure: unindexed CTAS also fails. Its INSERT never executes, so it
+does not provide a successful INSERT profile or complete cost comparison.
+
+H4 recursion carries six VARCHAR identities/names and two integer values;
+no list/trail state. Depth is bounded by segment position. Full-state keys
+retain target/namespace/binding distinctions; a smaller key that overwrites
+those would destroy ambiguity. The three measured H4 rewrites failed;
+stop query tuning here under the three-attempt rule. Integer-ID dictionary
+narrowing and text rejoin remain **untested**, not disproved: defining-path
+segments can hold scope identities, and visibility markers must remain
+non-NULL/restricted through any mapping. Thus H4 is not fully exhausted and
+batching is not implemented or justified yet.
+
+The probe itself has normal/empty/constraint-error rollback coverage:
+
+```text
+test result: ok. 57 passed; 0 failed; ... finished in 8.60s
+release example: Finished `release` profile [optimized] target(s) in 6.13s
+all-target release Clippy: Finished `release` profile [optimized] target(s) in 1.47s
+```
+
+No production resolver SQL/default settings changed. No smallest passing
+correction or CLI/SOP completion claimed. Existing native fixture still
+blocks S3/serde M2 and S5. Next bounded step: integer-ID recursion with exact
+small-fixture equality before a native replay. All probe artifacts remain
+in `namespace-insertion-hypothesis-results/`; original CLI WIP untouched.
+
+Environment check: blueprint reviewed; correct workspace/stable toolchain
+loaded. Repeated warning is pinned parser/syntax Cargo metadata:
+`unused manifest key lints.cargo (may be supported in a future version)`;
+Cargo says nightly `-Zcargo-lints` is required. Owned-crate checks/Clippy
+still finish. No unsafe toolchain/pin change made to silence the warning.
