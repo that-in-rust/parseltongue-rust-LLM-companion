@@ -59,6 +59,57 @@ fn make_fixture_command_runner() -> FixtureWorkspaceCommandRunner {
 }
 
 struct UnmappedWorkspaceCommandRunner;
+struct PackageMetadataCommandRunner;
+impl WorkspaceCommandRunPort for PackageMetadataCommandRunner {
+    fn run_workspace_command_output(
+        &self,
+        root: &Path,
+        args: &[&str],
+    ) -> Result<Vec<u8>, StoreBackendFailureError> {
+        let bytes = make_fixture_command_runner().run_workspace_command_output(root, args)?;
+        if args != ["cargo", "metadata", "--offline"] {
+            return Ok(bytes);
+        }
+        let mut document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let package = &mut document["packages"][0];
+        package["version"] = json!("1.2.3-beta.4+build");
+        package["authors"] = json!(["First", "Second"]);
+        package["homepage"] = json!("https://example.invalid/");
+        package["repository"] = json!("https://example.invalid/repo");
+        package["license_file"] = json!("LICENSE");
+        package["readme"] = json!("README.md");
+        package["rust_version"] = json!("1.85");
+        Ok(serde_json::to_vec(&document).unwrap())
+    }
+}
+
+#[test]
+fn test_package_metadata_environment() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
+    let rows = load_workspace_crate_graph(directory.path(), &PackageMetadataCommandRunner).unwrap();
+    let row = rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "crate-dependency-graph-table")
+        .map(|row| serde_json::from_str::<serde_json::Value>(&row.stage_row_payload_text).unwrap())
+        .find(|row| row["unit_cargo_target_kind"] == "lib")
+        .unwrap();
+    let values = &row["unit_metadata_environment_values"];
+    for (key, value) in [
+        ("CARGO_PKG_AUTHORS", "First:Second"),
+        ("CARGO_PKG_HOMEPAGE", "https://example.invalid/"),
+        ("CARGO_PKG_REPOSITORY", "https://example.invalid/repo"),
+        ("CARGO_PKG_LICENSE_FILE", "LICENSE"),
+        ("CARGO_PKG_README", "README.md"),
+        ("CARGO_PKG_RUST_VERSION", "1.85"),
+        ("CARGO_PKG_VERSION_PATCH", "3"),
+        ("CARGO_PKG_VERSION_PRE", "beta.4"),
+    ] {
+        assert_eq!(values[key], value, "{key}");
+    }
+    assert!(values.get("HOME").is_none());
+}
+
 impl WorkspaceCommandRunPort for UnmappedWorkspaceCommandRunner {
     fn run_workspace_command_output(
         &self,

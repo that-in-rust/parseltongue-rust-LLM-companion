@@ -917,3 +917,7 @@ missing included names and missing build_script evidence. A separate type-macro 
 fails because the item adapter currently tries to parse a type expansion as items; GREEN
 will constrain item callbacks to item positions rather than change type semantics.
 The test cancellation method spelling was corrected before collecting the RED results.
+
+The metadata extension adds a failing graph contract: CARGO_PKG_AUTHORS is Null rather
+than First:Second; the same case covers homepage, repository, license/readme paths,
+rust-version and prerelease/build metadata separation. This is RED before the loader edit.
