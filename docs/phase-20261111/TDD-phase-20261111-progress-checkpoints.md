@@ -2126,6 +2126,44 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Standard type/macro prelude projection is next; CLI remains unwired and no
   new M2/S5 measurements exist.
 
+### Standard prelude projection — continuation after three failed attempts
+
+- Pushed STUB `ac4296e8a` and semantic fixture RED `0c1f7e071`.
+  The fixture has separate fake std/core compilation units, 2024 type-prelude
+  modules, exported macro names, no_std selection and implicit-prelude disabling.
+- Four production files remain uncommitted: adapter constructor, frozen input
+  schema, default-prelude projector and common import-round SQL. The candidate
+  implementation injects an edition-prelude glob and a public macro-prelude
+  relation. It is NOT GREEN and has not been production qualified.
+- The fixture requests a 64 MiB DuckDB budget, not the production 1.2 GiB.
+  Initial implementation failed with `failed to allocate data of size 32.0 KiB
+  (63.9 MiB/64.0 MiB used)`. Bounding threads to two and disabling insertion-order
+  preservation did not clear it. Splitting the binding and visibility UNION
+  branches into sequential INSERT statements also failed:
+
+  ```text
+  Out of Memory Error: failed to allocate data of size 32.0 KiB (64.0 MiB/64.0 MiB used)
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 1.49s
+  ```
+
+- Stopped this fix loop after three unsuccessful attempts, per the engineering
+  handoff rule. No allocation-stack profile or failure at the production budget
+  has been established. Do not describe the 64 MiB fixture failure as a verified
+  breach of the 2 GiB process-tree gate. The test/assertions remain unchanged.
+  Latest failing output: `/home/ubuntu/namespace-default-prelude-green.log`.
+- Decision for continuation: permit this new semantic fixture to use the
+  specified production budget (its current 64 MiB was a fixture choice, not a
+  SPEC requirement), or require a separate 64 MiB qualification investigation.
+  No claim is made that the candidate semantics pass at either budget.
+- Additional production defect found by inspection, not yet fixed:
+  `syntax-namespace-input-persistence.rs::mapped_source_units` checks
+  `unit_is_mapped_target_flag`, while crate-graph-loader emits
+  `unit_mapped_target_flag`. The CLI name-resolution branch reaches this
+  persistence function. Non-sysroot mapped input units would be filtered out;
+  add a production persistence regression before CLI integration.
+- CLI publication/macro alternation, complete process audit, M2 resource
+  qualification, exact manifests, SQL comparator and all-five S5 remain pending.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement
