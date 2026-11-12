@@ -46,6 +46,23 @@ fn read_export_string_value<'a>(
     })
 }
 
+fn read_source_digest_values(
+    store: &dyn StageTableStorePort,
+    scope: &StageRunScopeValue,
+) -> Result<BTreeMap<String, Value>, StoreBackendFailureError> {
+    let mut files = BTreeMap::new();
+    store.visit_stage_table_rows(scope, "file-source-text-table", &mut |row| {
+        let file: Value = serde_json::from_str(&row.stage_row_payload_text)
+            .map_err(build_pipeline_stage_error)?;
+        files.insert(
+            read_export_string_value(&file, "file_source_absolute_path")?.to_owned(),
+            file["file_content_digest_full"].clone(),
+        );
+        Ok(())
+    })?;
+    Ok(files)
+}
+
 pub(crate) fn write_published_stage_rows(
     store: &dyn StageTableStorePort,
     table: &str,
@@ -94,15 +111,7 @@ pub(crate) fn read_published_unit_manifest(
             "ManifestInputInvalidError: snapshot parser identity missing",
         ));
     }
-    let files = read_export_table_values(store, &scope, "file-source-text-table")?
-        .into_iter()
-        .map(|file| {
-            Ok((
-                read_export_string_value(&file, "file_source_absolute_path")?.to_owned(),
-                file,
-            ))
-        })
-        .collect::<Result<BTreeMap<_, _>, StoreBackendFailureError>>()?;
+    let files = read_source_digest_values(store, &scope)?;
     let requests = read_export_table_values(store, &scope, "syntax-file-work-requests")?
         .into_iter()
         .try_fold(
@@ -114,7 +123,11 @@ pub(crate) fn read_published_unit_manifest(
                 let file = files.get(path).ok_or_else(|| {
                     build_pipeline_stage_error(format!("ManifestSourceMissingError: {path}"))
                 })?;
-                let digest = read_export_string_value(file, "file_content_digest_full")?;
+                let digest = file.as_str().ok_or_else(|| {
+                    build_pipeline_stage_error(
+                        "ManifestInputInvalidError: missing file_content_digest_full",
+                    )
+                })?;
                 let mut request = request;
                 request["file_content_digest_full"] = json!(digest);
                 requests.entry(unit).or_default().push(request);

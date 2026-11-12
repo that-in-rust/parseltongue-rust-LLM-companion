@@ -1525,3 +1525,20 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   tools/parser-const-closure-statements.patch, SHA-256
   89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa.
   No additional parser patch or external-checkout edit was made.
+
+### Exact mapped-unit manifest REFACTOR
+
+- Stream file-source metadata through the existing store visitor, retaining
+  only path-to-digest values for closure joins instead of complete file-row
+  JSON. Closure validation/errors and exported schemas are unchanged.
+  The visitor's bounded mutable accumulator avoids retaining the raw row
+  vector and is required by the streaming port interface.
+- Producer contracts: 5 passed / 0 failed. Dispatcher all-target/all-feature
+  Clippy -D warnings passed. No speed or RSS improvement is claimed without
+  a separate measurement. Logs:
+  /home/ubuntu/m2-mapped-manifest-refactor-tests.log and
+  /home/ubuntu/m2-mapped-refactor-clippy.log.
+- Next: cached proc-macro artifacts, recorded SECONDARY build-script deltas,
+  qualified path/provenance exports and the differ, then fresh all-five M2
+  snapshots/S5 results. Old S3 stores are not suitable manifest sources
+  because their immutable configurations predate snapshot compiler/pin fields.
