@@ -2,7 +2,7 @@
 
 use super::*;
 use parseltongue_core_row_types::{StageTableRowRecord, StageUnitWriteRequest};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::collections::BTreeMap;
 
 fn namespace_source_fixture() -> Source {
@@ -79,6 +79,64 @@ fn frozen_namespace_normalization_contract() {
     assert_eq!(segments, 1);
     let generation:String=connection.query_row("SELECT generation_key FROM \"namespace-normalized-source-manifests\" ORDER BY generation_key,attempt_key",[],|row|row.get(0)).unwrap();
     assert_eq!(generation, scope().run_generation_digest_value);
+}
+
+#[test]
+fn frozen_namespace_generation_integrity() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        64 * 1024 * 1024,
+    )
+    .unwrap();
+    let first = scope();
+    let second = StageRunScopeValue {
+        run_generation_digest_value: "second".into(),
+        ..scope()
+    };
+    let mut source = namespace_source_fixture();
+    [&first, &second].into_iter().for_each(|scope| {
+        source.published = Some(scope.clone());
+        store
+            .copy_published_stage_rows(
+                &source,
+                scope,
+                NAMESPACE_SOURCE_TABLE_NAMES,
+                &RunCancelFlagValue::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .normalize_frozen_namespace_rows(scope, &RunCancelFlagValue::default())
+                .unwrap(),
+            4
+        );
+    });
+    let connection = store._connection.lock().unwrap();
+    let count:usize=connection.query_row("SELECT count(*) FROM \"namespace-binding-declaration-records\" WHERE generation_key='generation'",[],|row|row.get(0)).unwrap();
+    assert_eq!(count, 1);
+    drop(connection);
+    let invalid = StageRunScopeValue {
+        run_generation_digest_value: "corrupt".into(),
+        ..scope()
+    };
+    source.published = Some(invalid.clone());
+    store
+        .copy_published_stage_rows(
+            &source,
+            &invalid,
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store._connection.lock().unwrap().execute("UPDATE \"frozen-generation-source-records\" SET payload=replace(payload,'\"scope_parent_lookup_flag\":false','\"scope_parent_lookup_flag\":true') WHERE generation_key='corrupt' AND table_name='syntax-namespace-input-scopes'",[]).unwrap();
+    let error = store
+        .normalize_frozen_namespace_rows(&invalid, &RunCancelFlagValue::default())
+        .unwrap_err();
+    assert!(error.to_string().contains("digest changed"), "{error}");
+    let count:usize=store._connection.lock().unwrap().query_row("SELECT count(*) FROM \"namespace-normalized-source-manifests\" WHERE generation_key='corrupt'",[],|row|row.get(0)).unwrap();
+    assert_eq!(count, 0);
 }
 
 #[test]

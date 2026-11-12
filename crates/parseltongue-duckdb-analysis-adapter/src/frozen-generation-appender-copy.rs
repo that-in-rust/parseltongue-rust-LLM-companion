@@ -12,7 +12,7 @@ fn check_cancel(cancel: &RunCancelFlagValue) -> Result<(), StoreBackendFailureEr
     }
 }
 
-fn hash_record(hasher: &mut blake3::Hasher, row: &StageTableRowRecord) {
+pub(super) fn hash_record(hasher: &mut blake3::Hasher, row: &StageTableRowRecord) {
     [
         &row.stage_owned_table_name,
         &row.stage_row_record_key,

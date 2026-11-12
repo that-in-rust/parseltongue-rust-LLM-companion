@@ -2051,6 +2051,37 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   `tools/parser-const-closure-statements.patch`, SHA-256
   `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.
 
+### Frozen namespace normalization — GREEN
+
+- STUB `57f91a762`; contracts RED `be353b81d` (two expected failures at
+  `frozen namespace normalization not implemented`). The Rust/serde codec now
+  reads complete Appender-copy manifests, pages 128 total-key-ordered frozen
+  records at a time, rechecks each table's framed BLAKE3/count, and appends
+  normalized scope/binding/target/import/path/macro/extern/textual-lookup facts.
+  No DuckDB JSON extension is used. Cargo graph context alone is retained in
+  Rust, not repository-wide typed resolver rows. Edition lookup uses exact
+  compilation-unit identity; malformed/absent context fails closed.
+- Generation/attempt keys survive normalization; prior generations remain
+  intact. A failed/cancelled normalization rolls back without a completion
+  manifest. Raw frozen rows remain authoritative and unchanged. Textual facts
+  retain identity, revision, numeric source-order parts and nullable targets.
+- Before final integrity coverage, all 40 DuckDB library tests passed in
+  39.59s, including the 11 resolver contracts and existing accuracy coverage.
+  Focused final normalization/empty/error/corruption/generation checks:
+  `test result: ok. 3 passed; 0 failed`; adapter all-target Clippy completed.
+  Logs: `/home/ubuntu/frozen-namespace-codec-{green,final,clippy}.log`.
+- The editor's independently launched default-debug DuckDB C++ build had
+  accumulated 21 descendants and held the target lock. It was stopped and its
+  build descendants terminated; subsequent checks used two jobs and the
+  existing no-C++-debug cache. PID 1532439 is temporarily paused during native
+  build work and must be resumed after it. The Cargo `unused manifest key
+  lints.cargo` warnings come from the pinned external parser manifests, not a
+  missing repository environment. The managed blueprint's old spancut command
+  remains obsolete; workspace Cargo commands are the maintained equivalent.
+- Next: latest textual-lookup SQL join; common production/contract SQL round
+  function; separate frozen-input publication and CLI macro alternation.
+  No new full M2, process-tree peak, wall/round or S5 measurements yet.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement
