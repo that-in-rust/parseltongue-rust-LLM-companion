@@ -1203,3 +1203,19 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   silently discarding newer compiler evidence; recognize support separately.
 - Fixes remain uncommitted pending native GREEN; release integration shell 84b53b,
   log /home/ubuntu/m2-native-sysroot-release.log (no suspended mapper remains).
+
+## Source macro documentation RED — 2026-11-12
+
+- Source-relative path regression GREEN: 1 passed, 0 failed (0.53s).
+- Native release integration now reaches macro expansion; fails with
+  WorkspaceNotCompilingError: InvalidMacroDefinitionError: unexpected macro token ///.
+  Parser accepts all reached native files; this is the adapted MBe input lexer,
+  not another upstream parser defect.
+- Focused test_macro_documentation_token_origins reproduces InvalidDefinition(
+  "unexpected macro token /// hello"). New pinned parser exposes INNER_DOC_COMMENT /
+  OUTER_DOC_COMMENT separately from trivia; the local lexer treated them as punct.
+- Adapt pinned syntax-bridge convert_doc_comment / DocCommentDesugarMode::Mbe:
+  emit proper doc attribute TT and raw-string token; retain original comment span
+  for all derived tokens (definition or invocation). Do not strip comments or patch
+  Rust source. Cover line/block, inner/outer, empty docs, quoting, meta matching,
+  invocation provenance, unterminated comments and delimiter-limit errors.

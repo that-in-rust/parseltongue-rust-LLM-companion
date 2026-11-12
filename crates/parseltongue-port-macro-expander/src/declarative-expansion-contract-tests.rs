@@ -96,6 +96,58 @@ fn test_macro_empty_expansion() {
 }
 
 #[test]
+fn test_macro_documentation_token_origins() {
+    for docs in [
+        "/// hello",
+        "/** hello */",
+        "///",
+        "//! inner",
+        "/*! inner */",
+        "/// quotes \"## and \\ backslash",
+    ] {
+        let definition = format!("{{()=>{{{docs}\npub struct Documented;}};}}");
+        let output = read_macro_expansion_fixture(&definition, "()");
+        assert!(
+            output.macro_expanded_source_text.contains("doc"),
+            "{docs}: {output:?}"
+        );
+        assert!(!output.macro_token_origin_rows.is_empty());
+        let parsed = ra_ap_syntax::SourceFile::parse(
+            &output.macro_expanded_source_text,
+            ra_ap_syntax::Edition::Edition2024,
+        );
+        assert!(parsed.errors().is_empty(), "{docs}: {:?}", parsed.errors());
+    }
+    let output = read_macro_expansion_fixture(
+        "{($(#[$meta:meta])* $name:ident)=>{$(#[$meta])* pub struct $name;};}",
+        "(/// captured\nDocumented)",
+    );
+    assert!(output.macro_expanded_source_text.contains("captured"));
+    assert!(
+        output
+            .macro_token_origin_rows
+            .iter()
+            .any(|row| row.token_source_origin_kind
+                == parseltongue_core_row_types::MacroSourceOriginKind::Invocation)
+    );
+    for definition in [
+        "{()=>{/** unterminated".to_owned(),
+        format!(
+            "{{()=>{{/// \"{}\npub struct Documented;}};}}",
+            "#".repeat(255)
+        ),
+    ] {
+        assert!(matches!(
+            expand_declarative_macro_items(
+                &build_macro_expansion_fixture(&definition, "()"),
+                &RunCancelFlagValue::default()
+            ),
+            Err(MacroExpansionFailureKind::InvalidDefinition(_))
+        ));
+    }
+}
+
+#[test]
 fn test_macro_invalid_inputs() {
     let cancel = RunCancelFlagValue::default();
     assert!(matches!(
