@@ -2731,3 +2731,31 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   together and preserve full generation/attempt filtering. Filter ancestor
   visibility probes to active request scopes. Prove unbatched-vs-batched
   semantic equality and actual native success before claiming a root fix.
+
+### INSERT profiling cut and diagnostic REFACTOR
+
+- Add transactional insertion EXPLAIN probe: clear only this scope's old
+  candidate rows, EXPLAIN ANALYZE the production INSERT, roll back on both
+  success and failure. Frozen Turso input is never modified by this probe.
+- STUB release check: `Finished release profile [optimized] target(s) in 0.82s`.
+  RED rollback fixture: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 filtered out; finished in 0.04s`.
+  GREEN normal/error/rollback coverage is in the full adapter gate:
+  `test result: FAILED. 54 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.15s`.
+  The only failure remains the unchanged preexisting completion-marker
+  fixture described above. All six new diagnostics tests pass.
+- REFACTOR: share one EXPLAIN row reader; transaction rollback makes
+  repeated insertion probes non-destructive. No resolver semantics changed.
+- Final two-package all-target release Clippy:
+  `Finished release profile [optimized] target(s) in 1.13s`.
+  Final binary/example release build:
+  `Finished release profile [optimized] target(s) in 10.63s`.
+- INSERT EXPLAIN ANALYZE itself fails at the unchanged cap after 4.884s:
+  `Out of Memory Error: failed to pin block of size 256.0 KiB (1.1 GiB/1.1 GiB used)`.
+  Therefore the exact failing INSERT is reproduced independently, but its
+  full runtime operator counts cannot be returned at this cap. The complete
+  133-operator CSV is explicitly the SELECT-body profile, not INSERT/index
+  or previous-iteration working-set evidence.
+- Stop after native capture + two resolution replays; no fourth full native
+  attempt and no speculative schema/index removal. Root-cause correction,
+  CLI GREEN, serde M2, all-five S1/S2/S3 and S5 remain open. Publish this
+  measured blocker before a narrower request-batching implementation.

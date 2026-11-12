@@ -129,6 +129,38 @@ mod tests {
     }
     /// REQ-RUST-024.6
     #[test]
+    fn test_namespace_insert_plan_rollback() {
+        let directory = tempfile::tempdir().unwrap();
+        let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+            &directory.path().join("phases.duckdb"),
+            directory.path(),
+            1288490188,
+        )
+        .unwrap();
+        analysis._connection.lock().unwrap().execute_batch("CREATE TABLE \"namespace-path-candidate-records\" (generation_key VARCHAR,attempt_key VARCHAR,target_key VARCHAR); INSERT INTO \"namespace-path-candidate-records\" VALUES ('same','same','original');").unwrap();
+        let scope = parseltongue_core_row_types::StageRunScopeValue {
+            run_generation_digest_value: "same".into(),
+            stage_attempt_sequence_value: "same".into(),
+        };
+        let plan = analysis
+            .explain_namespace_insert_plan(
+                "INSERT INTO \"namespace-path-candidate-records\" SELECT ?,?,'replacement'",
+                &scope,
+            )
+            .unwrap()
+            .join("\n");
+        assert!(plan.to_ascii_uppercase().contains("INSERT"));
+        assert!(
+            analysis
+                .explain_namespace_insert_plan("INSERT INTO absent_source SELECT ?,?", &scope)
+                .is_err()
+        );
+        let targets: String = analysis._connection.lock().unwrap().query_row("SELECT string_agg(target_key,',' ORDER BY target_key) FROM \"namespace-path-candidate-records\"",[],|row|row.get(0)).unwrap();
+        assert_eq!(targets, "original");
+    }
+
+    /// REQ-RUST-024.6
+    #[test]
     fn test_namespace_query_explain_rows() {
         let directory = tempfile::tempdir().unwrap();
         let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
@@ -187,6 +219,26 @@ pub enum NamespaceAnalysisPhaseKind {
 }
 
 impl DuckdbAnalysisStoreAdapter {
+    pub fn explain_namespace_insert_plan(
+        &self,
+        query: &str,
+        scope: &parseltongue_core_row_types::StageRunScopeValue,
+    ) -> Result<Vec<String>, StoreBackendFailureError> {
+        let connection = self
+            ._connection
+            .lock()
+            .map_err(super::build_analysis_error)?;
+        let transaction = connection
+            .unchecked_transaction()
+            .map_err(super::build_analysis_error)?;
+        transaction.execute("DELETE FROM \"namespace-path-candidate-records\" WHERE generation_key=? AND attempt_key=?",duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(super::build_analysis_error)?;
+        let plan = read_namespace_explain_rows(&transaction, query, scope, true)?;
+        transaction
+            .rollback()
+            .map_err(super::build_analysis_error)?;
+        Ok(plan)
+    }
+
     pub fn explain_namespace_query_plan(
         &self,
         query: &str,
@@ -197,25 +249,7 @@ impl DuckdbAnalysisStoreAdapter {
             ._connection
             .lock()
             .map_err(super::build_analysis_error)?;
-        let command = if analyze {
-            "EXPLAIN ANALYZE"
-        } else {
-            "EXPLAIN"
-        };
-        let mut statement = connection
-            .prepare(&format!("{command} {query}"))
-            .map_err(super::build_analysis_error)?;
-        statement
-            .query_map(
-                duckdb::params![
-                    scope.run_generation_digest_value,
-                    scope.stage_attempt_sequence_value
-                ],
-                |row| row.get(1),
-            )
-            .map_err(super::build_analysis_error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(super::build_analysis_error)
+        read_namespace_explain_rows(&connection, query, scope, analyze)
     }
 
     pub fn measure_namespace_phase_work<T>(
@@ -281,4 +315,31 @@ impl DuckdbAnalysisStoreAdapter {
             serde_json::json!({"memory_usage_bytes":memory,"temporary_storage_bytes":temporary,"databases":databases}),
         )
     }
+}
+
+fn read_namespace_explain_rows(
+    connection: &duckdb::Connection,
+    query: &str,
+    scope: &parseltongue_core_row_types::StageRunScopeValue,
+    analyze: bool,
+) -> Result<Vec<String>, StoreBackendFailureError> {
+    let command = if analyze {
+        "EXPLAIN ANALYZE"
+    } else {
+        "EXPLAIN"
+    };
+    let mut statement = connection
+        .prepare(&format!("{command} {query}"))
+        .map_err(super::build_analysis_error)?;
+    statement
+        .query_map(
+            duckdb::params![
+                scope.run_generation_digest_value,
+                scope.stage_attempt_sequence_value
+            ],
+            |row| row.get(1),
+        )
+        .map_err(super::build_analysis_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(super::build_analysis_error)
 }

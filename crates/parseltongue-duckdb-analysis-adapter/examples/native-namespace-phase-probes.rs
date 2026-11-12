@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
     let [input, database, directory, phase, rest @ ..] = arguments.as_slice() else {
         return Err(
-            "expected TURSO_FILE DUCKDB_FILE RUN_DIRECTORY copy|normalization|resolution|explain|plan [SQL_FILE]".into(),
+            "expected TURSO_FILE DUCKDB_FILE RUN_DIRECTORY copy|normalization|resolution|explain|plan|insert [SQL_FILE]".into(),
         );
     };
     let source = TursoWorkspaceStoreAdapter::open_turso_workspace_store(input)?;
@@ -49,12 +49,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 })?
                 .fixed_point_round_count
         }
-        "explain" | "plan" => {
+        "explain" | "plan" | "insert" => {
             let query = std::fs::read_to_string(rest.first().ok_or("missing SQL file")?)?;
-            let rows = analysis
-                .measure_namespace_phase_work(NamespaceAnalysisPhaseKind::Resolution, || {
-                    analysis.explain_namespace_query_plan(&query, &scope, phase == "explain")
-                })?;
+            let rows = analysis.measure_namespace_phase_work(
+                NamespaceAnalysisPhaseKind::Resolution,
+                || {
+                    if phase == "insert" {
+                        analysis.explain_namespace_insert_plan(&query, &scope)
+                    } else {
+                        analysis.explain_namespace_query_plan(&query, &scope, phase == "explain")
+                    }
+                },
+            )?;
             println!("{}", rows.join("\n"));
             return Ok(());
         }
