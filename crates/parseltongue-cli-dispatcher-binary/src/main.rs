@@ -27,6 +27,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "namespace-pipeline-publication-facade.rs"]
+mod namespace_pipeline_publication_facade;
 #[path = "oracle-path-comparison-facade.rs"]
 mod oracle_path_comparison_facade;
 #[path = "published-stage-export-facade.rs"]
@@ -613,6 +615,7 @@ fn prepare_sysroot_staging_scope(
 }
 fn run_workspace_mapping_pipeline(
     root: &Path,
+    store_path: &Path,
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
     workers: usize,
@@ -709,9 +712,12 @@ fn run_workspace_mapping_pipeline(
     let started = std::time::Instant::now();
     if final_stage == MappingFinalStageKind::NameResolution {
         persist_namespace_syntax_inputs(&scope, store, cancel)?;
-        return Err(build_pipeline_stage_error(
-            "DuckDB name-resolution stage not implemented",
-        ));
+        namespace_pipeline_publication_facade::run_namespace_analysis_pipeline(
+            &scope,
+            store,
+            cancel,
+            &store_path.with_extension("duckdb-analysis-run-files"),
+        )?;
     }
     eprintln!(
         "stage=name-resolution elapsed_seconds={:.3}",
@@ -852,7 +858,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some("syntax-spans") => MappingFinalStageKind::SyntaxSpans,
                 Some(_) => return Err("unknown mapping final stage".into()),
             };
-            run_workspace_mapping_pipeline(&root, &store, &cancel, workers, final_stage)?
+            run_workspace_mapping_pipeline(
+                &root,
+                Path::new(path),
+                &store,
+                &cancel,
+                workers,
+                final_stage,
+            )?
         }
         _ => return Err(format!("unknown command {command}").into()),
     };

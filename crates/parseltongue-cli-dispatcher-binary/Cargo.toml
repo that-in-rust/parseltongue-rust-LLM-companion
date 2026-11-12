@@ -12,6 +12,7 @@ path = "src/main.rs"
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
 parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" }
 parseltongue-turso-store-adapter = { path = "../parseltongue-turso-store-adapter" }
+parseltongue-duckdb-analysis-adapter = { path = "../parseltongue-duckdb-analysis-adapter" }
 parseltongue-crate-graph-loader = { path = "../parseltongue-crate-graph-loader" }
 parseltongue-syntax-span-extractor = { path = "../parseltongue-syntax-span-extractor" }
 parseltongue-stage-worker-scheduler = { path = "../parseltongue-stage-worker-scheduler" }
