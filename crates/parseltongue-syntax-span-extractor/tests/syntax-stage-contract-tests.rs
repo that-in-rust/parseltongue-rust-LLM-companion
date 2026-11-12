@@ -61,6 +61,14 @@ fn test_sysroot_dependency_demand_detection() {
         "pub fn take(_:Option<Vec<u8>>){}"
     ));
     assert!(check_sysroot_context_needed("use core::ops::Range;"));
+    for source in [
+        "pub trait Borrowed: AsRef<u8> {}",
+        "pub trait Borrowed: AsMut<u8> {}",
+        "pub fn dispose(value: u8) { drop(value); }",
+        "pub fn measure() { size_of::<u8>(); size_of_val(&0); align_of::<u8>(); align_of_val(&0); }",
+    ] {
+        assert!(check_sysroot_context_needed(source), "{source}");
+    }
 }
 
 #[test]

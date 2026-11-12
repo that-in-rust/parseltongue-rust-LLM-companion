@@ -1185,3 +1185,21 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   Native integration PID 1091013 SIGCONT-resumed after measurements. It has not
   completed; shell 787eb5, log /home/ubuntu/m2-patched-sysroot-integration.log.
   GDB attach was denied by ptrace policy; no privilege/sysctl workaround attempted.
+
+## Sysroot integration continuation RED — 2026-11-12
+
+- Native debug integration completed with no parser errors, then failed at
+  StageInputMissingError: module repr. Its 2030.18-second wall time includes the
+  deliberate S3 pause; syntax write timing includes that pause and is not profiling.
+- Reachable case: core/src/io/error.rs selects #[cfg_attr(...,path=
+  "error/repr_bitpacked.rs")] mod repr. M1 discovers it relative to the physical
+  source directory; M2 incorrectly used the default non-mod.rs module directory.
+  Portable CLI regression test_path_attributes_follow_source fails identically at
+  module selected. Existing APIs unchanged; no new stub surface.
+- Additional pure demand regression fails on AsRef (also covers AsMut and prelude
+  memory functions). Installed core/prelude/v1.rs exports these names explicitly.
+- Native source lang-attribute spelling inventory found additional names absent from
+  the old recognition whitelist. Persist actual reached lang attributes rather than
+  silently discarding newer compiler evidence; recognize support separately.
+- Fixes remain uncommitted pending native GREEN; release integration shell 84b53b,
+  log /home/ubuntu/m2-native-sysroot-release.log (no suspended mapper remains).

@@ -576,6 +576,38 @@ fn test_mapping_stage_selection_contract() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
     create_workspace_source_fixture(&root);
+#[test]
+fn test_path_attributes_follow_source() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(
+        root.join("src/lib.rs"),
+        "mod parent; pub fn take(_:parent::Selected){}",
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/parent.rs"),
+        "#[path=\"selected.rs\"] mod selected; pub use selected::Selected;",
+    )
+    .unwrap();
+    fs::write(root.join("src/selected.rs"), "pub struct Selected;").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    assert!(
+        paths
+            .iter()
+            .any(|row| row["path_site_source_text"] == "parent::Selected"
+                && row["path_resolution_state_kind"] == "resolved")
+    );
+}
+
     let database = directory.path().join("store.db");
     let run = |stage: &str| {
         Command::new(env!("CARGO_BIN_EXE_parseltongue"))
