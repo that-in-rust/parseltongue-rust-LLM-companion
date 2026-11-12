@@ -106,6 +106,9 @@ mod namespace_frozen_resolution_rounds;
 pub use namespace_frozen_resolution_rounds::NamespaceResolutionRoundReport;
 #[path = "namespace-default-prelude-inputs.rs"]
 mod namespace_default_prelude_inputs;
+#[path = "namespace-frozen-macro-lookups.rs"]
+mod namespace_frozen_macro_lookups;
+pub use namespace_frozen_macro_lookups::FrozenNamespaceMacroLookup;
 #[path = "namespace-unit-link-inputs.rs"]
 mod namespace_unit_link_inputs;
 
