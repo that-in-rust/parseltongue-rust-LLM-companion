@@ -4,6 +4,10 @@
 mod mapped_oracle_export_facade;
 pub use mapped_oracle_export_facade::{OracleConfigurationKindValue, export_mapped_semantic_paths};
 
+#[cfg(test)]
+#[path = "mapped-oracle-contract-tests.rs"]
+mod mapped_oracle_export_contract_tests;
+
 #[path = "primary-path-export-rows.rs"]
 mod primary_path_export_rows;
 #[path = "primary-workspace-loader-adapter.rs"]

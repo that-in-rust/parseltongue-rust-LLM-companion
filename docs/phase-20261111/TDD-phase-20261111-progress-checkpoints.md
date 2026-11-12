@@ -1426,3 +1426,44 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Next RED covers generation-bearing empty exports, normal-dependency unit
   selection/source closure, unknown tables/unpublished stores, exact cfg/edition,
   and explicit missing/duplicate/malformed oracle inputs.
+
+## Exact mapped-unit manifests RED — 2026-11-12
+
+- CLI five contracts fail at the intended typed STUBs: published JSONL rows,
+  generation-bearing empty filter, exact dependency/physical source closure,
+  empty mapped units, explicit missing-publication/table/store errors.
+  Result: 0 passed, 5 failed (0.28 seconds).
+- Offline oracle four contracts fail at the intended STUB: exact selected
+  dependency units and cfg overrides, SECONDARY same baseline, empty selection,
+  malformed version/duplicate units/missing closure errors.
+  Result: 0 passed, 4 failed, 16 existing filtered (0.12 seconds).
+- The oracle fixture exercises a reachable feature mismatch: normal dependency
+  enables wanted with default-features=false, while dev-dependency enables
+  default/wrong. cargo metadata can unify the dev feature; selected normal
+  lib/bin manifest must force wanted-only cfg. Test also requires paths from
+  the non-root dependency, not only workspace-member target roots.
+- RED logs: /home/ubuntu/m2-mapped-manifest-red-tests.log and
+  /home/ubuntu/m2-mapped-oracle-red-tests.log. No GREEN edits yet.
+- Producer header schema in tests: export_record_kind_value=header,
+  export_scope_identity_record, export_owned_table_name; rows have
+  export_record_kind_value=row, export_row_identity_value,
+  export_row_payload_value. Even zero rows must carry the header.
+- Manifest test schema: manifest_format_version_value=1,
+  manifest_target_context_kind=compiler_default, manifest_compiler_version_text,
+  manifest_scope_identity_record, manifest_configuration_state_record,
+  manifest_unit_context_rows. Unit entries preserve raw graph fields plus
+  unit_semantic_identity_record (canonical cfg hash), unit_source_root_paths
+  and unit_source_closure_rows (requests joined with content digests).
+- Production currently has no target-triple CLI override and config stores
+  compiler-default target cfg, not an explicit triple. Preserve that exact
+  context; do not invent a triple or add a fourth direct compiler command.
+- Important input/output metadata gap for following GREEN: production path and
+  target scope records currently omit role/cfg digest. Add canonical semantic
+  context/site kind evidence where required for exact differ keys; do not
+  weaken matching to root path alone. Core semantic hash is blake3 of JSON
+  [unit_target_cfg_values, unit_enabled_feature_values, edition, role].
+- Code inspection verified base-db::all_crates and base-db::salsa reexport,
+  allowing direct input cfg setters after workspace loading. Manifest override
+  should happen before semantic queries; validate exact unit matches and source
+  closure. SECONDARY build-script deltas must not leak into PRIMARY.
+- No active background process, no S5 numbers. Available disk remains 32 GiB.
