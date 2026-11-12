@@ -96,6 +96,9 @@ impl AnalysisTableStorePort for DuckdbAnalysisStoreAdapter {
 #[path = "frozen-generation-appender-copy.rs"]
 mod frozen_generation_appender_copy;
 
+#[path = "namespace-binding-round-strata.rs"]
+mod namespace_binding_round_strata;
+
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
 pub fn resolve_crate_name_bindings(
