@@ -104,6 +104,10 @@ pub use namespace_binding_round_strata::recompute_binding_round;
 mod namespace_import_endpoint_rounds;
 pub use namespace_import_endpoint_rounds::resolve_import_endpoint_rounds;
 
+#[path = "namespace-scope-relation-records.rs"]
+mod namespace_scope_relation_records;
+pub use namespace_scope_relation_records::materialize_scope_relations;
+
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
 pub fn resolve_crate_name_bindings(
