@@ -156,6 +156,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 unit_compilation_identity_key: key,
                 unit_rust_edition_kind: edition,
                 unit_extern_prelude_key: Some(external.clone()),
+                name_shared_namespace_rows: vec![],
                 name_module_scope_rows: vec![
                     NameScopeRecordRow {
                         scope_module_identity_key: root,

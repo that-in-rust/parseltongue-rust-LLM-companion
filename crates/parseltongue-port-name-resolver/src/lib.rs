@@ -61,6 +61,18 @@ pub fn resolve_crate_name_bindings(
     )
 }
 
+pub fn resolve_owned_crate_bindings(
+    _input: NameResolutionInputRows,
+    _port: &dyn ItemMacroExpansionPort,
+    _cancel: &RunCancelFlagValue,
+) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
+    Err(NameResolutionStageError::Input(
+        parseltongue_core_row_types::StageInputMissingError {
+            error_context_detail_text: "owned namespace resolution not implemented".into(),
+        },
+    ))
+}
+
 #[cfg(test)]
 #[path = "row-resolution-contract-tests.rs"]
 mod row_resolution_contract_tests;

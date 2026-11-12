@@ -75,6 +75,10 @@ pub fn retry_bounded_store_write<T>(
     Err(build_store_backend_error("unreachable retry state"))
 }
 
+fn build_crate_visibility_clause(_table: &str) -> String {
+    "1".into()
+}
+
 fn validate_stage_owned_table(table: &str) -> Result<(), StoreBackendFailureError> {
     if STAGE_OWNED_TABLE_NAMES
         .iter()
@@ -197,7 +201,7 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async {
             let connection = self.store_database_handle_value.connect()?;
-            let mut rows = connection.query(format!("SELECT stage_row_record_key,stage_row_payload_text FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? ORDER BY stage_row_record_key"),
+            let mut rows = connection.query(format!("SELECT stage_row_record_key,stage_row_payload_text FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {} ORDER BY stage_row_record_key",build_crate_visibility_clause(table)),
                 turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
             let mut records = Vec::new();
             while let Some(row) = rows.next().await? {
@@ -215,7 +219,7 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async{
             let connection=self.store_database_handle_value.connect()?;
-            let mut rows=connection.query(format!(r#"SELECT COUNT(*) FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=?"#),
+            let mut rows=connection.query(format!(r#"SELECT COUNT(*) FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {}"#,build_crate_visibility_clause(table)),
                 turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
             let count:i64=rows.next().await?.ok_or(turso::Error::QueryReturnedNoRows)?.get(0)?;
             usize::try_from(count).map_err(|error|turso::Error::ConversionFailure(error.to_string()))
@@ -231,7 +235,7 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
         validate_stage_owned_table(table)?;
         self.store_runtime_handle_value.block_on(async{
             let connection=self.store_database_handle_value.connect().map_err(build_store_backend_error)?;
-            let mut rows=connection.query(format!(r#"SELECT stage_row_record_key,stage_row_payload_text FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? ORDER BY stage_row_record_key"#),
+            let mut rows=connection.query(format!(r#"SELECT stage_row_record_key,stage_row_payload_text FROM "{table}" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND {} ORDER BY stage_row_record_key"#,build_crate_visibility_clause(table)),
                 turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await.map_err(build_store_backend_error)?;
             let mut count=0;
             while let Some(row)=rows.next().await.map_err(build_store_backend_error)? {

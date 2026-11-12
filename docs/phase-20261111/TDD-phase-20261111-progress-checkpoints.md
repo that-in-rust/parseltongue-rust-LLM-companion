@@ -1705,3 +1705,41 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   6m26s / RSS 3,610,668 and 3,485,264 KiB. These are live observations, not
   final performance/peak measurements or S5 results. All were in the
   name-resolution stage; no additional writer has touched their stores.
+
+### Priority: M2 memory gate investigation
+
+- Full runs stopped per the lead's interrupt. SIGTERM sent to ripgrep
+  1353631 and tokio 1353632; their shells 7aa41a/448968 exited 1.
+  Serde 1335853 had already completed before termination: shell ce054b
+  exited 0, name resolution 1077.043s, total wall 18:49.46, maximum RSS
+  14,073,956 KiB. This FAILS the 2 GiB gate and is not qualified S5 evidence.
+- Task 6 supersedes task 3 until bounded-memory qualification exists.
+- Comparator GREEN is parked UNCOMMITTED: facade and Turso backend. Its
+  4 new CLI contracts passed in 0.28s, log
+  /home/ubuntu/m2-path-comparison-green-tests.log; existing affected adapter
+  and CLI tests and clippy have NOT yet run. Do not commit it as qualified.
+- Serde's published store/manifest can support read-only diagnosis. Never
+  reuse it as a passing measurement. No rust-analyzer/cargo-modules M2
+  writers have been started.
+
+### Bounded namespace state STUB and short profile
+
+- Parked comparator GREEN source changes in
+  /home/ubuntu/m2-paused-comparator-green.patch; restored its committed STUB.
+  This keeps unrelated comparator changes out of memory-fix commits.
+- Added shared namespace rows (Arc), an owned-input resolver seam (STUB),
+  and a private-crate-row visibility predicate seam (currently no-op).
+- RSS-sampled serde reproduction, frozen original binary, 120s timeout:
+  3,304,857,600 bytes peak, exit 124. Evidence under
+  e2e-runs/2026-11-11/serde/m2-name-memory-profiling/.
+  The core projection reached 41,232 scopes, 25,705 declaration bindings,
+  4,240 imports, 61,757 paths and 708 macros. The first macro round had
+  253,837 settled bindings and 624 resolved invocations.
+- This disproves bulk loading of already-published SDK maps as the sole
+  initial cause: the budget already fails in core's own first resolution.
+  Reachable retention also includes projector/input/engine copies and
+  whole-round semantic rows held until one large crate transaction.
+  Attribution of the full run's 14,073,956 KiB peak is not yet isolated.
+- Read-only payload sizing found 2,118 expanded macro rows / 254,146,220
+  export bytes, plus 2,053 unresolved rows; largest single expanded row
+  10,130,358 bytes. /home/ubuntu/m2-macro-payload-size-records.json.

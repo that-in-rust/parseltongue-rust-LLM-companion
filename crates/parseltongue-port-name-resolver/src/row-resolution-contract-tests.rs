@@ -80,6 +80,7 @@ fn build_fixture_resolver_input(scopes: &[&[&str]]) -> NameResolutionInputRows {
         unit_compilation_identity_key: build_fixture_unit_identity(),
         unit_rust_edition_kind: RustSourceEditionKind::Edition2024,
         unit_extern_prelude_key: None,
+        name_shared_namespace_rows: Vec::new(),
         name_module_scope_rows: scopes
             .iter()
             .map(|parts| build_fixture_scope_record(parts))

@@ -145,11 +145,35 @@ pub struct NameResolutionInputRows {
     pub unit_compilation_identity_key: CrateCompilationUnitKey,
     pub unit_rust_edition_kind: RustSourceEditionKind,
     pub unit_extern_prelude_key: Option<NameResolutionScopeKey>,
+    pub name_shared_namespace_rows: Vec<std::sync::Arc<NameSharedNamespaceRows>>,
     pub name_module_scope_rows: Vec<NameScopeRecordRow>,
     pub name_symbol_binding_rows: Vec<NameResolvedBindingRow>,
     pub name_import_request_rows: Vec<NameImportRequestRow>,
     pub name_signature_path_rows: Vec<NamePathRequestRow>,
     pub name_macro_invocation_rows: Vec<NameMacroInvocationRow>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NameSharedNamespaceRows {
+    pub name_module_scope_rows: Vec<NameScopeRecordRow>,
+    pub name_symbol_binding_rows: Vec<NameResolvedBindingRow>,
+}
+
+impl NameResolutionInputRows {
+    pub fn all_name_scope_rows(&self) -> impl Iterator<Item = &NameScopeRecordRow> {
+        self.name_module_scope_rows.iter().chain(
+            self.name_shared_namespace_rows
+                .iter()
+                .flat_map(|rows| rows.name_module_scope_rows.iter()),
+        )
+    }
+    pub fn all_name_binding_rows(&self) -> impl Iterator<Item = &NameResolvedBindingRow> {
+        self.name_symbol_binding_rows.iter().chain(
+            self.name_shared_namespace_rows
+                .iter()
+                .flat_map(|rows| rows.name_symbol_binding_rows.iter()),
+        )
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
