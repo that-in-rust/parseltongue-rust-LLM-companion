@@ -1608,3 +1608,12 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Logs: /home/ubuntu/m2-oracle-cache-refactor-tests.log and
   /home/ubuntu/m2-oracle-cache-refactor-clippy.log. The already-passing legacy
   and manifest suites were not rerun because their inputs did not change.
+
+### SECONDARY recorded-script deltas STUB
+
+- Added a private boundary for baseline-plus-recorded-script cfg/env/output
+  qualification. No-script SECONDARY retains the identical manifest baseline;
+  script-bearing inputs stop explicitly at the STUB. PRIMARY never invokes
+  this boundary or applies these inputs.
+- SECONDARY now accepts cached observations as the required recorded input
+  rather than rejecting all selected packages with build scripts.

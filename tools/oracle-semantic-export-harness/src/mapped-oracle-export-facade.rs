@@ -254,8 +254,10 @@ pub(super) fn apply_mapped_unit_configuration(
     files: &vfs::Vfs,
     packages: &BTreeMap<(String, String), String>,
     manifest: &Value,
-) -> Result<(), OracleSemanticExportError> {
+    scripts: Option<&[Value]>,
+) -> Result<Vec<Value>, OracleSemanticExportError> {
     let crates = all_crates(database);
+    let mut deltas = Vec::new();
     let mut matched = BTreeSet::new();
     for unit in read_manifest_unit_records(manifest)?.iter().filter(|unit| {
         unit["unit_mapped_target_flag"] == true || unit["unit_sysroot_context_flag"] == true
@@ -308,11 +310,21 @@ pub(super) fn apply_mapped_unit_configuration(
                 "mapped compilation unit edition differs",
             ));
         }
-        krate
-            .set_cfg_options(database)
-            .to(build_manifest_cfg_options(unit)?);
+        let options = build_manifest_cfg_options(unit)?;
+        let (options, delta) = match scripts {
+            Some(rows) => crate::oracle_build_script_deltas::apply_recorded_script_options(
+                unit,
+                rows,
+                krate.cfg_options(database),
+                krate.env(database),
+                options,
+            )?,
+            None => (options, None),
+        };
+        deltas.extend(delta);
+        krate.set_cfg_options(database).to(options);
     }
-    Ok(())
+    Ok(deltas)
 }
 
 pub(super) fn check_mapped_compilation_record(record: &Value, unit: &Value) -> bool {

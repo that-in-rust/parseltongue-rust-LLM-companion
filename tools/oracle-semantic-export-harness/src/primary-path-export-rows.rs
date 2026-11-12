@@ -140,10 +140,15 @@ pub(super) fn export_configured_semantic_paths(
                         unit["unit_mapped_target_flag"] == true
                             && unit["unit_cargo_package_identifier"]
                                 == cargo[package].id.to_string()
-                    }) && cargo[package]
-                        .targets
+                    }) && !artifact_cache
+                        .oracle_recorded_script_rows
                         .iter()
-                        .any(|target| cargo[*target].kind.as_cargo_target() == Some("custom-build"))
+                        .any(|row| {
+                            row["script_package_identifier_text"] == cargo[package].id.to_string()
+                        })
+                        && cargo[package].targets.iter().any(|target| {
+                            cargo[*target].kind.as_cargo_target() == Some("custom-build")
+                        })
                 })
             })
         {
@@ -184,9 +189,18 @@ pub(super) fn export_configured_semantic_paths(
     let _server = loaded.oracle_macro_server_handle;
     let macro_loading = loaded.oracle_macro_loading_rows;
     let source_omissions = loaded.oracle_source_omission_rows;
-    if let Some(manifest) = mapped_manifest {
-        apply_mapped_unit_configuration(&mut database, &vfs, &package_roots, manifest)?;
-    }
+    let build_script_deltas = if let Some(manifest) = mapped_manifest {
+        apply_mapped_unit_configuration(
+            &mut database,
+            &vfs,
+            &package_roots,
+            manifest,
+            (kind == OracleConfigurationKindValue::Secondary)
+                .then_some(artifact_cache.oracle_recorded_script_rows.as_slice()),
+        )?
+    } else {
+        Vec::new()
+    };
     let export_attached_path_rows = || {
         let semantics = Semantics::new(&database);
         let modules: Vec<_> = hir::Crate::all(&database)
@@ -284,6 +298,7 @@ pub(super) fn export_configured_semantic_paths(
         "oracle_proc_macro_rows":macro_loading,
         "oracle_source_omission_rows":source_omissions,
         "oracle_cached_script_rows":artifact_cache.oracle_recorded_script_rows,
+        "oracle_build_script_deltas":build_script_deltas,
     }))
 }
 

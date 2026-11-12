@@ -2,6 +2,8 @@
 
 #[path = "oracle-artifact-cache-facade.rs"]
 mod oracle_artifact_cache_facade;
+#[path = "oracle-build-script-deltas.rs"]
+mod oracle_build_script_deltas;
 pub use oracle_artifact_cache_facade::build_oracle_artifact_cache;
 
 #[cfg(test)]
