@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 use std::{error::Error, path::Path, process::Command};
 
 fn main() -> Result<(), Box<dyn Error>> {

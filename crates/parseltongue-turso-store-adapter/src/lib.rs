@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 //! M0 database/runtime foundation; stage schemas and persistence arrive at M1.
 
 use parseltongue_core_row_types::StoreBackendFailureError;

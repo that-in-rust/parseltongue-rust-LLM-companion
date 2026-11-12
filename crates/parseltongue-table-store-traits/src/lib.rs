@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 //! Synchronous stage seams; concrete storage belongs to L3.
 
 use parseltongue_core_row_types::{

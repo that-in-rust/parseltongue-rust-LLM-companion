@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 extern crate ra_ap_rustc_lexer as rustc_lexer;
 
 #[cfg(test)]

@@ -63,20 +63,23 @@ fn append_library_namespace_inputs(
                 .into_iter()
                 .filter(|row| &row.scope_module_identity_key.scope_compilation_unit_key != own),
         );
-    for value in read_name_stage_records(store, scope, "module-scope-binding-table")? {
-        let binding = decode_binding_record_value(&value)?;
-        if &binding.binding_lexical_scope_key.scope_compilation_unit_key == own {
-            continue;
-        }
-        projector.projection_target_metadata_rows.insert(
-            binding.binding_target_identity_key.clone(),
-            value["binding_target_metadata_value"].clone(),
-        );
-        projector
-            .projection_resolution_input_rows
-            .name_symbol_binding_rows
-            .push(binding);
-    }
+    read_name_stage_records(store, scope, "module-scope-binding-table")?
+        .into_iter()
+        .try_for_each(|value| {
+            let binding = decode_binding_record_value(&value)?;
+            if &binding.binding_lexical_scope_key.scope_compilation_unit_key == own {
+                return Ok(());
+            }
+            projector.projection_target_metadata_rows.insert(
+                binding.binding_target_identity_key.clone(),
+                value["binding_target_metadata_value"].clone(),
+            );
+            projector
+                .projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .push(binding);
+            Ok::<_, StoreBackendFailureError>(())
+        })?;
     let external = projector
         .projection_resolution_input_rows
         .unit_extern_prelude_key

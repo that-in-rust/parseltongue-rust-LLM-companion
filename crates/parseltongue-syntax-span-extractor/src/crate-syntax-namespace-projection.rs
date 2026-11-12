@@ -1281,10 +1281,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                         .unwrap_or_default(),
                 });
         }
-        for child in node.children() {
-            self.visit_namespace_syntax_node(&child, active, directory, file)?;
-        }
-        Ok(())
+        node.children()
+            .try_for_each(|child| self.visit_namespace_syntax_node(&child, active, directory, file))
     }
 }
 

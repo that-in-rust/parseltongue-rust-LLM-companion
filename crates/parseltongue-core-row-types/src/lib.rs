@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 //! Dependency-free semantic identities and typed stage boundaries.
 
 #[path = "stage-pipeline-row-types.rs"]

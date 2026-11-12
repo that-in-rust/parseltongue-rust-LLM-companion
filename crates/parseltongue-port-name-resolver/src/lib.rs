@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 //! Pure crate-local name resolution; parsing and expansion are explicit ports.
 
 use parseltongue_core_row_types::{

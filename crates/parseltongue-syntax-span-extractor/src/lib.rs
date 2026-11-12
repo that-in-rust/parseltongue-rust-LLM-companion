@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 use parseltongue_core_row_types::{StageTableRowRecord, StoreBackendFailureError};
 use ra_ap_syntax::{AstNode, AstToken, Edition, SyntaxNode, ast};
 use serde_json::{Value, json};
@@ -87,9 +93,9 @@ fn parse_compatible_rust_syntax(
             "source tokens remain unconsumed",
         ));
     }
-    for (index, error) in lexed.errors() {
+    lexed.errors().for_each(|(index, error)| {
         builder.error(error.into(), TextSize::new(lexed.text_start(index) as u32));
-    }
+    });
     Ok(builder.finish())
 }
 

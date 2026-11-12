@@ -120,7 +120,7 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                 "name-resolution work keys require the crate/ namespace",
             ));
         }
-        for row in request.stage_unit_output_rows {
+        request.stage_unit_output_rows.iter().try_for_each(|row| {
             if !check_table_stage_access(
                 &row.stage_owned_table_name,
                 request.stage_owner_name_value,
@@ -130,7 +130,8 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                     "stage output table access denied",
                 ));
             }
-        }
+            Ok(())
+        })?;
         retry_bounded_store_write(cancel, || {
             self.store_runtime_handle_value.block_on(async {
             let started=std::time::Instant::now();

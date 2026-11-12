@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 //! Safe compatibility records for the pinned token-tree leaf library.
 //! Adapted from rust-analyzer span, MIT OR Apache-2.0, commit
 //! 6e37b2d62127d445d77069031b416c48c9b0b4f2.

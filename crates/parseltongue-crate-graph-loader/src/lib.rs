@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
     StoreBackendFailureError, evaluate_cfg_expression_truth,
@@ -479,11 +485,11 @@ pub fn ingest_workspace_source_files(
     )
     .map_err(build_graph_stage_failure)?;
     let graph = store.read_stage_table_rows(scope, "crate-dependency-graph-table")?;
-    let mut roots = BTreeSet::from([PathBuf::from(read_json_string_field(
+    let roots = BTreeSet::from([PathBuf::from(read_json_string_field(
         &configuration,
         "workspace_source_root_path",
     )?)]);
-    for row in graph {
+    let roots = graph.into_iter().try_fold(roots, |mut roots, row| {
         let unit: Value =
             serde_json::from_str(&row.stage_row_payload_text).map_err(build_graph_stage_failure)?;
         if unit["unit_mapped_target_flag"] == true || unit["unit_sysroot_context_flag"] == true {
@@ -497,7 +503,8 @@ pub fn ingest_workspace_source_files(
                 package
             });
         }
-    }
+        Ok::<_, StoreBackendFailureError>(roots)
+    })?;
     let mut files = BTreeSet::new();
     fn walk_source_directory_tree(
         root: &Path,
@@ -529,9 +536,9 @@ pub fn ingest_workspace_source_files(
         }
         Ok(())
     }
-    for root in roots {
-        walk_source_directory_tree(&root, &mut files)?;
-    }
+    roots
+        .into_iter()
+        .try_for_each(|root| walk_source_directory_tree(&root, &mut files))?;
     for path in &files {
         ingest_requested_source_file(scope, store, cancel, path)?;
     }

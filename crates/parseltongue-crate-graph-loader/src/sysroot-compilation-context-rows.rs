@@ -53,42 +53,43 @@ pub fn extend_sysroot_crate_graph(
             "dependency_compilation_role_kind":"target","dependency_sysroot_context_flag":true
         })
     };
-    let mut rows = graph
-        .iter()
-        .map(|row| {
-            let Some(flags) = contexts.get(&row.stage_row_record_key) else {
-                return Ok(row.clone());
-            };
-            let mut value: Value = serde_json::from_str(&row.stage_row_payload_text)
-                .map_err(build_graph_stage_failure)?;
-            value["unit_no_std_flag"] = json!(flags.unit_no_std_flag);
-            value["unit_no_core_flag"] = json!(flags.unit_no_core_flag);
-            value["unit_implicit_prelude_flag"] = json!(flags.unit_implicit_prelude_flag);
-            let dependencies = value["unit_normal_dependency_rows"]
-                .as_array_mut()
-                .ok_or_else(|| build_graph_stage_failure("unit dependencies missing"))?;
-            dependencies.extend(["core", "alloc", "std"].into_iter().map(link));
-            Ok(StageTableRowRecord {
-                stage_row_payload_text: value.to_string(),
-                ..row.clone()
-            })
+    let rows = graph.iter().map(|row| {
+        let Some(flags) = contexts.get(&row.stage_row_record_key) else {
+            return Ok(row.clone());
+        };
+        let mut value: Value =
+            serde_json::from_str(&row.stage_row_payload_text).map_err(build_graph_stage_failure)?;
+        value["unit_no_std_flag"] = json!(flags.unit_no_std_flag);
+        value["unit_no_core_flag"] = json!(flags.unit_no_core_flag);
+        value["unit_implicit_prelude_flag"] = json!(flags.unit_implicit_prelude_flag);
+        let dependencies = value["unit_normal_dependency_rows"]
+            .as_array_mut()
+            .ok_or_else(|| build_graph_stage_failure("unit dependencies missing"))?;
+        dependencies.extend(["core", "alloc", "std"].into_iter().map(link));
+        Ok(StageTableRowRecord {
+            stage_row_payload_text: value.to_string(),
+            ..row.clone()
         })
-        .collect::<Result<Vec<_>, StoreBackendFailureError>>()?;
-    for (name, mut value) in system.clone() {
+    });
+    let support = system.iter().map(|(&name, value)| {
+        let mut value = value.clone();
         value["unit_normal_dependency_rows"] = json!(match name {
             "core" => vec![],
             "alloc" => vec![link("core")],
             _ => vec![link("core"), link("alloc")],
         });
-        rows.push(StageTableRowRecord {
+        Ok(StageTableRowRecord {
             stage_owned_table_name: "crate-dependency-graph-table".into(),
             stage_row_record_key: value["unit_compilation_identity_key"]
                 .as_str()
                 .ok_or_else(|| build_graph_stage_failure("sysroot unit key missing"))?
                 .into(),
             stage_row_payload_text: value.to_string(),
-        });
-    }
+        })
+    });
+    let mut rows = rows
+        .chain(support)
+        .collect::<Result<Vec<_>, StoreBackendFailureError>>()?;
     rows.sort_by(|left, right| {
         (&left.stage_owned_table_name, &left.stage_row_record_key)
             .cmp(&(&right.stage_owned_table_name, &right.stage_row_record_key))

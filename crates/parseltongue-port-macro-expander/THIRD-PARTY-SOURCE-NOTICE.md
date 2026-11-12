@@ -15,6 +15,7 @@ Original sources:
 - crates/syntax-bridge/src/to_parser_input.rs
 
 Upstream license: MIT OR Apache-2.0. Copyright rust-analyzer contributors.
+Matcher/transcriber state-machine loops stay close to upstream for diffability.
 The production port must not link the upstream mbe crate, salsa, HIR or IDE databases.
 
 Adaptations replace database arguments with explicit edition callbacks, preserve token source

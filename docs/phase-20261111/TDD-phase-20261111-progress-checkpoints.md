@@ -1353,3 +1353,61 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   pending. Additional lead reminder recorded: when reaching S6/S7 use
   codebase-memory list_projects, match root_path, inspect schema, then consume
   complete paginated coverage per SOP; continue strict phase checkpoints.
+
+## Functional Rust and sysroot REFACTOR — 2026-11-12
+
+- Added forbid(unsafe_code) and cfg_attr(not(test), deny(clippy::unwrap_used,
+  clippy::expect_used, clippy::panic)) to all ten production crate roots and
+  the shared parser-source build script. There were no new production lint
+  hits to suppress or bypass. Test-only unwrap allowances remain test-only.
+- Converted clear authored accumulators/traversals to iterator/try_fold/
+  try_for_each: Turso output validation, graph source-root collection and
+  traversal, sysroot row assembly, syntax errors/child traversal, and foreign
+  binding input collection. Async database cursors and state-machine/fixed-point
+  loops remain explicit where an async fold would obscure ordering or add
+  boxing. Copy-adapted MBe loops are unchanged; source notice records why.
+- Pure name normalization now stable-sorts owned rows and consumes contiguous
+  groups instead of cloning large scope/target keys into grouping maps.
+  Stable grouping preserves precedence, candidate order, visibility union
+  order, evidence deduplication and canonical output.
+- cargo test --release --workspace: 112 unit/integration passes plus one
+  doctest, zero failures, three intentionally ignored manual profiles.
+  Native CLI is now fully green: 21 passed, 0 failed in 935.51 seconds.
+  Other result counts: core 3; graph 9+3; macros 22; resolver 9; scheduler 4;
+  syntax 17; trait fake 1; backend 2+15; dependency gates 4; safe span 2.
+- cargo clippy --workspace --all-targets --all-features -- -D warnings:
+  Finished dev profile in 1.40 seconds. cargo fmt --all --check and
+  git diff --check: exit zero. No isolated performance-envelope claim.
+- Verification logs: /home/ubuntu/m2-functional-rust-refactor-tests.log and
+  /home/ubuntu/m2-functional-rust-refactor-clippy.log.
+
+## Exact mapped-unit manifest continuation findings
+
+- Critical denominator correction: graph loader lib.rs selects all reached
+  normal-dependency libraries as mapped target units, plus workspace bins.
+  Existing oracle selects only workspace-member lib/bin roots. Therefore raw
+  counts (especially cargo-modules 1369) are not valid S5 denominators.
+  Manifest selection must use every published unit_mapped_target_flag=true
+  row, not infer selection from workspace membership. Sysroot support stays
+  unmapped. Preserve host/target and independent cfg/features.
+- Plan next STUB/RED: read-only published-stage JSONL export (header includes
+  generation/attempt even when empty), exact unit/config/source-closure
+  manifest export, then harness validation/selection/configuration.
+  Unknown tables/missing publication/malformed input must fail explicitly.
+- Existing oracle loader keeps proc-macro load errors and invalid UTF-8
+  omissions silently; exact export must record them and block affected
+  relations. Cached proc-macro injection is still an explicit unsupported
+  branch. SECONDARY build-script output can supply cache artifacts, but
+  PRIMARY must inject only dylibs, not build-script cfg/env.
+- External base-db reexports salsa; all_crates(db) returns base Crate inputs,
+  whose salsa setters can override cfg_options after loading, avoiding private
+  CrateGraphBuilder internals and package-name/version conflation. Verify
+  exact manifest cfg on each selected compilation unit. SECONDARY adds only
+  recorded build-script deltas to the same baseline.
+- Module-scoped shared-file resolver remains preferred. It explicitly errors
+  on unexportable shared local items; if reached, use the authorized duplicated
+  file-id fallback with canonical paths in separate FileSets/SourceRoots,
+  preferably cloning only the exact active closure from the manifest. Do not
+  rewrite physical paths or hide export failures.
+- No exact manifests, differ or S5 measurements exist yet. S6/S7 reminder is
+  task 4; use project root matching, schema inspection and complete pagination.

@@ -1,3 +1,9 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
+
 use parseltongue_core_row_types::{RunCancelFlagValue, StoreBackendFailureError};
 
 pub fn map_bounded_stage_workers<T: Send>(
