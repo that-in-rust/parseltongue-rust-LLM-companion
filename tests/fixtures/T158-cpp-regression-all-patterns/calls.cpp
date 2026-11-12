@@ -1,4 +1,0 @@
-void process() {
-    calculate();
-    validate();
-}

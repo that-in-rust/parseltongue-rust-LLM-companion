@@ -1,5 +1,0 @@
-# Binding-model provenance
-
-`binding.onnx` is a modified copy of [Xenova's ONNX conversion](https://huggingface.co/Xenova/paraphrase-MiniLM-L3-v2/tree/4b544e74dfc3256b2b56849ea5d7064fee1ac846) of [sentence-transformers/paraphrase-MiniLM-L3-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L3-v2), by Sentence Transformers. The upstream model card identifies the license as Apache-2.0; the license text is included in [LICENSE.txt](LICENSE.txt). Credit for the underlying pretrained model and its quantized conversion belongs to their respective authors.
-
-Parseltongue modifications: retained the pretrained encoder, added a candidate feature input, two binding heads and a fused score; replaced the model's exposed outputs with the three task-specific scores. [Build script](../build.py) verifies the original checkpoint and vocabulary digests. The derived checkpoint SHA-256 is `a1c586649ffb9fdebe56139fd78f79bb5a7586379b432c9538db9d12f1f58dd8`. Use the accompanying `meta.json` with the Rust scanner. This is an evaluated research artifact, not a verified Rust name resolver.
