@@ -160,6 +160,7 @@ for both exports; do not change them or the source generation between PRIMARY an
 The manifest command's stdout is the JSON artifact itself; its stderr is retained separately.
 
 ```bash
+set -e
 SOURCE_STORE="$OUT/hld-current-workspace-store.db"
 MANIFEST="$OUT/mapped-unit-manifest.json"
 CACHE_OUT="$OUT/oracle-cache"
