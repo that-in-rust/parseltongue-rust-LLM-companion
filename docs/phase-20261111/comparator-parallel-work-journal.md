@@ -731,3 +731,72 @@ warning: /home/ubuntu/repos/rust-tools/rust-analyzer/crates/hir-expand/Cargo.tom
 REQ-RUST-027.0 REFACTOR / scope checkpoint
   - No further refactor was needed; no production source, scoring, resolver, provenance behavior, pins, lockfiles, static executable manifest, or digest changed. The only main-worktree change for this validation is this append-only journal evidence.
   - This validates the harness manifest capability contract only. No production mapper, serde corpus/export, final executable freeze, or S4/S5 qualification run was performed. Complete stdout/stderr and timing files are retained at `/home/ubuntu/oracle-capability-validation-f1e6197`.
+
+### REQ-RUST-005.1 — persisted disagreement evidence test
+
+Prelaunch verification budget: expected 10 minutes total, with a hard maximum of 20 minutes (`timeout 1200s`) for each compilation invocation. Reuse the existing `target` cache; do not set memory caps or tune builds. No compilation has started for this assignment yet.
+
+STUB
+  - Added the tagged `test_oracle_disagreements_keep_reasons` signature in `crates/parseltongue-cli-dispatcher-binary/tests/oracle-comparison-contract-tests.rs`; its body is a test-only `todo!()` while the persisted fixture assertions are developed.
+  - Planned compile check: `cargo check -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests`, wrapped in `/usr/bin/timeout 1200s` and `/usr/bin/time`.
+  - Output: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.90s`; `elapsed_seconds=0.94 exit_code=0`. The temporary stub compiled. Its expected unused `BTreeMap` import warning will disappear when the evidence assertion map is added. Cargo also emitted the previously observed upstream `lints.cargo` warnings for pinned rust-analyzer manifests.
+
+Pre-RED fixture expectation correction
+  - The first focused invocation exited `101` before the deliberately incorrect evidence expectation: the test assumed the unit identity was `[cfg, features, edition, role]`, while this persisted fixture's `unit_semantic_identity_record` is the exact serialized identity object. The assertion output showed the object on the actual side and the tuple on the expected side. This was an incorrect test expectation, not a comparator failure. The test now derives that identity from the existing fixture context; source inspection confirms `resolve_compilation_context_identity` selects the matching record before constructing the site identity.
+  - First attempt log: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/red-focused.log`; `/usr/bin/time`: `elapsed_seconds=5.73 exit_code=101`. It is not counted as the requested fixture-evidence RED.
+
+RED — intentionally incomplete expected fixture evidence
+  - The focused test deliberately expected the mismatch row's SECONDARY reason to be empty even though the fixture supplied `build_script`. It failed on the structured persisted row, showing the actual evidence retains that reason. This validates the assertion against existing comparator behavior; it is not a production defect.
+  - Exact assertion delta: left `"secondary_reason": String("build_script")`; right `"secondary_reason": String("")`.
+  - Test output: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 21 filtered out`; `/usr/bin/time`: `elapsed_seconds=4.88 exit_code=101`.
+  - Command and full output: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/red-fixture-expectation.log`.
+
+GREEN
+  - Corrected only the deliberately incomplete expected SECONDARY reason to `build_script`. The focused test then passed after reading and decoding the published Turso agreement rows, validating the exact site identities/keys, all known-answer statuses/reasons/target evidence, the PRIMARY denominator, and unchanged publication after missing PRIMARY and malformed SECONDARY evidence.
+  - Command: `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_oracle_disagreements_keep_reasons -- --exact --nocapture`, wrapped in `/usr/bin/timeout 1200s` and `/usr/bin/time`.
+  - Output: `test test_oracle_disagreements_keep_reasons ... ok`; `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 1.96s`; `elapsed_seconds=5.41 exit_code=0`.
+  - Full output: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/green-focused.log`.
+  - The first `cargo fmt --all -- --check` reported formatting-only differences in the new test. Applied `cargo fmt --all`; no behavior or fixture data changed. The initial check output is saved at `/home/ubuntu/oracle-disagreement-validation-eecdf0d/fmt.log`; the final fmt check remains pending.
+  - Post-format focused verification: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 1.82s`; `elapsed_seconds=5.44 exit_code=0`. Final `cargo fmt --all -- --check`: no diagnostics; `elapsed_seconds=4.03 exit_code=0`. Logs: `focused-final.log`, `fmt-final.log` in `/home/ubuntu/oracle-disagreement-validation-eecdf0d`.
+  - Adapter comparator regressions: `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`; `test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 3.35s`; `elapsed_seconds=3.56 exit_code=0`.
+  - CLI contract regressions: `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`; `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.98s`; `elapsed_seconds=7.19 exit_code=0`.
+  - `git diff --check`: `PASS: git diff --check`. Full outputs are saved as `adapter-comparator.log`, `cli-contract-suite.log`, and `fmt-final.log` in `/home/ubuntu/oracle-disagreement-validation-eecdf0d`.
+  - Workspace clippy: `cargo clippy --workspace --all-targets -- -D warnings`; `Finished dev profile [unoptimized + debuginfo] target(s) in 0.56s`; `elapsed_seconds=0.62 exit_code=0`.
+  - Workspace release build: `cargo build --workspace --release`; `Finished release profile [optimized] target(s) in 0.21s`; `elapsed_seconds=0.24 exit_code=0`. Both compilation invocations used `/usr/bin/timeout 1200s`; neither approached the limit. The existing target cache was reused and no C/C++ rebuild output appeared. No memory cap or build tuning was applied.
+  - Cargo emitted the upstream nonfatal `unused manifest key `lints.cargo`` warnings for the pinned rust-analyzer `parser` and `syntax` manifests; all requested gates completed successfully. Full outputs are saved as `clippy.log` and `release-build.log` in `/home/ubuntu/oracle-disagreement-validation-eecdf0d`.
+
+REFACTOR — no further refactor needed
+  - Reviewed the final persisted-row assertions and publication-preservation path. The fixture decoder and expected evidence projection remain local to this one contract test; no shared helper or production behavior change is needed.
+  - The test is tagged with REQ-RUST-005.1 and applicable REQ-RUST-026.0–026.4 identifiers. Existing requirement thresholds, test cases, and the `oracle-edge-agreement-table` alias remain unchanged.
+  - Only the requested contract-test file and this append-only journal changed; no pins, lockfiles, production comparator code, corpus, or memory/build settings changed. No commit or push was performed pending review.
+
+### Follow-up — require present, typed persisted target evidence
+
+- Tightened the test-local decoder to require each target-evidence field with `Value::get(...).expect(...)`; only explicit JSON `null` and encoded JSON strings are accepted. Missing fields and any other JSON type now panic instead of becoming `Null`.
+- Controlled RED: temporarily removed `agreement_production_targets_json` from the locally decoded missing-production row at range 45. The focused test rejected the incomplete evidence at the decoder's field-presence expectation:
+  ```text
+  persisted target evidence field must be present
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 21 filtered out; finished in 1.53s
+  elapsed_seconds=4.64 exit_code=101
+  ```
+- The temporary mutation was removed immediately; it changed only the in-memory test row and did not alter the database, fixture files, or production code. Full output: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/red-missing-target-field.log`. Previous RED logs remain unchanged.
+- The first follow-up workspace clippy run flagged the required `Option::expect` (`clippy::expect_used`) under `-D warnings`. Kept the requested `get(...).expect(...)` behavior and isolated the lint exception to a test-local decoder function; final clippy is pending.
+- Focused GREEN, CLI suite, formatting, and workspace clippy are pending after restoration of the valid fixture.
+
+Follow-up GREEN and checks
+- Removed the temporary in-memory row mutation; the strict decoder remains, requiring the field and accepting only explicit `null` or encoded JSON string values. The valid persisted fixture passes.
+- Focused test: `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_oracle_disagreements_keep_reasons -- --exact --nocapture`; `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 1.75s`; `elapsed_seconds=5.13 exit_code=0`.
+- CLI contract suite: `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`; `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.65s`; `elapsed_seconds=6.85 exit_code=0`.
+- `cargo fmt --all -- --check`: no diagnostics; `elapsed_seconds=4.07 exit_code=0`.
+- Workspace clippy after the test-local `#[allow(clippy::expect_used)]` on the decoder that intentionally uses the required `Option::expect`: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.63s`; `elapsed_seconds=0.70 exit_code=0`.
+- Full outputs: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/focused-green-followup.log`, `cli-contract-followup.log`, `fmt-followup.log`, and `clippy-followup.log`. The initial clippy failure is preserved in the log from that attempt; no adapter or release build was rerun, per scope.
+
+### Final review correction — direct target-evidence shape match
+
+- Removed the `clippy::expect_used` allowance and `Option::expect`. The decoder now directly matches `row.get(field)`: `Some(Value::Null)` returns null, `Some(Value::String(encoded))` decodes nested JSON, `Some(other)` panics on invalid type, and `None` panics on a missing field. The missing-field controlled RED above remains valid for this behavior; no product code changed.
+- Final format check: `cargo fmt --all -- --check`, no diagnostics; `elapsed_seconds=4.32 exit_code=0`.
+- Final focused test: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 1.99s`; `elapsed_seconds=5.71 exit_code=0`.
+- Final CLI suite: `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.87s`; `elapsed_seconds=8.13 exit_code=0`.
+- Final workspace clippy: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.64s`; `elapsed_seconds=0.74 exit_code=0`.
+- Logs: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/fmt-final-review.log`, `focused-final-review.log`, `cli-final-review.log`, and `clippy-final-review.log`. No adapter or release build was rerun, per scope.
+- Journal correction: the earlier intermediate `clippy-followup.log` was overwritten by the passing rerun, so it does not retain the initial `expect_used` failure despite the preceding note. The failed command/output appeared in the tool result and is described above; `clippy-final-review.log` contains the final passing output.
