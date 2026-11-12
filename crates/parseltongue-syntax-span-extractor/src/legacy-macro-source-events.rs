@@ -15,14 +15,147 @@ pub fn read_legacy_node_events(
     cfg: &BTreeSet<String>,
     read_key: &dyn Fn(&SyntaxNode, bool) -> Result<Value, StoreBackendFailureError>,
 ) -> Result<LegacyMacroNodeEvents, StoreBackendFailureError> {
-    todo!("ordered legacy macro source events")
+    let mut events = LegacyMacroNodeEvents {
+        before_node_rows: Vec::new(),
+        after_node_rows: Vec::new(),
+    };
+    if !super::check_node_configuration_active(node, cfg)? {
+        return Ok(events);
+    }
+    let start = u32::from(node.text_range().start()) as u64;
+    let event = |position,
+                 phase,
+                 ordinal,
+                 kind: &str,
+                 name: &str,
+                 site: Value,
+                 target: Value,
+                 export| {
+        let order = prefix
+            .iter()
+            .copied()
+            .chain([position, phase, ordinal])
+            .collect::<Vec<_>>();
+        json!({"legacy_source_unit_key":unit,"legacy_source_order_parts":order,"legacy_event_kind_value":kind,
+            "legacy_macro_name_text":name,"legacy_source_site_key":site,"legacy_target_identity_key":target,
+            "legacy_module_export_flag":export})
+    };
+    if matches!(node.kind(), SyntaxKind::MODULE | SyntaxKind::BLOCK_EXPR) {
+        let export = node.kind() == SyntaxKind::MODULE
+            && super::collect_effective_node_attributes(node, cfg)?
+                .iter()
+                .any(|attribute| attribute == "macro_use" || attribute.starts_with("macro_use("));
+        events.before_node_rows.push(event(
+            start,
+            1,
+            0,
+            "enter",
+            "",
+            Value::Null,
+            Value::Null,
+            export,
+        ));
+        events.after_node_rows.push(event(
+            u32::from(node.text_range().end()) as u64,
+            0,
+            0,
+            "exit",
+            "",
+            Value::Null,
+            Value::Null,
+            false,
+        ));
+    }
+    if node.kind() == SyntaxKind::MACRO_RULES
+        && let Some(name) = node.children().find_map(ast::Name::cast)
+    {
+        events.before_node_rows.push(event(
+            start,
+            2,
+            0,
+            "definition",
+            name.text(),
+            Value::Null,
+            read_key(node, true)?,
+            false,
+        ));
+    }
+    if ast::MacroCall::can_cast(node.kind()) {
+        let names = node
+            .descendants_with_tokens()
+            .filter_map(|element| element.into_token())
+            .filter(|token| !token.kind().is_trivia())
+            .scan(None::<String>, |previous, token| {
+                let name = if token.kind() == T![!] {
+                    previous.take()
+                } else {
+                    None
+                };
+                *previous = (token.kind() == SyntaxKind::IDENT)
+                    .then(|| token.text().trim_start_matches("r#").to_owned());
+                Some(name)
+            })
+            .flatten()
+            .collect::<BTreeSet<_>>();
+        if !names.is_empty() {
+            let site = read_key(node, false)?;
+            events
+                .before_node_rows
+                .extend(names.into_iter().enumerate().map(|(index, name)| {
+                    event(
+                        start,
+                        4,
+                        index as u64,
+                        "request",
+                        &name,
+                        site.clone(),
+                        Value::Null,
+                        false,
+                    )
+                }));
+        }
+    }
+    let import = ast::UseTree::cast(node.clone())
+        .filter(|tree| {
+            tree.use_tree_list().is_none()
+                && tree.star_token().is_none()
+                && !tree
+                    .syntax()
+                    .ancestors()
+                    .skip(1)
+                    .filter_map(ast::UseTree::cast)
+                    .any(|parent| parent.path().is_some())
+        })
+        .and_then(|tree| tree.path());
+    let macro_path = ast::Path::cast(node.clone()).filter(|path| {
+        path.syntax()
+            .parent()
+            .is_some_and(|parent| ast::MacroCall::can_cast(parent.kind()))
+    });
+    if let Some(path) = import
+        .or(macro_path)
+        .filter(|path| path.qualifier().is_none())
+        && let Some(name) = path.segment().and_then(|segment| segment.name_ref())
+    {
+        events.before_node_rows.push(event(
+            start,
+            3,
+            0,
+            "request",
+            name.text(),
+            read_key(node, false)?,
+            Value::Null,
+            false,
+        ));
+    }
+    Ok(events)
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
-    use ra_ap_syntax::{AstNode, Edition, SyntaxKind};
+    use ra_ap_syntax::{Edition, SyntaxKind};
     use serde_json::json;
 
     fn collect(source: &str, prefix: &[u64]) -> Vec<Value> {
