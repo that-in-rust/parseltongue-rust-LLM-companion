@@ -725,3 +725,28 @@ evidence can be supplied and validated; those evidence-intake gates are not impl
 structured component validators only, not independent authoritative exported-table or primary-JSONL
 verification. S4/S5 remain unavailable/BLOCKED pending those integrations. No full-corpus qualification
 run was performed.
+
+### REFACTOR — no refactor needed
+
+The import guard and isolated CLI regression are focused; no broader refactor is needed. GREEN code commit:
+`9c538d6ff95888bd20a373955ee6fcedd35daabc`. This checkpoint is documentation-only; no code changed after
+the GREEN test run.
+
+### Scoped codebase-memory refresh
+
+Refreshed once after the final code commit; the following no-refactor checkpoint changes only this journal
+and will not trigger another reindex. Code commit analyzed: `9c538d6ff95888bd20a373955ee6fcedd35daabc`.
+
+```text
+~/.local/bin/codebase-memory-mcp cli index_repository --repo-path /home/ubuntu/repos/parseltongue-rust-LLM-companion --mode full
+status=indexed; nodes=23089; edges=43614; parse_partial=6; not_indexed_files=17
+
+~/.local/bin/codebase-memory-mcp cli index_status --project home-ubuntu-repos-parseltongue-rust-LLM-companion --diagnostics full --format json
+status=ready; indexed_at=2026-11-12T18:20:09Z; nodes=23089; edges=43614; generation_matches=true
+
+~/.local/bin/codebase-memory-mcp cli check_index_coverage --project home-ubuntu-repos-parseltongue-rust-LLM-companion --paths '["tools/hld-current-qualification-runner.py","tools/corpus-index-coverage-inventory.py","tools/corpus-production-stage-measurements.py","tools/test_sop_qualification_runner.py","docs/phase-20261111/sop-runner-work-journal.md"]' --diagnostics full --format json
+path_total=5; path_returned=5; each status=no_recorded_issue; each freshness=metadata_match
+```
+
+Scoped coverage is explicitly a best-effort signal, not a completeness guarantee. The first index command
+attempt mistakenly passed unsupported `--format json` and exited 1; the exact command above succeeded.
