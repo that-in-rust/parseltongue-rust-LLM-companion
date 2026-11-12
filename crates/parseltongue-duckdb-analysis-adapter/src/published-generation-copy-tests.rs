@@ -152,6 +152,54 @@ fn frozen_macro_candidate_lookups() {
         },
         scope_semantic_path_parts: vec![],
     };
+    let occurrence = SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+        &typed_root.scope_compilation_unit_key,
+        "lib.rs",
+        SpanByteRangeValue::try_from((1, 2)).unwrap(),
+        [0; 32].into(),
+        &[],
+    )
+    .unwrap();
+    let shadow =
+        json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":"shadow"})
+            .to_string();
+    {
+        let connection = store._connection.lock().unwrap();
+        connection.execute("INSERT INTO \"namespace-target-context-records\" SELECT generation_key,attempt_key,?,child_scope,visibility_scope,scope_identity FROM \"namespace-target-context-records\" WHERE target_key=?",duckdb::params![shadow,target.to_string()]).unwrap();
+        connection
+            .execute(
+                "INSERT INTO \"namespace-target-source-records\" VALUES (?,?,?,NULL,'{}',false)",
+                duckdb::params![
+                    scope().run_generation_digest_value,
+                    scope().stage_attempt_sequence_value,
+                    shadow
+                ],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO \"namespace-latest-legacy-lookups\" VALUES (?,?,?,?,?,?,1,[1])",
+                duckdb::params![
+                    scope().run_generation_digest_value,
+                    scope().stage_attempt_sequence_value,
+                    "nested-shadow",
+                    namespace_frozen_identity_codec::occurrence_key(&occurrence).to_string(),
+                    "Macro",
+                    shadow
+                ],
+            )
+            .unwrap();
+    }
+    assert_eq!(
+        lookup
+            .read_resolved_builtin_macro_at(
+                &occurrence,
+                &typed_root,
+                &[NamePathSegmentKind::Name("Macro".into())]
+            )
+            .unwrap(),
+        None
+    );
     assert_eq!(
         lookup
             .read_resolved_builtin_macro(&typed_root, &[NamePathSegmentKind::Name("Macro".into())])

@@ -2220,6 +2220,31 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - `20 passed; 0 failed; ... finished in 2.88s` Turso contracts;
   `13 passed; 0 failed; ... finished in 13.99s` adapter publication contracts.
 
+### Ordered macro barriers and frozen macro lookup — GREEN
+
+- CPU projection now expands one resolved pending invocation at a time, ordered
+  by Rust's lexical/virtual source prefix and occurrence identity. It retains
+  only the current crate projection. Generated nested calls run before later
+  original calls. Lightweight expansion queries avoid cloning crate def maps.
+- DuckDB frozen macro lookup reads candidates and target metadata by generation
+  and attempt. Nested builtin argument probes reuse the identical SQL path
+  kernel over one temporary request; they do not replace real candidates or
+  materialize bindings across every scope. Probes copy Rust-produced textual
+  lookups for the enclosing invocation, including nested macro names already
+  emitted by legacy-macro-source-events. Textual shadowing prevents incorrectly
+  selecting a global builtin. Scratch rows are transactionally removed.
+- Added normal/nested-order, empty, lookup-error retry, cancellation, missing
+  candidate, missing metadata, conflicting metadata and generation-isolation
+  tests. Final adapter: 47 passed; syntax: 20 unit + 17 contract passed.
+  All-target three-crate Clippy `-D warnings` finished in 1.24s.
+- CLI wiring is NEXT: freeze source; Appender copy and normalize; fixed point;
+  dependency/source-ordered one-crate macro projection; atomically persist each
+  expansion's semantic_output_rows under name-resolution ownership; freeze a
+  new analysis snapshot and rerun SQL before the next expansion. Retain one
+  lookup wrapper and replace its frozen scope only after the new round settles.
+  Publish an analysis receipt, then final workspace success separately. No full
+  M2 run, resource qualification, manifest, comparator or S5 is claimed yet.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement

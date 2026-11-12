@@ -20,6 +20,7 @@ pub(super) struct PersistedItemMacroPort<'a> {
 }
 
 struct ResolvedBuiltinMacroLookup<'a, 'b> {
+    invocation_occurrence_identity_key: &'a SemanticOccurrenceKeyValue,
     invocation_lexical_scope_key: &'a NameResolutionScopeKey,
     resolved_macro_lookup_port: &'b dyn ResolvedMacroLookupPort,
     lookup_failure: RefCell<Option<NameResolutionStageError>>,
@@ -29,8 +30,11 @@ impl BuiltinMacroLookupPort for ResolvedBuiltinMacroLookup<'_, '_> {
     fn read_builtin_macro_name(&self, path: &[NamePathSegmentKind]) -> Option<String> {
         match self
             .resolved_macro_lookup_port
-            .read_resolved_builtin_macro(self.invocation_lexical_scope_key, path)
-        {
+            .read_resolved_builtin_macro_at(
+                self.invocation_occurrence_identity_key,
+                self.invocation_lexical_scope_key,
+                path,
+            ) {
             Ok(name) => name,
             Err(error) => {
                 *self.lookup_failure.borrow_mut() = Some(error);
@@ -66,6 +70,7 @@ fn expand_builtin_stage_rows(
         .build_builtin_expansion_input(invocation, name)
         .map_err(build_macro_expansion_error)?;
     let lookup = ResolvedBuiltinMacroLookup {
+        invocation_occurrence_identity_key: &invocation.invocation_site_occurrence_key,
         invocation_lexical_scope_key: &invocation.invocation_lexical_scope_key,
         resolved_macro_lookup_port,
         lookup_failure: RefCell::new(None),

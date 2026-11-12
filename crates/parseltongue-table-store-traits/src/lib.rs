@@ -132,6 +132,14 @@ pub trait ItemMacroExpansionPort: Send + Sync {
 }
 
 pub trait ResolvedMacroLookupPort: Send + Sync {
+    fn read_resolved_builtin_macro_at(
+        &self,
+        _invocation: &parseltongue_core_row_types::SemanticOccurrenceKeyValue,
+        scope: &parseltongue_core_row_types::NameResolutionScopeKey,
+        path: &[parseltongue_core_row_types::NamePathSegmentKind],
+    ) -> Result<Option<String>, parseltongue_core_row_types::NameResolutionStageError> {
+        self.read_resolved_builtin_macro(scope, path)
+    }
     fn read_macro_invocation_binding_record(
         &self,
         _request_key: &str,
