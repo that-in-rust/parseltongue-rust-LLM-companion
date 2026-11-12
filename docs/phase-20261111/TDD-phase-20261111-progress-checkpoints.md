@@ -3653,3 +3653,20 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   DuckDB C++.
 - This contract regression is separate from the native M2 test and does not
   qualify S3 or start any corpus run.
+
+## 2026-11-12 — reviewed oracle branch integration
+
+- Fetched and merged
+  `origin/devin/1794501872-comparator-parallel-work` through
+  `eecdf0d3700d33b7522709f01cfbf24fbdba9e90`. Verified it descends from
+  `c2e971409b43d028d0e2ce2c92119cb709c79fc3` through both
+  `e7519a2` and `f1e6197`. No commits were rebased or rewritten.
+- The only merge conflict was a mechanical append-at-EOF conflict in SPEC:
+  one branch appended REQ-RUST-028.0 and the other REQ-RUST-027.0. Both
+  independent appendices and existing requirements were preserved, ordered
+  027 then 028. AGENTS.md and SOP auto-merged. The effective no-interim-cap
+  policy under REQ-RUST-024.4 remains intact. No substantive conflict remains.
+- The oracle branch's reviewed RED, 34 harness tests, fmt, Clippy and release
+  gates were not repeated here as instructed. The earlier CLI contract target
+  result excludes `test_lang_items_in_sysroot`; native M2 remains pending and
+  the timeout report remains historical. No corpus run or push occurred.
