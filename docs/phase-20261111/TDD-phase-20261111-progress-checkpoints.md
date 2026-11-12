@@ -1647,3 +1647,16 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   /home/ubuntu/m2-secondary-script-green-clippy.log. Diff check passed.
 - Remaining before S5: exact expansion/proc provenance, CPU/table-backed
   differ and full corpus mapping/export/measurement. No S5 number yet exists.
+
+### SECONDARY recorded-script deltas REFACTOR
+
+- Extracted recorded cfg-atom parsing; no behavior/schema change.
+- Paired script contracts: 3 passed / 0 failed (5.07s); release all-target
+  clippy -D warnings passed (3.97s); diff check passed.
+- Logs: /home/ubuntu/m2-secondary-script-refactor-tests.log and
+  /home/ubuntu/m2-secondary-script-refactor-clippy.log.
+- Full M2 serde mapping started independently using the frozen production
+  executable 30cf4b8f5f0c456d7c4fa6d6a9a960575fec24a9fe691320db23efd92443ac8a.
+  Output: e2e-runs/2026-11-11/serde/s5-primary-path-agreement/.
+  Shell ce054b owns the sole writer. It exports the exact manifest only after
+  mapping succeeds. Do not run a second writer against this store.

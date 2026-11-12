@@ -7,6 +7,19 @@ use ide_db::{
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+fn parse_recorded_cfg_atom(flag: &str) -> Result<CfgAtom, OracleSemanticExportError> {
+    if let Some((key, value)) = flag.split_once('=') {
+        let value =
+            serde_json::from_str::<String>(value.trim()).map_err(build_oracle_export_error)?;
+        Ok(CfgAtom::KeyValue {
+            key: hir::Symbol::intern(key.trim()),
+            value: hir::Symbol::intern(&value),
+        })
+    } else {
+        Ok(CfgAtom::Flag(hir::Symbol::intern(flag)))
+    }
+}
+
 pub(super) fn apply_recorded_script_options(
     unit: &Value,
     rows: &[Value],
@@ -59,18 +72,7 @@ pub(super) fn apply_recorded_script_options(
             .map_err(build_oracle_export_error)?;
     let atoms = flags
         .iter()
-        .map(|flag| {
-            if let Some((key, value)) = flag.split_once('=') {
-                let value = serde_json::from_str::<String>(value.trim())
-                    .map_err(build_oracle_export_error)?;
-                Ok(CfgAtom::KeyValue {
-                    key: hir::Symbol::intern(key.trim()),
-                    value: hir::Symbol::intern(&value),
-                })
-            } else {
-                Ok(CfgAtom::Flag(hir::Symbol::intern(flag)))
-            }
-        })
+        .map(|flag| parse_recorded_cfg_atom(flag))
         .collect::<Result<Vec<_>, OracleSemanticExportError>>()?;
     if atoms.iter().any(|atom| !actual.check_atom(atom)) {
         return Err(build_oracle_export_error("SECONDARY recorded cfg differs"));
