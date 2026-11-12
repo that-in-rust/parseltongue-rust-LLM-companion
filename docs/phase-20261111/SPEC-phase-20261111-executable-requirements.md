@@ -803,3 +803,14 @@ GREEN, serde wall time/rounds/tree RSS, comparator SQL, all-five S5. Continue
 S6/S7 with SOP codebase-memory: list_projects, exact root_path match, schema,
 complete paginated coverage and reconciliation. Commit/push STUB, RED, GREEN,
 REFACTOR separately. No success is inferred from unmeasured stages.
+
+### Memory acceptance revision — correctness milestone first
+
+REQ-RUST-024.5 supersedes the process-tree acceptance threshold in
+REQ-RUST-024.4: the final target is peak RSS ≤500 MB (500,000,000 bytes) for
+the whole process tree. Enforce this target after the correctness milestone:
+working end-to-end DuckDB M2 and S5 results for all five repositories.
+Until those S5 results exist, prioritize correctness and do not optimize RAM.
+Retain the current approximately 1.2 GiB DuckDB cap, record measured tree
+peaks, wall time and resolution rounds, and label the historical 2 GiB gate
+and current engine settings as interim, not final memory acceptance.

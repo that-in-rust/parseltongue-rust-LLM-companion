@@ -333,3 +333,13 @@ The process auditor must bind that exact configured path, not infer identity fro
 the filename. Reanalyse saved traces only with that explicit identity; never rewrite
 traces or ignore unfinished events. A repeat audit may replace an incomplete capture
 only if the failed capture and the repeat's evidence are both retained.
+
+### S10 memory revision — deferred until correctness
+
+The final whole-process-tree peak RSS target is ≤500 MB (500,000,000 bytes),
+superseding the earlier 2 GiB acceptance gate. Enforce the revised target
+after working DuckDB M2 and S5 results exist for all five repositories.
+Before that milestone, prioritize correctness: do not optimize RAM, retain
+the approximately 1.2 GiB DuckDB cap, and record actual process-tree peaks,
+wall time and resolution rounds. Historical 2 GiB checks and current engine
+limits are interim settings, not evidence of final memory acceptance.
