@@ -98,6 +98,7 @@ mod frozen_generation_appender_copy;
 
 #[path = "frozen-namespace-source-codec.rs"]
 mod frozen_namespace_source_codec;
+pub use frozen_namespace_source_codec::NAMESPACE_SOURCE_TABLE_NAMES;
 
 #[path = "namespace-binding-round-strata.rs"]
 mod namespace_binding_round_strata;

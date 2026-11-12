@@ -2,7 +2,153 @@
 
 use super::*;
 use parseltongue_core_row_types::{StageTableRowRecord, StageUnitWriteRequest};
+use serde_json::{Value, json};
 use std::collections::BTreeMap;
+
+fn namespace_source_fixture() -> Source {
+    let unit = json!({"unit_cargo_package_identifier":"fixture","unit_cargo_target_name":"fixture","unit_cargo_target_kind":"lib","unit_compilation_role_kind":"target","unit_configuration_digest_full":"0".repeat(64)});
+    let root = json!({"scope_compilation_unit_key":unit,"scope_semantic_path_parts":[]});
+    let item = json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":"u8"});
+    let scope_row = json!({"scope_module_identity_key":root,"scope_parent_identity_key":null,"scope_parent_lookup_flag":false,"scope_module_boundary_flag":true,"scope_implicit_prelude_key":null,"scope_cargo_unit_key":"fixture-unit"});
+    let binding = json!({"binding_lexical_scope_key":root,"binding_resolved_name_text":"r#Item","binding_namespace_kind_value":"type","binding_target_identity_key":item,"binding_target_child_scope":null,"binding_visibility_scope_kind":{"visibility_scope_kind_value":"public"},"binding_selection_priority_kind":"declaration","binding_import_evidence_keys":[],"binding_target_metadata_value":{"target_symbol_kind_value":"Struct"}});
+    let path = json!({"path_site_occurrence_key":{"site":"path"},"path_lexical_scope_key":root,"path_source_segment_rows":[{"kind":"name","name":"r#Item"}],"path_requested_namespace_kind":"Type","path_resolution_source_kind":"Signature","path_unavailable_reason_kind":null,"path_source_metadata_value":{"path_source_absolute_path":"/fixture/lib.rs"}});
+    let mut records = NAMESPACE_SOURCE_TABLE_NAMES
+        .iter()
+        .map(|table| (table.to_string(), vec![]))
+        .collect::<BTreeMap<_, _>>();
+    for (table, value) in [
+        ("syntax-namespace-input-scopes", scope_row),
+        ("syntax-namespace-input-items", binding),
+        ("syntax-namespace-input-paths", path),
+        (
+            "crate-dependency-graph-table",
+            json!({"unit_compilation_identity_key":"fixture-unit","unit_rust_edition_value":"2024","unit_normal_dependency_rows":[]}),
+        ),
+    ] {
+        let text = value.to_string();
+        records
+            .entry(table.into())
+            .or_default()
+            .push(StageTableRowRecord {
+                stage_owned_table_name: table.into(),
+                stage_row_record_key: blake3::hash(text.as_bytes()).to_hex().to_string(),
+                stage_row_payload_text: text,
+            });
+    }
+    Source {
+        published: Some(scope()),
+        records,
+        fail: false,
+        wrong_count: false,
+    }
+}
+
+#[test]
+fn frozen_namespace_normalization_contract() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        64 * 1024 * 1024,
+    )
+    .unwrap();
+    store
+        .copy_published_stage_rows(
+            &namespace_source_fixture(),
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+            .unwrap(),
+        4
+    );
+    let connection = store._connection.lock().unwrap();
+    let name:String=connection.query_row("SELECT name FROM \"namespace-binding-declaration-records\" ORDER BY generation_key,attempt_key,scope_key,name,namespace,target_key,priority,evidence_key",[],|row|row.get(0)).unwrap();
+    assert_eq!(name, "Item");
+    let segments: usize = connection
+        .query_row(
+            "SELECT count(*) FROM \"namespace-path-segment-records\"",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(segments, 1);
+    let generation:String=connection.query_row("SELECT generation_key FROM \"namespace-normalized-source-manifests\" ORDER BY generation_key,attempt_key",[],|row|row.get(0)).unwrap();
+    assert_eq!(generation, scope().run_generation_digest_value);
+}
+
+#[test]
+fn frozen_namespace_normalization_empty_and_errors() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        64 * 1024 * 1024,
+    )
+    .unwrap();
+    assert!(
+        store
+            .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+            .is_err()
+    );
+    let mut source = namespace_source_fixture();
+    source.records.values_mut().for_each(Vec::clear);
+    store
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+            .unwrap(),
+        0
+    );
+    let cancelled = RunCancelFlagValue::default();
+    cancelled.request_stage_work_cancellation();
+    assert!(
+        store
+            .normalize_frozen_namespace_rows(&scope(), &cancelled)
+            .is_err()
+    );
+    let invalid = StageRunScopeValue {
+        stage_attempt_sequence_value: "invalid".into(),
+        ..scope()
+    };
+    source.published = Some(invalid.clone());
+    source
+        .records
+        .get_mut("syntax-namespace-input-scopes")
+        .unwrap()
+        .push(StageTableRowRecord {
+            stage_owned_table_name: "syntax-namespace-input-scopes".into(),
+            stage_row_record_key: "bad".into(),
+            stage_row_payload_text: "null".into(),
+        });
+    store
+        .copy_published_stage_rows(
+            &source,
+            &invalid,
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    assert!(
+        store
+            .normalize_frozen_namespace_rows(&invalid, &RunCancelFlagValue::default())
+            .is_err()
+    );
+    let connection = store._connection.lock().unwrap();
+    let count:usize=connection.query_row("SELECT count(*) FROM \"namespace-normalized-source-manifests\" WHERE attempt_key='invalid'",[],|row|row.get(0)).unwrap();
+    assert_eq!(count, 0);
+}
 
 struct Source {
     published: Option<StageRunScopeValue>,
