@@ -1,7 +1,9 @@
 {
-  "oracle_executable_digest_full": "65c41accfa14cffd800324c41dc5c70b46dfb47d4b7ce7f9fabaa2494c5c2604",
+  "oracle_executable_digest_full": "b8feab58a4162ab97c77e96befcda58acd716ff1265bb2f7a03735a482f4bd1a",
   "oracle_export_support_kind": "provenance_only",
   "oracle_hir_crate_bytes": 8,
-  "oracle_source_commit_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+  "oracle_source_commit_hash": "bf6b2099d6351c37039b01447a9bb64f9a54a586",
+  "oracle_source_upstream_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+  "oracle_source_patch_path": "tools/parser-const-closure-statements.patch",
   "oracle_toolchain_version_text": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
 }

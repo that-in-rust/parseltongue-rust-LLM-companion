@@ -11,12 +11,12 @@ spec=importlib.util.spec_from_file_location("driver",ROOT/"tools/corpus-producti
 driver=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(driver)
 
-def measure_parser_aligned_corpus(binary):
+def measure_parser_aligned_corpus(binary, evidence_name="parser-aligned-m1-measurements"):
     binary=Path(binary).resolve()
     digest=hashlib.sha256(binary.read_bytes()).hexdigest()
     pin=json.loads((ROOT/"docs/phase-20261111/parser-source-pin-manifest.json").read_text())["parser_source_commit_hash"]
     for record in json.loads((ROOT/"docs/phase-20261111/corpus-source-pin-manifest.json").read_text()):
-        output=ROOT/record["corpus_evidence_directory_path"]/"parser-aligned-m1-measurements"
+        output=ROOT/record["corpus_evidence_directory_path"]/evidence_name
         output.mkdir(exist_ok=False)
         selected=dict(record,corpus_mapper_binary_path=str(binary),corpus_mapping_final_stage="syntax-spans",
                       corpus_evidence_directory_path=str(output))
@@ -27,4 +27,4 @@ def measure_parser_aligned_corpus(binary):
         print(json.dumps(summary),flush=True)
 
 if __name__=="__main__":
-    measure_parser_aligned_corpus(sys.argv[1])
+    measure_parser_aligned_corpus(sys.argv[1], *sys.argv[2:])

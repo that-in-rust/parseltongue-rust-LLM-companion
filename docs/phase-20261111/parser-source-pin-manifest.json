@@ -1,8 +1,12 @@
 {
-  "parser_source_commit_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+  "parser_source_commit_hash": "bf6b2099d6351c37039b01447a9bb64f9a54a586",
+  "parser_source_upstream_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+  "parser_source_patch_path": "tools/parser-const-closure-statements.patch",
+  "parser_source_bundle_path": "tools/parser-source-fork-bundle.bundle",
   "parser_source_checkout_path": "../rust-tools/rust-analyzer",
   "parser_source_dependency_kind": "path",
   "parser_source_package_names": ["parser", "syntax"],
-  "parser_source_previous_hash": "6e37b2d62127d445d77069031b416c48c9b0b4f2",
-  "parser_source_qualification_text": "Upstream master fetched 2026-11-11; grammar/items.rs consumes final, with final_assoc_fn fixture. Production and oracle use this identical clean checkout; no token patch."
+  "parser_source_previous_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+  "parser_source_patch_digest": "89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa",
+  "parser_source_qualification_text": "upstream 2a362a41 + patch bf6b2099d6351c37039b01447a9bb64f9a54a586; opt_item leaves const move/pipe closures to expression parsing. Production and oracle share this clean fork. No token patch."
 }

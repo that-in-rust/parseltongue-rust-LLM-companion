@@ -1142,3 +1142,41 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   errors, or silently select an older sysroot. No external checkout edits made.
 - Sysroot GREEN/REFACTOR and manifests/differ/S5 remain incomplete. Preserve the
   seven existing uncommitted sysroot files. No agreement numerator/denominator exists.
+
+## Authorized const closure grammar GREEN — 2026-11-12
+
+- Local upstream fork branch: devin/1794451883-statement-const-closures.
+  Base 2a362a41a8eb6e090f1a12d9b712df85af6f0c33; patch
+  bf6b2099d6351c37039b01447a9bb64f9a54a586. Parser and oracle pin that same clean fork.
+- opt_item returns its unconsumed marker for const followed by move/pipe, before
+  both modifier parsing AND the later const-item fallback. Merely excluding the
+  modifier guard was insufficient: native tests exposed the fallback.
+  No token rewriting, suppression, source substitution, or toolchain changes.
+- Upstream inline fixtures cover const/move, empty/typed parameters, tails and
+  semicolon statements, plus missing-body recovery. Generated success/error
+  snapshots inspected: CLOSURE_EXPR owns const; error case still reports expression.
+- Native parser: 333 passed; xtask: 13 passed; affected parser Clippy and xtask tidy
+  exit zero. Existing stable-Cargo optional-nightly-lint warnings remain unchanged.
+  Direct production const-closure regression: 1 passed.
+  Oracle tests: 16 passed; release build succeeded. Manifest digest refreshed.
+- Rustc evidence (AI policy): compiler/rustc_parse/src/parser/mod.rs at installed
+  58cf8f9c35b355199727627d07ae34a4e2846d67, check_const_closure and
+  parse_constness_ explicitly avoid parsing closures as const items; expr.rs
+  dispatches them to parse_expr_closure. Citation is in the patch commit.
+- Reviewable patch is tools/parser-const-closure-statements.patch. The 2.9 KiB
+  tools/parser-source-fork-bundle.bundle publishes the exact fork git object without
+  pushing to upstream or creating a PR. Fetch bundle HEAD after cloning upstream;
+  git bundle verify requires the recorded base commit. Both artefacts are in-repo.
+- Patched native sysroot integration advanced beyond parsing and remains running,
+  paused while all-five untraced S3 measurements execute (SIGCONT 1091013 afterwards).
+  It is not yet GREEN. Preserve its seven implementation files uncommitted.
+- Frozen M1 binary: /home/ubuntu/m1-const-patched-parseltongue. Evidence suffix:
+  const-patched-m1-measurements. Keep prior parser-aligned evidence unchanged.
+  Next: finish S3, resume native sysroot integration, then sysroot GREEN/REFACTOR,
+  exact oracle mapped units, differ and all-five S5. No S5 number claimed.
+- Patched workspace tests: 103 passed, 3 manual profiles ignored; only pending
+  native sysroot integration filtered. Fork cargo fetch --locked and cargo check
+  --workspace --locked both exit zero; check reports 9.28s.
+- Frozen executable SHA-256:
+  f528d38b7e4b0aaadf2b83f4d5b9b9eb7336ed4e9462ff15846f3027a202be9f.
+  Driver shell 190221; log /home/ubuntu/m2-const-patched-corpus.log.

@@ -1,0 +1,328 @@
+From bf6b2099d6351c37039b01447a9bb64f9a54a586 Mon Sep 17 00:00:00 2001
+From: That in Rust <amul.exe@gmail.com>
+Date: Thu, 12 Nov 2026 02:54:57 +0000
+Subject: [PATCH] fix: parse statement-position const closures as expressions
+
+AI-assisted implementation; human review required before upstream submission. Base: 2a362a41a8eb6e090f1a12d9b712df85af6f0c33.
+
+Mirrors rustc check_const_closure and parse_constness_: const closures must not be parsed as const items; stmt parsing falls through to expression parsing. Scope is move and pipe lookahead already supported by the expression parser.
+
+rustc citation: https://github.com/rust-lang/rust/blob/58cf8f9c35b355199727627d07ae34a4e2846d67/compiler/rustc_parse/src/parser/mod.rs (check_const_closure, parse_constness_); expr.rs (parse_expr_closure); stmt.rs (parse_item_common fallback).
+
+Co-Authored-By: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>
+---
+ crates/parser/src/grammar/expressions/atom.rs |   3 +
+ crates/parser/src/grammar/items.rs            |  10 +
+ crates/parser/test_data/generated/runner.rs   |   8 +
+ .../err/const_closure_missing_body.rast       |  30 +++
+ .../inline/err/const_closure_missing_body.rs  |   1 +
+ .../inline/ok/const_closure_statement.rast    | 178 ++++++++++++++++++
+ .../inline/ok/const_closure_statement.rs      |   5 +
+ 7 files changed, 235 insertions(+)
+ create mode 100644 crates/parser/test_data/parser/inline/err/const_closure_missing_body.rast
+ create mode 100644 crates/parser/test_data/parser/inline/err/const_closure_missing_body.rs
+ create mode 100644 crates/parser/test_data/parser/inline/ok/const_closure_statement.rast
+ create mode 100644 crates/parser/test_data/parser/inline/ok/const_closure_statement.rs
+
+diff --git a/crates/parser/src/grammar/expressions/atom.rs b/crates/parser/src/grammar/expressions/atom.rs
+index fbcd5d672e..9a38e2e0ce 100644
+--- a/crates/parser/src/grammar/expressions/atom.rs
++++ b/crates/parser/src/grammar/expressions/atom.rs
+@@ -612,6 +612,9 @@ fn closure_expr(p: &mut Parser<'_>) -> CompletedMarker {
+     }
+     // test const_closure
+     // fn main() { let cl = const || _ = 0; }
++
++    // test_err const_closure_missing_body
++    // fn f() { const move |x| }
+     p.eat(T![const]);
+     p.eat(T![static]);
+     p.eat(T![async]);
+diff --git a/crates/parser/src/grammar/items.rs b/crates/parser/src/grammar/items.rs
+index eefad273ef..ace0f99df6 100644
+--- a/crates/parser/src/grammar/items.rs
++++ b/crates/parser/src/grammar/items.rs
+@@ -112,6 +112,16 @@ pub(super) fn opt_item(p: &mut Parser<'_>, m: Marker, is_in_extern: bool) -> Res
+     // fn foo() { pub 92; }
+     let has_visibility = opt_visibility(p, false);
+ 
++    // test const_closure_statement
++    // fn f() { const || () }
++    // fn f() { const move || () }
++    // fn f() { const |x: u8| x }
++    // fn f() { const move |x: u8| x }
++    // fn f() { const || (); const move || (); }
++    if !has_visibility && p.at(T![const]) && matches!(p.nth(1), T![move] | T![|]) {
++        return Err(m);
++    }
++
+     let m = match opt_item_without_modifiers(p, m) {
+         Ok(()) => return Ok(()),
+         Err(m) => m,
+diff --git a/crates/parser/test_data/generated/runner.rs b/crates/parser/test_data/generated/runner.rs
+index fe7e3d5c8d..918d392650 100644
+--- a/crates/parser/test_data/generated/runner.rs
++++ b/crates/parser/test_data/generated/runner.rs
+@@ -159,6 +159,10 @@ mod ok {
+     #[test]
+     fn const_closure() { run_and_expect_no_errors("test_data/parser/inline/ok/const_closure.rs"); }
+     #[test]
++    fn const_closure_statement() {
++        run_and_expect_no_errors("test_data/parser/inline/ok/const_closure_statement.rs");
++    }
++    #[test]
+     fn const_item() { run_and_expect_no_errors("test_data/parser/inline/ok/const_item.rs"); }
+     #[test]
+     fn const_param() { run_and_expect_no_errors("test_data/parser/inline/ok/const_param.rs"); }
+@@ -849,6 +853,10 @@ mod err {
+         );
+     }
+     #[test]
++    fn const_closure_missing_body() {
++        run_and_expect_errors("test_data/parser/inline/err/const_closure_missing_body.rs");
++    }
++    #[test]
+     fn crate_visibility_empty_recover() {
+         run_and_expect_errors("test_data/parser/inline/err/crate_visibility_empty_recover.rs");
+     }
+diff --git a/crates/parser/test_data/parser/inline/err/const_closure_missing_body.rast b/crates/parser/test_data/parser/inline/err/const_closure_missing_body.rast
+new file mode 100644
+index 0000000000..e8580122d7
+--- /dev/null
++++ b/crates/parser/test_data/parser/inline/err/const_closure_missing_body.rast
+@@ -0,0 +1,30 @@
++SOURCE_FILE
++  FN
++    FN_KW "fn"
++    WHITESPACE " "
++    NAME
++      IDENT "f"
++    PARAM_LIST
++      L_PAREN "("
++      R_PAREN ")"
++    WHITESPACE " "
++    BLOCK_EXPR
++      STMT_LIST
++        L_CURLY "{"
++        WHITESPACE " "
++        CLOSURE_EXPR
++          CONST_KW "const"
++          WHITESPACE " "
++          MOVE_KW "move"
++          WHITESPACE " "
++          PARAM_LIST
++            PIPE "|"
++            PARAM
++              IDENT_PAT
++                NAME
++                  IDENT "x"
++            PIPE "|"
++        WHITESPACE " "
++        R_CURLY "}"
++  WHITESPACE "\n"
++error 23: expected expression
+diff --git a/crates/parser/test_data/parser/inline/err/const_closure_missing_body.rs b/crates/parser/test_data/parser/inline/err/const_closure_missing_body.rs
+new file mode 100644
+index 0000000000..40c87dee09
+--- /dev/null
++++ b/crates/parser/test_data/parser/inline/err/const_closure_missing_body.rs
+@@ -0,0 +1 @@
++fn f() { const move |x| }
+diff --git a/crates/parser/test_data/parser/inline/ok/const_closure_statement.rast b/crates/parser/test_data/parser/inline/ok/const_closure_statement.rast
+new file mode 100644
+index 0000000000..113901da50
+--- /dev/null
++++ b/crates/parser/test_data/parser/inline/ok/const_closure_statement.rast
+@@ -0,0 +1,178 @@
++SOURCE_FILE
++  FN
++    FN_KW "fn"
++    WHITESPACE " "
++    NAME
++      IDENT "f"
++    PARAM_LIST
++      L_PAREN "("
++      R_PAREN ")"
++    WHITESPACE " "
++    BLOCK_EXPR
++      STMT_LIST
++        L_CURLY "{"
++        WHITESPACE " "
++        CLOSURE_EXPR
++          CONST_KW "const"
++          WHITESPACE " "
++          PARAM_LIST
++            PIPE "|"
++            PIPE "|"
++          WHITESPACE " "
++          TUPLE_EXPR
++            L_PAREN "("
++            R_PAREN ")"
++        WHITESPACE " "
++        R_CURLY "}"
++  WHITESPACE "\n"
++  FN
++    FN_KW "fn"
++    WHITESPACE " "
++    NAME
++      IDENT "f"
++    PARAM_LIST
++      L_PAREN "("
++      R_PAREN ")"
++    WHITESPACE " "
++    BLOCK_EXPR
++      STMT_LIST
++        L_CURLY "{"
++        WHITESPACE " "
++        CLOSURE_EXPR
++          CONST_KW "const"
++          WHITESPACE " "
++          MOVE_KW "move"
++          WHITESPACE " "
++          PARAM_LIST
++            PIPE "|"
++            PIPE "|"
++          WHITESPACE " "
++          TUPLE_EXPR
++            L_PAREN "("
++            R_PAREN ")"
++        WHITESPACE " "
++        R_CURLY "}"
++  WHITESPACE "\n"
++  FN
++    FN_KW "fn"
++    WHITESPACE " "
++    NAME
++      IDENT "f"
++    PARAM_LIST
++      L_PAREN "("
++      R_PAREN ")"
++    WHITESPACE " "
++    BLOCK_EXPR
++      STMT_LIST
++        L_CURLY "{"
++        WHITESPACE " "
++        CLOSURE_EXPR
++          CONST_KW "const"
++          WHITESPACE " "
++          PARAM_LIST
++            PIPE "|"
++            PARAM
++              IDENT_PAT
++                NAME
++                  IDENT "x"
++              COLON ":"
++              WHITESPACE " "
++              PATH_TYPE
++                PATH
++                  PATH_SEGMENT
++                    NAME_REF
++                      IDENT "u8"
++            PIPE "|"
++          WHITESPACE " "
++          PATH_EXPR
++            PATH
++              PATH_SEGMENT
++                NAME_REF
++                  IDENT "x"
++        WHITESPACE " "
++        R_CURLY "}"
++  WHITESPACE "\n"
++  FN
++    FN_KW "fn"
++    WHITESPACE " "
++    NAME
++      IDENT "f"
++    PARAM_LIST
++      L_PAREN "("
++      R_PAREN ")"
++    WHITESPACE " "
++    BLOCK_EXPR
++      STMT_LIST
++        L_CURLY "{"
++        WHITESPACE " "
++        CLOSURE_EXPR
++          CONST_KW "const"
++          WHITESPACE " "
++          MOVE_KW "move"
++          WHITESPACE " "
++          PARAM_LIST
++            PIPE "|"
++            PARAM
++              IDENT_PAT
++                NAME
++                  IDENT "x"
++              COLON ":"
++              WHITESPACE " "
++              PATH_TYPE
++                PATH
++                  PATH_SEGMENT
++                    NAME_REF
++                      IDENT "u8"
++            PIPE "|"
++          WHITESPACE " "
++          PATH_EXPR
++            PATH
++              PATH_SEGMENT
++                NAME_REF
++                  IDENT "x"
++        WHITESPACE " "
++        R_CURLY "}"
++  WHITESPACE "\n"
++  FN
++    FN_KW "fn"
++    WHITESPACE " "
++    NAME
++      IDENT "f"
++    PARAM_LIST
++      L_PAREN "("
++      R_PAREN ")"
++    WHITESPACE " "
++    BLOCK_EXPR
++      STMT_LIST
++        L_CURLY "{"
++        WHITESPACE " "
++        EXPR_STMT
++          CLOSURE_EXPR
++            CONST_KW "const"
++            WHITESPACE " "
++            PARAM_LIST
++              PIPE "|"
++              PIPE "|"
++            WHITESPACE " "
++            TUPLE_EXPR
++              L_PAREN "("
++              R_PAREN ")"
++          SEMICOLON ";"
++        WHITESPACE " "
++        EXPR_STMT
++          CLOSURE_EXPR
++            CONST_KW "const"
++            WHITESPACE " "
++            MOVE_KW "move"
++            WHITESPACE " "
++            PARAM_LIST
++              PIPE "|"
++              PIPE "|"
++            WHITESPACE " "
++            TUPLE_EXPR
++              L_PAREN "("
++              R_PAREN ")"
++          SEMICOLON ";"
++        WHITESPACE " "
++        R_CURLY "}"
++  WHITESPACE "\n"
+diff --git a/crates/parser/test_data/parser/inline/ok/const_closure_statement.rs b/crates/parser/test_data/parser/inline/ok/const_closure_statement.rs
+new file mode 100644
+index 0000000000..d6b544caa1
+--- /dev/null
++++ b/crates/parser/test_data/parser/inline/ok/const_closure_statement.rs
+@@ -0,0 +1,5 @@
++fn f() { const || () }
++fn f() { const move || () }
++fn f() { const |x: u8| x }
++fn f() { const move |x: u8| x }
++fn f() { const || (); const move || (); }
+-- 
+2.56.0
+

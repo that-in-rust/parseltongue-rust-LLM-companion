@@ -571,7 +571,14 @@ copies/links no code; tooling is for agents, never part of production. Record fu
 
 Repository: https://github.com/rust-lang/rust-analyzer
 License: MIT OR Apache-2.0.
-Pinned parser/oracle source commit: 2a362a41a8eb6e090f1a12d9b712df85af6f0c33 (M: upstream master, 2026-11-11).
+Pinned parser/oracle source: upstream 2a362a41 + patch bf6b2099d6351c37039b01447a9bb64f9a54a586.
+Full upstream base: 2a362a41a8eb6e090f1a12d9b712df85af6f0c33.
+The minimal opt_item grammar patch routes statement-position const move/pipe closures
+to expression parsing, retaining source tokens. Upstream-style success/error snapshots
+are included. Reviewable patch: tools/parser-const-closure-statements.patch.
+Reproducible fork object: tools/parser-source-fork-bundle.bundle (base prerequisite).
+After cloning upstream, fetch that bundle's HEAD and detach at the full patch hash.
+The parser and oracle manifests require this same clean commit.
 The earlier nameres/MBe copy-adaptations retain their recorded 6e37b2d62127d445d77069031b416c48c9b0b4f2 origin.
 - Copy-adapt crates/hir-def/src/nameres/ collector/path resolution into the crate fixed point.
 - Copy-adapt crates/mbe/src/ expander/transcriber without salsa; crates/hir-expand/src/builtin/
@@ -622,7 +629,7 @@ Mode: pinned dev-dependency; byte, reason, identity and graph-invariant fixtures
 
 All five are equal test cases; external offline lib+bin qualification once, never production compilation.
 - https://github.com/rust-lang/rust-analyzer
-  Commit: 2a362a41a8eb6e090f1a12d9b712df85af6f0c33.
+  Commit: upstream 2a362a41 + patch bf6b2099d6351c37039b01447a9bb64f9a54a586.
 - https://github.com/BurntSushi/ripgrep
   Full commit: 178cc027e283fd965cb72d0a7395b219eada170c.
 - https://github.com/tokio-rs/tokio
