@@ -18,7 +18,7 @@ A successful external cargo check does not imply arbitrary repository files pars
 
 The offline answer key is `oracle-semantic-export-harness`, built from the rust-analyzer commit in §8.
 Record its executable digest, source commit, toolchain and configuration. The installed rust-analyzer
-1.99.1 (58cf8f9) is NOT the oracle for checkout 6e37b2d62. The harness may link ide/hir/salsa and run proc
+1.99.1 (58cf8f9) is NOT the oracle for checkout 2a362a41a. The harness may link ide/hir/salsa and run proc
 macros: it is outside Parseltongue's production dependency/process boundary. No LLM or training anywhere.
 
 - PRIMARY: build scripts disabled; proc macros enabled; mapped target/feature/cfg/edition policy identical
@@ -571,15 +571,17 @@ copies/links no code; tooling is for agents, never part of production. Record fu
 
 Repository: https://github.com/rust-lang/rust-analyzer
 License: MIT OR Apache-2.0.
-Pinned source commit: 6e37b2d62127d445d77069031b416c48c9b0b4f2 (M: checkout).
+Pinned parser/oracle source commit: 2a362a41a8eb6e090f1a12d9b712df85af6f0c33 (M: upstream master, 2026-11-11).
+The earlier nameres/MBe copy-adaptations retain their recorded 6e37b2d62127d445d77069031b416c48c9b0b4f2 origin.
 - Copy-adapt crates/hir-def/src/nameres/ collector/path resolution into the crate fixed point.
 - Copy-adapt crates/mbe/src/ expander/transcriber without salsa; crates/hir-expand/src/builtin/
   fn_macro.rs, attr_macro.rs and derives; lang_item.rs recognized lang-item names.
 - Rewrite-from hir-def/src/expr_store/lower.rs; hir-ty/src/lower.rs, infer/, method_resolution.rs,
   next_solver/interner.rs; project-model/ process/input handling; ide-db/src/prime_caches.rs scheduling.
-- Link parser crates ra_ap_syntax, ra_ap_parser, ra-ap-rustc_lexer at one compatible pinned set,
-  recorded at M0. M: registry observations ra_ap_syntax 0.0.362, ra-ap-rustc_lexer 0.180;
-  availability alone is not proof of compatibility with the checkout.
+- Link syntax/parser directly from the exact clean oracle checkout, with ra-ap-rustc_lexer 0.180.
+  parser-source-pin-manifest.json and a shared build-time verifier enforce the source pin.
+  M: registry 0.0.362 and the earlier checkout both reject Rust 1.99 final associated functions;
+  the new checkout's grammar accepts them. Do not rewrite tokens to compensate.
 - Build oracle-semantic-export-harness from this exact checkout with its ide/hir crates.
   Record executable digest/build manifest after build; the installed 58cf8f9 binary is not substituted.
 - Never link ra_ap_hir*, ra_ap_ide*, ra_ap_base_db, salsa or the proc-macro server into production.
@@ -620,7 +622,7 @@ Mode: pinned dev-dependency; byte, reason, identity and graph-invariant fixtures
 
 All five are equal test cases; external offline lib+bin qualification once, never production compilation.
 - https://github.com/rust-lang/rust-analyzer
-  Commit: 6e37b2d62127d445d77069031b416c48c9b0b4f2.
+  Commit: 2a362a41a8eb6e090f1a12d9b712df85af6f0c33.
 - https://github.com/BurntSushi/ripgrep
   Full commit: 178cc027e283fd965cb72d0a7395b219eada170c.
 - https://github.com/tokio-rs/tokio

@@ -2,16 +2,16 @@
   {
     "corpus_repository_short_name": "rust-analyzer",
     "corpus_repository_remote_url": "https://github.com/rust-lang/rust-analyzer",
-    "corpus_source_commit_hash": "6e37b2d62127d445d77069031b416c48c9b0b4f2",
+    "corpus_source_commit_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
     "corpus_source_checkout_path": "/home/ubuntu/repos/rust-tools/rust-analyzer",
     "corpus_qualification_command_values": [
-      "cargo fetch",
-      "cargo check --workspace"
+      "cargo fetch --locked",
+      "cargo check --workspace --locked"
     ],
     "corpus_fetch_exit_code": 0,
     "corpus_check_exit_code": 0,
-    "corpus_check_reported_duration": "1m 19s",
-    "corpus_target_output_path": "/home/ubuntu/m1-corpus-build-targets/rust-analyzer",
+    "corpus_check_reported_duration": "32.16s",
+    "corpus_target_output_path": "/home/ubuntu/repos/rust-tools/rust-analyzer/target",
     "corpus_evidence_directory_path": "e2e-runs/2026-11-11/rust-analyzer"
   },
   {

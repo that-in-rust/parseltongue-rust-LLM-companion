@@ -142,6 +142,12 @@ enum SyntaxStageOperationKind {
     Discovery,
     Extraction,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MappingFinalStageKind {
+    SyntaxSpans,
+    NameResolution,
+}
 fn run_persisted_syntax_stage(
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
@@ -474,7 +480,10 @@ fn compute_workspace_generation_digest(
     scope: &StageRunScopeValue,
 ) -> Result<String, StoreBackendFailureError> {
     let mut digest = blake3::Hasher::new();
-    digest.update(b"parseltongue/0.1.0/m1-schema-1/ra_ap_syntax-0.0.362");
+    digest.update(b"parseltongue/0.1.0/m1-schema-1");
+    digest.update(include_bytes!(
+        "../../../docs/phase-20261111/parser-source-pin-manifest.json"
+    ));
     [
         "workspace-config-state-records",
         "crate-dependency-graph-table",
@@ -497,6 +506,7 @@ fn run_workspace_mapping_pipeline(
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
     workers: usize,
+    final_stage: MappingFinalStageKind,
 ) -> Result<Value, StoreBackendFailureError> {
     let started = std::time::Instant::now();
     let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?
@@ -505,12 +515,17 @@ fn run_workspace_mapping_pipeline(
             if row.stage_owned_table_name == "workspace-config-state-records" {
                 let mut value: Value = serde_json::from_str(&row.stage_row_payload_text)
                     .map_err(build_pipeline_stage_error)?;
-                value["workspace_required_stage_names"] = json!([
-                    "crate-graph",
-                    "source-ingest",
-                    "syntax-spans",
-                    "name-resolution"
-                ]);
+                value["workspace_required_stage_names"] =
+                    if final_stage == MappingFinalStageKind::NameResolution {
+                        json!([
+                            "crate-graph",
+                            "source-ingest",
+                            "syntax-spans",
+                            "name-resolution"
+                        ])
+                    } else {
+                        json!(["crate-graph", "source-ingest", "syntax-spans"])
+                    };
                 row.stage_row_payload_text = value.to_string();
             }
             Ok(row)
@@ -572,7 +587,9 @@ fn run_workspace_mapping_pipeline(
         started.elapsed().as_secs_f64()
     );
     let started = std::time::Instant::now();
-    run_persisted_name_resolution(&scope, store, cancel)?;
+    if final_stage == MappingFinalStageKind::NameResolution {
+        run_persisted_name_resolution(&scope, store, cancel)?;
+    }
     eprintln!(
         "stage=name-resolution elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
@@ -607,6 +624,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--workspace-root-path-value"
                 | "--workspace-store-file-path"
                 | "--worker-thread-count-value"
+                | "--mapping-final-stage-kind"
         ) {
             return Err(format!("unknown flag {}", args[index]).into());
         }
@@ -641,7 +659,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cancel = RunCancelFlagValue::default();
             let signal = cancel.clone();
             ctrlc::set_handler(move || signal.request_stage_work_cancellation())?;
-            run_workspace_mapping_pipeline(&root, &store, &cancel, workers)?
+            let final_stage = match flags.get("--mapping-final-stage-kind").map(String::as_str) {
+                None | Some("name-resolution") => MappingFinalStageKind::NameResolution,
+                Some("syntax-spans") => MappingFinalStageKind::SyntaxSpans,
+                Some(_) => return Err("unknown mapping final stage".into()),
+            };
+            run_workspace_mapping_pipeline(&root, &store, &cancel, workers, final_stage)?
         }
         _ => return Err(format!("unknown command {command}").into()),
     };

@@ -1,0 +1,8 @@
+{
+  "parser_source_commit_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
+  "parser_source_checkout_path": "../rust-tools/rust-analyzer",
+  "parser_source_dependency_kind": "path",
+  "parser_source_package_names": ["parser", "syntax"],
+  "parser_source_previous_hash": "6e37b2d62127d445d77069031b416c48c9b0b4f2",
+  "parser_source_qualification_text": "Upstream master fetched 2026-11-11; grammar/items.rs consumes final, with final_assoc_fn fixture. Production and oracle use this identical clean checkout; no token patch."
+}

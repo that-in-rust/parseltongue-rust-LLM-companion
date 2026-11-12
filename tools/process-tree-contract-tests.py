@@ -56,6 +56,10 @@ class ProcessTreeContractTests(unittest.TestCase):
                             audit[audit.index("--workspace-store-file-path") + 1])
         self.assertIn("-P", reads)
         self.assertIn("/source/repo/target", reads)
+        stopped, _, _ = driver.build_corpus_measurement_commands(
+            dict(record,corpus_mapping_final_stage="syntax-spans",corpus_mapper_binary_path="/frozen/parseltongue"),Path("/evidence"))
+        self.assertIn("/frozen/parseltongue",stopped)
+        self.assertEqual(stopped[stopped.index("--mapping-final-stage-kind")+1],"syntax-spans")
     def test_crate_graph_offline_only(self):
         trace = '''100 execve("/bin/parseltongue", ["parseltongue", "map-workspace-full-run"], []) = 0
 100 clone(child_stack=NULL, flags=SIGCHLD) = 101

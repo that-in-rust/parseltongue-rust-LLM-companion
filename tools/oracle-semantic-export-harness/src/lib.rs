@@ -26,7 +26,7 @@ mod oracle_manifest_contract_tests {
         let oracle_source_build_manifest = super::build_oracle_source_manifest();
         assert_eq!(
             oracle_source_build_manifest["oracle_source_commit_hash"],
-            "6e37b2d62127d445d77069031b416c48c9b0b4f2"
+            "2a362a41a8eb6e090f1a12d9b712df85af6f0c33"
         );
         assert_eq!(
             oracle_source_build_manifest["oracle_export_support_kind"],

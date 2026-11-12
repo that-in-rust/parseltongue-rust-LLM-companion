@@ -172,7 +172,7 @@ glob precedence/ambiguity, aliases, edition-specific extern preludes and no_std/
 
 ## 7. Oracle and evidence
 
-oracle-semantic-export-harness is built from rust-analyzer@6e37b2d62127d445d77069031b416c48c9b0b4f2,
+oracle-semantic-export-harness is built from rust-analyzer@2a362a41a8eb6e090f1a12d9b712df85af6f0c33,
 not the installed 1.99.1 binary. Record build commit, executable digest, toolchain and configuration.
 It exports normalized per-site path targets, expansion items with invocation IDs, impl relations,
 call/method targets, signature refs and effective visibility/reachability.

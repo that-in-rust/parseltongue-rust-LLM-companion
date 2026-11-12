@@ -572,6 +572,47 @@ fn test_lang_items_in_sysroot() {
 }
 
 #[test]
+fn test_mapping_stage_selection_contract() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let database = directory.path().join("store.db");
+    let run = |stage: &str| {
+        Command::new(env!("CARGO_BIN_EXE_parseltongue"))
+            .args([
+                "map-workspace-full-run",
+                "--workspace-root-path-value",
+                root.to_str().unwrap(),
+                "--workspace-store-file-path",
+                database.to_str().unwrap(),
+                "--mapping-final-stage-kind",
+                stage,
+            ])
+            .output()
+            .unwrap()
+    };
+    let output = run("syntax-spans");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let banner: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        banner["stage_implementation_status_values"]["syntax-spans"],
+        "complete"
+    );
+    assert_eq!(
+        banner["stage_implementation_status_values"]["name-resolution"],
+        "not yet implemented"
+    );
+    assert!(read_published_table_fixture(&database, "module-scope-binding-table").is_empty());
+    let output = run("");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown mapping final stage"));
+}
+
+#[test]
 fn test_type_macros_remain_deferred() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");

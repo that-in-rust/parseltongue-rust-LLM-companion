@@ -15,9 +15,10 @@ spec.loader.exec_module(auditor)
 
 
 def build_corpus_measurement_commands(record, output):
-    binary = str(ROOT / "target/release/parseltongue")
+    binary = str(record.get("corpus_mapper_binary_path", ROOT / "target/release/parseltongue"))
     common = [binary, "map-workspace-full-run", "--workspace-root-path-value",
               record["corpus_source_checkout_path"], "--worker-thread-count-value", "4",
+              "--mapping-final-stage-kind", record.get("corpus_mapping_final_stage", "name-resolution"),
               "--workspace-store-file-path"]
     measurement = [sys.executable, str(ROOT / "tools/process-tree-access-auditor.py"),
                    "sample", "--memory-sample-output-path", str(output / "process-tree-memory-samples.json"),
@@ -42,7 +43,7 @@ def measure_corpus_production_stages(record):
     database = output / "production-untraced-workspace-store.db"
     memory = output / "process-tree-memory-samples.json"
     trace = output / "production-process-access-audit.txt"
-    binary = ROOT / "target/release/parseltongue"
+    binary = Path(record.get("corpus_mapper_binary_path", ROOT / "target/release/parseltongue"))
     command, audit_command, read_command = build_corpus_measurement_commands(record, output)
     environment = dict(os.environ, CARGO_TARGET_DIR=str(output / "cargo-discovery-cache"))
     with (output / "production-stage-output-log.txt").open("w") as stdout, (output / "production-stage-error-log.txt").open("w") as stderr:

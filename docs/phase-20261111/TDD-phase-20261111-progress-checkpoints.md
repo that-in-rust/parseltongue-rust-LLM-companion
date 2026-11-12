@@ -1072,3 +1072,41 @@ no_implicit_prelude/extern alias integration cases, improve demand detection to 
 all prelude identifiers (AsRef/AsMut and memory functions are currently missing), run
 affected tests and Clippy, then GREEN/REFACTOR commits. Exact oracle manifests, differ,
 all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exists.
+
+# Parser/oracle source alignment — 2026-11-11
+
+- The earlier checkout's item grammar has no final modifier. Fetched upstream history
+  (unshallowed before history inspection); newest upstream master is
+  2a362a41a8eb6e090f1a12d9b712df85af6f0c33, dated 2026-11-10.
+  Its grammar explicitly consumes final and includes final_assoc_fn.
+- Updated the corpus/oracle pin and linked production parser and syntax directly to
+  that same clean checkout, including macro parsing. No token patch or checkout source edit.
+  A shared build verifier checks revision and tracked cleanliness; generation identity
+  includes the parser manifest; a dependency gate checks both manifest paths.
+- Native checkout qualification: cargo fetch --locked exited 0; cargo check --workspace
+  --locked printed Finished dev profile in 32.16s. Direct native-source syntax parse
+  and extractor regression: test_sysroot_final_trait_methods passed.
+- M1 requalification uses the explicit --mapping-final-stage-kind syntax-spans;
+  default remains name-resolution. It skips M2 sysroot augmentation and resolver work,
+  and the banner honestly leaves name-resolution not yet implemented.
+- Working-tree workspace tests excluding the pending native sysroot integration:
+  102 passed; 0 failed; 3 manual performance tests ignored; 1 M2 case filtered.
+  The parser-source gate passes and production still has zero L1 dependencies and no
+  semantic-analysis/salsa packages. Oracle tests: 16 passed; 0 failed.
+  Production Clippy all targets/features with -D warnings passed; Python contracts:
+  Ran 5 tests in 0.320s / OK. Release build completed in 14.98s.
+- The repeated upstream warning "unused manifest key lints.cargo (may be supported in
+  a future version)" was diagnosed against the blueprint, rustup active-toolchain
+  (stable default), and cargo 1.99.1: these optional upstream nightly Cargo lints
+  are unsupported on stable. The environment is loaded; no missing dependency or
+  degraded Rust build was found. Upstream manifests were not edited.
+- Frozen executable /home/ubuntu/m1-parser-aligned-parseltongue is running the
+  sequential all-five untraced measurements plus separate process and target audits.
+  Driver log /home/ubuntu/m2-parser-aligned-corpus.log; evidence per repository at
+  parser-aligned-m1-measurements. Count deltas remain pending until completion.
+- Sysroot implementation remains separate unfinished working-tree work, not claimed
+  GREEN. With final now accepted, native discovery advances to core/src/ops/try_trait.rs
+  and fails at offset 16948 on a const move closure. A direct native syntax regression
+  bypassing the wrapper reproduces expected fn, trait or impl at 14..14; removing only
+  const parses. No workaround applied. Full reachability evidence and scope decision
+  will be recorded after the required all-five M1 rerun.

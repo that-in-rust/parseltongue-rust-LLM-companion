@@ -690,6 +690,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9bda8e21c04aca2ae33ffc2fd8c23134f3cac46db123ba97bd9d3f3b8a4a85e1"
 
 [[package]]
+name = "edition"
+version = "0.0.0"
+
+[[package]]
 name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1715,15 +1719,15 @@ dependencies = [
  "bitflags",
  "cov-mark",
  "parseltongue-core-row-types",
+ "parser",
  "ra-ap-rustc_lexer",
  "ra_ap_intern",
- "ra_ap_parser",
  "ra_ap_span",
  "ra_ap_stdx",
- "ra_ap_syntax",
  "ra_ap_tt",
  "rustc-hash 2.1.3",
  "smallvec",
+ "syntax",
 ]
 
 [[package]]
@@ -1749,9 +1753,9 @@ dependencies = [
  "parseltongue-port-macro-expander",
  "parseltongue-port-name-resolver",
  "parseltongue-table-store-traits",
- "ra_ap_parser",
- "ra_ap_syntax",
+ "parser",
  "serde_json",
+ "syntax",
 ]
 
 [[package]]
@@ -1771,6 +1775,18 @@ dependencies = [
  "tempfile",
  "tokio",
  "turso",
+]
+
+[[package]]
+name = "parser"
+version = "0.0.0"
+dependencies = [
+ "drop_bomb",
+ "edition",
+ "ra-ap-rustc_lexer",
+ "rustc-literal-escaper",
+ "tracing",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -1928,12 +1944,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ra_ap_edition"
-version = "0.0.362"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd43a65cf099bc9504c03bafc9222be8f5c8f8b21cca99c6ff3fba88f14668f4"
-
-[[package]]
 name = "ra_ap_intern"
 version = "0.0.362"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1948,24 +1958,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "ra_ap_parser"
-version = "0.0.362"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f1a1d37548815415f0c5d01dec840b6929e70ea8a27316d1140668103ff542a"
-dependencies = [
- "drop_bomb",
- "ra-ap-rustc_lexer",
- "ra_ap_edition",
- "rustc-literal-escaper",
- "tracing",
- "winnow 0.7.15",
-]
-
-[[package]]
 name = "ra_ap_span"
 version = "0.0.362"
 dependencies = [
- "ra_ap_syntax",
+ "syntax",
 ]
 
 [[package]]
@@ -1983,28 +1979,6 @@ dependencies = [
  "thin-vec",
  "tracing",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "ra_ap_syntax"
-version = "0.0.362"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92f0b061ea65326bda07525ff34a50480597a866d721e0bbac6ea4b9026df109"
-dependencies = [
- "either",
- "itertools 0.15.0",
- "ra-ap-rustc_lexer",
- "ra_ap_parser",
- "ra_ap_stdx",
- "rowan",
- "rustc-hash 2.1.3",
- "rustc-literal-escaper",
- "smallvec",
- "smol_str",
- "tracing",
- "triomphe",
- "unicode-ident",
- "unicode-properties",
 ]
 
 [[package]]
@@ -2474,6 +2448,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
+name = "stdx"
+version = "0.0.0"
+dependencies = [
+ "crossbeam-channel",
+ "crossbeam-utils",
+ "itertools 0.15.0",
+ "jod-thread",
+ "libc",
+ "miow",
+ "thin-vec",
+ "tracing",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2544,6 +2533,26 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
+]
+
+[[package]]
+name = "syntax"
+version = "0.0.0"
+dependencies = [
+ "either",
+ "itertools 0.15.0",
+ "parser",
+ "ra-ap-rustc_lexer",
+ "rowan",
+ "rustc-hash 2.1.3",
+ "rustc-literal-escaper",
+ "smallvec",
+ "smol_str",
+ "stdx",
+ "tracing",
+ "triomphe",
+ "unicode-ident",
+ "unicode-properties",
 ]
 
 [[package]]

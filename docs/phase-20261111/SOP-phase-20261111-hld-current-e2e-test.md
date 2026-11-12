@@ -11,7 +11,7 @@ Every applicable corpus gate runs on all five repos, never a tune/held-out split
 - Parseltongue is the production mapper under test: CPU-only, tables between stages.
 - oracle-semantic-export-harness is the answer key, built from rust-analyzer's pinned checkout in SPEC §8.
   Its offline ide/hir/salsa dependencies are allowed ONLY in the harness. Installed rust-analyzer 1.99.1
-  (58cf8f9) is not the oracle for checkout 6e37b2d62.
+  (58cf8f9) is not the oracle for checkout 2a362a41a.
 - codebase-memory-mcp 0.12.1 is a structural/coverage cross-check, not an answer key.
   Heuristic and missing edges never override PRIMARY oracle evidence.
 - SCIP is optional secondary occurrence evidence; method references are useful, but SCIP's empty

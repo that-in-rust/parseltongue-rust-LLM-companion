@@ -3,6 +3,7 @@ name = "oracle-semantic-export-harness"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+build = "../parser-source-build-identity.rs"
 
 [workspace]
 
@@ -28,3 +29,6 @@ tempfile = "3"
 
 [lints.rust]
 unsafe_code = "forbid"
+
+[build-dependencies]
+serde_json = "1"

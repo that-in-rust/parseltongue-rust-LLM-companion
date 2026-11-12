@@ -1,7 +1,7 @@
 {
-  "oracle_executable_digest_full": "7daf3c49f20cf6eb773af8a02579ee49b80cb9b751a33f068e890aa1834ca43a",
+  "oracle_executable_digest_full": "65c41accfa14cffd800324c41dc5c70b46dfb47d4b7ce7f9fabaa2494c5c2604",
   "oracle_export_support_kind": "provenance_only",
   "oracle_hir_crate_bytes": 8,
-  "oracle_source_commit_hash": "6e37b2d62127d445d77069031b416c48c9b0b4f2",
+  "oracle_source_commit_hash": "2a362a41a8eb6e090f1a12d9b712df85af6f0c33",
   "oracle_toolchain_version_text": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
 }

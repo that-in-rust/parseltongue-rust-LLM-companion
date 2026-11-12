@@ -6,8 +6,8 @@ license.workspace = true
 
 [dependencies]
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
-ra_ap_syntax = "=0.0.362"
-parser = { package = "ra_ap_parser", version = "=0.0.362" }
+ra_ap_syntax = { package = "syntax", path = "../../../rust-tools/rust-analyzer/crates/syntax" }
+parser = { package = "parser", path = "../../../rust-tools/rust-analyzer/crates/parser" }
 tt = { package = "ra_ap_tt", version = "=0.0.362" }
 span = { package = "ra_ap_span", version = "=0.0.362", default-features = false }
 intern = { package = "ra_ap_intern", version = "=0.0.362" }

@@ -38,7 +38,19 @@ fn test_no_analysis_crates_linked() -> Result<(), Box<dyn Error>> {
             !workspace_dependency_package_name.starts_with("salsa")
                 && !workspace_dependency_package_name.starts_with("ra_ap_hir")
                 && !workspace_dependency_package_name.starts_with("ra_ap_ide")
-                && workspace_dependency_package_name != "ra_ap_base_db",
+                && workspace_dependency_package_name != "ra_ap_base_db"
+                && !matches!(
+                    workspace_dependency_package_name.as_str(),
+                    "hir"
+                        | "hir_def"
+                        | "hir_ty"
+                        | "hir_expand"
+                        | "hir_ide"
+                        | "ide"
+                        | "ide_db"
+                        | "base_db"
+                        | "proc_macro_srv"
+                ),
             "forbidden production dependency: {workspace_dependency_package_name}"
         );
     }
@@ -52,6 +64,59 @@ fn test_no_analysis_crates_linked() -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|package| package["name"] == "oracle-semantic-export-harness")
     );
+    Ok(())
+}
+
+#[test]
+fn test_parser_source_pin_aligned() -> Result<(), Box<dyn Error>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()?;
+    let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        root.join("docs/phase-20261111/parser-source-pin-manifest.json"),
+    )?)?;
+    let checkout = root
+        .join(
+            manifest["parser_source_checkout_path"]
+                .as_str()
+                .ok_or("checkout absent")?,
+        )
+        .canonicalize()?;
+    let revision = Command::new("git")
+        .arg("-C")
+        .arg(&checkout)
+        .args(["rev-parse", "HEAD"])
+        .output()?;
+    assert!(revision.status.success());
+    assert_eq!(
+        std::str::from_utf8(&revision.stdout)?.trim(),
+        manifest["parser_source_commit_hash"]
+            .as_str()
+            .ok_or("pin absent")?
+    );
+    let output = Command::new(env!("CARGO"))
+        .current_dir(&root)
+        .args(["metadata", "--offline", "--locked", "--format-version", "1"])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    for name in ["parser", "syntax"] {
+        let package = metadata["packages"]
+            .as_array()
+            .ok_or("packages absent")?
+            .iter()
+            .find(|package| package["name"] == name)
+            .ok_or("source package absent")?;
+        assert_eq!(
+            Path::new(package["manifest_path"].as_str().ok_or("manifest absent")?)
+                .canonicalize()?,
+            checkout.join("crates").join(name).join("Cargo.toml")
+        );
+    }
     Ok(())
 }
 
