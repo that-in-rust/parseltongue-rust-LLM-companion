@@ -1,34 +1,36 @@
-use super::{
-    crate_syntax_namespace_projection::CrateSyntaxProjectionState,
-    name_resolution_record_codec::build_name_projection_error,
-};
+use super::syntax_namespace_input_extraction::CrateSyntaxProjectionState;
 use parseltongue_core_row_types::*;
 use parseltongue_port_macro_expander::{
     BuiltinMacroLookupPort, expand_builtin_macro_items, expand_declarative_macro_items,
 };
-use parseltongue_port_name_resolver::{ItemMacroExpansionPort, resolve_macro_path_binding};
-use std::{collections::BTreeMap, sync::Mutex};
+use parseltongue_table_store_traits::{
+    ItemMacroExpansionPort, ResolvedMacroLookupPort, StageTableStorePort,
+};
+use std::{cell::RefCell, collections::BTreeMap, sync::Mutex};
 
 pub(super) struct PersistedItemMacroPort<'a> {
     projection_source_state_lock: Mutex<CrateSyntaxProjectionState<'a>>,
+    resolved_macro_lookup_port: &'a dyn ResolvedMacroLookupPort,
 }
 
 struct ResolvedBuiltinMacroLookup<'a, 'b> {
-    expansion_query_record_rows: &'a NameMacroExpansionQuery<'b>,
     invocation_lexical_scope_key: &'a NameResolutionScopeKey,
-    projection_target_metadata_rows: &'a BTreeMap<NameSymbolTargetKey, serde_json::Value>,
+    resolved_macro_lookup_port: &'b dyn ResolvedMacroLookupPort,
+    lookup_failure: RefCell<Option<NameResolutionStageError>>,
 }
 
 impl BuiltinMacroLookupPort for ResolvedBuiltinMacroLookup<'_, '_> {
     fn read_builtin_macro_name(&self, path: &[NamePathSegmentKind]) -> Option<String> {
-        let query = self.expansion_query_record_rows;
-        let binding = resolve_macro_path_binding(
-            query.expansion_input_record_rows,
-            query.expansion_known_binding_rows,
-            self.invocation_lexical_scope_key,
-            path,
-        )?;
-        read_macro_builtin_name(&binding, self.projection_target_metadata_rows)
+        match self
+            .resolved_macro_lookup_port
+            .read_resolved_builtin_macro(self.invocation_lexical_scope_key, path)
+        {
+            Ok(name) => name,
+            Err(error) => {
+                *self.lookup_failure.borrow_mut() = Some(error);
+                None
+            }
+        }
     }
 }
 
@@ -50,27 +52,29 @@ fn read_macro_builtin_name(
 
 fn expand_builtin_stage_rows(
     state: &mut CrateSyntaxProjectionState<'_>,
-    query: &NameMacroExpansionQuery<'_>,
     invocation: &NameMacroInvocationRow,
     name: &str,
+    resolved_macro_lookup_port: &dyn ResolvedMacroLookupPort,
 ) -> Result<NameExpansionRoundRows, NameResolutionStageError> {
     let input = state
         .build_builtin_expansion_input(invocation, name)
         .map_err(build_macro_expansion_error)?;
     let lookup = ResolvedBuiltinMacroLookup {
-        expansion_query_record_rows: query,
         invocation_lexical_scope_key: &invocation.invocation_lexical_scope_key,
-        projection_target_metadata_rows: &state.projection_target_metadata_rows,
+        resolved_macro_lookup_port,
+        lookup_failure: RefCell::new(None),
     };
-    match expand_builtin_macro_items(&input, &lookup, state.projection_cancel_flag_value).map_err(
-        |error| {
-            if error == MacroExpansionFailureKind::Cancelled {
-                NameResolutionStageError::Cancelled
-            } else {
-                build_macro_expansion_error(error)
-            }
-        },
-    )? {
+    let output = expand_builtin_macro_items(&input, &lookup, state.projection_cancel_flag_value);
+    if let Some(error) = lookup.lookup_failure.into_inner() {
+        return Err(error);
+    }
+    match output.map_err(|error| {
+        if error == MacroExpansionFailureKind::Cancelled {
+            NameResolutionStageError::Cancelled
+        } else {
+            build_macro_expansion_error(error)
+        }
+    })? {
         BuiltinMacroExpansionOutput::Include(path) => state
             .project_builtin_include_rows(invocation, &path)
             .map_err(build_macro_expansion_error),
@@ -116,19 +120,22 @@ fn merge_expansion_round_rows(
     round
 }
 
-impl<'a> PersistedItemMacroPort<'a> {
-    pub(super) fn build_persisted_macro_port(projection: CrateSyntaxProjectionState<'a>) -> Self {
-        Self {
-            projection_source_state_lock: Mutex::new(projection),
-        }
-    }
-    pub(super) fn finish_persisted_macro_port(
-        self,
-    ) -> Result<CrateSyntaxProjectionState<'a>, StoreBackendFailureError> {
-        self.projection_source_state_lock
-            .into_inner()
-            .map_err(build_name_projection_error)
-    }
+pub fn prepare_macro_expansion_port<'a>(
+    unit: serde_json::Value,
+    workspace: &serde_json::Value,
+    store: &'a dyn StageTableStorePort,
+    scope: &StageRunScopeValue,
+    cancel: &'a RunCancelFlagValue,
+    lookup: &'a dyn ResolvedMacroLookupPort,
+) -> Result<impl ItemMacroExpansionPort + 'a, StoreBackendFailureError> {
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit, workspace, store, scope, cancel,
+    )?;
+    projection.project_unit_source_root()?;
+    Ok(PersistedItemMacroPort {
+        projection_source_state_lock: Mutex::new(projection),
+        resolved_macro_lookup_port: lookup,
+    })
 }
 
 impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
@@ -176,6 +183,15 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                     .ok_or_else(|| {
                         build_macro_expansion_error("resolved macro invocation missing")
                     })?;
+                let metadata = self
+                    .resolved_macro_lookup_port
+                    .read_macro_target_metadata(&binding.binding_target_identity_key)?
+                    .ok_or_else(|| build_macro_expansion_error("macro target metadata absent"))?;
+                state.projection_target_metadata_rows.insert(
+                    binding.binding_target_identity_key.clone(),
+                    serde_json::from_str(&metadata.stage_row_payload_text)
+                        .map_err(build_macro_expansion_error)?,
+                );
                 if std::env::var_os("PARSELTONGUE_PROFILE_MACRO_ROUNDS").is_some()
                     && query.expansion_resolved_macro_rows.len() <= 16
                 {
@@ -190,7 +206,12 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                 if let Some(name) =
                     read_macro_builtin_name(binding, &state.projection_target_metadata_rows)
                 {
-                    let delta = expand_builtin_stage_rows(&mut state, query, invocation, &name)?;
+                    let delta = expand_builtin_stage_rows(
+                        &mut state,
+                        invocation,
+                        &name,
+                        self.resolved_macro_lookup_port,
+                    )?;
                     return Ok(merge_expansion_round_rows(round, delta));
                 }
                 let definition = state
@@ -215,7 +236,7 @@ impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
                         macro_declaration_style_flag: definition["macro_declaration_style_flag"]
                             == true,
                         macro_definition_source_text:
-                            super::name_resolution_record_codec::read_record_string_value(
+                            super::syntax_namespace_record_codec::read_record_string_value(
                                 &definition,
                                 "macro_definition_source_text",
                             )

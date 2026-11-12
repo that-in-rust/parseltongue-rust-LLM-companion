@@ -1,4 +1,4 @@
-use super::name_resolution_record_codec::*;
+use super::syntax_namespace_record_codec::*;
 use super::{
     check_node_configuration_active, parse_compatible_rust_syntax, read_effective_module_path,
     restore_source_byte_offset,
@@ -17,7 +17,7 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_target_metadata_rows: BTreeMap<NameSymbolTargetKey, Value>,
     pub(super) projection_path_metadata_rows: BTreeMap<SemanticOccurrenceKeyValue, Value>,
     pub(super) projection_lang_definition_rows: Vec<StageTableRowRecord>,
-    pub(super) projection_available_extern_rows: BTreeMap<String, NameResolvedBindingRow>,
+    pub(super) projection_extern_declaration_rows: Vec<Value>,
     projection_macro_source_rows:
         BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
     projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
@@ -199,7 +199,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             projection_target_metadata_rows: BTreeMap::new(),
             projection_path_metadata_rows: BTreeMap::new(),
             projection_lang_definition_rows: Vec::new(),
-            projection_available_extern_rows: BTreeMap::new(),
+            projection_extern_declaration_rows: Vec::new(),
             projection_macro_source_rows: BTreeMap::new(),
             projection_macro_failure_rows: BTreeMap::new(),
             projection_source_store_port: store,
@@ -599,6 +599,20 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 invocation.invocation_site_occurrence_key.clone(),
                 reason,
             )],
+            expansion_semantic_output_rows: {
+                let value = self.build_unresolved_macro_value(
+                    &invocation.invocation_site_occurrence_key,
+                    reason,
+                );
+                vec![StageTableRowRecord {
+                    stage_owned_table_name: "macro-expanded-item-table".into(),
+                    stage_row_record_key: format!(
+                        "unresolved/{}",
+                        blake3::hash(value.to_string().as_bytes()).to_hex()
+                    ),
+                    stage_row_payload_text: value.to_string(),
+                }]
+            },
             ..Default::default()
         }
     }
@@ -1001,20 +1015,15 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 .and_then(|rename| rename.syntax().children().find_map(ast::Name::cast))
                 .map(|name| name.text().trim_start_matches("r#").to_owned())
                 .unwrap_or_else(|| source_name.clone());
-            if let Some(mut binding) = self
-                .projection_available_extern_rows
-                .get(&source_name)
-                .cloned()
-            {
-                binding.binding_lexical_scope_key = scope.clone();
-                binding.binding_resolved_name_text = alias;
-                binding.binding_selection_priority_kind = NameBindingPriorityKind::Declaration;
-                binding.binding_visibility_scope_kind =
-                    self.build_node_visibility_kind(node, scope);
-                self.projection_resolution_input_rows
-                    .name_symbol_binding_rows
-                    .push(binding);
-            }
+            self.projection_extern_declaration_rows.push(json!({
+                "extern_declaration_scope_key":encode_resolution_scope_value(scope),
+                "extern_declaration_source_name":source_name,
+                "extern_declaration_alias_name":alias,
+                "extern_declaration_visibility":encode_visibility_scope_value(&self.build_node_visibility_kind(node,scope)),
+                "extern_declaration_source_path":file.source_file_absolute_path,
+                "extern_declaration_source_start":restore_source_byte_offset(node.text_range().start(),&file.source_crlf_removed_offsets),
+                "extern_declaration_attributes":super::collect_effective_node_attributes(node,&self.projection_target_cfg_values)?,
+            }));
         }
         let kind = node.kind();
         let name = node

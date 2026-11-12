@@ -1895,3 +1895,70 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Remaining work: adapter RED/GREEN/REFACTOR and process audit; complete source
   cleanup; DuckDB resolver contract GREEN; serde measurement; SQL comparator;
   all-five S5 and S6/S7. No S5 denominator or agreement is measured.
+
+### 2026-11-12 — DuckDB namespace contract port RED
+
+- Deleted the obsolete parseltongue-port-name-resolver implementation, manifest
+  and source notice. Its eleven contract cases moved unchanged to
+  parseltongue-duckdb-analysis-adapter/src/row-resolution-contract-tests.rs.
+  The DuckDB entry points are STUBs; the moved suite is intentionally RED:
+  `test result: FAILED. 0 passed; 11 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s`.
+  Every failure reaches `not yet implemented: DuckDB non-monotone SQL resolution`.
+- Removed whole-crate resolved-dependency namespace grafting and the old
+  name-resolution-stage-adapter. Moved syntax extraction and input encoding
+  into syntax-namespace-input-extraction, syntax-namespace-record-codec and
+  syntax-namespace-input-persistence. Resolved-row decoders were deleted.
+  Source scopes, declared items, imports, paths, macro invocations and extern
+  declarations now have Turso input tables. Extern aliases remain syntax
+  records, not Rust-side binding decisions.
+- Input records are emitted in 4 MiB chunks, private until the crate completion
+  marker. Restored the previously green Turso private-chunk visibility predicate
+  from the parked patch and extended it to the new input owner. A new Turso
+  contract checks private namespace input rows; all seventeen stage contracts pass.
+- Moved ItemMacroExpansionPort to the L2 table-store traits and added
+  ResolvedMacroLookupPort for primary target metadata and nested builtin lookup.
+  The second old-resolver dependency is gone; lookup errors propagate rather than
+  becoming missing-builtin answers. Rust macro parsing/expansion is retained.
+- Removed obsolete CLI DHAT allocator/features, Turso allocator-profile feature
+  indirection, the native heap profile contract, both heap summary Python tools
+  and the pre-DuckDB comparator patch. Existing profiling evidence and the
+  separately parked resolver patch remain. No memory fix is claimed.
+- Full M2 mapping currently returns an explicit DuckDB-not-implemented error
+  after input extraction. It does not publish incomplete semantic success.
+  M1 remains available. Constructor policy, Appender handoff, SQL resolution,
+  macro alternation, exact oracle manifests, SQL comparator and all-five
+  qualification remain to be implemented.
+- Final source cleanup checks:
+  `cargo check --workspace`:
+  `Finished `dev` profile [unoptimized] target(s) in 0.48s`.
+  Syntax tests: `test result: ok. 3 passed; 0 failed` and
+  `test result: ok. 17 passed; 0 failed`.
+  Turso stage tests: `test result: ok. 17 passed; 0 failed`.
+  Dependency/build gates: `test result: ok. 4 passed; 0 failed`.
+  `cargo clippy --workspace --all-targets -- -D warnings`:
+  `Finished `dev` profile [unoptimized] target(s) in 0.59s`.
+  The external pinned parser/syntax `unused manifest key lints.cargo` warning
+  remains the previously diagnosed upstream-toolchain warning.
+- Post-legacy-deletion workspace check also completed:
+  `Finished `dev` profile [unoptimized] target(s) in 10m 33s`.
+  Its workspace test command stopped at three existing comparator STUB failures
+  (`oracle path comparison not implemented`), not missing legacy files.
+  No full-workspace test GREEN is claimed.
+- Codebase-memory verification used the exact root_path match, schema, complete
+  cursor pagination (150 + 150 + 124 = 424 file nodes) and coverage reconciliation.
+  All 57 filesystem Rust sources under crates/ and tools/ are represented.
+  Deleted resolver/extractor paths have zero graph nodes. Coverage reports no
+  recorded issue under crates/; tools' only recorded gap is the intentionally
+  excluded oracle target directory. This is a source-cleanup check, not S6/S7.
+- Environment maintenance: removed unused release/native debug build caches to
+  recover disk; the VS Code rust-analyzer process 1532439 is temporarily SIGSTOPed
+  because its separate default-debug Cargo builds competed with bounded native
+  builds. Resume it when native build/measurement work is finished. No mapper or
+  profiler runs. The read-only environment blueprint still mentions the deleted
+  experiments/spancut maintenance command; workspace Cargo commands replace it.
+- Parser/oracle remain pinned together at
+  bf6b2099d6351c37039b01447a9bb64f9a54a586, base
+  2a362a41a8eb6e090f1a12d9b712df85af6f0c33, reviewable patch
+  tools/parser-const-closure-statements.patch, SHA-256
+  89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa.
+  No new parser defect or S5 measurement is claimed.

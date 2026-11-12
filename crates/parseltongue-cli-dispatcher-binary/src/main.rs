@@ -15,7 +15,8 @@ use parseltongue_crate_graph_loader::{
 use parseltongue_stage_worker_scheduler::map_bounded_stage_workers;
 use parseltongue_syntax_span_extractor::{
     SyntaxFileInputData, check_sysroot_context_needed, extract_file_syntax_rows,
-    read_parser_compiler_identity, read_unit_prelude_configuration, run_persisted_name_resolution,
+    persist_namespace_syntax_inputs, read_parser_compiler_identity,
+    read_unit_prelude_configuration,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
@@ -30,13 +31,6 @@ use std::{
 mod oracle_path_comparison_facade;
 #[path = "published-stage-export-facade.rs"]
 mod published_stage_export_facade;
-
-#[cfg(all(
-    feature = "system-heap-allocation-profile",
-    not(feature = "native-production-heap-allocator")
-))]
-#[global_allocator]
-static NATIVE_HEAP_PROFILE_ALLOCATOR: dhat::Alloc = dhat::Alloc;
 
 fn build_pipeline_stage_error(message: impl std::fmt::Display) -> StoreBackendFailureError {
     StoreBackendFailureError {
@@ -714,7 +708,10 @@ fn run_workspace_mapping_pipeline(
     );
     let started = std::time::Instant::now();
     if final_stage == MappingFinalStageKind::NameResolution {
-        run_persisted_name_resolution(&scope, store, cancel)?;
+        persist_namespace_syntax_inputs(&scope, store, cancel)?;
+        return Err(build_pipeline_stage_error(
+            "DuckDB name-resolution stage not implemented",
+        ));
     }
     eprintln!(
         "stage=name-resolution elapsed_seconds={:.3}",
@@ -733,18 +730,6 @@ fn run_workspace_mapping_pipeline(
     build_workspace_coverage_banner(store)
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(all(
-        feature = "system-heap-allocation-profile",
-        not(feature = "native-production-heap-allocator")
-    ))]
-    let _heap_profile = dhat::Profiler::builder()
-        .file_name(
-            std::env::var_os("PARSELTONGUE_HEAP_PROFILE_PATH")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("heap-allocation-profile-records.json")),
-        )
-        .trim_backtraces(Some(16))
-        .build();
     let args: Vec<_> = std::env::args().skip(1).collect();
     let command = args
         .first()

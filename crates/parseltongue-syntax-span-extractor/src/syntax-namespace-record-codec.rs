@@ -87,20 +87,6 @@ pub(super) fn encode_resolution_scope_value(scope: &NameResolutionScopeKey) -> V
     json!({"scope_compilation_unit_key":encode_compilation_unit_value(&scope.scope_compilation_unit_key),"scope_semantic_path_parts":scope.scope_semantic_path_parts})
 }
 
-pub(super) fn decode_resolution_scope_value(
-    value: &Value,
-) -> Result<NameResolutionScopeKey, StoreBackendFailureError> {
-    Ok(NameResolutionScopeKey {
-        scope_compilation_unit_key: decode_compilation_unit_value(
-            &value["scope_compilation_unit_key"],
-        )?,
-        scope_semantic_path_parts: serde_json::from_value(
-            value["scope_semantic_path_parts"].clone(),
-        )
-        .map_err(build_name_projection_error)?,
-    })
-}
-
 pub(super) fn encode_occurrence_identity_value(occurrence: &SemanticOccurrenceKeyValue) -> Value {
     let parts = occurrence.read_semantic_occurrence_parts();
     let range = parts.span_byte_range_value.read_source_range_pair();
@@ -113,31 +99,7 @@ pub(super) fn encode_occurrence_identity_value(occurrence: &SemanticOccurrenceKe
     })
 }
 
-pub(super) fn decode_occurrence_identity_value(
-    value: &Value,
-) -> Result<SemanticOccurrenceKeyValue, StoreBackendFailureError> {
-    let range: [u64; 2] = serde_json::from_value(value["span_byte_range_value"].clone())
-        .map_err(build_name_projection_error)?;
-    let provenance: Vec<String> =
-        serde_json::from_value(value["span_expansion_provenance_chain"].clone())
-            .map_err(build_name_projection_error)?;
-    SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
-        &decode_compilation_unit_value(&value["unit_compilation_identity_key"])?,
-        read_record_string_value(value, "span_source_file_path")?,
-        SpanByteRangeValue::try_from((range[0], range[1])).map_err(build_name_projection_error)?,
-        SpanDigestIdValue::from(decode_digest_hex_value(read_record_string_value(
-            value,
-            "span_content_digest_full",
-        )?)?),
-        &provenance
-            .iter()
-            .map(|value| decode_digest_hex_value(value))
-            .collect::<Result<Vec<_>, _>>()?,
-    )
-    .map_err(build_name_projection_error)
-}
-
-fn encode_symbol_target_value(target: &NameSymbolTargetKey) -> Value {
+pub(super) fn encode_symbol_target_value(target: &NameSymbolTargetKey) -> Value {
     match target {
         NameSymbolTargetKey::Definition(key) => {
             json!({"target_identity_variant_kind":"definition","target_semantic_occurrence_key":encode_occurrence_identity_value(key)})
@@ -154,29 +116,6 @@ fn encode_symbol_target_value(target: &NameSymbolTargetKey) -> Value {
     }
 }
 
-fn decode_symbol_target_value(
-    value: &Value,
-) -> Result<NameSymbolTargetKey, StoreBackendFailureError> {
-    match read_record_string_value(value, "target_identity_variant_kind")? {
-        "definition" => Ok(NameSymbolTargetKey::Definition(
-            decode_occurrence_identity_value(&value["target_semantic_occurrence_key"])?,
-        )),
-        "generic" => Ok(NameSymbolTargetKey::GenericParameter(
-            decode_occurrence_identity_value(&value["target_semantic_occurrence_key"])?,
-            read_record_string_value(value, "target_parameter_name_value")?.into(),
-        )),
-        "builtin" => Ok(NameSymbolTargetKey::Builtin(
-            read_record_string_value(value, "target_builtin_name_value")?.into(),
-        )),
-        "crate" => Ok(NameSymbolTargetKey::CrateRoot(
-            decode_compilation_unit_value(&value["target_compilation_unit_key"])?,
-        )),
-        other => Err(build_name_projection_error(format!(
-            "unknown target identity {other}"
-        ))),
-    }
-}
-
 pub(super) fn encode_scope_record_value(row: &NameScopeRecordRow) -> Value {
     json!({
         "scope_module_identity_key":encode_resolution_scope_value(&row.scope_module_identity_key),
@@ -184,28 +123,6 @@ pub(super) fn encode_scope_record_value(row: &NameScopeRecordRow) -> Value {
         "scope_parent_lookup_flag":row.scope_parent_lookup_flag,
         "scope_module_boundary_flag":row.scope_module_boundary_flag,
         "scope_implicit_prelude_key":row.scope_implicit_prelude_key.as_ref().map(encode_resolution_scope_value),
-    })
-}
-
-pub(super) fn decode_scope_record_value(
-    value: &Value,
-) -> Result<NameScopeRecordRow, StoreBackendFailureError> {
-    Ok(NameScopeRecordRow {
-        scope_module_identity_key: decode_resolution_scope_value(
-            &value["scope_module_identity_key"],
-        )?,
-        scope_parent_identity_key: (!value["scope_parent_identity_key"].is_null())
-            .then(|| decode_resolution_scope_value(&value["scope_parent_identity_key"]))
-            .transpose()?,
-        scope_parent_lookup_flag: value["scope_parent_lookup_flag"]
-            .as_bool()
-            .ok_or_else(|| build_name_projection_error("missing parent lookup flag"))?,
-        scope_module_boundary_flag: value["scope_module_boundary_flag"]
-            .as_bool()
-            .ok_or_else(|| build_name_projection_error("missing module boundary flag"))?,
-        scope_implicit_prelude_key: (!value["scope_implicit_prelude_key"].is_null())
-            .then(|| decode_resolution_scope_value(&value["scope_implicit_prelude_key"]))
-            .transpose()?,
     })
 }
 
@@ -229,6 +146,33 @@ pub(super) fn encode_binding_record_value(row: &NameResolvedBindingRow, metadata
     })
 }
 
+pub(super) fn encode_visibility_scope_value(visibility: &NameBindingVisibilityKind) -> Value {
+    match visibility {
+        NameBindingVisibilityKind::Public => json!({"visibility_scope_kind_value":"public"}),
+        NameBindingVisibilityKind::Invisible => json!({"visibility_scope_kind_value":"invisible"}),
+        NameBindingVisibilityKind::Restricted(scope) => json!({
+            "visibility_scope_kind_value":"restricted",
+            "visibility_restricted_scope_key":encode_resolution_scope_value(scope),
+        }),
+    }
+}
+
+pub(super) fn encode_path_segment_values(segments: &[NamePathSegmentKind]) -> Vec<Value> {
+    segments
+        .iter()
+        .map(|segment| match segment {
+            NamePathSegmentKind::CrateRoot => json!({"kind":"crate"}),
+            NamePathSegmentKind::SelfModule => json!({"kind":"self"}),
+            NamePathSegmentKind::ParentModule => json!({"kind":"super"}),
+            NamePathSegmentKind::GlobalRoot => json!({"kind":"global"}),
+            NamePathSegmentKind::DefiningCrate(unit) => {
+                json!({"kind":"defining_crate","unit":encode_compilation_unit_value(unit)})
+            }
+            NamePathSegmentKind::Name(name) => json!({"kind":"name","name":name}),
+        })
+        .collect()
+}
+
 pub(super) fn encode_namespace_kind_value(namespace: NamespaceBindingKindValue) -> &'static str {
     match namespace {
         NamespaceBindingKindValue::Type => "type",
@@ -237,58 +181,67 @@ pub(super) fn encode_namespace_kind_value(namespace: NamespaceBindingKindValue) 
     }
 }
 
-pub(super) fn decode_binding_record_value(
-    value: &Value,
-) -> Result<NameResolvedBindingRow, StoreBackendFailureError> {
-    let visibility = &value["binding_visibility_scope_kind"];
-    Ok(NameResolvedBindingRow {
-        binding_lexical_scope_key: decode_resolution_scope_value(
-            &value["binding_lexical_scope_key"],
-        )?,
-        binding_resolved_name_text: read_record_string_value(value, "binding_resolved_name_text")?
-            .into(),
-        binding_namespace_kind_value: match read_record_string_value(
-            value,
-            "binding_namespace_kind_value",
-        )? {
-            "type" => NamespaceBindingKindValue::Type,
-            "value" => NamespaceBindingKindValue::Value,
-            "macro" => NamespaceBindingKindValue::Macro,
-            _ => return Err(build_name_projection_error("invalid namespace")),
-        },
-        binding_target_identity_key: decode_symbol_target_value(
-            &value["binding_target_identity_key"],
-        )?,
-        binding_target_child_scope: (!value["binding_target_child_scope"].is_null())
-            .then(|| decode_resolution_scope_value(&value["binding_target_child_scope"]))
-            .transpose()?,
-        binding_visibility_scope_kind: match read_record_string_value(
-            visibility,
-            "visibility_scope_kind_value",
-        )? {
-            "public" => NameBindingVisibilityKind::Public,
-            "invisible" => NameBindingVisibilityKind::Invisible,
-            "restricted" => NameBindingVisibilityKind::Restricted(decode_resolution_scope_value(
-                &visibility["visibility_restricted_scope_key"],
-            )?),
-            _ => return Err(build_name_projection_error("invalid visibility")),
-        },
-        binding_selection_priority_kind: match read_record_string_value(
-            value,
-            "binding_selection_priority_kind",
-        )? {
-            "builtin" => NameBindingPriorityKind::Builtin,
-            "prelude" => NameBindingPriorityKind::Prelude,
-            "glob" => NameBindingPriorityKind::Glob,
-            "explicit" => NameBindingPriorityKind::Explicit,
-            "declaration" => NameBindingPriorityKind::Declaration,
-            _ => return Err(build_name_projection_error("invalid binding priority")),
-        },
-        binding_import_evidence_keys: value["binding_import_evidence_keys"]
-            .as_array()
-            .ok_or_else(|| build_name_projection_error("missing import evidence"))?
-            .iter()
-            .map(decode_occurrence_identity_value)
-            .collect::<Result<_, _>>()?,
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preserves_path_root_kinds() {
+        let unit = CrateCompilationUnitKey {
+            unit_cargo_package_identifier: "fixture".into(),
+            unit_cargo_target_name: "fixture".into(),
+            unit_cargo_target_kind: "lib".into(),
+            unit_compilation_role_kind: CompilationUnitRoleKind::Host,
+            unit_configuration_digest_full: [7; 32],
+        };
+        let segments = encode_path_segment_values(&[
+            NamePathSegmentKind::CrateRoot,
+            NamePathSegmentKind::SelfModule,
+            NamePathSegmentKind::ParentModule,
+            NamePathSegmentKind::GlobalRoot,
+            NamePathSegmentKind::DefiningCrate(unit.clone()),
+            NamePathSegmentKind::Name("ordinary".into()),
+        ]);
+        assert_eq!(
+            segments
+                .iter()
+                .map(|value| value["kind"].as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                Some("crate"),
+                Some("self"),
+                Some("super"),
+                Some("global"),
+                Some("defining_crate"),
+                Some("name")
+            ]
+        );
+        assert_eq!(
+            decode_compilation_unit_value(&segments[4]["unit"]),
+            Ok(unit)
+        );
+        assert_eq!(segments[5]["name"], "ordinary");
+        assert_eq!(
+            encode_visibility_scope_value(&NameBindingVisibilityKind::Invisible)["visibility_scope_kind_value"],
+            "invisible"
+        );
+    }
+
+    #[test]
+    fn preserves_empty_paths() {
+        assert!(encode_path_segment_values(&[]).is_empty());
+    }
+
+    #[test]
+    fn rejects_invalid_compilation_identities() {
+        assert!(decode_compilation_unit_value(&json!({})).is_err());
+        assert!(
+            decode_compilation_unit_value(&json!({
+                "unit_cargo_package_identifier":"fixture",
+                "unit_cargo_target_name":"fixture","unit_cargo_target_kind":"lib",
+                "unit_compilation_role_kind":"host","unit_configuration_digest_full":"short",
+            }))
+            .is_err()
+        );
+    }
 }

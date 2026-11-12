@@ -8,7 +8,6 @@ build = "../../tools/parser-source-build-identity.rs"
 [dependencies]
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
 parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" }
-parseltongue-port-name-resolver = { path = "../parseltongue-port-name-resolver" }
 parseltongue-port-macro-expander = { path = "../parseltongue-port-macro-expander" }
 ra_ap_syntax = { package = "syntax", path = "../../../rust-tools/rust-analyzer/crates/syntax" }
 ra_ap_parser = { package = "parser", path = "../../../rust-tools/rust-analyzer/crates/parser" }

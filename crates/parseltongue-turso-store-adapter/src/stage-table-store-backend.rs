@@ -19,7 +19,34 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("name-resolution-scope-records", "name-resolution"),
     ("path-resolution-site-records", "name-resolution"),
     ("macro-expanded-item-table", "name-resolution"),
-    ("lang-item-definition-table", "name-resolution"),
+    (
+        "lang-item-definition-table",
+        "syntax-namespace-input-records",
+    ),
+    (
+        "syntax-namespace-input-scopes",
+        "syntax-namespace-input-records",
+    ),
+    (
+        "syntax-namespace-input-items",
+        "syntax-namespace-input-records",
+    ),
+    (
+        "syntax-namespace-input-imports",
+        "syntax-namespace-input-records",
+    ),
+    (
+        "syntax-namespace-input-paths",
+        "syntax-namespace-input-records",
+    ),
+    (
+        "syntax-namespace-input-macros",
+        "syntax-namespace-input-records",
+    ),
+    (
+        "syntax-namespace-input-externs",
+        "syntax-namespace-input-records",
+    ),
     ("stage-run-generation-records", "markers"),
 ];
 
@@ -75,8 +102,21 @@ pub fn retry_bounded_store_write<T>(
     Err(build_store_backend_error("unreachable retry state"))
 }
 
-fn build_crate_visibility_clause(_table: &str) -> String {
-    "1".into()
+fn build_crate_visibility_clause(table: &str) -> String {
+    let owner = STAGE_OWNED_TABLE_NAMES
+        .iter()
+        .find(|(name, _)| *name == table)
+        .map(|(_, owner)| *owner)
+        .filter(|owner| *owner == "syntax-namespace-input-records")
+        .unwrap_or("name-resolution");
+    format!(
+        r#"("{table}".stage_unit_work_key NOT LIKE 'crate/%/pending/%' OR EXISTS (
+        SELECT 1 FROM "stage-run-generation-records" AS completed
+        WHERE completed.run_generation_digest_value="{table}".run_generation_digest_value
+        AND completed.stage_attempt_sequence_value="{table}".stage_attempt_sequence_value
+        AND completed.stage_row_record_key='__marker__/{owner}/' ||
+            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1)))"#
+    )
 }
 
 fn validate_stage_owned_table(table: &str) -> Result<(), StoreBackendFailureError> {

@@ -7,9 +7,12 @@
 //! Bounded, extension-free analysis of frozen Turso generations.
 
 use parseltongue_core_row_types::{
+    NameResolutionInputRows, NameResolutionOutputRows, NameResolutionStageError,
     RunCancelFlagValue, StageRunScopeValue, StoreBackendFailureError,
 };
-use parseltongue_table_store_traits::{AnalysisTableStorePort, StageTableStorePort};
+use parseltongue_table_store_traits::{
+    AnalysisTableStorePort, ItemMacroExpansionPort, StageTableStorePort,
+};
 use std::{path::Path, sync::Mutex};
 
 pub struct DuckdbAnalysisStoreAdapter {
@@ -45,3 +48,25 @@ impl AnalysisTableStorePort for DuckdbAnalysisStoreAdapter {
         todo!("frozen generation analysis count")
     }
 }
+
+pub const FIXED_POINT_LIMIT: usize = 8192;
+
+pub fn resolve_crate_name_bindings(
+    _input: &NameResolutionInputRows,
+    _macros: &dyn ItemMacroExpansionPort,
+    _cancel: &RunCancelFlagValue,
+) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
+    todo!("DuckDB non-monotone SQL resolution")
+}
+
+pub fn resolve_owned_crate_bindings(
+    input: NameResolutionInputRows,
+    macros: &dyn ItemMacroExpansionPort,
+    cancel: &RunCancelFlagValue,
+) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
+    resolve_crate_name_bindings(&input, macros, cancel)
+}
+
+#[cfg(test)]
+#[path = "row-resolution-contract-tests.rs"]
+mod row_resolution_contract_tests;

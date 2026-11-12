@@ -93,6 +93,29 @@ pub trait AnalysisTableStorePort: Send + Sync {
     ) -> Result<usize, StoreBackendFailureError>;
 }
 
+pub trait ItemMacroExpansionPort: Send + Sync {
+    fn expand_resolved_macro_items(
+        &self,
+        query: &parseltongue_core_row_types::NameMacroExpansionQuery<'_>,
+    ) -> Result<
+        parseltongue_core_row_types::NameExpansionRoundRows,
+        parseltongue_core_row_types::NameResolutionStageError,
+    >;
+}
+
+pub trait ResolvedMacroLookupPort: Send + Sync {
+    fn read_resolved_builtin_macro(
+        &self,
+        scope: &parseltongue_core_row_types::NameResolutionScopeKey,
+        path: &[parseltongue_core_row_types::NamePathSegmentKind],
+    ) -> Result<Option<String>, parseltongue_core_row_types::NameResolutionStageError>;
+
+    fn read_macro_target_metadata(
+        &self,
+        target: &parseltongue_core_row_types::NameSymbolTargetKey,
+    ) -> Result<Option<StageTableRowRecord>, parseltongue_core_row_types::NameResolutionStageError>;
+}
+
 use parseltongue_core_row_types::{
     RunGenerationDigestValue, SemanticOccurrenceKeyValue, StoreBackendFailureError,
 };

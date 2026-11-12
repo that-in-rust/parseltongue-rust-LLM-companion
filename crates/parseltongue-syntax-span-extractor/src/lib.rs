@@ -17,15 +17,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[path = "crate-syntax-namespace-projection.rs"]
-mod crate_syntax_namespace_projection;
-#[path = "name-resolution-record-codec.rs"]
-mod name_resolution_record_codec;
-#[path = "name-resolution-stage-adapter.rs"]
-mod name_resolution_stage_adapter;
 #[path = "persisted-macro-expansion-adapter.rs"]
 mod persisted_macro_expansion_adapter;
-pub use name_resolution_stage_adapter::run_persisted_name_resolution;
+#[path = "syntax-namespace-input-extraction.rs"]
+mod syntax_namespace_input_extraction;
+#[path = "syntax-namespace-input-persistence.rs"]
+mod syntax_namespace_input_persistence;
+#[path = "syntax-namespace-record-codec.rs"]
+mod syntax_namespace_record_codec;
+pub use persisted_macro_expansion_adapter::prepare_macro_expansion_port;
+pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
 #[path = "sysroot-prelude-context-rules.rs"]
 mod sysroot_prelude_context_rules;
 pub use sysroot_prelude_context_rules::{
