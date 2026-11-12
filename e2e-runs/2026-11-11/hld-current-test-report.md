@@ -375,3 +375,45 @@ Continuing requires an authorized parser/oracle grammar fix with both pinned tog
 or an explicit toolchain change. Upstream-master pin alignment alone cannot clear this
 second compatibility defect. Sysroot GREEN/REFACTOR, exact manifests, differ and all-five
 S5 remain BLOCKED/unmeasured, never 100 percent or an empty passing denominator.
+
+## Authorized const-closure fork requalification — 2026-11-12
+
+The preceding parser blocker is resolved by upstream 2a362a41 + patch
+bf6b2099d6351c37039b01447a9bb64f9a54a586. The opt_item early return preserves
+const move/pipe closure tokens for the existing expression parser. Both parser and
+oracle use the identical clean fork, without token rewriting or compiler changes.
+Reviewable patch and reproducible thin bundle are under tools/ and recorded in SPEC §8.
+Native parser: 333 passed; xtask: 13 passed; tidy and parser Clippy exit zero.
+Production M1/affected suites: 103 passed, 3 manual profiles ignored, pending native
+M2 integration filtered. Oracle: 16 passed; release rebuild and source manifests updated.
+
+One frozen executable was used for all runs:
+/home/ubuntu/m1-const-patched-parseltongue, SHA-256
+f528d38b7e4b0aaadf2b83f4d5b9b9eb7336ed4e9462ff15846f3027a202be9f.
+Evidence is under each repo's const-patched-m1-measurements directory. Measurements
+are untraced; process/network and exact-path target audits run separately.
+
+```text
+repo           files  spans   fields  body-sites  seconds   peak GiB
+rust-analyzer   5709 120245   256414     656866    173.933     0.601
+ripgrep         1039  21434    40231     106389     24.988     0.182
+tokio           1239   8632    18581      27492     10.182     0.101
+serde            354   4150     5848      19735      3.715     0.125
+cargo-modules   5597 114015   258302     636893    186.835     0.563
+```
+
+All five mapper/status/audit exits are zero, tiling identities hold, process audit
+violations are zero, and both audit flags pass. Peak process-tree RSS remains below
+2 GiB. Target filtering is exact-path, not recursive. No failed/replaced captures
+were needed in this requalification.
+
+Relative to the previous parser-aligned run, rust-analyzer changed by +2 files,
+0 spans, 0 fields and +8 body sites. The new fixture files are byte inventory;
+the source guard adds expression evidence. All other repositories have zero count
+deltas. Source-closure findings for cargo-modules/ripgrep remain unchanged; fixture
+bytes are not mapped closure/spans.
+
+The long native sysroot integration was SIGSTOP-paused during all S3 measurements,
+then SIGCONT-resumed. Its elapsed wall time therefore is not a performance result.
+Sysroot GREEN/REFACTOR, exact mapped-unit oracle inputs, differ and all-five S5 are
+still pending, not claimed passing or measured.

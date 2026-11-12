@@ -1180,3 +1180,8 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Frozen executable SHA-256:
   f528d38b7e4b0aaadf2b83f4d5b9b9eb7336ed4e9462ff15846f3027a202be9f.
   Driver shell 190221; log /home/ubuntu/m2-const-patched-corpus.log.
+- All-five patched S3 completed (driver exit zero): tiling, memory and both audits
+  pass, zero process violations. Counts and deltas are in the human report.
+  Native integration PID 1091013 SIGCONT-resumed after measurements. It has not
+  completed; shell 787eb5, log /home/ubuntu/m2-patched-sysroot-integration.log.
+  GDB attach was denied by ptrace policy; no privilege/sysctl workaround attempted.
