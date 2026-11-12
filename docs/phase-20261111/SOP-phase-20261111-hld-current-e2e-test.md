@@ -343,3 +343,53 @@ Before that milestone, prioritize correctness: do not optimize RAM, retain
 the approximately 1.2 GiB DuckDB cap, and record actual process-tree peaks,
 wall time and resolution rounds. Historical 2 GiB checks and current engine
 limits are interim settings, not evidence of final memory acceptance.
+
+### SOP revision — process compliance and DuckDB analysis (2026-11-12)
+
+Appended after a compliance audit. Earlier text stays; where it conflicts, this revision wins.
+
+R1 oracle pin. The answer key and the production parser are built from the
+patched fork commit bf6b2099d6351c37039b01447a9bb64f9a54a586 plus
+tools/parser-const-closure-statements.patch (SHA-256
+89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa).
+References to checkout 2a362a41a in §0 are superseded.
+
+R2 stale evidence. Every run binds one frozen release executable digest.
+Evidence from an older digest does not carry forward: the M1 S1–S3 PASS
+recorded before the DuckDB migration is historical only. The next applicable
+milestone subset re-runs S1/S2/S3 on all five repositories.
+
+R3 persistent report location.
+```text
+hld-current-test-runs/<run-id>/hld-current-test-report.md   committed, append-only
+hld-current-test-runs/<run-id>/<repo-name>/                 small manifests, committed
+~/hld-current-test-artifacts/<run-id>/<repo-name>/          large traces/exports, gitignored;
+                                                            report records path + BLAKE3 digest
+```
+A gate without a report entry is not observed.
+
+R4 Turso → DuckDB handoff gate (new, applies from M2). Before any analysis:
+only a published, non-cancelled Turso generation is copied; per-table row
+counts and content digests match on both sides; the DuckDB connection reports
+extension autoload/autoinstall off, external access off, the configured
+memory_limit and a run-local temp directory. Any mismatch is FAIL, not retry-and-pass.
+
+R5 M2 S5 denominator. Oracle path sites are partitioned by a published rule:
+module-scope paths are scored at M2; type-relative/associated paths are counted
+and reported, scored from M4–M6. Every oracle row lands in exactly one class
+with a reason; partition sums equal the raw export count per repository.
+
+R6 deterministic analysis. Every consumed query has ORDER BY a total key.
+S10 compares exports from DuckDB threads=1 and threads=N byte-for-byte.
+
+R7 development-process gates (checked per run, recorded in the report):
+- STUB → RED → GREEN → REFACTOR; each GREEN group is followed by a REFACTOR
+  commit or an explicit "no refactor needed" checkpoint note.
+- The SPEC verification matrix maps every REQ-RUST id to test ids; a check
+  fails if a listed REQ or test id does not exist. Tests name their REQ.
+- L2/L3 errors are typed (thiserror enums); free-text-only error variants are
+  a refactor defect.
+- cargo fmt --check, clippy --all-targets -D warnings, cargo test, release build.
+
+R8 memory: see "S10 memory revision" — ≤500 MB whole-tree peak, enforced
+after all-five DuckDB S5 exists; interim DuckDB cap ≈1.2 GiB.
