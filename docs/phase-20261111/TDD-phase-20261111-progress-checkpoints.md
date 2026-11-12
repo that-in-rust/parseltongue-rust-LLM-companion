@@ -1597,3 +1597,14 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - S5 is still unmeasured. Next: SECONDARY exact-baseline cfg plus verified
   build-script deltas, invocation/expansion provenance and proc exclusions,
   the differ, full all-five runs, then S6/S7 complete codebase-memory coverage.
+
+### Oracle artifact-cache input REFACTOR
+
+- Replaced cache-path accumulation with try_fold and extracted canonical
+  build-script env hashing for SECONDARY verification. No protocol or
+  configuration behavior change.
+- Preparation/cache contracts: 6 passed / 0 failed (2.80s); release all-target
+  clippy -D warnings passed (0.45s); diff check passed.
+- Logs: /home/ubuntu/m2-oracle-cache-refactor-tests.log and
+  /home/ubuntu/m2-oracle-cache-refactor-clippy.log. The already-passing legacy
+  and manifest suites were not rerun because their inputs did not change.

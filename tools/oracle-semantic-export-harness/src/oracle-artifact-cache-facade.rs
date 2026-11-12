@@ -52,6 +52,12 @@ fn read_required_macro_units(manifest: &Value) -> Result<Vec<&Value>, OracleSema
         .collect())
 }
 
+pub(super) fn build_recorded_env_digest(environment: &BTreeMap<String, String>) -> String {
+    blake3::hash(json!(environment).to_string().as_bytes())
+        .to_hex()
+        .to_string()
+}
+
 pub fn build_oracle_artifact_cache(
     request: &OracleWorkspaceExportConfig,
     manifest: &Value,
@@ -137,19 +143,26 @@ pub fn build_oracle_artifact_cache(
             "artifact_binary_digest_full":blake3::hash(&fs::read(binary).map_err(build_oracle_export_error)?).to_hex().to_string(),
         }))
     }).collect::<Result<Vec<_>,OracleSemanticExportError>>()?;
-    let scripts=messages.iter().filter(|message|message["reason"]=="build-script-executed")
+    let scripts = messages
+        .iter()
+        .filter(|message| message["reason"] == "build-script-executed")
         .map(|message| {
-            let environment=serde_json::from_value::<Vec<(String,String)>>(message["env"].clone())
-                .map_err(build_oracle_export_error)?.into_iter().collect::<BTreeMap<_,_>>();
-            let cfgs=serde_json::from_value::<BTreeSet<String>>(message["cfgs"].clone())
+            let environment =
+                serde_json::from_value::<Vec<(String, String)>>(message["env"].clone())
+                    .map_err(build_oracle_export_error)?
+                    .into_iter()
+                    .collect::<BTreeMap<_, _>>();
+            let cfgs = serde_json::from_value::<BTreeSet<String>>(message["cfgs"].clone())
                 .map_err(build_oracle_export_error)?;
             Ok(json!({
-            "script_package_identifier_text":message["package_id"],
-            "script_emitted_cfg_values":cfgs,
-            "script_emitted_env_names":environment.keys().collect::<Vec<_>>(),
-            "script_emitted_env_digest":blake3::hash(json!(environment).to_string().as_bytes()).to_hex().to_string(),
-            "script_generated_output_path":message["out_dir"],
-        }))}).collect::<Result<Vec<_>,OracleSemanticExportError>>()?;
+                "script_package_identifier_text":message["package_id"],
+                "script_emitted_cfg_values":cfgs,
+                "script_emitted_env_names":environment.keys().collect::<Vec<_>>(),
+                "script_emitted_env_digest":build_recorded_env_digest(&environment),
+                "script_generated_output_path":message["out_dir"],
+            }))
+        })
+        .collect::<Result<Vec<_>, OracleSemanticExportError>>()?;
     validate_mapped_unit_manifest(request, manifest)?;
     Ok(json!({
         "cache_manifest_version_value":1,
@@ -198,52 +211,54 @@ pub(super) fn read_oracle_artifact_cache(
             "artifact cache unit count differs",
         ));
     }
-    let mut paths = BTreeMap::new();
-    for unit in required {
-        let candidates = rows
-            .iter()
-            .filter(|row| {
-                row["artifact_compilation_unit_key"] == unit["unit_compilation_identity_key"]
-            })
-            .collect::<Vec<_>>();
-        let [row] = candidates.as_slice() else {
-            return Err(build_oracle_export_error(
-                "artifact cache unit missing or ambiguous",
-            ));
-        };
-        if row["artifact_semantic_identity_record"] != unit["unit_semantic_identity_record"]
-            || row["artifact_source_root_path"] != unit["unit_source_root_path"]
-            || read_artifact_feature_values(&row["artifact_enabled_feature_values"])?
-                != read_artifact_feature_values(&unit["unit_enabled_feature_values"])?
-        {
-            return Err(build_oracle_export_error(
-                "artifact cache unit configuration differs",
-            ));
-        }
-        let binary = read_artifact_string_value(row, "artifact_binary_absolute_path")?;
-        let absolute = vfs::AbsPathBuf::try_from(binary)
-            .map_err(|_| build_oracle_export_error("artifact path is not absolute UTF-8"))?;
-        if row["artifact_binary_digest_full"]
-            != blake3::hash(&fs::read(binary).map_err(build_oracle_export_error)?)
-                .to_hex()
-                .to_string()
-        {
-            return Err(build_oracle_export_error(
-                "artifact cache dylib digest differs",
-            ));
-        }
-        if paths
-            .insert(
-                read_artifact_string_value(unit, "unit_source_root_path")?.to_owned(),
-                absolute,
-            )
-            .is_some()
-        {
-            return Err(build_oracle_export_error(
-                "artifact cache source context ambiguous",
-            ));
-        }
-    }
+    let paths = required
+        .into_iter()
+        .try_fold(BTreeMap::new(), |mut paths, unit| {
+            let candidates = rows
+                .iter()
+                .filter(|row| {
+                    row["artifact_compilation_unit_key"] == unit["unit_compilation_identity_key"]
+                })
+                .collect::<Vec<_>>();
+            let [row] = candidates.as_slice() else {
+                return Err(build_oracle_export_error(
+                    "artifact cache unit missing or ambiguous",
+                ));
+            };
+            if row["artifact_semantic_identity_record"] != unit["unit_semantic_identity_record"]
+                || row["artifact_source_root_path"] != unit["unit_source_root_path"]
+                || read_artifact_feature_values(&row["artifact_enabled_feature_values"])?
+                    != read_artifact_feature_values(&unit["unit_enabled_feature_values"])?
+            {
+                return Err(build_oracle_export_error(
+                    "artifact cache unit configuration differs",
+                ));
+            }
+            let binary = read_artifact_string_value(row, "artifact_binary_absolute_path")?;
+            let absolute = vfs::AbsPathBuf::try_from(binary)
+                .map_err(|_| build_oracle_export_error("artifact path is not absolute UTF-8"))?;
+            if row["artifact_binary_digest_full"]
+                != blake3::hash(&fs::read(binary).map_err(build_oracle_export_error)?)
+                    .to_hex()
+                    .to_string()
+            {
+                return Err(build_oracle_export_error(
+                    "artifact cache dylib digest differs",
+                ));
+            }
+            if paths
+                .insert(
+                    read_artifact_string_value(unit, "unit_source_root_path")?.to_owned(),
+                    absolute,
+                )
+                .is_some()
+            {
+                return Err(build_oracle_export_error(
+                    "artifact cache source context ambiguous",
+                ));
+            }
+            Ok(paths)
+        })?;
     let scripts = cache["cache_build_script_rows"]
         .as_array()
         .ok_or_else(|| build_oracle_export_error("artifact cache build-script rows missing"))?
