@@ -98,6 +98,7 @@ mod frozen_generation_appender_copy;
 
 #[path = "namespace-binding-round-strata.rs"]
 mod namespace_binding_round_strata;
+pub use namespace_binding_round_strata::recompute_binding_round;
 
 pub const FIXED_POINT_LIMIT: usize = 8192;
 

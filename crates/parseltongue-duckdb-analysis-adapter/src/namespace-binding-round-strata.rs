@@ -1,13 +1,63 @@
 use super::build_analysis_error;
 use parseltongue_core_row_types::{StageRunScopeValue, StoreBackendFailureError};
 
-pub(super) fn recompute_binding_round(
-    _connection: &duckdb::Connection,
-    _scope: &StageRunScopeValue,
+pub fn recompute_binding_round(
+    connection: &duckdb::Connection,
+    scope: &StageRunScopeValue,
 ) -> Result<String, StoreBackendFailureError> {
-    Err(build_analysis_error(
-        "full-set binding round not implemented",
-    ))
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(build_analysis_error)?;
+    transaction
+        .execute_batch(
+            "CREATE TABLE IF NOT EXISTS \"namespace-binding-round-results\" (
+        generation_key VARCHAR NOT NULL,attempt_key VARCHAR NOT NULL,scope_key VARCHAR NOT NULL,
+        name VARCHAR NOT NULL,namespace VARCHAR NOT NULL,target_key VARCHAR NOT NULL,
+        priority INTEGER NOT NULL,evidence_key VARCHAR NOT NULL,state VARCHAR NOT NULL,
+        PRIMARY KEY(generation_key,attempt_key,scope_key,name,namespace,target_key,evidence_key));",
+        )
+        .map_err(build_analysis_error)?;
+    transaction.execute("DELETE FROM \"namespace-binding-round-results\" WHERE generation_key=? AND attempt_key=?",
+        duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+    transaction.execute("INSERT INTO \"namespace-binding-round-results\"
+        WITH ranked AS (
+            SELECT DISTINCT *,max(priority) OVER (PARTITION BY generation_key,attempt_key,scope_key,name,namespace) AS selected_priority
+            FROM \"namespace-binding-round-inputs\" WHERE generation_key=? AND attempt_key=?
+        ), selected AS (
+            SELECT generation_key,attempt_key,scope_key,name,namespace,target_key,priority,evidence_key
+            FROM ranked WHERE priority=selected_priority
+        ) SELECT *,CASE WHEN count(DISTINCT target_key) OVER (
+            PARTITION BY generation_key,attempt_key,scope_key,name,namespace)>1
+            THEN 'ambiguous' ELSE 'resolved' END FROM selected",
+        duckdb::params![scope.run_generation_digest_value,scope.stage_attempt_sequence_value]).map_err(build_analysis_error)?;
+    let mut hasher = blake3::Hasher::new();
+    {
+        let mut statement = transaction.prepare("SELECT generation_key,attempt_key,scope_key,name,namespace,target_key,priority,evidence_key,state
+            FROM \"namespace-binding-round-results\" WHERE generation_key=? AND attempt_key=?
+            ORDER BY generation_key,attempt_key,scope_key,name,namespace,target_key,evidence_key")
+            .map_err(build_analysis_error)?;
+        let mut rows = statement
+            .query(duckdb::params![
+                scope.run_generation_digest_value,
+                scope.stage_attempt_sequence_value
+            ])
+            .map_err(build_analysis_error)?;
+        while let Some(row) = rows.next().map_err(build_analysis_error)? {
+            (0..9).try_for_each(|column| {
+                let text = if column == 6 {
+                    row.get::<_, i32>(column).map(|value| value.to_string())
+                } else {
+                    row.get::<_, String>(column)
+                }
+                .map_err(build_analysis_error)?;
+                hasher.update(&(text.len() as u64).to_le_bytes());
+                hasher.update(text.as_bytes());
+                Ok::<_, StoreBackendFailureError>(())
+            })?;
+        }
+    }
+    transaction.commit().map_err(build_analysis_error)?;
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 #[cfg(test)]
