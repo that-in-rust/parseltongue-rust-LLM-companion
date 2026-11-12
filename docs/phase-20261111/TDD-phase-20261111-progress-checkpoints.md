@@ -2156,3 +2156,10 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   before final workspace publication, then wire the CLI macro loop. No new
   M2 or S5 measurements exist. The macro port already restricts expansion to
   source/module/associated/extern item positions (not arbitrary body macros).
+
+- Final lookup GREEN is `33106792e`, pushed. After normalizing the revision
+  field to four words, both syntax suites again passed 17/17; Clippy finished
+  in 0.27s. Native builds are finished for this checkpoint; PID 1532439 was
+  resumed with SIGCONT and verified `Sl` (previously `Tl`). Parser patch
+  SHA-256 was rechecked as
+  `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.
