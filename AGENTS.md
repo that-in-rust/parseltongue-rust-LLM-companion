@@ -1,5 +1,29 @@
 # AGENTS.md — rules for any agent working in this repository
 
+## Definition of done (read first)
+
+```text
+ A milestone is DONE only when its SOP-subset run report shows PASS on all five repos:
+   hld-current-test-runs/<run-id>/hld-current-test-report.md
+ Unit tests passing = progress, never done.
+ Any production change after a run invalidates it: new run, all five repos, one frozen release executable digest.
+ Status is reported per SOP step (PASS / FAIL / BLOCKED / not-started) with measured numbers — no bare percentages.
+```
+
+## Canonical paths (phase-20261111)
+
+```text
+ PRD      docs/phase-20261111/PRD-phase-20261111-compiling-hld.md
+ SPEC     docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md   (REQ-RUST ids + verification matrix)
+ SOP      docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md       (S1–S10, milestone subsets, revisions R1–R8)
+ JOURNAL  docs/phase-20261111/TDD-phase-20261111-progress-checkpoints.md       (append-only TDD journal)
+ STATUS   docs/phase-20261111/current-milestone-status-board.md                (rewritten in place; one page)
+ PINS     docs/phase-20261111/{parser-source-pin,oracle-source-build,corpus-source-pin}-manifest.json
+ RUNS     hld-current-test-runs/<run-id>/ (committed reports) · ~/hld-current-test-artifacts/<run-id>/ (large, gitignored, digest-recorded)
+```
+
+A change to architecture or to any pin updates SPEC, SOP and AGENTS.md in the same commit.
+
 ## Naming rule: four words, hyphenated, for everything
 
 Every component, artefact, table, tool, model, role and view named in this repository's documents and code gets an explicit **four-word hyphenated name** — the way the HTTP API already names its endpoints (`blast-radius-impact-analysis`, `reverse-callers-query-graph`). Enum *values* (status words such as `extracted`, `abstained`) are values, not names, and stay single words.
@@ -29,22 +53,49 @@ traits and error types (`SpanDigestIdValue`, `SpanRowReadStore`, `CrateGraphLoad
 
 ## Working method (always apply)
 
-- Classify first: broken behavior → bug; existing rails → enhancement; bounded new capability → feature; unclear new system → product. Use the lightest safe workflow.
-- Define correctness before implementation: write a failing executable spec or regression test first; use explicit structural checks for documentation-only work.
-- Proceed when correctness is definable; research missing facts; escalate unclear requirements rather than guessing.
-- Load only relevant rules, interfaces, dependency context, tests and prior patterns; explore with codebase-memory-mcp before reading files by hand.
-- Give precise names, types, constraints and examples; enforce this repo's four-word hyphenated naming rule.
-- Explore, constrain, refine, then verify; challenge assumptions and simplify the design before shipping.
-- Let requirements and architecture co-evolve; remove unnecessary scope rather than building the first draft literally.
-- Serialize phase, requirements, decisions, rejected options, test status, open questions and next steps to durable files after major decisions and before handoff.
-- Keep a concrete negative-knowledge registry in a scoped four-word-named file: failure, cause, detection signal, safer replacement and proof gate; reuse it during review.
-- Research with an incremental source ledger: URL/path, line range, version/date, authority, claim and uncertainty; separate sourced facts from inference.
-- Adopt idioms only with an applicability boundary, failure prevented, tradeoff and verification gate; measure performance and reliability claims.
-- Package reusable skills with explicit triggers, exclusions, mode routing, progressive reference loading and repo-native checks.
-- Verify against the executable spec and relevant existing checks; report observed output and remaining uncertainty, not unsupported success claims.
-- Close the loop: record failures, fixes and repeatable wins; preserve append-only research conventions.
+### TDD loop with a journal — every code change, every time
 
-Full workflows, research rubric and source attribution: [agent-working-method-playbook](docs/agent-working-method-playbook.md).
+Use `tdd-workflow-for-rust-stub-red-green-refactor` constantly; no code change skips it.
+
+```text
+ 1 pick REQ-RUST ids from SPEC (add/revise the REQ first if missing)
+ 2 STUB      signatures + todo!(); cargo check                       → journal entry
+ 3 RED       failing tests named test_<four_words>, doc-tagged /// REQ-RUST-NNN.R; paste failing output → journal entry
+ 4 GREEN     minimum code; tests pass                                 → journal entry + commit
+ 5 REFACTOR  combinators, newtypes, typed errors, dead code; or an explicit "no refactor needed" note → journal entry + commit
+ 6 gates     cargo fmt --check · clippy --all-targets -D warnings · cargo test · release build
+ 7 push      git pull --rebase origin <branch> first (the user also commits from a Mac)
+ 8 milestone end → SOP-subset run → run report → update status board
+```
+
+Journal entry (append to JOURNAL after EVERY phase, never edit old entries):
+
+```text
+ phase · REQ ids · test names + status · exact command + pasted output (pass/fail lines)
+ commit sha · decisions + rejected options · next step · blockers
+```
+
+### Requirements, errors, layering
+
+- Every test names its REQ; a check fails when the SPEC verification matrix lists a REQ or test id that does not exist.
+- L1 core is dependency-free with hand-written error enums; L2/L3 errors are `thiserror` enums. A free-text-only error variant is a refactor defect.
+- Side effects only in L3 adapters behind L2 traits.
+
+### Budgets before big runs
+
+- Always run serde first; only then the other four repos.
+- Kill any run that exceeds its memory budget (final target ≤500 MB whole process tree; interim DuckDB cap ≈1.2 GiB) or 2× its expected wall time; record the peak and stop to re-plan.
+- Measure memory and time before arguing design.
+
+### Stop rule
+
+After 3 failed attempts at the same step: stop, journal what was tried, re-plan or cut the step smaller. No further tuning.
+
+### Status messages
+
+Milestone · per-SOP-step PASS/FAIL/BLOCKED · measured numbers · next action. Read STATUS and the latest run report before answering "how far".
+
+Research rubric, source ledger, negative-knowledge registry and skill packaging: [agent-working-method-playbook](docs/agent-working-method-playbook.md).
 
 ## Nomenclature (keep in sync with devin-research/Deep-Insight-08.md)
 
@@ -60,7 +111,7 @@ Full workflows, research rubric and source attribution: [agent-working-method-pl
  multi-level-code-map-entity       what we build: the tables below
  multi-level-query-engine-entity   what the agent uses: find · impact · status · propose
 
- TABLES AND VIEWS (one Turso / SQLite-compatible file)
+ TABLES AND VIEWS (Turso is the write/serving store; phase-20261111 analysis tables live in DuckDB, see SPEC)
  file-source-text-table            raw files: path, folder, digest, text — written first, by a CPU tool
  span-reference-text-table         one row per item span: digest id, kind, name, path, visibility, range, raw code, doc, cfg
  name-token-index-table            sub-tokens of names and paths, for joins and BM25
@@ -84,6 +135,7 @@ Full workflows, research rubric and source attribution: [agent-working-method-pl
  cpu-tool-propose-future-rows      validate and write hld-future-dependency-edges rows for the agent/human
  cpu-tool-status-coverage-banner   per-level coverage, stale rows, pending L3
 
+NEXT PHASE (not phase-20261111; do not build now)
  TINY LLMS (only where grammar cannot decide; text in → labels + confidence out; never touch the table; see DI-08 "When a tiny LLM is called")
  tiny-llm-span-clarifier           grey spans only (parse error + recovery rule conf < 1); fix boundary/kind/visibility
  tiny-llm-edge-binder              site + several candidates → one target or abstain; only after the CPU resolver fails
@@ -96,9 +148,13 @@ Full workflows, research rubric and source attribution: [agent-working-method-pl
 
  PHASE-20261111 ADDITIONS (docs/phase-20261111/PRD-phase-20261111-compiling-hld.md; compiling code only, ported rust-analyzer logic)
  crate-dependency-graph-table · body-site-pending-table · module-scope-binding-table · macro-expanded-item-table
- lowered-signature-type-table · impl-header-index-table · oracle-edge-agreement-table · lang-item-definition-table · proc-macro-shape-table · hld-current-test-procedure
- cpu-tool-crate-graph-loader · cpu-tool-port-name-resolver · cpu-tool-port-macro-expander · cpu-tool-port-signature-lowerer
+ lowered-signature-type-table · impl-header-index-table · oracle-edge-agreement-table · lang-item-definition-table · proc-macro-shape-table · hld-current-e2e-test (SOP)
+ cpu-tool-crate-graph-loader · cpu-tool-port-macro-expander · cpu-tool-port-signature-lowerer
  cpu-tool-port-body-inferencer · cpu-tool-oracle-edge-differ
+
+ RETIRED 2026-11-12 (in-memory resolver exceeded memory gate; replaced by DuckDB SQL fixed point) — do not reuse
+ cpu-tool-port-name-resolver (crate parseltongue-port-name-resolver) → parseltongue-duckdb-analysis-adapter
+ hld-current-test-procedure → hld-current-e2e-test (SOP file name)
 
  LEVELS
  crate-level-l0-context · folder-file-l1-rollup · public-item-l2-interface · body-site-l3-evidence
@@ -136,4 +192,12 @@ codebase-memory-mcp cli manage_adr --project <name> --mode update   # persist ar
 # MCP for a coding agent: run the binary with no args (stdio); optional graph UI: daemon start --open --port=9749
 ```
 
-Indexed on 2026-11-09 for this repo: 24,681 nodes, 50,558 edges; project name `home-ubuntu-repos-parseltongue-rust-LLM-companion`. It is an exploration aid for agents working on this repo; it is not part of the Parseltongue runtime (it uses tree-sitter and LSP, which the product excludes — see Deep-Insight-07 §2).
+Project name `home-ubuntu-repos-parseltongue-rust-LLM-companion`; re-index after large changes (counts go stale — read them from `index_status`, not from here). It is an exploration aid for agents working on this repo; it is not part of the Parseltongue runtime (it uses tree-sitter and LSP, which the product excludes — see Deep-Insight-07 §2).
+
+Gotchas: it only partly parses DuckDB `.sql` files (check `parse_partial` in the index output); `search_graph --name_pattern` rejects inline regex flags such as `(?i)`.
+
+## Environment gotchas
+
+- DuckDB's bundled C++ build is slow and memory-heavy: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0`; pause the VS Code rust-analyzer process (SIGSTOP) during native builds and SIGCONT it afterwards.
+- The oracle harness incremental cache (`tools/oracle-semantic-export-harness/target`) can reach ~10 GiB and is safe to delete; keep its executables' digests recorded.
+- The VM environment blueprint still references the deleted `experiments/spancut`.
