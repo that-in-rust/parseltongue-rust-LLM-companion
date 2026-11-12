@@ -70,3 +70,7 @@ pub fn resolve_owned_crate_bindings(
 #[cfg(test)]
 #[path = "row-resolution-contract-tests.rs"]
 mod row_resolution_contract_tests;
+
+#[cfg(test)]
+#[path = "bounded-constructor-policy-tests.rs"]
+mod bounded_constructor_policy_tests;
