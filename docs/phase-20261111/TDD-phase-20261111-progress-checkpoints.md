@@ -2759,3 +2759,22 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   attempt and no speculative schema/index removal. Root-cause correction,
   CLI GREEN, serde M2, all-five S1/S2/S3 and S5 remain open. Publish this
   measured blocker before a narrower request-batching implementation.
+
+### Committed diagnostic run report and handoff
+
+- Diagnostic GREEN/checkpoint `1db884db2`; rollback-safe shared-reader
+  REFACTOR `4363fca99`. Latest build 1.04s and all-target release Clippy
+  0.30s, both exit zero. No semantic production edits followed those checks.
+- Report: `hld-current-test-runs/20261112-namespace-phase-blocker/hld-current-test-report.md`.
+  Includes all-five NOT-STARTED/BLOCKED status, failed clause, exact cap,
+  per-phase measurements, input identity, candidate hashes, and uncertainty.
+- Structural check output:
+  `REPORT_STRUCTURE_PASS: 133 unique operator paths; production SELECT body identical; all five statuses explicit`.
+- Negative knowledge/source ledger: `native-namespace-memory-findings.md`.
+  Original CLI WIP remains in its two files and an artifact patch; retained
+  stash is not dropped. No full CLI GREEN or all-five SOP PASS is claimed.
+- Resumed editor rust-analyzer PID 1804565 with SIGCONT and verified Sl.
+  Old PID 1532439 no longer exists. No mapper/profile process remains.
+- Current task remains BLOCKED at the candidate INSERT, not at copy or
+  normalization. Root fix, serde M2 qualification, comparator and all-five
+  S5 require the next narrower request-batching/equality step. No GUI changed.

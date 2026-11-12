@@ -850,3 +850,9 @@ support separate phase replay at 1,288,490,188 bytes without re-ingestion.
 Verification: `test_namespace_phase_failure_context` forces each phase to
 fail and checks its variant/source; `test_namespace_phase_empty_success`
 checks empty success and real memory diagnostics.
+
+Additional verification: `test_namespace_telemetry_failure_preserves` keeps
+the original failure when observation fails; `test_namespace_query_explain_rows`
+and `test_namespace_query_explain_error` cover normal/empty/error operator
+profiling; `test_namespace_insert_plan_rollback` proves diagnostic insertion
+profiles leave preexisting candidate rows unchanged on success and error.
