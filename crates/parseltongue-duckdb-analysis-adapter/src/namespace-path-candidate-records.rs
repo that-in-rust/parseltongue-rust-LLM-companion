@@ -8,6 +8,10 @@ pub fn recompute_path_candidates(
     let transaction = connection
         .unchecked_transaction()
         .map_err(build_analysis_error)?;
+    transaction.execute_batch("CREATE TABLE IF NOT EXISTS \"namespace-binding-visibility-records\" (
+        generation_key VARCHAR,attempt_key VARCHAR,scope_key VARCHAR,name VARCHAR,
+        namespace VARCHAR,target_key VARCHAR,priority INTEGER,evidence_key VARCHAR,visibility_scope VARCHAR);")
+        .map_err(build_analysis_error)?;
     transaction
         .execute(
             "CREATE OR REPLACE TEMP TABLE \"namespace-active-path-requests\" AS

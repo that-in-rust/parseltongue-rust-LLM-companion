@@ -46,11 +46,15 @@ WITH RECURSIVE seeds AS (
             AND b.name=regexp_replace(s.segment_text,'^r#','')
         JOIN "namespace-target-context-records" t ON t.generation_key=r.generation_key
             AND t.attempt_key=r.attempt_key AND t.target_key=b.target_key
+        LEFT JOIN "namespace-binding-visibility-records" v ON v.generation_key=b.generation_key
+            AND v.attempt_key=b.attempt_key AND v.scope_key=b.scope_key AND v.name=b.name
+            AND v.namespace=b.namespace AND v.target_key=b.target_key AND v.priority=b.priority AND v.evidence_key=b.evidence_key
+        CROSS JOIN LATERAL (SELECT CASE WHEN v.target_key IS NULL THEN t.visibility_scope ELSE v.visibility_scope END AS restriction_scope) visibility
         WHERE s.segment_kind='name' AND r.unavailable_reason IS NULL
-            AND (t.visibility_scope IS NULL OR EXISTS (
+            AND (visibility.restriction_scope IS NULL OR EXISTS (
                 SELECT 1 FROM "namespace-scope-ancestor-records" a
                 WHERE a.generation_key=r.generation_key AND a.attempt_key=r.attempt_key
-                    AND a.scope_key=r.scope_key AND a.ancestor_scope=t.visibility_scope))
+                    AND a.scope_key=r.scope_key AND a.ancestor_scope=visibility.restriction_scope))
             AND CASE WHEN w.position+1<r.segment_count THEN b.namespace='type'
                 ELSE r.namespace_filter='any' OR r.namespace_filter=b.namespace
                     OR (r.namespace_filter='type-or-value' AND b.namespace IN ('type','value')) END

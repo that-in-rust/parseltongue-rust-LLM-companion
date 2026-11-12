@@ -17,3 +17,8 @@ CREATE TABLE "namespace-path-segment-records" (
 CREATE TABLE "namespace-import-request-records" (
  generation_key VARCHAR,attempt_key VARCHAR,request_key VARCHAR,importer_scope VARCHAR,
  alias_name VARCHAR,is_glob BOOLEAN);
+CREATE TABLE "namespace-declaration-visibility-records" (
+ generation_key VARCHAR,attempt_key VARCHAR,scope_key VARCHAR,name VARCHAR,
+ namespace VARCHAR,target_key VARCHAR,priority INTEGER,evidence_key VARCHAR,visibility_scope VARCHAR);
+CREATE TABLE "namespace-import-visibility-records" (
+ generation_key VARCHAR,attempt_key VARCHAR,request_key VARCHAR,visibility_scope VARCHAR);

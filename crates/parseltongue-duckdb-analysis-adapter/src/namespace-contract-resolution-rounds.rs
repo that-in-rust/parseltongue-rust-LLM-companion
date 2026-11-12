@@ -25,6 +25,7 @@ pub(super) fn resolve_contract_input(
     };
     super::materialize_scope_relations(&connection, &scope).map_err(error)?;
     connection.execute_batch("CREATE TABLE \"namespace-binding-round-inputs\" AS SELECT * FROM \"namespace-binding-declaration-records\"").map_err(error)?;
+    connection.execute_batch("CREATE TABLE \"namespace-binding-visibility-records\" AS SELECT * FROM \"namespace-declaration-visibility-records\"").map_err(error)?;
     let mut previous = recompute_binding_rows(&connection, &scope).map_err(error)?;
     let mut settled = false;
     for _ in 0..=FIXED_POINT_LIMIT {
@@ -35,7 +36,7 @@ pub(super) fn resolve_contract_input(
         connection.execute_batch("DELETE FROM \"namespace-binding-round-inputs\";
             INSERT INTO \"namespace-binding-round-inputs\"
             SELECT * FROM \"namespace-binding-declaration-records\"
-            UNION ALL SELECT i.generation_key,i.attempt_key,i.importer_scope,coalesce(i.alias_name,c.binding_name),c.namespace,c.target_key,3,i.request_key
+            UNION ALL SELECT i.generation_key,i.attempt_key,i.importer_scope,regexp_replace(coalesce(i.alias_name,c.binding_name),'^r#',''),c.namespace,c.target_key,3,i.request_key
             FROM \"namespace-import-request-records\" i JOIN \"namespace-path-candidate-records\" c
                 ON c.generation_key=i.generation_key AND c.attempt_key=i.attempt_key AND c.request_key=i.request_key
             WHERE NOT i.is_glob AND c.state='resolved' AND coalesce(i.alias_name,'')<>'_'
@@ -45,8 +46,16 @@ pub(super) fn resolve_contract_input(
             JOIN \"namespace-target-context-records\" t ON t.generation_key=c.generation_key AND t.attempt_key=c.attempt_key AND t.target_key=c.target_key
             JOIN \"namespace-binding-round-results\" b ON b.generation_key=t.generation_key AND b.attempt_key=t.attempt_key AND b.scope_key=t.child_scope
             JOIN \"namespace-target-context-records\" v ON v.generation_key=b.generation_key AND v.attempt_key=b.attempt_key AND v.target_key=b.target_key
-            WHERE i.is_glob AND (v.visibility_scope IS NULL OR EXISTS (SELECT 1 FROM \"namespace-scope-ancestor-records\" a
-                WHERE a.generation_key=i.generation_key AND a.attempt_key=i.attempt_key AND a.scope_key=i.importer_scope AND a.ancestor_scope=v.visibility_scope));")
+            LEFT JOIN \"namespace-binding-visibility-records\" bv ON bv.generation_key=b.generation_key AND bv.attempt_key=b.attempt_key
+                AND bv.scope_key=b.scope_key AND bv.name=b.name AND bv.namespace=b.namespace AND bv.target_key=b.target_key AND bv.priority=b.priority AND bv.evidence_key=b.evidence_key
+            CROSS JOIN LATERAL (SELECT CASE WHEN bv.target_key IS NULL THEN v.visibility_scope ELSE bv.visibility_scope END AS restriction_scope) visibility
+            WHERE i.is_glob AND (visibility.restriction_scope IS NULL OR EXISTS (SELECT 1 FROM \"namespace-scope-ancestor-records\" a
+                WHERE a.generation_key=i.generation_key AND a.attempt_key=i.attempt_key AND a.scope_key=i.importer_scope AND a.ancestor_scope=visibility.restriction_scope));
+            DELETE FROM \"namespace-binding-visibility-records\";
+            INSERT INTO \"namespace-binding-visibility-records\"
+                SELECT * FROM \"namespace-declaration-visibility-records\"
+                UNION ALL SELECT b.*,v.visibility_scope FROM \"namespace-binding-round-inputs\" b
+                JOIN \"namespace-import-visibility-records\" v ON b.generation_key=v.generation_key AND b.attempt_key=v.attempt_key AND b.evidence_key=v.request_key;")
             .map_err(error)?;
         let digest = recompute_binding_rows(&connection, &scope).map_err(error)?;
         if previous == digest {

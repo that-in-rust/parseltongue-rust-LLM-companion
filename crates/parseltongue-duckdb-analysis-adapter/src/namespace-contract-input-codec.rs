@@ -88,6 +88,9 @@ impl ContractInputCodec {
             };
             target_contexts.entry(target.clone()).or_insert((binding.binding_target_child_scope.as_ref().map(key),visibility,binding.binding_target_child_scope.is_some()));
             let name = binding.binding_resolved_name_text.trim_start_matches("r#");
+            connection.execute("INSERT INTO \"namespace-declaration-visibility-records\" VALUES ('contract','0',?,?,?,?,?,'',?)",
+                duckdb::params![key(&binding.binding_lexical_scope_key),name,namespace(binding.binding_namespace_kind_value),target,binding.binding_selection_priority_kind as i32,
+                    match &binding.binding_visibility_scope_kind {NameBindingVisibilityKind::Public=>None,NameBindingVisibilityKind::Restricted(scope)=>Some(key(scope)),NameBindingVisibilityKind::Invisible=>Some("invisible".into())}]).map_err(error)?;
             result.originals.insert((key(&binding.binding_lexical_scope_key),name.into(),namespace(binding.binding_namespace_kind_value).into(),target.clone()),binding.clone());
             connection.execute("INSERT INTO \"namespace-binding-declaration-records\" VALUES ('contract','0',?,?,?,?,?, '')",
                 duckdb::params![key(&binding.binding_lexical_scope_key),name,namespace(binding.binding_namespace_kind_value),target,binding.binding_selection_priority_kind as i32]).map_err(error)?;
@@ -104,6 +107,8 @@ impl ContractInputCodec {
         input.name_import_request_rows.iter().try_for_each(|import| {
             let request = key(&import.import_site_occurrence_key);
             result.imports.insert(request.clone(),import.clone());
+            connection.execute("INSERT INTO \"namespace-import-visibility-records\" VALUES ('contract','0',?,?)",
+                duckdb::params![request,match &import.import_visibility_scope_kind {NameBindingVisibilityKind::Public=>None,NameBindingVisibilityKind::Restricted(scope)=>Some(key(scope)),NameBindingVisibilityKind::Invisible=>Some("invisible".into())}]).map_err(error)?;
             result.insert_path(connection,input,&NamePathRequestRow {
                 path_site_occurrence_key:import.import_site_occurrence_key.clone(),path_lexical_scope_key:import.import_lexical_scope_key.clone(),
                 path_source_segment_rows:import.import_path_segment_rows.clone(),path_requested_namespace_kind:NameNamespaceFilterKind::Any,
