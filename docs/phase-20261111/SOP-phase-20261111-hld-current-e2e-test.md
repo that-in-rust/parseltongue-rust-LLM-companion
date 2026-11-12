@@ -150,24 +150,69 @@ The S3 fixture suite exercises SPEC §4's negative/stale/collision/cancellation 
 
 ### S4 — paired semantic oracle exports
 
-Run in isolated oracle output/build locations, never allowing SECONDARY to alter PRIMARY's inputs.
-Write normalized rows in oracle-primary-semantic-rows.jsonl and oracle-secondary-semantic-rows.jsonl.
+The current harness capability is `mapped_semantic_paths`: it exports mapped path-resolution sites only.
+The complete S4 families below remain requirements; this capability label does not imply their
+implementation or establish qualification. Freeze the published source generation before starting.
+Run from the repository root with the existing `parseltongue` and `oracle-semantic-export-harness`
+binaries; do not use `cargo run` per export. Use one persistent, invocation-unique `$OUT` and
+capture stdout/stderr for every command. The mapped manifest and artifact cache must be identical
+for both exports; do not change them or the source generation between PRIMARY and SECONDARY.
+The manifest command's stdout is the JSON artifact itself; its stderr is retained separately.
 
 ```bash
-oracle-semantic-export-harness export-workspace-semantic-rows \
-  --workspace-root-path-value "$REPO" --oracle-export-mode-value PRIMARY \
-  --semantic-row-output-path "$OUT/oracle-primary-semantic-rows.jsonl" \
-  > "$OUT/oracle-primary-output-log.txt" 2> "$OUT/oracle-primary-error-log.txt"
-oracle-semantic-export-harness export-workspace-semantic-rows \
-  --workspace-root-path-value "$REPO" --oracle-export-mode-value SECONDARY \
-  --semantic-row-output-path "$OUT/oracle-secondary-semantic-rows.jsonl" \
-  > "$OUT/oracle-secondary-output-log.txt" 2> "$OUT/oracle-secondary-error-log.txt"
+SOURCE_STORE="$OUT/hld-current-workspace-store.db"
+MANIFEST="$OUT/mapped-unit-manifest.json"
+CACHE_OUT="$OUT/oracle-cache"
+PRIMARY_OUT="$OUT/oracle-primary"
+SECONDARY_OUT="$OUT/oracle-secondary"
+CACHE="$CACHE_OUT/oracle-artifact-cache.json"
+mkdir -p "$CACHE_OUT" "$PRIMARY_OUT" "$SECONDARY_OUT" \
+  > "$OUT/oracle-stage-directories.stdout.log" 2> "$OUT/oracle-stage-directories.stderr.log"
+
+parseltongue export-mapped-unit-manifest \
+  --workspace-store-file-path "$SOURCE_STORE" \
+  > "$MANIFEST" 2> "$OUT/mapped-unit-manifest.stderr.log"
+
+CARGO_TARGET_DIR="$CACHE_OUT/cargo-target" oracle-semantic-export-harness \
+  --workspace-source-root-path "$REPO" \
+  --mapped-unit-manifest-path "$MANIFEST" \
+  --oracle-artifact-cache-output "$CACHE" \
+  > "$CACHE_OUT/stdout.log" 2> "$CACHE_OUT/stderr.log"
+
+sha256sum "$MANIFEST" "$CACHE" \
+  > "$OUT/oracle-paired-inputs.sha256" 2> "$OUT/oracle-paired-inputs.sha256.stderr.log"
+
+CARGO_TARGET_DIR="$PRIMARY_OUT/cargo-target" oracle-semantic-export-harness \
+  --workspace-source-root-path "$REPO" \
+  --mapped-unit-manifest-path "$MANIFEST" \
+  --oracle-path-export-output "$PRIMARY_OUT/oracle-path-export.json" \
+  --oracle-configuration-kind PRIMARY \
+  --oracle-macro-cache-manifest "$CACHE" \
+  > "$PRIMARY_OUT/stdout.log" 2> "$PRIMARY_OUT/stderr.log"
+
+CARGO_TARGET_DIR="$SECONDARY_OUT/cargo-target" oracle-semantic-export-harness \
+  --workspace-source-root-path "$REPO" \
+  --mapped-unit-manifest-path "$MANIFEST" \
+  --oracle-path-export-output "$SECONDARY_OUT/oracle-path-export.json" \
+  --oracle-configuration-kind SECONDARY \
+  --oracle-macro-cache-manifest "$CACHE" \
+  > "$SECONDARY_OUT/stdout.log" 2> "$SECONDARY_OUT/stderr.log"
+
+sha256sum --check "$OUT/oracle-paired-inputs.sha256" \
+  > "$OUT/oracle-paired-inputs-check.stdout.log" 2> "$OUT/oracle-paired-inputs-check.stderr.log"
 ```
 
 PRIMARY: build scripts disabled. SECONDARY: enabled. Both: proc macros enabled, identical selected targets,
 features/cfg/editions, test cfg OFF (--no-test equivalent), offline inputs and recorded artifacts.
+The current mapped route fixes target context to the compiler default, enables no extra features,
+keeps default features enabled, and disables test targets. Retain `$CACHE_OUT/cargo-target` and its
+proc-macro dylibs through both exports; the cache command internally runs `cargo check --offline --locked`.
+Each `oracle-path-export.json` is one pretty-printed JSON envelope, not JSONL. The comparator consumes
+each file as a single JSON value.
 Export path resolutions, invocation-keyed expansion items/signatures/body sites, impl relations,
 method/call targets, signature refs and effective visibility/reachability.
+The current `mapped_semantic_paths` route does not implement those full families or per-site expansion
+provenance and proc-macro-dependence fields, and does not establish S4/S5 qualification.
 The per-site PRIMARY/SECONDARY diff is the KL1 set; analysis-stats summaries cannot identify those sites.
 Optional `rust-analyzer scip` occurrence export must use a matching pinned binary/configuration and writes
 oracle-secondary-occurrence-index.scip; never substitute it for semantic rows or agreement gates.
@@ -176,9 +221,10 @@ oracle-secondary-occurrence-index.scip; never substitute it for semantic rows or
 
 ```bash
 parseltongue oracle-edge-differ-run \
-  --workspace-store-file-path "$OUT/hld-current-workspace-store.db" \
-  --primary-semantic-input-path "$OUT/oracle-primary-semantic-rows.jsonl" \
-  --secondary-semantic-input-path "$OUT/oracle-secondary-semantic-rows.jsonl" \
+  --workspace-store-file-path "$SOURCE_STORE" \
+  --primary-semantic-input-path "$PRIMARY_OUT/oracle-path-export.json" \
+  --secondary-semantic-input-path "$SECONDARY_OUT/oracle-path-export.json" \
+  --agreement-store-file-path "$OUT/oracle-edge-agreement-store.db" \
   > "$OUT/hld-current-oracle-difference.json" 2> "$OUT/oracle-differ-error-log.txt"
 ```
 

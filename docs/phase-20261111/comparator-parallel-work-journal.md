@@ -635,3 +635,38 @@ REQ-RUST-026.4 R9 final verification
   - `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.89s`; `Exit code: 0`.
   - `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 6.08s`; `Exit code: 0`.
   - Clippy initially rejected `expect()` in the new test (`clippy::expect-used`); the regression now asserts the read-back path is nonempty without `expect`, and the workspace clippy gate passed. The initial fmt check found formatting-only differences, fixed with `cargo fmt --all`, followed by the passing fmt check above.
+
+### REQ-RUST-027.0 — mapped path capability metadata
+
+REQ-RUST-027.0 STUB
+  - Retained the existing `build_oracle_source_manifest` API, manifest fields, source pin, and exporter flags. Read-only source inspection confirmed the mapped PRIMARY/SECONDARY path-export and artifact-cache routes; the manifest value alone did not describe that bounded capability accurately.
+  - Before assigning the requirement, repository-wide tracked and worktree searches for `REQ-RUST-027` returned no matches.
+
+REQ-RUST-027.0 RED — BLOCKED BEFORE ASSERTION
+  - Added the tagged four-word test `test_oracle_capability_reports_paths` first. The focused command did not reach Rust compilation or the assertion because the offline registry lacks a locked rust-analyzer dependency. This is not an actual assertion RED.
+  - `cargo metadata --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml --format-version 1 > /dev/null`: `Exit code: 101`.
+  - `cargo test --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml test_oracle_capability_reports_paths -- --nocapture`: `Exit code: 101`; test not executed.
+  - Both commands reported:
+
+```text
+error: no matching package named `la-arena` found
+location searched: crates.io index
+required by package `hir v0.0.0 (/home/ubuntu/repos/rust-tools/rust-analyzer/crates/hir)`
+    ... which satisfies path dependency `hir` (locked to 0.0.0) of package `oracle-semantic-export-harness v0.1.0 (/home/ubuntu/repos/parseltongue-rust-LLM-companion/tools/oracle-semantic-export-harness)`
+note: offline mode (via `--offline`) can sometimes cause surprising resolution failures
+help: if this error is too confusing you may wish to retry without `--offline`
+```
+
+REQ-RUST-027.0 GREEN IMPLEMENTATION — RUNTIME UNVERIFIED
+  - Changed only `oracle_export_support_kind` from `provenance_only` to `mapped_semantic_paths`; updated the existing pinned-manifest assertion without changing the pinned hash. The new assertion remains in place, but no Rust test result is claimed.
+  - `cargo fmt --manifest-path tools/oracle-semantic-export-harness/Cargo.toml -- --check`: no diagnostics; `Exit code: 0`.
+  - `cargo clippy --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml --all-targets -- -D warnings`: `Exit code: 101` before linting, with the same missing-`la-arena` error above. Cargo also emitted this upstream warning for pinned rust-analyzer manifests:
+
+```text
+warning: /home/ubuntu/repos/rust-tools/rust-analyzer/crates/hir-expand/Cargo.toml: unused manifest key `lints.cargo` (may be supported in a future version)
+```
+
+REQ-RUST-027.0 REFACTOR
+  - Source/diff review found no additional refactor needed. The SOP uses the live manifest/cache/export/comparator commands, ordered mapped-export flags, separate stage targets/logs, frozen paired inputs, and one pretty JSON envelope per oracle export. Full S4 families remain explicit requirements; current path capability does not implement them or per-site expansion provenance/proc-macro dependence and does not establish qualification.
+  - Source-only structural output: `PASS: REQ-RUST-027.0 was unused in HEAD and is now declared/test-mapped`; `PASS: live cache/export flags, order, pretty-JSON format, and S4/S5 paths match source`; `PASS: new four-word test and unchanged full source pin assertion`; `PASS: only AGENTS, SOP target block, SPEC additions, and harness lib.rs changed so far`; `PASS: scorer, static build manifest, parser/corpus pins unchanged; AGENTS/SPEC history is additions-only`; `SOURCE-ONLY: stale value in HEAD vs mapped_semantic_paths implementation/test expectation; not Rust runtime evidence`.
+  - The static `oracle-source-build-manifest.json`, executable digest, source pins, lockfiles, scoring, resolver, and provenance implementation were not changed. No corpus or workspace build was run. A lock-compatible offline Cargo registry containing `la-arena` is required to execute the actual RED/GREEN contract test and clippy gate.

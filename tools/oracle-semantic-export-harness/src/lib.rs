@@ -35,13 +35,23 @@ pub fn build_oracle_source_manifest() -> serde_json::Value {
     serde_json::json!({
         "oracle_source_commit_hash": env!("ORACLE_SOURCE_COMMIT_HASH"),
         "oracle_toolchain_version_text": env!("ORACLE_RUSTC_VERSION_TEXT"),
-        "oracle_export_support_kind": "provenance_only",
+        "oracle_export_support_kind": "mapped_semantic_paths",
         "oracle_hir_crate_bytes": std::mem::size_of::<hir::Crate>(),
     })
 }
 
 #[cfg(test)]
 mod oracle_manifest_contract_tests {
+    /// REQ-RUST-027.0
+    #[test]
+    fn test_oracle_capability_reports_paths() {
+        let oracle_source_build_manifest = super::build_oracle_source_manifest();
+        assert_eq!(
+            oracle_source_build_manifest["oracle_export_support_kind"],
+            "mapped_semantic_paths"
+        );
+    }
+
     #[test]
     fn test_oracle_build_manifest_pinned() {
         let oracle_source_build_manifest = super::build_oracle_source_manifest();
@@ -51,7 +61,7 @@ mod oracle_manifest_contract_tests {
         );
         assert_eq!(
             oracle_source_build_manifest["oracle_export_support_kind"],
-            "provenance_only"
+            "mapped_semantic_paths"
         );
         assert!(
             oracle_source_build_manifest["oracle_toolchain_version_text"]

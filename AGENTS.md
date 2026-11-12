@@ -201,3 +201,11 @@ Gotchas: it only partly parses DuckDB `.sql` files (check `parse_partial` in the
 - DuckDB's bundled C++ build is slow and memory-heavy: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0`; pause the VS Code rust-analyzer process (SIGSTOP) during native builds and SIGCONT it afterwards.
 - The oracle harness incremental cache (`tools/oracle-semantic-export-harness/target`) can reach ~10 GiB and is safe to delete; keep its executables' digests recorded.
 - The VM environment blueprint still references the deleted `experiments/spancut`.
+
+## Revision note — mapped-path-export-capability
+
+REQ-RUST-027.0 records that `mapped_semantic_paths` describes only the current
+mapped PRIMARY/SECONDARY path-envelope exporter. Use the live ordered CLI and
+single-envelope JSON format documented in SOP S4/S5. The value does not claim
+full S4 family support or qualification; keep the broader S4 requirements and
+historical capability records intact.

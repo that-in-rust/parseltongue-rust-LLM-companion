@@ -643,6 +643,11 @@ M1 source pins and one-time qualification outcomes: corpus-source-pin-manifest.j
 All five cargo fetch and cargo check --workspace commands passed on 2026-11-11, outside production.
 These checks do not establish semantic oracle agreement or a passing M1 mapping run.
 
+Oracle capability clarification (REQ-RUST-027.0): a source pin identifies the checkout used by the
+harness; it does not establish which semantic families the current exporter supports or qualify an
+S4/S5 run. The current `mapped_semantic_paths` capability is limited to mapped path-resolution
+envelopes. It does not claim full S4 family support, PASS/HLD status, or corpus qualification.
+
 ### Ideas without copying
 
 - cargo-modules: MPL-2.0; visibility/module rendering for node_reachable_outside_crate.
@@ -931,4 +936,39 @@ test_id: test_namespace_appender_batch_limits
 test_type: unit
 assertion: row/byte thresholds flush and reset, including oversized row
 metric: 1024 rows or 1048576 value bytes
+```
+
+## REQ-RUST-027.0 — mapped-path-export-capability
+
+WHEN the oracle source manifest reports the current mapped exporter capability,
+THEN `oracle_export_support_kind` SHALL be `mapped_semantic_paths`. This value
+describes the existing mapped PRIMARY/SECONDARY path-resolution exporter only;
+it is metadata, independent of REQ-RUST-026 comparator behavior, and SHALL NOT
+imply a PASS, HLD status, complete S4 semantic-family support, or corpus/S5
+qualification.
+
+WHEN building the mapped artifact cache, the live harness arguments SHALL be
+`--workspace-source-root-path PATH --mapped-unit-manifest-path FILE
+--oracle-artifact-cache-output FILE`. WHEN exporting a mapped path envelope,
+the arguments SHALL be ordered as
+`--workspace-source-root-path PATH --mapped-unit-manifest-path FILE
+--oracle-path-export-output FILE --oracle-configuration-kind PRIMARY|SECONDARY`
+followed, when used, by `--oracle-macro-cache-manifest FILE`. Each export SHALL
+write one pretty JSON envelope consumed as a single JSON value, not JSONL.
+
+The current route fixes target context to the compiler default, enables no extra
+features, keeps default features enabled, and disables test targets. It does not
+implement the full invocation-expansion, signature, body-site, impl, method,
+visibility, or reachability families; it also does not emit per-site expansion
+provenance or proc-macro-dependence fields. Those broader S4 families remain
+requirements and are not qualified by this metadata value.
+
+Verification mapping:
+
+```text
+req_id: REQ-RUST-027.0
+test_id: test_oracle_capability_reports_paths
+test_type: unit
+assertion: source manifest reports the limited mapped-path capability value
+metric: exact oracle_export_support_kind value mapped_semantic_paths
 ```
