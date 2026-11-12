@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS "namespace-legacy-scope-records" (
 CREATE TABLE IF NOT EXISTS "namespace-normalized-source-manifests" (
  generation_key VARCHAR,attempt_key VARCHAR,source_rows UBIGINT,
  PRIMARY KEY(generation_key,attempt_key));
+CREATE TABLE IF NOT EXISTS "namespace-fixed-point-manifests" (
+ generation_key VARCHAR,attempt_key VARCHAR,binding_digest VARCHAR,round_count UBIGINT,
+ PRIMARY KEY(generation_key,attempt_key));
 CREATE TABLE IF NOT EXISTS "namespace-unit-link-records" (
  generation_key VARCHAR,attempt_key VARCHAR,unit_key VARCHAR,package_key VARCHAR,
  compilation_role VARCHAR,target_kind VARCHAR,target_name VARCHAR,root_scope VARCHAR,

@@ -285,6 +285,11 @@ fn final_namespace_products_contract() {
     store
         .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
         .unwrap();
+    assert!(
+        store
+            .visit_frozen_namespace_products(&scope(), &mut |_| Ok(()))
+            .is_err()
+    );
     store
         .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
         .unwrap();
@@ -333,6 +338,34 @@ fn final_namespace_products_contract() {
         })
         .unwrap();
     assert_eq!(rows, again);
+    let empty_directory = tempfile::tempdir().unwrap();
+    let empty = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &empty_directory.path().join("analysis.duckdb"),
+        empty_directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    source.records.values_mut().for_each(Vec::clear);
+    empty
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    empty
+        .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    empty
+        .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    assert_eq!(
+        empty
+            .visit_frozen_namespace_products(&scope(), &mut |_| panic!("unexpected output"))
+            .unwrap(),
+        0
+    );
 }
 
 #[test]

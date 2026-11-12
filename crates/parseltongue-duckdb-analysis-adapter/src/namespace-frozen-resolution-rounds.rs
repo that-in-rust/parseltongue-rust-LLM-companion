@@ -27,7 +27,20 @@ impl DuckdbAnalysisStoreAdapter {
             ));
         }
         super::namespace_unit_link_inputs::link_namespace_unit_rows(&connection, scope, cancel)?;
-        resolve_namespace_sql_rounds(&connection, scope, cancel).map_err(build_analysis_error)
+        let report = resolve_namespace_sql_rounds(&connection, scope, cancel)
+            .map_err(build_analysis_error)?;
+        connection
+            .execute(
+                "INSERT OR REPLACE INTO \"namespace-fixed-point-manifests\" VALUES (?,?,?,?)",
+                duckdb::params![
+                    scope.run_generation_digest_value,
+                    scope.stage_attempt_sequence_value,
+                    report.binding_set_digest_value,
+                    report.fixed_point_round_count as u64
+                ],
+            )
+            .map_err(build_analysis_error)?;
+        Ok(report)
     }
 }
 
