@@ -39,15 +39,18 @@ fn run_comparison_cli_command(database: &Path, command: &str, extra: &[&str]) ->
 }
 
 fn build_oracle_comparison_fixture() -> OracleComparisonTestFixture {
-    build_oracle_comparison_fixture_with_matrix(false)
+    build_oracle_comparison_fixture_with_matrix(false, None, None, None)
 }
 
 fn build_oracle_comparison_matrix_fixture() -> OracleComparisonTestFixture {
-    build_oracle_comparison_fixture_with_matrix(true)
+    build_oracle_comparison_fixture_with_matrix(true, None, None, None)
 }
 
 fn build_oracle_comparison_fixture_with_matrix(
     include_matrix: bool,
+    source_reason: Option<&str>,
+    source_targets: Option<Value>,
+    source_target_range_start: Option<u64>,
 ) -> OracleComparisonTestFixture {
     let directory = tempfile::tempdir().unwrap();
     fs::create_dir(directory.path().join("src")).unwrap();
@@ -65,7 +68,7 @@ fn build_oracle_comparison_fixture_with_matrix(
         .unwrap()
         .to_owned();
     let package_identifier = format!("path+file://{package_root}#comparison@0.1.0");
-    let configuration = json!([[], [], "2024"]);
+    let configuration = json!([[], [], "2024", "target"]);
     let configuration_digest = blake3::hash(configuration.to_string().as_bytes())
         .to_hex()
         .to_string();
@@ -138,7 +141,7 @@ fn build_oracle_comparison_fixture_with_matrix(
     let mut oracle_site = site.clone();
     oracle_site["path_lookup_scope_kind"] = json!("module-scope");
     oracle_site["site_proc_macro_dependent_flag"] = json!(false);
-    let (source_sites, oracle_sites) = if include_matrix {
+    let (mut source_sites, oracle_sites) = if include_matrix {
         let mut wrong_source = site.clone();
         wrong_source["site_source_range_start"] = json!(40);
         wrong_source["site_source_range_end"] = json!(44);
@@ -163,6 +166,22 @@ fn build_oracle_comparison_fixture_with_matrix(
     } else {
         (vec![site.clone()], vec![oracle_site])
     };
+    for source_site in &mut source_sites {
+        if let Some(reason) = source_reason {
+            source_site["path_unresolved_reason_kind"] = json!(reason);
+        }
+        if let Some(targets) = &source_targets {
+            source_site["path_target_symbol_rows"] = targets.clone();
+        }
+        if let Some(range_start) = source_target_range_start
+            && let Some(target) = source_site
+                .get_mut("path_target_symbol_rows")
+                .and_then(Value::as_array_mut)
+                .and_then(|targets| targets.first_mut())
+        {
+            target["target_source_range_start"] = json!(range_start);
+        }
+    }
     let cancel = RunCancelFlagValue::default();
     let source_store =
         TursoWorkspaceStoreAdapter::open_turso_workspace_store(source.to_str().unwrap()).unwrap();
@@ -928,4 +947,88 @@ fn test_source_unpublished_generation_fails() {
         Err(OracleComparisonFailureError::SourceNotPublished)
     ));
     assert_eq!(agreement.read_workspace_publication_scope().unwrap(), None);
+}
+
+/// REQ-RUST-025.2
+#[test]
+fn test_production_cfg_keeps_mismatch() {
+    let fixture = build_oracle_comparison_fixture_with_matrix(
+        false,
+        Some("cfg_inactive"),
+        Some(json!([])),
+        None,
+    );
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_eligible_path_count"], 1);
+    assert_eq!(result["agreement_match_count_value"], 0);
+    assert_eq!(result["agreement_mismatched_path_count"], 1);
+    assert_eq!(result["agreement_cfg_excluded_path_count"], 0);
+    assert_eq!(
+        result["agreement_production_reason_counts"]["cfg_inactive"],
+        1
+    );
+}
+
+/// REQ-RUST-025.2
+#[test]
+fn test_secondary_cfg_preserves_match() {
+    let fixture = build_oracle_comparison_fixture();
+    let mut secondary = fixture.primary_value.clone();
+    secondary["oracle_path_export_rows"][0]["path_unresolved_reason_kind"] = json!("cfg_inactive");
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, Some(&secondary));
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_eligible_path_count"], 1);
+    assert_eq!(result["agreement_match_count_value"], 1);
+    assert_eq!(result["agreement_cfg_excluded_path_count"], 0);
+    let rows = run_comparison_cli_command(
+        &fixture.agreement,
+        "export-published-stage-rows",
+        &["--stage-owned-table-name", "oracle-edge-agreement-table"],
+    );
+    assert!(rows.status.success());
+    let evidence = String::from_utf8_lossy(&rows.stdout);
+    assert!(evidence.contains("agreement_secondary_unresolved_reason_kind"));
+    assert!(evidence.contains("cfg_inactive"));
+}
+
+/// REQ-RUST-025.2
+#[test]
+fn test_cfg_wrong_target_mismatch() {
+    let fixture =
+        build_oracle_comparison_fixture_with_matrix(false, Some("cfg_inactive"), None, Some(10));
+    write_oracle_comparison_inputs(&fixture, &fixture.primary_value, None);
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_eligible_path_count"], 1);
+    assert_eq!(result["agreement_match_count_value"], 0);
+    assert_eq!(result["agreement_mismatched_path_count"], 1);
+    assert_eq!(result["agreement_cfg_excluded_path_count"], 0);
+}
+
+/// REQ-RUST-025.2
+#[test]
+fn test_unknown_cfg_remains_blocked() {
+    let fixture = build_oracle_comparison_fixture();
+    let mut primary = fixture.primary_value.clone();
+    primary["oracle_path_export_rows"][0]["path_lookup_scope_kind"] = json!("unknown");
+    primary["oracle_path_export_rows"][0]["path_unresolved_reason_kind"] = json!("cfg_inactive");
+    write_oracle_comparison_inputs(&fixture, &primary, None);
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_denominator_status_kind"], "BLOCKED");
+    assert_eq!(result["agreement_blocked_path_count"], 1);
+    assert_eq!(result["agreement_cfg_excluded_path_count"], 0);
+}
+
+/// REQ-RUST-025.2
+#[test]
+fn test_primary_cfg_excludes_scored() {
+    let fixture = build_oracle_comparison_fixture_with_matrix(false, None, Some(json!([])), None);
+    let mut primary = fixture.primary_value.clone();
+    primary["oracle_path_export_rows"][0]["path_target_symbol_rows"] = json!([]);
+    primary["oracle_path_export_rows"][0]["path_unresolved_reason_kind"] = json!("cfg_inactive");
+    write_oracle_comparison_inputs(&fixture, &primary, None);
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_eligible_path_count"], 0);
+    assert_eq!(result["agreement_cfg_excluded_path_count"], 1);
+    assert_eq!(result["agreement_primary_reason_counts"]["cfg_inactive"], 1);
 }

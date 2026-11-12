@@ -245,3 +245,48 @@ REQ-RUST-025.5
   - `test_thread_counts_export_identically`, `test_persisted_known_answer_matrix`.
 
 Refactor commit: `6c2420a64` (`refactor: isolate oracle comparison storage`), following GREEN commit `42db82b29`. No push was made.
+
+### Comparator correction follow-up
+
+Artifact ownership cleanup: commit `e6548c694` removes the three generated `.codebase-memory` files from the repository. The codebase-memory graph and ADR remain external. Observed external index status before this follow-up was full index, 23,022 nodes, 43,739 edges, seven changed comparator paths with `generation_matches=true` and `metadata_match`, and ADR update status `updated` with complete 27-line content.
+
+REQ-RUST-025.1 RED
+  - Added `test_role_changes_semantic_digest`, deriving expected digests directly from the producer formula `[cfg, features, edition, role]` and asserting host/target digest distinction.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_role_changes_semantic_digest -- --nocapture`
+  - RED output: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 93 filtered out`; the assertion showed derived `67e2ddbc3bd177b5876c703e99e2bcba1d3b0a668a6004aa39824ce14c4721bb` vs expected `e87c01979f2fba8b139cc3363aa8d4fc0226e0c9f4f46982eee99c805853e3f5`.
+
+REQ-RUST-025.1 GREEN
+  - `derive_semantic_unit_identity` and the persisted integration fixture now hash exactly `[cfg, features, edition, role]`; no alternate digest shape is accepted. The formula matches `crates/parseltongue-syntax-span-extractor/src/syntax-namespace-input-extraction.rs:119-129` and `crates/parseltongue-cli-dispatcher-binary/src/published-stage-export-facade.rs:155-158`.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_role_changes_semantic_digest -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 93 filtered out`.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_exact_comparison_publishes_turso -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out`.
+
+REQ-RUST-025.2 RED
+  - Added PRIMARY/production/SECONDARY cfg reason regressions, a wrong-target cfg case, unknown-classification cfg case, and a positive PRIMARY-only cfg exclusion case.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests cfg_ -- --nocapture`
+  - RED output: `test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 14 filtered out`. `test_production_cfg_keeps_mismatch`, `test_secondary_cfg_preserves_match`, and `test_cfg_wrong_target_mismatch` observed zero eligible rows instead of one; `test_unknown_cfg_remains_blocked` observed `N/A` instead of `BLOCKED`. The positive PRIMARY-only exclusion test passed.
+
+REQ-RUST-025.2 GREEN
+  - The score CASE now prioritizes unknown/deferred classification and nonempty target mismatches before cfg exclusion. Only `primary_reason='cfg_inactive'` can produce `cfg-excluded`; production/SECONDARY reasons remain evidence, and proc-macro empty-answer behavior remains distinct.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests cfg_ -- --nocapture`: `test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out`.
+
+REQ-RUST-024.2 RED
+  - Added `test_duckdb_rows_preserve_scope` and `test_wrong_scope_prevents_matching` for generation+attempt fields on copied/canonical/evidence rows and scope-qualified full-outer joins.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter scope_ -- --nocapture`
+  - RED output: `test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out`; `test_wrong_scope_prevents_matching` failed because `source_scope_generation_value` is absent from `production_oracle_site_rows`.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_duckdb_rows_preserve_scope -- --nocapture`
+  - RED output: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 93 filtered out`; the binder reported `source_scope_generation_value` absent from `oracle_source_copy_rows`.
+
+REQ-RUST-024.2 GREEN
+  - The source-copy Appender, production/PRIMARY/SECONDARY canonical rows, and comparison evidence rows now all carry exact source generation and attempt values. Source-copy verification checks total and scoped counts plus per-table framed digests that include generation, attempt, table, key, and payload. Canonical joins, result filters, and row ordering include both scope fields.
+  - Requirement: `docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md:773` (every DuckDB row carries its generation key; this comparator also carries source attempt as required by the scoped handoff).
+  - Tests: `test_duckdb_rows_preserve_scope` verifies exact fields and scope-framed digest; `test_wrong_scope_prevents_matching` proves a different generation cannot join by site alone.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+
+Follow-up verification
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`: `test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+  - `cargo fmt --all -- --check`: exit code 0 (after `cargo fmt --all` normalized the touched Rust files).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.79s`.
+  - `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 6.03s`.
+  - `git diff --check`: rerun after this journal update.
+  - Workspace tests were not rerun; the previously reported namespace-pipeline stub failures are unchanged and explicitly out of scope.
+  - Generated `.codebase-memory` files remain removed by targeted commit `e6548c694`. The graph and ADR remain external; the prior observed external index/ADR status above predates this follow-up and was not refreshed. No generated index artifact is part of the comparator deliverable.

@@ -217,7 +217,7 @@ fn derive_semantic_unit_identity(unit: &Value) -> Result<String, OracleCompariso
         .ok_or_else(|| OracleComparisonFailureError::InvalidRecord {
             field: "unit_mapped_target_flag".into(),
         })?;
-    let configuration = json!([cfg, features, edition]);
+    let configuration = json!([cfg, features, edition, role]);
     let configuration_digest = blake3::hash(configuration.to_string().as_bytes())
         .to_hex()
         .to_string();
@@ -956,5 +956,31 @@ mod oracle_path_normalization_tests {
                     .is_err()
             );
         }
+    }
+
+    /// REQ-RUST-025.1
+    #[test]
+    fn test_role_changes_semantic_digest() {
+        let target_unit = build_test_unit_record("/fixture/pkg", "fixture", "lib");
+        let mut host_unit = target_unit.clone();
+        host_unit["unit_compilation_role_kind"] = json!("host");
+        let target_identity: Value =
+            serde_json::from_str(&derive_semantic_unit_identity(&target_unit).unwrap()).unwrap();
+        let host_identity: Value =
+            serde_json::from_str(&derive_semantic_unit_identity(&host_unit).unwrap()).unwrap();
+        let target_configuration = json!([[], [], "2024", "target"]);
+        let host_configuration = json!([[], [], "2024", "host"]);
+        let target_digest = blake3::hash(target_configuration.to_string().as_bytes())
+            .to_hex()
+            .to_string();
+        let host_digest = blake3::hash(host_configuration.to_string().as_bytes())
+            .to_hex()
+            .to_string();
+        assert_eq!(
+            target_identity["unit_configuration_digest_full"],
+            target_digest
+        );
+        assert_eq!(host_identity["unit_configuration_digest_full"], host_digest);
+        assert_ne!(target_digest, host_digest);
     }
 }
