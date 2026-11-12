@@ -30,6 +30,9 @@ pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
 #[path = "legacy-macro-scope-records.rs"]
 mod legacy_macro_scope_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
+#[path = "legacy-macro-source-events.rs"]
+mod legacy_macro_source_events;
+pub use legacy_macro_source_events::{LegacyMacroNodeEvents, read_legacy_node_events};
 #[path = "sysroot-prelude-context-rules.rs"]
 mod sysroot_prelude_context_rules;
 pub use sysroot_prelude_context_rules::{
