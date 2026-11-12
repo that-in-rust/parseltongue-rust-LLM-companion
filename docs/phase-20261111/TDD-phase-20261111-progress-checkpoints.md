@@ -2585,3 +2585,45 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   `test result: ok. 5 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.72s`
   `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.18s`
   `test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s`.
+
+### Third bounded native attempt FAIL — stop-rule blocker report
+
+- REQ-RUST-024.1 / 024.4, original CLI publication WIP. Requested build
+  environment: CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0.
+- Build: `cargo build --release -p parseltongue-cli-dispatcher-binary`.
+  Output: `Finished release profile [optimized] target(s) in 23m 31s`.
+- Check: `timeout --signal=TERM --kill-after=10s 600s cargo test --release -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests -- --test-threads=1 --nocapture`.
+- Exact result: `test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 279.08s` (exit 101).
+- Native child output:
+  `stage=syntax-batches mode=Extraction units=618 records=358595 load_seconds=0.142 parse_seconds=3.644 write_seconds=41.973`
+  `stage=syntax-spans elapsed_seconds=45.858`
+  `Out of Memory Error: could not allocate block of size 256.0 KiB (1.1 GiB/1.1 GiB used)`.
+- This proves the remaining release blocker is a DuckDB cap error, not just
+  dev-profile debug validation. It does NOT identify which copy/normalize/
+  resolve operation failed; their context is erased and no completed SQL
+  banner exists. Whole-tree peak and resolution rounds were not measured.
+- STOP after the three native attempts. Do not raise the ~1.2 GiB cap or
+  tune a fourth full run. Recommended smaller next step: retain native input
+  and separately time/error-tag copy, normalization and resolution. Preserve
+  the user decision deferring final 500 MB RAM acceptance until all-five S5.
+- Persistent BLOCKED report and artifact digest manifest:
+  `hld-current-test-runs/20261112-native-cli-blocked/`.
+  The status board is updated. All-five S1/S2/S3 and serde M2/S5 remain
+  unstarted because task 1's fixture gate is not green; no historical PASS
+  is reused. Corpus pins and clean tracked sources were checked only.
+- Candidate SHA-256: `bfd1fc7f9d7f503dffcb2fd43730928ab619ed01b416dc9af4ac08c5cde3173d`.
+  Candidate, full logs, CPU trace and original CLI patch are preserved under
+  `/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/`.
+  The two original CLI files remain unstaged WIP; no CLI GREEN is committed.
+- Parser/oracle fork and patch were rechecked: commit
+  `bf6b2099d6351c37039b01447a9bb64f9a54a586`,
+  `tools/parser-const-closure-statements.patch`, SHA-256
+  `89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa`.
+- VS Code rust-analyzer PIDs 1532439, 1782164, 1797409 were resumed and
+  verified Sl after native builds. No mapper remains. No visual changes.
+
+- Blocked-report integrity: `ARTIFACT_MANIFEST_VERIFIED=15` and
+  `REPORT_BLOCKED_STATUS_VERIFIED=5`; archived sizes, BLAKE3 and SHA-256 all
+  match. `git diff --check` returned zero. Full candidate source identity is
+  `73a3c66c7cc422f96e252c742b9c062c458eec2a` plus the saved CLI patch.
+  The report and status board record the unmet prerequisite, not five runs.

@@ -1,0 +1,92 @@
+[
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-frozen-release-build.log",
+    "bytes": 13878,
+    "blake3": "5b44d673ade13556782dff41063d55172c4ee6366746b8a0d08be33fc990c805",
+    "sha256": "6ee029c1d8bbc3ede5604f3755f269d056e88b2a1ec632c0fec1e441a6414188"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-namespace-cleanup-red.log",
+    "bytes": 2578,
+    "blake3": "f3a980626904d520395a478600524e1316de7a46d52f15095bcfd1c8dce798de",
+    "sha256": "afd670fb13f0457fa6e47b132bcda7893c6de0891bd326a701cde0fa72f9098b"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-frozen-visibility-green.log",
+    "bytes": 1684,
+    "blake3": "2c89c6fe275cba7004f39ca378cc25e671a0ce39e4eba52a64a87c8b5569713f",
+    "sha256": "e264b24cf68e3f6dfb56f0c0149ab9bb0fedb38c590c83fe81fe53386bc2e0f2"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-orphan-stacks.log",
+    "bytes": 16456,
+    "blake3": "52ab235bd9a53d603c4eb89675a98943e0357c380a10e759e677315678e82854",
+    "sha256": "27cc7ea1780638e634eb0e627a23558e5128e9bd897d70911a917ad60229c193"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-profile-build.log",
+    "bytes": 1181,
+    "blake3": "93f1da54b5cb7113d0a620567a1bf0d35fab8f6a66ac2b71e212dd8ade0c69a0",
+    "sha256": "5c067997081bc545ecf82b575c7156e22d1edd7c4348ce0eec8cea3c78fcd7eb"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-profile-contract.log",
+    "bytes": 1089,
+    "blake3": "4692db5c881fafa874e34909a0674c65f3bd0c5a46c63e7b482ae17f3f6db08d",
+    "sha256": "7964ab7b8acb5199ab65dc793f6d7bac1f357f13014ab34b565c25a609041f67"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-release-contract.log",
+    "bytes": 4336,
+    "blake3": "0af7bb77f18f00c65a7c49ae7efc63349bf6ff43a2d04b1c54be3a2b4ab6f80f",
+    "sha256": "cef0b13b74e60d48d309d45e7c461131532081436ff83e4ed88f359133dbe4e4"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-write-cpu-report.log",
+    "bytes": 19392,
+    "blake3": "7fdb6e80d5f54b2e61e1a59c0eacd26e5372512581ddcaff0a037e191766fb49",
+    "sha256": "86ff6ea1acedae0def88c7ed73d435b80e43b16dd933d8aaeb3255750f681bb6"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-native-write-cpu.data",
+    "bytes": 8388234,
+    "blake3": "a9dfc7ed5daa20bbcdfbca4353cfda23c40e6f006622b3df1dcdc44956ef1ef2",
+    "sha256": "342e225e97d952a09e6f3f1afc62adff96adfa2173ecacb8dd943852005334da"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-visibility-complete-clippy.log",
+    "bytes": 1086,
+    "blake3": "1a94ab02adf3a74bfd3f87c99abbbb07e60c625791d69a90b30cf464a9584a79",
+    "sha256": "992e493a2cd757f443158c5dbada3d28492bce1baf37c8c39ccd28a5dc3be6a4"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-visibility-complete-green.log",
+    "bytes": 9326,
+    "blake3": "b8a6d94df14a5712f5853f58988448bcc96514945d1db197e313d3036bb0b5ae",
+    "sha256": "6a1bc9d3c31b7af3bfe8af76213d982c2aa9e4b0c79e7446fbf1bafa22524599"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/cli-visibility-marker-red.log",
+    "bytes": 4202,
+    "blake3": "2725db9519d95223eef94ab7640efa44a3394e0917d15bd023fd3291f56969e9",
+    "sha256": "5215f2c7b6bfcb972d58280e3f45ae9b44c7e4751013f00252d870bd30b4f41e"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/corpus-source-pin-preflight.json",
+    "bytes": 1469,
+    "blake3": "087915e87c3153cd543fb8382fef13f50243cd99e6412c42466fc90b95746f96",
+    "sha256": "150de3217ff473a522f16de66deb5c0aecbe542363cf915ffebe61c427ab166f"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/namespace-publication-worktree-changes.patch",
+    "bytes": 15837,
+    "blake3": "183e5b41a8afc46e71379a373799c675cb88e4f81a321528c9809742b39c6ba2",
+    "sha256": "b435daabb045c316ce08d08008c738b42cf6c9ffd3c9ab62caba1ab6c62f8d8c"
+  },
+  {
+    "path": "/home/ubuntu/hld-current-test-artifacts/20261112-native-cli-blocked/parseltongue",
+    "bytes": 100310904,
+    "blake3": "06d8b8b90ff8e2afa53d28bbdcf1e33465a40e18ccc7c77ac446a07a7da432dc",
+    "sha256": "bfd1fc7f9d7f503dffcb2fd43730928ab619ed01b416dc9af4ac08c5cde3173d"
+  }
+]

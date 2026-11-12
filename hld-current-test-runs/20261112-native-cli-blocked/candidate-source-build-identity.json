@@ -1,0 +1,22 @@
+{
+  "source_base_commit": "73a3c66c7cc422f96e252c742b9c062c458eec2a",
+  "source_worktree_patch_blake3": "183e5b41a8afc46e71379a373799c675cb88e4f81a321528c9809742b39c6ba2",
+  "source_file_sha256": {
+    "Cargo.lock": "d79f990659a4cfe9af4a10624e5074e8473dc9ea584d569b4d14d19165721a2f",
+    "Cargo.toml": "25ca85eeb56aa4a225ef0b6bb26d73f023061d5ce1aacd4269060382f0fe9ef9",
+    "docs/phase-20261111/parser-source-pin-manifest.json": "e2c96a147e2096544fd4ef8d23477bd435a5c2aa972b9a226d7dbb20847d65c5",
+    "docs/phase-20261111/corpus-source-pin-manifest.json": "4eed63352738951e1f3ac5de03769ae184409c6e8d7ae470948c4ff0ec98fc03"
+  },
+  "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+  "cargo_version": "cargo 1.99.1 (5f94df478 2026-08-27)",
+  "platform": "Linux-6.8.0-1060-aws-x86_64-with-glibc2.35",
+  "logical_cpu_count": 8,
+  "build_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CXXFLAGS": "-g0"
+  },
+  "analysis_memory_limit_configured_bytes": 1288490188,
+  "analysis_current_setting_observed": false,
+  "scope": "blocked native prerequisite, not corpus qualification"
+}
