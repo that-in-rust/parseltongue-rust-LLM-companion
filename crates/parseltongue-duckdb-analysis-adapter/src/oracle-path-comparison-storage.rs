@@ -725,7 +725,6 @@ fn score_canonical_comparison_rows(
          ), reasoned AS (
              SELECT *, CASE WHEN primary_key IS NOT NULL THEN
                  CASE
-                     WHEN primary_reason='external_source_missing' THEN 'external_source_missing'
                      WHEN 'cfg_inactive' IN (primary_reason,production_reason) THEN 'cfg_inactive'
                      WHEN 'build_script' IN (primary_reason,production_reason) THEN 'build_script'
                      WHEN 'proc_macro' IN (primary_reason,production_reason) THEN 'proc_macro'
@@ -1503,7 +1502,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.4, REQ-RUST-026.5
     #[test]
-    fn test_published_comparisons_threads_are_deterministic() {
+    fn test_published_comparison_is_deterministic() {
         let fixture = build_published_comparison_fixture();
         let cancel = RunCancelFlagValue::default();
         let first_result = compare_oracle_path_sites_with_threads(
@@ -1759,7 +1758,7 @@ mod oracle_path_comparison_sql_tests {
     /// REQ-RUST-026.2
     /// REQ-RUST-026.3
     #[test]
-    fn test_external_source_missing_blocks_match_rate() {
+    fn test_external_source_blocked_rate() {
         let mut production = Vec::with_capacity(200);
         let mut primary = Vec::with_capacity(201);
         let mut secondary = Vec::with_capacity(200);
@@ -1830,7 +1829,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.2
     #[test]
-    fn test_primary_valid_oracle_missing_production() {
+    fn test_primary_missing_production_nonmatch() {
         let primary = vec![build_test_site_value(
             "site",
             "module-scope",
@@ -1845,11 +1844,31 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(result["agreement_match_count_value"], 0);
         assert_eq!(result["agreement_blocked_path_count"], 0);
         assert_eq!(result["agreement_exact_match_rate"], 0.0);
+
+        let production = vec![build_test_site_value(
+            "site",
+            "production",
+            &[],
+            false,
+            "external_source_missing",
+        )];
+        let (evidence, result) = build_test_comparison_result(1, &production, &primary, &[]);
+        assert_eq!(result["agreement_status_kind"], "mismatch");
+        assert_eq!(result["agreement_denominator_status_kind"], "scored");
+        assert_eq!(result["agreement_eligible_path_count"], 1);
+        assert_eq!(result["agreement_match_count_value"], 0);
+        assert_eq!(result["agreement_blocked_path_count"], 0);
+        assert_eq!(result["agreement_oracle_source_blocked_path_count"], 0);
+        assert_eq!(result["agreement_exact_match_rate"], 0.0);
+        assert_eq!(
+            evidence[0]["agreement_production_unresolved_reason_kind"],
+            "external_source_missing"
+        );
     }
 
     /// REQ-RUST-026.2
     #[test]
-    fn test_primary_source_missing_beats_production_cfg() {
+    fn test_source_blocked_preserves_cfg() {
         let primary = vec![build_test_site_value(
             "site",
             "module-scope",
@@ -1873,6 +1892,10 @@ mod oracle_path_comparison_sql_tests {
             "cfg_inactive"
         );
         assert_eq!(
+            evidence[0]["agreement_authoritative_causal_reason_kind"],
+            "cfg_inactive"
+        );
+        assert_eq!(
             evidence[0]["agreement_partition_reason_kind"],
             "external_source_missing"
         );
@@ -1880,7 +1903,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.2
     #[test]
-    fn test_production_reason_does_not_excuse_wrong_target() {
+    fn test_production_reason_keeps_mismatch() {
         let primary = vec![build_test_site_value(
             "site",
             "module-scope",
@@ -1904,7 +1927,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.2
     #[test]
-    fn test_secondary_reasons_do_not_affect_primary() {
+    fn test_secondary_reason_nonimpact_primary() {
         for reason in ["cfg_inactive", "build_script"] {
             let primary = vec![build_test_site_value(
                 "site",
@@ -1993,7 +2016,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.4
     #[test]
-    fn test_comparison_connection_settings_are_verified() {
+    fn test_comparison_settings_are_verified() {
         let first_context = build_isolated_comparison_context(1).unwrap();
         let second_context = build_isolated_comparison_context(2).unwrap();
         let first = &first_context.connection;
@@ -2026,7 +2049,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.4
     #[test]
-    fn test_comparison_context_cleanup_after_sql_error() {
+    fn test_context_cleanup_sql_error() {
         let spill_path;
         {
             let context = build_isolated_comparison_context(1).unwrap();
@@ -2045,7 +2068,7 @@ mod oracle_path_comparison_sql_tests {
 
     /// REQ-RUST-026.4
     #[test]
-    fn test_comparison_context_cleanup_after_cancel() {
+    fn test_context_cleanup_after_cancel() {
         let spill_path;
         {
             let context = build_isolated_comparison_context(1).unwrap();

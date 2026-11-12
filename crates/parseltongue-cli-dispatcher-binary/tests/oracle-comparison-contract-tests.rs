@@ -1073,16 +1073,6 @@ fn test_write_cancellation_preserves_generation() {
         TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
             .unwrap();
     let previous_scope = seed_existing_agreement_generation(&agreement);
-    let spill_directories_before = fs::read_dir(std::env::temp_dir())
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with("parseltongue-oracle-path-comparison-"))
-        })
-        .collect::<std::collections::BTreeSet<_>>();
     let cancel = RunCancelFlagValue::default();
     let agreement_port = DelegatingStageStorePort {
         inner: &agreement,
@@ -1105,17 +1095,6 @@ fn test_write_cancellation_preserves_generation() {
         agreement.read_workspace_publication_scope().unwrap(),
         Some(previous_scope)
     );
-    let spill_directories_after = fs::read_dir(std::env::temp_dir())
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with("parseltongue-oracle-path-comparison-"))
-        })
-        .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(spill_directories_after, spill_directories_before);
 }
 
 /// REQ-RUST-026.4

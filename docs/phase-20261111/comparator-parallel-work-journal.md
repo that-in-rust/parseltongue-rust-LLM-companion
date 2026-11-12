@@ -523,11 +523,11 @@ REQ-RUST-026.4 REFACTOR
 - `test_blocked_partition_reconciles_duplicates`
 - `test_enum_variant_module_scored`
 - `test_primary_classes_partition_once`
-- `test_external_source_missing_blocks_match_rate`
-- `test_primary_valid_oracle_missing_production`
-- `test_primary_source_missing_beats_production_cfg`
-- `test_production_reason_does_not_excuse_wrong_target`
-- `test_secondary_reasons_do_not_affect_primary`
+- `test_external_source_blocked_rate`
+- `test_primary_missing_production_nonmatch`
+- `test_source_blocked_preserves_cfg`
+- `test_production_reason_keeps_mismatch`
+- `test_secondary_reason_nonimpact_primary`
 - `test_empty_denominator_is_na`
 - `test_unresolved_targets_remain_mismatch`
 - `test_production_cfg_keeps_mismatch`
@@ -541,15 +541,15 @@ REQ-RUST-026.4 REFACTOR
 - `test_extra_production_secondary_counts`
 - `test_production_only_rows_visible`
 - `test_primary_classes_partition_once`
-- `test_external_source_missing_blocks_match_rate`
+- `test_external_source_blocked_rate`
 - `test_changed_targets_persist_semantically`
 - `test_persisted_known_answer_matrix`
 
 **REQ-RUST-026.4**
-- `test_published_comparisons_threads_are_deterministic`
-- `test_comparison_connection_settings_are_verified`
-- `test_comparison_context_cleanup_after_sql_error`
-- `test_comparison_context_cleanup_after_cancel`
+- `test_published_comparison_is_deterministic`
+- `test_comparison_settings_are_verified`
+- `test_context_cleanup_sql_error`
+- `test_context_cleanup_after_cancel`
 - `test_exact_comparison_publishes_turso`
 - `test_comparison_telemetry_survives_publication`
 - `test_persisted_known_answer_matrix`
@@ -562,8 +562,40 @@ REQ-RUST-026.4 REFACTOR
 - `test_source_unpublished_generation_fails`
 
 **REQ-RUST-026.5**
-- `test_published_comparisons_threads_are_deterministic`
+- `test_published_comparison_is_deterministic`
 - `test_thread_counts_export_identically`
 
 REQ-RUST-026.0 REFACTOR
   - Reviewed the strict-envelope boolean check and table-driven regression after GREEN; the presence-plus-exact-boolean expression and typed prepublication error need no further refactor. GREEN implementation and regression commit: `dd94be791b4320e3b89797af26ba0b4acf039015`.
+
+### Review corrections: causal precedence and invocation-local cancellation
+
+REQ-RUST-026.2 RED
+  - `test_source_blocked_preserves_cfg` now checks that PRIMARY external-source absence still blocks with a null rate, while the authoritative causal reason follows SOP precedence (`cfg_inactive`) and the explicit oracle-source partition reason remains `external_source_missing`.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_source_blocked_preserves_cfg -- --nocapture`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 103 filtered out`; assertion output was `left: String("external_source_missing")`, `right: "cfg_inactive"`.
+
+REQ-RUST-026.2 GREEN
+  - Removed only the PRIMARY external-source special case from authoritative-reason precedence; the blocked status and explicit `oracle-source-blocked` partition/reason remain independent. PRIMARY-visible causal precedence uses PRIMARY plus production only and leaves SECONDARY reasons non-authoritative.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_source_blocked_preserves_cfg -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out`.
+  - `test_primary_missing_production_nonmatch` covers both absent production and an empty production row carrying `external_source_missing`; with valid PRIMARY evidence both remain eligible nonmatches (`eligible=1`, `blocked=0`, rate `0.0`). `cargo test -p parseltongue-duckdb-analysis-adapter test_primary_missing_production_nonmatch -- --nocapture`: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out`.
+
+REQ-RUST-026.4 REVIEW CORRECTION
+  - Removed the shared before/after TMPDIR directory-set snapshot from `test_write_cancellation_preserves_generation`; it still checks real write-path cancellation and preservation of the prior agreement generation. `test_context_cleanup_after_cancel` separately observes this invocation's spill path while its live context is cancelled, then verifies cleanup after the context drops. No global TMPDIR mutation or suite serialization is used.
+
+### Final review-correction gates
+
+- `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out; finished in 4.01s`.
+- `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture --test-threads=1`: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.26s`.
+- `cargo fmt --all -- --check`: `Exit code: 0`.
+- `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 10.71s`; `Exit code: 0`.
+- `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 7.36s`; `Exit code: 0`.
+- Workspace tests were not rerun; the previously reported namespace-pipeline stub remains outside comparator ownership.
+
+### Default-parallel CLI verification and refactor checkpoint
+
+- Command: `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture` (default test-harness parallelism; no `--test-threads=1`).
+- Output: `test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.85s`.
+- `test_write_cancellation_preserves_generation` passed with its invocation-wide TMPDIR snapshot removed; `test_context_cleanup_after_cancel` retains the direct live-context cleanup assertion.
+
+REQ-RUST-026.4 REFACTOR
+  - No further refactor needed. Default-parallel publication cancellation passed, the prior agreement generation remains protected, and per-invocation spill cleanup is checked by the isolated context guard test. No global TMPDIR mutation or suite serialization was introduced.
