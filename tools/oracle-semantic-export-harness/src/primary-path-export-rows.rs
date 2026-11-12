@@ -100,47 +100,58 @@ pub fn export_primary_semantic_paths(
     let database = loaded.oracle_database_owned_value;
     let vfs = loaded.oracle_source_virtual_files;
     let _server = loaded.oracle_macro_server_handle;
-    let semantics = Semantics::new(&database);
-    let modules: Vec<_> = hir::Crate::all(&database)
-        .into_iter()
-        .filter(|krate| selected.contains(&vfs.file_path(krate.root_file(&database)).to_string()))
-        .flat_map(|krate| collect_oracle_module_contexts(krate.root_module(&database), &database))
-        .collect();
-    let contexts = modules.iter().fold(
-        BTreeMap::<String, BTreeSet<String>>::new(),
-        |mut contexts, module| {
+    let export_attached_path_rows = || {
+        let semantics = Semantics::new(&database);
+        let modules: Vec<_> = hir::Crate::all(&database)
+            .into_iter()
+            .filter(|krate| {
+                selected.contains(&vfs.file_path(krate.root_file(&database)).to_string())
+            })
+            .flat_map(|krate| {
+                collect_oracle_module_contexts(krate.root_module(&database), &database)
+            })
+            .collect();
+        let contexts = modules.iter().fold(
+            BTreeMap::<String, BTreeSet<String>>::new(),
+            |mut contexts, module| {
+                let source = module.definition_source(&database);
+                semantics.parse_or_expand(source.file_id);
+                contexts
+                    .entry(read_oracle_context_key(*module, &semantics))
+                    .or_default()
+                    .insert(format!("{module:?}"));
+                contexts
+            },
+        );
+        let mut rows = Vec::new();
+        for module in modules {
+            let owner = build_oracle_compilation_record(module, &database, &vfs, &package_roots)?;
             let source = module.definition_source(&database);
+            let tree = source.value.node();
             semantics.parse_or_expand(source.file_id);
-            contexts
-                .entry(read_oracle_context_key(*module, &semantics))
-                .or_default()
-                .insert(format!("{module:?}"));
-            contexts
-        },
-    );
-    let mut rows = Vec::new();
-    for module in modules {
-        let owner = build_oracle_compilation_record(module, &database, &vfs, &package_roots)?;
-        let source = module.definition_source(&database);
-        let tree = source.value.node();
-        semantics.parse_or_expand(source.file_id);
-        let shared = contexts
-            .get(&read_oracle_context_key(module, &semantics))
-            .is_some_and(|contexts| contexts.len() > 1);
-        for path in tree
-            .descendants()
-            .filter_map(ast::Path::cast)
-            .filter(|path| check_oracle_signature_path(path, module, &database))
-        {
-            let range = semantics.original_range(path.syntax());
-            let file = vfs.file_path(range.file_id.file_id(&database)).to_string();
-            let targets =
-                build_oracle_path_targets(module, &path, &semantics, &vfs, &package_roots, shared)?;
-            let targets = merge_oracle_namespace_targets(targets);
-            let reason = targets
-                .is_empty()
-                .then_some(SiteUnresolvedReasonKind::ExternalSourceMissing);
-            rows.push(json!({
+            let shared = contexts
+                .get(&read_oracle_context_key(module, &semantics))
+                .is_some_and(|contexts| contexts.len() > 1);
+            for path in tree
+                .descendants()
+                .filter_map(ast::Path::cast)
+                .filter(|path| check_oracle_signature_path(path, module, &database))
+            {
+                let range = semantics.original_range(path.syntax());
+                let file = vfs.file_path(range.file_id.file_id(&database)).to_string();
+                let targets = build_oracle_path_targets(
+                    module,
+                    &path,
+                    &semantics,
+                    &vfs,
+                    &package_roots,
+                    shared,
+                )?;
+                let targets = merge_oracle_namespace_targets(targets);
+                let reason = targets
+                    .is_empty()
+                    .then_some(SiteUnresolvedReasonKind::ExternalSourceMissing);
+                rows.push(json!({
                 "unit_source_root_path":vfs.file_path(module.krate(&database).root_file(&database)).to_string(),
                 "site_compilation_scope_record":owner,
                 "site_source_absolute_path":file,
@@ -150,11 +161,13 @@ pub fn export_primary_semantic_paths(
                 "path_target_symbol_rows":targets,
                 "path_unresolved_reason_kind":reason.map(read_oracle_reason_label),
             }));
+            }
         }
-    }
-    rows.sort_by_cached_key(Value::to_string);
-    rows.dedup();
-    Ok(rows)
+        rows.sort_by_cached_key(Value::to_string);
+        rows.dedup();
+        Ok(rows)
+    };
+    hir::attach_db(&database, export_attached_path_rows)
 }
 
 fn build_oracle_compilation_record(
