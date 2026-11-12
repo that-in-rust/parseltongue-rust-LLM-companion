@@ -290,3 +290,25 @@ Follow-up verification
   - `git diff --check`: rerun after this journal update.
   - Workspace tests were not rerun; the previously reported namespace-pipeline stub failures are unchanged and explicitly out of scope.
   - Generated `.codebase-memory` files remain removed by targeted commit `e6548c694`. The graph and ADR remain external; the prior observed external index/ADR status above predates this follow-up and was not refreshed. No generated index artifact is part of the comparator deliverable.
+
+### Proc-macro empty PRIMARY correction
+
+REQ-RUST-025.2 RED
+  - Added `test_proc_empty_primary_exclusions` for PRIMARY proc-dependent empty targets with an empty production row and with production missing; `test_proc_wrong_target_mismatch` remains the wrong-target guard.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_proc_empty_primary_exclusions -- --nocapture`
+  - RED output: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 94 filtered out`; the empty-production case reported proc exclusions `0` instead of `1`.
+
+REQ-RUST-025.2 GREEN
+  - Restored `WHEN primary_empty AND proc_macro_dependent THEN 'proc-excluded'` after the nonempty mismatch and PRIMARY cfg branches, before generic unresolved handling. This covers empty and missing production while preserving wrong-target mismatch precedence.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_proc_ -- --nocapture`: `test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out`; this includes empty-production, missing-production, and proc wrong-target cases.
+
+Proc-macro empty PRIMARY follow-up verification
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture`: `test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+  - `cargo fmt --all -- --check`: exit code 0.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.56s`.
+  - `cargo build --workspace --release`: `Finished release profile [optimized] target(s) in 4.42s`.
+  - External index refresh used `index_repository --repo-path /home/ubuntu/repos/parseltongue-rust-LLM-companion --mode full --persistence false`: `status=indexed`, `nodes=23033`, `edges=43906`, `expected_nodes=23033`, `expected_edges=43906`, `artifact_present=false`.
+  - `index_status --project home-ubuntu-repos-parseltongue-rust-LLM-companion --diagnostics summary --format json`: `status=ready`, matching 23,033 nodes and 43,906 edges, six best-effort parse-partial files, zero parse-unusable files, and doc-links status `ok`; 17 intentionally ignored files were classified by design. The index coverage report is best-effort, not a completeness guarantee.
+  - `manage_adr --project home-ubuntu-repos-parseltongue-rust-LLM-companion --mode update` returned `status=updated`; read-back reported `content_complete=true`, `total_lines=29`.
+  - Indexing used persistence false; `.codebase-memory` remains absent. The final graph refresh is repeated after this journal update so the external graph covers this record too.

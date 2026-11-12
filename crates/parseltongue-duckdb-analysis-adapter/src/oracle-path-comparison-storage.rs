@@ -564,6 +564,7 @@ fn score_canonical_comparison_rows(
                    WHEN primary_targets <> production_targets AND production_empty AND proc_macro_dependent THEN 'proc-excluded'
                    WHEN primary_targets <> production_targets THEN 'mismatch'
                    WHEN primary_reason='cfg_inactive' THEN 'cfg-excluded'
+                   WHEN primary_empty AND proc_macro_dependent THEN 'proc-excluded'
                    WHEN primary_empty THEN 'unresolved'
                    WHEN production_key IS NULL AND proc_macro_dependent THEN 'proc-excluded'
                    WHEN production_key IS NULL THEN 'missing-production'
@@ -1092,6 +1093,43 @@ mod oracle_path_comparison_sql_tests {
             "proc_macro"
         );
         assert_eq!(evidence[0]["agreement_partition_kind"], "proc-excluded");
+    }
+
+    /// REQ-RUST-025.2
+    #[test]
+    fn test_proc_empty_primary_exclusions() {
+        let primary = vec![build_test_site_value(
+            "site-a",
+            "module-scope",
+            &[],
+            true,
+            "proc_macro",
+        )];
+        let empty_production = vec![build_test_site_value(
+            "site-a",
+            "production",
+            &[],
+            false,
+            "",
+        )];
+
+        let (empty_evidence, empty_result) =
+            build_test_comparison_result(1, &empty_production, &primary, &[]);
+        assert_eq!(empty_result["agreement_proc_excluded_path_count"], 1);
+        assert_eq!(empty_result["agreement_unresolved_path_count"], 0);
+        assert_eq!(
+            empty_evidence[0]["agreement_site_status_kind"],
+            "proc-excluded"
+        );
+
+        let (missing_evidence, missing_result) =
+            build_test_comparison_result(1, &[], &primary, &[]);
+        assert_eq!(missing_result["agreement_proc_excluded_path_count"], 1);
+        assert_eq!(missing_result["agreement_unresolved_path_count"], 0);
+        assert_eq!(
+            missing_evidence[0]["agreement_site_status_kind"],
+            "proc-excluded"
+        );
     }
 
     /// REQ-RUST-025.2
