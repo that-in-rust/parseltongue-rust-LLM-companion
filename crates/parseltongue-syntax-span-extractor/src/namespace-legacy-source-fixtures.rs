@@ -176,6 +176,12 @@ fn projected_virtual_macro_scope() {
     )
     .unwrap();
     state.project_unit_source_root().unwrap();
+    let mut invalid = state.projection_legacy_source_event_rows[0].clone();
+    invalid["legacy_event_kind_value"] = json!("exit");
+    invalid["legacy_source_order_parts"] = json!([9999, 0, 0]);
+    state.projection_legacy_source_event_rows.push(invalid);
+    assert!(state.read_legacy_lookup_updates().is_err());
+    state.projection_legacy_source_event_rows.pop();
     let initial = state.read_legacy_lookup_updates().unwrap();
     assert!(!initial.is_empty());
     assert!(initial.iter().all(|row| {
