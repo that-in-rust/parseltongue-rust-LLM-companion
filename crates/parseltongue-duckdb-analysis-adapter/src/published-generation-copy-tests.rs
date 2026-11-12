@@ -833,3 +833,72 @@ fn test_turso_published_appender_handoff() {
     ).unwrap();
     assert_eq!(payload, records[0].stage_row_payload_text);
 }
+
+#[test]
+fn analysis_input_published_appender_handoff() {
+    use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
+    let source = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+    source.initialize_workspace_stage_schema().unwrap();
+    let cancel = RunCancelFlagValue::default();
+    [
+        "crate-graph",
+        "source-ingest",
+        "syntax-spans",
+        "syntax-namespace-input-records",
+    ]
+    .into_iter()
+    .for_each(|stage| {
+        source
+            .write_stage_table_unit(
+                &StageUnitWriteRequest {
+                    stage_run_scope_value: &scope(),
+                    stage_owner_name_value: stage,
+                    stage_unit_work_key: "__complete__",
+                    stage_input_stage_names: &[],
+                    stage_unit_output_rows: &[],
+                },
+                &cancel,
+            )
+            .unwrap();
+    });
+    let records = [StageTableRowRecord {
+        stage_owned_table_name: "syntax-namespace-input-items".into(),
+        stage_row_record_key: "item".into(),
+        stage_row_payload_text: "{}".into(),
+    }];
+    source
+        .write_stage_table_unit(
+            &StageUnitWriteRequest {
+                stage_run_scope_value: &scope(),
+                stage_owner_name_value: "syntax-namespace-input-records",
+                stage_unit_work_key: "crate/fixture",
+                stage_input_stage_names: &["syntax-spans"],
+                stage_unit_output_rows: &records,
+            },
+            &cancel,
+        )
+        .unwrap();
+    let published = source
+        .publish_analysis_input_snapshot(&scope(), &cancel)
+        .unwrap();
+    assert!(source.read_workspace_publication_scope().unwrap().is_none());
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        64 * 1024 * 1024,
+    )
+    .unwrap();
+    assert_eq!(
+        store
+            .copy_published_stage_rows(
+                &source,
+                &published,
+                &["syntax-namespace-input-items"],
+                &cancel
+            )
+            .unwrap(),
+        1
+    );
+    assert!(source.read_workspace_publication_scope().unwrap().is_none());
+}

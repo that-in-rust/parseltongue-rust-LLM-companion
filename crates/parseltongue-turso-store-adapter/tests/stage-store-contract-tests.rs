@@ -83,7 +83,7 @@ fn independent_analysis_input_snapshots() {
         &store,
         &scope,
         "name-resolution",
-        "expansion",
+        "crate/expansion",
         &[],
         &[second_row],
     )
@@ -106,9 +106,19 @@ fn independent_analysis_input_snapshots() {
     );
     assert_eq!(
         store.read_analysis_input_publication_scope().unwrap(),
-        Some(second)
+        Some(second.clone())
     );
     assert!(store.read_workspace_publication_scope().unwrap().is_none());
+    cancel.request_stage_work_cancellation();
+    assert!(
+        store
+            .publish_analysis_input_snapshot(&scope, &cancel)
+            .is_err()
+    );
+    assert_eq!(
+        store.read_analysis_input_publication_scope().unwrap(),
+        Some(second)
+    );
 }
 
 #[test]

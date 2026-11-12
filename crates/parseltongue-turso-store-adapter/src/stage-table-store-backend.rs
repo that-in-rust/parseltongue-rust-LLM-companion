@@ -69,6 +69,10 @@ fn check_table_stage_access(table: &str, stage: &str) -> bool {
         .iter()
         .any(|(name, owner)| *name == table && *owner == stage)
         || (stage == "name-resolution"
+            && STAGE_OWNED_TABLE_NAMES
+                .iter()
+                .any(|(name, owner)| *name == table && *owner == "syntax-namespace-input-records"))
+        || (stage == "name-resolution"
             && matches!(
                 table,
                 "span-reference-text-table"
@@ -165,6 +169,7 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             }
             connection.execute("CREATE TABLE IF NOT EXISTS \"file-source-content-records\" (file_content_digest_full TEXT PRIMARY KEY, file_source_content_bytes BLOB NOT NULL)", ()).await?;
             connection.execute("CREATE TABLE IF NOT EXISTS \"workspace-generation-publication-manifest\" (manifest_singleton_key_value INTEGER PRIMARY KEY, run_generation_digest_value TEXT NOT NULL, stage_attempt_sequence_value TEXT NOT NULL)", ()).await?;
+            connection.execute("CREATE TABLE IF NOT EXISTS \"analysis-input-publication-manifest\" (manifest_singleton_key_value INTEGER PRIMARY KEY, run_generation_digest_value TEXT NOT NULL, stage_attempt_sequence_value TEXT NOT NULL)", ()).await?;
             connection.execute("CREATE TABLE IF NOT EXISTS \"frozen-stage-publication-records\" (generation_key TEXT NOT NULL,attempt_key TEXT NOT NULL,source_attempt_key TEXT NOT NULL,publication_revision INTEGER NOT NULL,PRIMARY KEY(generation_key,attempt_key))",()).await?;
             connection.execute("CREATE TABLE IF NOT EXISTS \"frozen-stage-unit-memberships\" (generation_key TEXT NOT NULL,source_attempt_key TEXT NOT NULL,stage_marker_key TEXT NOT NULL,publication_revision INTEGER NOT NULL,PRIMARY KEY(generation_key,source_attempt_key,stage_marker_key))",()).await?;
             Ok::<_,turso::Error>(())
@@ -381,6 +386,41 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             let connection = self.store_database_handle_value.connect()?;
             let mut rows = connection.query("SELECT file_source_content_bytes FROM \"file-source-content-records\" WHERE file_content_digest_full=?", [digest.to_owned()]).await?;
             rows.next().await?.ok_or(turso::Error::QueryReturnedNoRows)?.get(0)
+        }).map_err(build_store_backend_error)
+    }
+
+    fn publish_analysis_input_snapshot(
+        &self,
+        scope: &StageRunScopeValue,
+        cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        retry_bounded_store_write(cancel, || {
+            self.store_runtime_handle_value.block_on(async{
+            let mut connection=self.store_database_handle_value.connect()?;
+            let transaction=connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
+            let result=async{
+                check_stage_cancel_requested(cancel)?;
+                let mut rows=transaction.query("SELECT count(*) FROM \"stage-run-generation-records\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_row_record_key IN ('__marker__/crate-graph/__complete__','__marker__/source-ingest/__complete__','__marker__/syntax-spans/__complete__','__marker__/syntax-namespace-input-records/__complete__')",turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
+                let count:i64=rows.next().await?.ok_or(turso::Error::QueryReturnedNoRows)?.get(0)?;
+                drop(rows);
+                if count!=4{return Err(turso::Error::Misuse("StageInputMissingError: analysis source incomplete".into()));}
+                let published=seal_snapshot_publication(&transaction,scope).await?;
+                transaction.execute("INSERT OR REPLACE INTO \"analysis-input-publication-manifest\" VALUES (1,?,?)",turso::params![published.run_generation_digest_value.clone(),published.stage_attempt_sequence_value.clone()]).await?;
+                check_stage_cancel_requested(cancel)?;
+                Ok(published)
+            }.await;
+            match result {Ok(value)=>{transaction.commit().await?;Ok(value)},Err(error)=>{let _=transaction.rollback().await;Err(error)}}
+        })
+        })
+    }
+
+    fn read_analysis_input_publication_scope(
+        &self,
+    ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
+        self.store_runtime_handle_value.block_on(async{
+            let connection=self.store_database_handle_value.connect()?;
+            let mut rows=connection.query("SELECT run_generation_digest_value,stage_attempt_sequence_value FROM \"analysis-input-publication-manifest\" WHERE manifest_singleton_key_value=1 ORDER BY run_generation_digest_value,stage_attempt_sequence_value",()).await?;
+            rows.next().await?.map(|row|Ok::<_,turso::Error>(StageRunScopeValue{run_generation_digest_value:row.get(0)?,stage_attempt_sequence_value:row.get(1)?})).transpose()
         }).map_err(build_store_backend_error)
     }
 

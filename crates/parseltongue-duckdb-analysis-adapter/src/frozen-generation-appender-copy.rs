@@ -64,7 +64,9 @@ pub(super) fn copy_generation(
     cancel: &RunCancelFlagValue,
 ) -> Result<usize, StoreBackendFailureError> {
     check_cancel(cancel)?;
-    if source.read_workspace_publication_scope()?.as_ref() != Some(scope) {
+    if source.read_workspace_publication_scope()?.as_ref() != Some(scope)
+        && source.read_analysis_input_publication_scope()?.as_ref() != Some(scope)
+    {
         return Err(build_analysis_error("source generation is not published"));
     }
     let mut tables = tables.to_vec();
@@ -155,7 +157,9 @@ pub(super) fn copy_generation(
         Ok(total + count)
     })?;
     check_cancel(cancel)?;
-    if source.read_workspace_publication_scope()?.as_ref() != Some(scope) {
+    if source.read_workspace_publication_scope()?.as_ref() != Some(scope)
+        && source.read_analysis_input_publication_scope()?.as_ref() != Some(scope)
+    {
         return Err(build_analysis_error(
             "source publication changed during copy",
         ));

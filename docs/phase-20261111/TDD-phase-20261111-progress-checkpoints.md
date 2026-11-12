@@ -2206,6 +2206,20 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   descendants were terminated; our native builds use CARGO_BUILD_JOBS=2 and
   CXXFLAGS=-g0. Resume the editor after remaining native work.
 
+### Independent analysis input snapshot publication — GREEN
+
+- Separate analysis-input-publication-manifest pointer seals immutable Turso
+  snapshots after graph, ingest, syntax and namespace inputs complete. It does
+  not advance workspace success. Atomic rollback/cancellation preserves the old
+  pointer. Macro-produced namespace rows may be written under name-resolution
+  ownership and are included in the next frozen snapshot, never the old one.
+- Appender handoff accepts either complete workspace publication or this
+  separate complete analysis-input publication and rechecks it after copying.
+  New real-Turso contract proves analysis handoff works while workspace success
+  remains absent. Existing snapshot write immutability remains enforced.
+- `20 passed; 0 failed; ... finished in 2.88s` Turso contracts;
+  `13 passed; 0 failed; ... finished in 13.99s` adapter publication contracts.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement
