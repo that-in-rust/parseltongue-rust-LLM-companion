@@ -193,6 +193,60 @@ fn frozen_compilation_dependency_alias_rules() {
     })));
 }
 
+fn append_standard_library_fixture(source: &mut Source, name: &str) {
+    let unit = json!({"unit_cargo_package_identifier":format!("sysroot-{name}"),"unit_cargo_target_name":name,"unit_cargo_target_kind":"lib","unit_compilation_role_kind":"target","unit_configuration_digest_full":"2".repeat(64)});
+    let cargo = format!("sysroot-{name}");
+    let root = append_compilation_fixture(
+        source,
+        &unit,
+        json!({"unit_compilation_identity_key":cargo,"unit_rust_edition_value":"2021","unit_no_core_flag":true,"unit_no_std_flag":true,"unit_implicit_prelude_flag":true,"unit_sysroot_context_flag":true,"unit_normal_dependency_rows":[]}),
+    );
+    let prelude =
+        json!({"scope_compilation_unit_key":unit,"scope_semantic_path_parts":["prelude"]});
+    let edition = json!({"scope_compilation_unit_key":unit,"scope_semantic_path_parts":["prelude","rust_2024"]});
+    [(prelude.clone(),root.clone()),(edition.clone(),prelude.clone())].into_iter().for_each(|(scope,parent)|{
+        append_namespace_fixture_value(source,"syntax-namespace-input-scopes",json!({"scope_module_identity_key":scope,"scope_parent_identity_key":parent,"scope_parent_lookup_flag":false,"scope_module_boundary_flag":true,"scope_implicit_prelude_key":null,"scope_cargo_unit_key":cargo}));
+    });
+    let target = |suffix: &str| json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":format!("{name}-{suffix}")});
+    [(root.clone(),"prelude",target("prelude"),Some(prelude.clone()),"type",json!({"target_symbol_kind_value":"Module"})),
+        (prelude,"rust_2024",target("edition"),Some(edition.clone()),"type",json!({"target_symbol_kind_value":"Module"})),
+        (edition,"Selected",target("Selected"),None,"type",json!({"target_symbol_kind_value":"Struct"})),
+        (root,"sdk_macro",target("macro"),None,"macro",json!({"target_symbol_kind_value":"Macro","target_macro_definition_record":{"macro_declaration_style_flag":false}}))
+    ].into_iter().for_each(|(scope,name,target,child,namespace,metadata)|{
+        append_namespace_fixture_value(source,"syntax-namespace-input-items",json!({"binding_lexical_scope_key":scope,"binding_resolved_name_text":name,"binding_namespace_kind_value":namespace,"binding_target_identity_key":target,"binding_target_child_scope":child,"binding_visibility_scope_kind":{"visibility_scope_kind_value":"public"},"binding_selection_priority_kind":"declaration","binding_import_evidence_keys":[],"binding_target_metadata_value":metadata}));
+    });
+}
+
+#[test]
+fn frozen_standard_type_macro_preludes() {
+    [(false,true),(true,true),(false,false)].into_iter().for_each(|(no_std,implicit)|{
+        let directory=tempfile::tempdir().unwrap();
+        let store=DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(&directory.path().join("analysis.duckdb"),directory.path(),64*1024*1024).unwrap();
+        let mut source=namespace_source_fixture();
+        let original:serde_json::Value=serde_json::from_str(&source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text).unwrap();
+        let unit=&original["scope_module_identity_key"]["scope_compilation_unit_key"];
+        source.records.get_mut("crate-dependency-graph-table").unwrap().clear();
+        source.records.get_mut("syntax-namespace-input-scopes").unwrap().clear();
+        let dependencies=["core","std"].map(|name|json!({"dependency_alias_name_value":name,"dependency_cargo_package_identifier":format!("sysroot-{name}"),"dependency_compilation_role_kind":"target","dependency_sysroot_context_flag":true}));
+        let root=append_compilation_fixture(&mut source,unit,json!({"unit_compilation_identity_key":"fixture-unit","unit_rust_edition_value":"2024","unit_no_core_flag":false,"unit_no_std_flag":no_std,"unit_implicit_prelude_flag":implicit,"unit_normal_dependency_rows":dependencies}));
+        ["core","std"].into_iter().for_each(|name|append_standard_library_fixture(&mut source,name));
+        append_namespace_fixture_value(&mut source,"syntax-namespace-input-paths",json!({"path_site_occurrence_key":{"site":"standard-type"},"path_lexical_scope_key":root,"path_source_segment_rows":[{"kind":"name","name":"Selected"}],"path_requested_namespace_kind":"Type","path_resolution_source_kind":"Signature","path_unavailable_reason_kind":null,"path_source_metadata_value":{}}));
+        append_namespace_fixture_value(&mut source,"syntax-namespace-input-macros",json!({"invocation_site_occurrence_key":{"site":"standard-macro"},"invocation_lexical_scope_key":root,"invocation_macro_path_segments":[{"kind":"name","name":"sdk_macro"}],"invocation_macro_input_text":""}));
+        store.copy_published_stage_rows(&source,&scope(),NAMESPACE_SOURCE_TABLE_NAMES,&RunCancelFlagValue::default()).unwrap();
+        store.normalize_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        store.resolve_frozen_namespace_rows(&scope(),&RunCancelFlagValue::default()).unwrap();
+        ["standard-type","standard-macro"].into_iter().for_each(|site|{
+            let connection=store._connection.lock().unwrap();
+            let mut statement=connection.prepare("SELECT target_key FROM \"namespace-path-candidate-records\" WHERE request_key=? ORDER BY generation_key,attempt_key,request_key,target_key,namespace,binding_scope,binding_name").unwrap();
+            let targets=statement.query_map([json!({"site":site}).to_string()],|row|row.get::<_,String>(0)).unwrap().collect::<Result<Vec<_>,_>>().unwrap();
+            let library=if no_std {"core"}else{"std"};
+            let suffix=if site=="standard-type" {"Selected"}else{"macro"};
+            let expected=if implicit {vec![json!({"target_identity_variant_kind":"builtin","target_builtin_name_value":format!("{library}-{suffix}")}).to_string()]}else{vec![]};
+            assert_eq!(targets,expected,"no_std={no_std} implicit={implicit} site={site}");
+        });
+    });
+}
+
 #[test]
 fn frozen_namespace_sql_resolution_contract() {
     let directory = tempfile::tempdir().unwrap();
