@@ -69,6 +69,193 @@ fn read_workspace_banner_fixture(database: &Path) -> Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
+fn read_published_table_fixture(database: &Path, table: &str) -> Vec<Value> {
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    store
+        .read_stage_table_rows(&scope, table)
+        .unwrap()
+        .iter()
+        .map(|row| serde_json::from_str(&row.stage_row_payload_text).unwrap())
+        .collect()
+}
+
+#[test]
+fn test_macro_items_publish_atomically() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(
+        root.join("src/lib.rs"),
+        r#"
+macro_rules! outer { ($name:ident) => {
+    macro_rules! inner { () => { pub struct $name { pub field:u8 } }; }
+    inner!();
+}; }
+outer!(Generated);
+pub fn take(_:Generated){}
+"#,
+    )
+    .unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let macros = read_published_table_fixture(&database, "macro-expanded-item-table");
+    assert_eq!(macros.len(), 2);
+    let nested = macros
+        .iter()
+        .find(|row| {
+            row["macro_invocation_provenance_chain"]
+                .as_array()
+                .unwrap()
+                .len()
+                == 2
+        })
+        .unwrap();
+    assert!(
+        nested["macro_expanded_source_text"]
+            .as_str()
+            .unwrap()
+            .contains("Generated")
+    );
+    let path = read_published_table_fixture(&database, "path-resolution-site-records")
+        .into_iter()
+        .find(|row| row["path_site_source_text"] == "Generated")
+        .unwrap();
+    assert_eq!(path["path_resolution_state_kind"], "resolved");
+    let targets = path["path_target_symbol_rows"].as_array().unwrap();
+    assert_eq!(targets.len(), 1);
+    assert!(
+        targets[0]["target_source_file_path"]
+            .as_str()
+            .unwrap()
+            .contains("macro-source")
+    );
+    assert!(
+        read_published_table_fixture(&database, "span-reference-text-table")
+            .iter()
+            .any(|row| !row["span_expansion_provenance_chain"]
+                .as_array()
+                .is_none_or(|chain| chain.is_empty()))
+    );
+    assert!(
+        read_published_table_fixture(&database, "field-signature-detail-table")
+            .iter()
+            .any(|row| !row["span_expansion_provenance_chain"]
+                .as_array()
+                .is_none_or(|chain| chain.is_empty()))
+    );
+
+    let before = read_workspace_banner_fixture(&database);
+    fs::write(
+        root.join("src/lib.rs"),
+        "macro_rules! make {($name:ident)=>{pub struct $name;};} make!(Completed); make!(1);",
+    )
+    .unwrap();
+    let failed = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(!failed.status.success());
+    assert_eq!(read_workspace_banner_fixture(&database), before);
+    assert_eq!(
+        read_published_table_fixture(&database, "macro-expanded-item-table"),
+        macros
+    );
+}
+
+#[test]
+fn test_macro_defining_crate_hygiene() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::create_dir_all(root.join("defs/src")).unwrap();
+    fs::write(
+        root.join("defs/Cargo.toml"),
+        "[package]\nname=\"defs\"\nversion=\"0.1.0\"\nedition=\"2021\"\n",
+    )
+    .unwrap();
+    fs::write(root.join("defs/src/lib.rs"),"pub struct Original; #[macro_export] macro_rules! build {($name:ident)=>{pub struct $name {pub value:$crate::Original}};}").unwrap();
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        format!("{manifest}\n[dependencies]\ndefs={{path=\"defs\"}}\n"),
+    )
+    .unwrap();
+    fs::write(root.join("src/lib.rs"),"pub struct Original; defs::build!(First); defs::build!(Second); pub fn take(_:First,_:Second){}").unwrap();
+    assert!(
+        Command::new(env!("CARGO"))
+            .current_dir(&root)
+            .args(["generate-lockfile", "--offline"])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let macros = read_published_table_fixture(&database, "macro-expanded-item-table");
+    assert_eq!(macros.len(), 2);
+    assert_ne!(
+        macros[0]["macro_virtual_source_path"],
+        macros[1]["macro_virtual_source_path"]
+    );
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    let defining = paths
+        .iter()
+        .filter(|row| row["path_site_source_text"] == "$crate::Original")
+        .collect::<Vec<_>>();
+    assert_eq!(defining.len(), 2);
+    for path in defining {
+        assert_eq!(path["path_resolution_state_kind"], "resolved");
+        assert!(
+            path["path_target_symbol_rows"][0]["target_source_file_path"]
+                .as_str()
+                .unwrap()
+                .ends_with("/defs/src/lib.rs")
+        );
+    }
+}
+
+#[test]
+fn test_macro_empty_virtual_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(
+        root.join("src/lib.rs"),
+        "macro_rules! empty {()=>{};} empty!();",
+    )
+    .unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rows = read_published_table_fixture(&database, "macro-expanded-item-table");
+    assert_eq!(rows.len(), 1);
+    assert!(
+        rows[0]["macro_expanded_source_text"]
+            .as_str()
+            .unwrap()
+            .trim()
+            .is_empty()
+    );
+    let files = read_published_table_fixture(&database, "file-source-text-table");
+    assert!(files.iter().any(|row| row["file_source_absolute_path"]
+        == rows[0]["macro_virtual_source_path"]
+        && row["file_source_byte_count"] == 0));
+}
+
 #[test]
 fn test_persisted_resolution_path_answers() {
     let directory = tempfile::tempdir().unwrap();

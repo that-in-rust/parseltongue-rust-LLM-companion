@@ -853,3 +853,12 @@ The stage retains its existing one-transaction-per-crate publication boundary.
 Offline cargo check for the syntax extractor passed (2.48s). Next RED: generated item/path
 answers, nested invocation provenance, cross-crate $crate hygiene, empty expansion, expanded
 span/field rows and failure preserving the previously published generation.
+
+### M2 persisted macro adapter — RED
+
+Three CLI/store contract tests cover nested expansion chains and expanded span/field
+evidence, cross-crate $crate with same-named caller items, distinct virtual files for
+two invocations, empty expansion and failure preserving the published generation.
+The existing span_expansion_provenance_chain spelling is used for evidence assertions.
+The RED run printed: test result: FAILED. 0 passed; 3 failed; 6 filtered out.
+All three failures reached the intended persisted adapter todo after syntax-spans.
