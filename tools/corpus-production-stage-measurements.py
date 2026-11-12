@@ -31,7 +31,7 @@ def build_corpus_measurement_commands(
     measurement = [sys.executable, str(ROOT / "tools/process-tree-access-auditor.py"),
                    "sample", "--memory-sample-output-path", str(output / "process-tree-memory-samples.json"),
                    "--", *common, str(output / "production-untraced-workspace-store.db")]
-    audit = ["strace", "--seccomp-bpf", "-f", "-s", "65535", "-e", "trace=execve,connect,clone,clone3,fork,vfork",
+    audit = ["strace", "--seccomp-bpf", "-f", "-yy", "-s", "65535", "-e", "trace=%process,%network",
              "-o", str(output / "production-process-access-audit.txt"),
              *common, str(output / "production-audit-workspace-store.db")]
     reads = ["strace", "--seccomp-bpf", "-f", "-s", "65535", "-e", "trace=openat",
@@ -172,14 +172,73 @@ def measure_corpus_production_stages(
         record, output, binary, final_stage_kind
     )
     environment = dict(os.environ, CARGO_TARGET_DIR=str(output / "cargo-discovery-cache"))
+    summary = {
+        "corpus_repository_short_name": record["corpus_repository_short_name"],
+        "production_artifact_directory": str(output),
+        "production_mapper_status": "NOT STARTED",
+        "production_mapper_exit_code": None,
+        "production_measurement_status": "NOT STARTED",
+        "production_process_audit_status": "NOT STARTED",
+        "production_process_audit_exit": None,
+        "production_target_audit_status": "NOT STARTED",
+        "production_target_audit_exit": None,
+        "production_status_command_status": "NOT STARTED",
+        "production_status_exit_code": None,
+        "production_publication_status": "NOT STARTED",
+        "production_process_audit_pass": None,
+        "production_target_audit_pass": None,
+        "production_trace_nonempty": None,
+        "production_process_trace_complete": None,
+        "production_target_trace_nonempty": None,
+        "production_target_trace_complete": None,
+        "production_target_audit_recursive": False,
+        "production_total_elapsed_seconds": None,
+        "production_peak_rss_bytes": None,
+        "production_peak_rss_sampling_interval_ms": None,
+        "production_peak_rss_sampling_exact": False,
+        "production_peak_rss_sampling_limitation": "nominal 10-ms sampling can miss short-lived children and exact peaks",
+        "production_memory_acceptance_status": "DEFERRED",
+        "production_memory_sample_count": 0,
+        "production_memory_sample_error": None,
+        "production_coverage_banner_values": None,
+        "publication_stage_marker_result": None,
+    }
+    summary_path = output / "production-stage-measurement-summary.json"
+
+    def persist_measurement_summary():
+        summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+
+    persist_measurement_summary()
 
     mapped = invoke_production_stage_command(command, output, "production-stage", environment, before_after_callback)
+    summary["production_mapper_exit_code"] = mapped.returncode
+    summary["production_mapper_status"] = "PASS" if mapped.returncode == 0 else "FAIL"
     measurement = None
     measurement_error = None
     try:
         measurement = json.loads(memory.read_text())
     except (OSError, json.JSONDecodeError) as error:
         measurement_error = f"memory sample output missing or malformed: {error}"
+    samples = measurement.get("process_memory_sample_values") if isinstance(measurement, dict) else None
+    peak_bytes = measurement.get("process_tree_peak_bytes") if isinstance(measurement, dict) else None
+    summary.update({
+        "production_measurement_status": (
+            "PASS" if isinstance(samples, list) and samples and isinstance(peak_bytes, int)
+            and isinstance(measurement.get("process_tree_elapsed_seconds"), (int, float)) else "BLOCKED"
+        ),
+        "production_total_elapsed_seconds": (
+            measurement.get("process_tree_elapsed_seconds") if isinstance(measurement, dict) else None
+        ),
+        "production_peak_rss_bytes": peak_bytes,
+        "production_peak_rss_sampling_interval_ms": (
+            measurement.get("sample_interval_millisecond_value") if isinstance(measurement, dict) else None
+        ),
+        "production_memory_sample_count": len(samples) if isinstance(samples, list) else 0,
+        "production_memory_sample_error": measurement_error,
+    })
+    persist_measurement_summary()
+    if mapped.returncode != 0:
+        return summary
 
     audited = invoke_production_stage_command(audit_command, output, "production-audit", environment, before_after_callback)
     try:
@@ -191,6 +250,44 @@ def measure_corpus_production_stages(
     violations = audit_recorded_process_events(trace_text, binary) if trace_text else ["process access trace missing"]
     if not process_trace_complete:
         violations.append("process access trace incomplete")
+
+    incomplete_trace_markers = ("incomplete trace", "unfinished trace", "trace missing")
+    observed_violations = [
+        value for value in violations
+        if not any(marker in value for marker in incomplete_trace_markers)
+    ]
+    if audited.returncode != 0 or observed_violations:
+        process_audit_status = "FAIL"
+    elif not process_trace_complete:
+        process_audit_status = "BLOCKED"
+    else:
+        process_audit_status = "PASS"
+    summary.update({
+        "production_process_audit_status": process_audit_status,
+        "production_process_audit_exit": audited.returncode,
+        "production_process_audit_pass": process_audit_status == "PASS",
+        "production_trace_nonempty": bool(trace_text.strip()),
+        "production_process_trace_complete": process_trace_complete,
+    })
+    process_audit = {
+        "process_audit_status": process_audit_status,
+        "process_audit_pass_flag": process_audit_status == "PASS",
+        "process_audit_exit_code": audited.returncode,
+        "process_audit_violation_rows": violations,
+        "process_trace_complete": process_trace_complete,
+        "target_audit_status": "NOT STARTED",
+        "target_filtered_audit_pass": None,
+        "target_filtered_violation_rows": [],
+        "target_trace_complete": None,
+        "target_filter_scope_value": "exact repo/target path only; not recursive",
+        "target_filter_complete_recursive_audit": False,
+        "target_trace_nonempty": None,
+    }
+    process_audit_path = output / "production-process-audit-result.json"
+    process_audit_path.write_text(json.dumps(process_audit, indent=2) + "\n")
+    if process_audit_status != "PASS":
+        persist_measurement_summary()
+        return summary
 
     reads = invoke_production_stage_command(read_command, output, "production-target", environment, before_after_callback)
     target_trace_path = output / "production-target-access-audit.txt"
@@ -205,19 +302,30 @@ def measure_corpus_production_stages(
         wrapper_return_code=reads.returncode,
     )
     target_violations = target_audit["violations"]
-    process_audit = {
-        "process_audit_pass_flag": not violations,
-        "process_audit_violation_rows": violations,
-        "process_trace_complete": process_trace_complete,
-        "target_filtered_audit_pass": target_audit["pass"],
+    if reads.returncode != 0 or target_violations:
+        target_audit_status = "FAIL"
+    elif not target_audit["complete"]:
+        target_audit_status = "BLOCKED"
+    else:
+        target_audit_status = "PASS"
+    summary.update({
+        "production_target_audit_status": target_audit_status,
+        "production_target_audit_exit": reads.returncode,
+        "production_target_audit_pass": target_audit_status == "PASS",
+        "production_target_trace_nonempty": target_trace_available,
+        "production_target_trace_complete": target_audit["complete"],
+    })
+    process_audit.update({
+        "target_audit_status": target_audit_status,
+        "target_filtered_audit_pass": target_audit_status == "PASS",
         "target_filtered_violation_rows": target_violations,
         "target_trace_complete": target_audit["complete"],
-        "target_filter_scope_value": "exact repo/target path only; not recursive",
-        "target_filter_complete_recursive_audit": False,
         "target_trace_nonempty": target_trace_available,
-    }
-    process_audit_path = output / "production-process-audit-result.json"
+    })
     process_audit_path.write_text(json.dumps(process_audit, indent=2) + "\n")
+    if target_audit_status != "PASS":
+        persist_measurement_summary()
+        return summary
 
     status_command = [str(binary), "status-coverage-banner-show", "--json",
                       "--workspace-store-file-path", str(database)]
@@ -238,36 +346,37 @@ def measure_corpus_production_stages(
     marker_result = validate_publication_stage_markers(banner, final_stage_kind or record.get(
         "corpus_mapping_final_stage", "name-resolution"
     ))
+    if status.returncode != 0:
+        publication_status = "FAIL"
+    elif marker_result.get("pass") is True:
+        publication_status = "PASS"
+    elif any(token in str(marker_result.get("reason", "")).lower()
+             for token in ("missing", "unavailable")):
+        publication_status = "BLOCKED"
+    else:
+        publication_status = "FAIL"
 
+    summary.update({
+        "production_status_command_status": "PASS" if status.returncode == 0 else "FAIL",
+        "production_status_exit_code": status.returncode,
+        "production_publication_status": publication_status,
+        "production_coverage_banner_values": banner,
+        "publication_stage_marker_result": marker_result,
+    })
     samples = measurement.get("process_memory_sample_values") if isinstance(measurement, dict) else None
     peak_bytes = measurement.get("process_tree_peak_bytes") if isinstance(measurement, dict) else None
-    summary = {
-        "corpus_repository_short_name": record["corpus_repository_short_name"],
-        "production_mapper_exit_code": mapped.returncode,
-        "production_status_exit_code": status.returncode,
-        "production_process_audit_exit": audited.returncode,
-        "production_target_audit_exit": reads.returncode,
-        "production_target_audit_pass": target_audit["pass"],
-        "production_process_audit_pass": not violations,
+    summary.update({
         "production_process_audit_violation_count": len(violations),
         "production_trace_nonempty": bool(trace_text.strip()),
-        "production_process_trace_complete": process_trace_complete,
-        "production_target_trace_nonempty": target_trace_available,
-        "production_target_trace_complete": target_audit["complete"],
         "production_target_audit_recursive": False,
-        "production_total_elapsed_seconds": measurement.get("process_tree_elapsed_seconds") if measurement else None,
-        "production_peak_rss_bytes": peak_bytes,
-        "production_peak_rss_sampling_interval_ms": measurement.get("sample_interval_millisecond_value") if measurement else None,
         "production_peak_rss_sampling_exact": False,
         "production_peak_rss_sampling_limitation": "nominal 10-ms sampling can miss short-lived children and exact peaks",
         "production_memory_acceptance_status": "DEFERRED",
-        "production_memory_sample_count": len(samples) if isinstance(samples, list) else 0,
-        "production_memory_sample_error": measurement_error,
-        "production_coverage_banner_values": banner,
-        "publication_stage_marker_result": marker_result,
         "production_artifact_directory": str(output),
-    }
-    (output / "production-stage-measurement-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    })
+    summary["production_memory_sample_count"] = len(samples) if isinstance(samples, list) else 0
+    summary["production_memory_sample_error"] = measurement_error
+    persist_measurement_summary()
     return summary
 
 

@@ -296,6 +296,7 @@ def record_persistent_run_transition(
     command_values: Sequence[str] = (),
     reason_text: str | None = None,
     clause_name: str | None = None,
+    command_metadata: Sequence[Mapping[str, Any]] | None = None,
 ) -> None:
     if status_value not in {"NOT STARTED", "PASS", "BLOCKED", "FAIL"}:
         raise ValueError(f"unsupported step status: {status_value}")
@@ -315,17 +316,23 @@ def record_persistent_run_transition(
         "reason": reason_text,
         "clause": clause_name,
     }
+    if command_metadata is not None:
+        event["command_metadata"] = [dict(value) for value in command_metadata]
     repository_state["events"].append(event)
     manifest_value["events"].append(event)
     if status_value in {"BLOCKED", "FAIL"} and repository_state["first_failed_clause"] is None:
         repository_state["first_failed_clause"] = clause_name or step_name
         repository_state["first_reason"] = reason_text or status_value
     rendered_reason = f" — {reason_text}" if reason_text else ""
+    rendered_metadata = (
+        f"\n  - Command metadata: `{json.dumps(list(command_metadata), sort_keys=True)}`"
+        if command_metadata is not None else ""
+    )
     append_persistent_report_entry(
         run_state,
         f"- [{event['timestamp']}] `{repository_name}` `{step_name}`: **{status_value}**{rendered_reason}\n"
         f"  - Clause: `{clause_name or 'not specified'}`\n"
-        f"  - Commands: `{json.dumps(list(command_values))}`",
+        f"  - Commands: `{json.dumps(list(command_values))}`{rendered_metadata}",
     )
     persist_run_manifest(run_state)
 
@@ -1339,18 +1346,46 @@ def finalize_s3_component_qualification(
 def validate_s3_measurement_result(summary: Mapping[str, Any], repository_name: str) -> None:
     if not isinstance(summary, Mapping):
         raise RunnerPreconditionBlockedError("S3 measurement summary is malformed")
-    if summary.get("production_mapper_exit_code") != 0:
+    mapper_exit_code = summary.get("production_mapper_exit_code")
+    mapper_status = summary.get("production_mapper_status")
+    if mapper_status == "FAIL" or mapper_exit_code is not None and mapper_exit_code != 0:
         raise RunnerContractViolationError("untraced mapper measurement subprocess did not succeed")
-    if summary.get("production_process_audit_exit") != 0:
-        raise RunnerContractViolationError("process access audit subprocess did not succeed")
-    if summary.get("production_target_audit_exit") != 0:
-        raise RunnerContractViolationError("filtered target audit subprocess did not succeed")
-    if summary.get("production_status_exit_code") != 0:
-        raise RunnerContractViolationError("published coverage status command did not succeed")
+    if mapper_status in {"BLOCKED", "NOT STARTED"} or mapper_exit_code is None:
+        raise RunnerPreconditionBlockedError("untraced mapper measurement was not completed")
     if summary.get("production_memory_sample_error"):
         raise RunnerPreconditionBlockedError(summary["production_memory_sample_error"])
     if summary.get("production_memory_sample_count", 0) <= 0 or not isinstance(summary.get("production_peak_rss_bytes"), int):
         raise RunnerPreconditionBlockedError("whole-tree RSS sampling produced no usable measurements")
+    process_audit_status = summary.get("production_process_audit_status")
+    process_audit_exit = summary.get("production_process_audit_exit")
+    if process_audit_status == "FAIL":
+        raise RunnerContractViolationError("process access audit observed forbidden behavior")
+    if process_audit_status in {"BLOCKED", "NOT STARTED"} or process_audit_exit is None:
+        raise RunnerPreconditionBlockedError(
+            f"process access audit is {(process_audit_status or 'NOT STARTED').lower()}"
+        )
+    if process_audit_exit != 0:
+        raise RunnerContractViolationError("process access audit subprocess did not succeed")
+    target_audit_status = summary.get("production_target_audit_status")
+    target_audit_exit = summary.get("production_target_audit_exit")
+    if target_audit_status == "FAIL":
+        raise RunnerContractViolationError("filtered target audit observed forbidden access")
+    if target_audit_status in {"BLOCKED", "NOT STARTED"} or target_audit_exit is None:
+        raise RunnerPreconditionBlockedError(
+            f"filtered target audit is {(target_audit_status or 'NOT STARTED').lower()}"
+        )
+    if target_audit_exit != 0:
+        raise RunnerContractViolationError("filtered target audit subprocess did not succeed")
+    publication_status = summary.get("production_publication_status")
+    status_exit_code = summary.get("production_status_exit_code")
+    if publication_status == "FAIL":
+        raise RunnerContractViolationError("publication status command or stage validation failed")
+    if publication_status in {"BLOCKED", "NOT STARTED"} or status_exit_code is None:
+        raise RunnerPreconditionBlockedError(
+            f"publication status is {(publication_status or 'NOT STARTED').lower()}"
+        )
+    if status_exit_code != 0:
+        raise RunnerContractViolationError("published coverage status command did not succeed")
     if (not summary.get("production_trace_nonempty") or not summary.get("production_target_trace_nonempty")):
         raise RunnerPreconditionBlockedError("one or more process trace files are empty")
     if (summary.get("production_process_trace_complete") is not True
@@ -1694,6 +1729,7 @@ def create_external_command_event_recorder(command_journal_path: Path):
     if command_journal_path.exists():
         raise RunnerPreconditionBlockedError(f"refusing to reuse command journal {command_journal_path}")
     event_count = 0
+    events = []
 
     def record_command_event(phase, command_values, outcome):
         nonlocal event_count
@@ -1703,6 +1739,7 @@ def create_external_command_event_recorder(command_journal_path: Path):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "phase": phase,
             "command": [str(value) for value in command_values],
+            "cwd": str(Path.cwd()),
             "outcome": dict(outcome),
         }
         serialized = json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n"
@@ -1716,8 +1753,27 @@ def create_external_command_event_recorder(command_journal_path: Path):
         with command_journal_path.open("a", encoding="utf-8") as journal:
             journal.write(serialized)
         event_count += 1
+        events.append(event)
 
+    record_command_event.events = events
     return record_command_event
+
+
+def collect_transition_command_metadata(command_event_callback, step_name):
+    command_events = getattr(command_event_callback, "events", ())
+    return [
+        {
+            "argv": list(event["command"]),
+            "cwd": event["cwd"],
+            "exit_result": {
+                "return_code": event["outcome"].get("return_code"),
+                "status": event["outcome"].get("status"),
+                "exception_type": event["outcome"].get("exception_type"),
+            },
+        }
+        for event in command_events
+        if event["phase"] == "after" and event.get("outcome", {}).get("stage") == step_name
+    ]
 
 
 def execute_repository_sop_stages(
@@ -1735,6 +1791,13 @@ def execute_repository_sop_stages(
     source_root = execution_context["corpus_roots"][repository_name]
     current_step = "S1"
     current_commands: list[str] = []
+    metadata_complete = False
+
+    def transition_command_evidence():
+        command_metadata = collect_transition_command_metadata(command_event_callback, current_step)
+        command_values = [json.dumps(value["argv"]) for value in command_metadata] or current_commands
+        return command_values, command_metadata or None
+
     try:
         current_commands = [json.dumps([
             str(execution_context["indexer_path"]), "cli", "index_repository",
@@ -1758,29 +1821,25 @@ def execute_repository_sop_stages(
             "index_result_status": index_result["result"].get("status"),
         }, indent=2) + "\n")
         current_step = "S1"
-        metadata_commands = [
-            str(execution_context["indexer_path"]) + " cli list_projects",
-            str(execution_context["indexer_path"]) + " cli index_status --diagnostics full --format json",
-            str(execution_context["indexer_path"]) + " cli get_graph_schema --format json --diagnostics full",
-        ]
-        current_commands = [json.dumps(index_result["command"]), *metadata_commands]
+        current_commands = [json.dumps(index_result["command"])]
 
         def record_index_metadata_complete(metadata_result):
-            nonlocal current_step, current_commands
+            nonlocal current_step, current_commands, metadata_complete
+            s1_command_metadata = collect_transition_command_metadata(command_event_callback, "S1")
+            current_commands = [json.dumps(value["argv"]) for value in s1_command_metadata]
             record_persistent_run_transition(
                 run_state, repository_name, "S1", "PASS", current_commands,
                 f"fresh full generation {metadata_result['generation']} has matching status/schema metadata",
                 "S1.fresh-full-index-and-metadata",
+                command_metadata=s1_command_metadata,
             )
+            metadata_complete = True
             current_step = "S2"
-            current_commands = [
-                str(execution_context["indexer_path"]) + " cli check_index_coverage --scopes [\".\"]",
-                str(execution_context["indexer_path"]) + " cli query_graph --graph missed --query MATCH (f:File) RETURN f.file_path",
-                str(execution_context["indexer_path"]) + " cli index_status (final generation check)",
-            ]
+            current_commands = []
 
         def record_s2_command_event(phase, command_values, outcome):
-            command_event_callback(phase, command_values, {"stage": "S2", **outcome})
+            command_stage = "S2" if metadata_complete else "S1"
+            command_event_callback(phase, command_values, {"stage": command_stage, **outcome})
 
         coverage_summary = coverage_inventory.collect_index_coverage_inventory(
             repository_name,
@@ -1805,12 +1864,15 @@ def execute_repository_sop_stages(
         run_state["manifest"]["repositories"][repository_name]["coverage_summary"] = coverage_summary
         coverage_summary["commands_jsonl_path"] = str(command_journal_path.resolve())
         run_state["manifest"]["repositories"][repository_name]["coverage_summary"] = coverage_summary
+        s2_command_metadata = collect_transition_command_metadata(command_event_callback, "S2")
+        current_commands = [json.dumps(value["argv"]) for value in s2_command_metadata]
         record_persistent_run_transition(
             run_state, repository_name, "S2", "PASS", current_commands,
             f"scope entries={coverage_summary['scope_coverage_entry_count']}; "
             f"missed File rows={coverage_summary['missed_source_file_count']}; "
             f"generation={coverage_summary['index_generation_timestamp_value']}",
             "S2.complete-stable-pagination",
+            command_metadata=s2_command_metadata,
         )
         append_persistent_report_entry(
             run_state,
@@ -1860,18 +1922,46 @@ def execute_repository_sop_stages(
         production_summary_path.write_text(json.dumps(measurement_summary, indent=2) + "\n")
         run_state["manifest"]["repositories"][repository_name]["s3_measurements"] = measurement_summary
         repository_components = run_state["manifest"]["repositories"][repository_name]["s3_components"]
-        repository_components["mapping"] = (
-            "PASS" if measurement_summary.get("production_mapper_exit_code") == 0 else "FAIL"
-        )
-        repository_components["measurement"] = (
-            "PASS" if measurement_summary.get("production_memory_sample_count", 0) > 0
-            and isinstance(measurement_summary.get("production_peak_rss_bytes"), int)
-            and isinstance(measurement_summary.get("production_total_elapsed_seconds"), (int, float))
-            else "BLOCKED"
-        )
-        if (measurement_summary.get("production_process_audit_exit") != 0
-                or measurement_summary.get("production_target_audit_exit") != 0):
+        mapper_status = measurement_summary.get("production_mapper_status")
+        mapper_exit = measurement_summary.get("production_mapper_exit_code")
+        if mapper_status in {"PASS", "FAIL", "BLOCKED", "NOT STARTED"}:
+            repository_components["mapping"] = mapper_status
+        elif mapper_exit is None:
+            repository_components["mapping"] = "NOT STARTED"
+        else:
+            repository_components["mapping"] = "PASS" if mapper_exit == 0 else "FAIL"
+        measurement_status = measurement_summary.get("production_measurement_status")
+        if measurement_status in {"PASS", "FAIL", "BLOCKED", "NOT STARTED"}:
+            repository_components["measurement"] = measurement_status
+        elif mapper_exit is None:
+            repository_components["measurement"] = "NOT STARTED"
+        elif (measurement_summary.get("production_memory_sample_count", 0) > 0
+              and isinstance(measurement_summary.get("production_peak_rss_bytes"), int)
+              and isinstance(measurement_summary.get("production_total_elapsed_seconds"), (int, float))):
+            repository_components["measurement"] = "PASS"
+        else:
+            repository_components["measurement"] = "BLOCKED"
+        process_audit_status = measurement_summary.get("production_process_audit_status")
+        target_audit_status = measurement_summary.get("production_target_audit_status")
+        process_audit_exit = measurement_summary.get("production_process_audit_exit")
+        target_audit_exit = measurement_summary.get("production_target_audit_exit")
+        if process_audit_status in {"FAIL", "BLOCKED"}:
+            repository_components["process_access_audit"] = process_audit_status
+        elif target_audit_status in {"FAIL", "BLOCKED"}:
+            repository_components["process_access_audit"] = target_audit_status
+        elif (process_audit_status == "NOT STARTED" or target_audit_status == "NOT STARTED"
+              or process_audit_status is None and process_audit_exit is None
+              or target_audit_status is None and target_audit_exit is None):
+            repository_components["process_access_audit"] = "NOT STARTED"
+        elif process_audit_exit is not None and process_audit_exit != 0 or (
+            target_audit_exit is not None and target_audit_exit != 0
+        ):
             repository_components["process_access_audit"] = "FAIL"
+        elif (process_audit_status == "PASS" and target_audit_status == "PASS"
+              and process_audit_exit == 0 and target_audit_exit == 0):
+            repository_components["process_access_audit"] = "PASS"
+        elif process_audit_exit is None or target_audit_exit is None:
+            repository_components["process_access_audit"] = "BLOCKED"
         elif (not measurement_summary.get("production_trace_nonempty")
                 or not measurement_summary.get("production_process_trace_complete")
                 or not measurement_summary.get("production_target_trace_nonempty")
@@ -1883,7 +1973,12 @@ def execute_repository_sop_stages(
         else:
             repository_components["process_access_audit"] = "PASS"
         marker_result = measurement_summary.get("publication_stage_marker_result")
-        if measurement_summary.get("production_status_exit_code") != 0:
+        publication_status = measurement_summary.get("production_publication_status")
+        if publication_status in {"PASS", "BLOCKED", "FAIL", "NOT STARTED"}:
+            repository_components["publication"] = publication_status
+        elif measurement_summary.get("production_status_exit_code") is None:
+            repository_components["publication"] = "NOT STARTED"
+        elif measurement_summary.get("production_status_exit_code") != 0:
             repository_components["publication"] = "FAIL"
         elif isinstance(marker_result, Mapping) and marker_result.get("pass") is True:
             repository_components["publication"] = "PASS"
@@ -1908,35 +2003,42 @@ def execute_repository_sop_stages(
     except RunnerFrozenInputMutationError as error:
         run_state["manifest"]["input_integrity_status"] = "FAIL"
         run_state["manifest"]["input_integrity_reason"] = str(error)
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "FAIL", current_commands, str(error),
-            f"{current_step}.frozen-input-mutation",
+            run_state, repository_name, current_step, "FAIL", transition_commands, str(error),
+            f"{current_step}.frozen-input-mutation", command_metadata=transition_metadata,
         )
         return "FAIL"
     except RunnerContractViolationError as error:
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "FAIL", current_commands, str(error),
-            f"{current_step}.observed-contract-violation",
+            run_state, repository_name, current_step, "FAIL", transition_commands, str(error),
+            f"{current_step}.observed-contract-violation", command_metadata=transition_metadata,
         )
         return "FAIL"
     except (RunnerPreconditionBlockedError, coverage_inventory.CoverageInventoryBlockedError) as error:
         if current_step == "S1" and run_state["manifest"]["repositories"][repository_name]["steps"]["S1"] == "PASS":
             current_step = "S2"
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "BLOCKED", current_commands, str(error),
-            f"{current_step}.missing-or-incomplete-evidence",
+            run_state, repository_name, current_step, "BLOCKED", transition_commands, str(error),
+            f"{current_step}.missing-or-incomplete-evidence", command_metadata=transition_metadata,
         )
         return "BLOCKED"
     except KeyboardInterrupt:
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "BLOCKED", current_commands,
+            run_state, repository_name, current_step, "BLOCKED", transition_commands,
             "execution interrupted before the current stage completed", f"{current_step}.interrupted",
+            command_metadata=transition_metadata,
         )
         raise
     except Exception as error:
+        transition_commands, transition_metadata = transition_command_evidence()
         record_persistent_run_transition(
-            run_state, repository_name, current_step, "BLOCKED", current_commands,
+            run_state, repository_name, current_step, "BLOCKED", transition_commands,
             f"unexpected {type(error).__name__}: {error}", f"{current_step}.runner-exception",
+            command_metadata=transition_metadata,
         )
         return "BLOCKED"
 
