@@ -100,6 +100,10 @@ mod frozen_generation_appender_copy;
 mod namespace_binding_round_strata;
 pub use namespace_binding_round_strata::recompute_binding_round;
 
+#[path = "namespace-import-endpoint-rounds.rs"]
+mod namespace_import_endpoint_rounds;
+pub use namespace_import_endpoint_rounds::resolve_import_endpoint_rounds;
+
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
 pub fn resolve_crate_name_bindings(
