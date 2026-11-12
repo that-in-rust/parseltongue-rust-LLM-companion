@@ -204,6 +204,11 @@ fn frozen_namespace_sql_resolution_contract() {
     .unwrap();
     assert!(
         store
+            .link_frozen_namespace_units(&scope(), &RunCancelFlagValue::default())
+            .is_err()
+    );
+    assert!(
+        store
             .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
             .is_err()
     );
@@ -228,6 +233,11 @@ fn frozen_namespace_sql_resolution_contract() {
     assert_eq!(count, 1);
     let cancelled = RunCancelFlagValue::default();
     cancelled.request_stage_work_cancellation();
+    assert!(
+        store
+            .link_frozen_namespace_units(&scope(), &cancelled)
+            .is_err()
+    );
     assert!(
         store
             .resolve_frozen_namespace_rows(&scope(), &cancelled)
@@ -257,6 +267,39 @@ fn frozen_namespace_sql_resolution_contract() {
             .fixed_point_round_count,
         1
     );
+    let invalid = StageRunScopeValue {
+        run_generation_digest_value: "invalid-extern".into(),
+        ..scope()
+    };
+    let mut source = namespace_source_fixture();
+    source.published = Some(invalid.clone());
+    let scope_row: serde_json::Value = serde_json::from_str(
+        &source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text,
+    )
+    .unwrap();
+    append_namespace_fixture_value(
+        &mut source,
+        "syntax-namespace-input-externs",
+        json!({"extern_declaration_scope_key":scope_row["scope_module_identity_key"]}),
+    );
+    store
+        .copy_published_stage_rows(
+            &source,
+            &invalid,
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&invalid, &RunCancelFlagValue::default())
+        .unwrap();
+    assert!(
+        store
+            .link_frozen_namespace_units(&invalid, &RunCancelFlagValue::default())
+            .is_err()
+    );
+    let count:usize=store._connection.lock().unwrap().query_row("SELECT count(*) FROM \"namespace-unit-link-records\" WHERE generation_key='invalid-extern'",[],|row|row.get(0)).unwrap();
+    assert_eq!(count, 0);
 }
 
 #[test]

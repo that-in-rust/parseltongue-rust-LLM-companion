@@ -2106,6 +2106,26 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   inspect graph-derived extern/prelude links, then the separate analysis-input
   pointer and macro session. No full M2 or S5 measurements are claimed.
 
+### Frozen dependency aliases — GREEN
+
+- STUB `b94acea2b`; edition/implicit-prelude/extern-alias contract RED
+  `fd8557740`. Compilation heads and Cargo dependency/extern facts are now
+  normalized without JSON SQL. Package+compilation-role joins preserve distinct
+  units. Automatic externs are separate from explicit `extern crate` bindings;
+  `no_implicit_prelude` suppresses automatic names but not explicit aliases.
+  Sysroot defaults exclude alloc, exclude std under no_std and exclude all
+  automatic system names under no_core. Missing dependency targets remain
+  nullable joined facts rather than being guessed or silently discarded.
+- Frozen resolution invokes the idempotent link projection automatically.
+  Cancellation, missing normalized input and malformed extern metadata fail
+  without committed link rows. An eight-case fixture exercises 2015/2018,
+  explicit aliases and enabled/disabled implicit lookup.
+- `test result: ok. 44 passed; 0 failed; ... finished in 41.86s`.
+  All-target adapter Clippy finished in 0.42s. Logs:
+  `/home/ubuntu/namespace-unit-links-{final,clippy}.log`.
+- Standard type/macro prelude projection is next; CLI remains unwired and no
+  new M2/S5 measurements exist.
+
 ### Ordered textual macro source facts — continuation
 
 - `c4c050115` STUB / `324b4cfbb` RED / `01aa33d14` GREEN implement

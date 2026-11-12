@@ -26,6 +26,7 @@ impl DuckdbAnalysisStoreAdapter {
                 "normalized namespace source is incomplete",
             ));
         }
+        super::namespace_unit_link_inputs::link_namespace_unit_rows(&connection, scope, cancel)?;
         resolve_namespace_sql_rounds(&connection, scope, cancel).map_err(build_analysis_error)
     }
 }
