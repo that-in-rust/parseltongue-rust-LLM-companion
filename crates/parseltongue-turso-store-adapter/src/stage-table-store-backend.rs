@@ -132,14 +132,22 @@ fn build_crate_visibility_clause(table: &str, revision: Option<i64>) -> String {
         WHERE frozen_completion.generation_key=completed.run_generation_digest_value AND frozen_completion.source_attempt_key=completed.stage_attempt_sequence_value
             AND frozen_completion.stage_marker_key=completed.stage_row_record_key AND frozen_completion.publication_revision<={revision})")).unwrap_or_default();
     let snapshot_visibility = build_snapshot_unit_visibility(table, revision);
+    let unit = format!(
+        "substr(\"{table}\".stage_unit_work_key,1,instr(\"{table}\".stage_unit_work_key,'/pending/')-1)"
+    );
+    let completion = if owner == "name-resolution" {
+        format!("completed.stage_row_record_key='__marker__/name-resolution/' || {unit}")
+    } else {
+        format!(
+            "completed.stage_row_record_key IN ('__marker__/{owner}/' || {unit},'__marker__/name-resolution/' || {unit})"
+        )
+    };
     format!(
         r#"("{table}".stage_unit_work_key NOT LIKE 'crate/%/pending/%' OR EXISTS (
         SELECT 1 FROM "stage-run-generation-records" AS completed
         WHERE completed.run_generation_digest_value="{table}".run_generation_digest_value
         AND completed.stage_attempt_sequence_value="{table}".stage_attempt_sequence_value
-        AND completed.stage_row_record_key IN ('__marker__/{owner}/' ||
-            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1),'__marker__/name-resolution/' ||
-            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1)) {frozen_completion})) AND {snapshot_visibility}"#
+        AND {completion} {frozen_completion})) AND {snapshot_visibility}"#
     )
 }
 
