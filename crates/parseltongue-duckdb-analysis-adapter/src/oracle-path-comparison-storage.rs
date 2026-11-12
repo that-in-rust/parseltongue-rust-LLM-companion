@@ -3,13 +3,14 @@ use super::oracle_path_comparison_core::{
     CanonicalPathSiteValue, canonicalize_site_evidence_rows, read_required_text_value,
     validate_compilation_unit_rows,
 };
-use duckdb::{Connection, params};
+use duckdb::{Config, Connection, params};
 use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
+use tempfile::TempDir;
 
 const SOURCE_GRAPH_STAGE_NAME: &str = "crate-dependency-graph-table";
 const SOURCE_PATH_STAGE_NAME: &str = "path-resolution-site-records";
@@ -63,9 +64,11 @@ pub(super) fn compare_oracle_path_sites_with_threads(
     let primary_oracle_site_rows = canonicalize_site_evidence_rows(&primary_rows, &units, true)?;
     let secondary_oracle_site_rows =
         canonicalize_site_evidence_rows(&secondary_rows, &units, true)?;
-    let connection = build_isolated_comparison_connection(threads)?;
-    let source_digest =
-        verify_duckdb_source_copy(&connection, &source_scope, &graph_rows, &path_rows, cancel)?;
+    let context = build_isolated_comparison_context(threads)?;
+    let connection = &context.connection;
+    let source_copy_evidence =
+        verify_duckdb_source_copy(connection, &source_scope, &graph_rows, &path_rows, cancel)?;
+    let source_digest = source_copy_evidence.aggregate_source_digest.clone();
     load_canonical_comparison_rows(
         &connection,
         &source_scope,
@@ -85,6 +88,26 @@ pub(super) fn compare_oracle_path_sites_with_threads(
         &primary_digest,
         &secondary_digest,
     )?;
+    result["agreement_source_copy_table_evidence"] = json!(source_copy_evidence
+        .table_evidence
+        .iter()
+        .map(|table| json!({
+            "table_name_value":table.table_name_value,
+            "source_scope_generation_value":table.source_scope_generation_value,
+            "source_scope_attempt_sequence_value":table.source_scope_attempt_sequence_value,
+            "observed_source_scope_generation_value":table.observed_source_scope_generation_value,
+            "observed_source_scope_attempt_sequence_value":table.observed_source_scope_attempt_sequence_value,
+            "expected_row_count":table.expected_row_count,
+            "observed_row_count":table.observed_row_count,
+            "expected_framed_digest_full":table.expected_framed_digest_full,
+            "observed_framed_digest_full":table.observed_framed_digest_full,
+        }))
+        .collect::<Vec<_>>());
+    result["agreement_operational_identity"] = json!({
+        "duckdb_settings": context.runtime_settings,
+        "duckdb_memory_before_analysis": context.memory_before_analysis,
+        "duckdb_memory_after_analysis": read_duckdb_memory_records(connection)?,
+    });
     if primary_envelope["oracle_configuration_kind_value"] != "PRIMARY"
         || secondary_envelope["oracle_configuration_kind_value"] != "SECONDARY"
     {
@@ -307,13 +330,30 @@ fn digest_persisted_source_rows(
     hasher.finalize().to_hex().to_string()
 }
 
+struct SourceCopyTableEvidenceValue {
+    table_name_value: String,
+    source_scope_generation_value: String,
+    source_scope_attempt_sequence_value: String,
+    observed_source_scope_generation_value: Option<String>,
+    observed_source_scope_attempt_sequence_value: Option<String>,
+    expected_row_count: usize,
+    observed_row_count: usize,
+    expected_framed_digest_full: String,
+    observed_framed_digest_full: String,
+}
+
+struct SourceCopyVerificationValue {
+    aggregate_source_digest: String,
+    table_evidence: Vec<SourceCopyTableEvidenceValue>,
+}
+
 fn verify_duckdb_source_copy(
     connection: &Connection,
     source_scope: &StageRunScopeValue,
     graph_rows: &[StageTableRowRecord],
     path_rows: &[StageTableRowRecord],
     cancel: &RunCancelFlagValue,
-) -> Result<String, OracleComparisonFailureError> {
+) -> Result<SourceCopyVerificationValue, OracleComparisonFailureError> {
     connection
         .execute_batch(
             "CREATE TEMP TABLE oracle_source_copy_rows (source_scope_generation_value VARCHAR, source_scope_attempt_value VARCHAR, table_name VARCHAR, row_key VARCHAR, payload VARCHAR)",
@@ -366,6 +406,7 @@ fn verify_duckdb_source_copy(
     if total_count != expected.len() || scoped_count != expected.len() {
         return Err(OracleComparisonFailureError::SourceCopyCountMismatch);
     }
+    let mut table_evidence = Vec::new();
     expected_by_table.iter().try_for_each(|(table, expected_rows)| {
         let table_count: usize = connection
             .query_row(
@@ -395,19 +436,36 @@ fn verify_duckdb_source_copy(
             ])
             .map_err(OracleComparisonFailureError::Duckdb)?;
         let mut copied_count = 0usize;
+        let mut observed_generation = None;
+        let mut observed_attempt = None;
         while let Some(row) = rows.next().map_err(OracleComparisonFailureError::Duckdb)? {
             for index in 0..5 {
                 let value: String = row.get(index).map_err(OracleComparisonFailureError::Duckdb)?;
+                if index == 0 {
+                    observed_generation = Some(value.clone());
+                } else if index == 1 {
+                    observed_attempt = Some(value.clone());
+                }
                 hash_framed_source_value(&mut hasher, &value);
             }
             copied_count += 1;
         }
         let copied_digest = hasher.finalize().to_hex().to_string();
-        if copied_count != expected_rows.len()
-            || copied_digest != digest_persisted_source_rows(source_scope, expected_rows)
-        {
+        let expected_table_digest = digest_persisted_source_rows(source_scope, expected_rows);
+        if copied_count != expected_rows.len() || copied_digest != expected_table_digest {
             return Err(OracleComparisonFailureError::SourceCopyDigestMismatch);
         }
+        table_evidence.push(SourceCopyTableEvidenceValue {
+            table_name_value: table.clone(),
+            source_scope_generation_value: source_scope.run_generation_digest_value.clone(),
+            source_scope_attempt_sequence_value: source_scope.stage_attempt_sequence_value.clone(),
+            observed_source_scope_generation_value: observed_generation,
+            observed_source_scope_attempt_sequence_value: observed_attempt,
+            expected_row_count: expected_rows.len(),
+            observed_row_count: copied_count,
+            expected_framed_digest_full: expected_table_digest,
+            observed_framed_digest_full: copied_digest,
+        });
         Ok(())
     })?;
     let mut hasher = blake3::Hasher::new();
@@ -429,26 +487,150 @@ fn verify_duckdb_source_copy(
     if copied_digest != expected_digest {
         return Err(OracleComparisonFailureError::SourceCopyDigestMismatch);
     }
-    Ok(expected_digest)
+    Ok(SourceCopyVerificationValue {
+        aggregate_source_digest: copied_digest,
+        table_evidence,
+    })
 }
 
-fn build_isolated_comparison_connection(
+struct OraclePathComparisonContextValue {
+    connection: Connection,
+    _spill_directory: TempDir,
+    runtime_settings: Value,
+    memory_before_analysis: Vec<Value>,
+}
+
+fn build_isolated_comparison_context(
     threads: usize,
-) -> Result<Connection, OracleComparisonFailureError> {
+) -> Result<OraclePathComparisonContextValue, OracleComparisonFailureError> {
     if !matches!(threads, 1 | 2) {
         return Err(OracleComparisonFailureError::UnsupportedThreadCount { threads });
     }
-    let config = duckdb::Config::default()
-        .enable_external_access(false)
+    let spill_directory = tempfile::Builder::new()
+        .prefix("parseltongue-oracle-path-comparison-")
+        .tempdir()
+        .map_err(OracleComparisonFailureError::TempDirectory)?;
+    let spill_path = spill_directory.path().to_string_lossy().into_owned();
+    let config = Config::default()
+        .with("temp_directory", spill_path.clone())
+        .and_then(|config| config.enable_external_access(false))
         .and_then(|config| config.with("autoinstall_known_extensions", "false"))
         .and_then(|config| config.with("autoload_known_extensions", "false"))
+        .and_then(|config| config.with("allow_community_extensions", "false"))
         .map_err(OracleComparisonFailureError::Duckdb)?;
     let connection = Connection::open_in_memory_with_flags(config)
         .map_err(OracleComparisonFailureError::Duckdb)?;
     connection
         .execute_batch(&format!("SET threads = {threads};"))
         .map_err(OracleComparisonFailureError::Duckdb)?;
-    Ok(connection)
+    let settings = read_duckdb_setting_values(&connection)?;
+    for (name, expected) in [
+        ("temp_directory", spill_path.as_str()),
+        ("enable_external_access", "false"),
+        ("autoload_known_extensions", "false"),
+        ("autoinstall_known_extensions", "false"),
+        ("allow_community_extensions", "false"),
+        ("threads", if threads == 1 { "1" } else { "2" }),
+    ] {
+        let observed = settings.get(name).map(String::as_str).unwrap_or("missing");
+        if observed != expected {
+            return Err(OracleComparisonFailureError::DuckdbSettingMismatch {
+                setting: name.into(),
+                expected: expected.into(),
+                observed: observed.into(),
+            });
+        }
+    }
+    let runtime_settings = Value::Object(
+        settings
+            .into_iter()
+            .filter(|(name, _)| {
+                matches!(
+                    name.as_str(),
+                    "memory_limit"
+                        | "temp_directory"
+                        | "enable_external_access"
+                        | "autoload_known_extensions"
+                        | "autoinstall_known_extensions"
+                        | "allow_community_extensions"
+                        | "threads"
+                )
+            })
+            .map(|(name, value)| {
+                let value = match name.as_str() {
+                    "enable_external_access"
+                    | "autoload_known_extensions"
+                    | "autoinstall_known_extensions"
+                    | "allow_community_extensions" => json!(value == "true"),
+                    "threads" => json!(threads),
+                    _ => json!(value),
+                };
+                (name, value)
+            })
+            .collect(),
+    );
+    let memory_before_analysis = read_duckdb_memory_records(&connection)?;
+    Ok(OraclePathComparisonContextValue {
+        connection,
+        _spill_directory: spill_directory,
+        runtime_settings,
+        memory_before_analysis,
+    })
+}
+
+fn read_duckdb_setting_values(
+    connection: &Connection,
+) -> Result<BTreeMap<String, String>, OracleComparisonFailureError> {
+    let values = connection
+        .query_row(
+            "SELECT current_setting('memory_limit')::VARCHAR, current_setting('temp_directory')::VARCHAR, current_setting('enable_external_access')::VARCHAR, current_setting('autoload_known_extensions')::VARCHAR, current_setting('autoinstall_known_extensions')::VARCHAR, current_setting('allow_community_extensions')::VARCHAR, current_setting('threads')::VARCHAR",
+            [],
+            |row| {
+                Ok([
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                ])
+            },
+        )
+        .map_err(OracleComparisonFailureError::Duckdb)?;
+    Ok([
+        "memory_limit",
+        "temp_directory",
+        "enable_external_access",
+        "autoload_known_extensions",
+        "autoinstall_known_extensions",
+        "allow_community_extensions",
+        "threads",
+    ]
+    .into_iter()
+    .zip(values)
+    .map(|(name, value)| (name.into(), value))
+    .collect())
+}
+
+fn read_duckdb_memory_records(
+    connection: &Connection,
+) -> Result<Vec<Value>, OracleComparisonFailureError> {
+    let mut statement = connection
+        .prepare("SELECT tag, memory_usage_bytes, temporary_storage_bytes FROM duckdb_memory() ORDER BY tag")
+        .map_err(OracleComparisonFailureError::Duckdb)?;
+    let mut rows = statement
+        .query([])
+        .map_err(OracleComparisonFailureError::Duckdb)?;
+    let mut records = Vec::new();
+    while let Some(row) = rows.next().map_err(OracleComparisonFailureError::Duckdb)? {
+        records.push(json!({
+            "tag": row.get::<_, String>(0).map_err(OracleComparisonFailureError::Duckdb)?,
+            "memory_usage_bytes": row.get::<_, u64>(1).map_err(OracleComparisonFailureError::Duckdb)?,
+            "temporary_storage_bytes": row.get::<_, u64>(2).map_err(OracleComparisonFailureError::Duckdb)?,
+        }));
+    }
+    Ok(records)
 }
 
 fn append_canonical_site_rows(
@@ -900,9 +1082,15 @@ fn publish_completed_agreement_generation(
     let scope =
         agreement.prepare_workspace_generation_scope(&requested_scope, &generation, cancel)?;
     result["agreement_generation_digest_value"] = json!(generation);
-    result["agreement_operational_identity"] = json!({
-        "agreement_stage_attempt_sequence_value":scope.stage_attempt_sequence_value,
-    });
+    let mut operational_identity = result["agreement_operational_identity"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    operational_identity.insert(
+        "agreement_stage_attempt_sequence_value".into(),
+        json!(scope.stage_attempt_sequence_value),
+    );
+    result["agreement_operational_identity"] = Value::Object(operational_identity);
     for row in evidence.iter_mut() {
         row["agreement_source_generation_digest_value"] =
             json!(source_scope.run_generation_digest_value);
@@ -996,6 +1184,8 @@ mod oracle_path_comparison_sql_tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
+    use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
+    use std::path::PathBuf;
 
     fn build_test_site_value(
         key: &str,
@@ -1028,18 +1218,317 @@ mod oracle_path_comparison_sql_tests {
             run_generation_digest_value: "generation".into(),
             stage_attempt_sequence_value: "attempt".into(),
         };
-        let connection = build_isolated_comparison_connection(threads).unwrap();
-        load_canonical_comparison_rows(&connection, &source_scope, production, primary, secondary)
+        let context = build_isolated_comparison_context(threads).unwrap();
+        let connection = &context.connection;
+        load_canonical_comparison_rows(connection, &source_scope, production, primary, secondary)
             .unwrap();
-        score_canonical_comparison_rows(&connection).unwrap();
+        score_canonical_comparison_rows(connection).unwrap();
         read_canonical_comparison_results(
-            &connection,
+            connection,
             &source_scope,
             "source-digest",
             "primary-digest",
             "secondary-digest",
         )
         .unwrap()
+    }
+
+    struct PublishedComparisonFixtureValue {
+        _directory: TempDir,
+        source: TursoWorkspaceStoreAdapter,
+        agreement: TursoWorkspaceStoreAdapter,
+        primary_path: PathBuf,
+        secondary_path: PathBuf,
+    }
+
+    fn write_comparison_fixture_stage(
+        store: &dyn StageTableStorePort,
+        scope: &StageRunScopeValue,
+        owner: &str,
+        work_key: &str,
+        inputs: &[&str],
+        rows: &[StageTableRowRecord],
+        cancel: &RunCancelFlagValue,
+    ) {
+        store
+            .write_stage_table_unit(
+                &StageUnitWriteRequest {
+                    stage_run_scope_value: scope,
+                    stage_owner_name_value: owner,
+                    stage_unit_work_key: work_key,
+                    stage_input_stage_names: inputs,
+                    stage_unit_output_rows: rows,
+                },
+                cancel,
+            )
+            .unwrap();
+    }
+
+    fn build_published_comparison_fixture() -> PublishedComparisonFixtureValue {
+        let directory = tempfile::tempdir().unwrap();
+        let package_root = directory.path().to_string_lossy().into_owned();
+        let source_root = directory
+            .path()
+            .join("src/lib.rs")
+            .to_string_lossy()
+            .into_owned();
+        fs::create_dir(directory.path().join("src")).unwrap();
+        fs::write(&source_root, "pub struct Leaf;").unwrap();
+        let package_identifier = format!("path+file://{package_root}#comparison@0.1.0");
+        let configuration = json!([[], [], "2024", "target"]);
+        let configuration_digest = blake3::hash(configuration.to_string().as_bytes())
+            .to_hex()
+            .to_string();
+        let semantic_identity = json!({
+            "unit_cargo_package_identifier":package_identifier,
+            "unit_cargo_target_name":"comparison",
+            "unit_cargo_target_kind":"lib",
+            "unit_compilation_role_kind":"target",
+            "unit_configuration_digest_full":configuration_digest,
+        });
+        let mut unit = json!({
+            "unit_cargo_package_identifier":package_identifier,
+            "unit_cargo_package_source":null,
+            "unit_cargo_target_name":"comparison",
+            "unit_cargo_target_kind":"lib",
+            "unit_compilation_role_kind":"target",
+            "unit_mapped_target_flag":true,
+            "unit_source_root_path":source_root,
+            "unit_package_root_path":package_root,
+            "unit_rust_edition_value":"2024",
+            "unit_enabled_feature_values":[],
+            "unit_target_cfg_values":[],
+            "unit_normal_dependency_rows":[],
+            "unit_build_script_present":false,
+        });
+        let unit_key = blake3::hash(unit.to_string().as_bytes())
+            .to_hex()
+            .to_string();
+        unit["unit_compilation_identity_key"] = json!(unit_key);
+        let compilation_record = json!({
+            "unit_compilation_identity_key":unit_key,
+            "unit_source_root_path":source_root,
+            "unit_package_root_path":package_root,
+            "unit_cargo_package_identifier":package_identifier,
+            "unit_cargo_target_name":"comparison",
+            "unit_cargo_target_kind":"lib",
+            "unit_compilation_role_kind":"target",
+            "unit_rust_edition_value":"2024",
+            "unit_target_cfg_values":[],
+            "unit_enabled_feature_values":[],
+            "unit_semantic_identity_record":semantic_identity,
+        });
+        let target = json!({
+            "target_compilation_scope_record":compilation_record,
+            "target_source_file_path":source_root,
+            "target_source_range_start":11,
+            "target_source_range_end":15,
+            "target_symbol_kind_value":"Struct",
+            "target_qualified_item_path":"comparison::Leaf",
+            "target_namespace_kind_values":["type"],
+        });
+        let site = json!({
+            "site_compilation_scope_record":compilation_record,
+            "site_source_absolute_path":source_root,
+            "site_source_range_start":34,
+            "site_source_range_end":38,
+            "site_path_context_kind":"signature",
+            "site_expansion_provenance_chain":[],
+            "path_site_source_text":"Leaf",
+            "path_resolution_state_kind":"resolved",
+            "path_target_symbol_rows":[target],
+            "path_unresolved_reason_kind":null,
+        });
+        let mut oracle_site = site.clone();
+        oracle_site["path_lookup_scope_kind"] = json!("module-scope");
+        oracle_site["site_proc_macro_dependent_flag"] = json!(false);
+        let source = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+        source.initialize_workspace_stage_schema().unwrap();
+        let agreement = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+        agreement.initialize_workspace_stage_schema().unwrap();
+        let cancel = RunCancelFlagValue::default();
+        let scope = StageRunScopeValue {
+            run_generation_digest_value: "published-comparison-generation".into(),
+            stage_attempt_sequence_value: "published-comparison-attempt".into(),
+        };
+        write_comparison_fixture_stage(
+            &source,
+            &scope,
+            "crate-graph",
+            "workspace",
+            &[],
+            &[StageTableRowRecord {
+                stage_owned_table_name: SOURCE_GRAPH_STAGE_NAME.into(),
+                stage_row_record_key: unit_key,
+                stage_row_payload_text: unit.to_string(),
+            }],
+            &cancel,
+        );
+        for (owner, inputs) in [
+            ("crate-graph", &[][..]),
+            ("source-ingest", &["crate-graph"][..]),
+            ("syntax-spans", &["source-ingest"][..]),
+        ] {
+            write_comparison_fixture_stage(
+                &source,
+                &scope,
+                owner,
+                "__complete__",
+                inputs,
+                &[],
+                &cancel,
+            );
+        }
+        write_comparison_fixture_stage(
+            &source,
+            &scope,
+            "name-resolution",
+            "crate/fixture",
+            &["crate-graph", "source-ingest", "syntax-spans"],
+            &[StageTableRowRecord {
+                stage_owned_table_name: SOURCE_PATH_STAGE_NAME.into(),
+                stage_row_record_key: "fixture-site".into(),
+                stage_row_payload_text: site.to_string(),
+            }],
+            &cancel,
+        );
+        let scope = source
+            .publish_workspace_generation_manifest(
+                &scope,
+                "published-comparison-generation",
+                &cancel,
+            )
+            .unwrap();
+        let envelope = |configuration: &str, build_scripts: bool| {
+            json!({
+                "oracle_configuration_kind_value":configuration,
+                "oracle_build_scripts_flag":build_scripts,
+                "oracle_proc_macros_flag":true,
+                "oracle_manifest_scope_record":{
+                    "run_generation_digest_value":scope.run_generation_digest_value,
+                    "stage_attempt_sequence_value":scope.stage_attempt_sequence_value,
+                },
+                "oracle_mapped_unit_count":1,
+                "oracle_path_export_rows":[oracle_site],
+                "oracle_proc_macro_rows":[],
+                "oracle_source_omission_rows":[],
+                "oracle_cached_script_rows":[],
+                "oracle_build_script_deltas":[],
+            })
+        };
+        let primary_path = directory.path().join("primary.json");
+        let secondary_path = directory.path().join("secondary.json");
+        fs::write(&primary_path, envelope("PRIMARY", false).to_string()).unwrap();
+        fs::write(&secondary_path, envelope("SECONDARY", true).to_string()).unwrap();
+        PublishedComparisonFixtureValue {
+            _directory: directory,
+            source,
+            agreement,
+            primary_path,
+            secondary_path,
+        }
+    }
+
+    fn read_published_semantic_export_bytes(
+        store: &dyn StageTableStorePort,
+        result: &Value,
+    ) -> String {
+        let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+        let rows = store
+            .read_stage_table_rows(&scope, AGREEMENT_STAGE_TABLE_NAME)
+            .unwrap();
+        let mut evidence = rows
+            .iter()
+            .filter(|row| row.stage_row_record_key != "summary")
+            .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+            .collect::<Vec<_>>();
+        evidence.sort_by_key(|row| row["agreement_site_key"].to_string());
+        let summary = rows
+            .iter()
+            .find(|row| row.stage_row_record_key == "summary")
+            .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+            .unwrap();
+        assert_eq!(
+            summary["agreement_operational_identity"],
+            result["agreement_operational_identity"]
+        );
+        let mut semantic_result = summary;
+        semantic_result
+            .as_object_mut()
+            .unwrap()
+            .remove("agreement_operational_identity");
+        semantic_result
+            .as_object_mut()
+            .unwrap()
+            .remove("agreement_semantic_export_digest_full");
+        let semantic_export = json!({
+            "agreement_evidence_rows":evidence,
+            "agreement_result":semantic_result,
+        });
+        let semantic_bytes = semantic_export.to_string();
+        assert_eq!(
+            blake3::hash(semantic_bytes.as_bytes()).to_hex().to_string(),
+            result["agreement_semantic_export_digest_full"]
+        );
+        semantic_bytes
+    }
+
+    /// REQ-RUST-026.4, REQ-RUST-026.5
+    #[test]
+    fn test_published_comparisons_threads_are_deterministic() {
+        let fixture = build_published_comparison_fixture();
+        let cancel = RunCancelFlagValue::default();
+        let first_result = compare_oracle_path_sites_with_threads(
+            &fixture.source,
+            &fixture.primary_path,
+            &fixture.secondary_path,
+            &fixture.agreement,
+            &cancel,
+            1,
+        )
+        .unwrap();
+        let first_settings = &first_result["agreement_operational_identity"]["duckdb_settings"];
+        assert_eq!(first_settings["threads"], 1);
+        assert!(
+            first_result["agreement_operational_identity"]["duckdb_memory_before_analysis"]
+                .is_array()
+        );
+        assert!(
+            first_result["agreement_operational_identity"]["duckdb_memory_after_analysis"]
+                .is_array()
+        );
+        let first_path = first_settings["temp_directory"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let first_export = read_published_semantic_export_bytes(&fixture.agreement, &first_result);
+        assert!(!Path::new(&first_path).exists());
+
+        let second_result = compare_oracle_path_sites_with_threads(
+            &fixture.source,
+            &fixture.primary_path,
+            &fixture.secondary_path,
+            &fixture.agreement,
+            &cancel,
+            2,
+        )
+        .unwrap();
+        let second_settings = &second_result["agreement_operational_identity"]["duckdb_settings"];
+        let second_path = second_settings["temp_directory"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(second_settings["threads"], 2);
+        assert_ne!(first_path, second_path);
+        assert!(!Path::new(&second_path).exists());
+        assert_eq!(
+            first_result["agreement_semantic_export_digest_full"],
+            second_result["agreement_semantic_export_digest_full"]
+        );
+        assert_eq!(
+            first_export,
+            read_published_semantic_export_bytes(&fixture.agreement, &second_result)
+        );
     }
 
     /// REQ-RUST-026.2
@@ -1278,6 +1767,83 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(result["agreement_status_kind"], "not-applicable");
     }
 
+    /// REQ-RUST-026.4
+    #[test]
+    fn test_comparison_connection_settings_are_verified() {
+        let first_context = build_isolated_comparison_context(1).unwrap();
+        let second_context = build_isolated_comparison_context(2).unwrap();
+        let first = &first_context.connection;
+        let second = &second_context.connection;
+        let read_setting = |connection: &Connection, name: &str| {
+            read_duckdb_setting_values(connection).unwrap()[name].clone()
+        };
+        let first_spill_path = read_setting(&first, "temp_directory");
+        let second_spill_path = read_setting(&second, "temp_directory");
+        assert_ne!(first_spill_path, second_spill_path);
+        assert!(Path::new(&first_spill_path).exists());
+        for connection in [&first, &second] {
+            for setting in [
+                "enable_external_access",
+                "autoload_known_extensions",
+                "autoinstall_known_extensions",
+                "allow_community_extensions",
+            ] {
+                assert_eq!(read_setting(connection, setting), "false", "{setting}");
+            }
+        }
+        let default = Connection::open_in_memory().unwrap();
+        assert_eq!(
+            read_setting(&first, "memory_limit"),
+            read_setting(&default, "memory_limit")
+        );
+        assert_eq!(read_setting(&first, "threads"), "1");
+        assert_eq!(read_setting(&second, "threads"), "2");
+    }
+
+    /// REQ-RUST-026.4
+    #[test]
+    fn test_comparison_context_cleanup_after_sql_error() {
+        let spill_path;
+        {
+            let context = build_isolated_comparison_context(1).unwrap();
+            spill_path =
+                Path::new(context.runtime_settings["temp_directory"].as_str().unwrap()).to_owned();
+            assert!(spill_path.exists());
+            assert!(
+                context
+                    .connection
+                    .execute_batch("SELECT * FROM missing_comparison_table")
+                    .is_err()
+            );
+        }
+        assert!(!spill_path.exists());
+    }
+
+    /// REQ-RUST-026.4
+    #[test]
+    fn test_comparison_context_cleanup_after_cancel() {
+        let spill_path;
+        {
+            let context = build_isolated_comparison_context(1).unwrap();
+            spill_path =
+                Path::new(context.runtime_settings["temp_directory"].as_str().unwrap()).to_owned();
+            assert!(
+                context
+                    .connection
+                    .execute_batch("CREATE TABLE comparison_cancel_probe(value INTEGER)")
+                    .is_ok()
+            );
+            let cancel = RunCancelFlagValue::default();
+            cancel.request_stage_work_cancellation();
+            assert!(matches!(
+                check_comparison_cancellation_flag(&cancel),
+                Err(OracleComparisonFailureError::Cancelled)
+            ));
+            assert!(spill_path.exists());
+        }
+        assert!(!spill_path.exists());
+    }
+
     /// REQ-RUST-024.2
     #[test]
     fn test_duckdb_rows_preserve_scope() {
@@ -1297,9 +1863,10 @@ mod oracle_path_comparison_sql_tests {
                 stage_row_payload_text: "{}".into(),
             },
         ];
-        let connection = build_isolated_comparison_connection(1).unwrap();
-        let source_digest = verify_duckdb_source_copy(
-            &connection,
+        let context = build_isolated_comparison_context(1).unwrap();
+        let connection = &context.connection;
+        let source_copy = verify_duckdb_source_copy(
+            connection,
             &source_scope,
             std::slice::from_ref(&source_rows[0]),
             std::slice::from_ref(&source_rows[1]),
@@ -1326,10 +1893,21 @@ mod oracle_path_comparison_sql_tests {
             hash_framed_source_value(&mut expected_hasher, &row.stage_row_record_key);
             hash_framed_source_value(&mut expected_hasher, &row.stage_row_payload_text);
         }
+        let source_digest = source_copy.aggregate_source_digest.clone();
         assert_eq!(
             source_digest,
             expected_hasher.finalize().to_hex().to_string()
         );
+        assert!(source_copy.table_evidence.iter().all(|table| {
+            table.expected_row_count == table.observed_row_count
+                && table.expected_framed_digest_full == table.observed_framed_digest_full
+                && table.observed_source_scope_generation_value.as_deref()
+                    == Some(source_scope.run_generation_digest_value.as_str())
+                && table
+                    .observed_source_scope_attempt_sequence_value
+                    .as_deref()
+                    == Some(source_scope.stage_attempt_sequence_value.as_str())
+        }));
         for other_scope in [
             StageRunScopeValue {
                 run_generation_digest_value: "other-generation".into(),
@@ -1399,7 +1977,8 @@ mod oracle_path_comparison_sql_tests {
             run_generation_digest_value: "generation".into(),
             stage_attempt_sequence_value: "attempt".into(),
         };
-        let connection = build_isolated_comparison_connection(1).unwrap();
+        let context = build_isolated_comparison_context(1).unwrap();
+        let connection = &context.connection;
         let production = [build_test_site_value(
             "site-a",
             "production",
@@ -1414,7 +1993,7 @@ mod oracle_path_comparison_sql_tests {
             false,
             "",
         )];
-        load_canonical_comparison_rows(&connection, &source_scope, &production, &primary, &primary)
+        load_canonical_comparison_rows(connection, &source_scope, &production, &primary, &primary)
             .unwrap();
         connection
             .execute(

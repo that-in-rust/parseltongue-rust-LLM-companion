@@ -397,3 +397,29 @@ Each listed active test doc-tag is located under every matching requirement iden
 - `test_persisted_known_answer_matrix`
 
 This correction changes requirement doc-tags and this journal only; it makes no comparator behavior changes. Structural traceability checks and `git diff --check` are recorded with the follow-up commit; no builds or tests are run for a doc-tag-only change.
+
+### REQ-RUST-026.4 R4 DuckDB lifecycle and telemetry correction
+
+REQ-RUST-026.4 RED
+  - Added `test_comparison_connection_settings_are_verified` and `test_comparison_telemetry_survives_publication` before implementation changes.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter test_comparison_connection_settings_are_verified -- --nocapture`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out`; both connections read the shared `.tmp` path instead of unique spill directories.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests test_comparison_telemetry_survives_publication -- --nocapture`: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out`; returned operational identity lacks `memory_limit` settings/telemetry.
+
+REQ-RUST-026.4 GREEN
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - `cargo test -p parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests -- --nocapture --test-threads=1`: `test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+  - Runtime read-back confirmed `memory_limit`, `temp_directory`, `enable_external_access`, `autoload_known_extensions`, `autoinstall_known_extensions`, `allow_community_extensions`, and `threads`; no memory limit override was added.
+
+### R4 authoritative test mapping update
+
+**REQ-RUST-026.4 — isolated lifecycle, settings, telemetry, and copy evidence**
+- `test_comparison_connection_settings_are_verified`
+- `test_comparison_context_cleanup_after_sql_error`
+- `test_comparison_context_cleanup_after_cancel`
+- `test_comparison_telemetry_survives_publication`
+- `test_write_cancellation_preserves_generation`
+- `test_duckdb_rows_preserve_scope`
+
+**REQ-RUST-026.5 — semantic determinism across supported thread counts**
+- `test_thread_counts_export_identically`
+- `test_published_comparisons_threads_are_deterministic`
