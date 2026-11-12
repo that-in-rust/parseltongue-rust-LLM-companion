@@ -1755,3 +1755,91 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   constant-size crate completion marker, across bindings and span rows.
 - Logs: /home/ubuntu/m2-bounded-namespace-red-tests.log and
   /home/ubuntu/m2-bounded-publication-red-tests.log.
+
+### Bounded namespace GREEN working state (not qualified or committed)
+
+- STUB bf5168136 and RED 9485766dc are pushed.
+- Working implementation shares dependency namespace rows and target
+  metadata through Arc, traverses only the dependency closure, consumes
+  resolver input, spools macro semantic rows immediately, and streams
+  final rows into 8 MiB private Turso chunks. One oversized row is allowed
+  alone. A constant-size crate marker exposes all its chunks together.
+  Reader count/read/visit use the same visibility predicate. Projector
+  state drops after publication; only immutable namespace maps survive.
+- Structural tests: shared 1,000-binding namespace pointer identity and
+  release; owned empty/cancelled inputs; pending binding/span invisibility;
+  bounded 20 MiB output, one oversized record, empty/cancelled/failed output;
+  namespace codec round trip/error.
+- Initial implementation passed 11 resolver tests, 16 stage-store
+  contracts, 2 adapter unit tests (3 ignored profiles), 17 syntax contracts
+  and 3 new syntax unit tests. Clippy all targets passed after test-only
+  unwrap allowances and mechanical test-module relocation.
+- However native CLI sysroot test exceeded the gate: PID 1409785 had
+  VmHWM 3,664,948 KiB and RSS 2,283,592 KiB. SIGTERM requested rather than
+  treating this as qualification. The CLI log ends 20 passed / 1 failed
+  (NameResolutionCancelledError), elapsed 391.86s.
+  /home/ubuntu/m2-bounded-cli-tests.log.
+- Latest additional change shares exact-equal import binding rows across
+  current/Brent-anchor states using Arc and bounded per-iteration borrowed
+  indexes. It preserves exact comparisons, with no hash-collision shortcut
+  and no global interner. Resolver tests again: 11 passed; all-target
+  Clippy passed (0.47s). Logs:
+  /home/ubuntu/m2-bounded-import-final-tests.log and
+  /home/ubuntu/m2-bounded-namespace-clippy.log.
+- A public-only dependency cache filter was considered then removed:
+  dropping private rows could change unresolved candidate diagnostics.
+  All dependency namespace rows are retained in the current source.
+- CLI retry is ACTIVE, shell 90c6dc:
+  /home/ubuntu/m2-bounded-cli-retry-tests.log.
+  Latest observed native mapper PID 1416782, 529,676 KiB RSS at 1:13.
+  This is NOT a peak or passing budget result. This executable was built
+  before removing the experimental public-only cache filter; its own-core
+  behavior is current, but subsequent dependency-cache behavior is not.
+  Rerun the affected CLI test after completion using current source.
+- No GREEN/REFACTOR commit yet. No new serde/full-corpus passing RSS
+  measurements or all-five name-resolution times. Comparator is still its
+  committed STUB, saved GREEN patch remains at
+  /home/ubuntu/m2-paused-comparator-green.patch. S5 is unmeasured.
+- If the newest implementation still exceeds 2 GiB, investigate lifetime
+  of projection_macro_source_rows (original/parse text and token-origin
+  maps), and import derivation's whole next-state temporary. Reachability
+  and retained-byte contribution are not yet profiled for these candidates.
+
+### Second budget failure and context handoff
+
+- Retry PID 1416782 reached VmHWM 2,878,372 KiB, RSS 1,573,004 KiB;
+  therefore it also FAILS the 2 GiB peak gate, despite row sharing.
+  SIGTERM requested. Shell 90c6dc is no longer a qualification run.
+  No passing all-five measurement or name-resolution time is claimed.
+- Next targeted measurement should count pre-normalization derived rows
+  versus normalized rows in normalize_scope_binding_rows. It currently
+  collects the complete iterator before sorting/grouping; derive_import_
+  binding_rows also collects a whole owned Vec. Core's 253,837 settled
+  bindings need not bound either transient size. This path is reached by
+  the observed macro round, but its retained-byte contribution remains
+  unverified. An incremental priority/target-group fold is a candidate;
+  preserve stable visibility-union and evidence semantics if implemented.
+- Current source retains ALL dependency bindings; the experimental
+  public-only cache filter was removed after the running executable was
+  built. Resolver 11 tests and focused all-target Clippy pass; native CLI
+  still has no passing completion. GREEN stays uncommitted.
+- Latest unit output log /home/ubuntu/m2-bounded-buffer-final-tests.log:
+  3 passed (bounded payload, cancellation/failure, codec round trip).
+- No mapper should remain writing the temporary native-test store.
+
+### Heap allocation profiling setup
+
+- Installed heaptrack 1.3.0 through apt after checking the repository
+  environment blueprint. Release symbols enabled with
+  CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_PROFILE_RELEASE_STRIP=none.
+- First trace is INVALID for Rust allocations: Turso's default mimalloc
+  feature installs a process-wide allocator from turso/src/lib.rs:35-37.
+  nm confirms __rustc::__rust_alloc and mi_malloc_aligned in the executable;
+  LD_PRELOAD was present, but heaptrack's malloc hooks saw only libc work.
+  Stopped this run rather than interpreting its output as Rust evidence.
+- Added feature forwarding so DEFAULT production still uses the identical
+  Turso mimalloc + fts + simd feature set. Profiling command selects
+  --no-default-features --features system-heap-allocation-profile on the
+  CLI; this disables only mimalloc, retaining Turso and its other defaults.
+  It is instrumentation, not a production allocator change. Production
+  qualification must rebuild with default features and run uninstrumented.

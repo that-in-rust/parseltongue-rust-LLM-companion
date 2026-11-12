@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = ["native-production-heap-allocator"]
+native-production-heap-allocator = ["parseltongue-turso-store-adapter/native-production-heap-allocator"]
+system-heap-allocation-profile = []
+
 [[bin]]
 name = "parseltongue"
 path = "src/main.rs"
@@ -11,7 +16,7 @@ path = "src/main.rs"
 [dependencies]
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
 parseltongue-table-store-traits = { path = "../parseltongue-table-store-traits" }
-parseltongue-turso-store-adapter = { path = "../parseltongue-turso-store-adapter" }
+parseltongue-turso-store-adapter = { path = "../parseltongue-turso-store-adapter", default-features = false }
 parseltongue-crate-graph-loader = { path = "../parseltongue-crate-graph-loader" }
 parseltongue-syntax-span-extractor = { path = "../parseltongue-syntax-span-extractor" }
 parseltongue-stage-worker-scheduler = { path = "../parseltongue-stage-worker-scheduler" }
