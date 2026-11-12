@@ -1,11 +1,150 @@
 use parseltongue_core_row_types::{StageTableRowRecord, StoreBackendFailureError};
-use serde_json::Value;
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+
+fn legacy_macro_scope_error(message: &str) -> StoreBackendFailureError {
+    StoreBackendFailureError {
+        error_context_detail_text: format!("legacy macro scope: {message}"),
+    }
+}
+
+struct LegacyMacroScopeState {
+    source_unit_key: Option<String>,
+    scope_frames: Vec<(BTreeMap<String, Value>, bool)>,
+}
+
+impl LegacyMacroScopeState {
+    fn finish_unit(&self) -> Result<(), StoreBackendFailureError> {
+        if self.scope_frames.len() == 1 {
+            Ok(())
+        } else {
+            Err(legacy_macro_scope_error("unclosed source scope"))
+        }
+    }
+
+    fn read_event(
+        &mut self,
+        unit: &str,
+        event: &Value,
+    ) -> Result<Option<StageTableRowRecord>, StoreBackendFailureError> {
+        if self.source_unit_key.as_deref() != Some(unit) {
+            self.finish_unit()?;
+            self.source_unit_key = Some(unit.into());
+            self.scope_frames = vec![(BTreeMap::new(), false)];
+        }
+        match event["legacy_event_kind_value"].as_str() {
+            Some("enter") => {
+                let export = event["legacy_module_export_flag"]
+                    .as_bool()
+                    .ok_or_else(|| legacy_macro_scope_error("module export flag absent"))?;
+                self.scope_frames.push((BTreeMap::new(), export));
+            }
+            Some("exit") => {
+                if self.scope_frames.len() == 1 {
+                    return Err(legacy_macro_scope_error("unmatched source scope exit"));
+                }
+                let (definitions, export) = self
+                    .scope_frames
+                    .pop()
+                    .ok_or_else(|| legacy_macro_scope_error("source scope absent"))?;
+                if export {
+                    self.scope_frames
+                        .last_mut()
+                        .ok_or_else(|| legacy_macro_scope_error("parent source scope absent"))?
+                        .0
+                        .extend(definitions);
+                }
+            }
+            Some("definition" | "request") => {
+                let name = event["legacy_macro_name_text"]
+                    .as_str()
+                    .filter(|name| !name.is_empty())
+                    .ok_or_else(|| legacy_macro_scope_error("macro name absent"))?
+                    .trim_start_matches("r#");
+                if event["legacy_event_kind_value"] == "definition" {
+                    let target = &event["legacy_target_identity_key"];
+                    if target.is_null() {
+                        return Err(legacy_macro_scope_error("macro definition target absent"));
+                    }
+                    self.scope_frames
+                        .last_mut()
+                        .ok_or_else(|| legacy_macro_scope_error("source scope absent"))?
+                        .0
+                        .insert(name.into(), target.clone());
+                } else {
+                    let site = &event["legacy_source_site_key"];
+                    if site.is_null() {
+                        return Err(legacy_macro_scope_error("source request key absent"));
+                    }
+                    let target = self
+                        .scope_frames
+                        .iter()
+                        .rev()
+                        .find_map(|(definitions, _)| definitions.get(name))
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                    let value = json!({"legacy_source_unit_key":event["legacy_source_unit_key"],
+                        "legacy_source_order_parts":event["legacy_source_order_parts"],"legacy_source_site_key":site,
+                        "legacy_macro_name_text":name,"legacy_target_identity_key":target});
+                    let payload = value.to_string();
+                    return Ok(Some(StageTableRowRecord {
+                        stage_owned_table_name: "legacy-macro-scope-records".into(),
+                        stage_row_record_key: blake3::hash(payload.as_bytes()).to_hex().to_string(),
+                        stage_row_payload_text: payload,
+                    }));
+                }
+            }
+            _ => return Err(legacy_macro_scope_error("unknown source event kind")),
+        }
+        Ok(None)
+    }
+}
 
 pub fn visit_legacy_macro_scope_records(
-    _events: &[Value],
-    _visitor: &mut dyn FnMut(StageTableRowRecord) -> Result<(), StoreBackendFailureError>,
+    events: &[Value],
+    visitor: &mut dyn FnMut(StageTableRowRecord) -> Result<(), StoreBackendFailureError>,
 ) -> Result<usize, StoreBackendFailureError> {
-    todo!("ordered textual macro scope records")
+    let ordered = events
+        .iter()
+        .try_fold(BTreeMap::new(), |mut ordered, event| {
+            let unit = &event["legacy_source_unit_key"];
+            if unit.is_null() {
+                return Err(legacy_macro_scope_error("compilation unit absent"));
+            }
+            let order = event["legacy_source_order_parts"]
+                .as_array()
+                .filter(|order| !order.is_empty())
+                .ok_or_else(|| legacy_macro_scope_error("source order absent"))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .ok_or_else(|| legacy_macro_scope_error("invalid source order"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if let Some(previous) = ordered.insert((unit.to_string(), order), event)
+                && previous != event
+            {
+                return Err(legacy_macro_scope_error("conflicting source order"));
+            }
+            Ok(ordered)
+        })?;
+    let mut state = LegacyMacroScopeState {
+        source_unit_key: None,
+        scope_frames: vec![(BTreeMap::new(), false)],
+    };
+    let count = ordered
+        .into_iter()
+        .try_fold(0, |count, ((unit, _), event)| {
+            if let Some(row) = state.read_event(&unit, event)? {
+                visitor(row)?;
+                Ok(count + 1)
+            } else {
+                Ok(count)
+            }
+        })?;
+    state.finish_unit()?;
+    Ok(count)
 }
 
 #[cfg(test)]
