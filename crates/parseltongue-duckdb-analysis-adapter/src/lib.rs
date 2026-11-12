@@ -21,11 +21,50 @@ pub struct DuckdbAnalysisStoreAdapter {
 
 impl DuckdbAnalysisStoreAdapter {
     pub fn open_bounded_analysis_store(
-        _database: &Path,
-        _run_directory: &Path,
-        _memory_limit_bytes: usize,
+        database: &Path,
+        run_directory: &Path,
+        memory_limit_bytes: usize,
     ) -> Result<Self, StoreBackendFailureError> {
-        todo!("bounded DuckDB analysis store")
+        if memory_limit_bytes == 0 || memory_limit_bytes > 1_288_490_188 {
+            return Err(build_analysis_error(
+                "analysis memory limit must be within 1.2 GiB",
+            ));
+        }
+        if !run_directory.is_dir() {
+            return Err(build_analysis_error("analysis run directory must exist"));
+        }
+        let spill = run_directory
+            .canonicalize()
+            .map_err(build_analysis_error)?
+            .join("duckdb-analysis-spill-files");
+        std::fs::create_dir_all(&spill).map_err(build_analysis_error)?;
+        let spill = spill
+            .to_str()
+            .ok_or_else(|| build_analysis_error("analysis spill path is not UTF-8"))?;
+        let config = duckdb::Config::default()
+            .enable_external_access(true)
+            .and_then(|config| config.with("autoinstall_known_extensions", "false"))
+            .and_then(|config| config.with("autoload_known_extensions", "false"))
+            .and_then(|config| config.with("allow_community_extensions", "false"))
+            .and_then(|config| config.max_memory(&format!("{memory_limit_bytes}B")))
+            .map_err(build_analysis_error)?;
+        let connection =
+            duckdb::Connection::open_with_flags(database, config).map_err(build_analysis_error)?;
+        connection
+            .execute("SET temp_directory = ?", [spill])
+            .map_err(build_analysis_error)?;
+        connection
+            .execute_batch("SET enable_external_access = false")
+            .map_err(build_analysis_error)?;
+        Ok(Self {
+            _connection: Mutex::new(connection),
+        })
+    }
+}
+
+fn build_analysis_error(message: impl std::fmt::Display) -> StoreBackendFailureError {
+    StoreBackendFailureError {
+        error_context_detail_text: message.to_string(),
     }
 }
 
