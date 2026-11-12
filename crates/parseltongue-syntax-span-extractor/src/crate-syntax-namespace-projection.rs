@@ -16,19 +16,31 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     pub(super) projection_resolution_input_rows: NameResolutionInputRows,
     pub(super) projection_target_metadata_rows: BTreeMap<NameSymbolTargetKey, Value>,
     pub(super) projection_path_metadata_rows: BTreeMap<SemanticOccurrenceKeyValue, Value>,
+    projection_macro_source_rows:
+        BTreeMap<SemanticOccurrenceKeyValue, MacroInvocationSourceContext>,
     projection_unit_record_value: Value,
     projection_workspace_root_path: PathBuf,
     projection_source_file_rows: BTreeMap<String, String>,
     projection_active_file_paths: BTreeSet<String>,
     projection_target_cfg_values: BTreeSet<String>,
     projection_source_store_port: &'a dyn StageTableStorePort,
-    projection_cancel_flag_value: &'a RunCancelFlagValue,
+    pub(super) projection_cancel_flag_value: &'a RunCancelFlagValue,
 }
 
 struct NamespaceSourceFileContext {
     source_file_absolute_path: String,
     source_file_original_text: String,
     source_crlf_removed_offsets: Vec<usize>,
+    source_macro_crate_bindings: BTreeMap<usize, CrateCompilationUnitKey>,
+    source_expansion_provenance_rows: Vec<[u8; 32]>,
+}
+
+struct MacroInvocationSourceContext {
+    macro_source_absolute_path: String,
+    macro_argument_range_start: usize,
+    macro_invocation_directory_path: PathBuf,
+    macro_argument_crate_bindings: BTreeMap<usize, CrateCompilationUnitKey>,
+    macro_source_provenance_rows: Vec<[u8; 32]>,
 }
 
 trait SourcePathCanonicalPort {
@@ -162,6 +174,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             projection_active_file_paths: BTreeSet::new(),
             projection_target_metadata_rows: BTreeMap::new(),
             projection_path_metadata_rows: BTreeMap::new(),
+            projection_macro_source_rows: BTreeMap::new(),
             projection_source_store_port: store,
             projection_cancel_flag_value: cancel,
         };
@@ -235,7 +248,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             SpanDigestIdValue::from(
                 *blake3::hash(&file.source_file_original_text.as_bytes()[start..end]).as_bytes(),
             ),
-            &[],
+            &file.source_expansion_provenance_rows,
         )
         .map_err(build_name_projection_error)
     }
@@ -364,13 +377,52 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "target_source_range_end":restore_source_byte_offset(range.end(),&file.source_crlf_removed_offsets),
             "target_symbol_kind_value":kind,"target_compilation_scope_record":self.build_compilation_scope_record(scope),
         }));
+        if kind == "Macro" {
+            let trees = node
+                .children()
+                .filter_map(ast::TokenTree::cast)
+                .collect::<Vec<_>>();
+            let body = trees
+                .last()
+                .ok_or_else(|| build_name_projection_error("macro definition body absent"))?;
+            let range = body.syntax().text_range();
+            let start =
+                restore_source_byte_offset(range.start(), &file.source_crlf_removed_offsets);
+            let end = restore_source_byte_offset(range.end(), &file.source_crlf_removed_offsets);
+            let source = &file.source_file_original_text[start..end];
+            let crates=source.match_indices("$crate").map(|(offset,_)|{
+                let unit=file.source_macro_crate_bindings.get(&(start+offset)).unwrap_or(&self.projection_resolution_input_rows.unit_compilation_identity_key);
+                json!({"macro_source_byte_offset":offset,"macro_definition_unit_key":encode_compilation_unit_value(unit)})
+            }).collect::<Vec<_>>();
+            let pattern = trees
+                .first()
+                .filter(|_| node.kind() == SyntaxKind::MACRO_DEF && trees.len() > 1)
+                .map(|tree| read_original_node_source(tree.syntax(), file));
+            self.projection_target_metadata_rows
+                .get_mut(&target)
+                .ok_or_else(|| build_name_projection_error("macro metadata missing"))?["target_macro_definition_record"] = json!({
+                "macro_definition_source_text":source,"macro_pattern_source_text":pattern,
+                "macro_source_absolute_path":file.source_file_absolute_path,"macro_source_range_start":start,
+                "macro_definition_unit_key":encode_compilation_unit_value(&self.projection_resolution_input_rows.unit_compilation_identity_key),
+                "macro_definition_edition_kind":self.projection_unit_record_value["unit_rust_edition_value"],
+                "macro_definition_crate_rows":crates,
+            });
+        }
         let inherited = node.parent().is_some_and(|parent| {
             parent.kind() == SyntaxKind::ASSOC_ITEM_LIST
                 && parent
                     .parent()
                     .is_some_and(|owner| ast::Trait::can_cast(owner.kind()))
         });
-        let visibility = if inherited {
+        let exported_macro = kind == "Macro"
+            && super::collect_effective_node_attributes(node, &self.projection_target_cfg_values)?
+                .iter()
+                .any(|attribute| {
+                    attribute == "macro_export" || attribute.starts_with("macro_export(")
+                });
+        let visibility = if exported_macro {
+            NameBindingVisibilityKind::Public
+        } else if inherited {
             self.projection_resolution_input_rows
                 .name_symbol_binding_rows
                 .iter()
@@ -392,6 +444,21 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 binding_selection_priority_kind: NameBindingPriorityKind::Declaration,
                 binding_import_evidence_keys: vec![],
             });
+        if exported_macro && !scope.scope_semantic_path_parts.is_empty() {
+            let mut exported = self
+                .projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .last()
+                .cloned()
+                .ok_or_else(|| build_name_projection_error("macro binding missing"))?;
+            exported
+                .binding_lexical_scope_key
+                .scope_semantic_path_parts
+                .clear();
+            self.projection_resolution_input_rows
+                .name_symbol_binding_rows
+                .push(exported);
+        }
         Ok(target)
     }
 
@@ -411,6 +478,190 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             "target_symbol_kind_value":"Crate","target_compilation_scope_record":self.build_compilation_scope_record(&scope),
         }));
         self.visit_namespace_source_file(&root, &scope)
+    }
+
+    pub(super) fn project_macro_expansion_rows(
+        &mut self,
+        invocation: &NameMacroInvocationRow,
+        definition: &Value,
+        expanded: &DeclarativeMacroExpansionOutput,
+    ) -> Result<NameExpansionRoundRows, StoreBackendFailureError> {
+        let context = self
+            .projection_macro_source_rows
+            .get(&invocation.invocation_site_occurrence_key)
+            .ok_or_else(|| build_name_projection_error("macro invocation source context absent"))?;
+        let invocation_value =
+            encode_occurrence_identity_value(&invocation.invocation_site_occurrence_key);
+        let digest = *blake3::hash(invocation_value.to_string().as_bytes()).as_bytes();
+        let mut provenance = context.macro_source_provenance_rows.clone();
+        provenance.push(digest);
+        let path = Path::new(read_record_string_value(
+            &self.projection_unit_record_value,
+            "unit_package_root_path",
+        )?)
+        .join(".parseltongue/macro-source")
+        .join(encode_digest_hex_value(&digest))
+        .join("expanded.rs")
+        .to_string_lossy()
+        .into_owned();
+        let directory = context.macro_invocation_directory_path.clone();
+        let source = &expanded.macro_expanded_source_text;
+        let default_unit = decode_compilation_unit_value(&definition["macro_definition_unit_key"])?;
+        let crates = source
+            .match_indices("$crate")
+            .filter_map(|(offset, _)| {
+                expanded
+                    .macro_token_origin_rows
+                    .iter()
+                    .find(|origin| {
+                        let range = origin.token_output_byte_range.read_source_range_pair();
+                        range.0 == offset as u64 || range.0 == offset as u64 + 1
+                    })
+                    .map(|origin| {
+                        let original =
+                            origin.token_original_byte_range.read_source_range_pair().0 as usize;
+                        let unit = match origin.token_source_origin_kind {
+                            MacroSourceOriginKind::Invocation => context
+                                .macro_argument_crate_bindings
+                                .get(&(context.macro_argument_range_start + original))
+                                .cloned()
+                                .unwrap_or_else(|| {
+                                    invocation
+                                        .invocation_lexical_scope_key
+                                        .scope_compilation_unit_key
+                                        .clone()
+                                }),
+                            MacroSourceOriginKind::Definition => {
+                                definition["macro_definition_crate_rows"]
+                                    .as_array()
+                                    .into_iter()
+                                    .flatten()
+                                    .find(|row| {
+                                        row["macro_source_byte_offset"].as_u64().is_some_and(
+                                            |start| {
+                                                start <= original as u64
+                                                    && (original as u64) < start + 6
+                                            },
+                                        )
+                                    })
+                                    .map(|row| {
+                                        decode_compilation_unit_value(
+                                            &row["macro_definition_unit_key"],
+                                        )
+                                    })
+                                    .transpose()?
+                                    .unwrap_or_else(|| default_unit.clone())
+                            }
+                        };
+                        Ok((offset, unit))
+                    })
+            })
+            .collect::<Result<BTreeMap<_, _>, StoreBackendFailureError>>()?;
+        let normalized = crates
+            .keys()
+            .rev()
+            .fold(source.clone(), |mut text, offset| {
+                text.replace_range(*offset..*offset + 1, "_");
+                text
+            })
+            .replace("\r\n", "\n");
+        let edition = match self.projection_resolution_input_rows.unit_rust_edition_kind {
+            RustSourceEditionKind::Edition2015 => Edition::Edition2015,
+            RustSourceEditionKind::Edition2018 => Edition::Edition2018,
+            RustSourceEditionKind::Edition2021 => Edition::Edition2021,
+            RustSourceEditionKind::Edition2024 => Edition::Edition2024,
+        };
+        let parsed = parse_compatible_rust_syntax(&normalized, "items", edition)?;
+        if let Some(error) = parsed.errors().first() {
+            return Err(build_name_projection_error(format!(
+                "macro expansion {path}: {error}"
+            )));
+        }
+        let file = NamespaceSourceFileContext {
+            source_file_absolute_path: path.clone(),
+            source_file_original_text: source.clone(),
+            source_crlf_removed_offsets: source
+                .match_indices("\r\n")
+                .enumerate()
+                .map(|(count, (offset, _))| offset - count)
+                .collect(),
+            source_macro_crate_bindings: crates,
+            source_expansion_provenance_rows: provenance.clone(),
+        };
+        let chain = provenance
+            .iter()
+            .map(encode_digest_hex_value)
+            .collect::<Vec<_>>();
+        let syntax = super::extract_file_syntax_core(
+            &super::SyntaxFileInputData {
+                file_source_absolute_path: path.clone(),
+                file_source_content_bytes: source.as_bytes().to_vec(),
+                unit_compilation_identity_key: read_record_string_value(
+                    &self.projection_unit_record_value,
+                    "unit_compilation_identity_key",
+                )?
+                .into(),
+                unit_rust_edition_value: read_record_string_value(
+                    &self.projection_unit_record_value,
+                    "unit_rust_edition_value",
+                )?
+                .into(),
+                unit_target_cfg_values: self.projection_target_cfg_values.clone(),
+                file_module_directory_path: directory.to_string_lossy().into_owned(),
+                unit_metadata_environment_values: BTreeMap::new(),
+                file_parse_context_kind: "items".into(),
+                file_expansion_provenance_chain: chain.clone(),
+            },
+            Some(&normalized),
+        )?;
+        let origins=expanded.macro_token_origin_rows.iter().map(|origin|{
+            let output=origin.token_output_byte_range.read_source_range_pair();
+            let original=origin.token_original_byte_range.read_source_range_pair();
+            let (kind,path,start)=match origin.token_source_origin_kind{
+                MacroSourceOriginKind::Definition=>("definition",definition["macro_source_absolute_path"].clone(),definition["macro_source_range_start"].as_u64().unwrap_or(0)),
+                MacroSourceOriginKind::Invocation=>("invocation",json!(context.macro_source_absolute_path),context.macro_argument_range_start as u64),
+            };
+            json!({"token_output_byte_range":[output.0,output.1],"token_original_byte_range":[start+original.0,start+original.1],"token_source_origin_kind":kind,"token_source_absolute_path":path})
+        }).collect::<Vec<_>>();
+        let input = &self.projection_resolution_input_rows;
+        let before = (
+            input.name_module_scope_rows.len(),
+            input.name_symbol_binding_rows.len(),
+            input.name_import_request_rows.len(),
+            input.name_signature_path_rows.len(),
+            input.name_macro_invocation_rows.len(),
+        );
+        self.visit_namespace_syntax_node(
+            &parsed.syntax_node(),
+            &invocation.invocation_lexical_scope_key,
+            &directory,
+            &file,
+        )?;
+        let input = &self.projection_resolution_input_rows;
+        let content = blake3::hash(source.as_bytes()).to_hex().to_string();
+        self.projection_source_store_port
+            .write_file_content_bytes(&content, source.as_bytes())?;
+        let mut rows = syntax.stage_unit_output_rows;
+        rows.push(super::build_syntax_output_record("file-source-text-table",path.clone(),json!({
+            "file_source_absolute_path":path,"file_content_digest_full":content,"file_source_byte_count":source.len(),"file_expansion_provenance_chain":chain,
+        })));
+        rows.push(super::build_syntax_output_record("macro-expanded-item-table",encode_digest_hex_value(&digest),json!({
+            "macro_invocation_identity_record":invocation_value,"macro_invocation_provenance_chain":chain,
+            "macro_virtual_source_path":path,"macro_expanded_source_text":source,"macro_token_origin_rows":origins,
+            "macro_matched_arm_index":expanded.macro_matched_arm_index,"macro_resolution_state_kind":"expanded",
+        })));
+        Ok(NameExpansionRoundRows {
+            expansion_module_scope_rows: input.name_module_scope_rows[before.0..].to_vec(),
+            expansion_symbol_binding_rows: input.name_symbol_binding_rows[before.1..].to_vec(),
+            expansion_import_request_rows: input.name_import_request_rows[before.2..].to_vec(),
+            expansion_signature_path_rows: input.name_signature_path_rows[before.3..].to_vec(),
+            expansion_macro_invocation_rows: input.name_macro_invocation_rows[before.4..].to_vec(),
+            expansion_completed_invocation_keys: vec![
+                invocation.invocation_site_occurrence_key.clone(),
+            ],
+            expansion_semantic_output_rows: rows,
+            ..Default::default()
+        })
     }
 
     fn visit_namespace_source_file(
@@ -456,6 +707,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             source_file_absolute_path: path.into(),
             source_file_original_text: source,
             source_crlf_removed_offsets: removed,
+            source_macro_crate_bindings: BTreeMap::new(),
+            source_expansion_provenance_rows: vec![],
         };
         let parent = Path::new(path)
             .parent()
@@ -625,7 +878,9 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                         import_site_occurrence_key: self
                             .build_source_occurrence_key(file, bound.syntax())?,
                         import_lexical_scope_key: active.clone(),
-                        import_path_segment_rows: read_ast_path_segments(&bound),
+                        import_path_segment_rows: read_contextual_path_segments(
+                            &bound, file, false,
+                        ),
                         import_binding_alias_text: None,
                         import_glob_expansion_flag: true,
                         import_visibility_scope_kind: NameBindingVisibilityKind::Public,
@@ -652,7 +907,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 .push(NameImportRequestRow {
                     import_site_occurrence_key: self.build_source_occurrence_key(file, node)?,
                     import_lexical_scope_key: scope.clone(),
-                    import_path_segment_rows: read_grouped_import_segments(&path),
+                    import_path_segment_rows: read_contextual_path_segments(&path, file, true),
                     import_binding_alias_text: alias,
                     import_glob_expansion_flag: use_tree.star_token().is_some(),
                     import_visibility_scope_kind: node
@@ -674,7 +929,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     "site_source_absolute_path":file.source_file_absolute_path,
                     "site_source_range_start":restore_source_byte_offset(range.start(),&file.source_crlf_removed_offsets),
                     "site_source_range_end":restore_source_byte_offset(range.end(),&file.source_crlf_removed_offsets),
-                    "path_site_source_text":node.text().to_string(),
+                    "path_site_source_text":read_original_node_source(node,file),
+                    "site_expansion_provenance_chain":file.source_expansion_provenance_rows.iter().map(encode_digest_hex_value).collect::<Vec<_>>(),
                     "site_compilation_scope_record":self.build_compilation_scope_record(scope),
                 }));
             self.projection_resolution_input_rows
@@ -683,9 +939,9 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     path_site_occurrence_key: occurrence,
                     path_lexical_scope_key: scope.clone(),
                     path_source_segment_rows: if in_use {
-                        read_grouped_import_segments(&path)
+                        read_contextual_path_segments(&path, file, true)
                     } else {
-                        read_ast_path_segments(&path)
+                        read_contextual_path_segments(&path, file, false)
                     },
                     path_requested_namespace_kind: if in_use {
                         NameNamespaceFilterKind::Any
@@ -705,19 +961,39 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 .parent()
                 .is_some_and(|parent| ast::MacroExpr::can_cast(parent.kind()))
         {
+            let occurrence = self.build_source_occurrence_key(file, node)?;
+            let argument = call.token_tree();
+            let start = argument
+                .as_ref()
+                .map(|tree| {
+                    restore_source_byte_offset(
+                        tree.syntax().text_range().start(),
+                        &file.source_crlf_removed_offsets,
+                    )
+                })
+                .unwrap_or(0);
+            self.projection_macro_source_rows.insert(
+                occurrence.clone(),
+                MacroInvocationSourceContext {
+                    macro_source_absolute_path: file.source_file_absolute_path.clone(),
+                    macro_argument_range_start: start,
+                    macro_invocation_directory_path: directory.into(),
+                    macro_argument_crate_bindings: file.source_macro_crate_bindings.clone(),
+                    macro_source_provenance_rows: file.source_expansion_provenance_rows.clone(),
+                },
+            );
             self.projection_resolution_input_rows
                 .name_macro_invocation_rows
                 .push(NameMacroInvocationRow {
-                    invocation_site_occurrence_key: self.build_source_occurrence_key(file, node)?,
+                    invocation_site_occurrence_key: occurrence,
                     invocation_lexical_scope_key: scope.clone(),
                     invocation_macro_path_segments: call
                         .path()
                         .as_ref()
-                        .map(read_ast_path_segments)
+                        .map(|path| read_contextual_path_segments(path, file, false))
                         .unwrap_or_default(),
-                    invocation_argument_source_text: call
-                        .token_tree()
-                        .map(|tree| tree.syntax().text().to_string())
+                    invocation_argument_source_text: argument
+                        .map(|tree| read_original_node_source(tree.syntax(), file))
                         .unwrap_or_default(),
                 });
         }
@@ -726,6 +1002,51 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         }
         Ok(())
     }
+}
+
+fn read_original_node_source(node: &SyntaxNode, file: &NamespaceSourceFileContext) -> String {
+    let range = node.text_range();
+    file.source_file_original_text[restore_source_byte_offset(
+        range.start(),
+        &file.source_crlf_removed_offsets,
+    )
+        ..restore_source_byte_offset(range.end(), &file.source_crlf_removed_offsets)]
+        .into()
+}
+
+fn read_contextual_path_segments(
+    path: &ast::Path,
+    file: &NamespaceSourceFileContext,
+    grouped: bool,
+) -> Vec<NamePathSegmentKind> {
+    let mut parts = if grouped {
+        read_grouped_import_segments(path)
+    } else {
+        read_ast_path_segments(path)
+    };
+    if parts.first() == Some(&NamePathSegmentKind::Name("_crate".into())) {
+        let start = restore_source_byte_offset(
+            path.syntax().text_range().start(),
+            &file.source_crlf_removed_offsets,
+        );
+        let unit = file.source_macro_crate_bindings.get(&start).or_else(|| {
+            path.syntax()
+                .ancestors()
+                .filter_map(ast::UseTree::cast)
+                .filter_map(|tree| tree.path())
+                .find_map(|prefix| {
+                    let start = restore_source_byte_offset(
+                        prefix.syntax().text_range().start(),
+                        &file.source_crlf_removed_offsets,
+                    );
+                    file.source_macro_crate_bindings.get(&start)
+                })
+        });
+        if let Some(unit) = unit {
+            parts[0] = NamePathSegmentKind::DefiningCrate(unit.clone());
+        }
+    }
+    parts
 }
 
 fn read_syntax_symbol_kind(kind: SyntaxKind) -> Option<(&'static str, NamespaceBindingKindValue)> {

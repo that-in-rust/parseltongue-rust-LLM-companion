@@ -210,7 +210,14 @@ fn test_macro_defining_crate_hygiene() {
     let paths = read_published_table_fixture(&database, "path-resolution-site-records");
     let defining = paths
         .iter()
-        .filter(|row| row["path_site_source_text"] == "$crate::Original")
+        .filter(|row| {
+            row["path_site_source_text"].as_str().is_some_and(|text| {
+                text.chars()
+                    .filter(|ch| !ch.is_whitespace())
+                    .collect::<String>()
+                    == "$crate::Original"
+            })
+        })
         .collect::<Vec<_>>();
     assert_eq!(defining.len(), 2);
     for path in defining {

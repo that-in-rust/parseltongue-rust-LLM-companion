@@ -31,6 +31,7 @@ fn check_table_stage_access(table: &str, stage: &str) -> bool {
             && matches!(
                 table,
                 "span-reference-text-table"
+                    | "span-byte-ownership-ranges"
                     | "field-signature-detail-table"
                     | "body-site-reference-table"
                     | "file-source-text-table"

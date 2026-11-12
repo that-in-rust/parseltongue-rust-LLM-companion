@@ -862,3 +862,26 @@ two invocations, empty expansion and failure preserving the published generation
 The existing span_expansion_provenance_chain spelling is used for evidence assertions.
 The RED run printed: test result: FAILED. 0 passed; 3 failed; 6 filtered out.
 All three failures reached the intended persisted adapter todo after syntax-spans.
+
+### M2 persisted macro adapter — GREEN
+
+The resolver's settled macro targets now feed expand_declarative_macro_items. Source
+definition metadata survives library publication/reexports. Expansion creates stable
+invocation-keyed virtual files, full invocation chains, absolute token-origin evidence,
+expanded spans/ownership/fields/body sites, names, imports and later macro requests.
+$crate is normalized only at recorded token positions, with its defining unit retained
+separately; original bytes/ranges remain authoritative, including syntax-walker evidence.
+All crate rows publish through the existing atomic name-resolution unit transaction;
+immutable content bytes can be written earlier but are not visible as published files.
+
+CLI contracts: 8 passed / 1 failed initially. The failure was the newly authored
+whitespace-sensitive $crate source-text assertion, not resolution: the renderer emits
+spaces between tokens. Normalizing that comparison produced 1 passed / 8 filtered.
+The assertions still require both targets to be the definition crate, not caller names.
+Affected tests: core 3, resolver 8, syntax 11, adapter 2 (+3 ignored profiles), store
+contracts 15, dependency/build gates 3 all passed. Focused all-target Clippy -D warnings,
+fmt check and diff check passed. A rustc lab probe rejected a captured type used in a
+new nested module, confirming not to override ordinary captured paths to caller scope.
+
+Next REFACTOR: factor token provenance and projection offsets; add further hygiene
+contracts. Built-ins, sysroot/preludes/lang items, exact oracle units and S5 remain pending.

@@ -376,6 +376,13 @@ fn build_syntax_output_record(table: &str, key: String, payload: Value) -> Stage
 pub fn extract_file_syntax_rows(
     input: &SyntaxFileInputData,
 ) -> Result<SyntaxFileExtractionResult, StoreBackendFailureError> {
+    extract_file_syntax_core(input, None)
+}
+
+fn extract_file_syntax_core(
+    input: &SyntaxFileInputData,
+    syntax_override: Option<&str>,
+) -> Result<SyntaxFileExtractionResult, StoreBackendFailureError> {
     let source = std::str::from_utf8(&input.file_source_content_bytes).map_err(|error| {
         build_syntax_stage_failure(format!(
             "{} non-UTF-8 at offset {}",
@@ -400,8 +407,11 @@ pub fn extract_file_syntax_rows(
     } else {
         Cow::Owned(source.replace("\r\n", "\n"))
     };
-    let parsed =
-        parse_compatible_rust_syntax(&normalized, &input.file_parse_context_kind, edition)?;
+    let parsed = parse_compatible_rust_syntax(
+        syntax_override.unwrap_or(&normalized),
+        &input.file_parse_context_kind,
+        edition,
+    )?;
     let (root, errors) = (parsed.syntax_node(), parsed.errors());
     if let Some(error) = errors.first() {
         return Err(build_syntax_stage_failure(format!(
