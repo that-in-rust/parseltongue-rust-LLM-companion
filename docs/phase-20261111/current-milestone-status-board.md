@@ -2,13 +2,13 @@
 
 Rewritten in place after every run report. History lives in the TDD journal and run reports.
 
-Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2 regression: timeout at 2,400.11s, exit 124, peak whole-tree RSS 8,786,596 KiB sampled every 0.2s; no assertion result. The historical baseline remains at `~/hld-current-test-artifacts/20261112-namespace-phase-probes/namespace-projection-lifecycle-controls/baseline-copy-storage-snapshot.log`. Mapper, runner, and comparator descendant histories are integrated through source merge tip `0f1fd73e0d655c2874fda09d5fb7d2f4e344db10`; code remains unqualified. No all-five PASS, production qualification, or frozen release exists.
+Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2 retry from clean integrated HEAD `825d760e8685d8d4d95ab8acd2267edf3687847b`: the supervisor enforced 2,400s, total command elapsed 2,410.252s including bounded descendant cleanup, exit 124, peak whole-tree RSS 9,234,448 KiB sampled every 0.2s; no assertion/result line. Live stderr reached completed copy/normalization and resolution rounds; its last marker was round 3 import-bindings started, with exact active query unknown. Production source remains clean and unqualified. No all-five PASS, production qualification, or frozen release exists.
 
 ```text
  MILESTONE  STATE
  M0  core types, Turso store            code done; SOP S3 skeleton subset not re-run on current digest
  M1  ingest, crate graph, spans         code done; S1/S2/S3 historical PASS (old digest) → re-run pending
- M2  name resolution (DuckDB SQL)       mapper plus runner/comparator descendants integrated but unqualified; native M2 test BLOCKED/incomplete at time ceiling; forensic copy shows frozen revision 8, normalized source 221,822 rows, persisted unit-link/path/binding outputs, and no fixed-point manifest; exact last SQL operation unknown; all-five S5 not started
+ M2  name resolution (DuckDB SQL)       mapper plus runner/comparator descendants integrated but unqualified; native M2 retry BLOCKED/incomplete at 2,400s; live stderr logged a 14-round fixed-point line and later copy/normalization plus repeated resolution progress, ending at round 3 import-bindings started; exact active query unknown. Earlier forensic copy shows frozen revision 8, normalized source 221,822 rows, persisted unit-link/path/binding outputs, and no fixed-point manifest; all-five S5 not started
        code   measured-only default, generation-backed publication receipts, and stage-status banner integrated
        runner component code/tests integrated; full S3 intake is unimplemented; S4/S5 execution is not started
        comparator R9 file-backed follow-up integrated; no production comparison or final freeze
@@ -16,7 +16,7 @@ Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2
        done   oracle path partition (module-scope scored at M2; type-relative deferred)
        done   indexed frozen visibility + distinct namespace cleanup indexes (focused tests GREEN)
        done   typed copy/normalization/resolution failures, memory telemetry, retained replay and rollback-safe EXPLAIN
-       open   review bounded DuckDB forensic findings and decide separately budgeted native-test next step; full S3 intake; all-five serde-first qualification
+       open   review the new bounded timeout/live-stderr evidence and decide any next action separately; no automatic retry; full S3 intake; all-five serde-first qualification
  M3  proc-macro shapes                  not started
  M4–M6 signatures, impls, bodies, methods  not started
  M7  coverage + performance             not started
@@ -27,8 +27,8 @@ Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2
  SOP STEP  LATEST RESULT ON CURRENT DIGEST
  S1  structural index        not-started (five pinned roots/locks checked read-only; no source qualification)
  S2  coverage inventory      not-started
- S3  fixture/production map  BLOCKED/incomplete: isolated native M2 test timed out at 2,400.11s (exit 124), not an assertion failure; full S3 intake is unimplemented
-                             Session-built reader matched bundled DuckDB 2.0.0 on an external copy; frozen revision 8 has one normalized manifest (221,822 source rows), persisted unit-link/path/binding outputs, and zero fixed-point manifests; exact last operation remains unknown
+ S3  fixture/production map  BLOCKED/incomplete: isolated native M2 retry reached the 2,400s deadline (exit 124; 2,410.252s including cleanup), not an assertion failure; full S3 intake is unimplemented
+                             Live stderr recorded a 14-round fixed-point line and later repeated copy/normalization/resolution work; last marker was round 3 import-bindings started. Exact active query remains unknown. Earlier forensic copy counts remain historical; see the separate retry report.
  S4  oracle exports          NOT STARTED; no production/corpus exports or full S3 intake
  S5  per-site comparison     NOT STARTED; comparator R9 code is integrated, but no production corpus comparison or all-five qualification
  S6–S10                      NOT STARTED
@@ -57,13 +57,14 @@ Integrated-source checks and readiness (2026-11-12):
 - Latest forensic finding: original and copy DuckDB hashes match before/after, and no DuckDB WAL sidecar exists. Copy and normalization completed for frozen revision 8; unit-link outputs and path/binding rows persisted; fixed-point completion is not evidenced. The exact last SQL operation remains unknown. This query evidence is not original-run DuckDB memory/settings telemetry.
 - CLI contract helper regression: 27 passed, 0 failed, 1 ignored (`test_child_fixture_waits_release`), and 1 filtered (`test_lang_items_in_sysroot`) in 4.29s, exit 0, using the warmed locked/offline release target. The ignored fixture supplies live-stderr, exit/output, and output-read cases. No DuckDB C++ rebuild occurred; the native M2 test remains excluded.
 - Reviewed oracle branch `eecdf0d3700d33b7522709f01cfbf24fbdba9e90` is integrated. REQ-RUST-027.0 limits the advertised capability to mapped path exports; it does not establish full S4 support or qualification. The child's reviewed RED/34-test/fmt/Clippy/release gates were not repeated here; no corpus export or native M2 rerun occurred.
+- Separate native M2 rerun preflight `20261112T222609Z-native-m2-regression-preflight` is BLOCKED before launch: persistent `/dev/root` had 3,213,532 KiB available (98% used), less than the preserved prior 4.0G fixture footprint. No test or Cargo process ran; this is not a timeout or assertion result. The earlier timeout report remains historical and S3 remains BLOCKED/incomplete.
 - Diagnostic-only run report: `hld-current-test-runs/20261112T203325Z-native-m2-regression/hld-current-test-report.md`.
 - The all-target/all-feature debug build was not run because the timed-out test gate reached `libduckdb-sys`; further debug compilation could require a bundled native build, which was not authorized. No test result or completed debug native build is inferred.
 - Five pinned corpus roots and lock hashes match the read-only inventory; stable Rust 1.99.1 `rust-src` core/alloc/std sources are present. `strace`, Cargo, rustc, Python, and process tools are available. The external pinned Python provider `blake3==1.0.10` is provisioned and its vectors/provider selection were verified, but the qualification runner has not been invoked and no corpus run directory was created.
 - No memory cap was set, no corpus/native qualification was run, and no release artifact was frozen.
 
 Next actions:
-1. Review the measured revision-8 forensic evidence and decide whether/when to separately budget another native-test attempt; do not infer a precise stalled query from the missing fixed-point manifest.
+1. Review the new timed-out native retry and retained live phase evidence; do not infer a precise stalled query from the last marker and do not start another retry automatically.
 2. Keep full S3 intake, all corpus runs, S4–S10, and qualification not started until the prerequisites and next step are reviewed.
 3. The external pinned Python BLAKE3 provider is ready, but keep the qualification runner unused until reviewed.
-4. Preserve the no-interim-memory-cap policy; no all-five PASS is claimed.
+4. Preserve the no-interim-memory-cap policy; no all-five PASS is claimed. The retry used no external memory cap; its live DuckDB logger reported the application's 25.0 GiB setting.

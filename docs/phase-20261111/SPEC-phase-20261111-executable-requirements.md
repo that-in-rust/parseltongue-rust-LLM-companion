@@ -1279,6 +1279,7 @@ separately active tests; the shared name is listed once per requirement.
 - `test_scope_oracle_errors_block`
 - `test_malformed_macro_record_rejected`
 - `test_macro_failure_blocks_publish`
+- `test_oracle_disagreements_keep_reasons`
 
 **REQ-RUST-026.1**
 - `test_site_context_identity_distinct`
@@ -1293,6 +1294,7 @@ separately active tests; the shared name is listed once per requirement.
 - `test_split_target_namespaces_merge`
 - `test_role_changes_semantic_digest`
 - `test_exact_comparison_publishes_turso`
+- `test_oracle_disagreements_keep_reasons`
 
 **REQ-RUST-026.2**
 - `test_unknown_scope_is_blocked`
@@ -1315,6 +1317,7 @@ separately active tests; the shared name is listed once per requirement.
 - `test_unknown_cfg_remains_blocked`
 - `test_primary_cfg_excludes_scored`
 - `test_persisted_known_answer_matrix`
+- `test_oracle_disagreements_keep_reasons`
 
 **REQ-RUST-026.3**
 - `test_extra_production_secondary_counts`
@@ -1323,6 +1326,7 @@ separately active tests; the shared name is listed once per requirement.
 - `test_external_source_blocked_rate`
 - `test_changed_targets_persist_semantically`
 - `test_persisted_known_answer_matrix`
+- `test_oracle_disagreements_keep_reasons`
 
 **REQ-RUST-026.4**
 - `test_database_backing_uses_file`
@@ -1340,6 +1344,7 @@ separately active tests; the shared name is listed once per requirement.
 - `test_source_changes_before_publish`
 - `test_write_cancellation_preserves_generation`
 - `test_source_unpublished_generation_fails`
+- `test_oracle_disagreements_keep_reasons`
 
 **REQ-RUST-026.5**
 - `test_published_comparison_is_deterministic`

@@ -3670,3 +3670,109 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   gates were not repeated here as instructed. The earlier CLI contract target
   result excludes `test_lang_items_in_sysroot`; native M2 remains pending and
   the timeout report remains historical. No corpus run or push occurred.
+
+## 2026-11-12 — native M2 rerun preflight blocked
+
+- Planned the exact native M2 regression from clean integrated HEAD
+  `825d760e8685d8d4d95ab8acd2267edf3687847b`, expected 1,200 seconds / maximum
+  2,400 seconds, no memory cap, with the retained fixture root under the new
+  external run directory. The Cargo argv, environment, active toolchain, source
+  and cached binary hashes are recorded in
+  `hld-current-test-artifacts/20261112T222609Z-native-m2-regression-preflight/`.
+- Preflight stopped before launch: `/dev/root` had 3,213,532 KiB available
+  (98% used), while the preserved prior native fixture measures 4.0G. Repo,
+  target and artifact paths share that persistent filesystem; temporary
+  `/dev/shm` was not substituted. No Cargo command, compile, test, or sampler
+  was started. No DuckDB C++ rebuild occurred.
+- Process preflight passed (372 processes, process limit 128356, no stale
+  Cargo/native-test/CLI process). No test phase, assertion, elapsed test time,
+  or test RSS exists for this preflight. The earlier timeout report and fixture
+  remain unchanged; this is a separate BLOCKED-before-launch run record, not a
+  timeout or assertion failure. No automatic retry, source change, freeze,
+  commit, or push occurred.
+- Next: obtain/review sufficient persistent artifact capacity, then authorize a
+  separately launched run under the same 1,200/2,400-second budget.
+
+## 2026-11-12 — read-only disk inventory
+
+- Inventory only; no files were deleted, no run report was rewritten, and no
+  source, worktree, lock, pin, release target, or external run artifact changed.
+  Latest /dev/root availability was 3,211,236 KiB. The full size/open-use
+  inventory and 22 oracle harness executable path digests are recorded in
+  ~/hld-current-test-artifacts/20261112T222609Z-native-m2-regression-preflight/disk-cache-inventory-report.md.
+- The inactive oracle harness target/debug directory measures 16,568,032 KiB
+  and has no open path; after a separately authorized cleanup, arithmetic
+  projects about 18.86 GiB free, above the requested 12 GiB. Preserve its
+  sibling target/release and the native-gate shared target/release. Do not
+  remove the shared target/debug: rust-analyzer currently has 88 open path
+  references there. No cleanup or native retry was performed.
+- Next: review/authorize or reject the proposed cleanup, then recheck df before
+  any separately authorized native run.
+
+## 2026-11-12 — authorized oracle cache cleanup and native M2 retry
+
+- Rechecked the exact authorized oracle harness target/debug path immediately
+  before removal: canonical path matched, final component was not a symlink,
+  directory existed, and lsof reported zero open paths. Removed only
+  /home/ubuntu/repos/parseltongue-rust-LLM-companion/tools/oracle-semantic-export-harness/target/debug.
+  Shared target/debug, both protected release targets, source, locks, pins,
+  e2e-runs, and earlier hld-current artifacts were preserved.
+- /dev/root had 3,192,228 KiB free immediately before cleanup and 19,760,256
+  KiB immediately after; latest prelaunch sample was 19,760,076 KiB, above
+  12 GiB. After the retry, 15,958,480 KiB remained. Nine protected release
+  executable/archive hashes matched before and after cleanup. The DuckDB
+  archive remained
+  a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba.
+- Launched one retry from clean production-source HEAD
+  825d760e8685d8d4d95ab8acd2267edf3687847b using the exact locked/offline
+  release command in the run report. Expected 1,200s, maximum 2,400s, no
+  external memory cap, 0.2s process-tree RSS sampling. No DuckDB C++ rebuild
+  occurred; the guard stayed clear and the archive hash was unchanged.
+- Result: BLOCKED/incomplete timeout, exit 124, no assertion failure or
+  test-result line. Command elapsed 2,410.252s including bounded cleanup;
+  supervisor total was 2,410.271s. Peak process-tree RSS was 9,234,448 KiB
+  across 4 processes. SIGTERM and SIGKILL were sent; cleanup reported complete
+  with no remaining members, independently confirmed after the run.
+- Live stderr recorded a namespace SQL fixed-point line for 221,714 rows,
+  14 rounds, 458.399s; completed copy and normalization; then repeated
+  resolution progress. The last retained event was round 3 import-bindings
+  started, with no completion or test result. This does not identify an exact
+  stalled SQL query or root cause. Full snapshots and limits are recorded in
+  ~/hld-current-test-artifacts/20261112T224747Z-native-m2-regression-retry/native-m2-phase-observations.md.
+- Report: hld-current-test-runs/20261112T224747Z-native-m2-regression-retry/hld-current-test-report.md.
+  S3 remains BLOCKED/incomplete; all five corpus runs and S4–S10 remain
+  NOT STARTED. The earlier timeout and forensic reports remain unchanged.
+  No production edit, qualification freeze, commit, push, or further retry.
+
+## 2026-11-12 — shared debug open-handle follow-up
+
+- After the authorized oracle-only cleanup, a read-only lsof sample showed
+  rust-analyzer PID 1805010 holding shared target/debug library handles marked
+  DEL, including libtypetag_impl-318c7ab49a189c87.so,
+  libthiserror_impl-22d2ebaa93385b1c.so, and
+  libturso_macros-d1d2eb01d8cdf145.so. The shared directory remained present;
+  the cleanup command did not target it. The unlink cause is unknown. No
+  repair or additional cleanup was attempted; investigate read-only before
+  relying on that shared debug cache.
+
+## 2026-11-12 — REQ-RUST-026.0–026.4 persisted disagreement integration
+
+- Integrated reviewed commit `a316078c2eb1f124a35cfad08340ea42885005e8`, which
+  adds `test_oracle_disagreements_keep_reasons`. The authoritative SPEC lists
+  now link that test under REQ-RUST-026.0 through .4; the §4 REQ-RUST-005.1
+  matrix entry already linked it. The incoming commit also appends its
+  comparator-work evidence; the existing TDD prefix and that journal's
+  reviewed-parent prefix remain intact.
+- Parent integration gate only; no native/sysroot test or corpus run:
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo test -p
+  parseltongue-cli-dispatcher-binary --test oracle-comparison-contract-tests
+  --all-features --release --locked --offline -- --nocapture`.
+  Expected 120 seconds / maximum 240 seconds; no memory cap.
+- Output: `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0
+  filtered out; finished in 0.68s`; `elapsed_seconds=3.13 exit_code=0`.
+  Full stdout/stderr and exit record:
+  `/home/ubuntu/hld-current-test-artifacts/20261112T235500Z-oracle-comparison-contract-integration/oracle-comparison-contract-tests.log`.
+- DuckDB archive SHA-256 and mtime matched before/after; no C++ build marker
+  appeared. Production source is unchanged. No PR or push. The local merge is
+  still pending its scoped integration commit.

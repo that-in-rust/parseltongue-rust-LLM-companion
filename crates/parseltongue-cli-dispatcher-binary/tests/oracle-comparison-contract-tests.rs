@@ -11,6 +11,7 @@ use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     process::{Command, Output},
@@ -682,6 +683,395 @@ fn test_persisted_known_answer_matrix() {
     let changed_export = String::from_utf8(rows.stdout).unwrap();
     assert_eq!(changed_export.matches("agreement_site_key").count(), 5);
     assert!(changed_export.contains(",9,15,"));
+}
+
+/// REQ-RUST-005.1, REQ-RUST-026.0, REQ-RUST-026.1, REQ-RUST-026.2, REQ-RUST-026.3, REQ-RUST-026.4
+#[test]
+fn test_oracle_disagreements_keep_reasons() {
+    let fixture =
+        build_oracle_comparison_fixture_with_matrix(true, Some("cfg_inactive"), None, None);
+    let site_template = fixture.primary_value["oracle_path_export_rows"][0].clone();
+    let mut primary = fixture.primary_value.clone();
+    primary["oracle_path_export_rows"][1]["site_proc_macro_dependent_flag"] = json!(true);
+
+    let empty_site = |start: u64, reason: &str, proc_macro_dependent: bool| {
+        let mut site = site_template.clone();
+        site["site_source_range_start"] = json!(start);
+        site["site_source_range_end"] = json!(start + 4);
+        site["path_target_symbol_rows"] = json!([]);
+        site["path_unresolved_reason_kind"] = json!(reason);
+        site["site_proc_macro_dependent_flag"] = json!(proc_macro_dependent);
+        site
+    };
+    let cfg_excluded = empty_site(75, "cfg_inactive", false);
+    let proc_excluded = empty_site(60, "proc_macro", true);
+    let unresolved = empty_site(65, "unknown_receiver", false);
+    primary["oracle_path_export_rows"]
+        .as_array_mut()
+        .unwrap()
+        .extend([cfg_excluded, proc_excluded, unresolved]);
+
+    let mut secondary = primary.clone();
+    for site in secondary["oracle_path_export_rows"].as_array_mut().unwrap() {
+        let reason = match site["site_source_range_start"].as_u64() {
+            Some(40 | 45 | 65) => Some("build_script"),
+            Some(60) => Some("proc_macro"),
+            Some(75) => Some("cfg_inactive"),
+            _ => None,
+        };
+        if let Some(reason) = reason {
+            site["path_target_symbol_rows"] = json!([]);
+            site["path_unresolved_reason_kind"] = json!(reason);
+        }
+    }
+    secondary["oracle_path_export_rows"]
+        .as_array_mut()
+        .unwrap()
+        .push(empty_site(70, "build_script", false));
+
+    write_oracle_comparison_inputs(&fixture, &primary, Some(&secondary));
+    let result = decode_oracle_comparison_result(&run_oracle_comparison_fixture(&fixture));
+    assert_eq!(result["agreement_eligible_path_count"], 4);
+    assert_eq!(result["agreement_match_count_value"], 1);
+    assert_eq!(result["agreement_mismatched_path_count"], 1);
+    assert_eq!(result["agreement_unresolved_path_count"], 1);
+    assert_eq!(result["agreement_missing_production_path_count"], 1);
+
+    let agreement =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(fixture.agreement.to_str().unwrap())
+            .unwrap();
+    let published_scope = agreement
+        .read_workspace_publication_scope()
+        .unwrap()
+        .unwrap();
+    let unit_identity = fixture.primary_value["oracle_path_export_rows"][0]
+        ["site_compilation_scope_record"]["unit_semantic_identity_record"]
+        .to_string();
+    let mut rows_by_start = BTreeMap::<u64, (String, Value)>::new();
+    for persisted in agreement
+        .read_stage_table_rows(&published_scope, "oracle-edge-agreement-table")
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.stage_row_record_key != "summary")
+    {
+        let payload: Value = serde_json::from_str(&persisted.stage_row_payload_text).unwrap();
+        let identity: Value =
+            serde_json::from_str(payload["agreement_site_identity_json"].as_str().unwrap())
+                .unwrap();
+        let start = identity[2].as_u64().unwrap();
+        assert_eq!(
+            identity,
+            json!([
+                unit_identity.clone(),
+                "src/lib.rs",
+                start,
+                start + 4,
+                "signature",
+                []
+            ])
+        );
+        let site_key = blake3::hash(identity.to_string().as_bytes())
+            .to_hex()
+            .to_string();
+        assert_eq!(
+            payload["agreement_site_key"].as_str(),
+            Some(site_key.as_str())
+        );
+        assert_eq!(persisted.stage_row_record_key, format!("site/{site_key}"));
+        assert!(
+            rows_by_start
+                .insert(start, (persisted.stage_row_record_key, payload))
+                .is_none()
+        );
+    }
+    assert_eq!(
+        rows_by_start.keys().copied().collect::<Vec<_>>(),
+        vec![34, 40, 45, 50, 55, 60, 65, 70, 75]
+    );
+
+    fn decode_persisted_target_evidence(row: &Value, field: &str) -> Value {
+        match row.get(field) {
+            Some(Value::Null) => Value::Null,
+            Some(Value::String(encoded)) => Value::Array(
+                serde_json::from_str::<Vec<String>>(encoded)
+                    .unwrap()
+                    .into_iter()
+                    .map(|target| serde_json::from_str(&target).unwrap())
+                    .collect(),
+            ),
+            Some(other) => {
+                panic!("persisted target evidence must be null or encoded JSON: {other}")
+            }
+            None => panic!("persisted target evidence field must be present"),
+        }
+    }
+    let target_rows = |start: u64, end: u64| {
+        json!([[
+            [
+                unit_identity.clone(),
+                "src/lib.rs",
+                start,
+                end,
+                "Struct",
+                []
+            ],
+            ["type"]
+        ]])
+    };
+    let row_evidence = |row: &Value| {
+        json!({
+            "status":row["agreement_site_status_kind"],
+            "partition":row["agreement_partition_kind"],
+            "partition_reason":row["agreement_partition_reason_kind"],
+            "primary_reason":row["agreement_primary_unresolved_reason_kind"],
+            "production_reason":row["agreement_production_unresolved_reason_kind"],
+            "secondary_reason":row["agreement_secondary_unresolved_reason_kind"],
+            "authoritative_reason":row["agreement_authoritative_causal_reason_kind"],
+            "primary_targets":decode_persisted_target_evidence(row,"agreement_primary_targets_json"),
+            "production_targets":decode_persisted_target_evidence(row,"agreement_production_targets_json"),
+            "secondary_targets":decode_persisted_target_evidence(row,"agreement_secondary_targets_json"),
+            "secondary_changed":row["agreement_secondary_changed_flag"],
+            "production_only":row["agreement_production_only_flag"],
+            "secondary_only":row["agreement_secondary_only_flag"],
+            "primary_duplicates":row["agreement_primary_duplicate_count"],
+            "production_duplicates":row["agreement_production_duplicate_count"],
+            "secondary_duplicates":row["agreement_secondary_duplicate_count"],
+        })
+    };
+    assert_eq!(
+        row_evidence(&rows_by_start[&34].1),
+        json!({
+            "status":"match",
+            "partition":"module-scope-scored",
+            "partition_reason":"cfg_inactive",
+            "primary_reason":"",
+            "production_reason":"cfg_inactive",
+            "secondary_reason":"",
+            "authoritative_reason":"cfg_inactive",
+            "primary_targets":target_rows(11,15),
+            "production_targets":target_rows(11,15),
+            "secondary_targets":target_rows(11,15),
+            "secondary_changed":false,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":1,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&40].1),
+        json!({
+            "status":"mismatch",
+            "partition":"module-scope-scored",
+            "partition_reason":"cfg_inactive",
+            "primary_reason":"",
+            "production_reason":"cfg_inactive",
+            "secondary_reason":"build_script",
+            "authoritative_reason":"cfg_inactive",
+            "primary_targets":target_rows(10,15),
+            "production_targets":target_rows(11,15),
+            "secondary_targets":[],
+            "secondary_changed":true,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":1,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&45].1),
+        json!({
+            "status":"missing-production",
+            "partition":"module-scope-scored",
+            "partition_reason":"module_scope",
+            "primary_reason":"",
+            "production_reason":"",
+            "secondary_reason":"build_script",
+            "authoritative_reason":"",
+            "primary_targets":target_rows(11,15),
+            "production_targets":null,
+            "secondary_targets":[],
+            "secondary_changed":true,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":0,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&50].1),
+        json!({
+            "status":"production-only",
+            "partition":"non-primary-production-only",
+            "partition_reason":"cfg_inactive",
+            "primary_reason":"",
+            "production_reason":"cfg_inactive",
+            "secondary_reason":"",
+            "authoritative_reason":"cfg_inactive",
+            "primary_targets":null,
+            "production_targets":target_rows(11,15),
+            "secondary_targets":null,
+            "secondary_changed":false,
+            "production_only":true,
+            "secondary_only":false,
+            "primary_duplicates":0,
+            "production_duplicates":1,
+            "secondary_duplicates":0,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&55].1),
+        json!({
+            "status":"deferred",
+            "partition":"associated-deferred",
+            "partition_reason":"type_relative",
+            "primary_reason":"",
+            "production_reason":"",
+            "secondary_reason":"",
+            "authoritative_reason":"",
+            "primary_targets":target_rows(11,15),
+            "production_targets":null,
+            "secondary_targets":target_rows(11,15),
+            "secondary_changed":false,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":0,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&60].1),
+        json!({
+            "status":"proc-excluded",
+            "partition":"proc-excluded",
+            "partition_reason":"proc_macro",
+            "primary_reason":"proc_macro",
+            "production_reason":"",
+            "secondary_reason":"proc_macro",
+            "authoritative_reason":"proc_macro",
+            "primary_targets":[],
+            "production_targets":null,
+            "secondary_targets":[],
+            "secondary_changed":false,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":0,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&65].1),
+        json!({
+            "status":"unresolved",
+            "partition":"module-scope-scored",
+            "partition_reason":"unknown_receiver",
+            "primary_reason":"unknown_receiver",
+            "production_reason":"",
+            "secondary_reason":"build_script",
+            "authoritative_reason":"unknown_receiver",
+            "primary_targets":[],
+            "production_targets":null,
+            "secondary_targets":[],
+            "secondary_changed":false,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":0,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&70].1),
+        json!({
+            "status":"secondary-only",
+            "partition":"non-primary-secondary-only",
+            "partition_reason":"build_script",
+            "primary_reason":"",
+            "production_reason":"",
+            "secondary_reason":"build_script",
+            "authoritative_reason":"build_script",
+            "primary_targets":null,
+            "production_targets":null,
+            "secondary_targets":[],
+            "secondary_changed":false,
+            "production_only":false,
+            "secondary_only":true,
+            "primary_duplicates":0,
+            "production_duplicates":0,
+            "secondary_duplicates":1,
+        })
+    );
+    assert_eq!(
+        row_evidence(&rows_by_start[&75].1),
+        json!({
+            "status":"cfg-excluded",
+            "partition":"cfg-excluded",
+            "partition_reason":"cfg_inactive",
+            "primary_reason":"cfg_inactive",
+            "production_reason":"",
+            "secondary_reason":"cfg_inactive",
+            "authoritative_reason":"cfg_inactive",
+            "primary_targets":[],
+            "production_targets":null,
+            "secondary_targets":[],
+            "secondary_changed":false,
+            "production_only":false,
+            "secondary_only":false,
+            "primary_duplicates":1,
+            "production_duplicates":0,
+            "secondary_duplicates":1,
+        })
+    );
+
+    let read_published_rows = |scope: &StageRunScopeValue| {
+        let mut rows = agreement
+            .read_stage_table_rows(scope, "oracle-edge-agreement-table")
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.stage_row_record_key, row.stage_row_payload_text))
+            .collect::<Vec<_>>();
+        rows.sort_by(|left, right| left.0.cmp(&right.0));
+        rows
+    };
+    let valid_rows = read_published_rows(&published_scope);
+    let mut missing_primary = primary.clone();
+    missing_primary
+        .as_object_mut()
+        .unwrap()
+        .remove("oracle_path_export_rows");
+    write_oracle_comparison_inputs(&fixture, &missing_primary, Some(&secondary));
+    let missing = run_oracle_comparison_fixture(&fixture);
+    assert!(
+        !missing.status.success(),
+        "missing PRIMARY evidence must block: {}",
+        String::from_utf8_lossy(&missing.stderr)
+    );
+    assert_eq!(
+        agreement.read_workspace_publication_scope().unwrap(),
+        Some(published_scope.clone())
+    );
+    assert_eq!(read_published_rows(&published_scope), valid_rows);
+
+    let mut malformed_secondary = secondary.clone();
+    malformed_secondary["oracle_path_export_rows"][0]["site_proc_macro_dependent_flag"] =
+        json!("true");
+    write_oracle_comparison_inputs(&fixture, &primary, Some(&malformed_secondary));
+    let malformed = run_oracle_comparison_fixture(&fixture);
+    assert!(
+        !malformed.status.success(),
+        "malformed SECONDARY evidence must block: {}",
+        String::from_utf8_lossy(&malformed.stderr)
+    );
+    assert_eq!(
+        agreement.read_workspace_publication_scope().unwrap(),
+        Some(published_scope.clone())
+    );
+    assert_eq!(read_published_rows(&published_scope), valid_rows);
 }
 
 /// REQ-RUST-026.3
