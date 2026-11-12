@@ -987,3 +987,42 @@ units support resolution but are excluded from mapped user-unit S5 denominators.
 Empty/local-only inputs need not instantiate std; existing empty contracts remain valid.
 Prelude imports honor crate-level cfg_attr, no_std, no_core and no_implicit_prelude.
 Lang-item rows use the pinned hir-def recognized names, never a hard-coded count of 169.
+
+### M2 sysroot/prelude contexts — RED
+
+Graph extension: 0 pass / 3 fail at todo (target cfg/edition separation, missing matching
+sources, empty input). Syntax: existing 11 pass / new 3 fail at todo (crate flags with
+cfg_attr, lexical demand ignoring strings/comments, recognized lang names including fn).
+CLI native-sysroot fixture fails on unresolved Option; initial stored-scope-field spelling
+was corrected against the codec before collecting the authoritative RED result.
+The pinned lang_item.rs sym-row scan currently returns 170 names; fn_ is the Rust-symbol
+alias for the attribute spelling fn. Do not use the SPEC's earlier 169 observation as a
+required count. std Cargo.toml currently has no default feature declaration.
+
+GREEN continuation details: extend_sysroot_crate_graph lives in graph-loader's new
+sysroot-compilation-context-rows.rs (still todo). The graph loader already depends on
+toml 0.9, so parse the library package manifests without a new dependency. Core/alloc/std
+units have unit_sysroot_context_flag=true and unit_mapped_target_flag=false; syntax/name
+stage selection and ingestion must admit semantic-support units explicitly. Ingestion
+must walk their common library parent to inventory stdarch/portable-simd sibling sources,
+while preserving each actual package root for source identities. Existing M1 closure
+discovery still decides which files enter semantic contexts.
+
+After the first reached-source discovery, scan only syntax-file-work-requests bytes for
+standard/prelude names. If needed, build crate-level contexts from each mapped root file,
+augment the graph, and restart graph/ingest/discovery in a distinct staging scope before
+compute_workspace_generation_digest; do not mix old closure rows with augmented units.
+The final generation must hash the augmented graph and sysroot source inventory. Keep
+the original Cargo unit keys stable when adding implicit system links. System units form
+core -> alloc -> std dependency order (std depends on core and alloc); normal units use
+flags for implicit std/core and explicit extern crates. Register aliases/edition prelude
+glob imports before resolution. The existing adapter currently has no ExternCrate AST
+visitor, so add it for explicit 2015/alloc aliases and nested declarations. Handle
+no_implicit_prelude without suppressing language primitives: builtin-priority lookup
+needs to remain available even when standard prelude lookup is disabled.
+
+Lang rows already have a declared Turso owner (lang-item-definition-table, name-resolution),
+so no new table/config is needed. Collect recognized active lang attributes during syntax
+namespace projection (including non-public items and expanded source), link source/range,
+unit/provenance and target identity, then publish with the crate's existing atomic rows.
+No GREEN implementation or corpus run has occurred for this subphase yet.

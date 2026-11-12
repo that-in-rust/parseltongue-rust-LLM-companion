@@ -37,6 +37,51 @@ fn test_module_raw_identifier_paths() {
 }
 
 #[test]
+fn test_sysroot_prelude_context_flags() {
+    let normal = read_unit_prelude_configuration(&make_syntax_file_input(b"")).unwrap();
+    assert!(
+        !normal.unit_no_std_flag && !normal.unit_no_core_flag && normal.unit_implicit_prelude_flag
+    );
+    let source = b"#![cfg_attr(unix,no_std)] #![no_implicit_prelude] pub struct Local;";
+    let no_std = read_unit_prelude_configuration(&make_syntax_file_input(source)).unwrap();
+    assert!(
+        no_std.unit_no_std_flag && !no_std.unit_no_core_flag && !no_std.unit_implicit_prelude_flag
+    );
+    let no_core = read_unit_prelude_configuration(&make_syntax_file_input(b"#![no_core]")).unwrap();
+    assert!(no_core.unit_no_core_flag && no_core.unit_no_std_flag);
+    assert!(read_unit_prelude_configuration(&make_syntax_file_input(&[0xff])).is_err());
+}
+
+#[test]
+fn test_sysroot_dependency_demand_detection() {
+    assert!(!check_sysroot_context_needed(
+        "pub struct Empty; // std Vec\n const TEXT:&str=\"Option core\";"
+    ));
+    assert!(check_sysroot_context_needed(
+        "pub fn take(_:Option<Vec<u8>>){}"
+    ));
+    assert!(check_sysroot_context_needed("use core::ops::Range;"));
+}
+
+#[test]
+fn test_lang_item_recognition_rules() {
+    for name in [
+        "sized",
+        "copy",
+        "fn",
+        "owned_box",
+        "panic_impl",
+        "Option",
+        "RangeCopy",
+    ] {
+        assert!(check_recognized_lang_item(name), "{name}");
+    }
+    for name in ["", "not_a_lang_item", "fn_"] {
+        assert!(!check_recognized_lang_item(name), "{name}");
+    }
+}
+
+#[test]
 fn test_cfg_comments_keep_semantics() {
     let enabled = BTreeSet::from(["unix".into(), "feature=\"selected\"".into()]);
     for source in [

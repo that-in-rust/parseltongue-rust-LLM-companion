@@ -539,6 +539,39 @@ fn test_builtin_nested_macro_shadowing() {
 }
 
 #[test]
+fn test_lang_items_in_sysroot() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::write(root.join("src/lib.rs"),"pub fn build(_:Option<Vec<u8>>,_:core::ops::Range<u8>)->std::string::String{String::new()}").unwrap();
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let paths = read_published_table_fixture(&database, "path-resolution-site-records");
+    for name in ["Option", "Vec", "core::ops::Range", "std::string::String"] {
+        let row = paths.iter().find(|row| {
+            row["path_site_source_text"] == name
+                && row["site_compilation_scope_record"]["unit_cargo_target_name"] == "fixture"
+        });
+        assert!(
+            row.is_some_and(|row| row["path_resolution_state_kind"] == "resolved"),
+            "{name}: {row:?}"
+        );
+    }
+    let langs = read_published_table_fixture(&database, "lang-item-definition-table");
+    for name in ["sized", "copy", "owned_box"] {
+        assert!(
+            langs.iter().any(|row| row["lang_item_source_name"] == name),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn test_type_macros_remain_deferred() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("workspace");
