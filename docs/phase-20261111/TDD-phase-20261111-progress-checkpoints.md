@@ -1617,3 +1617,16 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   this boundary or applies these inputs.
 - SECONDARY now accepts cached observations as the required recorded input
   rather than rejecting all selected packages with build scripts.
+
+### SECONDARY recorded-script deltas RED
+
+- Added script cfg/env/output fixture with a generated Rust include.
+  PRIMARY must retain the unresolved baseline; SECONDARY must resolve the
+  generated type while preserving scope/mapped-unit count and report KL1
+  cfg/env-hash/generated-source identities without env values.
+- Empty-script baseline and missing/stale cfg/env/output errors are covered.
+  RED log: /home/ubuntu/m2-secondary-script-red-tests.log.
+- Private upstream build-script fields were inspected and remain untouched.
+  Verify recorded inputs against public per-crate cfg/env, then add only
+  recorded cfg atoms to the manifest baseline. Collect generated-source
+  digests from the loaded VFS, not a second filesystem read.

@@ -7,7 +7,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::{fs, process::Command};
 
-fn build_artifact_test_fixture(
+pub(super) fn build_artifact_test_fixture(
     macros: bool,
 ) -> (tempfile::TempDir, OracleWorkspaceExportConfig, Value) {
     let directory = tempfile::tempdir().unwrap();
