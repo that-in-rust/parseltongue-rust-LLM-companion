@@ -3180,3 +3180,110 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 
 - Retry command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests test_lang_items_in_sysroot -- --exact`.
 - Shell `5fba81`, child PID 42940; latest observation elapsed 1:06:22, still running with no test-harness output. It has the fixture's `store.db` open and the run-local `namespace-resolution-analysis-data.duckdb` open (2,396,532,736 bytes, last modified 18:33:57); no result is inferred. Leave it running.
+
+### REQ-RUST-024.11 — published-stage coverage status
+
+- Added `stage_publication_status_values` with exactly four stages. It reads
+  `stage-run-generation-records` through the current
+  `read_workspace_publication_scope()` result, so the store's generation,
+  attempt and frozen-marker visibility rules exclude markers from other
+  generations. The prior `stage_implementation_status_values` availability
+  map retains its values. A database with no publication now emits the same
+  banner shape with zero counts, unavailable tiling, and all four publication
+  statuses pending.
+- Test/helper names are four-word names: the source-only unit regression,
+  complete-syntax integration, stale-other-generation integration, and
+  no-publication integration tests are all mapped to REQ-RUST-024.11 in SPEC.
+- Corrected STUB compile check:
+  `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo check -p parseltongue-cli-dispatcher-binary --tests`
+  exited 0; output: `Finished `dev` profile [unoptimized] target(s) in 0.36s`.
+- The first RED fixture attempt used `source-ingest` as a mapping final stage,
+  which the CLI intentionally does not accept; those two setup errors are not
+  counted as behavioral RED. The source-only regression was moved to a
+  published-scope store stub, and the stale-marker case now uses the supported
+  `syntax-spans` stage plus a persisted name-resolution marker in another
+  un-published generation.
+- Corrected RED was assertion-based: the three CLI regressions failed because
+  the publication map was absent (and the no-publication command still returned
+  `no completed published generation`); the source-only unit assertion saw
+  `Null` instead of the expected four-key map. Both targeted RED commands exited
+  101; no timeout or compile error is counted.
+- GREEN: `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests publication -- --nocapture`
+  passed 3/3 integration tests; `cargo test -p parseltongue-cli-dispatcher-binary --bin parseltongue source_publication_status_pending -- --nocapture`
+  passed 1/1 unit test. The source-only fixture verifies one zero-byte source,
+  zero syntax spans, vacuously true tiling, unchanged availability status, and
+  pending syntax publication. The stale fixture verifies a persisted
+  name-resolution marker in another generation does not complete the published
+  generation. `cargo fmt -p parseltongue-cli-dispatcher-binary -- --check`
+  passed.
+- Per the lead's review checkpoint, no full workspace rerun, clippy, or release
+  build was started after this change. The frozen executable previously copied
+  to `/home/ubuntu/parseltongue-mapper-frozen-release` predates REQ-RUST-024.11
+  and is not the final release artifact. Native/serde mapping remains unstarted.
+- The unrelated sysroot CLI integration remains active in shell `5fba81`
+  (child PID 42940, elapsed 1:20:07, no test output). Latest stage evidence:
+  `/tmp/.tmphJH8fL/store.duckdb-analysis-run-files/.../namespace-resolution-analysis-data.duckdb`
+  is 1,232,875,520 bytes (mtime 18:43:54); the fixture `store.db` is
+  1,823,821,824 bytes (mtime 18:17:15). Leave it running; no result is inferred.
+
+#### Name-resolution publication completion
+
+- Extended `test_persisted_resolution_path_answers` to assert that a complete
+  published namespace run reports all four publication statuses complete. The
+  same test is mapped to REQ-RUST-024.11 in SPEC.
+- `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests test_persisted_resolution_path_answers -- --exact --nocapture`
+  passed: `test test_persisted_resolution_path_answers ... ok` and
+  `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 4.38s`.
+- The sysroot CLI test is still active in shell `5fba81`: child PID 42940 at
+  elapsed 1:23:07, with no test output. Its analysis database is 516,435,968
+  bytes (mtime 18:49:19); the fixture store remains 1,823,821,824 bytes
+  (mtime 18:17:15). Leave it running; no result is inferred.
+
+### REQ-RUST-024.11 review follow-up — final banner gates
+
+- Added `/// REQ-RUST-024.11` to all four new banner tests and to the existing
+  `test_persisted_resolution_path_answers` annotation (which retains its
+  REQ-RUST-024.10 tag). The source-only stub now records
+  `file_source_byte_count: 17` with zero span rows; the existing tiling
+  assertion remains true because the range groups are empty, so the regression
+  demonstrates vacuous tiling for nonempty, unprocessed source. The old
+  zero-byte-fixture GREEN entry above is historical and is superseded by these
+  stronger final-fixture results.
+- Final targeted tests, log
+  `/home/ubuntu/parseltongue-banner-final-tests-1794509816.log`:
+  `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests publication -- --nocapture`
+  passed 3/3; `cargo test -p parseltongue-cli-dispatcher-binary --bin parseltongue source_publication_status_pending -- --nocapture`
+  passed 1/1; `cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests test_persisted_resolution_path_answers -- --exact --nocapture`
+  passed 1/1. `cargo fmt --all -- --check` exited 0 with no output.
+- `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo clippy --workspace --all-targets -- -D warnings`
+  exited 0; output ended `Finished `dev` profile [unoptimized] target(s) in 0.68s`.
+- Workspace split command
+  `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 cargo test --workspace --no-fail-fast -- --skip test_lang_items_in_sysroot`
+  exited 101. Mapper CLI contracts passed 23/23 (one identical sysroot test
+  filtered), the adapter passed 64/64, and other suites passed. The sole failed
+  target was comparator-owned `oracle-comparison-contract-tests`: three tests
+  each reported `Error: StoreBackendFailureError { error_context_detail_text: "oracle path comparison not implemented" }`;
+  no comparator code was changed.
+- Final release build:
+  `CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo build --release` exited 0 with
+  `Finished `release` profile [optimized] target(s) in 5.00s`. Both
+  `target/release/parseltongue` and
+  `/home/ubuntu/parseltongue-mapper-frozen-release` are 100,415,760 bytes with
+  SHA-256 `bbeee8c54b5bbb02e77b6aa00c44f2fcf66247cf23d46896c21ccff6f959c363`.
+- Before another native-equivalent run, inspected the still-active
+  `test_lang_items_in_sysroot` invocation (shell `5fba81`, mapper PID 42940,
+  debug executable). Its fixture is a normal std-enabled Cargo library using
+  `Option<Vec<u8>>`, `core::ops::Range<u8>`, and `std::string::String`; it is not
+  a no-std substitute. The open run-local
+  `namespace-resolution-analysis-data.duckdb` grew from 2,036,084,736 bytes at
+  18:56 to 2,440,048,640 bytes at 19:04; `/proc/42940/io` reported
+  28,489,592,832 bytes written and the process remained active. A read-only
+  Python SQLite inspection returned `sqlite3.OperationalError: database is locked`;
+  it was not retried. The fixture was copied to
+  `/home/ubuntu/parseltongue-native-fixture/workspace` for later release-binary
+  replay. Do not overlap the expensive release replay while this meaningful
+  debug namespace-resolution run remains active.
+- REFACTOR checkpoint: no further behavior-neutral code refactor was warranted
+  for this focused banner change. The formatter, all-target Clippy, and final
+  diff checks passed; the TDD/status evidence is recorded in the separate
+  REFACTOR documentation commit.
