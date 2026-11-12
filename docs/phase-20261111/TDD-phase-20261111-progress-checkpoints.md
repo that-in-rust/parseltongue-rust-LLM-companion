@@ -2495,3 +2495,25 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   its exact fraction of total wall time is not yet measured. Next: replace
   two-owner IN with two independent, full-key EXISTS probes, then run the
   semantics suite and a bounded native CLI reproduction.
+
+### Namespace cleanup index RED — per-table coverage correction
+
+- REQ-RUST-020.1 / REQ-RUST-021.1: add
+  `test_namespace_cleanup_index_coverage` at the existing schema/query seam.
+  It checks each namespace-owned table's actual DELETE plan, not just the
+  existence of a CREATE INDEX statement in the initializer.
+- Command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0 timeout --signal=TERM --kill-after=5s 120s cargo test -p parseltongue-turso-store-adapter --lib test_namespace_cleanup_index_coverage -- --nocapture`.
+- Exact output: `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.22s`.
+- `syntax-namespace-input-scopes` uses all three cleanup-key columns, but
+  `syntax-namespace-input-items` uses only generation/attempt. All six
+  namespace-input table names previously generated the SAME index name,
+  `syntax-namespace-input-lookup`; IF NOT EXISTS silently left five without
+  a work-unit index. Correction to the earlier STUB note: seeing the index
+  initializer was insufficient to reject missing cleanup indexes for every
+  table. This new per-table probe disproves that earlier rejection.
+- The previous actual native stack reached `flush_namespace_input_rows ->
+  write_stage_table_unit`, which executes these DELETEs. The current bounded
+  native attempt is still in syntax writes; its live stack does NOT yet
+  establish that the cleanup collision dominates that earlier phase. Next:
+  give each input kind its own four-word lookup-index name, then verify all
+  plan and atomic-publication contracts. No memory tuning is undertaken.
