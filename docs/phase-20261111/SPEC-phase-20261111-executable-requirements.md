@@ -666,3 +666,140 @@ Observed short commit: 117afc24b; executable-spec/reliability method ideas.
 
 Copied code keeps its original license header and a third-party-license-notices.md entry in the copying
 crate. MPL-2.0 cargo-modules code is never copied. No source pin or runtime outcome is fabricated here.
+
+## Architecture revision — Turso write side / DuckDB analysis side
+
+This user-approved revision supersedes earlier Turso-only analysis constraints,
+the in-memory optimization, and the Turso-SQL spike. Earlier text remains as
+history; these revisions govern implementation.
+
+```mermaid
+flowchart TD
+    A["cargo metadata + ingest"] --> B["Rust: parse spans / fields / body sites; Turso concurrent"]
+    B --> C["Complete published generation: Rust Appender copy"]
+    C --> D["DuckDB: name-resolution SQL fixed point"]
+    D <--> E["Rust: macro expansion, writes rows back to Turso"]
+    D --> F["DuckDB: signature type-path SQL join"]
+    F --> G["DuckDB: impl / trait index SQL"]
+    G --> H["Rust: per-body lowering"]
+    H --> I["DuckDB: method candidates SQL + Rust: per-body inference"]
+    I --> J["DuckDB: HLD chain-collapse recursive CTE + rollups"]
+    J --> K["DuckDB: oracle comparator SQL, S5–S7"]
+```
+
+### Crate inventory and stage ownership
+
+- Existing `parseltongue-crate-graph-loader`: metadata and ingestion.
+- Existing `parseltongue-syntax-span-extractor`: syntax and scope/import/item/
+  visibility extraction; ordered textual macro scope; later per-body lowering.
+- Existing `parseltongue-turso-store-adapter`: concurrent write-side evidence,
+  BEGIN CONCURRENT/MVCC and complete generation publication.
+- Existing `parseltongue-port-macro-expander`: Rust CPU expansion; output is
+  persisted to Turso before the next frozen generation is copied.
+- New `parseltongue-duckdb-analysis-adapter`: Appender handoff, resolution SQL,
+  signature joins, impl/trait indexes, method candidates, HLD collapse/rollups
+  and S5–S7 comparison. Inference remains Rust per body.
+- Existing `parseltongue-table-store-traits`: L2 write and analysis ports.
+- Existing `parseltongue-core-row-types`: dependency-free identities.
+- Existing `parseltongue-stage-worker-scheduler`: bounded Rust stage workers.
+- Existing `parseltongue-cli-dispatcher-binary`: composition and barriers.
+- Existing `parseltongue-macro-span-records`: parser span compatibility.
+- Deleted by this revision `parseltongue-port-name-resolver`: move its contract
+  cases to DuckDB; remove its engine and obsolete in-memory orchestration.
+- Oracle-only `offline-teacher-rust-analyzer`: external CPU oracle, never linked
+  into production. Parser source pins remain unchanged.
+
+### Revised requirements and named RED contracts
+
+The names below specify required RED cases; they are not claims that those
+tests have already been implemented or passed.
+
+REQ-RUST-005.2: Turso is the concurrent write side; DuckDB is the analysis side.
+No third database, LLM, salsa or native rust-analyzer semantic crate is allowed.
+Rust owns syntax, macro expansion and per-body work, not a global definition map.
+
+REQ-RUST-010.3: Resolution is NON-MONOTONE. Recompute the complete binding set
+each round, stratifying explicit/named candidates before globs. Explicit
+bindings shadow globs for the same scope/name/namespace even when the explicit
+import resolves later. Distinct glob targets produce ambiguity rows, never an
+arbitrary winner. Preserve determinate/indeterminate import states as in the
+pinned RA semantics. A Rust driver compares canonical full binding-set digests;
+stop only when unchanged, or fail at 8192 rounds. Append-only INSERT SELECT is
+not sufficient. Required RED cases: `late-explicit-overrides-glob`,
+`conflicting-glob-targets-ambiguous`, `cyclic-glob-imports-terminate`.
+
+REQ-RUST-011.2: Compute textual macro_rules scope and macro_use module order
+in Rust, per file, in source order. Emit `legacy-macro-scope-records`; SQL
+joins those rows rather than reconstructing textual order. Alternate SQL
+rounds with newly resolved item macro expansion in Rust. Persist hygiene,
+defining-crate identity, invocation chains, virtual files and expanded syntax
+in Turso before copying the next complete published generation.
+Required RED case: `legacy-macro-textual-order`.
+
+REQ-RUST-010.4: Preserve self/super/crate paths, 2015/2018 roots, extern crate
+aliases, no_std/no_implicit_prelude, use Trait as _, use Enum::*, normalized raw
+identifiers, pub(in path), visibility filtered at the importer, and block def
+scopes chained to module scopes. Required RED cases:
+`module-path-prefix-cases`, `edition-path-root-cases`,
+`external-crate-alias-cases`, `disabled-prelude-context-cases`,
+`anonymous-trait-import-cases`, `enum-glob-variant-cases`,
+`raw-identifier-normalization-cases`, `restricted-visibility-path-cases`,
+`glob-importer-visibility-cases`, `body-module-scope-chaining`.
+
+REQ-RUST-016.2: DuckDB SQL owns signature joins, impl/trait indexes, method
+candidate sets, HLD recursive chain collapse and rollups. Rust lowering and
+inference are bounded per body. Do not restore the in-memory resolver fallback.
+
+REQ-RUST-021.2: S5–S7 comparison runs in DuckDB SQL with exact mapped-unit,
+PRIMARY/SECONDARY and proc-macro policies unchanged. Publish an exhaustive
+oracle-row partition. M2 scores module-scope paths, including module-bound
+primitive names and enum variants. Type-relative/associated paths requiring
+lookup through a type, generic parameter, Self, trait or qualified projection
+are counted/reported but scored at M4–M6. Enum variant lookup alone is not
+associated-item lookup. Classify using oracle semantic resolution/container
+kind, not spelling heuristics. Unknown classifications are reported as blocked,
+not silently dropped. Reconcile all partition counts to the oracle rows;
+preserve exclusions and top disagreement categories. Zero denominators are
+N/A or BLOCKED. Required RED: `module-associated-denominator-partition`.
+
+REQ-RUST-024.1: Copy only a COMPLETE PUBLISHED Turso generation using the Rust
+duckdb Appender. No SQLite extension, database ATTACH, runtime download,
+INSTALL or LOAD. Before any analysis, verify per-table row counts AND content
+digests agree between Turso and DuckDB. Preserve keys, exact payloads,
+generation/attempt identity and atomic snapshot completion; cancel/failure
+leaves no usable partial snapshot.
+Required RED: `published-generation-copy-equality`.
+
+REQ-RUST-024.2: Every DuckDB row carries its generation key. DuckDB is the
+analysis source of truth; only final HLD/product tables copy back into Turso,
+with a digest check. Rust macro outputs are write-side evidence, not copied
+analysis intermediates. Required RED: `product-publication-digest-equality`.
+
+REQ-RUST-024.3: Every consumed query uses ORDER BY a total key; every tie-break
+is total. Canonical digests include the complete sorted binding set and all
+determinacy/ambiguity state. Single-thread and multi-thread DuckDB exports must
+be byte-identical. Required RED: `duckdb-thread-export-determinism`.
+
+REQ-RUST-024.4: Set autoinstall_known_extensions=false,
+autoload_known_extensions=false and enable_external_access=false. Use bundled
+DuckDB, no extensions. Enforce memory_limit approximately 1.2 GiB, not 1.5 GiB,
+and temp_directory inside the run directory. The full Turso + DuckDB process
+tree must remain at most 2 GiB; the engine limit alone is not acceptance.
+Required RED: `serde-analysis-residency-budget`.
+
+### §3.1 layer-table appended revision
+
+L1 stays dependency-free. L2 declares write/analysis ports. L3 includes Turso,
+DuckDB, graph loading, syntax extraction and macro implementation. The CLI
+composes these stages through ports. Delete the superseded in-memory engine;
+retain/move its contract cases and syntax projection rather than discarding
+their specification or extraction logic.
+
+### §5 milestone-plan appended revision
+
+Land bundled DuckDB skeleton and offline/budget/copy contracts; delete obsolete
+in-memory/profiling paths, preserving resolver contracts. Then SQL resolution
+GREEN, serde wall time/rounds/tree RSS, comparator SQL, all-five S5. Continue
+S6/S7 with SOP codebase-memory: list_projects, exact root_path match, schema,
+complete paginated coverage and reconciliation. Commit/push STUB, RED, GREEN,
+REFACTOR separately. No success is inferred from unmeasured stages.

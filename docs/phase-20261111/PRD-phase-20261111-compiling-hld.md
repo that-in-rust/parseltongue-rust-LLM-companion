@@ -272,3 +272,17 @@ Remaining corpus hashes are pinned at M1; harness executable hash is recorded af
 SPEC §8 lists repositories, exact known commits, modes (copy-adapt/link-pinned/rewrite-from/oracle/idea-only)
 and licenses. Copied code retains headers and third-party-license-notices.md in its crate.
 cargo-modules MPL-2.0 code is idea-only, never copied. No repository-wide AGENTS.md change is made by this phase.
+
+## 16. Architecture constraint revision
+
+User-approved replacement: Turso for concurrent writes, DuckDB for analysis;
+no third database. Preserve Turso BEGIN CONCURRENT/MVCC and complete generation
+publication. Copy frozen published generations through the Rust DuckDB
+Appender with per-table count/digest equality. No SQLite extension, downloads
+or extensions; disable auto-install, auto-load and external access. Bound the
+engine to approximately 1.2 GiB and spill under the run directory; require the
+whole Turso + DuckDB process tree at most 2 GiB. Name resolution uses complete,
+non-monotone stratified SQL rounds, not append-only accumulation. Rust macro
+expansion alternates with SQL and writes evidence to Turso. Only final
+HLD/product analysis tables copy back with digest verification. Per-body Rust
+work remains bounded. S5 reports module versus associated-path partitions.
