@@ -50,6 +50,8 @@ pub enum OracleComparisonFailureError {
         expected: String,
         observed: String,
     },
+    #[error("DuckDB database backing mismatch: expected {expected}, got {observed}")]
+    DuckdbDatabaseBackingMismatch { expected: String, observed: String },
     #[error("could not create comparison spill directory: {0}")]
     TempDirectory(#[source] std::io::Error),
     #[error("DuckDB comparison failed: {0}")]

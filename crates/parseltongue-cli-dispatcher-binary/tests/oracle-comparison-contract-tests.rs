@@ -549,6 +549,12 @@ fn test_comparison_telemetry_survives_publication() {
     assert_eq!(settings["autoinstall_known_extensions"], false);
     assert_eq!(settings["allow_community_extensions"], false);
     assert_eq!(settings["threads"], 1);
+    let database_backing = &operational["duckdb_database_backing"];
+    assert_eq!(database_backing["file_backed_flag"], true);
+    let database_file_path = database_backing["database_file_path"].as_str().unwrap();
+    assert!(Path::new(database_file_path).is_absolute());
+    assert!(database_file_path.ends_with("oracle-path-comparison-database.duckdb"));
+    assert!(!Path::new(database_file_path).exists());
     for snapshot in [
         "duckdb_memory_before_analysis",
         "duckdb_memory_after_analysis",
