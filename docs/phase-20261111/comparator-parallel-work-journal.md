@@ -423,3 +423,34 @@ REQ-RUST-026.4 GREEN
 **REQ-RUST-026.5 — semantic determinism across supported thread counts**
 - `test_thread_counts_export_identically`
 - `test_published_comparisons_threads_are_deterministic`
+
+### REQ-RUST-026.2/026.3 PRIMARY oracle-source-blocking correction
+
+REQ-RUST-026.2/026.3 RED
+  - Added `test_external_source_missing_blocks_match_rate`, `test_primary_valid_oracle_missing_production`, `test_primary_source_missing_beats_production_cfg`, `test_production_reason_does_not_excuse_wrong_target`, and `test_secondary_reasons_do_not_affect_primary`; updated `test_primary_classes_partition_once` to require distinct oracle-source and unknown-blocked partitions.
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: FAILED. 38 passed; 4 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - The RED failures showed PRIMARY `external_source_missing` scored as mismatch, failed to override production cfg, remained eligible in the class-partition test, and SECONDARY `cfg_inactive` incorrectly became the authoritative reason. The valid-oracle/missing-production and wrong-target regressions already passed, preserving their nonmatch/mismatch behavior.
+
+REQ-RUST-026.2/026.3 GREEN
+  - `cargo test -p parseltongue-duckdb-analysis-adapter oracle_path_comparison -- --nocapture`: `test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 62 filtered out`.
+  - `git diff --check`: exit code 0.
+  - The 201-site regression publishes 200 exact matches plus one PRIMARY `external_source_missing`; status and denominator status are BLOCKED, rates are null, both blocked partitions remain distinct, and raw partition totals reconcile. Production-missing remains an eligible zero-match nonmatch; PRIMARY source-missing overrides production cfg; SECONDARY-only cfg/build reasons remain separately recorded without changing PRIMARY authoritative reason.
+
+### PRIMARY source-blocking authoritative test mapping update
+
+**REQ-RUST-026.2 — oracle availability and PRIMARY-visible reason precedence**
+- `test_external_source_missing_blocks_match_rate`
+- `test_primary_valid_oracle_missing_production`
+- `test_primary_source_missing_beats_production_cfg`
+- `test_production_reason_does_not_excuse_wrong_target`
+- `test_secondary_reasons_do_not_affect_primary`
+- `test_primary_classes_partition_once`
+- `test_production_cfg_keeps_mismatch`
+- `test_secondary_cfg_preserves_match`
+- `test_unknown_cfg_remains_blocked`
+- `test_cfg_wrong_target_mismatch`
+
+**REQ-RUST-026.3 — disjoint blocked partitions and raw reconciliation**
+- `test_external_source_missing_blocks_match_rate`
+- `test_primary_classes_partition_once`
+- `test_blocked_partition_reconciles_duplicates`

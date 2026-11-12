@@ -725,14 +725,25 @@ fn score_canonical_comparison_rows(
              FULL OUTER JOIN production_oracle_site_rows d ON p.source_scope_generation_value=d.source_scope_generation_value AND p.source_scope_attempt_value=d.source_scope_attempt_value AND p.site_key=d.site_key
              FULL OUTER JOIN secondary_oracle_site_rows s ON COALESCE(p.source_scope_generation_value,d.source_scope_generation_value)=s.source_scope_generation_value AND COALESCE(p.source_scope_attempt_value,d.source_scope_attempt_value)=s.source_scope_attempt_value AND COALESCE(p.site_key,d.site_key)=s.site_key
          ), reasoned AS (
-             SELECT *, CASE
-                 WHEN 'cfg_inactive' IN (primary_reason,production_reason,secondary_reason) THEN 'cfg_inactive'
-                 WHEN 'build_script' IN (primary_reason,production_reason,secondary_reason) THEN 'build_script'
-                 WHEN 'proc_macro' IN (primary_reason,production_reason,secondary_reason) THEN 'proc_macro'
-                 WHEN 'external_source_missing' IN (primary_reason,production_reason,secondary_reason) THEN 'external_source_missing'
-                 WHEN 'unknown_receiver' IN (primary_reason,production_reason,secondary_reason) THEN 'unknown_receiver'
-                 WHEN 'trait_solver_needed' IN (primary_reason,production_reason,secondary_reason) THEN 'trait_solver_needed'
-                 ELSE '' END AS authoritative_reason
+             SELECT *, CASE WHEN primary_key IS NOT NULL THEN
+                 CASE
+                     WHEN primary_reason='external_source_missing' THEN 'external_source_missing'
+                     WHEN 'cfg_inactive' IN (primary_reason,production_reason) THEN 'cfg_inactive'
+                     WHEN 'build_script' IN (primary_reason,production_reason) THEN 'build_script'
+                     WHEN 'proc_macro' IN (primary_reason,production_reason) THEN 'proc_macro'
+                     WHEN 'external_source_missing' IN (primary_reason,production_reason) THEN 'external_source_missing'
+                     WHEN 'unknown_receiver' IN (primary_reason,production_reason) THEN 'unknown_receiver'
+                     WHEN 'trait_solver_needed' IN (primary_reason,production_reason) THEN 'trait_solver_needed'
+                     ELSE '' END
+                 ELSE CASE
+                     WHEN 'cfg_inactive' IN (production_reason,secondary_reason) THEN 'cfg_inactive'
+                     WHEN 'build_script' IN (production_reason,secondary_reason) THEN 'build_script'
+                     WHEN 'proc_macro' IN (production_reason,secondary_reason) THEN 'proc_macro'
+                     WHEN 'external_source_missing' IN (production_reason,secondary_reason) THEN 'external_source_missing'
+                     WHEN 'unknown_receiver' IN (production_reason,secondary_reason) THEN 'unknown_receiver'
+                     WHEN 'trait_solver_needed' IN (production_reason,secondary_reason) THEN 'trait_solver_needed'
+                     ELSE '' END
+                 END AS authoritative_reason
              FROM joined
          ), evaluated AS (
              SELECT *,
@@ -740,6 +751,7 @@ fn score_canonical_comparison_rows(
                    WHEN primary_key IS NULL AND production_key IS NOT NULL AND secondary_key IS NOT NULL THEN 'production-secondary-only'
                    WHEN primary_key IS NULL AND secondary_key IS NOT NULL THEN 'secondary-only'
                    WHEN primary_key IS NULL AND production_key IS NOT NULL THEN 'production-only'
+                   WHEN primary_reason='external_source_missing' THEN 'oracle-source-blocked'
                    WHEN classification='blocked' THEN 'blocked'
                    WHEN classification='type-relative' THEN 'deferred'
                    WHEN primary_empty AND production_key IS NOT NULL AND NOT production_empty THEN 'mismatch'
@@ -760,6 +772,7 @@ fn score_canonical_comparison_rows(
              SELECT *, CASE status
                  WHEN 'deferred' THEN 'associated-deferred'
                  WHEN 'blocked' THEN 'unknown-blocked'
+                 WHEN 'oracle-source-blocked' THEN 'oracle-source-blocked'
                  WHEN 'cfg-excluded' THEN 'cfg-excluded'
                  WHEN 'proc-excluded' THEN 'proc-excluded'
                  WHEN 'production-only' THEN 'non-primary-production-only'
@@ -769,6 +782,7 @@ fn score_canonical_comparison_rows(
                  CASE status
                  WHEN 'deferred' THEN COALESCE(classification_reason,'type_relative')
                  WHEN 'blocked' THEN COALESCE(classification_reason,'unknown_lookup_scope')
+                 WHEN 'oracle-source-blocked' THEN 'external_source_missing'
                  WHEN 'cfg-excluded' THEN 'cfg_inactive'
                  WHEN 'proc-excluded' THEN 'proc_macro'
                  ELSE COALESCE(NULLIF(authoritative_reason,''),classification_reason,'') END AS partition_reason
@@ -789,6 +803,8 @@ struct PathComparisonResultStats {
     matched: u64,
     deferred: u64,
     blocked: u64,
+    unknown_blocked: u64,
+    oracle_source_blocked: u64,
     production_only: u64,
     secondary_only: u64,
     secondary_changed: u64,
@@ -801,6 +817,8 @@ struct PathComparisonResultStats {
     type_relative_raw: u64,
     cfg_inactive_raw: u64,
     blocked_raw: u64,
+    unknown_blocked_raw: u64,
+    oracle_source_blocked_raw: u64,
     proc_macro_raw: u64,
     unresolved: u64,
     missing_production: u64,
@@ -818,7 +836,7 @@ fn read_canonical_comparison_results(
         "SELECT count(*) FILTER (WHERE primary_duplicates>0 AND partition_kind='module-scope-scored' AND status IN ('match','mismatch','unresolved','missing-production')),
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='match'),
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='deferred'),
-                count(*) FILTER (WHERE status='blocked'),
+                count(*) FILTER (WHERE status IN ('blocked','oracle-source-blocked')),
                 count(*) FILTER (WHERE production_only),
                 count(*) FILTER (WHERE secondary_only),
                 count(*) FILTER (WHERE secondary_changed),
@@ -830,11 +848,15 @@ fn read_canonical_comparison_results(
                 COALESCE(sum(primary_duplicates) FILTER (WHERE classification='module-scope'),0),
                 COALESCE(sum(primary_duplicates) FILTER (WHERE classification='type-relative'),0),
                 COALESCE(sum(primary_duplicates) FILTER (WHERE partition_kind='cfg-excluded'),0),
-                COALESCE(sum(primary_duplicates) FILTER (WHERE partition_kind='unknown-blocked'),0),
+                COALESCE(sum(primary_duplicates) FILTER (WHERE partition_kind IN ('unknown-blocked','oracle-source-blocked')),0),
                 COALESCE(sum(primary_duplicates) FILTER (WHERE partition_kind='proc-excluded'),0),
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='unresolved'),
                 count(*) FILTER (WHERE primary_duplicates>0 AND status='missing-production'),
-                count(*) FILTER (WHERE primary_duplicates>0 AND status='mismatch')
+                count(*) FILTER (WHERE primary_duplicates>0 AND status='mismatch'),
+                count(*) FILTER (WHERE primary_duplicates>0 AND status='blocked'),
+                count(*) FILTER (WHERE primary_duplicates>0 AND status='oracle-source-blocked'),
+                COALESCE(sum(primary_duplicates) FILTER (WHERE partition_kind='unknown-blocked'),0),
+                COALESCE(sum(primary_duplicates) FILTER (WHERE partition_kind='oracle-source-blocked'),0)
          FROM oracle_comparison_evidence_rows WHERE source_scope_generation_value=? AND source_scope_attempt_value=?",
         params![
             source_scope.run_generation_digest_value,
@@ -862,6 +884,10 @@ fn read_canonical_comparison_results(
                 unresolved: row.get(17)?,
                 missing_production: row.get(18)?,
                 mismatched: row.get(19)?,
+                unknown_blocked: row.get(20)?,
+                oracle_source_blocked: row.get(21)?,
+                unknown_blocked_raw: row.get(22)?,
+                oracle_source_blocked_raw: row.get(23)?,
             })
         },
     ).map_err(OracleComparisonFailureError::Duckdb)?;
@@ -981,6 +1007,8 @@ fn read_canonical_comparison_results(
         "agreement_match_rate":rate,
         "agreement_deferred_path_count":stats.deferred,
         "agreement_blocked_path_count":stats.blocked,
+        "agreement_unknown_blocked_path_count":stats.unknown_blocked,
+        "agreement_oracle_source_blocked_path_count":stats.oracle_source_blocked,
         "agreement_production_only_path_count":stats.production_only,
         "agreement_secondary_only_path_count":stats.secondary_only,
         "agreement_secondary_only_count":stats.secondary_only,
@@ -995,6 +1023,8 @@ fn read_canonical_comparison_results(
         "agreement_type_relative_raw_site_count":stats.type_relative_raw,
         "agreement_cfg_inactive_raw_site_count":stats.cfg_inactive_raw,
         "agreement_blocked_raw_site_count":stats.blocked_raw,
+        "agreement_unknown_blocked_raw_site_count":stats.unknown_blocked_raw,
+        "agreement_oracle_source_blocked_raw_site_count":stats.oracle_source_blocked_raw,
         "agreement_proc_macro_raw_site_count":stats.proc_macro_raw,
         "agreement_unresolved_path_count":stats.unresolved,
         "agreement_missing_production_path_count":stats.missing_production,
@@ -1688,6 +1718,7 @@ mod oracle_path_comparison_sql_tests {
     }
 
     /// REQ-RUST-026.2
+    /// REQ-RUST-026.3
     #[test]
     fn test_primary_classes_partition_once() {
         let primary = vec![
@@ -1708,14 +1739,209 @@ mod oracle_path_comparison_sql_tests {
         assert_eq!(result["agreement_module_scope_raw_site_count"], 1);
         assert_eq!(result["agreement_type_relative_raw_site_count"], 1);
         assert_eq!(result["agreement_cfg_inactive_raw_site_count"], 1);
-        assert_eq!(result["agreement_blocked_raw_site_count"], 1);
-        assert_eq!(result["agreement_eligible_path_count"], 1);
+        assert_eq!(result["agreement_eligible_path_count"], 0);
         assert_eq!(result["agreement_deferred_path_count"], 1);
-        assert_eq!(result["agreement_blocked_path_count"], 1);
+        assert_eq!(result["agreement_blocked_path_count"], 2);
+        assert_eq!(result["agreement_unknown_blocked_path_count"], 1);
+        assert_eq!(result["agreement_oracle_source_blocked_path_count"], 1);
+        assert_eq!(result["agreement_blocked_raw_site_count"], 2);
+        assert_eq!(result["agreement_unknown_blocked_raw_site_count"], 1);
+        assert_eq!(result["agreement_oracle_source_blocked_raw_site_count"], 1);
+        assert_eq!(result["agreement_primary_partition_reconciled_flag"], true);
+        assert_eq!(
+            result["agreement_primary_raw_partition_counts"]["oracle-source-blocked"],
+            1
+        );
         assert_eq!(
             result["agreement_reason_counts"]["external_source_missing"],
             1
         );
+    }
+
+    /// REQ-RUST-026.2
+    /// REQ-RUST-026.3
+    #[test]
+    fn test_external_source_missing_blocks_match_rate() {
+        let mut production = Vec::with_capacity(200);
+        let mut primary = Vec::with_capacity(201);
+        let mut secondary = Vec::with_capacity(200);
+        for index in 0..200 {
+            let key = format!("site-{index}");
+            let target = format!("target-{index}");
+            let targets = [target.as_str()];
+            production.push(build_test_site_value(
+                &key,
+                "production",
+                &targets,
+                false,
+                "",
+            ));
+            primary.push(build_test_site_value(
+                &key,
+                "module-scope",
+                &targets,
+                false,
+                "",
+            ));
+            secondary.push(build_test_site_value(
+                &key,
+                "module-scope",
+                &targets,
+                false,
+                "",
+            ));
+        }
+        primary.push(build_test_site_value(
+            "oracle-source-missing",
+            "module-scope",
+            &[],
+            false,
+            "external_source_missing",
+        ));
+        let (evidence, result) = build_test_comparison_result(1, &production, &primary, &secondary);
+        assert_eq!(result["agreement_status_kind"], "blocked");
+        assert_eq!(result["agreement_denominator_status_kind"], "BLOCKED");
+        assert_eq!(result["agreement_eligible_path_count"], 200);
+        assert_eq!(result["agreement_match_count_value"], 200);
+        assert!(result["agreement_exact_match_rate"].is_null());
+        assert_eq!(result["agreement_blocked_path_count"], 1);
+        assert_eq!(result["agreement_unknown_blocked_path_count"], 0);
+        assert_eq!(result["agreement_oracle_source_blocked_path_count"], 1);
+        assert_eq!(result["agreement_primary_raw_site_count"], 201);
+        assert_eq!(result["agreement_blocked_raw_site_count"], 1);
+        assert_eq!(result["agreement_oracle_source_blocked_raw_site_count"], 1);
+        assert_eq!(result["agreement_primary_partition_reconciled_flag"], true);
+        assert_eq!(
+            result["agreement_primary_raw_partition_counts"]["oracle-source-blocked"],
+            1
+        );
+        let blocked = evidence
+            .iter()
+            .find(|row| row["agreement_site_key"] == "oracle-source-missing")
+            .unwrap();
+        assert_eq!(
+            blocked["agreement_site_status_kind"],
+            "oracle-source-blocked"
+        );
+        assert_eq!(blocked["agreement_partition_kind"], "oracle-source-blocked");
+        assert_eq!(
+            blocked["agreement_partition_reason_kind"],
+            "external_source_missing"
+        );
+    }
+
+    /// REQ-RUST-026.2
+    #[test]
+    fn test_primary_valid_oracle_missing_production() {
+        let primary = vec![build_test_site_value(
+            "site",
+            "module-scope",
+            &["target"],
+            false,
+            "",
+        )];
+        let (_, result) = build_test_comparison_result(1, &[], &primary, &[]);
+        assert_eq!(result["agreement_status_kind"], "mismatch");
+        assert_eq!(result["agreement_denominator_status_kind"], "scored");
+        assert_eq!(result["agreement_eligible_path_count"], 1);
+        assert_eq!(result["agreement_match_count_value"], 0);
+        assert_eq!(result["agreement_blocked_path_count"], 0);
+        assert_eq!(result["agreement_exact_match_rate"], 0.0);
+    }
+
+    /// REQ-RUST-026.2
+    #[test]
+    fn test_primary_source_missing_beats_production_cfg() {
+        let primary = vec![build_test_site_value(
+            "site",
+            "module-scope",
+            &[],
+            false,
+            "external_source_missing",
+        )];
+        let production = vec![build_test_site_value(
+            "site",
+            "production",
+            &[],
+            false,
+            "cfg_inactive",
+        )];
+        let (evidence, result) = build_test_comparison_result(1, &production, &primary, &[]);
+        assert_eq!(result["agreement_status_kind"], "blocked");
+        assert_eq!(result["agreement_exact_match_rate"], Value::Null);
+        assert_eq!(result["agreement_oracle_source_blocked_path_count"], 1);
+        assert_eq!(
+            evidence[0]["agreement_production_unresolved_reason_kind"],
+            "cfg_inactive"
+        );
+        assert_eq!(
+            evidence[0]["agreement_partition_reason_kind"],
+            "external_source_missing"
+        );
+    }
+
+    /// REQ-RUST-026.2
+    #[test]
+    fn test_production_reason_does_not_excuse_wrong_target() {
+        let primary = vec![build_test_site_value(
+            "site",
+            "module-scope",
+            &["expected"],
+            false,
+            "",
+        )];
+        let production = vec![build_test_site_value(
+            "site",
+            "production",
+            &["wrong"],
+            false,
+            "cfg_inactive",
+        )];
+        let (evidence, result) = build_test_comparison_result(1, &production, &primary, &[]);
+        assert_eq!(result["agreement_eligible_path_count"], 1);
+        assert_eq!(result["agreement_match_count_value"], 0);
+        assert_eq!(result["agreement_mismatched_path_count"], 1);
+        assert_eq!(evidence[0]["agreement_site_status_kind"], "mismatch");
+    }
+
+    /// REQ-RUST-026.2
+    #[test]
+    fn test_secondary_reasons_do_not_affect_primary() {
+        for reason in ["cfg_inactive", "build_script"] {
+            let primary = vec![build_test_site_value(
+                "site",
+                "module-scope",
+                &["target"],
+                false,
+                "",
+            )];
+            let production = vec![build_test_site_value(
+                "site",
+                "production",
+                &["target"],
+                false,
+                "",
+            )];
+            let secondary = vec![build_test_site_value(
+                "site",
+                "module-scope",
+                &["target"],
+                false,
+                reason,
+            )];
+            let (evidence, result) =
+                build_test_comparison_result(1, &production, &primary, &secondary);
+            assert_eq!(result["agreement_eligible_path_count"], 1);
+            assert_eq!(result["agreement_match_count_value"], 1);
+            assert_eq!(
+                evidence[0]["agreement_secondary_unresolved_reason_kind"],
+                reason
+            );
+            assert_eq!(
+                evidence[0]["agreement_authoritative_causal_reason_kind"],
+                ""
+            );
+        }
     }
 
     /// REQ-RUST-026.2
