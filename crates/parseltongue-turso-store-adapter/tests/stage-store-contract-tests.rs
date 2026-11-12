@@ -11,6 +11,107 @@ fn make_fixture_store_adapter() -> TursoWorkspaceStoreAdapter {
 }
 
 #[test]
+fn analysis_allows_stage_completion_markers() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("completions");
+    let cancel = RunCancelFlagValue::default();
+    complete_fixture_stage_set(&store, &scope);
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-namespace-input-records",
+        "__complete__",
+        &[],
+        &[],
+    )
+    .unwrap();
+    let frozen = store
+        .publish_analysis_input_snapshot(&scope, &cancel)
+        .unwrap();
+    let before = store
+        .read_stage_table_rows(&frozen, "stage-run-generation-records")
+        .unwrap();
+    write_fixture_stage_rows(&store, &scope, "name-resolution", "__complete__", &[], &[]).unwrap();
+    assert_eq!(
+        store
+            .read_stage_table_rows(&frozen, "stage-run-generation-records")
+            .unwrap(),
+        before
+    );
+    let next = store
+        .publish_analysis_input_snapshot(&scope, &cancel)
+        .unwrap();
+    assert_eq!(
+        store
+            .count_stage_table_rows(&next, "stage-run-generation-records")
+            .unwrap(),
+        before.len() + 1
+    );
+    assert!(
+        write_fixture_stage_rows(&store, &scope, "name-resolution", "__complete__", &[], &[])
+            .is_err()
+    );
+    let row = StageTableRowRecord {
+        stage_owned_table_name: "path-resolution-site-records".into(),
+        stage_row_record_key: "invalid".into(),
+        stage_row_payload_text: "invalid".into(),
+    };
+    assert!(
+        write_fixture_stage_rows(
+            &store,
+            &scope,
+            "name-resolution",
+            "__complete__",
+            &[],
+            &[row]
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn analysis_macro_namespace_chunks_seal() {
+    let store = make_fixture_store_adapter();
+    let scope = make_fixture_stage_scope("macro-inputs");
+    let cancel = RunCancelFlagValue::default();
+    complete_fixture_stage_set(&store, &scope);
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "syntax-namespace-input-records",
+        "__complete__",
+        &[],
+        &[],
+    )
+    .unwrap();
+    let before = store
+        .publish_analysis_input_snapshot(&scope, &cancel)
+        .unwrap();
+    let table = "syntax-namespace-input-items";
+    let row = StageTableRowRecord {
+        stage_owned_table_name: table.into(),
+        stage_row_record_key: "generated".into(),
+        stage_row_payload_text: "generated".into(),
+    };
+    write_fixture_stage_rows(
+        &store,
+        &scope,
+        "name-resolution",
+        "crate/macros/pending/0000",
+        &[],
+        &[row],
+    )
+    .unwrap();
+    assert_eq!(store.count_stage_table_rows(&scope, table).unwrap(), 0);
+    write_fixture_stage_rows(&store, &scope, "name-resolution", "crate/macros", &[], &[]).unwrap();
+    let after = store
+        .publish_analysis_input_snapshot(&scope, &cancel)
+        .unwrap();
+    assert_eq!(store.count_stage_table_rows(&after, table).unwrap(), 1);
+    assert_eq!(store.count_stage_table_rows(&before, table).unwrap(), 0);
+}
+
+#[test]
 fn independent_analysis_input_snapshots() {
     let store = make_fixture_store_adapter();
     let scope = make_fixture_stage_scope("analysis");

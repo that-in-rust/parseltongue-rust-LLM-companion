@@ -24,6 +24,7 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ("module-scope-binding-table", "name-resolution"),
     ("name-resolution-scope-records", "name-resolution"),
     ("path-resolution-site-records", "name-resolution"),
+    ("analysis-resolution-receipt-records", "name-resolution"),
     ("macro-expanded-item-table", "name-resolution"),
     (
         "lang-item-definition-table",
@@ -136,8 +137,9 @@ fn build_crate_visibility_clause(table: &str, revision: Option<i64>) -> String {
         SELECT 1 FROM "stage-run-generation-records" AS completed
         WHERE completed.run_generation_digest_value="{table}".run_generation_digest_value
         AND completed.stage_attempt_sequence_value="{table}".stage_attempt_sequence_value
-        AND completed.stage_row_record_key='__marker__/{owner}/' ||
-            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1) {frozen_completion})) AND {snapshot_visibility}"#
+        AND completed.stage_row_record_key IN ('__marker__/{owner}/' ||
+            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1),'__marker__/name-resolution/' ||
+            substr("{table}".stage_unit_work_key,1,instr("{table}".stage_unit_work_key,'/pending/')-1)) {frozen_completion})) AND {snapshot_visibility}"#
     )
 }
 
@@ -209,12 +211,14 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
             let transaction = connection.transaction_with_behavior(turso::transaction::TransactionBehavior::Concurrent).await?;
             let result = async {
                 let scope = request.stage_run_scope_value;
+                let completion=request.stage_unit_work_key=="__complete__";
+                if completion && !request.stage_unit_output_rows.is_empty(){return Err(turso::Error::Misuse("stage completion markers cannot own output rows".into()));}
                 let mut snapshot=transaction.query("SELECT 1 FROM \"frozen-stage-publication-records\" WHERE generation_key=? AND attempt_key=? AND source_attempt_key<>attempt_key",
                     turso::params![scope.run_generation_digest_value.clone(),scope.stage_attempt_sequence_value.clone()]).await?;
                 if snapshot.next().await?.is_some() {return Err(turso::Error::Misuse("frozen snapshot scopes are read-only".into()));}
                 drop(snapshot);
                 let shared_owners=STAGE_OWNED_TABLE_NAMES.iter().map(|(_,owner)|*owner).filter(|owner|STAGE_OWNED_TABLE_NAMES.iter().any(|(table,_)|
-                    check_table_stage_access(table,request.stage_owner_name_value) && check_table_stage_access(table,owner))).collect::<std::collections::BTreeSet<_>>();
+                    check_table_stage_access(table,request.stage_owner_name_value) && check_table_stage_access(table,owner))).filter(|owner|!completion || *owner==request.stage_owner_name_value).collect::<std::collections::BTreeSet<_>>();
                 let parameters=std::iter::once(scope.run_generation_digest_value.clone()).chain(std::iter::once(scope.stage_attempt_sequence_value.clone()))
                     .chain(shared_owners.iter().map(|owner|format!("__marker__/{owner}/{}",request.stage_unit_work_key))).collect::<Vec<_>>();
                 let placeholders=std::iter::repeat_n("?",shared_owners.len()).collect::<Vec<_>>().join(",");
@@ -231,7 +235,7 @@ impl StageTableStorePort for TursoWorkspaceStoreAdapter {
                 let setup=started.elapsed().as_secs_f64();
                 let cleanup_started=std::time::Instant::now();
                 for (table,_) in STAGE_OWNED_TABLE_NAMES {
-                    if check_table_stage_access(table,request.stage_owner_name_value) {
+                    if !completion && check_table_stage_access(table,request.stage_owner_name_value) {
                         transaction.execute(format!("DELETE FROM \"{table}\" WHERE run_generation_digest_value=? AND stage_attempt_sequence_value=? AND stage_unit_work_key=?"),
                             turso::params![scope.run_generation_digest_value.clone(), scope.stage_attempt_sequence_value.clone(), request.stage_unit_work_key.to_owned()]).await?;
                     }
