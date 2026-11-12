@@ -2,20 +2,19 @@
 
 Rewritten in place after every run report. History lives in the TDD journal and run reports.
 
-Last updated: 2026-11-12 · Latest measurement: `~/hld-current-test-artifacts/20261112-namespace-phase-probes/namespace-projection-lifecycle-controls/baseline-copy-storage-snapshot.log`; no all-five qualification exists.
+Last updated: 2026-11-12 · Latest measurement is the historical baseline at `~/hld-current-test-artifacts/20261112-namespace-phase-probes/namespace-projection-lifecycle-controls/baseline-copy-storage-snapshot.log`. Mapper tip e3868ab is integrated locally for review; integrated code is unqualified. No all-five PASS or qualification exists.
 
 ```text
  MILESTONE  STATE
  M0  core types, Turso store            code done; SOP S3 skeleton subset not re-run on current digest
  M1  ingest, crate graph, spans         code done; S1/S2/S3 historical PASS (old digest) → re-run pending
- M2  name resolution (DuckDB SQL)       in progress: measured-only memory default; all-five S5 prerequisite pending
-       done   Turso→DuckDB Appender copy + digest checks; bounded DuckDB constructor
+ M2  name resolution (DuckDB SQL)       mapper implementation integrated but unqualified; native diagnostic unresolved; all-five S5 pending
+       code   measured-only default, generation-backed publication receipts, and stage-status banner integrated; no integrated build/test/corpus run in this merge
        done   non-monotone SQL resolution, preludes, extern aliases, textual macro scope, macro alternation
        done   oracle path partition (module-scope scored at M2; type-relative deferred)
        done   indexed frozen visibility + distinct namespace cleanup indexes (focused tests GREEN)
        done   typed copy/normalization/resolution failures, memory telemetry, retained replay and rollback-safe EXPLAIN
-       open   original CLI WIP remains uncommitted; unbounded native copy/resolution replay required
-       open   comparator · serde M2 qualification · all-five S5
+       open   native copy/resolution diagnostic; comparator review fixes; serde M2 qualification; all-five S5
  M3  proc-macro shapes                  not started
  M4–M6 signatures, impls, bodies, methods  not started
  M7  coverage + performance             not started
@@ -26,10 +25,10 @@ Last updated: 2026-11-12 · Latest measurement: `~/hld-current-test-artifacts/20
  SOP STEP  LATEST RESULT ON CURRENT DIGEST
  S1  structural index        not-started (all five pins/clean tracked sources checked only)
  S2  coverage inventory      not-started
-S3  fixture/production map  historical shared prerequisite FAIL: retained native fixture 305.41s; independent resolution OOM at superseded interim cap
+ S3  fixture/production map  historical shared prerequisite FAIL: retained native fixture 305.41s; independent resolution OOM at superseded interim cap; native diagnostic remains unresolved
                              serde/rust-analyzer/ripgrep/tokio/cargo-modules corpus runs BLOCKED
  S4  oracle exports          raw path exports exist (counts only); manifests pending
- S5  per-site comparison     not-run (comparator code assembled here; qualification pending)
+ S5  per-site comparison     not-run; comparator code assembled, review fixes pending, qualification pending
  S6–S10                      not-run
 ```
 
@@ -48,6 +47,6 @@ C++ non-managed BaseAppender stacks, not Rust JSON/Turso buffering. Full adapter
 suite now GREEN (57 tests); invalid completion-marker handoff fixture repaired.
 
 Next actions:
-1. Finish measured-only memory-constructor TDD, then run native copy/normalization/resolution without a cap; record RSS, elapsed, DuckDB tags and effective default. Existing 1.2 GiB OOM is not current-policy evidence.
-2. Finish CLI GREEN/REFACTOR, then frozen-release serde-first all-five S1/S2/S3 with process auditor and peaks/times.
-3. serde M2 qualification → SQL comparator → fresh all-five S5; enforce ≤500 MB only after the all-five S5 correctness milestone.
+1. Resolve the native diagnostic on the integrated tip without an interim memory cap; record effective DuckDB settings, duckdb_memory() tags, phase time, and whole-process-tree RSS.
+2. Review the comparator descendant fixes, then the runner descendant separately; neither is integrated by this mapper merge.
+3. Complete serde-first all-five qualification and fresh S5 only after those reviews; no all-five PASS is claimed.

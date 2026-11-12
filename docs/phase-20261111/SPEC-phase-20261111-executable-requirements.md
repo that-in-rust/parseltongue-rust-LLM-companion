@@ -781,10 +781,13 @@ determinacy/ambiguity state. Single-thread and multi-thread DuckDB exports must
 be byte-identical. Required RED: `duckdb-thread-export-determinism`.
 
 REQ-RUST-024.4: Set autoinstall_known_extensions=false,
-autoload_known_extensions=false and enable_external_access=false. Use bundled
-DuckDB, no extensions. Enforce memory_limit approximately 1.2 GiB, not 1.5 GiB,
-and temp_directory inside the run directory. The full Turso + DuckDB process
-tree must remain at most 2 GiB; the engine limit alone is not acceptance.
+autoload_known_extensions=false, allow_community_extensions=false and
+enable_external_access=false. Use bundled DuckDB without installing or loading
+extensions, and keep temp_directory inside the run directory. Until all-five
+DuckDB S5 results exist, do not set memory_limit or impose a memory cap; report
+the effective DuckDB default, memory tags, phase duration and whole-process-tree
+peak RSS under REQ-RUST-024.9 and SOP revision R9. Enforce the final
+500,000,000-byte process-tree target only after all-five S5.
 Required RED: `serde-analysis-residency-budget`.
 
 ### §3.1 layer-table appended revision
@@ -808,12 +811,11 @@ REFACTOR separately. No success is inferred from unmeasured stages.
 
 REQ-RUST-024.5 supersedes the process-tree acceptance threshold in
 REQ-RUST-024.4: the final target is peak RSS ≤500 MB (500,000,000 bytes) for
-the whole process tree. Enforce this target after the correctness milestone:
-working end-to-end DuckDB M2 and S5 results for all five repositories.
-Until those S5 results exist, prioritize correctness and do not optimize RAM.
-Retain the current approximately 1.2 GiB DuckDB cap, record measured tree
-peaks, wall time and resolution rounds, and label the historical 2 GiB gate
-and current engine settings as interim, not final memory acceptance.
+the whole process tree. Enforce this target after working end-to-end DuckDB M2
+and S5 results exist for all five repositories. Until those S5 results exist,
+prioritize correctness, do not optimize RAM or set an interim memory cap, and
+record measured tree peaks, wall time, resolution rounds and DuckDB memory tags.
+The historical 2 GiB gate and approximately 1.2 GiB engine cap are superseded.
 
 ### S5 semantic path partition — published classification rule
 
@@ -932,17 +934,17 @@ test_type: unit
 assertion: row/byte thresholds flush and reset, including oversized row
 metric: 1024 rows or 1048576 value bytes
 ```
-
 ## REQ-RUST-024.9 — correctness-memory-observation-only
 
-Until all-five DuckDB S5 results exist, the correctness-workspace constructor
-SHALL NOT set an explicit DuckDB memory_limit. The effective default
-current_setting('memory_limit'), per-phase DuckDB memory tags, elapsed time and
-whole-process-tree peak RSS are reported; run-local spilling, bundled-only
-extensions and external-access denial remain required. No interim RSS/cap
-gate is enforced. After all-five S5, enforce whole-process-tree peak RSS
-≤500,000,000 bytes. Compatibility callers passing the former cap parameter
-must not restore an implicit limit.
+WHEN the correctness workspace is constructed before all-five DuckDB S5 results
+exist, THEN it SHALL use DuckDB's effective default without setting an explicit
+memory_limit. It SHALL report current_setting('memory_limit'), per-phase DuckDB
+memory tags, elapsed time, and whole-process-tree peak RSS; it SHALL retain
+run-local spilling, bundled-only extensions, and external-access denial. It
+SHALL NOT enforce an interim RSS or memory-cap gate. After all-five S5 results
+exist, it SHALL enforce whole-process-tree peak RSS ≤500,000,000 bytes.
+Compatibility callers passing the former cap parameter SHALL NOT restore an
+explicit limit.
 
 ```text
 req_id: REQ-RUST-024.9
@@ -950,6 +952,136 @@ test_id: test_namespace_constructor_uses_default
 test_type: unit
 assertion: adapter effective memory_limit equals the independent DuckDB default and telemetry reports it
 metric: exact setting equality, no explicit cap
+```
+
+```text
+req_id: REQ-RUST-024.9
+test_id: test_namespace_constructor_rejects_missing
+test_type: unit
+assertion: measured constructor rejects a missing run directory
+metric: constructor error returned, no database opened
+```
+
+```text
+req_id: REQ-RUST-024.9
+test_id: test_legacy_constructor_ignores_limit
+test_type: unit
+assertion: compatibility constructor does not apply its former memory limit
+metric: effective setting equals the independent DuckDB default
+```
+
+```text
+req_id: REQ-RUST-024.9
+test_id: test_constructor_rejects_invalid_inputs
+test_type: unit
+assertion: invalid compatibility-constructor inputs still return an error
+metric: error propagated without opening an invalid analysis run
+```
+
+```text
+req_id: REQ-RUST-024.9
+test_id: test_namespace_probe_settings_limits
+test_type: unit
+assertion: phase diagnostics retain setting tags while reporting the default memory policy
+metric: exact setting/tag values, no explicit cap
+```
+
+```text
+req_id: REQ-RUST-024.9
+test_id: test_namespace_phase_empty_success
+test_type: unit
+assertion: empty successful analysis still reports the effective memory setting
+metric: diagnostics and phase completion are present
+```
+
+## REQ-RUST-024.10 — namespace-resolution-publication-receipts
+
+WHEN the CLI maps a published workspace generation, THEN it SHALL order selected
+compilation units dependency-first, publish Rust macro outputs through Turso,
+and refresh frozen snapshots before continuing resolution. It SHALL publish
+final DuckDB products to Turso only after fixed-point completion and verify
+each product table's row count and ordered BLAKE3 row-leaf digest. It SHALL
+publish a receipt containing those proofs for every product table, including
+zero-row tables, before the name-resolution completion marker. Empty output
+tables remain empty and receive no stale rows. A failed or cancelled attempt
+SHALL not publish a completion marker or replace the previous workspace
+generation. Re-running an unchanged source generation SHALL retain the same
+semantic product counts and digests.
+
+```text
+req_id: REQ-RUST-024.10
+test_id: test_empty_resolution_stage_rows
+test_type: integration
+assertion: empty path products remain empty, receipt proofs reconcile, and completion follows the receipt
+metric: exact counts, ordered digest proof, published completion marker
+```
+
+```text
+req_id: REQ-RUST-024.10
+test_id: test_persisted_resolution_path_answers
+test_type: integration
+assertion: independently re-read nonempty published Turso products; unique keys, exact counts, and ordered BLAKE3 row-leaf digests match every receipt proof, including the zero-row product
+metric: exact product-table set, row counts, unique keys, and per-table digest equality
+```
+
+```text
+req_id: REQ-RUST-024.10
+test_id: test_stage_rerun_is_identical
+test_type: integration
+assertion: deterministic rerun preserves semantic outputs and a failed rerun retains the previous generation
+metric: stable generation/product counts, no failed-generation publication
+```
+
+## REQ-RUST-024.11 — published-stage-coverage-status
+
+WHEN the CLI emits a coverage banner, THEN it SHALL retain the existing
+`stage_implementation_status_values` availability map and add exactly four
+`stage_publication_status_values` keys: `crate-graph`, `source-ingest`,
+`syntax-spans`, and `name-resolution`. Each publication status SHALL be
+`complete` only when that stage's persisted `__complete__` marker exists in the
+currently published workspace generation and attempt; otherwise it SHALL be
+`pending`. With no published generation, all four statuses SHALL be `pending`.
+Markers persisted in another generation SHALL NOT complete the current
+publication status.
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_syntax_publication_status_complete
+test_type: integration
+assertion: syntax-spans publication is complete only for its published marker; exact four-key map
+metric: published marker-to-status equality
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_source_publication_status_pending
+test_type: unit
+assertion: source-only published scope with no syntax marker has vacuous tiling but pending syntax publication while the availability map remains compatible
+metric: availability/publication distinction, vacuous tiling and pending syntax status
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_stale_publication_marker_pending
+test_type: integration
+assertion: a name-resolution completion marker in an un-published other generation does not complete the current publication
+metric: published-scope marker isolation
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_publication_status_without_generation
+test_type: integration
+assertion: a database without a publication reports all four statuses pending
+metric: all-pending status map without publication
+```
+
+```text
+req_id: REQ-RUST-024.11
+test_id: test_persisted_resolution_path_answers
+test_type: integration
+assertion: a full published namespace run reports all four stage markers complete in its generation
+metric: exact publication-status map for name-resolution completion
 ```
 
 ## REQ-RUST-025.0 — independent-source-grounded-hld-current-audit

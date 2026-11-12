@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
+use parseltongue_core_row_types::{RunCancelFlagValue, StageRunScopeValue, StageUnitWriteRequest};
 use parseltongue_table_store_traits::StageTableStorePort;
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::Value;
@@ -51,6 +52,43 @@ fn run_workspace_mapping_fixture(
         .output()
         .unwrap()
 }
+
+fn run_workspace_stage_fixture(root: &Path, database: &Path, stage: &str) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_parseltongue"))
+        .args([
+            "map-workspace-full-run",
+            "--workspace-root-path-value",
+            root.to_str().unwrap(),
+            "--workspace-store-file-path",
+            database.to_str().unwrap(),
+            "--worker-thread-count-value",
+            "2",
+            "--mapping-final-stage-kind",
+            stage,
+        ])
+        .output()
+        .unwrap()
+}
+
+fn write_stale_completion_marker(
+    store: &TursoWorkspaceStoreAdapter,
+    scope: &StageRunScopeValue,
+    stage: &str,
+    inputs: &[&str],
+) {
+    store
+        .write_stage_table_unit(
+            &StageUnitWriteRequest {
+                stage_run_scope_value: scope,
+                stage_owner_name_value: stage,
+                stage_unit_work_key: "__complete__",
+                stage_input_stage_names: inputs,
+                stage_unit_output_rows: &[],
+            },
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+}
 fn read_workspace_banner_fixture(database: &Path) -> Value {
     let output = Command::new(env!("CARGO_BIN_EXE_parseltongue"))
         .args([
@@ -79,6 +117,71 @@ fn read_published_table_fixture(database: &Path, table: &str) -> Vec<Value> {
         .iter()
         .map(|row| serde_json::from_str(&row.stage_row_payload_text).unwrap())
         .collect()
+}
+
+fn assert_receipt_product_rows(
+    store: &TursoWorkspaceStoreAdapter,
+    scope: &StageRunScopeValue,
+    receipt: &Value,
+) -> u64 {
+    let expected_tables = [
+        "name-resolution-scope-records",
+        "module-scope-binding-table",
+        "path-resolution-site-records",
+    ];
+    let proofs = receipt["analysis_product_content_proofs"]
+        .as_object()
+        .unwrap();
+    let actual_tables = proofs.keys().map(String::as_str).collect::<BTreeSet<_>>();
+    let expected_table_set = expected_tables.iter().copied().collect::<BTreeSet<_>>();
+    assert_eq!(actual_tables, expected_table_set);
+    let mut total = 0;
+    for table in expected_tables {
+        let mut rows = store.read_stage_table_rows(scope, table).unwrap();
+        rows.sort_unstable_by(|left, right| {
+            left.stage_row_record_key.cmp(&right.stage_row_record_key)
+        });
+        let row_count = rows.len() as u64;
+        assert_eq!(
+            proofs[table]["row_count"].as_u64(),
+            Some(row_count),
+            "{table} row count"
+        );
+        assert!(
+            rows.windows(2)
+                .all(|pair| { pair[0].stage_row_record_key != pair[1].stage_row_record_key }),
+            "{table} product keys must be unique"
+        );
+        let mut hasher = blake3::Hasher::new();
+        rows.iter().for_each(|row| {
+            hasher.update(&hash_published_row_leaf(
+                table,
+                &row.stage_row_record_key,
+                &row.stage_row_payload_text,
+            ));
+        });
+        let digest = hasher.finalize().to_hex().to_string();
+        assert_eq!(
+            proofs[table]["content_digest"].as_str(),
+            Some(digest.as_str()),
+            "{table} ordered digest"
+        );
+        total += row_count;
+    }
+    assert_eq!(
+        receipt["analysis_product_record_count"].as_u64(),
+        Some(total)
+    );
+    total
+}
+
+fn hash_published_row_leaf(table: &str, key: &str, payload: &str) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    [table, key, payload].into_iter().for_each(|value| {
+        hasher.update(&(value.len() as u64).to_le_bytes());
+        hasher.update(value.as_bytes());
+    });
+    *hasher.finalize().as_bytes()
 }
 
 #[test]
@@ -455,6 +558,8 @@ fn test_nested_macro_crate_provenance() {
     assert_eq!(generated["path_resolution_state_kind"], "resolved");
 }
 
+/// REQ-RUST-024.10
+/// REQ-RUST-024.11
 #[test]
 fn test_persisted_resolution_path_answers() {
     let directory = tempfile::tempdir().unwrap();
@@ -473,6 +578,16 @@ fn test_persisted_resolution_path_answers() {
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
+    );
+    let banner: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        banner["stage_publication_status_values"],
+        serde_json::json!({
+            "crate-graph": "complete",
+            "source-ingest": "complete",
+            "syntax-spans": "complete",
+            "name-resolution": "complete"
+        })
     );
     let store =
         TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
@@ -509,6 +624,13 @@ fn test_persisted_resolution_path_answers() {
             .unwrap()
             .is_empty()
     );
+    let receipt_rows = store
+        .read_stage_table_rows(&scope, "analysis-resolution-receipt-records")
+        .unwrap();
+    assert_eq!(receipt_rows.len(), 1);
+    let receipt: Value = serde_json::from_str(&receipt_rows[0].stage_row_payload_text).unwrap();
+    let product_count = assert_receipt_product_rows(&store, &scope, &receipt);
+    assert!(product_count > 0);
     drop(store);
     let banner = read_workspace_banner_fixture(&database);
     assert_eq!(
@@ -783,6 +905,102 @@ fn test_mapping_stage_selection_contract() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown mapping final stage"));
 }
 
+/// REQ-RUST-024.11
+#[test]
+fn test_syntax_publication_status_complete() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let database = directory.path().join("store.db");
+    let output = run_workspace_stage_fixture(&root, &database, "syntax-spans");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let banner: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        banner["stage_implementation_status_values"]["syntax-spans"],
+        "complete"
+    );
+    assert_eq!(
+        banner["stage_publication_status_values"],
+        serde_json::json!({
+            "crate-graph": "complete",
+            "source-ingest": "complete",
+            "syntax-spans": "complete",
+            "name-resolution": "pending"
+        })
+    );
+}
+
+/// REQ-RUST-024.11
+#[test]
+fn test_stale_publication_marker_pending() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    let database = directory.path().join("store.db");
+    let output = run_workspace_stage_fixture(&root, &database, "syntax-spans");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let published_scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let stale_scope = StageRunScopeValue {
+        run_generation_digest_value: format!(
+            "stale-{}",
+            published_scope.run_generation_digest_value
+        ),
+        stage_attempt_sequence_value: "stale-attempt".into(),
+    };
+    write_stale_completion_marker(&store, &stale_scope, "name-resolution", &[]);
+    assert!(
+        store
+            .read_stage_table_rows(&stale_scope, "stage-run-generation-records")
+            .unwrap()
+            .iter()
+            .any(|row| row.stage_row_record_key == "__marker__/name-resolution/__complete__")
+    );
+    assert_eq!(
+        store.read_workspace_publication_scope().unwrap(),
+        Some(published_scope)
+    );
+    drop(store);
+
+    let banner = read_workspace_banner_fixture(&database);
+    assert_eq!(
+        banner["stage_publication_status_values"]["name-resolution"],
+        "pending"
+    );
+}
+
+/// REQ-RUST-024.11
+#[test]
+fn test_publication_status_without_generation() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("store.db");
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    store.initialize_workspace_stage_schema().unwrap();
+    drop(store);
+
+    let banner = read_workspace_banner_fixture(&database);
+    assert_eq!(
+        banner["stage_publication_status_values"],
+        serde_json::json!({
+            "crate-graph": "pending",
+            "source-ingest": "pending",
+            "syntax-spans": "pending",
+            "name-resolution": "pending"
+        })
+    );
+}
+
 #[test]
 fn test_type_macros_remain_deferred() {
     let directory = tempfile::tempdir().unwrap();
@@ -803,6 +1021,7 @@ fn test_type_macros_remain_deferred() {
     assert!(read_published_table_fixture(&database, "macro-expanded-item-table").is_empty());
 }
 
+/// REQ-RUST-024.10
 #[test]
 fn test_empty_resolution_stage_rows() {
     let directory = tempfile::tempdir().unwrap();
@@ -830,6 +1049,47 @@ fn test_empty_resolution_stage_rows() {
             .count_stage_table_rows(&scope, "module-scope-binding-table")
             .unwrap(),
         19
+    );
+    let receipt_rows = store
+        .read_stage_table_rows(&scope, "analysis-resolution-receipt-records")
+        .unwrap();
+    assert_eq!(receipt_rows.len(), 1);
+    let receipt: Value = serde_json::from_str(&receipt_rows[0].stage_row_payload_text).unwrap();
+    assert_eq!(
+        receipt["analysis_product_digest_kind"],
+        "blake3-ordered-row-leaves"
+    );
+    let proofs = receipt["analysis_product_content_proofs"]
+        .as_object()
+        .unwrap();
+    let proved_count = proofs
+        .values()
+        .map(|proof| proof["row_count"].as_u64().unwrap())
+        .sum::<u64>();
+    assert_eq!(
+        receipt["analysis_product_record_count"].as_u64(),
+        Some(proved_count)
+    );
+    assert!(proofs.values().all(|proof| {
+        proof["content_digest"]
+            .as_str()
+            .is_some_and(|digest| digest.len() == 64)
+    }));
+    assert_eq!(
+        assert_receipt_product_rows(&store, &scope, &receipt),
+        proved_count
+    );
+    assert_eq!(
+        proofs["path-resolution-site-records"]["row_count"].as_u64(),
+        Some(0)
+    );
+    assert!(Path::new(receipt["analysis_database_absolute_path"].as_str().unwrap()).is_file());
+    assert!(
+        store
+            .read_stage_table_rows(&scope, "stage-run-generation-records")
+            .unwrap()
+            .iter()
+            .any(|row| row.stage_row_record_key == "__marker__/name-resolution/__complete__")
     );
 }
 
@@ -912,6 +1172,7 @@ fn test_fixture_projects_remain_unmapped() {
         true
     );
 }
+/// REQ-RUST-024.10
 #[test]
 fn test_stage_rerun_is_identical() {
     let directory = tempfile::tempdir().unwrap();
@@ -934,6 +1195,20 @@ fn test_stage_rerun_is_identical() {
         first["stage_implementation_status_values"]["name-resolution"],
         "complete"
     );
+    let first_receipts =
+        read_published_table_fixture(&database, "analysis-resolution-receipt-records");
+    assert_eq!(first_receipts.len(), 1);
+    let first_receipt = first_receipts[0].clone();
+    let first_store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let first_scope = first_store
+        .read_workspace_publication_scope()
+        .unwrap()
+        .unwrap();
+    let first_product_count =
+        assert_receipt_product_rows(&first_store, &first_scope, &first_receipt);
+    assert!(first_product_count > 0);
+    drop(first_store);
     let output = run_workspace_mapping_fixture(&root, &database, "4");
     assert!(
         output.status.success(),
@@ -949,6 +1224,24 @@ fn test_stage_rerun_is_identical() {
         first["syntax_span_record_count"],
         second["syntax_span_record_count"]
     );
+    let second_receipts =
+        read_published_table_fixture(&database, "analysis-resolution-receipt-records");
+    assert_eq!(second_receipts.len(), 1);
+    let second_receipt = second_receipts[0].clone();
+    let second_store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let second_scope = second_store
+        .read_workspace_publication_scope()
+        .unwrap()
+        .unwrap();
+    let second_product_count =
+        assert_receipt_product_rows(&second_store, &second_scope, &second_receipt);
+    assert_eq!(first_product_count, second_product_count);
+    assert_eq!(
+        first_receipt["analysis_product_content_proofs"],
+        second_receipt["analysis_product_content_proofs"]
+    );
+    drop(second_store);
     fs::write(root.join("src/child.rs"), "fn broken(").unwrap();
     assert!(
         !run_workspace_mapping_fixture(&root, &database, "4")
