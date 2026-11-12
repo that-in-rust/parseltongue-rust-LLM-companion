@@ -274,6 +274,33 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         with self.assertRaises(runner.RunnerContractViolationError):
             runner.verify_frozen_file_identity(frozen)
 
+    def test_cli_imports_avoid_bytecode(self):
+        """REQ-SOP-RUNNER-002: default CLI imports do not create source-tree bytecode."""
+        project_root = self.root_path / "cli-project"
+        tools_directory = project_root / "tools"
+        tools_directory.mkdir(parents=True)
+        support_files = (
+            "hld-current-qualification-runner.py",
+            "corpus-index-coverage-inventory.py",
+            "corpus-production-stage-measurements.py",
+            "process-tree-access-auditor.py",
+        )
+        for filename in support_files:
+            shutil.copy2(TOOLS_ROOT / filename, tools_directory / filename)
+
+        environment = dict(os.environ)
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)
+        environment.pop("PYTHONPYCACHEPREFIX", None)
+        result = subprocess.run(
+            [sys.executable, str(tools_directory / support_files[0]), "--help"],
+            cwd=project_root, env=environment, capture_output=True, text=True, check=False,
+        )
+        pyc_paths = sorted(path.relative_to(project_root).as_posix()
+                           for path in project_root.rglob("*.pyc"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage:", result.stdout.lower())
+        self.assertEqual(pyc_paths, [])
+
     def test_source_mutation_fails_boundary(self):
         """REQ-SOP-RUNNER-002: detect tracked source bytes changing at a stage boundary."""
         source_file = self.root_path / "src.rs"

@@ -87,7 +87,7 @@ requirement coverage. Each entry maps to the existing SOP and SPEC clauses it op
 - SPEC: REQ-RUST-015.1 target/build-script boundary; REQ-RUST-020.1 generation identity.
 - Tests: `test_missing_executable_blocks_preflight`, `test_binary_mutation_fails_boundary`,
   `test_lock_mutation_fails_boundary`, `test_source_mutation_fails_boundary`,
-  `test_pin_mismatch_blocks_parser`.
+  `test_pin_mismatch_blocks_parser`, `test_cli_imports_avoid_bytecode`.
 
 ### REQ-SOP-RUNNER-003
 
@@ -652,3 +652,76 @@ Reviewed the focused change set against the correction brief. The isolated produ
 trace proof, M2 failure propagation, and bounded command ledger are covered by direct regressions; no
 additional refactor is warranted. GREEN commit: `0dfbfa14c`. This checkpoint contains only this journal
 entry; no runner behavior changed after the GREEN test run.
+
+### CLI import hygiene correction — STUB / RED
+
+Local REQ traceability: REQ-SOP-RUNNER-002 covers the runner/helper source identity frozen by execute mode.
+The runner dynamically imports `corpus-index-coverage-inventory.py` before importing the measurement
+helper that sets `sys.dont_write_bytecode`; the planned stub sets that flag before loading support modules.
+
+Regression planned before implementation: `test_cli_imports_avoid_bytecode` copies the runner/support
+scripts into an isolated temporary project, starts the CLI with default Python bytecode behavior using
+`--help`, and asserts successful parser startup without creating `.pyc` files. It does not create a report
+or run corpus work. RED output follows.
+
+RED checkpoint:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_cli_imports_avoid_bytecode
+Ran 1 test in 0.091s
+FAILED (failures=1)
+AssertionError: Lists differ: ['tools/__pycache__/corpus-index-coverage-inventory.cpython-312.pyc', 'tools/__pycache__/corpus-production-stage-measurements.cpython-312.pyc'] != []
+```
+
+### CLI import hygiene correction — GREEN
+
+Set `sys.dont_write_bytecode = True` before loading dynamic support modules. GREEN checks:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_sop_qualification_runner.SopQualificationRunnerContractTests.test_cli_imports_avoid_bytecode
+Ran 1 test in 0.090s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py' -v
+Ran 73 tests in 0.561s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.341s
+OK
+
+python3 tools/hld-current-qualification-runner.py --help >/dev/null && pyc_count=$(find tools -type f -name '*.pyc' | wc -l) && test "$pyc_count" -eq 0 && printf 'CLI --help: source-tree .pyc files=%s\n' "$pyc_count"
+CLI --help: source-tree .pyc files=0
+```
+
+### Runner usage and acceptance boundary
+
+Safe planning example; replace the run ID with a new unique value. Planning writes a truthful NOT STARTED
+report under the default `hld-current-test-runs` root and invokes no mapper, oracle, or indexer:
+
+```bash
+python3 tools/hld-current-qualification-runner.py \
+  --run-id m1-plan-unique-001 --milestone M1 --mode plan
+```
+
+Execute-mode invocation outline (not executed here):
+
+```bash
+python3 tools/hld-current-qualification-runner.py \
+  --run-id m1-execution-unique-001 --milestone M1 --mode execute \
+  --mapper-binary /absolute/path/to/frozen/mapper \
+  --report-root hld-current-test-runs \
+  --artifact-root "$HOME/hld-current-test-artifacts" \
+  --indexer-path codebase-memory-mcp
+```
+
+Use a new run ID for every invocation. `--corpus-manifest` defaults to the pinned corpus manifest;
+repeat `--project-root NAME=PATH` only for an intentional checkout override. M2 component inputs are
+`--r4-evidence PATH` and `--r5-evidence PATH`.
+
+This CLI is **not yet a turnkey full-S3 acceptance tool**. Full S3 remains BLOCKED until current-run,
+frozen-identity-bound fixture-suite, build qualification, P2, dependency-audit, and release-provenance
+evidence can be supplied and validated; those evidence-intake gates are not implemented here. R4/R5 are
+structured component validators only, not independent authoritative exported-table or primary-JSONL
+verification. S4/S5 remain unavailable/BLOCKED pending those integrations. No full-corpus qualification
+run was performed.

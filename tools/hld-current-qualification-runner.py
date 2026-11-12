@@ -18,6 +18,8 @@ import subprocess
 import sys
 from typing import Any
 
+sys.dont_write_bytecode = True
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPOSITORY_ORDER = ("serde", "rust-analyzer", "ripgrep", "tokio", "cargo-modules")
