@@ -96,6 +96,9 @@ impl AnalysisTableStorePort for DuckdbAnalysisStoreAdapter {
 #[path = "frozen-generation-appender-copy.rs"]
 mod frozen_generation_appender_copy;
 
+#[path = "frozen-namespace-source-codec.rs"]
+mod frozen_namespace_source_codec;
+
 #[path = "namespace-binding-round-strata.rs"]
 mod namespace_binding_round_strata;
 pub use namespace_binding_round_strata::recompute_binding_round;

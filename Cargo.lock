@@ -2201,6 +2201,7 @@ dependencies = [
  "parseltongue-core-row-types",
  "parseltongue-table-store-traits",
  "parseltongue-turso-store-adapter",
+ "serde_json",
  "tempfile",
 ]
 
