@@ -7,7 +7,7 @@ license.workspace = true
 [features]
 default = ["native-production-heap-allocator"]
 native-production-heap-allocator = ["parseltongue-turso-store-adapter/native-production-heap-allocator"]
-system-heap-allocation-profile = []
+system-heap-allocation-profile = ["dep:dhat"]
 
 [[bin]]
 name = "parseltongue"
@@ -23,6 +23,7 @@ parseltongue-stage-worker-scheduler = { path = "../parseltongue-stage-worker-sch
 serde_json = "1"
 blake3 = "1"
 ctrlc = { version = "3", features = ["termination"] }
+dhat = { version = "=0.3.3", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

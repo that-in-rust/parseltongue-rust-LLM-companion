@@ -1843,3 +1843,15 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   CLI; this disables only mimalloc, retaining Turso and its other defaults.
   It is instrumentation, not a production allocator change. Production
   qualification must rebuild with default features and run uninstrumented.
+- System heaptrack trace also became incomplete: kernel dmesg verifies the
+  interpreter was OOM-killed at 26,577,164 KiB anonymous RSS (PID 1452145).
+  At that time the mapper was only 112,822 pages resident. The resulting
+  175.219-second trace has 608.41 MB peak heap and does NOT cover the later
+  >2 GiB mapper state. No allocation fix is inferred from this partial trace.
+  Switching to the explicitly permitted CLI-only feature-gated dhat allocator
+  with bounded backtrace depth, retaining the default production allocator.
+- Additional authorized experiment after the profile: validate pinned Turso
+  recursive CTE / INSERT SELECT joins, then spike a set-based import round
+  behind shared resolver contracts, alternating Rust macro expansion. Compare
+  serde binding equality, rounds, runtime and RSS against the in-memory
+  resolver before selecting the implementation and resuming all-five S5.

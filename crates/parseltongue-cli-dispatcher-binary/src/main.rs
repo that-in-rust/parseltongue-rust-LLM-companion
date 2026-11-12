@@ -31,6 +31,13 @@ mod oracle_path_comparison_facade;
 #[path = "published-stage-export-facade.rs"]
 mod published_stage_export_facade;
 
+#[cfg(all(
+    feature = "system-heap-allocation-profile",
+    not(feature = "native-production-heap-allocator")
+))]
+#[global_allocator]
+static NATIVE_HEAP_PROFILE_ALLOCATOR: dhat::Alloc = dhat::Alloc;
+
 fn build_pipeline_stage_error(message: impl std::fmt::Display) -> StoreBackendFailureError {
     StoreBackendFailureError {
         error_context_detail_text: message.to_string(),
@@ -726,6 +733,18 @@ fn run_workspace_mapping_pipeline(
     build_workspace_coverage_banner(store)
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(all(
+        feature = "system-heap-allocation-profile",
+        not(feature = "native-production-heap-allocator")
+    ))]
+    let _heap_profile = dhat::Profiler::builder()
+        .file_name(
+            std::env::var_os("PARSELTONGUE_HEAP_PROFILE_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("heap-allocation-profile-records.json")),
+        )
+        .trim_backtraces(Some(16))
+        .build();
     let args: Vec<_> = std::env::args().skip(1).collect();
     let command = args
         .first()
