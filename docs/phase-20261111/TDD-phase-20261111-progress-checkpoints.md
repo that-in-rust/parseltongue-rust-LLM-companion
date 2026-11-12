@@ -1962,3 +1962,49 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   tools/parser-const-closure-statements.patch, SHA-256
   89146042a1c1629ef67c730c0e180dec15264577f675de1c090dca2d87da6bfa.
   No new parser defect or S5 measurement is claimed.
+
+### 2026-11-12 — bounded DuckDB constructor and Appender handoff GREEN
+
+- Constructor policy RED a475542bc, GREEN 9e360a351; handoff RED c1def2e46,
+  GREEN 0490a37c3; export contract REFACTOR d9e169a63; pinned Turso integration
+  contract 88d1d014a. All pushed on research/tiny-rust-code-mapper.
+- Constructor rejects zero and above-1.2-GiB memory limits, requires an existing
+  run directory, creates duckdb-analysis-spill-files under its canonical path,
+  disables extension autoinstall/autoload and community extensions, and disables
+  external access before returning. Tests verify INSTALL/LOAD rejection and
+  inability to re-enable external access.
+- DuckDB does not accept temp_directory in startup Config, and changing it after
+  disabling external access returns Permission Error. The constructor therefore
+  opens privately with extension loading disabled, sets the spill directory,
+  then irreversibly disables external access before exposing the connection.
+  No external SQL is run while access is enabled. Native policy tests pass.
+- frozen-generation-appender-copy.rs streams each source table in strict unique
+  row-key order through Appender. It preserves generation, attempt, source table,
+  row key and exact payload. BLAKE3 uses length-framed table/key/payload bytes;
+  source count/digest must match ordered DuckDB count/digest before manifests
+  commit. Copy and completion manifests share one transaction; failures roll
+  back. Existing snapshots cannot be overwritten. Publication is checked before
+  copying and again before commit. Empty source tables receive verified manifests.
+- Named tests cover normal/empty copy, unpublished/cancelled/source-failure
+  rejection, wrong counts, unsorted source rows, rollback/retry and one-versus-four
+  thread identical ordered exports. Tests also copy a real complete publication
+  from the pinned Turso adapter and verify exact payload identity.
+- Focused constructor/copy tests:
+  `test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.26s`.
+  Final real-Turso integration:
+  `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.22s`.
+  Adapter all-target Clippy -D warnings:
+  `Finished \`dev\` profile [unoptimized] target(s) in 0.40s`.
+  The eleven resolver contracts remain RED; no resolver GREEN is claimed.
+- Native builds finished; resumed VS Code rust-analyzer PID 1532439 with SIGCONT.
+  No mapper or profiler measurement was started. Remaining: SQL resolver and
+  accuracy fixture tests, textual macro scopes, macro alternation, orchestration
+  of a frozen input publication, process-network audit, serde M2, exact oracle
+  manifests, SQL comparator and all-five S5/S6/S7. No S5 numbers exist.
+- Next implementation should live in the DuckDB adapter behind the L2 ports.
+  Do not reconstruct the deleted in-memory path resolver. Eleven moved contract
+  cases include per-namespace alias chaining, glob ambiguity/visibility, prelude
+  boundaries, edition paths, invalid scopes/cycles, shared dependency rows,
+  macro additions and the 8192-changing-round boundary. The macro test ports
+  simulate expansions even without a macro binding; production persisted macro
+  expansion only processes expansion_resolved_macro_rows. Preserve that guard.
