@@ -152,6 +152,45 @@ pub fn prepare_macro_expansion_port<'a>(
 }
 
 impl ItemMacroExpansionPort for PersistedItemMacroPort<'_> {
+    fn finish_unresolved_macro_items(
+        &self,
+    ) -> Result<NameExpansionRoundRows, NameResolutionStageError> {
+        let _operation = self
+            .expansion_operation_lock
+            .lock()
+            .map_err(build_macro_expansion_error)?;
+        let mut state = self
+            .projection_source_state_lock
+            .lock()
+            .map_err(build_macro_expansion_error)?;
+        if state
+            .projection_cancel_flag_value
+            .check_stage_work_cancelled()
+        {
+            return Err(NameResolutionStageError::Cancelled);
+        }
+        let mut completed = self
+            .completed_invocations_lock
+            .lock()
+            .map_err(build_macro_expansion_error)?;
+        state
+            .read_ordered_pending_invocations(&completed)
+            .map_err(build_macro_expansion_error)?
+            .into_iter()
+            .try_fold(NameExpansionRoundRows::default(), |mut all, invocation| {
+                let round = state.record_unavailable_macro_reason(
+                    &invocation,
+                    SiteUnresolvedReasonKind::ExternalSourceMissing,
+                    "macro binding remains unresolved at the source barrier".into(),
+                );
+                completed.insert(invocation.invocation_site_occurrence_key);
+                all.expansion_unavailable_reason_rows
+                    .extend(round.expansion_unavailable_reason_rows);
+                all.expansion_semantic_output_rows
+                    .extend(round.expansion_semantic_output_rows);
+                Ok(all)
+            })
+    }
     fn expand_next_resolved_macro_items(
         &self,
     ) -> Result<Option<NameExpansionRoundRows>, NameResolutionStageError> {
