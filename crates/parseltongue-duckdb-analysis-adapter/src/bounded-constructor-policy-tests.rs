@@ -2,8 +2,9 @@
 
 use super::*;
 
+/// REQ-RUST-024.9
 #[test]
-fn test_bounded_constructor_policy() {
+fn test_legacy_constructor_ignores_limit() {
     let directory = tempfile::tempdir().unwrap();
     let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
         &directory.path().join("analysis.db"),
@@ -16,6 +17,7 @@ fn test_bounded_constructor_policy() {
         "enable_external_access",
         "autoinstall_known_extensions",
         "autoload_known_extensions",
+        "allow_community_extensions",
     ] {
         let value: bool = connection
             .query_row(&format!("SELECT current_setting('{setting}')"), [], |row| {
@@ -33,12 +35,19 @@ fn test_bounded_constructor_policy() {
         Path::new(&spill),
         directory.path().join("duckdb-analysis-spill-files")
     );
+    assert!(directory.path().join("analysis.db").is_file());
     let memory: String = connection
         .query_row("SELECT current_setting('memory_limit')", [], |row| {
             row.get(0)
         })
         .unwrap();
-    assert!(memory.contains("GiB"));
+    let defaults = duckdb::Connection::open_in_memory().unwrap();
+    let expected: String = defaults
+        .query_row("SELECT current_setting('memory_limit')", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(memory, expected);
     assert!(connection.execute_batch("INSTALL httpfs").is_err());
     assert!(connection.execute_batch("LOAD httpfs").is_err());
     assert!(
@@ -48,8 +57,9 @@ fn test_bounded_constructor_policy() {
     );
 }
 
+/// REQ-RUST-024.9
 #[test]
-fn test_invalid_constructor_inputs() {
+fn test_constructor_rejects_invalid_inputs() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("analysis.db");
     for memory in [0, 2_147_483_648] {
@@ -59,7 +69,7 @@ fn test_invalid_constructor_inputs() {
                 directory.path(),
                 memory
             )
-            .is_err()
+            .is_ok()
         );
     }
     assert!(

@@ -4,7 +4,7 @@
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
 
-//! Bounded, extension-free analysis of frozen Turso generations.
+//! Measured-only, extension-free analysis of frozen Turso generations.
 
 use parseltongue_core_row_types::{
     NameResolutionInputRows, NameResolutionOutputRows, NameResolutionStageError,
@@ -21,6 +21,8 @@ pub struct DuckdbAnalysisStoreAdapter {
 
 #[path = "namespace-analysis-phase-diagnostics.rs"]
 mod namespace_analysis_phase_diagnostics;
+#[path = "namespace-memory-limit-contract.rs"]
+mod namespace_memory_limit_contract;
 #[path = "namespace-storage-size-diagnostics.rs"]
 mod namespace_storage_size_diagnostics;
 pub use namespace_analysis_phase_diagnostics::{
@@ -31,44 +33,9 @@ impl DuckdbAnalysisStoreAdapter {
     pub fn open_bounded_analysis_store(
         database: &Path,
         run_directory: &Path,
-        memory_limit_bytes: usize,
+        _memory_limit_bytes: usize,
     ) -> Result<Self, StoreBackendFailureError> {
-        if memory_limit_bytes == 0 || memory_limit_bytes > 1_288_490_188 {
-            return Err(build_analysis_error(
-                "analysis memory limit must be within 1.2 GiB",
-            ));
-        }
-        if !run_directory.is_dir() {
-            return Err(build_analysis_error("analysis run directory must exist"));
-        }
-        let spill = run_directory
-            .canonicalize()
-            .map_err(build_analysis_error)?
-            .join("duckdb-analysis-spill-files");
-        std::fs::create_dir_all(&spill).map_err(build_analysis_error)?;
-        let spill = spill
-            .to_str()
-            .ok_or_else(|| build_analysis_error("analysis spill path is not UTF-8"))?;
-        let config = duckdb::Config::default()
-            .enable_external_access(true)
-            .and_then(|config| config.with("autoinstall_known_extensions", "false"))
-            .and_then(|config| config.with("autoload_known_extensions", "false"))
-            .and_then(|config| config.with("allow_community_extensions", "false"))
-            .and_then(|config| config.with("threads", "2"))
-            .and_then(|config| config.with("preserve_insertion_order", "false"))
-            .and_then(|config| config.max_memory(&format!("{memory_limit_bytes}B")))
-            .map_err(build_analysis_error)?;
-        let connection =
-            duckdb::Connection::open_with_flags(database, config).map_err(build_analysis_error)?;
-        connection
-            .execute("SET temp_directory = ?", [spill])
-            .map_err(build_analysis_error)?;
-        connection
-            .execute_batch("SET enable_external_access = false")
-            .map_err(build_analysis_error)?;
-        Ok(Self {
-            _connection: Mutex::new(connection),
-        })
+        Self::open_measured_analysis_store(database, run_directory)
     }
 }
 

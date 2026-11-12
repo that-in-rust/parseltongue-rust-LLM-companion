@@ -29,15 +29,21 @@ mod tests {
     use std::error::Error;
 
     /// REQ-RUST-024.7
+    /// REQ-RUST-024.9
     #[test]
     fn test_namespace_probe_settings_limits() {
         let directory = tempfile::tempdir().unwrap();
-        let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        let analysis = DuckdbAnalysisStoreAdapter::open_measured_analysis_store(
             &directory.path().join("probe.duckdb"),
             directory.path(),
-            1288490188,
         )
         .unwrap();
+        let defaults = duckdb::Connection::open_in_memory().unwrap();
+        let expected: String = defaults
+            .query_row("SELECT current_setting('memory_limit')", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         for threads in [1, 2] {
             analysis
                 .configure_namespace_probe_settings(threads)
@@ -45,7 +51,7 @@ mod tests {
             let memory = analysis.read_namespace_memory_usage().unwrap();
             assert_eq!(memory["settings"]["threads"], threads);
             assert_eq!(memory["settings"]["preserve_insertion_order"], false);
-            assert_eq!(memory["settings"]["memory_limit"], "1.1 GiB");
+            assert_eq!(memory["settings"]["memory_limit"], expected);
             assert!(memory["settings"]["version"].is_string());
         }
         assert!(analysis.configure_namespace_probe_settings(0).is_err());
@@ -98,13 +104,13 @@ mod tests {
     }
 
     /// REQ-RUST-024.6
+    /// REQ-RUST-024.9
     #[test]
     fn test_namespace_phase_empty_success() {
         let directory = tempfile::tempdir().unwrap();
-        let analysis = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        let analysis = DuckdbAnalysisStoreAdapter::open_measured_analysis_store(
             &directory.path().join("phases.duckdb"),
             directory.path(),
-            1288490188,
         )
         .unwrap();
         assert_eq!(
@@ -117,6 +123,13 @@ mod tests {
         assert!(memory["memory_usage_bytes"].is_u64());
         assert!(memory["temporary_storage_bytes"].is_u64());
         assert!(!memory["databases"].as_array().unwrap().is_empty());
+        let defaults = duckdb::Connection::open_in_memory().unwrap();
+        let expected: String = defaults
+            .query_row("SELECT current_setting('memory_limit')", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(memory["settings"]["memory_limit"], expected);
     }
 
     /// REQ-RUST-024.6

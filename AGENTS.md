@@ -15,7 +15,7 @@
 ```text
  PRD      docs/phase-20261111/PRD-phase-20261111-compiling-hld.md
  SPEC     docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md   (REQ-RUST ids + verification matrix)
- SOP      docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md       (S1–S10, milestone subsets, revisions R1–R8)
+ SOP      docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md       (S1–S10, milestone subsets, revisions R1–R9)
  JOURNAL  docs/phase-20261111/TDD-phase-20261111-progress-checkpoints.md       (append-only TDD journal)
  STATUS   docs/phase-20261111/current-milestone-status-board.md                (rewritten in place; one page)
  PINS     docs/phase-20261111/{parser-source-pin,oracle-source-build,corpus-source-pin}-manifest.json
@@ -84,7 +84,8 @@ Journal entry (append to JOURNAL after EVERY phase, never edit old entries):
 ### Budgets before big runs
 
 - Always run serde first; only then the other four repos.
-- Kill any run that exceeds its memory budget (final target ≤500 MB whole process tree; interim DuckDB cap ≈1.2 GiB) or 2× its expected wall time; record the peak and stop to re-plan.
+- Kill a correctness run only if it exceeds 2× its expected wall time; until all-five DuckDB S5 exists, do not set an interim DuckDB memory cap and measure/report effective engine limits plus whole-tree peak RSS. After S5, enforce the unchanged final target ≤500 MB whole process tree.
+- 2026-11-12 revision: interim DuckDB cap removed by user decision; memory is measured and reported only until all-five S5 exists. Final ≤500 MB target remains unchanged.
 - Measure memory and time before arguing design.
 
 ### Stop rule

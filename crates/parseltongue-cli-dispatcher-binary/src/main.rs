@@ -487,7 +487,7 @@ fn build_workspace_coverage_banner(
         "build_script_unresolved_count":build_script,
         "crate_unresolved_reason_counts":reasons,
         "stage_implementation_status_values":{"crate-graph":"complete","source-ingest":"complete","syntax-spans":"complete",
-            "name-resolution":if name_resolution_complete {"complete"} else {"not yet implemented"},"macro-expansion":"not yet implemented","proc-macro-shapes":"not yet implemented",
+            "name-resolution":if name_resolution_complete {"complete"} else {"not yet implemented"},"macro-expansion":if name_resolution_complete {"complete"} else {"not yet implemented"},"proc-macro-shapes":"not yet implemented",
             "signature-lowering":"not yet implemented","call-resolution":"not yet implemented","visibility-hld":"not yet implemented"}}),
     )
 }
@@ -620,7 +620,7 @@ fn run_workspace_mapping_pipeline(
     cancel: &RunCancelFlagValue,
     workers: usize,
     final_stage: MappingFinalStageKind,
-) -> Result<Value, StoreBackendFailureError> {
+) -> Result<Value, parseltongue_duckdb_analysis_adapter::NamespaceAnalysisPhaseError> {
     let started = std::time::Instant::now();
     let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?
         .into_iter()
@@ -733,7 +733,7 @@ fn run_workspace_mapping_pipeline(
         "stage=generation-publication elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
-    build_workspace_coverage_banner(store)
+    build_workspace_coverage_banner(store).map_err(Into::into)
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();

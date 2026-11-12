@@ -12,7 +12,6 @@ pub(super) fn resolve_contract_input(
         .enable_external_access(false)
         .and_then(|config| config.with("autoinstall_known_extensions", "false"))
         .and_then(|config| config.with("autoload_known_extensions", "false"))
-        .and_then(|config| config.max_memory("1288490188B"))
         .map_err(error)?;
     let connection = duckdb::Connection::open_in_memory_with_flags(config).map_err(error)?;
     let codec = ContractInputCodec::load(&connection, input)?;

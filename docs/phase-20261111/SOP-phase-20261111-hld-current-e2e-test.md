@@ -393,3 +393,14 @@ R7 development-process gates (checked per run, recorded in the report):
 
 R8 memory: see "S10 memory revision" — ≤500 MB whole-tree peak, enforced
 after all-five DuckDB S5 exists; interim DuckDB cap ≈1.2 GiB.
+
+### SOP revision R9 — interim memory-cap removal (2026-11-12)
+
+User decision supersedes R4's configured-memory-cap language and R8's interim
+cap. Until all-five DuckDB S5 results exist, do not set any interim DuckDB
+memory_limit and do not impose a memory cap on correctness runs. Measure and
+report the effective DuckDB current_setting('memory_limit'), duckdb_memory()
+tags, phase elapsed time, and whole-process-tree peak RSS for every run. Keep
+run-local spill directories, disable extension install/load and external
+access, and retain file-backed databases. After all-five S5 exists, enforce
+the unchanged ≤500,000,000-byte whole-process-tree peak RSS target.
