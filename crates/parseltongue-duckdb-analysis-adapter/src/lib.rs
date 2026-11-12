@@ -112,14 +112,21 @@ pub use namespace_scope_relation_records::materialize_scope_relations;
 mod namespace_path_candidate_records;
 pub use namespace_path_candidate_records::recompute_path_candidates;
 
+#[path = "namespace-contract-input-codec.rs"]
+mod namespace_contract_input_codec;
+#[path = "namespace-contract-resolution-rounds.rs"]
+mod namespace_contract_resolution_rounds;
+#[path = "namespace-macro-alternation-rounds.rs"]
+mod namespace_macro_alternation_rounds;
+
 pub const FIXED_POINT_LIMIT: usize = 8192;
 
 pub fn resolve_crate_name_bindings(
-    _input: &NameResolutionInputRows,
-    _macros: &dyn ItemMacroExpansionPort,
-    _cancel: &RunCancelFlagValue,
+    input: &NameResolutionInputRows,
+    macros: &dyn ItemMacroExpansionPort,
+    cancel: &RunCancelFlagValue,
 ) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
-    todo!("DuckDB non-monotone SQL resolution")
+    namespace_macro_alternation_rounds::resolve_with_macro_rounds(input.clone(), macros, cancel)
 }
 
 pub fn resolve_owned_crate_bindings(
@@ -127,7 +134,7 @@ pub fn resolve_owned_crate_bindings(
     macros: &dyn ItemMacroExpansionPort,
     cancel: &RunCancelFlagValue,
 ) -> Result<NameResolutionOutputRows, NameResolutionStageError> {
-    resolve_crate_name_bindings(&input, macros, cancel)
+    namespace_macro_alternation_rounds::resolve_with_macro_rounds(input, macros, cancel)
 }
 
 #[cfg(test)]
