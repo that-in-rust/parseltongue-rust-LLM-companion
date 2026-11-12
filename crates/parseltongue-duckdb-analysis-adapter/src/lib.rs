@@ -102,6 +102,8 @@ pub use frozen_namespace_source_codec::NAMESPACE_SOURCE_TABLE_NAMES;
 #[path = "namespace-frozen-resolution-rounds.rs"]
 mod namespace_frozen_resolution_rounds;
 pub use namespace_frozen_resolution_rounds::NamespaceResolutionRoundReport;
+#[path = "namespace-unit-link-inputs.rs"]
+mod namespace_unit_link_inputs;
 
 #[path = "namespace-binding-round-strata.rs"]
 mod namespace_binding_round_strata;
