@@ -4,6 +4,9 @@ use super::*;
 use parseltongue_core_row_types::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[path = "sibling-namespace-accuracy-fixtures.rs"]
+mod sibling_namespace_accuracy_fixtures;
+
 fn build_fixture_unit_identity() -> CrateCompilationUnitKey {
     CrateCompilationUnitKey {
         unit_cargo_package_identifier: "path+file:///fixture#fixture@0.1.0".into(),
