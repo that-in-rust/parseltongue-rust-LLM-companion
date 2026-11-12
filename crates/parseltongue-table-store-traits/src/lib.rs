@@ -11,6 +11,20 @@ use parseltongue_core_row_types::{
 };
 
 pub trait StageTableStorePort: Send + Sync {
+    fn publish_analysis_input_snapshot(
+        &self,
+        _scope: &StageRunScopeValue,
+        _cancel: &RunCancelFlagValue,
+    ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
+        Err(StoreBackendFailureError {
+            error_context_detail_text: "analysis input publication not implemented".into(),
+        })
+    }
+    fn read_analysis_input_publication_scope(
+        &self,
+    ) -> Result<Option<StageRunScopeValue>, StoreBackendFailureError> {
+        Ok(None)
+    }
     fn initialize_workspace_stage_schema(&self) -> Result<(), StoreBackendFailureError>;
     fn write_stage_table_unit(
         &self,
