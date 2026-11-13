@@ -4700,3 +4700,12 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - The recursive CTE and output decoding need no further semantic refactor.
   Rollups, Turso publication, frozen-stage checks, source producers and CLI
   completion remain out of scope. GREEN/REFACTOR commit closure follows.
+
+## HLD-RECURSIVE-PATHS-COMMIT-CLOSURE — 2026-11-13
+
+- GREEN commit: 127bab060e2dec94177ea2d86e04da457af146f1.
+- REFACTOR commit: 2407835a28c32d6e2e4d1c40d4db132fa87f0fbf.
+- Both commits are local on devin/1794509368-hld-current-integration;
+  no push or PR was made.
+- The pre-existing status-board edit and four DRAFT reference artifacts
+  remained unstaged and untouched.
