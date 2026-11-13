@@ -4248,3 +4248,14 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - This closes the instrumentation measurement review. Commit sha remains
   pending the immediately following local commit; no resolver, frozen-copy,
   native, sysroot, or corpus replay was run, and no push or PR was made.
+
+## REQ-RUST-028.2 — IMPLEMENTATION-COMMIT-RECORDED — 2026-11-13
+
+- Validated implementation commit: `b5d6a8e1c73849e208d517fec39ada986d2e473d`
+  (`feat: trace namespace import statements`). It contains the adapter trace
+  module and call-site, SPEC crosswalk, append-only TDD record, and negative
+  knowledge additions. The tree was clean immediately after that commit.
+- This append-only journal closure records the implementation commit hash;
+  it makes no source or behavior change. The final gate evidence remains the
+  preceding focused/relevant release tests, format check, all-target Clippy,
+  and warmed combined-root release build. No replay or push was performed.
