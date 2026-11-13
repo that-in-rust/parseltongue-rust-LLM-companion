@@ -4827,3 +4827,11 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - GREEN implementation commit: f146850c38e77229f72458c6d34b20343c000335.
   REFACTOR source/doc commit and journal closure to follow locally; no push
   or PR.
+
+## HLD-ROLLUPS-REFACTOR-CLOSURE — 2026-11-13
+
+- Local REFACTOR commit: 300561497b1651cef840bed0b0aa8ea9ac161b4f
+  (`Refactor DuckDB HLD rollup materialization`). The commit contains the
+  formatter-only cleanup and the Clippy `manual_contains` correction,
+  with the full affected gates recorded above.
+- Journal closure follows locally; no push or PR.
