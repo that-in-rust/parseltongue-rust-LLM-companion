@@ -4259,3 +4259,20 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   it makes no source or behavior change. The final gate evidence remains the
   preceding focused/relevant release tests, format check, all-target Clippy,
   and warmed combined-root release build. No replay or push was performed.
+
+## REQ-RUST-028.2 — FINAL-TEST-RUNTIME-TRANSCRIPTION — 2026-11-13
+
+- Correction to the preceding `SQL-STATEMENT-TIMING-REVIEW` entry: the final
+  post-timer Cargo logs report the focused six-test group at `0.22s`,
+  `frozen_namespace_sql_resolution_contract` at `0.59s`, and
+  `frozen_standard_type_macro_preludes` at `1.47s`. Their wrapper command
+  elapsed times remain `25.08s`, `0.79s`, and `1.68s`, respectively. The
+  former `0.23s` / `0.58s` / `1.51s` test-duration values were transcribed
+  from earlier runs; use the final captured logs as authoritative.
+- The correction is documentation-only; no source changed and no Cargo check
+  was rerun. Logs: `focused-final.log`, `frozen-sql-final.log`, and
+  `frozen-preludes-final.log` under
+  `/home/ubuntu/hld-current-test-artifacts/20261113T015943Z-namespace-import-statement-trace-resume/`.
+- Implementation commit remains `b5d6a8e1c73849e208d517fec39ada986d2e473d`;
+  this exact-output correction will be recorded in a local journal-only
+  commit. No replay or push was performed.
