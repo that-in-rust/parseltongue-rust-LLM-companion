@@ -849,11 +849,8 @@ fn test_generated_import_refresh_trace() {
         "[package]\nname=\"defs\"\nversion=\"0.1.0\"\nedition=\"2021\"\n",
     )
     .unwrap();
-    fs::write(
-        root.join("defs/src/lib.rs"),
-        "#![no_std] #[macro_export] macro_rules! emit_generated { () => { pub struct Generated; }; } emit_generated!();",
-    )
-    .unwrap();
+    let fixture_dependency_source_text = "#![no_std] #[macro_export] macro_rules! emit_generated { () => { pub struct Generated; }; } emit_generated!();";
+    fs::write(root.join("defs/src/lib.rs"), fixture_dependency_source_text).unwrap();
     let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
     fs::write(
         root.join("Cargo.toml"),
@@ -927,10 +924,106 @@ fn test_generated_import_refresh_trace() {
         refreshes[1]["trigger_unit_compilation_identity_key"],
         dependency["unit_compilation_identity_key"]
     );
+    let fixture_dependency_package_root = root.join("defs");
+    let fixture_source_absolute_path = fixture_dependency_package_root.join("src/lib.rs");
     assert_eq!(
-        refreshes[1]["completed_invocation_occurrence_identities"][0]["unit_compilation_identity_key"]
-            ["package_identifier"],
-        dependency["unit_cargo_package_identifier"]
+        dependency["unit_package_root_path"],
+        fixture_dependency_package_root.to_str().unwrap()
+    );
+    let fixture_source_relative_path = fixture_source_absolute_path
+        .strip_prefix(&fixture_dependency_package_root)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    let fixture_invocation_source_text = "emit_generated!();";
+    let fixture_invocation_byte_start = fixture_dependency_source_text
+        .find(fixture_invocation_source_text)
+        .unwrap();
+    let fixture_invocation_byte_end =
+        fixture_invocation_byte_start + fixture_invocation_source_text.len();
+    let fixture_invocation_source_bytes = fixture_dependency_source_text.as_bytes();
+    let fixture_invocation_byte_range =
+        serde_json::json!([fixture_invocation_byte_start, fixture_invocation_byte_end]);
+    let fixture_invocation_content_digest = blake3::hash(
+        &fixture_invocation_source_bytes
+            [fixture_invocation_byte_start..fixture_invocation_byte_end],
+    )
+    .to_hex()
+    .to_string();
+    let fixture_unit_configuration_digest = blake3::hash(
+        serde_json::json!([
+            dependency["unit_target_cfg_values"],
+            dependency["unit_enabled_feature_values"],
+            dependency["unit_rust_edition_value"],
+            dependency["unit_compilation_role_kind"],
+        ])
+        .to_string()
+        .as_bytes(),
+    )
+    .to_hex()
+    .to_string();
+    let fixture_compilation_unit_identity = serde_json::json!({
+        "unit_cargo_package_identifier": dependency["unit_cargo_package_identifier"],
+        "unit_cargo_target_name": dependency["unit_cargo_target_name"],
+        "unit_cargo_target_kind": dependency["unit_cargo_target_kind"],
+        "unit_compilation_role_kind": dependency["unit_compilation_role_kind"],
+        "unit_configuration_digest_full": fixture_unit_configuration_digest,
+    });
+    let fixture_source_occurrence_identity = serde_json::json!({
+        "unit_compilation_identity_key": fixture_compilation_unit_identity,
+        "span_source_file_path": fixture_source_relative_path,
+        "span_byte_range_value": fixture_invocation_byte_range,
+        "span_content_digest_full": fixture_invocation_content_digest,
+        "span_expansion_provenance_chain": [],
+    });
+    let fixture_trace_unit_identity = serde_json::json!({
+        "package_identifier": dependency["unit_cargo_package_identifier"],
+        "target_name": dependency["unit_cargo_target_name"],
+        "target_kind": dependency["unit_cargo_target_kind"],
+        "role_kind": dependency["unit_compilation_role_kind"],
+        "configuration_digest": fixture_unit_configuration_digest,
+    });
+    let fixture_trace_occurrence_identity = serde_json::json!({
+        "unit_compilation_identity_key": fixture_trace_unit_identity,
+        "source_file_path": fixture_source_relative_path,
+        "byte_range": {
+            "start": fixture_invocation_byte_start,
+            "end": fixture_invocation_byte_end,
+        },
+        "content_digest": fixture_invocation_content_digest,
+        "expansion_provenance_chain": [],
+    });
+    let persisted_macro_expansion_rows =
+        read_published_table_fixture(&database, "macro-expanded-item-table");
+    let generated_macro_expansion_row = persisted_macro_expansion_rows
+        .iter()
+        .find(|row| {
+            row["macro_expanded_source_text"]
+                .as_str()
+                .is_some_and(|source| source.contains("pub struct Generated"))
+        })
+        .unwrap();
+    assert_eq!(
+        generated_macro_expansion_row["macro_invocation_identity_record"],
+        fixture_source_occurrence_identity
+    );
+    assert_eq!(
+        refreshes[1]["completed_invocation_occurrence_identities"][0],
+        fixture_trace_occurrence_identity
+    );
+    let fixture_invocation_identity_digest =
+        blake3::hash(fixture_source_occurrence_identity.to_string().as_bytes())
+            .to_hex()
+            .to_string();
+    let fixture_expected_virtual_path = fixture_dependency_package_root
+        .join(".parseltongue/macro-source")
+        .join(fixture_invocation_identity_digest)
+        .join("expanded.rs")
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(
+        generated_macro_expansion_row["macro_virtual_source_path"],
+        fixture_expected_virtual_path
     );
     assert!(
         units
@@ -1022,11 +1115,9 @@ fn test_generated_import_refresh_trace() {
         resolved_consumer_path["path_target_symbol_rows"][0]["target_symbol_kind_value"],
         "Struct"
     );
-    assert!(
-        resolved_consumer_path["path_target_symbol_rows"][0]["target_source_file_path"]
-            .as_str()
-            .unwrap()
-            .contains("macro-source"),
+    assert_eq!(
+        resolved_consumer_path["path_target_symbol_rows"][0]["target_source_file_path"],
+        generated_macro_expansion_row["macro_virtual_source_path"],
         "{resolved_consumer_path:#?}"
     );
 }

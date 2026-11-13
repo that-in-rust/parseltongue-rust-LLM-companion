@@ -3994,3 +3994,64 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Correction to the preceding next-step count: the scoped diff has six files
   (three Rust files, SPEC, TDD journal, and status board), not five. This note
   corrects the count without rewriting the appended REFACTOR entry.
+
+## REQ-RUST-028.1 — TEST-ONLY IDENTITY FOLLOW-UP — 2026-11-13
+
+- STUB: This follow-up only strengthens the existing persisted-fixture test;
+  production tracing, manifest hashing, resolver scheduling, and publication
+  remain unchanged. The fixture source is kept as a named value so the expected
+  invocation range and content digest are computed from its exact bytes.
+- RED: The first focused run of the new assertions exposed a test expectation
+  shape mismatch, not a production failure. The trace uses an object for
+  `byte_range`, while the initial expected value used an array:
+  `left: Object {"byte_range": Object {"end": Number(110), "start": Number(92)}, ...}`
+  versus
+  `right: Object {"byte_range": Array [Number(92), Number(110)], ...}`.
+  The expected trace shape was corrected. The initial run is retained at
+  `/home/ubuntu/hld-current-test-artifacts/20261113T003601Z-macro-refresh-identity-followup/cli-fixture.log`.
+- GREEN: The final focused release command was
+  `/usr/bin/time -f 'elapsed_seconds=%e exit_code=%x peak_rss_kib=%M' /usr/bin/timeout -k 10s 240s env CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo test -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- test_generated_import_refresh_trace --exact --nocapture`.
+  Output: `test test_generated_import_refresh_trace ... ok`;
+  `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 1.11s`;
+  `elapsed_seconds=3.27 exit_code=0 peak_rss_kib=318600`;
+  `TEST_EXIT_CODE=0`.
+- REFACTOR: Expected full compilation-unit identity is derived independently
+  from the published dependency-unit row, including configuration digest and
+  role. Expected normalized path, exact source byte range (92–110), digest
+  (`d2d501c95f2e51c636a2e031c2949717065daeed7b7303e552bfa5e74b738737`), and
+  empty source provenance are bound to the fixture source. The test compares
+  that expected record with the persisted macro invocation identity and the
+  complete trace identity. It derives the virtual source path from this
+  independently expected identity, checks the persisted macro row's path, and
+  requires the resolved target path to equal that same row path. The existing
+  exact two-refresh expectation is unchanged; this fixture makes no universal
+  progress or native/corpus convergence claim. No production or extractor
+  changes were made.
+- Final format check: `cargo fmt --all -- --check`; output
+  `elapsed_seconds=3.84 exit_code=0`, `FMT_EXIT_CODE=0`.
+- Final focused Clippy command:
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo clippy -p parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests --all-features --release --locked --offline -- -D warnings`.
+  Output: `Finished \\`release\\` profile [optimized] target(s) in 0.43s`;
+  `elapsed_seconds=0.48 exit_code=0 peak_rss_kib=225432`;
+  `CLIPPY_EXIT_CODE=0`. An initial Clippy run found
+  `clippy::sliced-string-as-bytes`; the digest test now slices the source byte
+  buffer before hashing.
+- Final retained logs are in
+  `/home/ubuntu/hld-current-test-artifacts/20261113T003601Z-macro-refresh-identity-followup/`:
+  `cli-fixture-verified.log` SHA-256
+  `3d2f6f5b5f125f74d9800fa9192a970fa8d0e12cd892c4974e808ea4dfd51105`,
+  `fmt-check-verified.log` SHA-256
+  `e8272b3912961e9145334f75b756665cb1f74d66cb8b4561a54ab9e92019fcac`, and
+  `clippy-verified.log` SHA-256
+  `51d6f6f5b5f125f74d9800fa9192a970fa8d0e12cd892c4974e808ea4dfd51105`.
+  No native/sysroot/corpus run, status-board change, push, or PR occurred in
+  this test-only follow-up; prior native timeout artifacts remain untouched.
+
+## REQ-RUST-028.1 — RECORD CORRECTION — 2026-11-13
+
+- Correction to the preceding follow-up evidence only: the SHA-256 for
+  `clippy-verified.log` is
+  `51d6b43c010f3fe250b6705f704e879deb283c40f370ea915fc0ade233138daa`.
+  Its recorded `Finished` line is `Finished `release` profile [optimized]
+  target(s) in 0.43s` (without literal backslashes around `release`). The
+  retained log and all earlier journal bytes are unchanged.
