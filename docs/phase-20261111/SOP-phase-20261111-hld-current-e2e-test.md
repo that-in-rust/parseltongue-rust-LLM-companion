@@ -119,6 +119,20 @@ Measured at commit `af77385d0daf4d0e949e81f2588be2e44f69f086`:
 
 **Constant regression loop — frozen Pass B**
 
+The graph-first construction order and table ownership are specified in
+[itoa-hld-backward-design.md](itoa-hld-current-benchmark/itoa-hld-backward-design.md)
+and SPEC REQ-RUST-029.0–031.0. First enumerate source-derived occurrences and
+relations, then build the HLD output boundary against semantic fixtures, then
+work backwards through visibility/signature/impl/body producers to real source.
+Synthetic semantic-input fixtures test the builder only; they are never Pass B
+and must never be substituted for a production run on the pinned source.
+The source-reference draft is not accepted output until step 7's freeze.
+Keep local item visibility distinct from outside-crate reachability; public
+`Sealed` members and `pub(crate) mulhi` are not excluded by their private modules.
+Use the same explicit external endpoint bucket policy for expected and actual
+roll-ups under REQ 031.0; an absent external definition file is not a guessed
+local file and does not remove the edge.
+
 8. After each production change affecting mapping, identities or HLD, run the
    affected focused tests and the available M0–M8 subset below on this same pin.
    After each integration checkpoint, rerun all currently implemented applicable
@@ -576,3 +590,14 @@ tags, phase elapsed time, and whole-process-tree peak RSS for every run. Keep
 run-local spill directories, disable extension install/load and external
 access, and retain file-backed databases. After all-five S5 exists, enforce
 the unchanged ≤500,000,000-byte whole-process-tree peak RSS target.
+
+### SOP revision R10 — direct-projection checkpoint (2026-11-13)
+
+The typed DuckDB materializer's current implementation checkpoint covers only
+SQL-based node selection and direct extracted-edge projection. It reports
+DirectProjectionOnly; roll-ups, recursive private-chain collapse,
+frozen-input marker validation, durable Turso publication, real-source
+producers and source-to-HLD acceptance remain NOT STARTED. Extracted edges
+through nonselected local items fail with the explicit unsupported-traversal
+error. This checkpoint is implementation progress only, not HLD-complete or
+SOP-subset PASS evidence.

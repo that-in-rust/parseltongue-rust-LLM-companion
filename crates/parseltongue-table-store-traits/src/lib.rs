@@ -6,6 +6,10 @@
 
 //! Synchronous stage seams; concrete storage belongs to L3.
 
+#[path = "hld-materialization-analysis-port.rs"]
+mod hld_materialization_analysis_port;
+pub use hld_materialization_analysis_port::*;
+
 use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
 };

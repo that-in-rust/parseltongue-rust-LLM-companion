@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 parseltongue-core-row-types = { path = "../parseltongue-core-row-types" }
+thiserror = "2"
 
 [lints]
 workspace = true

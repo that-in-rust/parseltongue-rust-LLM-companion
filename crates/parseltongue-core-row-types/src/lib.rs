@@ -25,6 +25,10 @@ pub use builtin_macro_expansion_records::*;
 mod unit_prelude_configuration_records;
 pub use unit_prelude_configuration_records::*;
 
+#[path = "hld-materialization-core-records.rs"]
+mod hld_materialization_core_records;
+pub use hld_materialization_core_records::*;
+
 #[path = "configuration-expression-truth-values.rs"]
 mod configuration_expression_truth_values;
 pub use configuration_expression_truth_values::evaluate_cfg_expression_truth;
@@ -83,6 +87,12 @@ pub struct CrateCompilationUnitKey {
     pub unit_cargo_target_kind: String,
     pub unit_compilation_role_kind: CompilationUnitRoleKind,
     pub unit_configuration_digest_full: [u8; 32],
+}
+
+impl CrateCompilationUnitKey {
+    pub fn validate_crate_unit_identity(&self) -> Result<(), CoreRowValidationError> {
+        validate_compilation_unit_identity(self)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

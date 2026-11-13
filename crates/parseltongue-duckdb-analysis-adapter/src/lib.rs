@@ -19,6 +19,12 @@ pub struct DuckdbAnalysisStoreAdapter {
     _connection: Mutex<duckdb::Connection>,
 }
 
+#[cfg(test)]
+#[path = "hld-materialization-contract-tests.rs"]
+mod hld_materialization_contract_tests;
+#[path = "hld-materialization-duckdb-store.rs"]
+mod hld_materialization_duckdb_store;
+
 #[path = "namespace-analysis-phase-diagnostics.rs"]
 mod namespace_analysis_phase_diagnostics;
 #[path = "namespace-memory-limit-contract.rs"]

@@ -4312,3 +4312,181 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   reference when work resumes. Lockfile/config freeze, expected graph and
   comparison remain unstarted. Agents/native diagnosis remain halted.
   This documentation set is saved in one local commit; no push or PR.
+
+## HLD-MATERIALIZER-STUB-PHASE — 2026-11-13
+
+- REQ-RUST-030.0 STUB only. Added dependency-free core HLD input/output and
+  validation-error record signatures, the `HldGraphAnalysisPort` signature,
+  and a DuckDB adapter implementation stub. No behavioral test had been
+  written or run at this checkpoint. `todo!()` remains in the validator and
+  adapter implementation by design for the RED phase. No persisted Turso
+  completion-marker behavior is represented by this typed-input API.
+- TDD skill read from the user-specified
+  `tdd-workflow-for-rust-stub-red-green-refactor/SKILL.md`; the active plugin
+  search returned no plugin match. The exact STUB command was:
+
+  ```text
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/stub-check-memory.json -- cargo check -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --tests --all-features --release --offline
+  ```
+
+  ```text
+  Finished `release` profile [optimized] target(s) in 2.26s
+  STUB_CARGO_CHECK_EXIT_CODE=0
+  elapsed_seconds=2.34 exit_code=0 peak_rss_kib=312488
+  WHOLE_TREE_RSS_BYTES=647434240 RSS_SAMPLE_COUNT=220
+  PROCESS_TREE_ELAPSED_SECONDS=2.3134043420432135 RSS_SAMPLING_INTERVAL_MS=10
+  ```
+
+- Cargo emitted the pre-existing rust-analyzer manifest warning
+  `unused manifest key lints.cargo` (parser and syntax manifests) and an
+  STUB-only unused `HldGraphAnalysisPort` import warning. No
+  `Compiling libduckdb-sys` marker appeared. The direct `thiserror` dependency
+  was added to the L2 trait crate and Cargo.lock was updated offline; no new
+  package was downloaded. Outputs are retained under
+  `/home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/`.
+- No commit was made in STUB. Next: write the node-visibility and direct-edge
+  projection RED tests, run them against the stub, and preserve their exact
+  failure output before implementing either behavior.
+
+## HLD-MATERIALIZER-RED-PHASE — 2026-11-13
+
+- REQ-RUST-030.0 RED covers only
+  `test_hld_node_visibility_rules` and `test_hld_direct_edge_projection`.
+  Both tests compile and fail because the DuckDB port implementation is still
+  the STUB `todo!()`; neither behavior is implemented yet. The exact command:
+
+  ```text
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/red-tests-memory.json -- cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features --release --locked --offline -- test_hld_ --nocapture
+  ```
+
+  ```text
+  Finished `release` profile [optimized] target(s) in 17.12s
+  running 2 tests
+  thread 'hld_materialization_contract_tests::test_hld_direct_edge_projection' panicked at crates/parseltongue-duckdb-analysis-adapter/src/hld-materialization-duckdb-store.rs:12:9:
+  not yet implemented
+  thread 'hld_materialization_contract_tests::test_hld_node_visibility_rules' panicked at crates/parseltongue-duckdb-analysis-adapter/src/hld-materialization-duckdb-store.rs:12:9:
+  not yet implemented
+  test hld_materialization_contract_tests::test_hld_direct_edge_projection ... FAILED
+  test hld_materialization_contract_tests::test_hld_node_visibility_rules ... FAILED
+  test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 116 filtered out; finished in 0.01s
+  RED_TEST_EXIT_CODE=101
+  elapsed_seconds=17.21 exit_code=101 peak_rss_kib=631536
+  WHOLE_TREE_RSS_BYTES=952848384 RSS_SAMPLE_COUNT=1635
+  PROCESS_TREE_ELAPSED_SECONDS=17.176002243999392 RSS_SAMPLING_INTERVAL_MS=10
+  ```
+
+- Full stdout/stderr and process-tree samples are retained under
+  `/home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/`.
+  No `Compiling libduckdb-sys` marker appeared. Cargo repeated the existing
+  rust-analyzer parser/syntax warning `unused manifest key `lints.cargo``.
+  Environment diagnosis: no repository toolchain file; active default is
+  `stable-x86_64-unknown-linux-gnu`, Cargo 1.99.1, rustc 1.99.1. The warnings
+  did not prevent the STUB check or test compilation; toolchain changes are
+  prohibited, so no maintenance command or workaround was applied.
+- No commit was made in RED. This is the requested checkpoint only: next
+  implement direct projection, rerun these two tests, then expand into private
+  traversal, path/evidence aggregation and roll-ups in separate increments.
+
+## HLD-MATERIALIZER-STRENGTHENED-RED — 2026-11-13
+
+- Applied the reviewed API corrections before implementation: canonical edge
+  identity fields and `HldGraphEdgeKey`, `HldAnalysisPortError`, explicit unit
+  provenance, typed full evidence-row keys, structured backend operations,
+  separate cancellation/lock errors and a `RunCancelFlagValue` trait argument.
+  The direct output explicitly reports `DirectProjectionOnly`; rollups are
+  represented as uncomputed rather than empty completed results.
+- Strengthened `test_hld_node_visibility_rules` to use a function item under
+  function-body ancestry and compare each selected node's actual reachability
+  value with its input. Strengthened `test_hld_direct_edge_projection` to
+  assert five complete source/target/relation/via keys, evidence counts and
+  paths, source/target signature and path preservation, and explicit provenance
+  for a `core`-named external unit and non-`core` standard unit. Added
+  `test_hld_private_traversal_rejected` as the fail-closed direct-only contract.
+- Exact RED command (E=60s, hard ceiling=120s):
+
+  ```text
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/strengthened-red-memory.json -- cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features --release --locked --offline -- test_hld_ --nocapture
+  ```
+
+  ```text
+  Finished `release` profile [optimized] target(s) in 17.48s
+  running 3 tests
+  test_hld_node_visibility_rules ... FAILED
+  test_hld_private_traversal_rejected ... FAILED
+  test_hld_direct_edge_projection ... FAILED
+  test result: FAILED. 0 passed; 3 failed; 0 ignored; 116 filtered out; finished in 0.02s
+  STRENGTHENED_RED_EXIT_CODE=101
+  elapsed_seconds=17.57 exit_code=101 peak_rss_kib=631196
+  WHOLE_TREE_RSS_BYTES=947687424 RSS_SAMPLE_COUNT=1668
+  PROCESS_TREE_ELAPSED_SECONDS=17.538100110949017 RSS_SAMPLING_INTERVAL_MS=10
+  ```
+
+- All three compiled and failed at the intentionally unchanged DuckDB
+  `todo!()` stub; this is behavioral RED, not a compiler failure. The exact
+  panic lines and full output are retained in
+  `/home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/strengthened-red.log`.
+  Cargo repeated the previously diagnosed stable-toolchain warning
+  `unused manifest key \`lints.cargo\`` for rust-analyzer parser/syntax. No
+ `libduckdb-sys` compile marker appeared. No commit was made.
+
+## HLD-MATERIALIZER-GREEN — 2026-11-13
+
+- Implemented SQL-only eligible-node selection and direct extracted-edge
+  projection with canonical endpoint fields, full evidence-row identity,
+  explicit unit provenance, typed origin classification, and fail-closed
+  validation. Extracted edges requiring private traversal return
+  UnsupportedTraversal. Output remains DirectProjectionOnly; roll-ups,
+  recursive collapse, durable publication, input-marker validation and
+  real-source producers remain unimplemented.
+- Final affected tests:
+
+  ~~~text
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/tests-verified-memory.json -- cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features --release --locked --offline -- test_hld_ --nocapture
+  running 3 tests
+  test hld_materialization_contract_tests::test_hld_private_traversal_rejected ... ok
+  test hld_materialization_contract_tests::test_hld_node_visibility_rules ... ok
+  test hld_materialization_contract_tests::test_hld_direct_edge_projection ... ok
+  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 116 filtered out; finished in 0.06s
+  AFFECTED_TEST_EXIT_CODE=0
+  elapsed_seconds=15.27 exit_code=0 peak_rss_kib=635984
+  WHOLE_TREE_RSS_BYTES=1115160576 RSS_SAMPLE_COUNT=1442
+  PROCESS_TREE_ELAPSED_SECONDS=15.229362154030241
+  ~~~
+
+- Scoped formatting and whitespace:
+
+  ~~~text
+  cargo fmt --all -- --check && git diff --check
+  exit_code=0; no diagnostics
+  ~~~
+
+- Clippy, all targets and features for changed crates plus CLI consumer:
+
+  ~~~text
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/clippy-verified-memory.json -- cargo clippy -p parseltongue-core-row-types -p parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-targets --all-features --release --locked --offline -- -D warnings
+  CLIPPY_EXIT_CODE=0
+  elapsed_seconds=2.39 exit_code=0 peak_rss_kib=362520
+  WHOLE_TREE_RSS_BYTES=485851136 RSS_SAMPLE_COUNT=214
+  ~~~
+
+- Release build:
+
+  ~~~text
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-stub-red/build-final-memory.json -- cargo build -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --release --locked --offline
+  RELEASE_BUILD_EXIT_CODE=0
+  elapsed_seconds=29.68 exit_code=0 peak_rss_kib=657344
+  WHOLE_TREE_RSS_BYTES=1002012672 RSS_SAMPLE_COUNT=2770
+  ~~~
+
+- The two successful in-memory HLD fixture connections reported DuckDB v2.0.0,
+  current_setting(memory_limit)=25.0 GiB, threads=8,
+  preserve_insertion_order=true, and zero temporary-storage bytes. duckdb_memory
+  reported the IN_MEMORY_TABLE tag at 114240 and 728288 bytes respectively;
+  other reported tags were zero. No memory cap was configured. The all-five
+  S5 memory target is not claimed by this unit-test run.
+- Cargo continued to emit the existing warning
+  unused manifest key lints.cargo for rust-analyzer parser/syntax manifests;
+  the stable-toolchain warning was previously diagnosed and no toolchain
+  change was made.
+- Local GREEN commit follows these scoped gates; its SHA is recorded in the
+  next append-only phase entry.

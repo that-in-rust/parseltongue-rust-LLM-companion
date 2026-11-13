@@ -2251,6 +2251,7 @@ name = "parseltongue-table-store-traits"
 version = "0.1.0"
 dependencies = [
  "parseltongue-core-row-types",
+ "thiserror",
 ]
 
 [[package]]

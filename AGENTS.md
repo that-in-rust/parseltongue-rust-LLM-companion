@@ -213,3 +213,25 @@ mapped PRIMARY/SECONDARY path-envelope exporter. Use the live ordered CLI and
 single-envelope JSON format documented in SOP S4/S5. The value does not claim
 full S4 family support or qualification; keep the broader S4 requirements and
 historical capability records intact.
+
+## Revision note — itoa graph-first construction
+
+Phase 1 follows SPEC REQ-RUST-029.0–031.0 and
+`docs/phase-20261111/itoa-hld-current-benchmark/itoa-hld-backward-design.md`:
+source-derived HLD expectation first, backward table contracts second, missing
+general-purpose producers third. Reference families/display names are not frozen
+canonical occurrences; never feed expected data into production. Builder
+fixtures are not a real-source comparison. Keep `body-site-reference-table` as
+the body-site store. Turso owns durable semantic facts and atomic HLD serving;
+DuckDB owns relational analysis. Halted large-repository/native work remains
+separate from this focused slice; all-five milestone completion is unchanged.
+
+### Revision note — direct HLD materializer checkpoint
+
+The bounded DuckDB materializer slice selects nodes and projects direct edges
+in SQL only. It is explicitly DirectProjectionOnly; recursive private-chain
+collapse, roll-ups, frozen-input marker checks, Turso publication and
+real-source producers remain separate increments. Reject extracted private
+traversal rather than implying a complete graph. Dependency origin uses
+explicit unit provenance and full compilation-unit identity, never labels or
+paths. Keep canonical edge fields and full evidence-row keys.

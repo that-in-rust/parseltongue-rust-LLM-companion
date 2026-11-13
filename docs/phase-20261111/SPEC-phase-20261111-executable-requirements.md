@@ -1505,3 +1505,117 @@ outputs SHALL remain unchanged.
 - `test_import_batch_failure_equivalence` — compares an injected middle
   statement failure under autocommit and explicit transaction rollback,
   including underlying error propagation and no later statement execution.
+
+## Phase 1 revision — itoa graph-first construction
+
+The source-derived reference and backward table design live in
+[itoa-hld-current-benchmark](itoa-hld-current-benchmark/itoa-hld-backward-design.md).
+The reference remains DRAFT until its compilation context, occurrence identities,
+expansion provenance and external endpoints are verified. A source inventory or
+passing synthetic HLD fixture is not a frozen golden or production comparison.
+
+This revision adds the missing HLD boundary without changing the two-database
+architecture. Turso stores durable semantic facts and atomic serving results;
+DuckDB computes selection, collapse, deduplication and roll-ups over compatible
+frozen inputs. Reuse `body-site-reference-table`; do not add a parallel call-site
+store. No benchmark reference data may enter the production mapper.
+
+### REQ-RUST-029.0 — source-derived reference separation
+
+WHEN the itoa reference is constructed, THEN source-written items SHALL carry
+exact source byte evidence and generated items SHALL distinguish template,
+invocation, substitution and declaration/implementation owner. Each of the
+twelve selected integer implementations has distinct associated occurrences;
+the bodyless trait declaration never owns an implementation body's calls.
+Local visibility and external reachability SHALL be evaluated separately under
+REQ 019.1: public `Sealed` items under a private parent and `pub(crate) mulhi`
+qualify locally. Impl blocks are header/evidence containers, not D6 nodes.
+
+WHEN a required context, expansion identity or external target is unverified,
+THEN the reference SHALL remain DRAFT and enumerate that gap. Semantic families,
+display-name identifiers and source-only target guesses SHALL NOT count as
+accepted canonical rows. Production SHALL NOT read expected-reference data.
+
+### REQ-RUST-030.0 — typed HLD materialization
+
+WHEN complete compatible semantic inputs are provided, THEN the HLD builder
+SHALL emit REQ 019.1 selected nodes, REQ 009.2 extracted edges and every distinct
+canonical simple evidence path. It SHALL retain selected zero-degree nodes.
+Effective visibility facts include item kind, owner, fn-body ancestry and
+outside-crate reachability; unknown visibility SHALL NOT silently mean private.
+Resolved relations use only calls/uses_type/implements/reexports/contains/derives.
+Generic/concrete dispatch is evidence metadata, not an additional relation kind.
+
+WHEN traversal reaches a selected or canonical external target, THEN it SHALL
+stop; otherwise it SHALL traverse only extracted relations through private
+items, preserving the terminal relation kind. Unresolved links terminate paths.
+Cycles SHALL terminate using per-path occurrence identities. Diamonds SHALL
+merge rows by (generation, source, target, relation kind, via kind), retain all
+distinct paths, and count the union of original evidence-row keys. Genuine
+direct/finite-path self-edges remain once; private cycles alone invent none.
+
+WHEN a semantic input has a malformed identity, missing local endpoint,
+conflicting duplicate, incompatible generation or missing completion marker,
+THEN the builder SHALL return a structured typed error before publication.
+Pure L1 types SHALL have zero dependencies and reuse the established full
+compilation/occurrence identity, not a parallel display-name key scheme.
+
+#### Bounded implementation checkpoint — direct projection only
+
+The initial DuckDB materializer increment implements only SQL-based node
+selection and direct extracted-edge projection. Its output SHALL identify itself
+as direct-projection-only, and file/folder roll-ups SHALL remain explicitly
+uncomputed. Any extracted relation requiring traversal through a nonselected
+local item SHALL fail with an unsupported-traversal error until the recursive
+collapse increment is implemented; it SHALL NOT be reported as a complete HLD.
+This checkpoint does not satisfy the full path/cycle/diamond or publication
+requirements above. Unit origin SHALL come from explicit unit-provenance input;
+only identical full unit keys derive same_crate, and a typed builtin endpoint
+uses the standard-library origin bucket.
+
+### REQ-RUST-031.0 — transactional HLD serving
+
+WHEN HLD output is persisted, THEN `hld-current-interface-nodes`,
+`hld-current-dependency-edges`, `hld-edge-evidence-paths`,
+`hld-file-level-rollup` and `hld-folder-level-rollup` SHALL be one atomic
+stage-owned Turso work unit. Publication SHALL require exact compatible
+semantic-input completion, not mere table existence. Cancellation or write
+failure SHALL leave the preceding publication unchanged.
+
+WHEN inputs are reordered or repeated in another operational attempt, THEN
+sorted semantic output SHALL remain identical after excluding attempt identity.
+Empty completed fixtures SHALL be distinguished from missing/incomplete input.
+Roll-ups SHALL count each deduplicated HLD row once at each level, not path
+multiplicity. File keys include compilation context and normalized relative
+path; folder keys use immediate parent directories with root `.`. An external
+target without verified definition-file evidence SHALL retain its canonical
+external-identity bucket, explicitly distinct from a source-file bucket; no
+guessed local file or silent edge exclusion is permitted.
+
+### Authoritative Phase 1 HLD verification matrix
+
+| req_id | test_id | test_type | assertion | metric |
+| --- | --- | --- | --- | --- |
+| REQ-RUST-029.0 | test_itoa_reference_occurrence_inventory | reference contract | distinct generated owners, selected internal interfaces, explicit unfrozen gaps | exact inventory |
+| REQ-RUST-030.0 | test_hld_identity_validation_rules | unit | full context identity and source-relative locations validated | invalid inputs rejected |
+| REQ-RUST-030.0 / 019.1 | test_hld_node_visibility_rules | unit/integration | internal-public selected; body-local/private-equivalent excluded; degree-zero retained | exact node set |
+| REQ-RUST-030.0 | test_hld_direct_edge_projection | integration | canonical local/external targets and extraction-only output | exact edge set |
+| REQ-RUST-030.0 | test_hld_private_traversal_rejected | negative integration | direct-only slice rejects extracted edges requiring private traversal | typed unsupported-traversal error |
+| REQ-RUST-030.0 | test_hld_private_terminal_kind | integration | complete private path and terminal relation kind retained | exact path/edge set |
+| REQ-RUST-030.0 | test_hld_selected_target_stop | integration | traversal does not continue past a selected target | zero spurious shortcuts |
+| REQ-RUST-030.0 | test_hld_diamond_evidence_union | integration | one edge, distinct paths, unique evidence count | exact counts |
+| REQ-RUST-030.0 | test_hld_cycle_self_rules | integration | private cycles terminate; genuine self-edges retained | exact finite output |
+| REQ-RUST-030.0 | test_hld_unresolved_path_termination | integration | unresolved path cannot produce extracted successor | zero fabricated rows |
+| REQ-RUST-030.0 | test_hld_invalid_input_rejection | negative integration | malformed identity/missing endpoint fails | typed error |
+| REQ-RUST-030.0 | test_hld_duplicate_conflict_rejection | negative integration | conflicting duplicate is not overwritten | typed error |
+| REQ-RUST-030.0 / 031.0 | test_hld_generation_input_isolation | integration | incompatible generation cannot contaminate output | zero foreign rows |
+| REQ-RUST-030.0 / 031.0 | test_hld_missing_input_markers | negative integration | table presence is not stage completion | no publication |
+| REQ-RUST-031.0 | test_hld_cancel_preserves_publication | integration | cancellation leaves old generation readable | unchanged digest |
+| REQ-RUST-031.0 | test_hld_failed_write_rollback | integration | partial output unit never publishes | unchanged digest |
+| REQ-RUST-031.0 / 012.1 | test_hld_order_attempt_determinism | integration | input order/attempt do not alter semantic result | byte equality |
+| REQ-RUST-031.0 / 009.2 | test_hld_rollup_edge_counts | integration | local/external file/folder groups count deduplicated edges | summed count = HLD count |
+| REQ-RUST-031.0 | test_hld_complete_empty_snapshot | integration | complete empty input differs from missing stage | explicit empty result |
+
+These are required test contracts, not passing evidence. Record STUB/RED/GREEN/
+REFACTOR output and exact test implementation locations in the journal. The
+pinned source-to-HLD comparison remains a separate Phase 1 end-to-end gate.
