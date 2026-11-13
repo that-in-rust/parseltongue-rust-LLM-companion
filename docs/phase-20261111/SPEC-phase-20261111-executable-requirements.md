@@ -1560,7 +1560,7 @@ THEN the builder SHALL return a structured typed error before publication.
 Pure L1 types SHALL have zero dependencies and reuse the established full
 compilation/occurrence identity, not a parallel display-name key scheme.
 
-#### Bounded implementation checkpoint — direct projection only
+#### Historical bounded implementation checkpoint — direct projection only
 
 The initial DuckDB materializer increment implements only SQL-based node
 selection and direct extracted-edge projection. Its output SHALL identify itself
@@ -1594,6 +1594,28 @@ Identical duplicate provenance/node/evidence records are legal; conflicting
 duplicates fail. Inferred, Proposed and Unresolved evidence SHALL never become
 extracted output, and unresolved reason metadata remains in its input record.
 
+#### Recursive DuckDB path/collapse checkpoint
+
+The DuckDB adapter SHALL seed a recursive CTE from extracted edges whose source
+is selected, extend paths only through nonselected LocalItem endpoints, and
+stop at selected or canonical external/builtin endpoints. Each path SHALL carry full
+source identity, ordered endpoint identities and ordered original evidence-row
+identities. The terminal edge's relation kind SHALL label the HLD row.
+
+Per-path visited identities SHALL prevent repeating private endpoints while
+allowing one finite return to the selected source as a terminal self-edge.
+Private cycles alone SHALL emit no edge. Distinct ordered evidence paths SHALL
+remain distinct even when endpoint sequences match. DuckDB SQL SHALL group HLD
+rows and count the distinct original evidence-key union per
+generation/source/target/relation/via group by UNNESTing ordered evidence
+lists. Rust SHALL only decode and sort the typed output, without traversing
+or aggregating the graph.
+
+This checkpoint SHALL report GraphPathsOnly; file and folder roll-ups remain
+None and CompleteGraph remains reserved until roll-ups exist. It does not
+implement input-marker validation, durable publication or real-source
+producers.
+
 ### REQ-RUST-031.0 — transactional HLD serving
 
 WHEN HLD output is persisted, THEN `hld-current-interface-nodes`,
@@ -1621,19 +1643,19 @@ guessed local file or silent edge exclusion is permitted.
 | REQ-RUST-030.0 | test_hld_identity_validation_rules | unit | full context identity and source-relative locations validated | invalid inputs rejected |
 | REQ-RUST-030.0 / 019.1 | test_hld_node_visibility_rules | unit/integration | internal-public selected; body-local/private-equivalent excluded; degree-zero retained | exact node set |
 | REQ-RUST-030.0 | test_hld_direct_edge_projection | integration | canonical local/external targets and extraction-only output | exact edge set |
-| REQ-RUST-030.0 | test_hld_private_traversal_rejected | negative integration | direct-only slice rejects extracted edges requiring private traversal | typed unsupported-traversal error |
-| REQ-RUST-030.0 | test_hld_private_terminal_kind | integration | complete private path and terminal relation kind retained | exact path/edge set |
-| REQ-RUST-030.0 | test_hld_selected_target_stop | integration | traversal does not continue past a selected target | zero spurious shortcuts |
-| REQ-RUST-030.0 | test_hld_diamond_evidence_union | integration | one edge, distinct paths, unique evidence count | exact counts |
-| REQ-RUST-030.0 | test_hld_cycle_self_rules | integration | private cycles terminate; genuine self-edges retained | exact finite output |
-| REQ-RUST-030.0 | test_hld_unresolved_path_termination | integration | unresolved path cannot produce extracted successor | zero fabricated rows |
+| REQ-RUST-030.0 | test_hld_private_path_materialized | integration | prior private-path fixture now emits the terminal collapsed row | exact key, path and evidence |
+| REQ-RUST-030.0 | test_hld_private_terminal_kind | integration | private Calls hop followed by terminal UsesType hop preserves UsesType | exact key, path and evidence |
+| REQ-RUST-030.0 | test_hld_selected_target_stop | integration | traversal does not continue past a selected target | exact terminal rows only |
+| REQ-RUST-030.0 | test_hld_diamond_evidence_union | integration | direct/collapsed buckets, evidence-separated paths and unique union | exact rows, paths and counts |
+| REQ-RUST-030.0 | test_hld_cycle_self_edges | integration | private cycles terminate; finite and direct self-edges remain distinct | exact rows and paths |
+| REQ-RUST-030.0 | test_hld_unresolved_path_stop | integration | unresolved, inferred and proposed hops stop while extracted branches remain | exact row/path set |
 | REQ-RUST-030.0 | test_hld_invalid_input_rejection | negative integration | malformed identity/missing endpoint fails | typed error |
 | REQ-RUST-030.0 | test_hld_duplicate_conflict_rejection | negative integration | conflicting duplicate is not overwritten | typed error |
 | REQ-RUST-030.0 / 031.0 | test_hld_generation_input_isolation | integration | incompatible generation cannot contaminate output | zero foreign rows |
 | REQ-RUST-030.0 / 031.0 | test_hld_missing_input_markers | negative integration | table presence is not stage completion | no publication |
 | REQ-RUST-031.0 | test_hld_cancel_preserves_publication | integration | cancellation leaves old generation readable | unchanged digest |
 | REQ-RUST-031.0 | test_hld_failed_write_rollback | integration | partial output unit never publishes | unchanged digest |
-| REQ-RUST-031.0 / 012.1 | test_hld_order_attempt_determinism | integration | input order/attempt do not alter semantic result | byte equality |
+| REQ-RUST-031.0 / 012.1 | test_hld_order_attempt_determinism | integration | reordered/duplicate inputs and attempt token preserve complete output; reused adapter clears on empty input | output equality including paths; empty output |
 | REQ-RUST-031.0 / 009.2 | test_hld_rollup_edge_counts | integration | local/external file/folder groups count deduplicated edges | summed count = HLD count |
 | REQ-RUST-031.0 | test_hld_complete_empty_snapshot | integration | complete empty input differs from missing stage | explicit empty result |
 

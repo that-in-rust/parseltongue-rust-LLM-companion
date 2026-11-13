@@ -3,15 +3,15 @@
 use super::*;
 use parseltongue_core_row_types::{
     CompilationUnitRoleKind, CrateCompilationUnitKey, HldDependencyOriginKind, HldEdgeInputRecord,
-    HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldEvidenceRowKey, HldGraphEdgeKey,
-    HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
+    HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldEvidencePathRecord, HldEvidenceRowKey,
+    HldGraphEdgeKey, HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
     HldMaterializationValidationError, HldNodeInputCategory, HldNodeInputRecord,
     HldOutputCompletenessKind, HldOutputEdgeStatus, HldOwnerKindValue, HldRelationKindValue,
     HldUnitOriginKind, HldUnitProvenanceRecord, HldUnresolvedReasonKind, HldViaKindValue,
     NameSymbolTargetKey, RunCancelFlagValue, RunGenerationDigestValue, SemanticOccurrenceKeyValue,
     SpanByteRangeValue, SpanDigestIdValue, validate_hld_materialization_input,
 };
-use parseltongue_table_store_traits::{HldAnalysisPortError, HldGraphAnalysisPort};
+use parseltongue_table_store_traits::HldGraphAnalysisPort;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn build_hld_fixture_unit(package_name: &str, context_byte: u8) -> CrateCompilationUnitKey {
@@ -128,6 +128,122 @@ fn materialize_hld_fixture_graph(
         store.read_namespace_memory_usage().unwrap()
     );
     output
+}
+
+fn build_hld_path_node(
+    generation: RunGenerationDigestValue,
+    unit_identity: &CrateCompilationUnitKey,
+    file_name: &str,
+    offset: u8,
+    visibility: HldEffectiveVisibilityKind,
+    qualified_path: &str,
+) -> HldNodeInputRecord {
+    let source_path = format!("src/{file_name}.rs");
+    build_hld_fixture_node(
+        generation,
+        NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+            unit_identity,
+            &source_path,
+            u64::from(offset),
+            offset,
+        )),
+        HldNodeInputCategory::LocalItem,
+        Some(HldItemKindValue::Function),
+        Some(HldOwnerKindValue::Module),
+        false,
+        Some(visibility),
+        false,
+        Some(&source_path),
+        qualified_path,
+    )
+}
+
+fn build_hld_path_edge(
+    generation: RunGenerationDigestValue,
+    unit_identity: &CrateCompilationUnitKey,
+    source: &NameSymbolTargetKey,
+    target: &NameSymbolTargetKey,
+    relation: HldRelationKindValue,
+    site_file_name: &str,
+    site_offset: u8,
+) -> HldEdgeInputRecord {
+    let site_path = format!("src/{site_file_name}.rs");
+    build_hld_fixture_edge(
+        generation,
+        source.clone(),
+        target.clone(),
+        relation,
+        build_hld_fixture_occurrence(
+            unit_identity,
+            &site_path,
+            u64::from(site_offset),
+            site_offset,
+        ),
+    )
+}
+
+fn expected_hld_edge_key(
+    generation: RunGenerationDigestValue,
+    source: NameSymbolTargetKey,
+    target: NameSymbolTargetKey,
+    relation: HldRelationKindValue,
+    via: HldViaKindValue,
+) -> HldGraphEdgeKey {
+    HldGraphEdgeKey {
+        run_generation_digest_value: generation,
+        edge_source_occurrence_key: source,
+        edge_target_reference_value: target,
+        edge_relation_kind_value: relation,
+        edge_collapse_via_kind: via,
+    }
+}
+
+fn build_hld_path_record(
+    generation: RunGenerationDigestValue,
+    source: NameSymbolTargetKey,
+    target: NameSymbolTargetKey,
+    relation: HldRelationKindValue,
+    via: HldViaKindValue,
+    endpoints: Vec<NameSymbolTargetKey>,
+    evidence: Vec<HldEvidenceRowKey>,
+) -> HldEvidencePathRecord {
+    let sites = evidence
+        .iter()
+        .map(|row| row.evidence_site_occurrence_key.clone())
+        .collect();
+    HldEvidencePathRecord {
+        edge_key: expected_hld_edge_key(generation, source, target, relation, via),
+        ordered_endpoint_path: endpoints,
+        ordered_evidence_row_keys: evidence,
+        ordered_site_occurrence_keys: sites,
+    }
+}
+
+fn build_hld_path_input(
+    generation: RunGenerationDigestValue,
+    unit_identity: &CrateCompilationUnitKey,
+    nodes: Vec<HldNodeInputRecord>,
+    edges: Vec<HldEdgeInputRecord>,
+) -> HldMaterializationInputRecord {
+    build_hld_fixture_input(
+        generation,
+        vec![HldUnitProvenanceRecord {
+            unit_compilation_identity_key: unit_identity.clone(),
+            unit_origin_kind: HldUnitOriginKind::Workspace,
+        }],
+        nodes,
+        edges,
+    )
+}
+
+fn collect_hld_edge_counts(
+    output: &parseltongue_core_row_types::HldMaterializationOutputRecord,
+) -> BTreeSet<(HldGraphEdgeKey, usize)> {
+    output
+        .materialized_edge_records
+        .iter()
+        .map(|edge| (edge.edge_key.clone(), edge.edge_evidence_row_count))
+        .collect()
 }
 
 /// REQ-RUST-030.0 / REQ-RUST-019.1
@@ -587,7 +703,7 @@ fn test_hld_direct_edge_projection() {
     assert_eq!(path_edge_keys, expected_edge_keys);
     assert_eq!(
         output.output_completeness_kind,
-        HldOutputCompletenessKind::DirectProjectionOnly
+        HldOutputCompletenessKind::GraphPathsOnly
     );
     assert_eq!(output.file_rollup_records, None);
     assert_eq!(output.folder_rollup_records, None);
@@ -676,7 +792,7 @@ fn test_hld_direct_edge_projection() {
 
 /// REQ-RUST-030.0
 #[test]
-fn test_hld_private_traversal_rejected() {
+fn test_hld_private_path_materialized() {
     let generation = RunGenerationDigestValue([13; 32]);
     let unit_identity = build_hld_fixture_unit("private-path-fixture", 13);
     let source_key = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
@@ -735,7 +851,7 @@ fn test_hld_private_traversal_rejected() {
             "crate::target",
         ),
     ];
-    let input = build_hld_fixture_input(
+    let mut input = build_hld_fixture_input(
         generation,
         vec![HldUnitProvenanceRecord {
             unit_compilation_identity_key: unit_identity.clone(),
@@ -754,17 +870,65 @@ fn test_hld_private_traversal_rejected() {
                 generation,
                 private_key,
                 target_key,
-                HldRelationKindValue::Calls,
+                HldRelationKindValue::UsesType,
                 build_hld_fixture_occurrence(&unit_identity, "src/private.rs", 21, 21),
             ),
         ],
     );
-
-    assert!(matches!(
-        build_hld_fixture_store()
-            .materialize_hld_graph_output(&input, &RunCancelFlagValue::default(),),
-        Err(HldAnalysisPortError::UnsupportedTraversal)
-    ));
+    input.input_node_records[0].node_signature_text = Some("fn source()".into());
+    input.input_node_records[2].node_signature_text = Some("fn target()".into());
+    let output = materialize_hld_fixture_graph(&input);
+    let source_key = input.input_node_records[0].node_target_reference.clone();
+    let private_key = input.input_node_records[1].node_target_reference.clone();
+    let target_key = input.input_node_records[2].node_target_reference.clone();
+    let expected_key = expected_hld_edge_key(
+        generation,
+        source_key.clone(),
+        target_key.clone(),
+        HldRelationKindValue::UsesType,
+        HldViaKindValue::Collapsed,
+    );
+    assert_eq!(
+        output.output_completeness_kind,
+        HldOutputCompletenessKind::GraphPathsOnly
+    );
+    assert_eq!(output.file_rollup_records, None);
+    assert_eq!(output.folder_rollup_records, None);
+    assert_eq!(output.materialized_edge_records.len(), 1);
+    let edge = &output.materialized_edge_records[0];
+    assert_eq!(edge.edge_key, expected_key);
+    assert_eq!(edge.edge_evidence_row_count, 2);
+    assert_eq!(edge.edge_source_qualified_path, "crate::source");
+    assert_eq!(edge.edge_target_qualified_path, "crate::target");
+    assert_eq!(
+        edge.edge_source_signature_text.as_deref(),
+        Some("fn source()")
+    );
+    assert_eq!(
+        edge.edge_target_signature_text.as_deref(),
+        Some("fn target()")
+    );
+    assert_eq!(output.evidence_path_records.len(), 1);
+    assert_eq!(
+        output.evidence_path_records[0],
+        build_hld_path_record(
+            generation,
+            source_key,
+            target_key,
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![
+                input.input_node_records[0].node_target_reference.clone(),
+                private_key,
+                input.input_node_records[2].node_target_reference.clone(),
+            ],
+            input
+                .input_edge_records
+                .iter()
+                .map(|edge| edge.edge_evidence_row_key.clone())
+                .collect(),
+        ),
+    );
 }
 
 fn build_hld_validation_input() -> (
@@ -964,10 +1128,8 @@ fn test_hld_identity_validation_rules() {
             expected_error,
         ));
     }
-    let mut external_unit = build_hld_fixture_unit("other-workspace", 22);
-    while external_unit == unit_identity {
-        external_unit.unit_configuration_digest_full[0] = 23;
-    }
+    let external_unit = build_hld_fixture_unit("other-workspace", 22);
+    assert_ne!(external_unit, unit_identity);
     let mut external_workspace_input = base_input.clone();
     external_workspace_input
         .input_unit_provenance_records
@@ -1209,4 +1371,923 @@ fn test_hld_duplicate_conflict_rejection() {
         validate_hld_materialization_input(&same_site_distinct_relation),
         Ok(())
     );
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_private_terminal_kind() {
+    let generation = RunGenerationDigestValue([31; 32]);
+    let unit_identity = build_hld_fixture_unit("private-terminal-fixture", 31);
+    let source = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "source",
+        1,
+        HldEffectiveVisibilityKind::Public,
+        "crate::source",
+    );
+    let private = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "private",
+        2,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::helper",
+    );
+    let target = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "target",
+        3,
+        HldEffectiveVisibilityKind::Public,
+        "crate::target",
+    );
+    let source_key = source.node_target_reference.clone();
+    let private_key = private.node_target_reference.clone();
+    let target_key = target.node_target_reference.clone();
+    let input = build_hld_path_input(
+        generation,
+        &unit_identity,
+        vec![source, private, target],
+        vec![
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &source_key,
+                &private_key,
+                HldRelationKindValue::Calls,
+                "callsite-a",
+                31,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &private_key,
+                &target_key,
+                HldRelationKindValue::UsesType,
+                "callsite-private",
+                32,
+            ),
+        ],
+    );
+    let output = materialize_hld_fixture_graph(&input);
+    let expected_key = expected_hld_edge_key(
+        generation,
+        source_key.clone(),
+        target_key.clone(),
+        HldRelationKindValue::UsesType,
+        HldViaKindValue::Collapsed,
+    );
+    assert_eq!(
+        collect_hld_edge_counts(&output),
+        BTreeSet::from([(expected_key, 2)]),
+    );
+    assert_eq!(
+        output.materialized_edge_records[0].edge_dependency_origin_kind,
+        HldDependencyOriginKind::SameCrate,
+    );
+    assert_eq!(
+        output.evidence_path_records,
+        vec![build_hld_path_record(
+            generation,
+            source_key.clone(),
+            target_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![source_key, private_key, target_key],
+            input
+                .input_edge_records
+                .iter()
+                .map(|edge| edge.edge_evidence_row_key.clone())
+                .collect(),
+        )],
+    );
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_selected_target_stop() {
+    let generation = RunGenerationDigestValue([32; 32]);
+    let unit_identity = build_hld_fixture_unit("selected-stop-fixture", 32);
+    let source = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "a",
+        1,
+        HldEffectiveVisibilityKind::Public,
+        "crate::a",
+    );
+    let private = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "p",
+        2,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::p",
+    );
+    let selected_b = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "b",
+        3,
+        HldEffectiveVisibilityKind::Public,
+        "crate::b",
+    );
+    let selected_c = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "c",
+        4,
+        HldEffectiveVisibilityKind::Public,
+        "crate::c",
+    );
+    let source_key = source.node_target_reference.clone();
+    let private_key = private.node_target_reference.clone();
+    let b_key = selected_b.node_target_reference.clone();
+    let c_key = selected_c.node_target_reference.clone();
+    let input = build_hld_path_input(
+        generation,
+        &unit_identity,
+        vec![source, private, selected_b, selected_c],
+        vec![
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &source_key,
+                &private_key,
+                HldRelationKindValue::Calls,
+                "a-p",
+                41,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &private_key,
+                &b_key,
+                HldRelationKindValue::UsesType,
+                "p-b",
+                42,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &b_key,
+                &c_key,
+                HldRelationKindValue::Implements,
+                "b-c",
+                43,
+            ),
+        ],
+    );
+    let output = materialize_hld_fixture_graph(&input);
+    let expected_edges = BTreeSet::from([
+        (
+            expected_hld_edge_key(
+                generation,
+                source_key.clone(),
+                b_key.clone(),
+                HldRelationKindValue::UsesType,
+                HldViaKindValue::Collapsed,
+            ),
+            2,
+        ),
+        (
+            expected_hld_edge_key(
+                generation,
+                b_key.clone(),
+                c_key.clone(),
+                HldRelationKindValue::Implements,
+                HldViaKindValue::Direct,
+            ),
+            1,
+        ),
+    ]);
+    assert_eq!(collect_hld_edge_counts(&output), expected_edges);
+    assert!(!output.materialized_edge_records.iter().any(|edge| {
+        edge.edge_key.edge_source_occurrence_key == source_key
+            && edge.edge_key.edge_target_reference_value == c_key
+    }));
+    let mut expected_paths = vec![
+        build_hld_path_record(
+            generation,
+            source_key.clone(),
+            b_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![source_key.clone(), private_key, b_key.clone()],
+            input.input_edge_records[..2]
+                .iter()
+                .map(|edge| edge.edge_evidence_row_key.clone())
+                .collect(),
+        ),
+        build_hld_path_record(
+            generation,
+            b_key.clone(),
+            c_key.clone(),
+            HldRelationKindValue::Implements,
+            HldViaKindValue::Direct,
+            vec![b_key, c_key],
+            vec![input.input_edge_records[2].edge_evidence_row_key.clone()],
+        ),
+    ];
+    expected_paths.sort();
+    assert_eq!(output.evidence_path_records, expected_paths);
+}
+
+/// REQ-RUST-030.0 / REQ-RUST-009.2
+#[test]
+fn test_hld_diamond_evidence_union() {
+    let generation = RunGenerationDigestValue([33; 32]);
+    let unit_identity = build_hld_fixture_unit("diamond-fixture", 33);
+    let a = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "a",
+        1,
+        HldEffectiveVisibilityKind::Public,
+        "crate::a",
+    );
+    let p = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "p",
+        2,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::p",
+    );
+    let q = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "q",
+        3,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::q",
+    );
+    let r = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "r",
+        4,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::r",
+    );
+    let b = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "b",
+        5,
+        HldEffectiveVisibilityKind::Public,
+        "crate::b",
+    );
+    let a_key = a.node_target_reference.clone();
+    let p_key = p.node_target_reference.clone();
+    let q_key = q.node_target_reference.clone();
+    let r_key = r.node_target_reference.clone();
+    let b_key = b.node_target_reference.clone();
+    let edges = vec![
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &a_key,
+            &p_key,
+            HldRelationKindValue::Calls,
+            "a-p",
+            51,
+        ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &p_key,
+            &q_key,
+            HldRelationKindValue::Calls,
+            "p-q",
+            52,
+        ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &q_key,
+            &b_key,
+            HldRelationKindValue::UsesType,
+            "q-b",
+            53,
+        ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &p_key,
+            &r_key,
+            HldRelationKindValue::Calls,
+            "p-r",
+            54,
+        ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &r_key,
+            &b_key,
+            HldRelationKindValue::UsesType,
+            "r-b",
+            55,
+        ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &a_key,
+            &b_key,
+            HldRelationKindValue::UsesType,
+            "direct-one",
+            56,
+        ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &a_key,
+            &b_key,
+            HldRelationKindValue::UsesType,
+            "direct-two",
+            57,
+        ),
+    ];
+    let input = build_hld_path_input(generation, &unit_identity, vec![a, p, q, r, b], edges);
+    let output = materialize_hld_fixture_graph(&input);
+    let expected_edges = BTreeSet::from([
+        (
+            expected_hld_edge_key(
+                generation,
+                a_key.clone(),
+                b_key.clone(),
+                HldRelationKindValue::UsesType,
+                HldViaKindValue::Collapsed,
+            ),
+            5,
+        ),
+        (
+            expected_hld_edge_key(
+                generation,
+                a_key.clone(),
+                b_key.clone(),
+                HldRelationKindValue::UsesType,
+                HldViaKindValue::Direct,
+            ),
+            2,
+        ),
+    ]);
+    assert_eq!(collect_hld_edge_counts(&output), expected_edges);
+    let mut expected_paths = vec![
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            b_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![a_key.clone(), p_key.clone(), q_key.clone(), b_key.clone()],
+            vec![
+                input.input_edge_records[0].edge_evidence_row_key.clone(),
+                input.input_edge_records[1].edge_evidence_row_key.clone(),
+                input.input_edge_records[2].edge_evidence_row_key.clone(),
+            ],
+        ),
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            b_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![a_key.clone(), p_key.clone(), r_key.clone(), b_key.clone()],
+            vec![
+                input.input_edge_records[0].edge_evidence_row_key.clone(),
+                input.input_edge_records[3].edge_evidence_row_key.clone(),
+                input.input_edge_records[4].edge_evidence_row_key.clone(),
+            ],
+        ),
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            b_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Direct,
+            vec![a_key.clone(), b_key.clone()],
+            vec![input.input_edge_records[5].edge_evidence_row_key.clone()],
+        ),
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            b_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Direct,
+            vec![a_key.clone(), b_key.clone()],
+            vec![input.input_edge_records[6].edge_evidence_row_key.clone()],
+        ),
+    ];
+    expected_paths.sort();
+    assert_eq!(output.evidence_path_records, expected_paths);
+    let direct_paths = output
+        .evidence_path_records
+        .iter()
+        .filter(|path| path.edge_key.edge_collapse_via_kind == HldViaKindValue::Direct)
+        .collect::<Vec<_>>();
+    assert_eq!(direct_paths.len(), 2);
+    assert_eq!(
+        direct_paths[0].ordered_endpoint_path,
+        direct_paths[1].ordered_endpoint_path
+    );
+    assert_ne!(
+        direct_paths[0].ordered_evidence_row_keys,
+        direct_paths[1].ordered_evidence_row_keys
+    );
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_cycle_self_edges() {
+    let generation = RunGenerationDigestValue([34; 32]);
+    let unit_identity = build_hld_fixture_unit("cycle-fixture", 34);
+    let a = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "a",
+        1,
+        HldEffectiveVisibilityKind::Public,
+        "crate::a",
+    );
+    let p = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "p",
+        2,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::p",
+    );
+    let q = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "q",
+        3,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::q",
+    );
+    let a_key = a.node_target_reference.clone();
+    let p_key = p.node_target_reference.clone();
+    let q_key = q.node_target_reference.clone();
+    let input = build_hld_path_input(
+        generation,
+        &unit_identity,
+        vec![a, p, q],
+        vec![
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &p_key,
+                HldRelationKindValue::Calls,
+                "a-p",
+                61,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &p_key,
+                &q_key,
+                HldRelationKindValue::Calls,
+                "p-q",
+                62,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &q_key,
+                &p_key,
+                HldRelationKindValue::Calls,
+                "q-p",
+                63,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &p_key,
+                &a_key,
+                HldRelationKindValue::UsesType,
+                "p-a",
+                64,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &a_key,
+                HldRelationKindValue::Implements,
+                "a-a",
+                65,
+            ),
+        ],
+    );
+    let output = materialize_hld_fixture_graph(&input);
+    let expected_edges = BTreeSet::from([
+        (
+            expected_hld_edge_key(
+                generation,
+                a_key.clone(),
+                a_key.clone(),
+                HldRelationKindValue::UsesType,
+                HldViaKindValue::Collapsed,
+            ),
+            2,
+        ),
+        (
+            expected_hld_edge_key(
+                generation,
+                a_key.clone(),
+                a_key.clone(),
+                HldRelationKindValue::Implements,
+                HldViaKindValue::Direct,
+            ),
+            1,
+        ),
+    ]);
+    assert_eq!(collect_hld_edge_counts(&output), expected_edges);
+    let mut expected_paths = vec![
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            a_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![a_key.clone(), p_key.clone(), a_key.clone()],
+            vec![
+                input.input_edge_records[0].edge_evidence_row_key.clone(),
+                input.input_edge_records[3].edge_evidence_row_key.clone(),
+            ],
+        ),
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            a_key.clone(),
+            HldRelationKindValue::Implements,
+            HldViaKindValue::Direct,
+            vec![a_key.clone(), a_key.clone()],
+            vec![input.input_edge_records[4].edge_evidence_row_key.clone()],
+        ),
+    ];
+    expected_paths.sort();
+    assert_eq!(output.evidence_path_records, expected_paths);
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_unresolved_path_stop() {
+    let generation = RunGenerationDigestValue([35; 32]);
+    let unit_identity = build_hld_fixture_unit("unresolved-path-fixture", 35);
+    let a = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "a",
+        1,
+        HldEffectiveVisibilityKind::Public,
+        "crate::a",
+    );
+    let p = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "p",
+        2,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::p",
+    );
+    let b = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "b",
+        3,
+        HldEffectiveVisibilityKind::Public,
+        "crate::b",
+    );
+    let r = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "r",
+        4,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::r",
+    );
+    let c = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "c",
+        5,
+        HldEffectiveVisibilityKind::Public,
+        "crate::c",
+    );
+    let s = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "s",
+        6,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::s",
+    );
+    let d = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "d",
+        7,
+        HldEffectiveVisibilityKind::Public,
+        "crate::d",
+    );
+    let q = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "q",
+        8,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::q",
+    );
+    let e = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "e",
+        9,
+        HldEffectiveVisibilityKind::Public,
+        "crate::e",
+    );
+    let f = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "f",
+        10,
+        HldEffectiveVisibilityKind::Public,
+        "crate::f",
+    );
+    let a_key = a.node_target_reference.clone();
+    let p_key = p.node_target_reference.clone();
+    let b_key = b.node_target_reference.clone();
+    let r_key = r.node_target_reference.clone();
+    let c_key = c.node_target_reference.clone();
+    let s_key = s.node_target_reference.clone();
+    let d_key = d.node_target_reference.clone();
+    let q_key = q.node_target_reference.clone();
+    let e_key = e.node_target_reference.clone();
+    let f_key = f.node_target_reference.clone();
+    let mut unresolved = build_hld_path_edge(
+        generation,
+        &unit_identity,
+        &p_key,
+        &b_key,
+        HldRelationKindValue::Calls,
+        "p-b-unresolved",
+        71,
+    );
+    unresolved.edge_resolution_value = HldEdgeResolutionValue::Unresolved {
+        reason: HldUnresolvedReasonKind::MissingTarget,
+    };
+    unresolved
+        .edge_evidence_row_key
+        .evidence_target_reference_value = None;
+    let mut proposed = build_hld_path_edge(
+        generation,
+        &unit_identity,
+        &r_key,
+        &c_key,
+        HldRelationKindValue::Calls,
+        "r-c-proposed",
+        72,
+    );
+    proposed.edge_resolution_value = HldEdgeResolutionValue::Proposed {
+        candidate_target: Some(c_key.clone()),
+    };
+    let mut inferred = build_hld_path_edge(
+        generation,
+        &unit_identity,
+        &s_key,
+        &d_key,
+        HldRelationKindValue::Calls,
+        "s-d-inferred",
+        73,
+    );
+    inferred.edge_resolution_value = HldEdgeResolutionValue::Inferred {
+        candidate_target: Some(d_key.clone()),
+    };
+    let input = build_hld_path_input(
+        generation,
+        &unit_identity,
+        vec![a, p, b, r, c, s, d, q, e, f],
+        vec![
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &p_key,
+                HldRelationKindValue::Calls,
+                "a-p",
+                74,
+            ),
+            unresolved,
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &r_key,
+                HldRelationKindValue::Calls,
+                "a-r",
+                75,
+            ),
+            proposed,
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &s_key,
+                HldRelationKindValue::Calls,
+                "a-s",
+                76,
+            ),
+            inferred,
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &q_key,
+                HldRelationKindValue::Calls,
+                "a-q",
+                77,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &q_key,
+                &e_key,
+                HldRelationKindValue::UsesType,
+                "q-e",
+                78,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &f_key,
+                HldRelationKindValue::Calls,
+                "a-f",
+                79,
+            ),
+        ],
+    );
+    let output = materialize_hld_fixture_graph(&input);
+    let expected_edges = BTreeSet::from([
+        (
+            expected_hld_edge_key(
+                generation,
+                a_key.clone(),
+                e_key.clone(),
+                HldRelationKindValue::UsesType,
+                HldViaKindValue::Collapsed,
+            ),
+            2,
+        ),
+        (
+            expected_hld_edge_key(
+                generation,
+                a_key.clone(),
+                f_key.clone(),
+                HldRelationKindValue::Calls,
+                HldViaKindValue::Direct,
+            ),
+            1,
+        ),
+    ]);
+    assert_eq!(collect_hld_edge_counts(&output), expected_edges);
+    let unresolved_targets = BTreeSet::from([b_key, c_key, d_key]);
+    assert!(
+        !output.materialized_edge_records.iter().any(|edge| {
+            unresolved_targets.contains(&edge.edge_key.edge_target_reference_value)
+        })
+    );
+    let mut expected_paths = vec![
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            e_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![a_key.clone(), q_key.clone(), e_key.clone()],
+            vec![
+                input.input_edge_records[6].edge_evidence_row_key.clone(),
+                input.input_edge_records[7].edge_evidence_row_key.clone(),
+            ],
+        ),
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            f_key.clone(),
+            HldRelationKindValue::Calls,
+            HldViaKindValue::Direct,
+            vec![a_key.clone(), f_key.clone()],
+            vec![input.input_edge_records[8].edge_evidence_row_key.clone()],
+        ),
+    ];
+    expected_paths.sort();
+    assert_eq!(output.evidence_path_records, expected_paths);
+}
+
+/// REQ-RUST-030.0 / REQ-RUST-031.0
+#[test]
+fn test_hld_order_attempt_determinism() {
+    let generation = RunGenerationDigestValue([36; 32]);
+    let unit_identity = build_hld_fixture_unit("order-attempt-fixture", 36);
+    let a = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "a",
+        1,
+        HldEffectiveVisibilityKind::Public,
+        "crate::a",
+    );
+    let p = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "p",
+        2,
+        HldEffectiveVisibilityKind::PrivateEquivalent,
+        "crate::private::p",
+    );
+    let b = build_hld_path_node(
+        generation,
+        &unit_identity,
+        "b",
+        3,
+        HldEffectiveVisibilityKind::Public,
+        "crate::b",
+    );
+    let a_key = a.node_target_reference.clone();
+    let p_key = p.node_target_reference.clone();
+    let b_key = b.node_target_reference.clone();
+    let input = build_hld_path_input(
+        generation,
+        &unit_identity,
+        vec![a, p, b],
+        vec![
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &p_key,
+                HldRelationKindValue::Calls,
+                "a-p",
+                81,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &p_key,
+                &b_key,
+                HldRelationKindValue::UsesType,
+                "p-b",
+                82,
+            ),
+            build_hld_path_edge(
+                generation,
+                &unit_identity,
+                &a_key,
+                &b_key,
+                HldRelationKindValue::UsesType,
+                "a-b",
+                83,
+            ),
+        ],
+    );
+    let store = build_hld_fixture_store();
+    let expected = store
+        .materialize_hld_graph_output(&input, &RunCancelFlagValue::default())
+        .unwrap();
+    assert!(!expected.materialized_edge_records.is_empty());
+    let mut reordered = input.clone();
+    reordered.input_unit_provenance_records.reverse();
+    reordered.input_node_records.reverse();
+    reordered.input_edge_records.reverse();
+    reordered
+        .input_unit_provenance_records
+        .extend(input.input_unit_provenance_records.clone());
+    reordered
+        .input_node_records
+        .extend(input.input_node_records.clone());
+    reordered
+        .input_edge_records
+        .extend(input.input_edge_records.clone());
+    reordered.stage_attempt_sequence_value = "attempt-b".into();
+    let reordered_output = store
+        .materialize_hld_graph_output(&reordered, &RunCancelFlagValue::default())
+        .unwrap();
+    assert_eq!(reordered_output, expected);
+    let empty_input = build_hld_fixture_input(generation, Vec::new(), Vec::new(), Vec::new());
+    let empty_output = store
+        .materialize_hld_graph_output(&empty_input, &RunCancelFlagValue::default())
+        .unwrap();
+    assert_eq!(
+        empty_output.output_completeness_kind,
+        HldOutputCompletenessKind::GraphPathsOnly
+    );
+    assert!(empty_output.selected_node_records.is_empty());
+    assert!(empty_output.materialized_edge_records.is_empty());
+    assert!(empty_output.evidence_path_records.is_empty());
+    assert_eq!(empty_output.file_rollup_records, None);
+    assert_eq!(empty_output.folder_rollup_records, None);
 }

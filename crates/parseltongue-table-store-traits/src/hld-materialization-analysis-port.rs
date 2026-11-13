@@ -9,7 +9,7 @@ pub enum HldAnalysisOperationKind {
     CreateWorkingRelations,
     NormalizeNodeInputs,
     NormalizeEdgeInputs,
-    ProjectDirectPaths,
+    ProjectRecursivePaths,
     ReadAnalysisOutputs,
     CommitTransaction,
 }
@@ -18,8 +18,6 @@ pub enum HldAnalysisOperationKind {
 pub enum HldAnalysisPortError {
     #[error("HLD semantic input is invalid: {0}")]
     InvalidInput(#[from] HldMaterializationValidationError),
-    #[error("private-edge traversal is not supported by direct projection")]
-    UnsupportedTraversal,
     #[error("HLD analysis was cancelled")]
     Cancelled,
     #[error("HLD analysis connection lock is poisoned")]

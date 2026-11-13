@@ -4584,3 +4584,77 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   (hld: record identity validation refactor).
 - This journal-closure commit records both phase SHAs. All three commits are
   local on devin/1794509368-hld-current-integration. No push or PR was made.
+
+## HLD-RECURSIVE-PATHS-STUB — 2026-11-13
+
+- REQ-RUST-030.0 recursive path/collapse checkpoint; planned tests:
+  test_hld_private_path_materialized, test_hld_private_terminal_kind,
+  test_hld_selected_target_stop, test_hld_diamond_evidence_union,
+  test_hld_cycle_self_rules, test_hld_unresolved_path_stop and
+  test_hld_order_attempt_determinism.
+- Added HldOutputCompletenessKind::GraphPathsOnly and the compiling
+  create_hld_recursive_paths stub. The current private-traversal rejection
+  remains active during this STUB phase.
+- STUB cargo check passed with the exact prior release/all-features/offline/
+  locked environment:
+  cargo check -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter
+  --all-features --release --locked --offline
+  Output: Finished release profile [optimized] target(s) in 1.51s;
+  elapsed 1.61s, peak RSS 229,828 KiB, process-tree peak 317,693,952 bytes
+  (sampled every 10ms). Declared E=30s, 2x ceiling=60s.
+- Cargo reported Checking libduckdb-sys, not Compiling; no native C++ rebuild
+  began. Existing parser/syntax manifest warning remains unchanged.
+- Next: add and run the exact recursive path RED matrix before implementing
+  the SQL CTE.
+
+## HLD-RECURSIVE-PATHS-RED — 2026-11-13
+
+- REQ-RUST-030.0; RED tests: test_hld_private_path_materialized,
+  test_hld_private_terminal_kind, test_hld_selected_target_stop,
+  test_hld_diamond_evidence_union, test_hld_cycle_self_rules,
+  test_hld_unresolved_path_stop, test_hld_order_attempt_determinism, and
+  the direct-projection completeness assertion.
+- Two initial test compilations did not execute tests: the first lacked the
+  HldEvidencePathRecord import; the next exposed a duplicate trait import and
+  moves from borrowed closure captures. These test-only compile errors were
+  corrected before the behavioral RED run.
+- Genuine RED command:
+  cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features
+  --release --locked --offline -- test_hld_ --nocapture
+  Output: test result: FAILED. 4 passed; 8 failed; 0 ignored; 0 measured;
+  116 filtered out; finished in 0.15s. Exit 101. The path tests failed on
+  UnsupportedTraversal; the direct projection assertion observed
+  DirectProjectionOnly instead of GraphPathsOnly.
+  E=30s, 2x ceiling=60s; elapsed 15.15s; process-tree peak 922,382,336
+  bytes (1,427 samples). No memory cap was configured and no
+  libduckdb-sys compilation began.
+- RED output and memory samples are preserved in
+  /home/ubuntu/hld-current-test-artifacts/20261113T042054Z-hld-materializer-
+  stub-red/recursive-red-focused-retry2.{log,memory.json,time}.
+- Next: replace the rejection with recursive DuckDB path generation and
+  SQL-side evidence union; retain typed Rust result decoding only.
+
+## HLD-RECURSIVE-PATHS-GREEN — 2026-11-13
+
+- REQ-RUST-030.0; the recursive DuckDB CTE now carries full encoded source,
+  endpoint and evidence identities, emits only selected/canonical terminal
+  endpoints, uses the terminal edge relation, and prevents repeated private
+  endpoints while allowing a terminal return to the selected source.
+  Paths are distinct by ordered evidence-row identity. SQL derives Direct vs
+  Collapsed from hop count and counts the evidence-key union with UNNEST and
+  COUNT(DISTINCT ...). Rust decodes ordered path identities, derives sites
+  from evidence rows, then sorts the typed output. GraphPathsOnly is emitted;
+  rollups remain None and CompleteGraph remains reserved.
+- Focused GREEN command:
+  cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features
+  --release --locked --offline -- test_hld_ --nocapture
+  Output: test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured;
+  116 filtered out; finished in 1.27s. Exit 0.
+  E=30s, 2x ceiling=60s; elapsed 27.81s, peak RSS 803,632 KiB,
+  process-tree peak 901,603,328 bytes (2,506 samples). No memory cap was
+  configured; no libduckdb-sys compilation began.
+- The implementation removes the temporary UnsupportedTraversal variant
+  and rejection query. Remaining: update SPEC/SOP/AGENTS/backward design,
+  run the affected suites and scoped gates, review the final diff, and
+  record the local GREEN/REFACTOR commits.

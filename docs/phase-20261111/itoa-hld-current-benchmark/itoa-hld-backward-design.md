@@ -340,14 +340,19 @@ the canonical journal.
 These are evidence/implementation blockers to resolve, not requests to weaken
 the existing acceptance requirements.
 
-## Implementation checkpoint — direct projection only
+## Implementation checkpoint — recursive paths and collapse
 
-The current typed DuckDB slice implements SQL-based node selection and direct
-extracted-edge projection. Its output is marked DirectProjectionOnly, with
-roll-ups explicitly uncomputed. It rejects any extracted relation requiring
-traversal through a nonselected local item until recursive collapse is
-implemented. This does not satisfy full REQ-RUST-030.0, persisted-input marker
-validation, Turso publication, producer integration, or itoa source-to-HLD
-acceptance. Dependency origin is supplied by explicit compilation-unit
-provenance; core-named external definitions are not inferred as standard
-library, and builtin primitives use a separate explicit standard bucket.
+The current bounded DuckDB slice recursively materializes ordered HLD paths
+and collapsed rows from explicit typed inputs. A recursive CTE seeds selected
+sources, extends through nonselected LocalItems with per-path full-identity
+cycle guards, and terminates at selected or canonical external/builtin
+endpoints. Terminal relation kind is retained; one return to the selected
+source is permitted as a finite self-edge, while private cycles alone produce
+no row. Ordered evidence identities distinguish paths with equal endpoint
+sequences, and SQL uses UNNEST plus COUNT(DISTINCT ...) for the evidence union.
+Output is sorted and marked GraphPathsOnly; file/folder roll-ups remain None.
+
+This does not validate frozen Turso stage markers, publish durable generations,
+run real-source producers, expose CLI completion status, or establish the
+pinned itoa source-to-HLD comparison. CompleteGraph remains reserved until
+roll-ups exist.

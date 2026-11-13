@@ -36,30 +36,24 @@ SELECT
 FROM "hld-analysis-node-inputs" AS input;
 "#;
 
-const HLD_DIRECT_PATH_SQL: &str = r#"
-CREATE TEMP TABLE "hld-analysis-path-records" AS
-WITH direct_paths AS (
+const HLD_RECURSIVE_PATH_SQL: &str = r#"
+CREATE OR REPLACE TEMP TABLE "hld-analysis-path-records" AS
+WITH RECURSIVE path_walks (
+    run_generation_key,
+    source_identity_key,
+    current_endpoint_identity_key,
+    relation_kind_value,
+    ordered_endpoint_identity_path,
+    ordered_evidence_identity_path
+) AS (
     SELECT
         edge.run_generation_key,
-        edge.source_identity_key,
-        edge.target_identity_key,
+        source.endpoint_identity_key AS source_identity_key,
+        target.endpoint_identity_key AS current_endpoint_identity_key,
         edge.relation_kind_value,
-        'direct' AS collapse_via_kind,
-        source.qualified_path_text AS source_qualified_path_text,
-        target.qualified_path_text AS target_qualified_path_text,
-        source.signature_text AS source_signature_text,
-        target.signature_text AS target_signature_text,
-        CASE
-            WHEN source.unit_identity_key IS NOT NULL
-                AND source.unit_identity_key = target.unit_identity_key
-                THEN 'same_crate'
-            WHEN target.endpoint_category_kind = 'builtin' THEN 'std'
-            WHEN target_origin.unit_origin_kind = 'workspace' THEN 'workspace_crate'
-            WHEN target_origin.unit_origin_kind = 'standard_library' THEN 'std'
-            ELSE 'external_crate'
-        END AS dependency_origin_kind,
-        edge.evidence_identity_key,
-        edge.evidence_site_key
+        [source.endpoint_identity_key, target.endpoint_identity_key]
+            AS ordered_endpoint_identity_path,
+        [edge.evidence_identity_key] AS ordered_evidence_identity_path
     FROM "hld-analysis-edge-records" AS edge
     JOIN "hld-analysis-node-records" AS source
         ON source.run_generation_key = edge.run_generation_key
@@ -67,13 +61,56 @@ WITH direct_paths AS (
     JOIN "hld-analysis-node-records" AS target
         ON target.run_generation_key = edge.run_generation_key
         AND target.endpoint_identity_key = edge.target_identity_key
-    LEFT JOIN "hld-analysis-unit-origins" AS target_origin
-        ON target_origin.unit_identity_key = target.unit_identity_key
     WHERE edge.resolution_status_kind = 'extracted'
         AND source.node_selected_flag
-        AND (target.node_selected_flag OR target.terminal_target_flag)
+    UNION ALL
+    SELECT
+        path.run_generation_key,
+        path.source_identity_key,
+        target.endpoint_identity_key AS current_endpoint_identity_key,
+        edge.relation_kind_value,
+        list_append(path.ordered_endpoint_identity_path, target.endpoint_identity_key)
+            AS ordered_endpoint_identity_path,
+        list_append(path.ordered_evidence_identity_path, edge.evidence_identity_key)
+            AS ordered_evidence_identity_path
+    FROM path_walks AS path
+    JOIN "hld-analysis-node-records" AS current
+        ON current.run_generation_key = path.run_generation_key
+        AND current.endpoint_identity_key = path.current_endpoint_identity_key
+    JOIN "hld-analysis-edge-records" AS edge
+        ON edge.run_generation_key = path.run_generation_key
+        AND edge.source_identity_key = path.current_endpoint_identity_key
+    JOIN "hld-analysis-node-records" AS target
+        ON target.run_generation_key = edge.run_generation_key
+        AND target.endpoint_identity_key = edge.target_identity_key
+    WHERE edge.resolution_status_kind = 'extracted'
+        AND current.endpoint_category_kind = 'local_item'
+        AND NOT current.node_selected_flag
+        AND (
+            target.node_selected_flag
+            OR target.terminal_target_flag
+            OR NOT list_contains(
+                path.ordered_endpoint_identity_path,
+                target.endpoint_identity_key
+            )
+        )
 )
-SELECT DISTINCT * FROM direct_paths;
+SELECT DISTINCT
+    path.run_generation_key,
+    path.source_identity_key,
+    target.endpoint_identity_key AS target_identity_key,
+    path.relation_kind_value,
+    CASE
+        WHEN array_length(path.ordered_endpoint_identity_path) = 2 THEN 'direct'
+        ELSE 'collapsed'
+    END AS collapse_via_kind,
+    path.ordered_endpoint_identity_path,
+    path.ordered_evidence_identity_path
+FROM path_walks AS path
+JOIN "hld-analysis-node-records" AS target
+    ON target.run_generation_key = path.run_generation_key
+    AND target.endpoint_identity_key = path.current_endpoint_identity_key
+WHERE target.node_selected_flag OR target.terminal_target_flag;
 "#;
 
 impl HldGraphAnalysisPort for DuckdbAnalysisStoreAdapter {
@@ -105,12 +142,7 @@ impl HldGraphAnalysisPort for DuckdbAnalysisStoreAdapter {
                 build_hld_backend_error(HldAnalysisOperationKind::NormalizeNodeInputs, source)
             })?;
         insert_hld_edge_inputs(&transaction, input_record)?;
-        reject_hld_private_traversal(&transaction)?;
-        transaction
-            .execute_batch(HLD_DIRECT_PATH_SQL)
-            .map_err(|source| {
-                build_hld_backend_error(HldAnalysisOperationKind::ProjectDirectPaths, source)
-            })?;
+        create_hld_recursive_paths(&transaction)?;
         let mut output_record = read_hld_materialization_output(&transaction, input_record)?;
         check_hld_analysis_cancel(cancel_flag)?;
         transaction.commit().map_err(|source| {
@@ -122,6 +154,16 @@ impl HldGraphAnalysisPort for DuckdbAnalysisStoreAdapter {
         output_record.evidence_path_records.sort();
         Ok(output_record)
     }
+}
+
+fn create_hld_recursive_paths(
+    transaction: &duckdb::Transaction<'_>,
+) -> Result<(), HldAnalysisPortError> {
+    transaction
+        .execute_batch(HLD_RECURSIVE_PATH_SQL)
+        .map_err(|source| {
+            build_hld_backend_error(HldAnalysisOperationKind::ProjectRecursivePaths, source)
+        })
 }
 
 fn check_hld_analysis_cancel(cancel_flag: &RunCancelFlagValue) -> Result<(), HldAnalysisPortError> {
@@ -306,25 +348,6 @@ fn insert_hld_edge_inputs(
         })
 }
 
-fn reject_hld_private_traversal(
-    transaction: &duckdb::Transaction<'_>,
-) -> Result<(), HldAnalysisPortError> {
-    let unsupported_edge_count = transaction
-        .query_row(
-            "SELECT COUNT(*) FROM \"hld-analysis-edge-records\" AS edge JOIN \"hld-analysis-node-records\" AS source ON source.run_generation_key = edge.run_generation_key AND source.endpoint_identity_key = edge.source_identity_key LEFT JOIN \"hld-analysis-node-records\" AS target ON target.run_generation_key = edge.run_generation_key AND target.endpoint_identity_key = edge.target_identity_key WHERE edge.resolution_status_kind = 'extracted' AND (NOT source.node_selected_flag OR NOT COALESCE(target.node_selected_flag OR target.terminal_target_flag, FALSE))",
-            [],
-            |row| row.get::<_, usize>(0),
-        )
-        .map_err(|source| {
-            build_hld_backend_error(HldAnalysisOperationKind::ProjectDirectPaths, source)
-        })?;
-    if unsupported_edge_count > 0 {
-        Err(HldAnalysisPortError::UnsupportedTraversal)
-    } else {
-        Ok(())
-    }
-}
-
 fn read_hld_materialization_output(
     transaction: &duckdb::Transaction<'_>,
     input_record: &HldMaterializationInputRecord,
@@ -381,7 +404,71 @@ fn read_hld_materialization_output(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let edge_query = "SELECT run_generation_key, source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind, source_qualified_path_text, target_qualified_path_text, source_signature_text, target_signature_text, dependency_origin_kind, COUNT(DISTINCT evidence_identity_key) FROM \"hld-analysis-path-records\" GROUP BY ALL ORDER BY run_generation_key, source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind";
+    let edge_query = r#"
+WITH path_evidence AS (
+    SELECT
+        path.run_generation_key,
+        path.source_identity_key,
+        path.target_identity_key,
+        path.relation_kind_value,
+        path.collapse_via_kind,
+        evidence.evidence_identity_key
+    FROM "hld-analysis-path-records" AS path
+    CROSS JOIN UNNEST(path.ordered_evidence_identity_path)
+        AS evidence(evidence_identity_key)
+),
+edge_evidence_counts AS (
+    SELECT
+        run_generation_key,
+        source_identity_key,
+        target_identity_key,
+        relation_kind_value,
+        collapse_via_kind,
+        COUNT(DISTINCT evidence_identity_key) AS evidence_row_count
+    FROM path_evidence
+    GROUP BY
+        run_generation_key,
+        source_identity_key,
+        target_identity_key,
+        relation_kind_value,
+        collapse_via_kind
+)
+SELECT
+    edge.run_generation_key,
+    edge.source_identity_key,
+    edge.target_identity_key,
+    edge.relation_kind_value,
+    edge.collapse_via_kind,
+    source.qualified_path_text AS source_qualified_path_text,
+    target.qualified_path_text AS target_qualified_path_text,
+    source.signature_text AS source_signature_text,
+    target.signature_text AS target_signature_text,
+    CASE
+        WHEN source.unit_identity_key IS NOT NULL
+            AND source.unit_identity_key = target.unit_identity_key
+            THEN 'same_crate'
+        WHEN target.endpoint_category_kind = 'builtin' THEN 'std'
+        WHEN target_origin.unit_origin_kind = 'workspace' THEN 'workspace_crate'
+        WHEN target_origin.unit_origin_kind = 'standard_library' THEN 'std'
+        ELSE 'external_crate'
+    END AS dependency_origin_kind,
+    edge.evidence_row_count
+FROM edge_evidence_counts AS edge
+JOIN "hld-analysis-node-records" AS source
+    ON source.run_generation_key = edge.run_generation_key
+    AND source.endpoint_identity_key = edge.source_identity_key
+JOIN "hld-analysis-node-records" AS target
+    ON target.run_generation_key = edge.run_generation_key
+    AND target.endpoint_identity_key = edge.target_identity_key
+LEFT JOIN "hld-analysis-unit-origins" AS target_origin
+    ON target_origin.unit_identity_key = target.unit_identity_key
+ORDER BY
+    edge.run_generation_key,
+    edge.source_identity_key,
+    edge.target_identity_key,
+    edge.relation_kind_value,
+    edge.collapse_via_kind
+"#;
     let mut statement = transaction.prepare(edge_query).map_err(|source| {
         build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
     })?;
@@ -453,7 +540,7 @@ fn read_hld_materialization_output(
         })
         .collect::<Result<BTreeMap<_, _>, _>>()?;
     let mut path_statement = transaction
-        .prepare("SELECT source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind, evidence_identity_key FROM \"hld-analysis-path-records\" ORDER BY source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind, evidence_identity_key")
+        .prepare("SELECT source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind, to_json(ordered_endpoint_identity_path), to_json(ordered_evidence_identity_path) FROM \"hld-analysis-path-records\"")
         .map_err(|source| {
             build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
         })?;
@@ -465,26 +552,47 @@ fn read_hld_materialization_output(
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
             ))
         })
         .map_err(|source| {
             build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
         })?
         .map(|row_result| {
-            let (source_identity, target_identity, relation_text, via_text, evidence_identity) =
-                row_result.map_err(|source| {
-                    build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
-                })?;
+            let (
+                source_identity,
+                target_identity,
+                relation_text,
+                via_text,
+                endpoint_path_json,
+                evidence_path_json,
+            ) = row_result.map_err(|source| {
+                build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+            })?;
             let source_target = read_hld_identity_target(&node_by_identity, &source_identity)?;
             let target_reference = read_hld_identity_target(&node_by_identity, &target_identity)?;
-            let evidence_row_key = evidence_by_identity
-                .get(&evidence_identity)
-                .cloned()
-                .ok_or_else(|| {
-                    HldAnalysisPortError::InvalidInput(
-                        HldMaterializationValidationError::InvalidEvidenceIdentity,
-                    )
-                })?;
+            let endpoint_identity_path = serde_json::from_str::<Vec<String>>(&endpoint_path_json)
+                .map_err(|source| {
+                build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+            })?;
+            let ordered_endpoint_path = endpoint_identity_path
+                .iter()
+                .map(|identity| read_hld_identity_target(&node_by_identity, identity))
+                .collect::<Result<Vec<_>, _>>()?;
+            let evidence_identity_path = serde_json::from_str::<Vec<String>>(&evidence_path_json)
+                .map_err(|source| {
+                build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+            })?;
+            let ordered_evidence_row_keys = evidence_identity_path
+                .iter()
+                .map(|identity| {
+                    evidence_by_identity.get(identity).cloned().ok_or_else(|| {
+                        HldAnalysisPortError::InvalidInput(
+                            HldMaterializationValidationError::InvalidEvidenceIdentity,
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(HldEvidencePathRecord {
                 edge_key: HldGraphEdgeKey {
                     run_generation_digest_value: input_record.run_generation_digest_value,
@@ -493,11 +601,12 @@ fn read_hld_materialization_output(
                     edge_relation_kind_value: read_hld_relation_kind(&relation_text)?,
                     edge_collapse_via_kind: read_hld_via_kind(&via_text)?,
                 },
-                ordered_endpoint_path: vec![source_target, target_reference],
-                ordered_site_occurrence_keys: vec![
-                    evidence_row_key.evidence_site_occurrence_key.clone(),
-                ],
-                ordered_evidence_row_keys: vec![evidence_row_key],
+                ordered_endpoint_path,
+                ordered_site_occurrence_keys: ordered_evidence_row_keys
+                    .iter()
+                    .map(|evidence| evidence.evidence_site_occurrence_key.clone())
+                    .collect(),
+                ordered_evidence_row_keys,
             })
         })
         .collect::<Result<Vec<_>, HldAnalysisPortError>>()?;
@@ -507,7 +616,7 @@ fn read_hld_materialization_output(
     evidence_path_records.sort();
     Ok(HldMaterializationOutputRecord {
         run_generation_digest_value: input_record.run_generation_digest_value,
-        output_completeness_kind: HldOutputCompletenessKind::DirectProjectionOnly,
+        output_completeness_kind: HldOutputCompletenessKind::GraphPathsOnly,
         selected_node_records,
         materialized_edge_records,
         evidence_path_records,

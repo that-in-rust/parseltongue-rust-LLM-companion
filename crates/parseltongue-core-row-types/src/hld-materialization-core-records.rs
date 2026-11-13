@@ -169,6 +169,7 @@ pub enum HldOutputEdgeStatus {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldOutputCompletenessKind {
     DirectProjectionOnly,
+    GraphPathsOnly,
     CompleteGraph,
 }
 

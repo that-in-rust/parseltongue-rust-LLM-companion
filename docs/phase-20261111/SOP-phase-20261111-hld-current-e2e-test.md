@@ -612,3 +612,20 @@ source file. Identical duplicates remain legal; conflicting unit, node and
 evidence duplicates fail. Inferred, Proposed and Unresolved evidence remain
 non-extracted. This increment does not implement recursive traversal,
 roll-ups or publication.
+
+### SOP revision R12 — recursive DuckDB paths (2026-11-13)
+
+The current bounded materializer replaces direct-only traversal rejection
+with a recursive DuckDB CTE over extracted edges. It carries ordered full
+endpoint/evidence identities, follows only nonselected LocalItems, stops at
+the first selected or canonical external/builtin terminal, and uses the
+terminal edge relation. Per-path guards prohibit repeated private endpoints
+while allowing a finite return to the selected source; private cycles alone
+emit no edge. Paths are distinct by ordered proof identity, and SQL counts the
+distinct evidence union per generation/source/target/relation/via row.
+The union is computed in SQL by UNNESTing ordered evidence lists; Rust only
+decodes the records and sorts the typed result.
+Output completeness is GraphPathsOnly; file/folder roll-ups remain None.
+Frozen-stage checks, Turso publication, real-source producers, CLI completion
+status and source-to-HLD acceptance remain NOT STARTED. This is not an HLD
+complete or SOP-subset PASS claim.

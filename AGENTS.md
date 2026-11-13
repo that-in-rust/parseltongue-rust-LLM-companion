@@ -226,7 +226,7 @@ the body-site store. Turso owns durable semantic facts and atomic HLD serving;
 DuckDB owns relational analysis. Halted large-repository/native work remains
 separate from this focused slice; all-five milestone completion is unchanged.
 
-### Revision note — direct HLD materializer checkpoint
+### Historical revision note — direct HLD materializer checkpoint
 
 The bounded DuckDB materializer slice selects nodes and projects direct edges
 in SQL only. It is explicitly DirectProjectionOnly; recursive private-chain
@@ -241,3 +241,16 @@ names. ExternalDefinition records cannot share a full unit key with a LocalItem
 or CrateRoot; evidence sites must share the owning source's full unit key.
 Unknown owner semantics and inconsistent body ancestry fail closed, while
 nested modules inside bodies remain excluded rather than invalidated.
+
+### Revision note — recursive HLD path/collapse checkpoint
+
+The current DuckDB materializer recursively traverses extracted edges in SQL
+from selected sources through nonselected LocalItems to the first selected or
+canonical external/builtin terminal. Per-path full occurrence identities
+prevent repeated private endpoints while permitting one terminal return to
+the source. Paths retain ordered endpoint and evidence-row identities; the
+terminal relation labels the output. SQL groups by generation/source/target/
+relation/via and counts the distinct evidence-key union with UNNEST. The
+typed output is GraphPathsOnly, sorted after decoding, with both roll-ups
+uncomputed. Roll-ups, frozen-stage-marker validation, Turso publication,
+real-source producers and CLI complete-stage status remain separate work.
