@@ -629,3 +629,27 @@ Output completeness is GraphPathsOnly; file/folder roll-ups remain None.
 Frozen-stage checks, Turso publication, real-source producers, CLI completion
 status and source-to-HLD acceptance remain NOT STARTED. This is not an HLD
 complete or SOP-subset PASS claim.
+
+### SOP revision R13 — DuckDB file/folder roll-ups (2026-11-13)
+
+The current explicit-input DuckDB materializer now materializes/reuses the
+deduplicated HLD edge relation in SQL and groups that relation for file and
+folder roll-ups. Paths and unnested evidence are not roll-up inputs; each
+full HLD key contributes once, with relation and Direct/Collapsed via kept
+as dimensions.
+
+File buckets preserve full compilation-unit identity and normalized source-
+relative path. CrateRoot uses its explicit bucket; an ExternalDefinition
+without verified file metadata and every Builtin use full canonical target
+identity. Folder buckets use immediate parent paths, including `.` for
+root-level source files, and retain unit identity. CrateRoot and canonical
+external buckets remain distinct. HldFolderEndpointBucket is a separate L1
+type from file buckets.
+
+The materializer reports CompleteGraph with Some(file roll-ups) and
+Some(folder roll-ups), including Some(empty) for empty typed input. This
+means only that all supplied typed facts were materialized. Frozen-stage
+checks, Turso publication, real-source producers, CLI status and source/
+corpus qualification remain NOT STARTED. The focused matrix covers
+test_hld_rollup_edge_counts, test_hld_rollup_bucket_context and
+test_hld_empty_input_rollups; determinism includes roll-ups.

@@ -7,6 +7,8 @@ use parseltongue_core_row_types::{
     HldRelationKindValue, HldSelectedNodeRecord, HldUnitOriginKind, HldViaKindValue,
     NameSymbolTargetKey, RunCancelFlagValue, SemanticOccurrenceKeyValue,
     validate_hld_materialization_input,
+    HldEndpointRollupBucket, HldFileRollupRecord, HldFolderEndpointBucket,
+    HldFolderRollupRecord,
 };
 use parseltongue_table_store_traits::{
     HldAnalysisOperationKind, HldAnalysisPortError, HldGraphAnalysisPort,
@@ -141,9 +143,14 @@ impl HldGraphAnalysisPort for DuckdbAnalysisStoreAdapter {
             .map_err(|source| {
                 build_hld_backend_error(HldAnalysisOperationKind::NormalizeNodeInputs, source)
             })?;
+        let rollup_bucket_indexes = insert_hld_rollup_buckets(&transaction, input_record)?;
         insert_hld_edge_inputs(&transaction, input_record)?;
         create_hld_recursive_paths(&transaction)?;
-        let mut output_record = read_hld_materialization_output(&transaction, input_record)?;
+        let mut output_record = read_hld_materialization_output(
+            &transaction,
+            input_record,
+            &rollup_bucket_indexes,
+        )?;
         check_hld_analysis_cancel(cancel_flag)?;
         transaction.commit().map_err(|source| {
             build_hld_backend_error(HldAnalysisOperationKind::CommitTransaction, source)
@@ -152,6 +159,16 @@ impl HldGraphAnalysisPort for DuckdbAnalysisStoreAdapter {
         output_record.selected_node_records.sort();
         output_record.materialized_edge_records.sort();
         output_record.evidence_path_records.sort();
+        output_record
+            .file_rollup_records
+            .as_mut()
+            .into_iter()
+            .for_each(|records| records.sort());
+        output_record
+            .folder_rollup_records
+            .as_mut()
+            .into_iter()
+            .for_each(|records| records.sort());
         Ok(output_record)
     }
 }
@@ -172,6 +189,171 @@ fn check_hld_analysis_cancel(cancel_flag: &RunCancelFlagValue) -> Result<(), Hld
     } else {
         Ok(())
     }
+}
+
+struct HldRollupBucketIndexes {
+    file_buckets_by_identity: BTreeMap<String, HldEndpointRollupBucket>,
+    folder_buckets_by_identity: BTreeMap<String, HldFolderEndpointBucket>,
+}
+
+fn build_hld_rollup_buckets(
+    node: &HldNodeInputRecord,
+) -> Result<(HldEndpointRollupBucket, HldFolderEndpointBucket), HldAnalysisPortError> {
+    match node.node_input_category {
+        HldNodeInputCategory::LocalItem => {
+            let unit = read_hld_target_unit(&node.node_target_reference)
+                .ok_or_else(|| invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory))?;
+            let path = node.node_source_relative_path.as_deref()
+                .ok_or_else(|| invalid_hld_rollup_input(HldMaterializationValidationError::InvalidSourceRelativePath))?;
+            source_hld_rollup_buckets(unit, path)
+        }
+        HldNodeInputCategory::ExternalDefinition => match node.node_source_relative_path.as_deref() {
+            Some(path) => {
+                let unit = read_hld_target_unit(&node.node_target_reference)
+                    .ok_or_else(|| invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory))?;
+                source_hld_rollup_buckets(unit, path)
+            }
+            None => Ok(canonical_hld_rollup_buckets(node.node_target_reference.clone())),
+        },
+        HldNodeInputCategory::CrateRoot => match &node.node_target_reference {
+            NameSymbolTargetKey::CrateRoot(unit) => Ok((
+                HldEndpointRollupBucket::CrateRoot { unit_compilation_identity_key: unit.clone() },
+                HldFolderEndpointBucket::CrateRoot { unit_compilation_identity_key: unit.clone() },
+            )),
+            _ => Err(invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory)),
+        },
+        HldNodeInputCategory::Builtin => match &node.node_target_reference {
+            NameSymbolTargetKey::Builtin(_) => Ok(canonical_hld_rollup_buckets(node.node_target_reference.clone())),
+            _ => Err(invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory)),
+        },
+    }
+}
+
+fn source_hld_rollup_buckets(
+    unit_identity: CrateCompilationUnitKey,
+    source_relative_path: &str,
+) -> Result<(HldEndpointRollupBucket, HldFolderEndpointBucket), HldAnalysisPortError> {
+    let normalized_path = normalize_hld_source_path(source_relative_path)?;
+    let folder_path = parent_hld_source_folder(&normalized_path);
+    Ok((
+        HldEndpointRollupBucket::SourceFile {
+            unit_compilation_identity_key: unit_identity.clone(),
+            file_source_relative_path: normalized_path,
+        },
+        HldFolderEndpointBucket::SourceFolder {
+            unit_compilation_identity_key: unit_identity,
+            folder_source_relative_path: folder_path,
+        },
+    ))
+}
+
+fn canonical_hld_rollup_buckets(
+    target_reference: NameSymbolTargetKey,
+) -> (HldEndpointRollupBucket, HldFolderEndpointBucket) {
+    (
+        HldEndpointRollupBucket::CanonicalExternalIdentity {
+            endpoint_target_reference: target_reference.clone(),
+        },
+        HldFolderEndpointBucket::CanonicalExternalIdentity {
+            endpoint_target_reference: target_reference,
+        },
+    )
+}
+
+fn normalize_hld_source_path(path: &str) -> Result<String, HldAnalysisPortError> {
+    let components = path
+        .split('/')
+        .filter(|component| !component.is_empty() && *component != ".")
+        .collect::<Vec<_>>();
+    if path.starts_with('/')
+        || path.contains('\\')
+        || components.is_empty()
+        || components.iter().any(|component| *component == "..")
+    {
+        return Err(invalid_hld_rollup_input(
+            HldMaterializationValidationError::InvalidSourceRelativePath,
+        ));
+    }
+    Ok(components.join("/"))
+}
+
+fn parent_hld_source_folder(path: &str) -> String {
+    path.rsplit_once('/')
+        .map(|(parent, _)| parent)
+        .filter(|parent| !parent.is_empty())
+        .unwrap_or(".")
+        .to_owned()
+}
+
+fn encode_hld_file_bucket(
+    bucket: &HldEndpointRollupBucket,
+) -> Result<String, serde_json::Error> {
+    let encoded = match bucket {
+        HldEndpointRollupBucket::SourceFile { unit_compilation_identity_key, file_source_relative_path } =>
+            json!(["source_file", encode_hld_unit_value(unit_compilation_identity_key), file_source_relative_path]),
+        HldEndpointRollupBucket::CrateRoot { unit_compilation_identity_key } =>
+            json!(["crate_root", encode_hld_unit_value(unit_compilation_identity_key)]),
+        HldEndpointRollupBucket::CanonicalExternalIdentity { endpoint_target_reference } =>
+            json!(["canonical_external", encode_hld_target_value(endpoint_target_reference)]),
+    };
+    serde_json::to_string(&encoded)
+}
+
+fn encode_hld_folder_bucket(
+    bucket: &HldFolderEndpointBucket,
+) -> Result<String, serde_json::Error> {
+    let encoded = match bucket {
+        HldFolderEndpointBucket::SourceFolder { unit_compilation_identity_key, folder_source_relative_path } =>
+            json!(["source_folder", encode_hld_unit_value(unit_compilation_identity_key), folder_source_relative_path]),
+        HldFolderEndpointBucket::CrateRoot { unit_compilation_identity_key } =>
+            json!(["crate_root", encode_hld_unit_value(unit_compilation_identity_key)]),
+        HldFolderEndpointBucket::CanonicalExternalIdentity { endpoint_target_reference } =>
+            json!(["canonical_external", encode_hld_target_value(endpoint_target_reference)]),
+    };
+    serde_json::to_string(&encoded)
+}
+
+fn insert_hld_rollup_buckets(
+    transaction: &duckdb::Transaction<'_>,
+    input_record: &HldMaterializationInputRecord,
+) -> Result<HldRollupBucketIndexes, HldAnalysisPortError> {
+    let unique_nodes = input_record
+        .input_node_records
+        .iter()
+        .map(|node| {
+            encode_hld_target_identity(&node.node_target_reference)
+                .map(|identity| (identity, node))
+                .map_err(|source| build_hld_backend_error(HldAnalysisOperationKind::NormalizeNodeInputs, source))
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let mut indexes = HldRollupBucketIndexes {
+        file_buckets_by_identity: BTreeMap::new(),
+        folder_buckets_by_identity: BTreeMap::new(),
+    };
+    unique_nodes.iter().try_for_each(|(endpoint_identity, node)| {
+        let (file_bucket, folder_bucket) = build_hld_rollup_buckets(node)?;
+        let file_identity = encode_hld_file_bucket(&file_bucket)
+            .map_err(|source| build_hld_backend_error(HldAnalysisOperationKind::NormalizeNodeInputs, source))?;
+        let folder_identity = encode_hld_folder_bucket(&folder_bucket)
+            .map_err(|source| build_hld_backend_error(HldAnalysisOperationKind::NormalizeNodeInputs, source))?;
+        transaction
+            .execute(
+                "INSERT INTO \"hld-analysis-rollup-buckets\" VALUES (?, ?, ?)",
+                duckdb::params![endpoint_identity, file_identity, folder_identity],
+            )
+            .map(|_| ())
+            .map_err(|source| build_hld_backend_error(HldAnalysisOperationKind::NormalizeNodeInputs, source))?;
+        indexes.file_buckets_by_identity.insert(file_identity, file_bucket);
+        indexes.folder_buckets_by_identity.insert(folder_identity, folder_bucket);
+        Ok::<(), HldAnalysisPortError>(())
+    })?;
+    Ok(indexes)
+}
+
+fn invalid_hld_rollup_input(
+    validation_error: HldMaterializationValidationError,
+) -> HldAnalysisPortError {
+    HldAnalysisPortError::InvalidInput(validation_error)
 }
 
 fn build_hld_backend_error(
@@ -351,6 +533,7 @@ fn insert_hld_edge_inputs(
 fn read_hld_materialization_output(
     transaction: &duckdb::Transaction<'_>,
     input_record: &HldMaterializationInputRecord,
+    rollup_bucket_indexes: &HldRollupBucketIndexes,
 ) -> Result<HldMaterializationOutputRecord, HldAnalysisPortError> {
     let node_by_identity = input_record
         .input_node_records
@@ -469,7 +652,15 @@ ORDER BY
     edge.relation_kind_value,
     edge.collapse_via_kind
 "#;
-    let mut statement = transaction.prepare(edge_query).map_err(|source| {
+    let materialize_edge_sql = format!(
+        "CREATE TEMP TABLE \"hld-analysis-materialized-edges\" AS {edge_query}"
+    );
+    transaction.execute_batch(&materialize_edge_sql).map_err(|source| {
+        build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+    })?;
+    let mut statement = transaction
+        .prepare("SELECT run_generation_key, source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind, source_qualified_path_text, target_qualified_path_text, source_signature_text, target_signature_text, dependency_origin_kind, evidence_row_count FROM \"hld-analysis-materialized-edges\" ORDER BY run_generation_key, source_identity_key, target_identity_key, relation_kind_value, collapse_via_kind")
+        .map_err(|source| {
         build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
     })?;
     let mut materialized_edge_records = statement
@@ -611,18 +802,162 @@ ORDER BY
         })
         .collect::<Result<Vec<_>, HldAnalysisPortError>>()?;
 
+    let file_rollup_records = read_hld_file_rollups(transaction, rollup_bucket_indexes)?;
+    let folder_rollup_records = read_hld_folder_rollups(transaction, rollup_bucket_indexes)?;
     selected_node_records.sort();
     materialized_edge_records.sort();
     evidence_path_records.sort();
     Ok(HldMaterializationOutputRecord {
         run_generation_digest_value: input_record.run_generation_digest_value,
-        output_completeness_kind: HldOutputCompletenessKind::GraphPathsOnly,
+        output_completeness_kind: HldOutputCompletenessKind::CompleteGraph,
         selected_node_records,
         materialized_edge_records,
         evidence_path_records,
-        file_rollup_records: None,
-        folder_rollup_records: None,
+        file_rollup_records: Some(file_rollup_records),
+        folder_rollup_records: Some(folder_rollup_records),
     })
+}
+
+fn read_hld_file_rollups(
+    transaction: &duckdb::Transaction<'_>,
+    indexes: &HldRollupBucketIndexes,
+) -> Result<Vec<HldFileRollupRecord>, HldAnalysisPortError> {
+    let query = r#"
+SELECT
+    source_bucket.file_bucket_identity,
+    target_bucket.file_bucket_identity,
+    edge.relation_kind_value,
+    edge.collapse_via_kind,
+    COUNT(*) AS edge_row_count
+FROM "hld-analysis-materialized-edges" AS edge
+JOIN "hld-analysis-rollup-buckets" AS source_bucket
+    ON source_bucket.endpoint_identity_key = edge.source_identity_key
+JOIN "hld-analysis-rollup-buckets" AS target_bucket
+    ON target_bucket.endpoint_identity_key = edge.target_identity_key
+GROUP BY
+    edge.run_generation_key,
+    source_bucket.file_bucket_identity,
+    target_bucket.file_bucket_identity,
+    edge.relation_kind_value,
+    edge.collapse_via_kind
+ORDER BY
+    source_bucket.file_bucket_identity,
+    target_bucket.file_bucket_identity,
+    edge.relation_kind_value,
+    edge.collapse_via_kind
+"#;
+    let mut statement = transaction.prepare(query).map_err(|source| {
+        build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+    })?;
+    statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, usize>(4)?,
+            ))
+        })
+        .map_err(|source| {
+            build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+        })?
+        .map(|row_result| {
+            let (source_identity, target_identity, relation, via, edge_count) =
+                row_result.map_err(|source| {
+                    build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+                })?;
+            Ok(HldFileRollupRecord {
+                source_endpoint_bucket: read_hld_file_bucket(indexes, &source_identity)?,
+                target_endpoint_bucket: read_hld_file_bucket(indexes, &target_identity)?,
+                edge_relation_kind_value: read_hld_relation_kind(&relation)?,
+                edge_collapse_via_kind: read_hld_via_kind(&via)?,
+                edge_row_count: edge_count,
+            })
+        })
+        .collect()
+}
+
+fn read_hld_folder_rollups(
+    transaction: &duckdb::Transaction<'_>,
+    indexes: &HldRollupBucketIndexes,
+) -> Result<Vec<HldFolderRollupRecord>, HldAnalysisPortError> {
+    let query = r#"
+SELECT
+    source_bucket.folder_bucket_identity,
+    target_bucket.folder_bucket_identity,
+    edge.relation_kind_value,
+    edge.collapse_via_kind,
+    COUNT(*) AS edge_row_count
+FROM "hld-analysis-materialized-edges" AS edge
+JOIN "hld-analysis-rollup-buckets" AS source_bucket
+    ON source_bucket.endpoint_identity_key = edge.source_identity_key
+JOIN "hld-analysis-rollup-buckets" AS target_bucket
+    ON target_bucket.endpoint_identity_key = edge.target_identity_key
+GROUP BY
+    edge.run_generation_key,
+    source_bucket.folder_bucket_identity,
+    target_bucket.folder_bucket_identity,
+    edge.relation_kind_value,
+    edge.collapse_via_kind
+ORDER BY
+    source_bucket.folder_bucket_identity,
+    target_bucket.folder_bucket_identity,
+    edge.relation_kind_value,
+    edge.collapse_via_kind
+"#;
+    let mut statement = transaction.prepare(query).map_err(|source| {
+        build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+    })?;
+    statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, usize>(4)?,
+            ))
+        })
+        .map_err(|source| {
+            build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+        })?
+        .map(|row_result| {
+            let (source_identity, target_identity, relation, via, edge_count) =
+                row_result.map_err(|source| {
+                    build_hld_backend_error(HldAnalysisOperationKind::ReadAnalysisOutputs, source)
+                })?;
+            Ok(HldFolderRollupRecord {
+                source_folder_bucket: read_hld_folder_bucket(indexes, &source_identity)?,
+                target_folder_bucket: read_hld_folder_bucket(indexes, &target_identity)?,
+                edge_relation_kind_value: read_hld_relation_kind(&relation)?,
+                edge_collapse_via_kind: read_hld_via_kind(&via)?,
+                edge_row_count: edge_count,
+            })
+        })
+        .collect()
+}
+
+fn read_hld_file_bucket(
+    indexes: &HldRollupBucketIndexes,
+    identity: &str,
+) -> Result<HldEndpointRollupBucket, HldAnalysisPortError> {
+    indexes
+        .file_buckets_by_identity
+        .get(identity)
+        .cloned()
+        .ok_or_else(|| invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory))
+}
+
+fn read_hld_folder_bucket(
+    indexes: &HldRollupBucketIndexes,
+    identity: &str,
+) -> Result<HldFolderEndpointBucket, HldAnalysisPortError> {
+    indexes
+        .folder_buckets_by_identity
+        .get(identity)
+        .cloned()
+        .ok_or_else(|| invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory))
 }
 
 fn read_hld_identity_target(

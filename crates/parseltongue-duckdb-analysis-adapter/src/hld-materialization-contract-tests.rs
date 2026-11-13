@@ -4,6 +4,7 @@ use super::*;
 use parseltongue_core_row_types::{
     CompilationUnitRoleKind, CrateCompilationUnitKey, HldDependencyOriginKind, HldEdgeInputRecord,
     HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldEvidencePathRecord, HldEvidenceRowKey,
+    HldEndpointRollupBucket, HldFileRollupRecord, HldFolderEndpointBucket, HldFolderRollupRecord,
     HldGraphEdgeKey, HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
     HldMaterializationValidationError, HldNodeInputCategory, HldNodeInputRecord,
     HldOutputCompletenessKind, HldOutputEdgeStatus, HldOwnerKindValue, HldRelationKindValue,
@@ -196,6 +197,93 @@ fn expected_hld_edge_key(
         edge_relation_kind_value: relation,
         edge_collapse_via_kind: via,
     }
+}
+
+fn build_hld_bucket_node(
+    generation: RunGenerationDigestValue,
+    unit_identity: &CrateCompilationUnitKey,
+    source_relative_path: &str,
+    offset: u8,
+    qualified_path: &str,
+) -> HldNodeInputRecord {
+    let target_reference = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+        unit_identity,
+        source_relative_path,
+        u64::from(offset),
+        offset,
+    ));
+    build_hld_fixture_node(
+        generation,
+        target_reference,
+        HldNodeInputCategory::LocalItem,
+        Some(HldItemKindValue::Function),
+        Some(HldOwnerKindValue::Module),
+        false,
+        Some(HldEffectiveVisibilityKind::Public),
+        false,
+        Some(source_relative_path),
+        qualified_path,
+    )
+}
+
+fn build_hld_file_rollup(
+    source_endpoint_bucket: HldEndpointRollupBucket,
+    target_endpoint_bucket: HldEndpointRollupBucket,
+    relation: HldRelationKindValue,
+    via: HldViaKindValue,
+    edge_count: usize,
+) -> HldFileRollupRecord {
+    HldFileRollupRecord {
+        source_endpoint_bucket,
+        target_endpoint_bucket,
+        edge_relation_kind_value: relation,
+        edge_collapse_via_kind: via,
+        edge_row_count: edge_count,
+    }
+}
+
+fn build_hld_folder_rollup(
+    source_folder_bucket: HldFolderEndpointBucket,
+    target_folder_bucket: HldFolderEndpointBucket,
+    relation: HldRelationKindValue,
+    via: HldViaKindValue,
+    edge_count: usize,
+) -> HldFolderRollupRecord {
+    HldFolderRollupRecord {
+        source_folder_bucket,
+        target_folder_bucket,
+        edge_relation_kind_value: relation,
+        edge_collapse_via_kind: via,
+        edge_row_count: edge_count,
+    }
+}
+
+fn sum_hld_file_rollups(records: &[HldFileRollupRecord]) -> usize {
+    records.iter().map(|record| record.edge_row_count).sum()
+}
+
+fn hld_source_file_bucket(
+    unit_identity: CrateCompilationUnitKey,
+    file_source_relative_path: &str,
+) -> HldEndpointRollupBucket {
+    HldEndpointRollupBucket::SourceFile {
+        unit_compilation_identity_key: unit_identity,
+        file_source_relative_path: file_source_relative_path.into(),
+    }
+}
+
+fn hld_source_folder_bucket(
+    unit_identity: CrateCompilationUnitKey,
+    folder_source_relative_path: &str,
+) -> HldFolderEndpointBucket {
+    HldFolderEndpointBucket::SourceFolder {
+        unit_compilation_identity_key: unit_identity,
+        folder_source_relative_path: folder_source_relative_path.into(),
+    }
+}
+
+fn sum_hld_folder_rollups(records: &[HldFolderRollupRecord]) -> usize {
+    records.iter().map(|record| record.edge_row_count).sum()
 }
 
 fn build_hld_path_record(
@@ -703,10 +791,8 @@ fn test_hld_direct_edge_projection() {
     assert_eq!(path_edge_keys, expected_edge_keys);
     assert_eq!(
         output.output_completeness_kind,
-        HldOutputCompletenessKind::GraphPathsOnly
+        HldOutputCompletenessKind::CompleteGraph
     );
-    assert_eq!(output.file_rollup_records, None);
-    assert_eq!(output.folder_rollup_records, None);
     assert!(
         output
             .selected_node_records
@@ -890,10 +976,8 @@ fn test_hld_private_path_materialized() {
     );
     assert_eq!(
         output.output_completeness_kind,
-        HldOutputCompletenessKind::GraphPathsOnly
+        HldOutputCompletenessKind::CompleteGraph
     );
-    assert_eq!(output.file_rollup_records, None);
-    assert_eq!(output.folder_rollup_records, None);
     assert_eq!(output.materialized_edge_records.len(), 1);
     let edge = &output.materialized_edge_records[0];
     assert_eq!(edge.edge_key, expected_key);
@@ -1708,6 +1792,15 @@ fn test_hld_diamond_evidence_union() {
             "direct-two",
             57,
         ),
+        build_hld_path_edge(
+            generation,
+            &unit_identity,
+            &p_key,
+            &q_key,
+            HldRelationKindValue::Calls,
+            "p-q-second-proof",
+            58,
+        ),
     ];
     let input = build_hld_path_input(generation, &unit_identity, vec![a, p, q, r, b], edges);
     let output = materialize_hld_fixture_graph(&input);
@@ -1720,7 +1813,7 @@ fn test_hld_diamond_evidence_union() {
                 HldRelationKindValue::UsesType,
                 HldViaKindValue::Collapsed,
             ),
-            5,
+            6,
         ),
         (
             expected_hld_edge_key(
@@ -1745,6 +1838,19 @@ fn test_hld_diamond_evidence_union() {
             vec![
                 input.input_edge_records[0].edge_evidence_row_key.clone(),
                 input.input_edge_records[1].edge_evidence_row_key.clone(),
+                input.input_edge_records[2].edge_evidence_row_key.clone(),
+            ],
+        ),
+        build_hld_path_record(
+            generation,
+            a_key.clone(),
+            b_key.clone(),
+            HldRelationKindValue::UsesType,
+            HldViaKindValue::Collapsed,
+            vec![a_key.clone(), p_key.clone(), q_key.clone(), b_key.clone()],
+            vec![
+                input.input_edge_records[0].edge_evidence_row_key.clone(),
+                input.input_edge_records[7].edge_evidence_row_key.clone(),
                 input.input_edge_records[2].edge_evidence_row_key.clone(),
             ],
         ),
@@ -1795,6 +1901,20 @@ fn test_hld_diamond_evidence_union() {
     assert_ne!(
         direct_paths[0].ordered_evidence_row_keys,
         direct_paths[1].ordered_evidence_row_keys
+    );
+    let collapsed_same_endpoint_paths = output
+        .evidence_path_records
+        .iter()
+        .filter(|path| {
+            path.edge_key.edge_collapse_via_kind == HldViaKindValue::Collapsed
+                && path.ordered_endpoint_path
+                    == vec![a_key.clone(), p_key.clone(), q_key.clone(), b_key.clone()]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(collapsed_same_endpoint_paths.len(), 2);
+    assert_ne!(
+        collapsed_same_endpoint_paths[0].ordered_evidence_row_keys,
+        collapsed_same_endpoint_paths[1].ordered_evidence_row_keys
     );
 }
 
@@ -1931,6 +2051,11 @@ fn test_hld_cycle_self_edges() {
     ];
     expected_paths.sort();
     assert_eq!(output.evidence_path_records, expected_paths);
+    let mut private_cycle_input = input.clone();
+    private_cycle_input.input_edge_records.truncate(3);
+    let private_cycle_output = materialize_hld_fixture_graph(&private_cycle_input);
+    assert!(private_cycle_output.materialized_edge_records.is_empty());
+    assert!(private_cycle_output.evidence_path_records.is_empty());
 }
 
 /// REQ-RUST-030.0
@@ -2188,6 +2313,148 @@ fn test_hld_unresolved_path_stop() {
     assert_eq!(output.evidence_path_records, expected_paths);
 }
 
+/// REQ-RUST-031.0 / REQ-RUST-009.2
+#[test]
+fn test_hld_rollup_edge_counts() {
+    let generation = RunGenerationDigestValue([42; 32]);
+    let unit = build_hld_fixture_unit("rollup-counts-fixture", 42);
+    let a = build_hld_path_node(generation, &unit, "group/a", 1, HldEffectiveVisibilityKind::Public, "crate::a");
+    let p = build_hld_path_node(generation, &unit, "private/p", 2, HldEffectiveVisibilityKind::PrivateEquivalent, "crate::private::p");
+    let q = build_hld_path_node(generation, &unit, "private/q", 3, HldEffectiveVisibilityKind::PrivateEquivalent, "crate::private::q");
+    let b = build_hld_path_node(generation, &unit, "target/b", 4, HldEffectiveVisibilityKind::Public, "crate::b");
+    let c = build_hld_path_node(generation, &unit, "group/c", 5, HldEffectiveVisibilityKind::Public, "crate::c");
+    let d = build_hld_path_node(generation, &unit, "target/d", 6, HldEffectiveVisibilityKind::Public, "crate::d");
+    let e = build_hld_path_node(generation, &unit, "group/e", 7, HldEffectiveVisibilityKind::Public, "crate::e");
+    let f = build_hld_path_node(generation, &unit, "target/f", 8, HldEffectiveVisibilityKind::Public, "crate::f");
+    let (a_key, p_key, q_key, b_key, c_key, d_key, e_key, f_key) = (
+        a.node_target_reference.clone(), p.node_target_reference.clone(),
+        q.node_target_reference.clone(), b.node_target_reference.clone(),
+        c.node_target_reference.clone(), d.node_target_reference.clone(),
+        e.node_target_reference.clone(), f.node_target_reference.clone(),
+    );
+    let input = build_hld_path_input(generation, &unit, vec![a, p, q, b, c, d, e, f], vec![
+        build_hld_path_edge(generation, &unit, &a_key, &p_key, HldRelationKindValue::Calls, "a-p", 101),
+        build_hld_path_edge(generation, &unit, &p_key, &b_key, HldRelationKindValue::UsesType, "p-b", 102),
+        build_hld_path_edge(generation, &unit, &a_key, &q_key, HldRelationKindValue::Calls, "a-q", 103),
+        build_hld_path_edge(generation, &unit, &q_key, &b_key, HldRelationKindValue::UsesType, "q-b", 104),
+        build_hld_path_edge(generation, &unit, &a_key, &b_key, HldRelationKindValue::UsesType, "a-b", 105),
+        build_hld_path_edge(generation, &unit, &c_key, &d_key, HldRelationKindValue::Calls, "c-d", 106),
+        build_hld_path_edge(generation, &unit, &e_key, &f_key, HldRelationKindValue::Calls, "e-f", 107),
+    ]);
+    let output = materialize_hld_fixture_graph(&input);
+    let collapsed_key = expected_hld_edge_key(generation, a_key.clone(), b_key.clone(), HldRelationKindValue::UsesType, HldViaKindValue::Collapsed);
+    assert_eq!(output.materialized_edge_records.len(), 4);
+    assert_eq!(output.materialized_edge_records.iter().filter(|edge| edge.edge_key == collapsed_key).count(), 1);
+    assert_eq!(output.materialized_edge_records.iter().find(|edge| edge.edge_key == collapsed_key).unwrap().edge_evidence_row_count, 4);
+    assert_eq!(output.evidence_path_records.iter().filter(|path| path.edge_key == collapsed_key).count(), 2);
+    let a_file = hld_source_file_bucket(unit.clone(), "src/group/a.rs");
+    let b_file = hld_source_file_bucket(unit.clone(), "src/target/b.rs");
+    let c_file = hld_source_file_bucket(unit.clone(), "src/group/c.rs");
+    let d_file = hld_source_file_bucket(unit.clone(), "src/target/d.rs");
+    let e_file = hld_source_file_bucket(unit.clone(), "src/group/e.rs");
+    let f_file = hld_source_file_bucket(unit.clone(), "src/target/f.rs");
+    let mut expected_files = vec![
+        build_hld_file_rollup(a_file.clone(), b_file.clone(), HldRelationKindValue::UsesType, HldViaKindValue::Collapsed, 1),
+        build_hld_file_rollup(a_file.clone(), b_file.clone(), HldRelationKindValue::UsesType, HldViaKindValue::Direct, 1),
+        build_hld_file_rollup(c_file, d_file, HldRelationKindValue::Calls, HldViaKindValue::Direct, 1),
+        build_hld_file_rollup(e_file, f_file, HldRelationKindValue::Calls, HldViaKindValue::Direct, 1),
+    ];
+    expected_files.sort();
+    assert_eq!(output.file_rollup_records, Some(expected_files));
+    let group_folder = hld_source_folder_bucket(unit.clone(), "src/group");
+    let target_folder = hld_source_folder_bucket(unit.clone(), "src/target");
+    let mut expected_folders = vec![
+        build_hld_folder_rollup(group_folder.clone(), target_folder.clone(), HldRelationKindValue::UsesType, HldViaKindValue::Collapsed, 1),
+        build_hld_folder_rollup(group_folder.clone(), target_folder.clone(), HldRelationKindValue::UsesType, HldViaKindValue::Direct, 1),
+        build_hld_folder_rollup(group_folder, target_folder, HldRelationKindValue::Calls, HldViaKindValue::Direct, 2),
+    ];
+    expected_folders.sort();
+    assert_eq!(output.folder_rollup_records, Some(expected_folders));
+    assert_eq!(output.output_completeness_kind, HldOutputCompletenessKind::CompleteGraph);
+    assert_eq!(sum_hld_file_rollups(output.file_rollup_records.as_deref().unwrap()), output.materialized_edge_records.len());
+    assert_eq!(sum_hld_folder_rollups(output.folder_rollup_records.as_deref().unwrap()), output.materialized_edge_records.len());
+}
+
+/// REQ-RUST-031.0 / REQ-RUST-009.2
+#[test]
+fn test_hld_rollup_bucket_context() {
+    let generation = RunGenerationDigestValue([43; 32]);
+    let first_unit = build_hld_fixture_unit("bucket-first", 43);
+    let second_unit = build_hld_fixture_unit("bucket-second", 44);
+    let known_unit = build_hld_fixture_unit("core", 45);
+    let missing_unit = build_hld_fixture_unit("remote", 46);
+    let root_key = NameSymbolTargetKey::CrateRoot(first_unit.clone());
+    let root_file = build_hld_bucket_node(generation, &first_unit, "lib.rs", 1, "crate::root_file");
+    let first_shared = build_hld_bucket_node(generation, &first_unit, "src/shared.rs", 2, "crate::first_shared");
+    let second_shared = build_hld_bucket_node(generation, &second_unit, "src/shared.rs", 3, "crate::second_shared");
+    let main = build_hld_bucket_node(generation, &first_unit, "src/main.rs", 4, "crate::main");
+    let root_file_key = root_file.node_target_reference.clone();
+    let first_shared_key = first_shared.node_target_reference.clone();
+    let second_shared_key = second_shared.node_target_reference.clone();
+    let main_key = main.node_target_reference.clone();
+    let known_key = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(&known_unit, "vendor/known.rs", 5, 5));
+    let missing_key = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(&missing_unit, "vendor/missing.rs", 6, 6));
+    let builtin_key = NameSymbolTargetKey::Builtin("u8".into());
+    let nodes = vec![
+        build_hld_fixture_node(generation, root_key.clone(), HldNodeInputCategory::CrateRoot, None, None, false, None, true, None, "crate"),
+        root_file, first_shared, second_shared, main,
+        build_hld_fixture_node(generation, known_key.clone(), HldNodeInputCategory::ExternalDefinition, None, None, false, None, true, Some("vendor/known.rs"), "core::known"),
+        build_hld_fixture_node(generation, missing_key.clone(), HldNodeInputCategory::ExternalDefinition, None, None, false, None, true, None, "remote::missing"),
+        build_hld_fixture_node(generation, builtin_key.clone(), HldNodeInputCategory::Builtin, None, None, false, None, true, None, "u8"),
+    ];
+    let input = build_hld_fixture_input(generation, vec![
+        HldUnitProvenanceRecord { unit_compilation_identity_key: first_unit.clone(), unit_origin_kind: HldUnitOriginKind::Workspace },
+        HldUnitProvenanceRecord { unit_compilation_identity_key: second_unit.clone(), unit_origin_kind: HldUnitOriginKind::Workspace },
+        HldUnitProvenanceRecord { unit_compilation_identity_key: known_unit.clone(), unit_origin_kind: HldUnitOriginKind::ExternalCrate },
+        HldUnitProvenanceRecord { unit_compilation_identity_key: missing_unit.clone(), unit_origin_kind: HldUnitOriginKind::ExternalCrate },
+    ], nodes, vec![
+        build_hld_path_edge(generation, &first_unit, &root_key, &root_file_key, HldRelationKindValue::Contains, "root-contains", 31),
+        build_hld_path_edge(generation, &first_unit, &first_shared_key, &known_key, HldRelationKindValue::Calls, "first-known", 32),
+        build_hld_path_edge(generation, &second_unit, &second_shared_key, &known_key, HldRelationKindValue::Calls, "second-known", 33),
+        build_hld_path_edge(generation, &first_unit, &main_key, &missing_key, HldRelationKindValue::UsesType, "missing-file", 34),
+        build_hld_path_edge(generation, &first_unit, &main_key, &builtin_key, HldRelationKindValue::Implements, "builtin", 35),
+    ]);
+    let output = materialize_hld_fixture_graph(&input);
+    assert_eq!(output.materialized_edge_records.len(), 5);
+    let first_file = hld_source_file_bucket(first_unit.clone(), "src/shared.rs");
+    let second_file = hld_source_file_bucket(second_unit.clone(), "src/shared.rs");
+    let known_file = hld_source_file_bucket(known_unit.clone(), "vendor/known.rs");
+    let main_file = hld_source_file_bucket(first_unit.clone(), "src/main.rs");
+    let mut expected_files = vec![
+        build_hld_file_rollup(HldEndpointRollupBucket::CrateRoot { unit_compilation_identity_key: first_unit.clone() }, hld_source_file_bucket(first_unit.clone(), "lib.rs"), HldRelationKindValue::Contains, HldViaKindValue::Direct, 1),
+        build_hld_file_rollup(first_file.clone(), known_file.clone(), HldRelationKindValue::Calls, HldViaKindValue::Direct, 1),
+        build_hld_file_rollup(second_file.clone(), known_file, HldRelationKindValue::Calls, HldViaKindValue::Direct, 1),
+        build_hld_file_rollup(main_file.clone(), HldEndpointRollupBucket::CanonicalExternalIdentity { endpoint_target_reference: missing_key.clone() }, HldRelationKindValue::UsesType, HldViaKindValue::Direct, 1),
+        build_hld_file_rollup(main_file.clone(), HldEndpointRollupBucket::CanonicalExternalIdentity { endpoint_target_reference: builtin_key.clone() }, HldRelationKindValue::Implements, HldViaKindValue::Direct, 1),
+    ];
+    expected_files.sort();
+    assert_eq!(output.file_rollup_records, Some(expected_files));
+    assert_ne!(first_file, second_file);
+    let mut expected_folders = vec![
+        build_hld_folder_rollup(HldFolderEndpointBucket::CrateRoot { unit_compilation_identity_key: first_unit.clone() }, hld_source_folder_bucket(first_unit.clone(), "."), HldRelationKindValue::Contains, HldViaKindValue::Direct, 1),
+        build_hld_folder_rollup(hld_source_folder_bucket(first_unit.clone(), "src"), hld_source_folder_bucket(known_unit.clone(), "vendor"), HldRelationKindValue::Calls, HldViaKindValue::Direct, 1),
+        build_hld_folder_rollup(hld_source_folder_bucket(second_unit.clone(), "src"), hld_source_folder_bucket(known_unit, "vendor"), HldRelationKindValue::Calls, HldViaKindValue::Direct, 1),
+        build_hld_folder_rollup(hld_source_folder_bucket(first_unit.clone(), "src"), HldFolderEndpointBucket::CanonicalExternalIdentity { endpoint_target_reference: missing_key }, HldRelationKindValue::UsesType, HldViaKindValue::Direct, 1),
+        build_hld_folder_rollup(hld_source_folder_bucket(first_unit, "src"), HldFolderEndpointBucket::CanonicalExternalIdentity { endpoint_target_reference: builtin_key }, HldRelationKindValue::Implements, HldViaKindValue::Direct, 1),
+    ];
+    expected_folders.sort();
+    assert_eq!(output.folder_rollup_records, Some(expected_folders));
+    assert_eq!(output.output_completeness_kind, HldOutputCompletenessKind::CompleteGraph);
+    assert_eq!(sum_hld_file_rollups(output.file_rollup_records.as_deref().unwrap()), output.materialized_edge_records.len());
+    assert_eq!(sum_hld_folder_rollups(output.folder_rollup_records.as_deref().unwrap()), output.materialized_edge_records.len());
+}
+
+/// REQ-RUST-031.0
+#[test]
+fn test_hld_empty_input_rollups() {
+    let generation = RunGenerationDigestValue([44; 32]);
+    let input = build_hld_fixture_input(generation, Vec::new(), Vec::new(), Vec::new());
+    let output = materialize_hld_fixture_graph(&input);
+    assert_eq!(output.file_rollup_records, Some(Vec::new()));
+    assert_eq!(output.folder_rollup_records, Some(Vec::new()));
+    assert_eq!(output.output_completeness_kind, HldOutputCompletenessKind::CompleteGraph);
+}
+
 /// REQ-RUST-030.0 / REQ-RUST-031.0
 #[test]
 fn test_hld_order_attempt_determinism() {
@@ -2259,6 +2526,8 @@ fn test_hld_order_attempt_determinism() {
         .materialize_hld_graph_output(&input, &RunCancelFlagValue::default())
         .unwrap();
     assert!(!expected.materialized_edge_records.is_empty());
+    assert!(expected.file_rollup_records.as_ref().is_some_and(|rows| !rows.is_empty()));
+    assert!(expected.folder_rollup_records.as_ref().is_some_and(|rows| !rows.is_empty()));
     let mut reordered = input.clone();
     reordered.input_unit_provenance_records.reverse();
     reordered.input_node_records.reverse();
@@ -2283,11 +2552,11 @@ fn test_hld_order_attempt_determinism() {
         .unwrap();
     assert_eq!(
         empty_output.output_completeness_kind,
-        HldOutputCompletenessKind::GraphPathsOnly
+        HldOutputCompletenessKind::CompleteGraph
     );
     assert!(empty_output.selected_node_records.is_empty());
     assert!(empty_output.materialized_edge_records.is_empty());
     assert!(empty_output.evidence_path_records.is_empty());
-    assert_eq!(empty_output.file_rollup_records, None);
-    assert_eq!(empty_output.folder_rollup_records, None);
+    assert_eq!(empty_output.file_rollup_records, Some(Vec::new()));
+    assert_eq!(empty_output.folder_rollup_records, Some(Vec::new()));
 }

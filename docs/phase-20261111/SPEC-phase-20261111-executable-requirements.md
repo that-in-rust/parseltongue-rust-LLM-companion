@@ -1594,7 +1594,7 @@ Identical duplicate provenance/node/evidence records are legal; conflicting
 duplicates fail. Inferred, Proposed and Unresolved evidence SHALL never become
 extracted output, and unresolved reason metadata remains in its input record.
 
-#### Recursive DuckDB path/collapse checkpoint
+#### Historical recursive DuckDB path/collapse checkpoint
 
 The DuckDB adapter SHALL seed a recursive CTE from extracted edges whose source
 is selected, extend paths only through nonselected LocalItem endpoints, and
@@ -1615,6 +1615,34 @@ This checkpoint SHALL report GraphPathsOnly; file and folder roll-ups remain
 None and CompleteGraph remains reserved until roll-ups exist. It does not
 implement input-marker validation, durable publication or real-source
 producers.
+
+#### DuckDB file/folder roll-up checkpoint
+
+The adapter SHALL materialize or reuse one deduplicated HLD edge relation in
+SQL. File and folder roll-ups SHALL GROUP that relation, never raw paths or
+unnested evidence; each full HLD edge key contributes exactly once at each
+level. Relation and collapse-via kind SHALL remain grouping dimensions.
+
+File buckets SHALL use SourceFile(full compilation-unit identity, normalized
+relative path) for LocalItem and ExternalDefinition nodes with explicit
+verified source-relative paths; CrateRoot nodes SHALL use the explicit
+CrateRoot bucket. ExternalDefinition nodes without verified file metadata
+and Builtin nodes SHALL use CanonicalExternalIdentity(full target key).
+Missing external file paths SHALL never be guessed from labels or occurrence
+names.
+
+Folder buckets SHALL use the immediate parent directory of known files, with
+`.` for root-level files and the full compilation-unit identity. CrateRoot
+and CanonicalExternalIdentity buckets SHALL remain explicit. The L1
+HldFolderEndpointBucket SHALL be distinct from HldEndpointRollupBucket so a
+folder path is never stored as a file path.
+
+For complete typed facts, output SHALL be CompleteGraph with Some(file rows)
+and Some(folder rows), including Some(empty) for empty input. This denotes
+complete materialization of the supplied facts only; it proves neither
+frozen-stage-marker completion nor source-pipeline, publication or corpus
+qualification. Rust may normalize/encode each endpoint bucket and decode/sort
+typed rows; grouping and counting SHALL remain SQL operations.
 
 ### REQ-RUST-031.0 — transactional HLD serving
 
@@ -1655,8 +1683,10 @@ guessed local file or silent edge exclusion is permitted.
 | REQ-RUST-030.0 / 031.0 | test_hld_missing_input_markers | negative integration | table presence is not stage completion | no publication |
 | REQ-RUST-031.0 | test_hld_cancel_preserves_publication | integration | cancellation leaves old generation readable | unchanged digest |
 | REQ-RUST-031.0 | test_hld_failed_write_rollback | integration | partial output unit never publishes | unchanged digest |
-| REQ-RUST-031.0 / 012.1 | test_hld_order_attempt_determinism | integration | reordered/duplicate inputs and attempt token preserve complete output; reused adapter clears on empty input | output equality including paths; empty output |
-| REQ-RUST-031.0 / 009.2 | test_hld_rollup_edge_counts | integration | local/external file/folder groups count deduplicated edges | summed count = HLD count |
+| REQ-RUST-031.0 / 012.1 | test_hld_order_attempt_determinism | integration | reordered/duplicate inputs and attempt token preserve nodes, edges, paths and roll-ups; reused adapter clears on empty input | output equality including roll-ups; empty output |
+| REQ-RUST-031.0 / 009.2 | test_hld_rollup_edge_counts | integration | path/evidence multiplicity never inflates deduplicated file/folder groups; relation/via stay distinct and functions merge by folder | exact group counts; sums at both levels equal HLD row count |
+| REQ-RUST-031.0 / 009.2 | test_hld_rollup_bucket_context | integration | same relative path in distinct units, root file, CrateRoot, verified/missing external files and Builtin preserve typed buckets | exact typed bucket keys |
+| REQ-RUST-031.0 | test_hld_empty_input_rollups | integration | completed empty typed input yields CompleteGraph and present empty roll-ups | Some(empty) at both levels |
 | REQ-RUST-031.0 | test_hld_complete_empty_snapshot | integration | complete empty input differs from missing stage | explicit empty result |
 
 These are required test contracts, not passing evidence. Record STUB/RED/GREEN/

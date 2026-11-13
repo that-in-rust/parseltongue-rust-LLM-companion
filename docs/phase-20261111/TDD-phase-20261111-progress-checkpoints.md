@@ -4709,3 +4709,73 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   no push or PR was made.
 - The pre-existing status-board edit and four DRAFT reference artifacts
   remained unstaged and untouched.
+
+## HLD-ROLLUPS-STUB — 2026-11-13
+
+- REQ-RUST-031.0 / 009.2; updated SPEC, SOP, AGENTS and backward-design
+  contracts before implementation. Added the dependency-free
+  HldFolderEndpointBucket and changed folder roll-up records to use it;
+  roll-up behavior remains unimplemented at this STUB checkpoint.
+- STUB command:
+  cargo check -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter
+  --all-features --release --locked --offline
+  Output: Finished `release` profile [optimized] target(s) in 0.97s;
+  ROLLUP_STUB_CARGO_CHECK_EXIT_CODE=0; elapsed 1.05s, peak RSS 217,324
+  KiB, process-tree peak 289,001,472 bytes (96 samples). E=30s, 2x ceiling
+  =60s. No memory cap; cargo only reported Checking libduckdb-sys, not
+  Compiling, so no C++ rebuild began.
+- Cargo emitted the previously diagnosed `unused manifest key `lints.cargo``
+  warning from rust-analyzer parser/syntax manifests.
+- Next: add roll-up and recursive coverage assertions, then run behavioral
+  RED before implementing bucket grouping.
+
+## HLD-ROLLUPS-RED — 2026-11-13
+
+- REQ-RUST-031.0 / 009.2; tests: test_hld_rollup_edge_counts,
+  test_hld_rollup_bucket_context and test_hld_empty_input_rollups.
+- Behavioral RED command:
+  cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features
+  --release --locked --offline -- test_hld_
+- Output: `running 15 tests`; `test result: FAILED. 9 passed; 6 failed;
+  0 ignored; 0 measured; 116 filtered out`. Failing assertions included
+  `test_hld_rollup_edge_counts` (`left: None`, expected `Some([...])`),
+  `test_hld_rollup_bucket_context` (`left: None`, expected `Some([...])`),
+  and `test_hld_empty_input_rollups` (`left: None`, expected `Some([])`).
+  Existing completeness assertions in direct/path/order tests also correctly
+  failed because the adapter still returned GraphPathsOnly/None.
+  `ROLLUP_RED_EXIT_CODE=101`; elapsed 21.70s; peak RSS 634,056 KiB;
+  whole-tree RSS 912,486,400 bytes (2,007 samples); E=30s, ceiling=60s.
+- Recursive coverage additions were passing in the same RED run, not counted
+  as fabricated RED: test_hld_diamond_evidence_union (including second proof
+  on a collapsed hop and six-key evidence union) and
+  test_hld_cycle_self_edges (private cycle without self-return edges).
+  Existing red-compatible checks passed: 9/15 tests.
+- No `libduckdb-sys` C++ rebuild began. DuckDB test settings observed in
+  existing diagnostics: 25.0 GiB engine limit, 8 threads, no temporary
+  storage; no memory cap was set by the test command.
+- Next: reuse the SQL-deduplicated HLD edge relation for file/folder GROUP BY
+  roll-ups and decode the typed bucket records.
+
+## HLD-ROLLUPS-GREEN — 2026-11-13
+
+- REQ-RUST-031.0 / 009.2; implemented SQL materialization of the deduplicated
+  HLD edge relation and file/folder GROUP BY queries over that relation.
+  Rust computes only per-node typed buckets/identity encodings and decodes
+  SQL groups. Output now returns CompleteGraph and Some(roll-ups), including
+  Some(empty) for completed empty input.
+- Focused command: cargo test -p parseltongue-duckdb-analysis-adapter --lib
+  --all-features --release --locked --offline -- test_hld_
+  Output: `running 15 tests`; `test result: ok. 15 passed; 0 failed; 0
+  ignored; 0 measured; 116 filtered out; finished in 0.75s`.
+  `ROLLUP_GREEN_FOCUSED_EXIT_CODE=0`; elapsed 16.39s; peak RSS 635,684 KiB;
+  whole-tree RSS 910,569,472 bytes (1,504 samples); E=30s, ceiling=60s.
+  No DuckDB memory cap. Effective engine limit observed: 25.0 GiB, 8 threads.
+- The first GREEN compile attempt reported two incorrect Vec-sort iterator
+  calls and an ambiguous `Ok(())` type in bucket insertion; fixed them and
+  reran the test after source changes. The passing retry rebuilt the adapter
+  only; no libduckdb-sys C++ rebuild began.
+- Cargo continued the previously diagnosed rust-analyzer manifest warning
+  `unused manifest key `lints.cargo``; no toolchain change.
+- Next: formatter, full affected library suites, scoped warnings-denied
+  Clippy, release build, final diff review and local REFACTOR commit.

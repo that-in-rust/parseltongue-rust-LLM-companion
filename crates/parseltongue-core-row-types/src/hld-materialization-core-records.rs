@@ -236,6 +236,20 @@ pub enum HldEndpointRollupBucket {
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum HldFolderEndpointBucket {
+    SourceFolder {
+        unit_compilation_identity_key: crate::CrateCompilationUnitKey,
+        folder_source_relative_path: String,
+    },
+    CrateRoot {
+        unit_compilation_identity_key: crate::CrateCompilationUnitKey,
+    },
+    CanonicalExternalIdentity {
+        endpoint_target_reference: NameSymbolTargetKey,
+    },
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldFileRollupRecord {
     pub source_endpoint_bucket: HldEndpointRollupBucket,
     pub target_endpoint_bucket: HldEndpointRollupBucket,
@@ -246,8 +260,8 @@ pub struct HldFileRollupRecord {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldFolderRollupRecord {
-    pub source_folder_bucket: HldEndpointRollupBucket,
-    pub target_folder_bucket: HldEndpointRollupBucket,
+    pub source_folder_bucket: HldFolderEndpointBucket,
+    pub target_folder_bucket: HldFolderEndpointBucket,
     pub edge_relation_kind_value: HldRelationKindValue,
     pub edge_collapse_via_kind: HldViaKindValue,
     pub edge_row_count: usize,

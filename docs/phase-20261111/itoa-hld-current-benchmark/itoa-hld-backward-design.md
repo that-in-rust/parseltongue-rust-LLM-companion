@@ -340,7 +340,7 @@ the canonical journal.
 These are evidence/implementation blockers to resolve, not requests to weaken
 the existing acceptance requirements.
 
-## Implementation checkpoint — recursive paths and collapse
+## Historical checkpoint — recursive paths and collapse
 
 The current bounded DuckDB slice recursively materializes ordered HLD paths
 and collapsed rows from explicit typed inputs. A recursive CTE seeds selected
@@ -356,3 +356,18 @@ This does not validate frozen Turso stage markers, publish durable generations,
 run real-source producers, expose CLI completion status, or establish the
 pinned itoa source-to-HLD comparison. CompleteGraph remains reserved until
 roll-ups exist.
+
+## Implementation checkpoint — DuckDB file/folder roll-ups
+
+The current explicit-input DuckDB materializer derives one deduplicated HLD
+edge relation from recursively collapsed paths, then groups that relation for
+file and folder roll-ups. Counts include each full HLD edge key once and keep
+relation/via dimensions. Typed source-file, source-folder, CrateRoot and
+canonical-external buckets preserve full compilation context; absent external
+definition-file metadata is never guessed. Empty complete typed input returns
+CompleteGraph with Some(empty) roll-up vectors.
+
+This checkpoint does not validate frozen Turso stage markers, publish
+durable generations, run real-source producers, expose CLI completion, or
+establish the pinned itoa source-to-HLD comparison. Completeness applies only
+to facts supplied explicitly to this materializer.

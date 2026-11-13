@@ -1,4 +1,6 @@
 DROP TABLE IF EXISTS "hld-analysis-path-records";
+DROP TABLE IF EXISTS "hld-analysis-materialized-edges";
+DROP TABLE IF EXISTS "hld-analysis-rollup-buckets";
 DROP TABLE IF EXISTS "hld-analysis-edge-records";
 DROP TABLE IF EXISTS "hld-analysis-node-records";
 DROP TABLE IF EXISTS "hld-analysis-node-inputs";
@@ -7,6 +9,12 @@ DROP TABLE IF EXISTS "hld-analysis-unit-origins";
 CREATE TEMP TABLE "hld-analysis-unit-origins" (
     unit_identity_key VARCHAR NOT NULL,
     unit_origin_kind VARCHAR NOT NULL
+);
+
+CREATE TEMP TABLE "hld-analysis-rollup-buckets" (
+    endpoint_identity_key VARCHAR PRIMARY KEY,
+    file_bucket_identity VARCHAR NOT NULL,
+    folder_bucket_identity VARCHAR NOT NULL
 );
 
 CREATE TEMP TABLE "hld-analysis-node-inputs" (

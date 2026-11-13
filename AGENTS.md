@@ -242,7 +242,7 @@ or CrateRoot; evidence sites must share the owning source's full unit key.
 Unknown owner semantics and inconsistent body ancestry fail closed, while
 nested modules inside bodies remain excluded rather than invalidated.
 
-### Revision note — recursive HLD path/collapse checkpoint
+### Historical revision note — recursive HLD path/collapse checkpoint
 
 The current DuckDB materializer recursively traverses extracted edges in SQL
 from selected sources through nonselected LocalItems to the first selected or
@@ -254,3 +254,14 @@ relation/via and counts the distinct evidence-key union with UNNEST. The
 typed output is GraphPathsOnly, sorted after decoding, with both roll-ups
 uncomputed. Roll-ups, frozen-stage-marker validation, Turso publication,
 real-source producers and CLI complete-stage status remain separate work.
+
+### Revision note — DuckDB file/folder roll-ups
+
+The bounded materializer now groups a SQL materialized/deduplicated HLD edge
+relation for both file and folder roll-ups. Path/evidence multiplicity never
+inflates counts; relation and collapse-via kind remain grouping keys.
+SourceFile and SourceFolder buckets preserve full unit identity and
+normalized paths; CrateRoot and canonical external identities remain
+separate typed buckets. Missing external file metadata is never inferred.
+CompleteGraph with present roll-up options describes only supplied typed
+facts, not source-pipeline completion or durable Turso publication.
