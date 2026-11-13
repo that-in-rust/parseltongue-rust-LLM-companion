@@ -235,3 +235,9 @@ real-source producers remain separate increments. Reject extracted private
 traversal rather than implying a complete graph. Dependency origin uses
 explicit unit provenance and full compilation-unit identity, never labels or
 paths. Keep canonical edge fields and full evidence-row keys.
+
+The validation increment accepts only namespace-seeded primitive Builtin type
+names. ExternalDefinition records cannot share a full unit key with a LocalItem
+or CrateRoot; evidence sites must share the owning source's full unit key.
+Unknown owner semantics and inconsistent body ancestry fail closed, while
+nested modules inside bodies remain excluded rather than invalidated.

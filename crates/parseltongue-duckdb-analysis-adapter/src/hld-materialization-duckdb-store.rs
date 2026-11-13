@@ -24,7 +24,7 @@ SELECT
             AND item_kind_value IN (
                 'module', 'function', 'struct', 'enum', 'trait', 'type_alias',
                 'constant', 'static', 'associated_function', 'associated_constant',
-                'associated_type', 'enum_variant', 'field'
+                'associated_type'
             )
             AND owner_kind_value IN ('crate_root', 'module', 'trait', 'impl')
             AND function_body_ancestry_flag = FALSE
@@ -161,7 +161,7 @@ fn insert_hld_unit_origins(
         transaction
             .execute(
                 "INSERT INTO \"hld-analysis-unit-origins\" VALUES (?, ?)",
-                duckdb::params![identity, unit_origin_text(*origin)],
+                duckdb::params![identity, encode_hld_unit_origin(*origin)],
             )
             .map(|_| ())
             .map_err(|source| {
@@ -201,12 +201,12 @@ fn insert_hld_node_inputs(
                 duckdb::params![
                     encode_hld_hex_digest(&input_record.run_generation_digest_value.0),
                     identity,
-                    node_category_text(node.node_input_category),
+                    encode_hld_node_category(node.node_input_category),
                     unit_identity,
-                    node.node_item_kind_value.map(item_kind_text),
-                    node.node_owner_kind_value.map(owner_kind_text),
+                    node.node_item_kind_value.map(encode_hld_item_kind),
+                    node.node_owner_kind_value.map(encode_hld_owner_kind),
                     node.node_function_body_ancestry_flag,
-                    node.node_effective_visibility_kind.map(visibility_kind_text),
+                    node.node_effective_visibility_kind.map(encode_hld_visibility_kind),
                     node.node_reachable_outside_crate_flag,
                     node.node_source_relative_path,
                     node.node_qualified_path_text,
@@ -289,7 +289,7 @@ fn insert_hld_edge_inputs(
                     site_identity,
                     source_identity,
                     target_identity,
-                    relation_kind_text(edge.edge_relation_kind_value),
+                    encode_hld_relation_kind(edge.edge_relation_kind_value),
                     resolution_status,
                     edge.edge_dispatch_metadata_text,
                     source_unit_identity,
@@ -634,7 +634,7 @@ fn encode_hld_evidence_identity(
     serde_json::to_string(&json!([
         encode_hld_occurrence_value(&evidence_key.evidence_site_occurrence_key),
         encode_hld_target_value(&evidence_key.evidence_source_occurrence_key),
-        relation_kind_text(evidence_key.evidence_relation_kind_value),
+        encode_hld_relation_kind(evidence_key.evidence_relation_kind_value),
         evidence_key
             .evidence_target_reference_value
             .as_ref()
@@ -660,7 +660,7 @@ fn read_hld_target_unit(target: &NameSymbolTargetKey) -> Option<CrateCompilation
     }
 }
 
-fn node_category_text(category: HldNodeInputCategory) -> &'static str {
+fn encode_hld_node_category(category: HldNodeInputCategory) -> &'static str {
     match category {
         HldNodeInputCategory::LocalItem => "local_item",
         HldNodeInputCategory::CrateRoot => "crate_root",
@@ -669,7 +669,7 @@ fn node_category_text(category: HldNodeInputCategory) -> &'static str {
     }
 }
 
-fn item_kind_text(kind: parseltongue_core_row_types::HldItemKindValue) -> &'static str {
+fn encode_hld_item_kind(kind: parseltongue_core_row_types::HldItemKindValue) -> &'static str {
     use parseltongue_core_row_types::HldItemKindValue as Kind;
     match kind {
         Kind::Module => "module",
@@ -693,7 +693,7 @@ fn item_kind_text(kind: parseltongue_core_row_types::HldItemKindValue) -> &'stat
     }
 }
 
-fn owner_kind_text(kind: parseltongue_core_row_types::HldOwnerKindValue) -> &'static str {
+fn encode_hld_owner_kind(kind: parseltongue_core_row_types::HldOwnerKindValue) -> &'static str {
     use parseltongue_core_row_types::HldOwnerKindValue as Kind;
     match kind {
         Kind::CrateRoot => "crate_root",
@@ -705,7 +705,7 @@ fn owner_kind_text(kind: parseltongue_core_row_types::HldOwnerKindValue) -> &'st
     }
 }
 
-fn visibility_kind_text(
+fn encode_hld_visibility_kind(
     kind: parseltongue_core_row_types::HldEffectiveVisibilityKind,
 ) -> &'static str {
     use parseltongue_core_row_types::HldEffectiveVisibilityKind as Kind;
@@ -717,7 +717,7 @@ fn visibility_kind_text(
     }
 }
 
-fn unit_origin_text(origin: HldUnitOriginKind) -> &'static str {
+fn encode_hld_unit_origin(origin: HldUnitOriginKind) -> &'static str {
     match origin {
         HldUnitOriginKind::Workspace => "workspace",
         HldUnitOriginKind::StandardLibrary => "standard_library",
@@ -725,7 +725,7 @@ fn unit_origin_text(origin: HldUnitOriginKind) -> &'static str {
     }
 }
 
-fn relation_kind_text(kind: HldRelationKindValue) -> &'static str {
+fn encode_hld_relation_kind(kind: HldRelationKindValue) -> &'static str {
     match kind {
         HldRelationKindValue::Calls => "calls",
         HldRelationKindValue::UsesType => "uses_type",

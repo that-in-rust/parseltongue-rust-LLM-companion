@@ -5,10 +5,11 @@ use parseltongue_core_row_types::{
     CompilationUnitRoleKind, CrateCompilationUnitKey, HldDependencyOriginKind, HldEdgeInputRecord,
     HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldEvidenceRowKey, HldGraphEdgeKey,
     HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
-    HldNodeInputCategory, HldNodeInputRecord, HldOutputCompletenessKind, HldOutputEdgeStatus,
-    HldOwnerKindValue, HldRelationKindValue, HldUnitOriginKind, HldUnitProvenanceRecord,
-    HldViaKindValue, NameSymbolTargetKey, RunCancelFlagValue, RunGenerationDigestValue,
-    SemanticOccurrenceKeyValue, SpanByteRangeValue, SpanDigestIdValue,
+    HldMaterializationValidationError, HldNodeInputCategory, HldNodeInputRecord,
+    HldOutputCompletenessKind, HldOutputEdgeStatus, HldOwnerKindValue, HldRelationKindValue,
+    HldUnitOriginKind, HldUnitProvenanceRecord, HldUnresolvedReasonKind, HldViaKindValue,
+    NameSymbolTargetKey, RunCancelFlagValue, RunGenerationDigestValue, SemanticOccurrenceKeyValue,
+    SpanByteRangeValue, SpanDigestIdValue, validate_hld_materialization_input,
 };
 use parseltongue_table_store_traits::{HldAnalysisPortError, HldGraphAnalysisPort};
 use std::collections::{BTreeMap, BTreeSet};
@@ -764,4 +765,448 @@ fn test_hld_private_traversal_rejected() {
             .materialize_hld_graph_output(&input, &RunCancelFlagValue::default(),),
         Err(HldAnalysisPortError::UnsupportedTraversal)
     ));
+}
+
+fn build_hld_validation_input() -> (
+    HldMaterializationInputRecord,
+    CrateCompilationUnitKey,
+    NameSymbolTargetKey,
+    NameSymbolTargetKey,
+) {
+    let generation = RunGenerationDigestValue([21; 32]);
+    let unit_identity = build_hld_fixture_unit("validation-fixture", 21);
+    let root_key = NameSymbolTargetKey::CrateRoot(unit_identity.clone());
+    let source_key = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+        &unit_identity,
+        "src/source.rs",
+        1,
+        1,
+    ));
+    let target_key = NameSymbolTargetKey::Builtin("u8".into());
+    let input = build_hld_fixture_input(
+        generation,
+        vec![HldUnitProvenanceRecord {
+            unit_compilation_identity_key: unit_identity.clone(),
+            unit_origin_kind: HldUnitOriginKind::Workspace,
+        }],
+        vec![
+            build_hld_fixture_node(
+                generation,
+                root_key,
+                HldNodeInputCategory::CrateRoot,
+                None,
+                None,
+                false,
+                None,
+                false,
+                None,
+                "crate",
+            ),
+            build_hld_fixture_node(
+                generation,
+                source_key.clone(),
+                HldNodeInputCategory::LocalItem,
+                Some(HldItemKindValue::Function),
+                Some(HldOwnerKindValue::Module),
+                false,
+                Some(HldEffectiveVisibilityKind::Public),
+                false,
+                Some("src/source.rs"),
+                "crate::source",
+            ),
+            build_hld_fixture_node(
+                generation,
+                target_key.clone(),
+                HldNodeInputCategory::Builtin,
+                None,
+                None,
+                false,
+                None,
+                false,
+                None,
+                "u8",
+            ),
+        ],
+        vec![build_hld_fixture_edge(
+            generation,
+            source_key.clone(),
+            target_key.clone(),
+            HldRelationKindValue::Calls,
+            build_hld_fixture_occurrence(&unit_identity, "src/callsite.rs", 8, 8),
+        )],
+    );
+    (input, unit_identity, source_key, target_key)
+}
+
+fn set_hld_builtin_target(input: &mut HldMaterializationInputRecord, name: &str) {
+    let target = NameSymbolTargetKey::Builtin(name.into());
+    input.input_node_records[2].node_target_reference = target.clone();
+    input.input_node_records[2].node_qualified_path_text = name.into();
+    input.input_edge_records[0].edge_resolution_value = HldEdgeResolutionValue::Extracted {
+        target: target.clone(),
+    };
+    input.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_target_reference_value = Some(target);
+}
+
+fn collect_hld_validation_failures(
+    cases: Vec<(
+        &str,
+        HldMaterializationInputRecord,
+        HldMaterializationValidationError,
+    )>,
+) -> Vec<String> {
+    cases
+        .into_iter()
+        .filter_map(|(case_name, input, expected_error)| {
+            let result = validate_hld_materialization_input(&input);
+            (result != Err(expected_error)).then(|| format!("{case_name}: {result:?}"))
+        })
+        .collect()
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_identity_validation_rules() {
+    let (base_input, unit_identity, _, _) = build_hld_validation_input();
+    let supported_builtins = [
+        "bool", "char", "str", "usize", "isize", "u8", "u16", "u32", "u64", "u128", "i8", "i16",
+        "i32", "i64", "i128", "f16", "f32", "f64", "f128",
+    ];
+    for builtin_name in supported_builtins {
+        let mut input = base_input.clone();
+        set_hld_builtin_target(&mut input, builtin_name);
+        assert_eq!(validate_hld_materialization_input(&input), Ok(()));
+    }
+
+    let mut invalid_cases = Vec::new();
+    for builtin_name in ["not_a_primitive", "u8 ", "MaybeUninit", "uninit"] {
+        let mut input = base_input.clone();
+        set_hld_builtin_target(&mut input, builtin_name);
+        invalid_cases.push((
+            "invalid builtin identity",
+            input,
+            HldMaterializationValidationError::MalformedBuiltinIdentity,
+        ));
+    }
+    let mut namespaced_builtin = base_input.clone();
+    set_hld_builtin_target(&mut namespaced_builtin, "core::mem::MaybeUninit::uninit");
+    invalid_cases.push((
+        "ordinary core definition as builtin",
+        namespaced_builtin,
+        HldMaterializationValidationError::MalformedBuiltinIdentity,
+    ));
+
+    let external_same_unit = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+        &unit_identity,
+        "src/external.rs",
+        22,
+        22,
+    ));
+    let mut external_masquerade = base_input.clone();
+    external_masquerade
+        .input_node_records
+        .push(build_hld_fixture_node(
+            external_masquerade.run_generation_digest_value,
+            external_same_unit,
+            HldNodeInputCategory::ExternalDefinition,
+            None,
+            None,
+            false,
+            None,
+            false,
+            None,
+            "external::same_unit",
+        ));
+    invalid_cases.push((
+        "external definition in local unit",
+        external_masquerade,
+        HldMaterializationValidationError::InvalidNodeCategory,
+    ));
+
+    let mut function_body_owner = base_input.clone();
+    function_body_owner.input_node_records[1].node_owner_kind_value =
+        Some(HldOwnerKindValue::FunctionBody);
+    invalid_cases.push((
+        "function body owner without ancestry",
+        function_body_owner,
+        HldMaterializationValidationError::InvalidNodeCategory,
+    ));
+    let mut unknown_owner = base_input.clone();
+    unknown_owner.input_node_records[1].node_owner_kind_value = Some(HldOwnerKindValue::Other);
+    invalid_cases.push((
+        "unknown owner kind",
+        unknown_owner,
+        HldMaterializationValidationError::InvalidNodeCategory,
+    ));
+    for item_kind in [HldItemKindValue::Field, HldItemKindValue::EnumVariant] {
+        let mut unsupported_owner = base_input.clone();
+        unsupported_owner.input_node_records[1].node_item_kind_value = Some(item_kind);
+        invalid_cases.push((
+            "unsupported item owner semantics",
+            unsupported_owner,
+            HldMaterializationValidationError::InvalidNodeCategory,
+        ));
+    }
+    for (node_index, expected_error) in [
+        (0, HldMaterializationValidationError::InvalidNodeCategory),
+        (
+            2,
+            HldMaterializationValidationError::MalformedBuiltinIdentity,
+        ),
+    ] {
+        let mut invalid_ancestry = base_input.clone();
+        invalid_ancestry.input_node_records[node_index].node_function_body_ancestry_flag = true;
+        invalid_cases.push((
+            "nonlocal endpoint has body ancestry",
+            invalid_ancestry,
+            expected_error,
+        ));
+    }
+    let mut external_unit = build_hld_fixture_unit("other-workspace", 22);
+    while external_unit == unit_identity {
+        external_unit.unit_configuration_digest_full[0] = 23;
+    }
+    let mut external_workspace_input = base_input.clone();
+    external_workspace_input
+        .input_unit_provenance_records
+        .push(HldUnitProvenanceRecord {
+            unit_compilation_identity_key: external_unit.clone(),
+            unit_origin_kind: HldUnitOriginKind::Workspace,
+        });
+    external_workspace_input
+        .input_node_records
+        .push(build_hld_fixture_node(
+            external_workspace_input.run_generation_digest_value,
+            NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+                &external_unit,
+                "src/dependency.rs",
+                23,
+                23,
+            )),
+            HldNodeInputCategory::ExternalDefinition,
+            None,
+            None,
+            false,
+            None,
+            false,
+            None,
+            "dependency::external",
+        ));
+    assert_eq!(
+        validate_hld_materialization_input(&external_workspace_input),
+        Ok(())
+    );
+    let mut external_body_ancestry = external_workspace_input.clone();
+    external_body_ancestry.input_node_records[3].node_function_body_ancestry_flag = true;
+    invalid_cases.push((
+        "external definition has body ancestry",
+        external_body_ancestry,
+        HldMaterializationValidationError::InvalidNodeCategory,
+    ));
+
+    let mut nested_module = base_input.clone();
+    nested_module.input_edge_records.clear();
+    nested_module.input_node_records[1].node_item_kind_value = Some(HldItemKindValue::Module);
+    nested_module.input_node_records[1].node_function_body_ancestry_flag = true;
+    assert_eq!(validate_hld_materialization_input(&nested_module), Ok(()));
+    let nested_output = materialize_hld_fixture_graph(&nested_module);
+    assert!(
+        !nested_output
+            .selected_node_records
+            .iter()
+            .any(|node| node.node_target_reference
+                == nested_module.input_node_records[1].node_target_reference)
+    );
+
+    let failures = collect_hld_validation_failures(invalid_cases);
+    assert!(failures.is_empty(), "{failures:?}");
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_invalid_input_rejection() {
+    let (base_input, unit_identity, source_key, target_key) = build_hld_validation_input();
+    let mut cases = Vec::new();
+    let mut incomplete = base_input.clone();
+    incomplete.semantic_input_completeness_kind = HldInputCompletenessKind::IncompleteTypedInput;
+    cases.push((
+        "incomplete input",
+        incomplete,
+        HldMaterializationValidationError::IncompleteTypedInput,
+    ));
+
+    let mut generation_mismatch = base_input.clone();
+    generation_mismatch.input_node_records[1].run_generation_digest_value =
+        RunGenerationDigestValue([99; 32]);
+    cases.push((
+        "mismatched generation",
+        generation_mismatch,
+        HldMaterializationValidationError::GenerationMismatch,
+    ));
+
+    let missing_endpoint = NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+        &unit_identity,
+        "src/missing.rs",
+        30,
+        30,
+    ));
+    let mut missing_target = base_input.clone();
+    missing_target.input_edge_records[0].edge_resolution_value =
+        HldEdgeResolutionValue::Extracted {
+            target: missing_endpoint.clone(),
+        };
+    missing_target.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_target_reference_value = Some(missing_endpoint);
+    cases.push((
+        "missing endpoint",
+        missing_target,
+        HldMaterializationValidationError::MissingLocalEndpoint,
+    ));
+
+    let mut missing_provenance = base_input.clone();
+    missing_provenance.input_unit_provenance_records.clear();
+    cases.push((
+        "missing unit provenance",
+        missing_provenance,
+        HldMaterializationValidationError::MissingUnitProvenance,
+    ));
+
+    let mut invalid_evidence = base_input.clone();
+    invalid_evidence.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_relation_kind_value = HldRelationKindValue::Derives;
+    cases.push((
+        "invalid evidence identity",
+        invalid_evidence,
+        HldMaterializationValidationError::InvalidEvidenceIdentity,
+    ));
+
+    let other_unit = build_hld_fixture_unit("other-evidence-unit", 24);
+    let mut cross_unit_site = base_input.clone();
+    cross_unit_site
+        .input_unit_provenance_records
+        .push(HldUnitProvenanceRecord {
+            unit_compilation_identity_key: other_unit.clone(),
+            unit_origin_kind: HldUnitOriginKind::Workspace,
+        });
+    cross_unit_site.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_site_occurrence_key =
+        build_hld_fixture_occurrence(&other_unit, "src/other.rs", 24, 24);
+    cases.push((
+        "cross-unit evidence site",
+        cross_unit_site,
+        HldMaterializationValidationError::InvalidEvidenceIdentity,
+    ));
+
+    let failures = collect_hld_validation_failures(cases);
+    assert!(failures.is_empty(), "{failures:?}");
+    assert_eq!(
+        source_key,
+        base_input.input_edge_records[0].edge_source_reference
+    );
+
+    for (resolution, evidence_target) in [
+        (
+            HldEdgeResolutionValue::Inferred {
+                candidate_target: Some(target_key.clone()),
+            },
+            Some(target_key.clone()),
+        ),
+        (
+            HldEdgeResolutionValue::Proposed {
+                candidate_target: Some(target_key.clone()),
+            },
+            Some(target_key.clone()),
+        ),
+        (
+            HldEdgeResolutionValue::Unresolved {
+                reason: HldUnresolvedReasonKind::TraitSolverNeeded,
+            },
+            None,
+        ),
+    ] {
+        let mut input = base_input.clone();
+        input.input_edge_records[0].edge_resolution_value = resolution.clone();
+        input.input_edge_records[0]
+            .edge_evidence_row_key
+            .evidence_target_reference_value = evidence_target;
+        let output = materialize_hld_fixture_graph(&input);
+        assert!(output.materialized_edge_records.is_empty());
+        assert_eq!(
+            input.input_edge_records[0].edge_resolution_value,
+            resolution
+        );
+    }
+}
+
+/// REQ-RUST-030.0
+#[test]
+fn test_hld_duplicate_conflict_rejection() {
+    let (base_input, _, _, _) = build_hld_validation_input();
+    let mut identical_duplicates = base_input.clone();
+    identical_duplicates
+        .input_unit_provenance_records
+        .push(identical_duplicates.input_unit_provenance_records[0].clone());
+    identical_duplicates
+        .input_node_records
+        .push(identical_duplicates.input_node_records[1].clone());
+    identical_duplicates
+        .input_edge_records
+        .push(identical_duplicates.input_edge_records[0].clone());
+    assert_eq!(
+        validate_hld_materialization_input(&identical_duplicates),
+        Ok(())
+    );
+
+    let mut conflicting_unit = base_input.clone();
+    conflicting_unit
+        .input_unit_provenance_records
+        .push(HldUnitProvenanceRecord {
+            unit_compilation_identity_key: conflicting_unit.input_unit_provenance_records[0]
+                .unit_compilation_identity_key
+                .clone(),
+            unit_origin_kind: HldUnitOriginKind::ExternalCrate,
+        });
+    assert_eq!(
+        validate_hld_materialization_input(&conflicting_unit),
+        Err(HldMaterializationValidationError::ConflictingUnitProvenance)
+    );
+
+    let mut conflicting_node = base_input.clone();
+    let mut node_conflict = conflicting_node.input_node_records[1].clone();
+    node_conflict.node_signature_text = Some("different signature".into());
+    conflicting_node.input_node_records.push(node_conflict);
+    assert_eq!(
+        validate_hld_materialization_input(&conflicting_node),
+        Err(HldMaterializationValidationError::ConflictingNodeRecord)
+    );
+
+    let mut conflicting_evidence = base_input.clone();
+    let mut evidence_conflict = conflicting_evidence.input_edge_records[0].clone();
+    evidence_conflict.edge_dispatch_metadata_text = Some("different dispatch".into());
+    conflicting_evidence
+        .input_edge_records
+        .push(evidence_conflict);
+    assert_eq!(
+        validate_hld_materialization_input(&conflicting_evidence),
+        Err(HldMaterializationValidationError::ConflictingEvidenceRecord)
+    );
+
+    let mut same_site_distinct_relation = base_input;
+    let mut second_relation = same_site_distinct_relation.input_edge_records[0].clone();
+    second_relation.edge_relation_kind_value = HldRelationKindValue::UsesType;
+    second_relation
+        .edge_evidence_row_key
+        .evidence_relation_kind_value = HldRelationKindValue::UsesType;
+    same_site_distinct_relation
+        .input_edge_records
+        .push(second_relation);
+    assert_eq!(
+        validate_hld_materialization_input(&same_site_distinct_relation),
+        Ok(())
+    );
 }

@@ -1573,6 +1573,27 @@ requirements above. Unit origin SHALL come from explicit unit-provenance input;
 only identical full unit keys derive same_crate, and a typed builtin endpoint
 uses the standard-library origin bucket.
 
+#### Identity/input-validation increment
+
+HLD Builtin node/target identities SHALL use only the primitive type vocabulary
+seeded by the namespace extractor: bool, char, str, usize/isize, signed and
+unsigned integers through 128 bits, and f16/f32/f64/f128. Ordinary definitions
+including core functions and methods SHALL retain full Definition identity.
+An ExternalDefinition whose full compilation-unit key is represented by a
+LocalItem or CrateRoot in the same input SHALL be rejected; an external
+definition in another explicitly classified workspace unit remains valid.
+Evidence-site and owning-source occurrences SHALL share the full compilation
+unit key, while their file paths may differ for macro provenance.
+
+Local items SHALL carry known owner/item semantics. FunctionBody ownership
+requires body ancestry; CrateRoot, Builtin and ExternalDefinition records SHALL
+not carry body ancestry. Nested module items with body ancestry remain valid
+input but unselected. Unsupported Field/EnumVariant ownership, Other/unknown
+owners and inconsistent ancestry SHALL fail with a typed validation error.
+Identical duplicate provenance/node/evidence records are legal; conflicting
+duplicates fail. Inferred, Proposed and Unresolved evidence SHALL never become
+extracted output, and unresolved reason metadata remains in its input record.
+
 ### REQ-RUST-031.0 — transactional HLD serving
 
 WHEN HLD output is persisted, THEN `hld-current-interface-nodes`,

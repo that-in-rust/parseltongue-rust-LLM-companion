@@ -2,7 +2,12 @@ use crate::{
     CrateCompilationUnitKey, NameSymbolTargetKey, RunGenerationDigestValue,
     SemanticOccurrenceKeyValue,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+const HLD_BUILTIN_TYPE_NAMES: [&str; 19] = [
+    "bool", "char", "str", "usize", "isize", "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32",
+    "i64", "i128", "f16", "f32", "f64", "f128",
+];
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldInputCompletenessKind {
@@ -328,12 +333,34 @@ pub fn validate_hld_materialization_input(
         }
     }
 
+    let local_unit_identities = input_record.input_node_records.iter().try_fold(
+        BTreeSet::new(),
+        |mut unit_identities, node_record| {
+            if matches!(
+                node_record.node_input_category,
+                HldNodeInputCategory::LocalItem | HldNodeInputCategory::CrateRoot
+            ) {
+                validate_hld_node_input(node_record)?;
+                let unit_identity = read_hld_target_unit(&node_record.node_target_reference)?
+                    .ok_or(HldMaterializationValidationError::InvalidNodeCategory)?;
+                unit_identities.insert(unit_identity);
+            }
+            Ok::<_, HldMaterializationValidationError>(unit_identities)
+        },
+    )?;
+
     let mut node_records = BTreeMap::new();
     for node_record in &input_record.input_node_records {
         if node_record.run_generation_digest_value != input_record.run_generation_digest_value {
             return Err(HldMaterializationValidationError::GenerationMismatch);
         }
         validate_hld_node_input(node_record)?;
+        if node_record.node_input_category == HldNodeInputCategory::ExternalDefinition
+            && read_hld_target_unit(&node_record.node_target_reference)?
+                .is_some_and(|unit_identity| local_unit_identities.contains(&unit_identity))
+        {
+            return Err(HldMaterializationValidationError::InvalidNodeCategory);
+        }
         if let Some(unit_identity) = read_hld_target_unit(&node_record.node_target_reference)? {
             match unit_origins.get(&unit_identity) {
                 None => return Err(HldMaterializationValidationError::MissingUnitProvenance),
@@ -414,6 +441,11 @@ pub fn validate_hld_materialization_input(
             .evidence_site_occurrence_key
             .read_semantic_occurrence_parts()
             .unit_compilation_identity_key;
+        if read_hld_target_unit(&edge_record.edge_source_reference)?.as_ref()
+            != Some(site_unit_identity)
+        {
+            return Err(HldMaterializationValidationError::InvalidEvidenceIdentity);
+        }
         if !unit_origins.contains_key(site_unit_identity) {
             return Err(HldMaterializationValidationError::MissingUnitProvenance);
         }
@@ -451,6 +483,15 @@ fn validate_hld_node_input(
             {
                 return Err(HldMaterializationValidationError::InvalidNodeCategory);
             }
+            if matches!(
+                node_record.node_item_kind_value,
+                Some(HldItemKindValue::Field | HldItemKindValue::EnumVariant)
+            ) || node_record.node_owner_kind_value == Some(HldOwnerKindValue::Other)
+                || (node_record.node_owner_kind_value == Some(HldOwnerKindValue::FunctionBody)
+                    && !node_record.node_function_body_ancestry_flag)
+            {
+                return Err(HldMaterializationValidationError::InvalidNodeCategory);
+            }
             match node_record.node_effective_visibility_kind {
                 Some(HldEffectiveVisibilityKind::Unknown) | None => {
                     Err(HldMaterializationValidationError::UnknownEffectiveVisibility)
@@ -464,6 +505,7 @@ fn validate_hld_node_input(
                 .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity)?;
             if node_record.node_item_kind_value.is_some()
                 || node_record.node_owner_kind_value.is_some()
+                || node_record.node_function_body_ancestry_flag
                 || node_record.node_effective_visibility_kind.is_some()
                 || node_record.node_source_relative_path.is_some()
             {
@@ -478,6 +520,7 @@ fn validate_hld_node_input(
             validate_hld_occurrence_identity(occurrence_key)?;
             if node_record.node_item_kind_value.is_some()
                 || node_record.node_owner_kind_value.is_some()
+                || node_record.node_function_body_ancestry_flag
                 || node_record.node_effective_visibility_kind.is_some()
                 || node_record
                     .node_source_relative_path
@@ -493,10 +536,10 @@ fn validate_hld_node_input(
             Ok(())
         }
         (HldNodeInputCategory::Builtin, NameSymbolTargetKey::Builtin(name)) => {
-            if name.trim().is_empty()
-                || name.contains("::")
+            if !is_hld_builtin_type(name)
                 || node_record.node_item_kind_value.is_some()
                 || node_record.node_owner_kind_value.is_some()
+                || node_record.node_function_body_ancestry_flag
                 || node_record.node_effective_visibility_kind.is_some()
                 || node_record.node_source_relative_path.is_some()
             {
@@ -540,7 +583,7 @@ fn validate_hld_target_key(
             validate_hld_occurrence_identity(occurrence_key)
         }
         NameSymbolTargetKey::Builtin(name) => {
-            if name.trim().is_empty() || name.contains("::") {
+            if !is_hld_builtin_type(name) {
                 Err(HldMaterializationValidationError::MalformedBuiltinIdentity)
             } else {
                 Ok(())
@@ -550,6 +593,10 @@ fn validate_hld_target_key(
             .validate_crate_unit_identity()
             .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity),
     }
+}
+
+fn is_hld_builtin_type(name: &str) -> bool {
+    HLD_BUILTIN_TYPE_NAMES.contains(&name)
 }
 
 fn validate_hld_occurrence_identity(

@@ -4514,3 +4514,52 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   (hld: record direct projection refactor checkpoint).
 - Both commits are local on devin/1794509368-hld-current-integration;
   no push or pull request was performed.
+
+## HLD-IDENTITY-VALIDATION-STUB-RED-GREEN — 2026-11-13
+
+- SPEC REQ-RUST-030.0 identity/input-validation increment; tests:
+  test_hld_identity_validation_rules, test_hld_invalid_input_rejection and
+  test_hld_duplicate_conflict_rejection.
+- STUB baseline: the public typed API already existed from the prior materializer
+  checkpoint. The all-features release cargo check attempt exited 124 at its
+  120-second ceiling while compiling libduckdb-sys; it reached core/trait
+  checking but did not finish. No API signature changed in this increment.
+- RED: after fixing one test import compile error, the focused command reported
+  4 passed; 2 failed; 116 filtered out. The failures were genuine: invalid
+  Builtin/local-external/owner-ancestry cases were accepted, and cross-unit
+  evidence site identity returned Ok(()). The duplicate-conflict
+  characterization test passed.
+- GREEN: validator now enforces the namespace-seeded 19-name primitive type
+  vocabulary, local/external full-unit separation, same-unit evidence sites,
+  body ancestry consistency and fail-closed unsupported owner semantics.
+  The six focused HLD tests passed. Codec helpers use four-word names.
+- The final affected library suites and scoped gates are recorded in the
+  following append-only phase entry.
+
+## HLD-IDENTITY-VALIDATION-REFACTOR — 2026-11-13
+
+- Full affected library suites, command:
+  cargo test -p parseltongue-core-row-types -p parseltongue-table-store-traits
+  -p parseltongue-duckdb-analysis-adapter --lib --all-features --release
+  --locked --offline
+  Output: core 3 passed, adapter 122 passed, traits 1 passed; 0 failed.
+  Wall time 21.95s, process-tree peak 1,102,053,376 bytes (1,948 samples);
+  declared E=180s and ceiling=280s. No memory cap was configured.
+- Scoped Clippy passed:
+  cargo clippy -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter
+  --all-targets --all-features --release --locked --offline -- -D warnings
+  Exit 0, elapsed 27.08s, peak RSS 1,779,432 KiB.
+- cargo fmt --all -- --check and git diff --check exited 0 after the
+  test-only rustfmt correction.
+- Scoped release build passed:
+  cargo build -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter
+  --all-features --release --locked --offline
+  Exit 0, elapsed 986.72s, peak RSS 1,987,472 KiB. The warmed target needed
+  a libduckdb-sys native build; no CLI native/sysroot tests were run.
+- No further semantic refactor was needed. The SQL projection and traversal
+  behavior are unchanged; this increment only tightens validation, excludes
+  unsupported field/enum kinds, and renames the six codec helpers.
+- Local GREEN and REFACTOR commits are recorded in the subsequent commit
+  closure entry. No push or PR was performed.

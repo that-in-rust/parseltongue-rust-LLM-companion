@@ -601,3 +601,14 @@ producers and source-to-HLD acceptance remain NOT STARTED. Extracted edges
 through nonselected local items fail with the explicit unsupported-traversal
 error. This checkpoint is implementation progress only, not HLD-complete or
 SOP-subset PASS evidence.
+
+### SOP revision R11 — HLD identity validation (2026-11-13)
+
+The typed input validator accepts only the primitive Builtin type vocabulary
+seeded by namespace records, rejects local-unit ExternalDefinition aliases and
+cross-unit evidence sites, and fails closed for unsupported owner/item semantics
+or inconsistent body ancestry. Same-unit macro evidence may use a different
+source file. Identical duplicates remain legal; conflicting unit, node and
+evidence duplicates fail. Inferred, Proposed and Unresolved evidence remain
+non-extracted. This increment does not implement recursive traversal,
+roll-ups or publication.
