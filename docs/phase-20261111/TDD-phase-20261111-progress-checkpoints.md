@@ -4504,4 +4504,13 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   were not rerun.
 - This is the explicit no-additional-refactor checkpoint. Only this
   append-only journal record remains to be committed for the REFACTOR phase;
-  its SHA will be recorded in the subsequent commit-closure entry.
+ its SHA will be recorded in the subsequent commit-closure entry.
+
+## HLD-MATERIALIZER-COMMIT-CLOSURE — 2026-11-13
+
+- GREEN commit: 3d472bbc32435a444989fe483c3dd0ac1c5567b0
+  (hld: implement direct SQL materializer).
+- REFACTOR commit: be228aad896353a6e439b1e92d979e7ba53a7358
+  (hld: record direct projection refactor checkpoint).
+- Both commits are local on devin/1794509368-hld-current-integration;
+  no push or pull request was performed.
