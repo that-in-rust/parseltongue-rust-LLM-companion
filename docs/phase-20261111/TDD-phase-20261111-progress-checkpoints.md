@@ -4779,3 +4779,51 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   `unused manifest key `lints.cargo``; no toolchain change.
 - Next: formatter, full affected library suites, scoped warnings-denied
   Clippy, release build, final diff review and local REFACTOR commit.
+
+## HLD-ROLLUPS-REFACTOR — 2026-11-13
+
+- REQ-RUST-031.0 / 009.2; tests retained: test_hld_rollup_edge_counts,
+  test_hld_rollup_bucket_context, test_hld_empty_input_rollups,
+  test_hld_order_attempt_determinism, test_hld_diamond_evidence_union and
+  test_hld_cycle_self_edges.
+- Final format/diff gate:
+  `cargo fmt --all -- --check && git diff --check HEAD^ HEAD && git diff
+  --check`; `FINAL_FORMAT_AND_DIFF_CHECK_EXIT_CODE=0`, no diagnostics.
+- Full affected library command (release, all features, locked/offline):
+  `cargo test -p parseltongue-core-row-types --lib --all-features --release
+  --locked --offline && cargo test -p parseltongue-table-store-traits --lib
+  --all-features --release --locked --offline && cargo test -p
+  parseltongue-duckdb-analysis-adapter --lib --all-features --release
+  --locked --offline`.
+  Output: `test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0
+  filtered out`; `test result: ok. 1 passed; 0 failed; 0 ignored; 0
+  measured; 0 filtered out`; `test result: ok. 131 passed; 0 failed; 0
+  ignored; 0 measured; 0 filtered out; finished in 9.15s`.
+  `FULL_AFFECTED_LIBS_EXIT_CODE=0`; elapsed 24.53s; peak RSS 636,456 KiB;
+  whole-tree RSS 902,062,080 bytes (2,142 samples). E=30s, ceiling=60s.
+- Scoped warnings-denied Clippy command:
+  `cargo clippy -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter -p
+  parseltongue-cli-dispatcher-binary --all-targets --all-features --release
+  --locked --offline -- -D warnings`.
+  Output: `Finished release profile [optimized] target(s) in 1.86s`;
+  `CLIPPY_EXIT_CODE=0`; elapsed 1.96s; peak RSS 375,624 KiB; whole-tree
+  RSS 789,426,176 bytes (182 samples). Initial Clippy identified
+  `clippy::manual_contains`; replaced iterator search with `contains` and
+  reran Clippy successfully.
+- Release build command: `cargo build -p
+  parseltongue-duckdb-analysis-adapter -p
+  parseltongue-cli-dispatcher-binary --release --locked --offline`.
+  Output: `Finished release profile [optimized] target(s) in 14.37s`;
+  `RELEASE_BUILD_EXIT_CODE=0`; elapsed 14.46s; peak RSS 658,460 KiB;
+  whole-tree RSS 1,002,967,040 bytes (1,361 samples). E=40s, ceiling=80s.
+  First attempt used E=10s/20s ceiling and timed out at 20s while compiling
+  Rust crates; no `Compiling libduckdb-sys` appeared. The continued warmed
+  build completed within the declared retry ceiling; no toolchain/cache
+  changes and no memory cap.
+- The first format check reported formatting diffs; ran `cargo fmt --all`
+  and the final check above passed. The known external manifest warning
+  `unused manifest key `lints.cargo`` continued; no toolchain change.
+- GREEN implementation commit: f146850c38e77229f72458c6d34b20343c000335.
+  REFACTOR source/doc commit and journal closure to follow locally; no push
+  or PR.
