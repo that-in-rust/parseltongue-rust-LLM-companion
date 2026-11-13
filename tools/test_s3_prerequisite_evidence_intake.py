@@ -992,12 +992,41 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
         result = self.build_bundle_result(bundle, reference)
         self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
 
-    def test_tree_nonzero_reference_fails(self):
-        """REQ-SOP-RUNNER-022.D: a completed internal tree command with nonzero exit is FAIL."""
+    def test_tree_nonzero_reference_blocks(self):
+        """REQ-SOP-RUNNER-022.D: a nonzero runner-owned tree acquisition is BLOCKED without a token."""
         bundle = SyntheticEvidenceBundle()
-        reference = self.make_dependency_reference(bundle, exit_status=7)
+        stderr = b"cargo tree acquisition failed\n"
+        reference = self.make_dependency_reference(bundle, stderr_bytes=stderr, exit_status=7)
         result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
+        self.assertEqual(result["tokens_by_repository"], {})
+        self.assertEqual(reference.exit_status, 7)
+        self.assertEqual(reference.read_stream("stderr"), stderr)
+
+    def test_tree_nonzero_forbidden_fails(self):
+        """REQ-SOP-RUNNER-022.D: a forbidden row keeps FAIL precedence over a nonzero tree acquisition."""
+        bundle = SyntheticEvidenceBundle()
+        stdout = self.baseline_tree_bytes + b"ra_ap_ide v0.0.0\n"
+        stderr = b"cargo tree reported forbidden dependency\n"
+        reference = self.make_dependency_reference(
+            bundle, stdout, stderr_bytes=stderr, exit_status=7,
+        )
+        result = self.build_bundle_result(bundle, reference)
+        gate = result["repository_results"]["serde"]["dependency_audit"]
+        self.assertEqual(gate["status"], "FAIL")
+        self.assertIn("forbidden runtime dependency rows", gate["reason"])
+        self.assertEqual(result["tokens_by_repository"], {})
+        self.assertEqual(reference.exit_status, 7)
+        self.assertEqual(reference.read_stream("stderr"), stderr)
+
+    def test_tree_supplied_nonzero_fails(self):
+        """REQ-SOP-RUNNER-022.D: a supplied external tree receipt with nonzero exit remains FAIL."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_receipt(tree_path, lambda receipt: receipt.update({"exit_status": 7}))
+        result = self.build_bundle_result(bundle)
         self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+        self.assertEqual(result["tokens_by_repository"], {})
 
     def test_tree_partial_forbidden_fails(self):
         """REQ-SOP-RUNNER-022.D: a forbidden row in a timed-out partial reference is FAIL."""

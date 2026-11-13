@@ -2024,3 +2024,46 @@ Exit code 0; no output
 ```
 
 No Cargo command or policy change was made.
+
+### Runner-owned nonzero dependency tree acquisition is BLOCKED
+
+The focused RED run showed the old evaluator returned `FAIL` for a runner-owned completed tree
+reference with exit 7. The evaluator now classifies that acquisition as `BLOCKED`; supplied external
+receipt nonzero exits remain `FAIL`. Independent forbidden-row, exact-root, and retained-stream
+mutation observations keep `FAIL` precedence. The renamed REQ-linked test verifies a plain nonzero
+reference yields no tokens and retains exit 7 plus stderr. A nonzero reference containing a forbidden
+row remains `FAIL`, also with no tokens and retained exit/stderr. A separate regression confirms a
+nonzero supplied receipt remains `FAIL`; existing root and mutation precedence regressions remain
+unchanged.
+
+Focused RED output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py' -k nonzero
+Ran 5 tests in 0.030s
+AssertionError: 'FAIL' != 'BLOCKED'
+FAILED (failures=1)
+```
+
+Checks, each run with a 60-second command timeout:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py' -k nonzero
+Ran 5 tests in 0.028s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 95 tests in 0.523s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 145 tests in 3.229s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.341s
+OK
+```
+
+Budget correction: historical E<30s / 120s-ceiling figures remain historical. Future Python gates
+use E=30s with a 60-second ceiling (exact 2x).

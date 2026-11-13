@@ -1150,7 +1150,7 @@ def _evaluate_dependency_audit_records(records, expected_identity_binding, depen
         elif dependency_reference.timed_out or dependency_reference.completion_status != "completed":
             observations.append(("BLOCKED", "runner-owned dependency tree reference timed out or is incomplete"))
         elif dependency_reference.exit_status != 0:
-            observations.append(("FAIL", "runner-owned dependency tree command exited nonzero"))
+            observations.append(("BLOCKED", "runner-owned dependency tree acquisition exited nonzero"))
         elif not reference_streams_complete:
             observations.append(("BLOCKED", "runner-owned dependency tree stream is incomplete"))
         if reference_matches_context and (dependency_reference.elapsed_seconds < 0
