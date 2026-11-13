@@ -1246,3 +1246,829 @@ Python AST syntax: 6 files parsed; test methods=121; non-four-word names=[]; mis
 
 diff checks: exit 0, no output
 ```
+
+### REQ-SOP-RUNNER-022 — RED
+
+The first synthetic helper tests were added before validator implementation. Actual command/output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py' -v
+Ran 6 tests in 0.002s
+FAILED (errors=6)
+NotImplementedError at parse_s3_evidence_json, validate_s3_evidence_receipt, and validate_s3_prerequisite_evidence
+```
+
+The failures reproduce the unimplemented strict JSON, numeric receipt, timeout, and duplicate-reference
+contracts; no Cargo, mapper, corpus, or native Rust command was run.
+
+### REQ-SOP-RUNNER-022 — schema and later evidence collection
+
+Schema v1 requires `schema_version`, `run_id`, `milestone`, exact runtime `identity_binding`, four global
+prerequisite families (`fixture_suite`, separate `fmt`/`clippy` build receipts, `dependency_audit`, and
+`release_provenance`), and a per-pinned-repository `repository_binding` plus distinct P2 metadata/check
+receipts. Each reference is `{path,size_bytes,sha256,blake3}`. Receipt JSON binds family, scope, exact
+argv/cwd/environment, finite elapsed/timeout, completion/timeout/exit fields, and complete stdout/stderr
+descriptors. The runner loads and freezes inputs in prepared context; it does not create receipts or expose
+an identity-freezer command. Missing inputs stay BLOCKED; observed nonzero/identity/hash contradictions are
+FAIL. Hashes establish byte consistency, not independent proof that a command ran as claimed.
+
+Truthful nonqualifying example (intentionally incomplete; never evidence of a successful run):
+
+```json
+{"schema_version":1,"run_id":"example-not-run","milestone":"M1","identity_binding":{},"global_prerequisites":{},"repositories":{}}
+```
+
+Later collection recipe: first prepare/freeze the exact mapper, runner source, lockfiles, parser pin/bundle,
+R1 patch, toolchain, config/environment, repository snapshots and P2 unit policy. Do not derive a new
+identity from the receipt bundle. Run each required command separately from its bound workspace cwd; for
+example production checks use `cargo fmt --all -- --check`, `cargo clippy --message-format=json --workspace
+--all-targets --all-features -- -D warnings`, unfiltered `cargo test --workspace`, the pinned normal-edge
+`cargo tree`, and the separate release build. For each pinned repository, run offline+locked metadata and
+the exact `cargo check --workspace --lib --bins --message-format=json` policy. Preserve raw stdout/stderr
+outside project/corpus/output roots; record actual argv, cwd, non-secret relevant environment, elapsed,
+timeout and exit result. Compute every descriptor from the retained bytes with the runner's existing
+SHA-256/BLAKE3 identity helpers, then finalize manifest references only after commands finish. Do not
+substitute a hand-authored PASS flag or example bundle.
+
+Validator GREEN after subsequent P2, source-inventory and publication-token integration changes:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 31 tests in 0.086s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 121 tests in 1.231s
+OK
+
+PYTHONPYCACHEPREFIX=/tmp/s3-intake-pycache python3 -m py_compile tools/hld-current-qualification-runner.py tools/s3-prerequisite-evidence-intake.py tools/test_sop_qualification_runner.py tools/test_s3_prerequisite_evidence_intake.py
+exit 0
+```
+
+No-refactor checkpoint: the current review batch changes only the scoped runner, helper, tests and this
+journal; no Cargo, mapper, corpus, native Rust test, production crate, or shared documentation was run or
+edited. Full external-receipt authenticity remains outside this validator's claim.
+
+## REQ-SOP-RUNNER-022 — append-only implementation checkpoint
+
+This REQ-022 overview and historical STUB checkpoint are now placed after all pre-existing HEAD content;
+the original journal bytes are unchanged. The former STUB is superseded by the implementation and results
+below. This local runner requirement adds no Cargo evidence and no mapper, corpus, or native-Rust command.
+It traces to SPEC §4 REQ 001–004, 010, 014–017, 020–022 at M0/M1/M2 applicability and SOP §1 P1–P5,
+§2 S3, and §3 M0–M2. Shared SPEC/SOP/AGENTS remain unchanged.
+
+### REQ-SOP-RUNNER-022 — historical STUB checkpoint
+
+The initial planned pure API was `parse_s3_evidence_json`, `validate_s3_evidence_bundle`, command-family
+validators, and source-backed fixture inventory, with a runner I/O adapter. The initial test plan covered
+duplicate/malformed JSON, receipt identity/file integrity, command grammar, source fixture accounting and
+conditional ignores, gate aggregation, freeze mutation, and pre-mapper stop. The RED implementation stub
+was replaced by the strict helper and adapter exercised in the recorded GREEN results below.
+
+The optional input is `--s3-prerequisite-evidence PATH`. The helper is pure over strict-decoded documents,
+receipt/log bytes, runtime identity, source-derived repository bindings, and frozen Rust fixture inventory;
+it never executes manifest-supplied commands. The runner freezes manifest/receipt/log bytes and present and
+absent identities, checks those identities at boundaries, records five gate families, and blocks/fails
+before S3 output or mapping unless all prerequisites and the internal run/repository/identity token pass.
+Public PASS maps cannot promote a run; HARNESS ONLY synthetic evidence leaves the overall run
+`HARNESS ONLY`. Top-level wrong run/milestone/identity violations propagate FAIL to fallback gate rows,
+while a later repository's P2 result remains repository-scoped and does not fail `serde`.
+
+### Exact schema v1 fields
+
+The manifest has exactly `schema_version`, `run_id`, `milestone`, `identity_binding`,
+`global_prerequisites`, and `repositories`. `schema_version` is integer 1 (not bool). The runtime identity
+binds the run/milestone, mapper path and SHA-256/BLAKE3, runner/source and lock identities, parser/R1
+identities, toolchain/configuration, and relevant secret-free environment. `global_prerequisites` contains
+`fixture_suite`, `build_evidence` with separate `fmt`/`clippy`, `dependency_audit`, and `release_provenance`.
+The repository map is exactly the pinned repository set; each value has exactly `repository_binding` and
+`p2_offline_qualification`, containing two independent P2 receipt references (`p2_metadata`, `p2_check`).
+
+Each reference has exactly `{path,size_bytes,sha256,blake3}` and names a unique retained regular file by a
+relative non-alias path. A receipt has exactly `{schema_version,receipt_id,family,scope,identity_binding,
+argv,cwd,relevant_environment,elapsed_seconds,timeout_seconds,completion_status,timed_out,exit_status,
+stdout,stderr}`; P2 receipts additionally require `repository_binding`. The `stdout` and `stderr`
+descriptors each have exactly `{path,size_bytes,sha256,blake3,complete}`; `complete` must be true. Receipt
+and descriptor sizes/hashes are checked against retained bytes. Duplicate JSON keys/nonfinite numbers,
+unsupported shapes, absent data, and incomplete streams cannot produce PASS; observed command/test/build/
+dependency/hash/identity violations are FAIL. A receipt hash proves byte consistency, not who produced it.
+
+### Required command argv table
+
+| Receipt family / scope | Required argv after frozen PATH-dispatched Cargo |
+| --- | --- |
+| `fixture_suite` / production | `test --workspace` (unfiltered) |
+| `fmt` / production | `fmt --all -- --check` |
+| `clippy` / production | `clippy --message-format=json --workspace --all-targets --all-features -- -D warnings` |
+| `dependency_audit` / production | `tree --package parseltongue-cli-dispatcher-binary --edges normal --prefix none --format {p}` |
+| `release_build` / production | `build --release --package parseltongue-cli-dispatcher-binary --bin parseltongue --message-format=json` |
+| `p2_metadata` / each pinned repo | `metadata --format-version 1 --offline --locked` |
+| `p2_check` / each pinned repo | `check --workspace --lib --bins --offline --locked --message-format=json` |
+
+The actual argv[0] must be the current PATH-dispatched Cargo executable whose frozen file identity is in
+the runtime binding; an arbitrary same-basename executable is not accepted. P2 source inventory includes
+canonical `src_path`; Cargo metadata target sources and check-artifact `target.src_path` plus
+`manifest_path` are compared to the expected unit. Missing path data is BLOCKED, observed mismatch is FAIL,
+and unsupported external/ambiguous target paths stay BLOCKED.
+
+### Bounded future receipt collection
+
+Prepare the ordinary runner context first and keep its identity helpers and repository/unit bindings; never
+derive expected identity or argv from receipts. Run each required command separately in the bound cwd.
+Capture monotonic start/end readings and calculate elapsed with `time.monotonic()`, recording configured
+timeout, completion, and actual exit. A timed-out command with no complete result remains BLOCKED; exit 124
+alone is not an assertion failure. A separately observed failed test, explicit build-finished false, or
+completed nonzero remains FAIL even if a sibling stream/receipt is incomplete. Retain exact raw stdout and
+stderr bytes outside project/corpus/report/artifact roots; do not normalize, truncate, or fabricate them.
+After stream completion, compute byte count, SHA-256 and BLAKE3 with the runner's identity helpers, then
+write receipt and manifest references. The runner never executes an arbitrary manifest command or offers an
+evidence-creation shortcut. Do not fabricate real command/test/dependency/build evidence.
+
+External receipt honesty is not authenticated by hashes, and command output alone cannot authenticate that
+a historical command ran. Missing exact M2 crosswalk names in THIS checkout remain required-but-unproven
+and BLOCKED; no aliases/waivers are inferred. The child-ignore exception is conditional only: accept the
+exact `test_child_fixture_waits_release` ignored source/reason only when source-backed and all three named
+active child tests passed; absent child support is not required, and an unsupported claimed ignored row is
+BLOCKED. The three manual-profile ignores remain source-backed only.
+
+### Actual final integration RED and GREEN logs
+
+Before implementation, P2 source/manifest regressions recorded:
+
+```text
+Ran 5 tests in 0.027s
+FAILED (failures=4)
+test_p2_metadata_source_fails: BLOCKED != FAIL
+test_p2_metadata_manifest_fails: BLOCKED != FAIL
+test_p2_artifact_source_fails: BLOCKED != FAIL
+test_p2_artifact_manifest_fails: BLOCKED != FAIL
+test_p2_missing_source_blocks: ok
+```
+
+The initial runner adapter RED was `Ran 3 tests in 0.241s` / `FAILED (failures=1, errors=2)`: wrong
+identity raised `KeyError: 'validation_error'`; intake priority raised
+`AttributeError: module 'sop_qualification_runner' has no attribute 'merge_s3_intake_error'`; external
+source path reported `RunnerPreconditionBlockedError not raised`. The wrong-identity regression was then
+extended through `serde` S3 pre-mapper stop.
+
+```text
+Focused helper GREEN: Ran 5 tests in 0.027s / OK
+Focused runner GREEN: Ran 4 tests in 0.235s / OK
+
+Helper suite: Ran 70 tests in 0.290s / OK
+Runner suite: Ran 136 tests in 2.408s / OK
+Process-tree suite: Ran 6 tests in 0.342s / OK
+```
+
+### Test traceability and final checkpoint
+
+The complete method-name list for tests previously unreferenced in the journal is appended next; every
+test has a `REQ-SOP-RUNNER-*` docstring tag and four underscore-delimited words after `test_`. The final
+AST/name/tag/traceability and whitespace command outputs follow that list. No-refactor checkpoint: only
+the scoped runner, pure intake helper, tests and this journal changed; no Cargo, native Rust, mapper,
+corpus, or production evidence command was run, and no commit was made.
+
+Tests previously absent from this journal, now cross-listed for traceability:
+
+Runner:
+`test_s3_identity_bound_harness` `test_s3_intake_failure_priority` `test_s3_identity_failure_stops`
+`test_s3_intake_error_priority` `test_s3_native_skip_blocks` `test_workspace_inherited_proc_macro`
+`test_workspace_custom_crate_blocks` `test_workspace_external_source_blocks`
+`test_s3_component_cannot_promote` `test_s3_fail_precedes_blocked` `test_s3_prerequisite_blocks_mapper`
+`test_intake_mutated_bytes_fail` `test_parent_symlink_replacement_fails`
+`test_external_member_overlap_blocks` `test_config_appears_pre_freeze` `test_config_appears_post_freeze`
+`test_receipt_appears_pre_freeze` `test_intake_fail_over_blocks` `test_frozen_evidence_mutation_fails`
+`test_frozen_evidence_deletion_fails` `test_evidence_symlink_retarget_fails`
+`test_duplicate_page_stops_collection`
+
+Helper:
+`test_json_rejects_duplicate_keys` `test_json_rejects_nonfinite_numbers`
+`test_receipt_rejects_boolean_version` `test_receipt_rejects_boolean_elapsed`
+`test_bad_reference_shape_blocks` `test_missing_receipt_schema_blocks` `test_missing_receipt_exit_blocks`
+`test_nested_receipt_identity_fails` `test_receipt_rejects_timeout_success`
+`test_manifest_rejects_duplicate_references` `test_manifest_schema_version_blocks`
+`test_valid_bundle_returns_tokens` `test_identity_mismatch_fails_bundle` `test_hash_mismatch_fails_bundle`
+`test_missing_log_blocks_bundle` `test_truncated_log_blocks_bundle` `test_fixture_filter_blocks_bundle`
+`test_native_skip_blocks_bundle` `test_forbidden_tree_fails_gate` `test_analysis_tree_dependencies_fail`
+`test_pinned_parser_tree_passes` `test_release_mismatch_fails_gate` `test_p2_target_override_blocks`
+`test_p2_feature_override_blocks` `test_manual_ignore_passes_bundle` `test_unknown_ignore_blocks_fixture`
+`test_child_absent_ignore_blocks` `test_child_exception_active_passes` `test_failed_fixture_sets_fail`
+`test_nonzero_then_missing_fails` `test_fixture_failure_beats_truncated`
+`test_forbidden_tree_lacks_p2` `test_missing_then_nonzero_fails` `test_m2_missing_crosswalk_blocks`
+`test_source_macro_ambiguity_blocks` `test_duplicate_receipt_id_fails`
+`test_duplicate_receipt_contents_fail` `test_p2_feature_mismatch_fails`
+`test_async_source_inventory_matches` `test_detached_test_attribute_blocks`
+`test_wrong_runtime_run_fails` `test_wrong_pinned_repository_fails` `test_selected_unit_policy_fails`
+`test_command_target_selector_blocks` `test_fixture_section_counts_block` `test_fixture_measured_rows_block`
+`test_clippy_warning_stderr_fails` `test_tree_full_rows_block` `test_tree_server_families_fail`
+`test_release_missing_artifact_blocks` `test_release_identity_context_blocks`
+`test_release_package_locator_fails` `test_release_version_only_pkgid`
+`test_timeout_fixture_receipt_blocks` `test_timeout_fixture_failure_fails`
+`test_unknown_target_override_blocks` `test_wrong_dispatched_cargo_blocks`
+`test_release_binary_source_fails` `test_release_malformed_target_blocks`
+`test_release_success_beats_truncated` `test_release_missing_success_blocks`
+`test_p2_missing_finish_blocks` `test_p2_failure_beats_truncated`
+`test_metadata_nested_malformed_blocks` `test_malformed_receipt_id_blocks`
+
+### Receipt recipe correction — read-only identity preparation
+
+“Prepare the ordinary runner context first” means assemble the expected binding with read-only identity
+helpers only: capture the source snapshots, lock/config/toolchain identities and registry, then call
+`build_s3_expected_identity` and `build_s3_repository_bindings`. Choose a fresh run ID and calculate the
+exact PLANNED runner-owned report/artifact run-directory paths, but exclude those exact paths from the
+identity registry; do not create them. Do not invoke `prepare_execution_context` or
+`execute_qualification_run` and do not precreate either owned run directory before the receipt manifest is
+complete. Retain the expected identity and repository bindings externally, run the fixed bounded receipt
+commands using those bindings, retain/hash their raw streams, and assemble the complete manifest. Only
+then invoke the runner once with that manifest and the fresh run ID. Never reuse a run ID or owned
+directory from a failed or incomplete preparation. No automatic identity freezer or receipt-collection
+command is added.
+
+### REQ-SOP-RUNNER-022.R — explicit standard release-profile receipts
+
+Policy review before implementation:
+
+- `docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md` §S3, lines 77–82, requires the
+  applicable fixture/build suite, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo test`, production `cargo tree`, and a separate release build of the production binary from
+  the oracle harness. It does not prescribe a debug profile for fixture or Clippy commands, or prohibit
+  an explicit standard `--release` on either command.
+- The same SOP's gate summary at line 392 and `AGENTS.md` lines 64–66 require Clippy, tests, and a
+  release build; neither explicitly prohibits release-profile fixture/Clippy receipts. The separate
+  production release-build requirement remains in force.
+
+No policy prohibition was found. For `fixture_suite` and `clippy`, exactly one literal Cargo-level
+`--release` is accepted only after the command name and before `--`. The receipt's original argv remains
+unchanged and is the profile evidence; the validator does not infer or relabel a debug invocation as
+release. Workspace/all-target/all-feature coverage, Clippy JSON output and `-D warnings`, and the
+unfiltered fixture contract remain exact. Package filters, `--skip`, positional test filters, custom
+`--profile`, unknown options, duplicate/misplaced `--release`, and environment identity overrides remain
+rejected. P2 command and feature matching was not changed.
+
+Traceability for this subclause (each test has the `REQ-SOP-RUNNER-022` doc tag):
+`test_fixture_release_profile_passes`, `test_clippy_release_profile_passes`,
+`test_release_profile_misuse_blocks`.
+
+Actual RED, before the command validator change:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_fixture_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_clippy_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_release_profile_misuse_blocks
+test_fixture_release_profile_passes ... FAIL
+test_clippy_release_profile_passes ... FAIL
+test_release_profile_misuse_blocks ... ok
+AssertionError: 'BLOCKED' != 'PASS' (fixture_suite)
+AssertionError: 'BLOCKED' != 'PASS' (build_evidence)
+Ran 3 tests in 0.053s
+FAILED (failures=2)
+```
+
+Actual GREEN after the minimal allowlist change:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_fixture_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_clippy_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_release_profile_misuse_blocks
+test_fixture_release_profile_passes ... ok
+test_clippy_release_profile_passes ... ok
+test_release_profile_misuse_blocks ... ok
+Ran 3 tests in 0.083s
+OK
+```
+
+The positive tests assert that `--release` is present in the retained argv. The negative matrix covers
+package selection, custom profiles, unknown flags, a fixture `--skip`, duplicate or misplaced release
+flags, and an environment field not matching the frozen binding. No Cargo command was run for this
+implementation.
+
+### Real frozen source-inventory observation
+
+The existing pure `derive_production_source_test_inventory` was run on the real tracked `crates/` source
+at base commit `36f4042644285a2c2f26593a06ed4a6882ce74ef`; no compilation or target command was run.
+`capture_frozen_source_snapshot` was called before and after inventory derivation with
+`project_root / "crates"`, the same tracked source prefix enumerated by the derivation:
+
+```text
+source root: /home/ubuntu/repos/parseltongue-rust-LLM-companion/crates
+HEAD before/after: 36f4042644285a2c2f26593a06ed4a6882ce74ef
+source_tree_sha256 before/after: 456adfe775f377b59d11eb248c923db472f6a3e2ef4c996d99373af6834c3637
+tracked source files before/after: 94
+snapshot_unchanged: true
+source inventory tests: 208
+ambiguity status: AMBIGUOUS
+```
+
+A repository-root snapshot attempt is unsupported because tracked `.claude/skills` is a directory
+symlink and the snapshot helper requires regular file inputs (`frozen input is not a regular file:
+/home/ubuntu/repos/parseltongue-rust-LLM-companion/.claude/skills`). The source-only `crates/` snapshot
+avoids that unrelated path and covers the exact tracked source prefix read by the inventory derivation.
+
+Ambiguity reasons returned by the existing derivation (no names were inferred or aliased):
+
+- macro-generated test inventory is ambiguous in
+  `crates/parseltongue-port-macro-expander/src/macro-expansion-rule-parts/macro-expansion-match-parts/macro-token-transcription-logic.rs`
+- macro-generated test inventory is ambiguous in
+  `crates/parseltongue-port-macro-expander/src/macro-expansion-rule-parts/rule-match-expansion-logic.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-cli-dispatcher-binary/tests/oracle-comparison-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-cli-dispatcher-binary/tests/stage-export-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-cli-dispatcher-binary/tests/workspace-cli-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-core-row-types/src/lib.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-crate-graph-loader/tests/graph-stage-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-crate-graph-loader/tests/sysroot-context-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/bounded-constructor-policy-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-binding-round-strata.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-import-endpoint-rounds.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-path-candidate-records.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-scope-relation-records.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/published-generation-copy-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/row-resolution-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/sibling-namespace-accuracy-fixtures.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-port-macro-expander/src/builtin-expansion-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-port-macro-expander/src/declarative-expansion-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-stage-worker-scheduler/tests/worker-stage-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/src/legacy-macro-scope-records.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/src/namespace-legacy-source-fixtures.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/src/syntax-namespace-record-codec.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/tests/syntax-stage-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-table-store-traits/src/lib.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-turso-store-adapter/tests/stage-store-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-turso-store-adapter/tests/workspace-dependency-build-gates.rs`
+
+Required-name comparison used the existing `M0_TEST_NAMES`, `M1_TEST_NAMES`, and `M2_TEST_NAMES` sets
+against the 208 derived source names:
+
+```text
+missing required M1 names: test_no_analysis_crates_linked
+missing required M2 names (M0 + M1 + M2):
+  test_body_macro_sites_match
+  test_macro_rules_items_match
+  test_nameres_matches_oracle_paths
+  test_no_analysis_crates_linked
+  test_oracle_disagreements_keep_reasons
+missing additional M2 names:
+  test_body_macro_sites_match
+  test_macro_rules_items_match
+  test_nameres_matches_oracle_paths
+  test_oracle_disagreements_keep_reasons
+```
+
+These missing names remain BLOCKED in this checkout; the observed inventory ambiguity is not waived.
+The Python suite budget was `<30s` expected and `120s` maximum per suite; final measured results after the
+code change were helper `Ran 73 tests in 0.383s / OK`, runner `Ran 136 tests in 2.532s / OK`, and process
+tree `Ran 6 tests in 0.343s / OK`. No-refactor checkpoint: only the helper, helper tests, and this scoped
+journal changed in this follow-up; no production Rust source, P2 matching logic, SOP, or AGENTS file was
+edited, and no commit or push was made.
+
+### Supplemental test traceability
+
+The final static traceability check also identified earlier runner/helper tests that were not yet
+cross-listed in this append-only journal. Their existing REQ-tagged docstrings remain authoritative;
+this list records the names without changing prior checkpoints:
+
+Runner:
+`test_output_checkout_root_blocks` `test_output_source_ancestor_blocks`
+`test_output_source_subtree_blocks` `test_corpus_ancestor_root_blocks`
+`test_corpus_root_output_blocks` `test_output_symlink_bypass_blocks`
+`test_output_symlink_alias_blocks` `test_output_safe_paths_validate`
+`test_outputs_block_before_writes` `test_output_exclusions_detect_mutations`
+`test_selected_locks_are_frozen` `test_selected_lock_modification_fails`
+`test_selected_lock_deletion_fails` `test_unselected_lock_stays_blocked`
+`test_publication_map_accepts_complete` `test_publication_map_requires_stages`
+`test_publication_map_requires_generation` `test_static_status_cannot_publish`
+`test_unaddressed_sends_require_proof` `test_socketpair_local_send_passes`
+`test_annotated_unix_fd_allowed` `test_stale_socket_proof_rejected`
+`test_socketpair_inode_fd_untrusted` `test_execveat_relative_path_blocks`
+`test_failed_exec_payload_blocks` `test_failed_forbidden_exec_blocks`
+`test_mapper_failure_retains_samples` `test_target_failure_skips_status`
+`test_runner_persists_skipped_states`
+
+Helper:
+`test_p2_metadata_source_fails` `test_p2_metadata_manifest_fails`
+`test_p2_artifact_source_fails` `test_p2_artifact_manifest_fails`
+`test_p2_missing_source_blocks`
+
+### Authorized resolver-v2 fixture exception — HARNESS ONLY
+
+The only Cargo invocations authorized for this fixture were run in the external, dependency-free,
+two-package resolver-v2 workspace at
+`/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace`. Both commands used a 20-second
+timeout and completed successfully:
+
+```text
+argv: cargo metadata --offline --format-version 1
+elapsed_monotonic_seconds=0.037953; timed_out=false; exit_status=0
+
+argv: cargo check --offline --locked --workspace --lib --bins --message-format=json
+elapsed_monotonic_seconds=0.157697; timed_out=false; exit_status=0
+```
+
+Exact cwd, argv arrays, timeout, stream sizes/hashes, and unmodified raw stdout/stderr are retained in
+`/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/observations/command-records.json` and the
+adjacent `metadata.stdout`, `metadata.stderr`, `check.stdout`, and `check.stderr`; the short report is
+`feature-resolution-observation.md` in the same directory. Both commands took less than the expected
+10 seconds. The `cargo check` build-finished record succeeded.
+
+In `resolve.nodes`, `resolver-v2-shared` has `baseline`, `default`, and `dev-extra`; its emitted lib
+artifact has only `baseline` and `default`. The consumer node and its emitted lib/bin artifacts all have
+`default`. Metadata lists the consumer lib, default bin, feature-gated bin, and shared lib; the gated
+bin was not emitted because its required `gated-bin` feature was disabled. This exact feature mismatch
+is recorded without a subset or union shortcut. This fixture is **HARNESS ONLY**, not qualification:
+P2 feature matching was not changed and no S3/P2 qualification is claimed. Current P2 remains BLOCKED
+pending a parent decision on retaining exact package-level equality or defining future unit-attributed
+Cargo evidence.
+
+### Source-inventory absence wording clarification
+
+The listed “missing required” names mean only that the existing pure inventory derivation did not
+return those names. Because that inventory reports `AMBIGUOUS`, this does not establish that any of
+these tests are absent from Rust source. They remain unproven and BLOCKED; no alias or waiver was used:
+
+```text
+M1 derived-name gap: test_no_analysis_crates_linked
+M2 derived-name gap: test_body_macro_sites_match, test_macro_rules_items_match,
+  test_nameres_matches_oracle_paths, test_no_analysis_crates_linked,
+  test_oracle_disagreements_keep_reasons
+```
+
+The full-checkout frozen-source limitation also remains: tracked `.claude/skills` is a symlink to a
+directory, which the snapshot helper cannot capture as a regular file. The before/after `crates/`
+source snapshot covers the exact tracked source prefix read by the inventory; no claim is made that the
+full checkout snapshot succeeded.
+
+### Runner-owned dependency-tree cross-check and P2 classification — HARNESS ONLY
+
+The external dependency-audit receipt remains required in schema v1. No receipt schema field, CLI
+option, or manifest reference was added. `prepare_s3_evidence_qualification`,
+`validate_s3_prerequisite_evidence`, and the dependency-audit evaluator accept an optional internal
+reference; absence or an unsupported/serialized value is BLOCKED. The reference is an immutable
+in-process capability minted through the runner collection path, bound to the canonical expected
+identity digest, fixed argv, frozen project root, and relevant environment. Its private authority
+guard protects the manifest boundary, not arbitrary Python code executing inside the process.
+
+Collection is placed after registry, expected identity, and guard creation and before helper
+validation, outside the mapper-traced process. It uses the frozen Cargo dispatch path and package
+name, and no receipt-supplied argv, flags, or cwd:
+
+```text
+cargo tree --package <frozen production package> --edges normal --prefix none --format {p} --offline --locked
+cwd: frozen PROJECT_ROOT
+```
+
+The collector snapshots the current relevant secret-free environment and checks it against frozen
+identity; identity guards run before and after collection and retained stdout/stderr file identities
+are checked at later boundaries. Full stdout and stderr are spooled to exclusive files in the owned
+artifact run directory, without the event recorder's 16 KiB limit or a row/RAM acceptance cap. The
+observation retains argv, cwd, relevant environment, monotonic elapsed time, completion/timeout/exit
+state, stream byte counts, SHA-256, and BLAKE3. Timeout is 60 seconds: `cargo tree --offline --locked`
+does not compile and is normally a short local resolution, while this cap allows for slow filesystem
+or machine contention and still bounds a hung child. On timeout, the collector kills the process
+group and waits no more than the additional 5-second cleanup bound, preserving partial streams.
+
+The helper scans forbidden rows in both retained supplied and runner-owned output before
+completeness/timeout handling, so an observed forbidden row remains FAIL even when a sibling receipt
+is malformed or incomplete. It binds the root name and version exactly to frozen identity and
+compares complete successful output as ordered raw rows after CRLF-to-LF normalization only. It does
+not trim, sort, deduplicate, or discard blank rows. Valid repeated rows pass only when present in the
+same reference output. Missing, unsupported, stale, incomplete, or timed-out current reference is
+BLOCKED; a completed nonzero reference command is FAIL; valid wrong root/version or full-row mismatch
+is FAIL. A successful internal reference is required for a qualification token.
+
+P2 remains strict: exact metadata/artifact feature equality and target coverage are unchanged; there
+is no subset/union acceptance, metadata-as-unit-graph claim, or nightly-policy change. The only P2
+change is classification of metadata/artifact feature mismatch as BLOCKED with reason
+`P2 metadata/artifact feature mismatch leaves per-unit feature context unproven`. A missing
+required-features artifact remains BLOCKED. No Cargo or production qualification command was run for
+this implementation. The resolver-v2 mismatch remains an unsupported context, not a qualification.
+
+### RED/GREEN regressions
+
+The initial RED run showed `test_tree_reference_required_blocks` receiving PASS without an internal
+reference (expected BLOCKED) and `test_p2_feature_context_blocks` receiving FAIL for unsupported
+metadata/artifact context (expected BLOCKED). After implementation, helper and runner regressions
+passed. The helper references are synthetic HARNESS ONLY and use an independent baseline, never the
+mutated receipt's stdout. Coverage includes root-only and wrong-version output; interior/suffix
+omission with rehashed receipts; inserted duplicate/order mismatch; exact matching including actual
+duplicate rows; CRLF-only equivalence and other-whitespace mismatch; absent/forged/stale references;
+timeout, partial, and completed-nonzero references; forbidden-row precedence over malformed or
+incomplete receipts; retained-output mutation; fixed argv despite a malicious receipt flag; skipped
+collection for absent/unsupported evidence; and collector-to-adapter-to-helper/token integration
+with only the process boundary mocked.
+
+Regression methods: `test_p2_feature_context_blocks`, `test_tree_reference_required_blocks`,
+`test_tree_root_only_fails`, `test_tree_root_version_fails`, `test_tree_suffix_omission_fails`,
+`test_tree_interior_omission_fails`, `test_tree_order_mismatch_fails`,
+`test_tree_duplicate_reference_passes`, `test_tree_crlf_only_passes`,
+`test_tree_whitespace_mismatch_fails`, `test_tree_forged_reference_blocks`,
+`test_tree_stale_reference_blocks`, `test_tree_timeout_output_blocks`,
+`test_tree_nonzero_reference_fails`, `test_tree_partial_forbidden_fails`,
+`test_tree_incomplete_forbidden_fails`, `test_tree_reference_mutation_fails`,
+`test_dependency_collector_token_harness`, and `test_dependency_tree_timeout_reaps`.
+
+Exact suite results:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 89 tests in 0.559s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 138 tests in 2.584s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.374s
+OK
+```
+
+The runner collector's subprocess and BLAKE3 process boundaries were mocked in HARNESS ONLY tests;
+the exact Cargo command was not invoked. No qualification is claimed from these synthetic tests, and
+no commit or push is part of this checkpoint.
+
+### Final static verification
+
+Four Python files parsed with `compile`/AST. The four-word naming, REQ docstring, and journal
+traceability check printed:
+
+```text
+Python AST syntax: 4 files parsed
+test methods=227; non-four-word names=[]; missing REQ tags=[]; missing journal traceability=[]
+```
+
+`git diff --check`: exit 0, no output.
+
+### Bounded collector review corrections — HARNESS ONLY
+
+The collector now reads from still-open `x+b` output streams and compares each descriptor's
+`fstat` device/inode with the path's `lstat` identity before and after identity capture and hashing.
+It compares captured bytes with the path identity before registering the output for later boundary
+checks. A detected mutation is persisted in the observation and raised as FAIL, not downgraded to
+missing authority. Retained partial stdout is scanned and the forbidden-row finding is persisted
+before incomplete authority is discarded; forbidden rows still raise FAIL when hashing fails or
+timeout cleanup cannot reap the child. An after-collection identity guard runs from `finally` for
+every attempted spawn, including Popen failures. Unreaped output cannot mint an internal reference.
+
+Internal stdout/stderr stream handles retain and validate their `complete` boolean. Incomplete
+streams cannot authorize ordered comparison, while retained forbidden rows and exact root
+name/version findings remain observable. Root validation precedes parsing suffix rows, so a wrong
+root followed by malformed text remains FAIL without a reference. External schema-v1 dependency
+receipts preserve the prior optional `--offline`/`--locked` argv acceptance; unknown supplied flags
+remain BLOCKED. The runner-owned command remains fixed in code with both flags, independent of
+receipt argv. No schema or P2 matching-policy change was made.
+
+RED runs before the collector/helper corrections:
+
+```text
+helper focused regressions: Ran 4 tests in 0.025s; FAILED (failures=2)
+test_dependency_legacy_receipt_passes: BLOCKED != PASS
+test_tree_reference_incomplete_blocks: PASS != BLOCKED
+
+collector focused regressions: Ran 5 tests in 0.226s; FAILED (failures=5)
+test_collector_stream_race_fails: mutation was not raised
+test_unreaped_timeout_forbidden_fails: forbidden partial row was not raised as FAIL
+test_collector_hash_failure_forbidden: forbidden partial row was not raised as FAIL
+test_collector_spawn_failure_guards: after guard was not called
+```
+
+The first source-mutation test harness also intercepted the registry guard's real Git subprocess
+while mocking BLAKE3. It was corrected to mock only the fixed Cargo/BLAKE3 boundaries and delegate
+other subprocesses; `test_dependency_source_mutation_fails` then passed using the real registry
+guard. The root-order test was corrected to call validation without an auto-generated reference;
+with the early root check disabled, the regression produced `BLOCKED` instead of its required
+`FAIL` (one test, one failure).
+
+GREEN suites after corrections:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 93 tests in 0.510s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 143 tests in 3.117s
+OK
+```
+
+Coverage added for legacy and unknown supplied argv, incomplete internal streams, root-before-suffix
+failure, a genuine swap of distinct interior rows, output path replacement between open-stream read
+and identity capture, real-registry source mutation during the mocked child, unreaped timeout plus
+forbidden partial output, hash failure plus forbidden partial output, and after-guard on spawn
+failure. The subprocess tests are HARNESS ONLY; no Cargo command or qualification was run. No commit
+or push was made.
+
+Review regression methods: `test_tree_root_malformed_fails`,
+`test_dependency_legacy_receipt_passes`, `test_dependency_unknown_flag_blocks`,
+`test_tree_reference_incomplete_blocks`, `test_collector_stream_race_fails`,
+`test_dependency_source_mutation_fails`, `test_unreaped_timeout_forbidden_fails`,
+`test_collector_hash_failure_forbidden`, and `test_collector_spawn_failure_guards`.
+
+### Resolver-v2 fixture collector verification attempt — BLOCKED before collection
+
+Only the existing `/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace` fixture was
+inspected. Its workspace manifest declares resolver 2 and members `consumer`/`shared`; the frozen
+requested package is `resolver-v2-consumer v0.1.0`, with local normal dependency
+`resolver-v2-shared v0.1.0`. `dev-extra` is only on the dev-dependency declaration and the gated
+bin requires `gated-bin`. Its lock lists those two packages. Cargo dispatch lookup found
+`/home/ubuntu/.cargo/bin/cargo`; no Cargo version probe was run, so the exact version/context remains
+HARNESS ONLY / unprobed. No `.cargo/config` appeared in the workspace file listing.
+
+The provider discovery command
+`command -v b3sum || true; command -v b3 || true; command -v cargo || true; python3 -c 'import importlib.util; print("python_blake3", importlib.util.find_spec("blake3"))'`
+printed only `/home/ubuntu/.cargo/bin/cargo` and `python_blake3 None`; the `b3sum` and `b3` lookups
+were empty. A search of existing system/user bin locations found no BLAKE3 executable, and Node
+reported `node_blake3 unavailable`. The existing runner preflight returned exactly
+`RunnerPreconditionBlockedError large artifact BLAKE3 provider is unavailable`. No provider was
+installed or substituted. Because this production prerequisite blocks collection, no identity
+registry was frozen, no collector or Cargo command ran, no before/after guards ran, and no stream
+hashes or output comparison exist. The fixed command that was not executed was:
+
+```text
+/home/ubuntu/.cargo/bin/cargo tree --package resolver-v2-consumer --edges normal --prefix none --format {p} --offline --locked
+cwd: /home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace
+```
+
+The requested 20-second harness timeout was not applied because no invocation occurred; actual
+fixture timeout is N/A. Production defaults remain 60 seconds plus a 5-second cleanup bound. No
+raw streams or omission comparison were produced. Full details are retained at
+`/home/ubuntu/resolver-v2-tree-collector-verification.md`.
+
+Requested follow-up checks:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile tools/hld-current-qualification-runner.py tools/s3-prerequisite-evidence-intake.py tools/test_sop_qualification_runner.py tools/test_s3_prerequisite_evidence_intake.py
+Exit code 0; no output
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.416s
+OK
+
+git diff --check
+Exit code 0; no output
+```
+
+No production code was changed, no Cargo/production/corpus command ran, and no qualification is
+claimed. No commit or push was made.
+
+### Resolver-v2 fixture collector run completed — HARNESS ONLY
+
+After the initial BLAKE3-provider blocker, the explicitly authorized binary-only install succeeded
+outside the repo:
+
+```text
+python3 -m pip install --only-binary=:all: --target /home/ubuntu/resolver-v2-blake3-wheel-1.0.8 blake3==1.0.8
+Successfully installed blake3-1.0.8
+```
+
+The runner detected `python-blake3:1.0.8` from that target; the package reported version 1.0.8 and
+the known empty-input vector `af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262`.
+No synthetic stream hashes were used.
+
+The external HARNESS ONLY driver at `/home/ubuntu/resolver-v2-tree-collector-harness.py` used the
+existing resolver-v2 path-only workspace and fixed command twice, with
+`DEPENDENCY_TREE_TIMEOUT_SECONDS=20.0` patched in-process (production remains 60 seconds plus 5
+seconds cleanup):
+
+```text
+PYTHONPATH=/home/ubuntu/resolver-v2-blake3-wheel-1.0.8:/home/ubuntu/repos/parseltongue-rust-LLM-companion/tools PYTHONDONTWRITEBYTECODE=1 python3 /home/ubuntu/resolver-v2-tree-collector-harness.py
+
+/home/ubuntu/.cargo/bin/cargo tree --package resolver-v2-consumer --edges normal --prefix none --format {p} --offline --locked
+cwd: /home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace
+```
+
+No Cargo version, metadata, check, build, or other Cargo command was run. Exact toolchain version
+remains HARNESS ONLY / unprobed. The fixture is not a Git checkout, so the production Git-index
+snapshot helper cannot apply. The external harness transparently used an explicit full non-`target`
+fixture path inventory with the existing `capture_frozen_file_identity`, standard identity registry,
+`verify_identity_registry`, and a path-set guard. It also froze Cargo shim and resolved executable,
+Cargo config candidates, runner/helper sources, and the installed BLAKE3 provider files. Guards
+before and after both collector calls passed with no mutation.
+
+The collector retained observations and raw stdout/stderr in
+`/home/ubuntu/resolver-v2-tree-collector-run-1/` and
+`/home/ubuntu/resolver-v2-tree-collector-run-2/`. Both fixed commands completed and were reaped with
+exit 0, no timeout, and complete streams. Elapsed times were 0.678797331s and 0.679927683s. Both
+produced identical 208-byte stdout:
+
+```text
+resolver-v2-consumer v0.1.0 (/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace/consumer)
+resolver-v2-shared v0.1.0 (/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace/shared)
+```
+
+Each stdout SHA-256 was `e9b68ecebfa3a2453f2493095a2545acad2d7743a8042d766b38209b48c1c11d` and BLAKE3
+was `a5f13aa41a60e006c8bdad14e3171ad124ff9717172f9aae8c27cd955002e632`. Each stderr was empty
+(0 bytes), SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, BLAKE3
+`af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262`.
+
+The helper gate comparing run 1's real stream with run 2's independent reference returned PASS.
+Removing the final `resolver-v2-shared` row from run 1 returned FAIL with
+`supplied dependency rows differ from runner-owned ordered rows`. This fixture has two rows, so a
+suffix omission was testable but there was no interior row. Full report:
+`/home/ubuntu/resolver-v2-tree-collector-verification.md`.
+
+No production code changed, no qualification is claimed, and no commit or push was made.
+
+### Dependency-tree command timing excludes guards
+
+The collector now records `elapsed_seconds` only from immediately before `Popen` through wait and
+any bounded process-group cleanup. A separate `collection_elapsed_seconds` records the broader
+collector duration, including identity guards and stream capture/hashing. The hard child timeout
+remains 60 seconds with a bounded 5-second cleanup; command construction, authority, and evidence
+policy are unchanged.
+
+The mocked regression `test_collector_slow_guard_timing` uses a 50ms command timeout and 60ms sleeps
+in the before/after identity guards. RED on the old implementation recorded
+`elapsed_seconds=0.06293139699846506`, exceeding the 50ms limit. GREEN asserts the bounded command
+elapsed stays within the timeout, full collection elapsed exceeds it, and the completed reference
+still passes the helper gate. The runner suite passed all 144 tests in 3.242s; `py_compile` exited 0.
+
+The fixture's earlier observation values 0.678797331s and 0.679927683s were recorded before this
+timing correction and included collection guards/capture/hashing. They remain historical observed
+collection durations and are not reinterpreted as subprocess-only command elapsed times. No Cargo
+command was run for this fix.
+
+### Dependency-tree timeout kill permission failure
+
+The first run of `test_collector_killpg_error_blocks` was RED: mocked `os.killpg` raised
+`PermissionError`, and the handler raised `UnboundLocalError: cannot access local variable 'error'
+where it is not associated with a value` instead of recording the command failure.
+
+The catch now binds the exception as `error`. GREEN confirms the 60-second wait times out, the
+mocked process-group kill permission failure is recorded, the bounded 5-second cleanup wait still
+runs and reaps the child, and the collector returns no dependency reference. Observation remains
+timed out with command error; no authority is minted. The full runner suite passed:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 145 tests in 3.161s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile tools/hld-current-qualification-runner.py tools/test_sop_qualification_runner.py
+Exit code 0; no output
+```
+
+No Cargo command or policy change was made.
+
+### Runner-owned nonzero dependency tree acquisition is BLOCKED
+
+The focused RED run showed the old evaluator returned `FAIL` for a runner-owned completed tree
+reference with exit 7. The evaluator now classifies that acquisition as `BLOCKED`; supplied external
+receipt nonzero exits remain `FAIL`. Independent forbidden-row, exact-root, and retained-stream
+mutation observations keep `FAIL` precedence. The renamed REQ-linked test verifies a plain nonzero
+reference yields no tokens and retains exit 7 plus stderr. A nonzero reference containing a forbidden
+row remains `FAIL`, also with no tokens and retained exit/stderr. A separate regression confirms a
+nonzero supplied receipt remains `FAIL`; existing root and mutation precedence regressions remain
+unchanged.
+
+Focused RED output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py' -k nonzero
+Ran 5 tests in 0.030s
+AssertionError: 'FAIL' != 'BLOCKED'
+FAILED (failures=1)
+```
+
+Checks, each run with a 60-second command timeout:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py' -k nonzero
+Ran 5 tests in 0.028s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 95 tests in 0.523s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 145 tests in 3.229s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.341s
+OK
+```
+
+Budget correction: historical E<30s / 120s-ceiling figures remain historical. Future Python gates
+use E=30s with a 60-second ceiling (exact 2x).
