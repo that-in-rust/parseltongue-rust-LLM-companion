@@ -818,6 +818,59 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         self.assertEqual(wait_timeouts, [60.0, runner.DEPENDENCY_TREE_CLEANUP_TIMEOUT_SECONDS])
         kill_process_group.assert_called_once_with(45678, runner.signal.SIGKILL)
 
+    def test_collector_killpg_error_blocks(self):
+        """REQ-SOP-RUNNER-022.D: denied process-group kill still performs bounded cleanup without authority."""
+        cargo_path = self.root_path / "frozen-cargo"
+        cargo_path.write_text("harness only\n")
+        cargo_identity = runner.capture_frozen_file_identity(cargo_path)
+        expected_identity = {
+            "configuration": {
+                "project_root": str(runner.PROJECT_ROOT.resolve()),
+                "production_package_name": "parseltongue-cli-dispatcher-binary",
+                "p2_configuration_blocked_reason": None, "unsupported_prerequisite_gates": {},
+            },
+            "toolchain_versions": {"cargo": {"path": str(cargo_path), "version": "cargo harness"}},
+            "toolchain_executables": {"cargo": cargo_identity},
+            "relevant_environment": runner.capture_s3_evidence_environment(),
+        }
+        partial_stdout = b"parseltongue-cli-dispatcher-binary v0.1.0\n"
+        wait_timeouts = []
+
+        class KillDeniedProcess:
+            pid = 45678
+            returncode = None
+
+            def wait(self, timeout=None):
+                wait_timeouts.append(timeout)
+                if len(wait_timeouts) == 1:
+                    raise subprocess.TimeoutExpired("cargo tree", timeout)
+                self.returncode = -9
+                return -9
+
+        def fake_popen(_command, **kwargs):
+            kwargs["stdout"].write(partial_stdout)
+            kwargs["stderr"].write(b"partial diagnostic")
+            return KillDeniedProcess()
+
+        def fake_b3sum(_command, **_kwargs):
+            return SimpleNamespace(returncode=0, stdout=("b" * 64 + "  output\n").encode(), stderr=b"")
+
+        artifact_directory = self.root_path / "artifacts" / "kill-denied-timeout"
+        with patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum), \
+             patch.object(runner.os, "killpg", side_effect=PermissionError("permission denied")) as kill_process_group:
+            reference = runner.collect_dependency_tree_reference(
+                self.make_dependency_collector_evidence(), expected_identity, {}, lambda *_args: None,
+                artifact_directory, "/fixture/b3sum", None,
+            )
+        self.assertIsNone(reference)
+        self.assertEqual(wait_timeouts, [60.0, runner.DEPENDENCY_TREE_CLEANUP_TIMEOUT_SECONDS])
+        kill_process_group.assert_called_once_with(45678, runner.signal.SIGKILL)
+        observation = json.loads((artifact_directory / "s3-dependency-tree-observation.json").read_text())
+        self.assertTrue(observation["timed_out"])
+        self.assertTrue(observation["process_reaped"])
+        self.assertIn("permission denied", observation["command_error"])
+
     def test_collector_stream_race_fails(self):
         """REQ-SOP-RUNNER-022.D: output replacement between read and identity capture is FAIL."""
         expected_identity = self.make_dependency_collector_identity()

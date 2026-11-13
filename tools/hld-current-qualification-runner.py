@@ -1247,7 +1247,7 @@ def collect_dependency_tree_reference(
                                 os.killpg(process.pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 pass
-                            except OSError:
+                            except OSError as error:
                                 command_error = command_error or f"cannot kill dependency process group: {error}"
                             timed_out = True
                             try:

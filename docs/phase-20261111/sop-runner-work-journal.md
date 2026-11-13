@@ -2002,3 +2002,25 @@ The fixture's earlier observation values 0.678797331s and 0.679927683s were reco
 timing correction and included collection guards/capture/hashing. They remain historical observed
 collection durations and are not reinterpreted as subprocess-only command elapsed times. No Cargo
 command was run for this fix.
+
+### Dependency-tree timeout kill permission failure
+
+The first run of `test_collector_killpg_error_blocks` was RED: mocked `os.killpg` raised
+`PermissionError`, and the handler raised `UnboundLocalError: cannot access local variable 'error'
+where it is not associated with a value` instead of recording the command failure.
+
+The catch now binds the exception as `error`. GREEN confirms the 60-second wait times out, the
+mocked process-group kill permission failure is recorded, the bounded 5-second cleanup wait still
+runs and reaps the child, and the collector returns no dependency reference. Observation remains
+timed out with command error; no authority is minted. The full runner suite passed:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 145 tests in 3.161s
+OK
+
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile tools/hld-current-qualification-runner.py tools/test_sop_qualification_runner.py
+Exit code 0; no output
+```
+
+No Cargo command or policy change was made.
