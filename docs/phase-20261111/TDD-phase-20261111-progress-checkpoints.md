@@ -4563,3 +4563,15 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   unsupported field/enum kinds, and renames the six codec helpers.
 - Local GREEN and REFACTOR commits are recorded in the subsequent commit
   closure entry. No push or PR was performed.
+
+## HLD-IDENTITY-VALIDATION-REFactor-CHECKPOINT — 2026-11-13
+
+- GREEN commit: 1d07ebbb1ac4a596365192eea36dd5bab2650026.
+- Final gates passed for the committed behavior. The only post-test source
+  edit was rustfmt whitespace in the added external-owner test case; the
+  final full-library results and warnings-denied Clippy cover that test code.
+  The release build covered unchanged production source and passed before
+  that test-only formatting edit.
+- No further semantic refactor was warranted. This journal-only checkpoint
+  is the local REFACTOR commit; its SHA is recorded in the closure entry.
+  No push or PR was performed.
