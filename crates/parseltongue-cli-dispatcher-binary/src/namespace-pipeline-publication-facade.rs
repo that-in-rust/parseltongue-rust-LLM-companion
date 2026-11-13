@@ -1,7 +1,8 @@
 use super::{build_pipeline_stage_error, read_required_json_string, write_pipeline_stage_unit};
 use parseltongue_core_row_types::{
-    MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord,
-    StageUnitWriteRequest, StoreBackendFailureError,
+    CompilationUnitRoleKind, MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue,
+    SemanticOccurrenceKeyValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
+    StoreBackendFailureError,
 };
 use parseltongue_duckdb_analysis_adapter::{
     DuckdbAnalysisStoreAdapter, NAMESPACE_SOURCE_TABLE_NAMES, NamespaceAnalysisPhaseError,
@@ -213,22 +214,80 @@ fn hash_product_row_leaf(row: &StageTableRowRecord) -> [u8; 32] {
     *hasher.finalize().as_bytes()
 }
 
+struct NamespaceInputRefreshTrace {
+    refresh_trigger_kind_value: &'static str,
+    triggering_unit_identity_key: Option<String>,
+    outer_expansion_ordinal_value: usize,
+    completed_invocation_identity_values: Vec<Value>,
+    emitted_semantic_rows_count: usize,
+}
+
+fn encode_invocation_identity_trace(
+    completed_invocation_occurrence: &SemanticOccurrenceKeyValue,
+) -> Value {
+    let parts = completed_invocation_occurrence.read_semantic_occurrence_parts();
+    let unit = parts.unit_compilation_identity_key;
+    let (span_byte_start_offset, span_byte_end_offset) =
+        parts.span_byte_range_value.read_source_range_pair();
+    json!({
+        "unit_compilation_identity_key": {
+            "package_identifier": unit.unit_cargo_package_identifier,
+            "target_name": unit.unit_cargo_target_name,
+            "target_kind": unit.unit_cargo_target_kind,
+            "role_kind": match unit.unit_compilation_role_kind {
+                CompilationUnitRoleKind::Host => "host",
+                CompilationUnitRoleKind::Target => "target",
+            },
+            "configuration_digest": blake3::Hash::from_bytes(unit.unit_configuration_digest_full).to_hex().to_string(),
+        },
+        "source_file_path": parts.span_source_file_path,
+        "byte_range": {
+            "start": span_byte_start_offset,
+            "end": span_byte_end_offset,
+        },
+        "content_digest": blake3::Hash::from_bytes(*parts.span_content_digest_full.read_full_digest_bytes()).to_hex().to_string(),
+        "expansion_provenance_chain": parts.span_expansion_provenance_chain.iter()
+            .map(|digest| blake3::Hash::from_bytes(*digest).to_hex().to_string())
+            .collect::<Vec<_>>(),
+    })
+}
+
 fn refresh_frozen_namespace_inputs(
     analysis: &DuckdbAnalysisStoreAdapter,
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
     cancel: &RunCancelFlagValue,
+    refresh_trace: NamespaceInputRefreshTrace,
 ) -> Result<(StageRunScopeValue, NamespaceResolutionRoundReport), NamespaceAnalysisPhaseError> {
     let frozen = store.publish_analysis_input_snapshot(scope, cancel)?;
     analysis.discard_unpublished_analysis_inputs()?;
     let started = std::time::Instant::now();
     eprintln!(
-        "stage=namespace-frozen-input snapshot={}",
-        json!({"generation_key":frozen.run_generation_digest_value,"attempt_key":frozen.stage_attempt_sequence_value})
+        "stage=namespace-frozen-input snapshot={} trace={}",
+        json!({"generation_key":frozen.run_generation_digest_value,"attempt_key":frozen.stage_attempt_sequence_value}),
+        json!({
+            "generation_key":frozen.run_generation_digest_value,
+            "frozen_attempt_key":frozen.stage_attempt_sequence_value,
+            "trigger_kind":refresh_trace.refresh_trigger_kind_value,
+            "trigger_unit_compilation_identity_key":refresh_trace.triggering_unit_identity_key,
+            "outer_expansion_ordinal":refresh_trace.outer_expansion_ordinal_value,
+            "completed_invocation_occurrence_identities":refresh_trace.completed_invocation_identity_values,
+            "emitted_semantic_row_count":refresh_trace.emitted_semantic_rows_count,
+        })
     );
     let copied = analysis.measure_namespace_phase_work(NamespaceAnalysisPhaseKind::Copy, || {
         analysis.copy_published_stage_rows(store, &frozen, NAMESPACE_SOURCE_TABLE_NAMES, cancel)
     })?;
+    let source_input_digest = analysis.frozen_source_input_digest(&frozen)?;
+    eprintln!(
+        "stage=namespace-frozen-input event=copy-verified trace={}",
+        json!({
+            "generation_key":frozen.run_generation_digest_value,
+            "frozen_attempt_key":frozen.stage_attempt_sequence_value,
+            "source_input_digest":source_input_digest,
+            "copied_source_row_count":copied,
+        })
+    );
     analysis.measure_namespace_phase_work(NamespaceAnalysisPhaseKind::Normalization, || {
         analysis.normalize_frozen_namespace_rows(&frozen, cancel)
     })?;
@@ -237,9 +296,14 @@ fn refresh_frozen_namespace_inputs(
             analysis.resolve_frozen_namespace_rows(&frozen, cancel)
         })?;
     eprintln!(
-        "stage=namespace-sql-fixed-point source_rows={copied} rounds={} elapsed_seconds={:.3}",
+        "stage=namespace-sql-fixed-point source_rows={copied} rounds={} elapsed_seconds={:.3} trace={}",
         report.fixed_point_round_count,
-        started.elapsed().as_secs_f64()
+        started.elapsed().as_secs_f64(),
+        json!({
+            "source_input_digest":source_input_digest,
+            "binding_digest":report.binding_set_digest_value,
+            "inner_sql_round_count":report.fixed_point_round_count,
+        })
     );
     Ok((frozen, report))
 }
@@ -269,8 +333,19 @@ pub(crate) fn run_namespace_analysis_pipeline(
             })
             .collect(),
     )?;
-    let (mut frozen, mut report) =
-        refresh_frozen_namespace_inputs(&analysis, store, scope, cancel)?;
+    let (mut frozen, mut report) = refresh_frozen_namespace_inputs(
+        &analysis,
+        store,
+        scope,
+        cancel,
+        NamespaceInputRefreshTrace {
+            refresh_trigger_kind_value: "initial",
+            triggering_unit_identity_key: None,
+            outer_expansion_ordinal_value: 0,
+            completed_invocation_identity_values: Vec::new(),
+            emitted_semantic_rows_count: 0,
+        },
+    )?;
     let lookup = analysis.frozen_namespace_macro_lookup(frozen.clone());
     let mut rounds = report.fixed_point_round_count;
     let mut expansions = 0;
@@ -279,11 +354,27 @@ pub(crate) fn run_namespace_analysis_pipeline(
             read_required_json_string(&unit, "unit_compilation_identity_key")?.to_owned();
         let port = prepare_macro_expansion_port(unit, workspace, store, scope, cancel, &lookup)
             .map_err(build_pipeline_stage_error)?;
-        while let Some(round) = port
-            .expand_next_resolved_macro_items()
-            .map_err(|error| build_pipeline_stage_error(format!("{error:?}")))?
-        {
+        loop {
+            let next_round = port
+                .expand_next_resolved_macro_items()
+                .map_err(|error| build_pipeline_stage_error(format!("{error:?}")))?;
+            let Some(round) = next_round else {
+                eprintln!(
+                    "stage=namespace-macro-port event=exhausted trace={}",
+                    json!({
+                        "unit_compilation_identity_key":unit_key.as_str(),
+                        "outer_expansion_ordinal":expansions,
+                    })
+                );
+                break;
+            };
             expansions += 1;
+            let completed_invocation_identity_values = round
+                .expansion_completed_invocation_keys
+                .iter()
+                .map(encode_invocation_identity_trace)
+                .collect();
+            let emitted_semantic_rows_count = round.expansion_semantic_output_rows.len();
             publish_namespace_output_rows(
                 store,
                 scope,
@@ -291,7 +382,19 @@ pub(crate) fn run_namespace_analysis_pipeline(
                 format!("crate/macros/{expansions:08}"),
                 round.expansion_semantic_output_rows,
             )?;
-            (frozen, report) = refresh_frozen_namespace_inputs(&analysis, store, scope, cancel)?;
+            (frozen, report) = refresh_frozen_namespace_inputs(
+                &analysis,
+                store,
+                scope,
+                cancel,
+                NamespaceInputRefreshTrace {
+                    refresh_trigger_kind_value: "macro_expansion",
+                    triggering_unit_identity_key: Some(unit_key.clone()),
+                    outer_expansion_ordinal_value: expansions,
+                    completed_invocation_identity_values,
+                    emitted_semantic_rows_count,
+                },
+            )?;
             rounds += report.fixed_point_round_count;
             lookup.replace_frozen_lookup_scope(frozen.clone())?;
         }

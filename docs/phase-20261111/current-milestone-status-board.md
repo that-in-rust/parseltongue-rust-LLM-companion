@@ -2,13 +2,13 @@
 
 Rewritten in place after every run report. History lives in the TDD journal and run reports.
 
-Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2 retry from clean integrated HEAD `825d760e8685d8d4d95ab8acd2267edf3687847b`: the supervisor enforced 2,400s, total command elapsed 2,410.252s including bounded descendant cleanup, exit 124, peak whole-tree RSS 9,234,448 KiB sampled every 0.2s; no assertion/result line. Live stderr reached completed copy/normalization and resolution rounds; its last marker was round 3 import-bindings started, with exact active query unknown. Production source remains clean and unqualified. No all-five PASS, production qualification, or frozen release exists.
+Last updated: 2026-11-13 · Latest full native runtime measurement remains the isolated M2 retry from integrated HEAD `825d760e8685d8d4d95ab8acd2267edf3687847b`: the supervisor enforced 2,400s, total command elapsed 2,410.252s including bounded descendant cleanup, exit 124, peak whole-tree RSS 9,234,448 KiB sampled every 0.2s; no assertion/result line. Live stderr reached completed copy/normalization and resolution rounds; its last marker was round 3 import-bindings started, with exact active query unknown. REQ-RUST-028.1 now adds operational refresh traces and a bounded generated-import fixture; its focused checks passed but do not change the native S3 status. The current source includes that instrumentation and remains unqualified. No all-five PASS, production qualification, or frozen release exists; the three-attempt stop rule bars another full native retry.
 
 ```text
  MILESTONE  STATE
  M0  core types, Turso store            code done; SOP S3 skeleton subset not re-run on current digest
  M1  ingest, crate graph, spans         code done; S1/S2/S3 historical PASS (old digest) → re-run pending
- M2  name resolution (DuckDB SQL)       mapper plus runner/comparator descendants integrated but unqualified; native M2 retry BLOCKED/incomplete at 2,400s; live stderr logged a 14-round fixed-point line and later copy/normalization plus repeated resolution progress, ending at round 3 import-bindings started; exact active query unknown. Earlier forensic copy shows frozen revision 8, normalized source 221,822 rows, persisted unit-link/path/binding outputs, and no fixed-point manifest; all-five S5 not started
+ M2  name resolution (DuckDB SQL)       mapper plus runner/comparator descendants integrated but unqualified; native M2 retry BLOCKED/incomplete at 2,400s; live stderr logged a 14-round fixed-point line and later copy/normalization plus repeated resolution progress, ending at round 3 import-bindings started; exact active query unknown. REQ-RUST-028.1 trace and bounded generated-import regression are GREEN, instrumentation-only; earlier forensic copy shows frozen revision 8, normalized source 221,822 rows, persisted unit-link/path/binding outputs, and no fixed-point manifest; all-five S5 not started
        code   measured-only default, generation-backed publication receipts, and stage-status banner integrated
        runner component code/tests integrated; full S3 intake is unimplemented; S4/S5 execution is not started
        comparator R9 file-backed follow-up integrated; no production comparison or final freeze
@@ -16,7 +16,7 @@ Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2
        done   oracle path partition (module-scope scored at M2; type-relative deferred)
        done   indexed frozen visibility + distinct namespace cleanup indexes (focused tests GREEN)
        done   typed copy/normalization/resolution failures, memory telemetry, retained replay and rollback-safe EXPLAIN
-       open   review the new bounded timeout/live-stderr evidence and decide any next action separately; no automatic retry; full S3 intake; all-five serde-first qualification
+       open   choose the next bounded S3 acceptance action from the timeout diagnosis; no further full native retry is authorized by the three-attempt stop rule; full S3 intake and all-five serde-first qualification remain pending
  M3  proc-macro shapes                  not started
  M4–M6 signatures, impls, bodies, methods  not started
  M7  coverage + performance             not started
@@ -29,6 +29,7 @@ Last updated: 2026-11-12 · Latest runtime measurement is the isolated native M2
  S2  coverage inventory      not-started
  S3  fixture/production map  BLOCKED/incomplete: isolated native M2 retry reached the 2,400s deadline (exit 124; 2,410.252s including cleanup), not an assertion failure; full S3 intake is unimplemented
                              Live stderr recorded a 14-round fixed-point line and later repeated copy/normalization/resolution work; last marker was round 3 import-bindings started. Exact active query remains unknown. Earlier forensic copy counts remain historical; see the separate retry report.
+                             REQ-RUST-028.1 structured refresh/digest/fixed-point/exhaustion trace and generated-import fixture: focused checks PASS; this does not establish native or corpus convergence.
  S4  oracle exports          NOT STARTED; no production/corpus exports or full S3 intake
  S5  per-site comparison     NOT STARTED; comparator R9 code is integrated, but no production corpus comparison or all-five qualification
  S6–S10                      NOT STARTED
@@ -63,8 +64,10 @@ Integrated-source checks and readiness (2026-11-12):
 - Five pinned corpus roots and lock hashes match the read-only inventory; stable Rust 1.99.1 `rust-src` core/alloc/std sources are present. `strace`, Cargo, rustc, Python, and process tools are available. The external pinned Python provider `blake3==1.0.10` is provisioned and its vectors/provider selection were verified, but the qualification runner has not been invoked and no corpus run directory was created.
 - No memory cap was set, no corpus/native qualification was run, and no release artifact was frozen.
 
+REQ-RUST-028.1 instrumentation-only checks (2026-11-13): the generated-import CLI fixture passed (1 test, 0.96s); manifest digest tests passed (3 tests); the non-native CLI contract target passed (28 passed, 1 ignored child-fixture, 1 native M2 test filtered). `cargo fmt --all -- --check`, all-target/all-feature Clippy, and warmed release build passed. The test fixture proves only the trace contract and this bounded dependency-macro/import scenario; it is not native/corpus qualification. DuckDB archive hash and mtime stayed unchanged; no C++ rebuild marker appeared. Retained command logs and digests are in `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/`.
+
 Next actions:
-1. Review the new timed-out native retry and retained live phase evidence; do not infer a precise stalled query from the last marker and do not start another retry automatically.
-2. Keep full S3 intake, all corpus runs, S4–S10, and qualification not started until the prerequisites and next step are reviewed.
+1. Keep full S3 intake, all corpus runs, S4–S10, and qualification not started until the timeout diagnosis and next bounded action are reviewed; do not infer a precise stalled query from the last marker.
+2. No further full native retry is authorized under the three-attempt stop rule.
 3. The external pinned Python BLAKE3 provider is ready, but keep the qualification runner unused until reviewed.
 4. Preserve the no-interim-memory-cap policy; no all-five PASS is claimed. The retry used no external memory cap; its live DuckDB logger reported the application's 25.0 GiB setting.

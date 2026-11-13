@@ -837,6 +837,200 @@ fn test_nested_macro_crate_provenance() {
     assert_eq!(generated["path_resolution_state_kind"], "resolved");
 }
 
+/// REQ-RUST-028.1
+#[test]
+fn test_generated_import_refresh_trace() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("workspace");
+    create_workspace_source_fixture(&root);
+    fs::create_dir_all(root.join("defs/src")).unwrap();
+    fs::write(
+        root.join("defs/Cargo.toml"),
+        "[package]\nname=\"defs\"\nversion=\"0.1.0\"\nedition=\"2021\"\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("defs/src/lib.rs"),
+        "#![no_std] #[macro_export] macro_rules! emit_generated { () => { pub struct Generated; }; } emit_generated!();",
+    )
+    .unwrap();
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+    fs::write(
+        root.join("Cargo.toml"),
+        format!("{manifest}\n[dependencies]\ndefs={{path=\"defs\"}}\n"),
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/lib.rs"),
+        "#![no_std] #![no_implicit_prelude] extern crate defs; use defs::Generated; pub fn consume(_:Generated){}",
+    )
+    .unwrap();
+    assert!(
+        Command::new(env!("CARGO"))
+            .current_dir(&root)
+            .args(["generate-lockfile", "--offline"])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    let database = directory.path().join("store.db");
+    let output = run_workspace_mapping_fixture(&root, &database, "2");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let refreshes = stderr
+        .lines()
+        .filter_map(|line| {
+            let (prefix, value) = line.split_once(" trace=")?;
+            prefix
+                .starts_with("stage=namespace-frozen-input snapshot=")
+                .then(|| serde_json::from_str::<Value>(value).unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(refreshes.len(), 2, "{stderr}");
+    assert_eq!(refreshes[0]["trigger_kind"], "initial");
+    assert_eq!(refreshes[0]["outer_expansion_ordinal"], 0);
+    assert!(refreshes[0]["trigger_unit_compilation_identity_key"].is_null());
+    assert_eq!(
+        refreshes[0]["completed_invocation_occurrence_identities"],
+        serde_json::json!([])
+    );
+    assert_eq!(refreshes[0]["emitted_semantic_row_count"], 0);
+    assert_eq!(refreshes[1]["trigger_kind"], "macro_expansion");
+    assert_eq!(refreshes[1]["outer_expansion_ordinal"], 1);
+    assert_eq!(
+        refreshes[1]["completed_invocation_occurrence_identities"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(refreshes.windows(2).all(|pair| {
+        pair[0]["outer_expansion_ordinal"].as_u64().unwrap()
+            < pair[1]["outer_expansion_ordinal"].as_u64().unwrap()
+    }));
+    assert!(refreshes[1]["emitted_semantic_row_count"].as_u64().unwrap() > 0);
+    let units = read_published_table_fixture(&database, "crate-dependency-graph-table");
+    let dependency = units
+        .iter()
+        .find(|unit| {
+            unit["unit_package_root_path"] == root.join("defs").to_str().unwrap()
+                && unit["unit_cargo_target_kind"] == "lib"
+                && unit["unit_compilation_role_kind"] == "target"
+        })
+        .unwrap();
+    assert_eq!(
+        refreshes[1]["trigger_unit_compilation_identity_key"],
+        dependency["unit_compilation_identity_key"]
+    );
+    assert_eq!(
+        refreshes[1]["completed_invocation_occurrence_identities"][0]["unit_compilation_identity_key"]
+            ["package_identifier"],
+        dependency["unit_cargo_package_identifier"]
+    );
+    assert!(
+        units
+            .iter()
+            .all(|unit| unit["unit_sysroot_context_flag"] != true)
+    );
+    let copied = stderr
+        .lines()
+        .filter_map(|line| {
+            let (prefix, value) = line.split_once(" trace=")?;
+            (prefix == "stage=namespace-frozen-input event=copy-verified")
+                .then(|| serde_json::from_str::<Value>(value).unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(copied.len(), 2, "{stderr}");
+    assert_eq!(copied[0]["generation_key"], refreshes[0]["generation_key"]);
+    assert_eq!(copied[1]["generation_key"], refreshes[1]["generation_key"]);
+    assert_eq!(
+        copied[0]["frozen_attempt_key"],
+        refreshes[0]["frozen_attempt_key"]
+    );
+    assert_eq!(
+        copied[1]["frozen_attempt_key"],
+        refreshes[1]["frozen_attempt_key"]
+    );
+    let first_digest = copied[0]["source_input_digest"].as_str().unwrap();
+    let second_digest = copied[1]["source_input_digest"].as_str().unwrap();
+    assert_eq!(first_digest.len(), 64);
+    assert_eq!(second_digest.len(), 64);
+    assert_ne!(first_digest, second_digest);
+    let fixed_points = stderr
+        .lines()
+        .filter_map(|line| {
+            let (prefix, value) = line.split_once(" trace=")?;
+            prefix
+                .starts_with("stage=namespace-sql-fixed-point ")
+                .then(|| serde_json::from_str::<Value>(value).unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(fixed_points.len(), 2, "{stderr}");
+    assert_eq!(fixed_points[0]["source_input_digest"], first_digest);
+    assert_eq!(fixed_points[1]["source_input_digest"], second_digest);
+    assert!(fixed_points.iter().all(|report| {
+        report["binding_digest"]
+            .as_str()
+            .is_some_and(|digest| !digest.is_empty())
+            && report["inner_sql_round_count"].as_u64().unwrap_or_default() > 0
+    }));
+    let exhausted = stderr
+        .lines()
+        .filter_map(|line| {
+            let (prefix, value) = line.split_once(" trace=")?;
+            (prefix == "stage=namespace-macro-port event=exhausted")
+                .then(|| serde_json::from_str::<Value>(value).unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(exhausted.len(), 2, "{stderr}");
+    assert_eq!(
+        exhausted[0]["unit_compilation_identity_key"],
+        dependency["unit_compilation_identity_key"]
+    );
+    assert_eq!(exhausted[0]["outer_expansion_ordinal"], 1);
+    let consumer = units
+        .iter()
+        .find(|unit| {
+            unit["unit_package_root_path"] == root.to_str().unwrap()
+                && unit["unit_cargo_target_kind"] == "lib"
+                && unit["unit_compilation_role_kind"] == "target"
+        })
+        .unwrap();
+    assert_eq!(
+        exhausted[1]["unit_compilation_identity_key"],
+        consumer["unit_compilation_identity_key"]
+    );
+    assert_eq!(exhausted[1]["outer_expansion_ordinal"], 1);
+    let resolved_consumer_path =
+        read_published_table_fixture(&database, "path-resolution-site-records")
+            .into_iter()
+            .find(|path| {
+                path["path_site_source_text"] == "Generated"
+                    && path["site_compilation_scope_record"]["unit_cargo_target_name"] == "fixture"
+            })
+            .unwrap();
+    assert_eq!(
+        resolved_consumer_path["path_resolution_state_kind"],
+        "resolved"
+    );
+    assert_eq!(
+        resolved_consumer_path["path_target_symbol_rows"][0]["target_symbol_kind_value"],
+        "Struct"
+    );
+    assert!(
+        resolved_consumer_path["path_target_symbol_rows"][0]["target_source_file_path"]
+            .as_str()
+            .unwrap()
+            .contains("macro-source"),
+        "{resolved_consumer_path:#?}"
+    );
+}
+
 /// REQ-RUST-024.10
 /// REQ-RUST-024.11
 #[test]

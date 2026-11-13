@@ -3,6 +3,7 @@ use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StoreBackendFailureError,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn check_cancel(cancel: &RunCancelFlagValue) -> Result<(), StoreBackendFailureError> {
     if cancel.check_stage_work_cancelled() {
@@ -175,4 +176,191 @@ pub(super) fn copy_generation(
         .execute_batch("CHECKPOINT")
         .map_err(build_analysis_error)?;
     Ok(count)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct VerifiedSourceTableManifest {
+    source_table_manifest_name: String,
+    source_table_row_count: u64,
+    source_table_content_digest: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FrozenSourceManifestSnapshot {
+    run_generation_identity_key: String,
+    frozen_attempt_identity_key: String,
+    frozen_source_table_manifests: Vec<VerifiedSourceTableManifest>,
+}
+
+impl DuckdbAnalysisStoreAdapter {
+    pub fn frozen_source_input_digest(
+        &self,
+        scope: &StageRunScopeValue,
+    ) -> Result<String, StoreBackendFailureError> {
+        read_source_manifest_digest(self, scope)
+    }
+}
+
+fn read_source_manifest_digest(
+    store: &DuckdbAnalysisStoreAdapter,
+    scope: &StageRunScopeValue,
+) -> Result<String, StoreBackendFailureError> {
+    let connection = store._connection.lock().map_err(build_analysis_error)?;
+    let mut statement = connection
+        .prepare(
+            "SELECT table_name,row_count,content_digest FROM \"frozen-generation-table-manifests\" WHERE generation_key=? AND attempt_key=? ORDER BY table_name",
+        )
+        .map_err(build_analysis_error)?;
+    let verified_source_manifest_rows = statement
+        .query_map(
+            duckdb::params![
+                scope.run_generation_digest_value,
+                scope.stage_attempt_sequence_value
+            ],
+            |row| {
+                Ok(VerifiedSourceTableManifest {
+                    source_table_manifest_name: row.get(0)?,
+                    source_table_row_count: row.get(1)?,
+                    source_table_content_digest: row.get(2)?,
+                })
+            },
+        )
+        .map_err(build_analysis_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(build_analysis_error)?;
+    let expected_source_table_names = super::NAMESPACE_SOURCE_TABLE_NAMES
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let actual_source_table_names = verified_source_manifest_rows
+        .iter()
+        .map(|manifest| manifest.source_table_manifest_name.as_str())
+        .collect::<BTreeSet<_>>();
+    if verified_source_manifest_rows.len() != expected_source_table_names.len()
+        || actual_source_table_names != expected_source_table_names
+    {
+        return Err(build_analysis_error(
+            "verified frozen namespace source manifests are incomplete",
+        ));
+    }
+    hash_source_input_digest(&FrozenSourceManifestSnapshot {
+        run_generation_identity_key: scope.run_generation_digest_value.clone(),
+        frozen_attempt_identity_key: scope.stage_attempt_sequence_value.clone(),
+        frozen_source_table_manifests: verified_source_manifest_rows,
+    })
+}
+
+fn hash_source_input_digest(
+    snapshot: &FrozenSourceManifestSnapshot,
+) -> Result<String, StoreBackendFailureError> {
+    let _snapshot_identity = (
+        &snapshot.run_generation_identity_key,
+        &snapshot.frozen_attempt_identity_key,
+    );
+    let source_manifest_name_map = snapshot
+        .frozen_source_table_manifests
+        .iter()
+        .map(|manifest| (manifest.source_table_manifest_name.as_str(), manifest))
+        .collect::<BTreeMap<_, _>>();
+    if source_manifest_name_map.is_empty()
+        || source_manifest_name_map.len() != snapshot.frozen_source_table_manifests.len()
+    {
+        return Err(build_analysis_error(
+            "source input digest requires unique table manifests",
+        ));
+    }
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"namespace-source-input-v1\0");
+    source_manifest_name_map
+        .into_iter()
+        .for_each(|(table_name, manifest)| {
+            hasher.update(&(table_name.len() as u64).to_le_bytes());
+            hasher.update(table_name.as_bytes());
+            hasher.update(&manifest.source_table_row_count.to_le_bytes());
+            hasher.update(&(manifest.source_table_content_digest.len() as u64).to_le_bytes());
+            hasher.update(manifest.source_table_content_digest.as_bytes());
+        });
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
+#[cfg(test)]
+mod source_input_digest_tests {
+    use super::{
+        FrozenSourceManifestSnapshot, StoreBackendFailureError, VerifiedSourceTableManifest,
+        hash_source_input_digest,
+    };
+
+    /// REQ-RUST-028.1
+    #[test]
+    fn test_source_digest_snapshot_stable() -> Result<(), StoreBackendFailureError> {
+        let source_manifests = vec![
+            VerifiedSourceTableManifest {
+                source_table_manifest_name: "syntax-namespace-input-items".into(),
+                source_table_row_count: 3,
+                source_table_content_digest: "a".repeat(64),
+            },
+            VerifiedSourceTableManifest {
+                source_table_manifest_name: "crate-dependency-graph-table".into(),
+                source_table_row_count: 1,
+                source_table_content_digest: "b".repeat(64),
+            },
+        ];
+        let first = FrozenSourceManifestSnapshot {
+            run_generation_identity_key: "generation-one".into(),
+            frozen_attempt_identity_key: "attempt-one".into(),
+            frozen_source_table_manifests: source_manifests.clone(),
+        };
+        let second = FrozenSourceManifestSnapshot {
+            run_generation_identity_key: "generation-two".into(),
+            frozen_attempt_identity_key: "attempt-two".into(),
+            frozen_source_table_manifests: source_manifests.iter().cloned().rev().collect(),
+        };
+        let changed = FrozenSourceManifestSnapshot {
+            run_generation_identity_key: "generation-two".into(),
+            frozen_attempt_identity_key: "attempt-three".into(),
+            frozen_source_table_manifests: source_manifests
+                .iter()
+                .cloned()
+                .map(|mut manifest| {
+                    if manifest.source_table_manifest_name == "syntax-namespace-input-items" {
+                        manifest.source_table_content_digest = "c".repeat(64);
+                    }
+                    manifest
+                })
+                .collect(),
+        };
+        let first_digest = hash_source_input_digest(&first)?;
+        let second_digest = hash_source_input_digest(&second)?;
+        let changed_digest = hash_source_input_digest(&changed)?;
+        assert_eq!(first_digest, second_digest);
+        assert_ne!(first_digest, changed_digest);
+        Ok(())
+    }
+
+    /// REQ-RUST-028.1
+    #[test]
+    fn test_source_digest_empty_rejected() {
+        let snapshot = FrozenSourceManifestSnapshot {
+            run_generation_identity_key: "generation-one".into(),
+            frozen_attempt_identity_key: "attempt-one".into(),
+            frozen_source_table_manifests: Vec::new(),
+        };
+        assert!(hash_source_input_digest(&snapshot).is_err());
+    }
+
+    /// REQ-RUST-028.1
+    #[test]
+    fn test_source_digest_duplicates_rejected() {
+        let manifest = VerifiedSourceTableManifest {
+            source_table_manifest_name: "syntax-namespace-input-items".into(),
+            source_table_row_count: 3,
+            source_table_content_digest: "a".repeat(64),
+        };
+        let snapshot = FrozenSourceManifestSnapshot {
+            run_generation_identity_key: "generation-one".into(),
+            frozen_attempt_identity_key: "attempt-one".into(),
+            frozen_source_table_manifests: vec![manifest.clone(), manifest],
+        };
+        assert!(hash_source_input_digest(&snapshot).is_err());
+    }
 }

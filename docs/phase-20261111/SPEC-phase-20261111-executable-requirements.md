@@ -1418,3 +1418,34 @@ reconstructs `std::process::Output` from the captured files.
 - `test_child_spawn_error_propagation` — checks a missing executable returns `NotFound`.
 - `test_child_output_read_error` — checks a missing captured output file returns `NotFound` after completion.
 - `test_child_fixture_waits_release` — ignored fixture process invoked by live-visibility, exit-preservation, and output-read cases; not an independent runtime gate.
+
+## REQ-RUST-028.1 — per-refresh-namespace-operational-trace
+
+WHEN the namespace pipeline starts a frozen-input refresh, completes its copied
+source inputs, resolves those inputs, or exhausts a unit's macro-expansion port,
+THEN it SHALL emit unconditional operational stderr diagnostics with structured
+JSON values serialized by `serde_json`. Refresh-start diagnostics SHALL identify
+the generation and frozen attempt, an explicit initial state or the triggering
+unit and outer expansion ordinal, completed invocation occurrence identities,
+and emitted semantic-row count. After copy, the pipeline SHALL report a stable
+source INPUT digest composed from existing verified copied-table manifest table
+names, row counts, and content digests in deterministic table order; the digest
+SHALL exclude snapshot identity and timing and SHALL NOT rescan or rehash copied
+row payloads. Successful resolver diagnostics SHALL report the binding digest
+and inner SQL fixed-point round count separately. Per-unit macro-port exhaustion
+SHALL be emitted only after the port returns `None`. These diagnostics SHALL not
+change resolution scheduling, SQL, publication semantics, memory policy, or
+semantic output tables.
+
+### Authoritative REQ-RUST-028.1 test matrix
+
+- `test_generated_import_refresh_trace` — proves a dependency-generated public
+  type resolves at its importing consumer and checks the operational refresh,
+  copied-input digest, fixed-point, and post-`None` exhaustion trace.
+- `test_source_digest_snapshot_stable` — proves equal copied content has the
+  same source-input digest across snapshot identities and changed manifest
+  content changes that digest.
+- `test_source_digest_empty_rejected` — proves an empty copied-manifest set
+  cannot produce a source-input digest.
+- `test_source_digest_duplicates_rejected` — proves duplicate table manifests
+  cannot produce an ambiguous source-input digest.

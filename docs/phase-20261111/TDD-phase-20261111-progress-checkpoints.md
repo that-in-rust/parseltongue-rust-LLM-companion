@@ -3776,3 +3776,221 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - DuckDB archive SHA-256 and mtime matched before/after; no C++ build marker
   appeared. Production source is unchanged. No PR or push. The local merge is
   still pending its scoped integration commit.
+
+## REQ-RUST-028.1 — STUB(check) — 2026-11-13
+
+- Added the new 028.1 contract and red CLI/digest assertions before diagnostic
+  implementation. The adapter digest function is currently a `todo!()` stub;
+  no resolver scheduling, SQL, publication, or macro-port code has changed.
+- Check command (warmed release target; expected 10 minutes, maximum 20 minutes;
+  no memory cap):
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo check -p
+  parseltongue-duckdb-analysis-adapter -p
+  parseltongue-cli-dispatcher-binary --tests --all-features --release --locked
+  --offline`.
+- Exact retained output:
+  `Checking parseltongue-duckdb-analysis-adapter v0.1.0
+  (/home/ubuntu/repos/parseltongue-integration/crates/parseltongue-duckdb-analysis-adapter)`;
+  `Checking parseltongue-cli-dispatcher-binary v0.1.0
+  (/home/ubuntu/repos/parseltongue-integration/crates/parseltongue-cli-dispatcher-binary)`;
+  `Finished `release` profile [optimized] target(s) in 1.27s`;
+  `elapsed_seconds=1.31 exit_code=0 peak_rss_kib=304528`.
+  The expected dead-code warnings are from the not-yet-used manifest stub.
+  Cargo also emitted the existing stable-toolchain warning:
+  `unused manifest key `lints.cargo` (may be supported in a future version)`
+  for the external rust-analyzer parser and syntax manifests.
+- Retained log:
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/stub-check.log`;
+  SHA-256 `d76643a7f0ddeaf91d336ead577a0482d030df0964364889faab55dc8c5d5cab`.
+  The bounded exec wrapper capped its wait at 4m40s, but the command exited in
+  1.31s. The working directory, blueprint, Cargo path, and stable toolchain
+  were verified; the manifest warning is not an environment-load failure.
+- DuckDB archive remained SHA-256
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`,
+  mtime `1794494878`; no C++ rebuild marker appeared. Next: execute the planned
+  RED checks for the absent trace and stub digest behavior.
+
+## REQ-RUST-028.1 — RED — 2026-11-13
+
+- Tests: `test_source_digest_snapshot_stable` and
+  `test_generated_import_refresh_trace`; both fail for the intended missing
+  implementation.
+- Adapter command used the warmed release target and ran only the digest test:
+  `cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features
+  --release --locked --offline -- test_source_digest_snapshot_stable
+  --nocapture`. Exact failure: `not yet implemented`; result:
+  `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 107 filtered
+  out; finished in 0.00s`; `elapsed_seconds=0.17 exit_code=101
+  peak_rss_kib=82600`.
+- CLI command ran only the generated-import test, expected 1 minute / maximum
+  2 minutes:
+  `cargo test -p parseltongue-cli-dispatcher-binary --test
+  workspace-cli-contract-tests --all-features --release --locked --offline --
+  test_generated_import_refresh_trace --exact --nocapture`. Exact assertion:
+  `left: 0` / `right: 2` for absent structured refresh-start records; result:
+  `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered
+  out; finished in 0.95s`; `elapsed_seconds=1.14 exit_code=101
+  peak_rss_kib=146244`. The fixture mapping itself completed: the retained child
+  stderr shows fixed-point summaries `source_rows=64 rounds=1` and
+  `source_rows=69 rounds=2`, then publication completed. This is an intended
+  instrumentation RED, not a fixture mapping failure.
+- Full outputs are retained at
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/red-adapter-test.log`
+  (SHA-256 `93ed88b8c0ac78375824c12680f24310fc3570e3cf76f947eba5220e41b7539b`)
+  and
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/red-cli-test.log`
+  (SHA-256 `a865e793c8d6be011990f0764a6fa131284a5b849fab9f3fa60b224ee98c79ed`).
+  The pre-test executables compiled successfully in 16.83s (adapter) and
+  12.52s (CLI). No `libduckdb-sys` C++ build marker appeared; the bundled
+  archive SHA-256 and mtime remained
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba` and
+  `1794494878`.
+- Native timeout diagnosis, retained unchanged in
+  `hld-current-test-runs/20261112T224747Z-native-m2-regression-retry/hld-current-test-report.md`:
+  resolver snapshot `/frozen/2` completed `source_rows=221714 rounds=14`; later
+  frozen snapshots `/frozen/3` through `/frozen/8` followed. On `/frozen/8`,
+  `round=3 step=import-bindings event=started` was the last marker after
+  round-3 path-candidate work; no binding digest or resolver completion followed.
+  The report has no triggering unit, outer expansion ordinal, invocation
+  identity, or exact active SQL query, so the timeout's active operation and
+  root cause remain unknown. Current code explains why another resolver call
+  can follow a fixed point: the refresh publishes/copies/resolves a frozen
+  snapshot (`namespace-pipeline-publication-facade.rs:216-244`), while the
+  dependency-first macro loop republishes and refreshes after `Some(round)`
+  (`:272-297`); the SQL fixed point is local to that snapshot
+  (`namespace-frozen-resolution-rounds.rs:49-93`). This is not evidence of a
+  stalled query or native convergence.
+- Next: implement only the adapter's read of already-verified manifest
+  metadata and operational refresh/inner-round/exhaustion diagnostics; preserve
+  scheduling, SQL, publication and memory policy.
+
+## REQ-RUST-028.1 — GREEN — 2026-11-13
+
+- Focused adapter tests, including the stable-input identity case and empty /
+  duplicate manifest errors, pass:
+  `cargo test -p parseltongue-duckdb-analysis-adapter --lib --all-features
+  --release --locked --offline -- test_source_digest_ --nocapture`.
+  Exact result: `running 3 tests`;
+  `test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 107 filtered
+  out; finished in 0.00s`; `elapsed_seconds=0.17 exit_code=0
+  peak_rss_kib=82088`.
+- Bounded generated-import fixture passes:
+  `cargo test -p parseltongue-cli-dispatcher-binary --test
+  workspace-cli-contract-tests --all-features --release --locked --offline --
+  test_generated_import_refresh_trace --exact --nocapture`.
+  Exact result: `test test_generated_import_refresh_trace ... ok`;
+  `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 29 filtered
+  out; finished in 0.96s`; `elapsed_seconds=1.15 exit_code=0
+  peak_rss_kib=137824` (expected 1 minute / maximum 2 minutes).
+- One intermediate GREEN run failed because the test incorrectly expected the
+  generated target path to end in `/defs/src/lib.rs`; the retained failure was
+  `assertion failed: ...ends_with("/defs/src/lib.rs")`,
+  `elapsed_seconds=1.22 exit_code=101`. The fixture resolves the macro-created
+  item through the virtual `macro-source` path, as the existing
+  `test_macro_items_publish_atomically` also does. The assertion now checks
+  the generated target's `macro-source` location and `Struct` kind. This was a
+  test expectation correction; production behavior and scheduling were not
+  changed. Failed log SHA-256:
+  `cc5aa037b37c3937fac5f17498cd73a661a324eba71ab4b71b58767765d908d0`.
+- Build results: the final adapter unit-test executable compiled in
+  `10.96s` (`exit_code=0`, peak RSS `632560 KiB`); the final CLI contract test
+  executable compiled in `12.64s` (`exit_code=0`, peak RSS `657560 KiB`).
+  The final test logs are
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/green-adapter-final-test.log`
+  (SHA-256 `dcdf443d760833fc0c68983e6c78268c03329d2255cec4ca4f95c918bcbe4f48`)
+  and
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/green-cli-final-test.log`
+  (SHA-256 `b7b767d4f54c1b7e6bf6d4dd09c697fb7964081164b7cfc4154882524da2d170`).
+- Implementation stays at the adapter manifest-read and CLI facade boundaries;
+  no extractor/port, resolver scheduling, SQL, publication semantics, memory
+  policy, or semantic tables changed. DuckDB archive SHA-256 and mtime remained
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba` and
+  `1794494878`; no `libduckdb-sys` rebuild marker appeared.
+- Next: final REFACTOR review, remaining non-native CLI regressions, fmt,
+  Clippy, and release build.
+
+## REQ-RUST-028.1 — REFACTOR — 2026-11-13
+
+- Refactor review kept production behavior at the L3 manifest-read and
+  publication-facade diagnostics. The outer dependency-first expansion order,
+  resolver SQL, snapshot publication, copy/normalization order, and memory
+  policy remain unchanged. The equivalent macro-port loop now emits the
+  per-unit exhausted record only in the `None` branch. Digest test success
+  paths return typed `StoreBackendFailureError` and use `?`, rather than
+  `unwrap()`.
+- First all-target Clippy attempt caught four test-only unwraps:
+  `error: used `unwrap()` on a `Result` value` (four locations in
+  `frozen-generation-appender-copy.rs`); `elapsed_seconds=1.88 exit_code=101`.
+  After the typed-`Result` refactor, the focused digest tests were rerun and
+  passed. The original failure log remains at
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/clippy.log`
+  (SHA-256 `e332f04907826d5df32a0a7d8dc96ca724cac96ab798fdf881b93b66e68e91dc`).
+- Post-refactor digest-test command, using the warmed release target:
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo test -p
+  parseltongue-duckdb-analysis-adapter --lib --all-features --release --locked
+  --offline -- test_source_digest_ --nocapture`.
+  Exact result: `running 3 tests`; all three named source-digest tests `... ok`;
+  `test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 107 filtered
+  out; finished in 0.00s`; `elapsed_seconds=11.06 exit_code=0
+  peak_rss_kib=631628` (includes 11.02s release test recompilation after the
+  test error-path refactor). Retained log SHA-256
+  `ccbe7413eefcb7246b6f583f59385d46c0e5253731cf1280015b1b17c6edc2e1`.
+- The final CLI contract regression command excluded only the bounded native
+  test `test_lang_items_in_sysroot`:
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo test -p
+  parseltongue-cli-dispatcher-binary --test workspace-cli-contract-tests
+  --all-features --release --locked --offline -- --skip
+  test_lang_items_in_sysroot`.
+  Exact result: `running 29 tests`; `test result: ok. 28 passed; 0 failed; 1
+  ignored; 0 measured; 1 filtered out; finished in 3.77s`;
+  `elapsed_seconds=3.97 exit_code=0 peak_rss_kib=169672`. The ignored test is
+  `test_child_fixture_waits_release` (helper child-fixture process); the one
+  filtered test is `test_lang_items_in_sysroot`. The complete retained log is
+  `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/cli-regressions.log`
+  (SHA-256 `028b77c211fa8ea6c314e046dcb26a203970df4e08df1e926527475a9f94176e`).
+  The runner handoff arrived during the command wrapper, but the persisted log
+  ended with this result and the process scan found no surviving Cargo/test
+  process; the completed run was reused, not restarted.
+- The focused generated-import fixture remains `1 passed / 0 failed / 29
+  filtered` in 0.96s test time (`elapsed_seconds=1.15 exit_code=0
+  peak_rss_kib=137824`); its exact final log SHA-256 is
+  `b7b767d4f54c1b7e6bf6d4dd09c697fb7964081164b7cfc4154882524da2d170`.
+  Expected fixture maximum was 2 minutes. It covers one dependency-generated
+  public `Struct` imported by the consumer, with no sysroot context; this is
+  not a native/corpus convergence result.
+- Final gates: `cargo fmt --all -- --check` exited 0 with no diagnostics;
+  REQ traceability check printed
+  `REQ028_TRACEABILITY=PASS; tests=4; REQ028.0=preserved`. All-target,
+  all-feature Clippy exited 0: `Finished `release` profile [optimized]
+  target(s) in 1.50s`; `elapsed_seconds=1.55 exit_code=0
+  peak_rss_kib=350344`. Warmed release build exited 0:
+  `Finished `release` profile [optimized] target(s) in 11.87s`;
+  `elapsed_seconds=11.91 exit_code=0 peak_rss_kib=656156`. Expected compile
+  maximum was 20 minutes. Retained Clippy and release logs have SHA-256
+  `6fbe54d6f72faf95bc244e9ad2b556a4d258589a05c6536cc8d36760c1e8d591` and
+  `aef29df3d3894e025061e37acc9fd09f996654bee0d327be4cfcffc3af54f182`.
+- DuckDB archive stayed at SHA-256
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`, mtime
+  `1794494878`; no `Compiling libduckdb-sys` marker occurred. No native, sysroot,
+  corpus, profiler, SQL mutation, memory cap, C++ rebuild, commit, or push has
+  occurred in this instrumentation slice so far.
+- Native diagnosis remains evidence-limited: the prior retry completed a
+  14-round fixed point on `/frozen/2` (`source_rows=221714`), then refreshed
+  through `/frozen/8`; the last marker was
+  `round=3 step=import-bindings event=started` after round-3 path-candidate
+  work. There is no completed round-3 binding digest or resolver result; the
+  unit, invocation, active SQL operation, and root cause remain unknown. This
+  work adds the missing refresh observability and does not retry or claim
+  native convergence. S3 remains BLOCKED/incomplete; five-corpus runs and
+  S4–S10 remain NOT STARTED.
+- Next: run final append-only/diff/status checks, then commit only the five
+  scoped implementation/spec/journal/status files locally; do not push.
+
+## REQ-RUST-028.1 — RECORD CORRECTION — 2026-11-13
+
+- Correction to the preceding next-step count: the scoped diff has six files
+  (three Rust files, SPEC, TDD journal, and status board), not five. This note
+  corrects the count without rewriting the appended REFACTOR entry.
