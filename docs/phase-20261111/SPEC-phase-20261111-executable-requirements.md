@@ -1449,3 +1449,38 @@ semantic output tables.
   cannot produce a source-input digest.
 - `test_source_digest_duplicates_rejected` — proves duplicate table manifests
   cannot produce an ambiguous source-input digest.
+
+## REQ-RUST-028.2 — namespace-import-statement-trace
+
+WHEN the frozen namespace resolver runs the checked-in
+`namespace-import-binding-rounds.sql` for an inner fixed-point round, THEN it
+SHALL validate the complete fixed-script boundary contract before executing
+any statement, preserve every SQL byte and its declared order, and execute
+each of the nine statements with the existing DuckDB `execute_batch` API,
+without adding a transaction. For every statement it SHALL emit JSON-serialized
+operational `started` and `complete` or `failed` stderr events carrying the
+generation, attempt, inner round, stable one-based ordinal, stable statement
+name, and elapsed milliseconds. On the first DuckDB error it SHALL emit the
+failure event, propagate the same underlying error through the existing
+`NameResolutionStageError` boundary, and execute no later statement. An
+unsupported or changed boundary contract SHALL fail before any statement is
+executed or statement event is emitted. SQL semantics, binding digests,
+publication behavior, fixed-point scheduling, engine settings, and semantic
+outputs SHALL remain unchanged.
+
+### Authoritative REQ-RUST-028.2 test matrix
+
+- `test_import_sql_statement_boundaries` — checks the nine fixed named slices
+  reconstruct the production SQL byte-for-byte.
+- `test_sql_quoted_comment_boundaries` — checks quoted and commented
+  semicolons are not treated as statement boundaries.
+- `test_import_sql_rejects_unsupported` — checks changed/unsupported scripts
+  fail before SQL execution or diagnostics.
+- `test_import_batch_output_equivalence` — compares the old whole-batch and
+  traced production SQL over direct-import, glob, macro-prelude, and visibility
+  inputs, including exact sorted rows and binding digest.
+- `test_import_batch_trace_markers` — checks successful per-statement JSON
+  markers, identity fields, order, and elapsed-duration fields.
+- `test_import_batch_failure_equivalence` — compares an injected middle
+  statement failure under autocommit and explicit transaction rollback,
+  including underlying error propagation and no later statement execution.

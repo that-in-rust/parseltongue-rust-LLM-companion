@@ -93,6 +93,8 @@ pub use namespace_frozen_resolution_rounds::NamespaceResolutionRoundReport;
 mod namespace_default_prelude_inputs;
 #[path = "namespace-frozen-macro-lookups.rs"]
 mod namespace_frozen_macro_lookups;
+#[path = "namespace-import-statement-trace.rs"]
+mod namespace_import_statement_trace;
 pub use namespace_frozen_macro_lookups::FrozenNamespaceMacroLookup;
 #[path = "namespace-final-output-records.rs"]
 mod namespace_final_output_records;

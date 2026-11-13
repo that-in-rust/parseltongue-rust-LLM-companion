@@ -4055,3 +4055,196 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   Its recorded `Finished` line is `Finished `release` profile [optimized]
   target(s) in 0.43s` (without literal backslashes around `release`). The
   retained log and all earlier journal bytes are unchanged.
+
+## REQ-RUST-028.2 — STUB BLOCKED — 2026-11-13
+
+- REQ-RUST-028.2 was confirmed unused and reserved in the SPEC with its
+  statement-trace contract and planned test crosswalk. No RED tests or
+  implementation have been completed.
+- STUB: temporary boundary/execution signatures were wired to the resolver
+  only for the required check, then removed when Cargo entered the pinned
+  DuckDB system crate build. The resolver call was restored to the original
+  whole-batch path so no `todo!()` behavior remains in the working tree.
+- Check command, expected <=60 seconds and ceiling 240 seconds:
+  `/usr/bin/time -f 'elapsed_seconds=%e exit_code=%x peak_rss_kib=%M' -o /home/ubuntu/hld-current-test-artifacts/20261113T013827Z-namespace-import-statement-trace/stub-check.time /usr/bin/timeout -k 10s 240s env CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo check -p parseltongue-duckdb-analysis-adapter --lib --all-features --release --locked --offline`.
+  Retained log: `/home/ubuntu/hld-current-test-artifacts/20261113T013827Z-namespace-import-statement-trace/stub-check.log`.
+  Output: `Compiling libduckdb-sys v1.20000.1`; then
+  `Command exited with non-zero status 124`,
+  `elapsed_seconds=240.00 exit_code=124 peak_rss_kib=276976`,
+  `CARGO_CHECK_EXIT_CODE=124`. The warmed `libduckdb.a` hash and mtime were
+  unchanged before/after, and no related process remained; whether the C++
+  compiler itself started is unverified. No tests, Clippy, fmt, or release
+  build were run. Per the no-C++-rebuild constraint, no Cargo gate was retried.
+- Next: resolve the missing warmed check artifact or obtain approval for a
+  check path that does not invoke the DuckDB C++ build; then resume STUB→RED→
+  GREEN→REFACTOR. No commit, native/sysroot/corpus run, or replay occurred.
+
+## REQ-RUST-028.2 — BUDGET CORRECTION — 2026-11-13
+
+- Correction: the preceding STUB check stated an expected duration of `<=60`
+  seconds and a `240`-second ceiling. Using the stated 60-second upper
+  expectation, that ceiling was 4× expected and violated the SOP 2× rule; it
+  was not a compliant budget. The observed command still timed out at its
+  recorded 240-second deadline. This read-only diagnosis did not retry Cargo.
+- Future bounded checks will declare one explicit expected duration `E` and
+  set the ceiling to exactly `2E`; for a 60-second expectation, the ceiling is
+  120 seconds.
+
+## REQ-RUST-028.2 — STUB RESUME PASS — 2026-11-13
+
+- Added only the temporary typed helper signature and resolver wiring for
+  `execute_import_binding_statements`; no test or runtime behavior was run.
+- Reused the exact previously successful adapter-plus-CLI `--tests` release
+  graph. Expected `E=60s`; ceiling `2E=120s`:
+  `/usr/bin/timeout -k 10s 120s env CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never cargo check -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --tests --all-features --release --locked --offline`.
+- Exact output: `Finished `release` profile [optimized] target(s) in 1.22s`;
+  `elapsed_seconds=1.26 exit_code=0`; `CARGO_CHECK_EXIT_CODE=0`;
+  `STOPPED_ON_LIBDUCKDB_SYS_REBUILD_MARKER=FALSE`.
+- Retained log:
+  `/home/ubuntu/hld-current-test-artifacts/20261113T015943Z-namespace-import-statement-trace-resume/stub-both-root.log`.
+  The bundled archive remained SHA-256
+  `a753cf5c643d8bfe15e58fbf6f7e53c280ddf52b4bf811a791600ea7f71272ba`,
+  size `156174170`, mtime `2026-11-12 14:47:58.568027830 +0000`.
+- Next: add the production-SQL parity, marker, boundary and injected-failure
+  RED tests; no resolver replay or corpus run.
+
+## REQ-RUST-028.2 — RED ATTEMPT 1 — TEST HARNESS COMPILE ERROR
+
+- Added the six REQ-tagged statement-trace tests and ran the focused adapter
+  module through the approved combined package roots with expected `E=60s`,
+  ceiling `2E=120s`:
+  `cargo test -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-features --release --locked --offline namespace_import_statement_trace::tests -- --nocapture`.
+- No tests ran: the initial callback stub accepted `serde_json::Value`, while
+  the test harness verifies serialized JSON strings. The compiler reported
+  `error[E0599]: no method named contains found for enum serde_json::Value`
+  and `error[E0308]: expected &str, found &serde_json::Value` at the trace
+  event assertions. Exit `101`, elapsed `7.38s`; no libduckdb-sys rebuild
+  marker appeared. Corrected the helper callback type to `FnMut(String)`;
+  test assertions and production behavior were not changed.
+- The repeated non-fatal Cargo warning was
+  `unused manifest key 'lints.cargo' (may be supported in a future version)`
+  from the external rust-analyzer manifests. Environment diagnosis confirmed
+  the intended repository, Cargo/rustc `1.99.1`, stable toolchain, and shared
+  target path. This is the stable Cargo warning already documented in prior
+  runs, not a loaded-environment failure; no external manifest or blueprint
+  was changed.
+
+## REQ-RUST-028.2 — RED — SIX SPECIFICATION FAILURES — 2026-11-13
+
+- The focused test module now compiles and contains the six REQ-tagged cases:
+  `test_import_sql_statement_boundaries`,
+  `test_sql_quoted_comment_boundaries`,
+  `test_import_sql_rejects_unsupported`,
+  `test_import_batch_output_equivalence`,
+  `test_import_batch_trace_markers`, and
+  `test_import_batch_failure_equivalence`.
+- Ran with expected `E=60s`, ceiling `2E=120s` through the approved combined
+  adapter-plus-CLI roots:
+  `cargo test -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-features --release --locked --offline namespace_import_statement_trace::tests -- --nocapture`.
+- RED output: `running 6 tests`; all six failed at the intentional
+  `todo!()` statement-boundary or executor stubs;
+  `test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 110 filtered out; finished in 0.08s`.
+  The command ended `elapsed_seconds=24.98 exit_code=101`; no
+  `libduckdb-sys` rebuild marker appeared.
+- Retained complete output at
+  `/home/ubuntu/hld-current-test-artifacts/20261113T015943Z-namespace-import-statement-trace-resume/red-tests-fixed.log`.
+  Next: implement only the fixed nine-boundary contract and per-slice
+  `execute_batch` tracing; retain whole-batch parity and failure assertions.
+
+## REQ-RUST-028.2 — GREEN — SIX TESTS PASS — 2026-11-13
+
+- Implemented the fixed, nine-entry start-marker contract; the splitter
+  rejects duplicate/missing/reordered markers, comment syntax, unbalanced
+  quotes, and any statement slice without exactly one terminal semicolon.
+  The returned slices retain all source bytes and are validated before any
+  trace event or SQL execution. Each slice is passed to the existing
+  `Connection::execute_batch` API in order; the first DuckDB error emits a
+  JSON failure event and is converted with the existing typed error mapper.
+  No transaction, parser, unsafe code, dependency, or SQL edit was added.
+- The final focused combined-root release test command used expected
+  `E=60s`, ceiling `2E=120s`:
+  `cargo test -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-features --release --locked --offline namespace_import_statement_trace::tests -- --nocapture`.
+- Exact result: `running 6 tests`; all six named REQ tests are `... ok`;
+  `test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 110 filtered out; finished in 0.24s`;
+  `elapsed_seconds=25.77 exit_code=0`;
+  `STOPPED_ON_LIBDUCKDB_SYS_REBUILD_MARKER=FALSE`.
+  Log: `/home/ubuntu/hld-current-test-artifacts/20261113T015943Z-namespace-import-statement-trace-resume/focused-tests-postfmt.log`.
+- Two implementation-test corrections were evidence-driven. First, a blanket
+  single-quote rejection rejected existing SQL literals; the guard now checks
+  quote balance, comments and fixed per-slice terminators. Second, DuckDB's
+  whole-script and slice error excerpts differed (`LINE 9` vs `LINE 5`), while
+  the primary missing-table diagnostic matched and traced text exactly matched
+  a raw call on statement four. The test compares those engine-specific
+  properties plus autocommit/rollback rows instead of requiring context-line
+  identity. The final failure test confirms 3 statements complete, statement
+  4 fails, and no later statement marker/side effect occurs.
+- `cargo fmt --all` completed after formatting changes; the final
+  `cargo fmt --all -- --check` exited `0` in `3.95s`. The initial pre-format
+  check correctly reported formatting diffs and was followed by the formatter.
+- Next: run relevant existing adapter regressions, scoped all-target/all-feature
+  release Clippy and warmed release build; then record REFACTOR and gates.
+
+## REQ-RUST-028.2 — REFACTOR AND GATES — 2026-11-13
+
+- Refactor review retained the fixed marker-derived slices and iterator-based
+  execution; no parser, transaction abstraction, or wider SQL boundary helper
+  is needed. Clippy identified `chunks_exact(2)` in the marker test as a
+  constant-chunk anti-pattern. Replaced it with `as_chunks::<2>()` and an
+  explicit empty-remainder assertion; this also makes odd event counts fail
+  directly. The focused six-test group passed again after that edit.
+- Focused combined-root release tests, expected `60s` / ceiling `120s`:
+  `cargo test -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-features --release --locked --offline namespace_import_statement_trace::tests -- --nocapture`.
+  Output: `test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 110 filtered out; finished in 0.23s`;
+  `elapsed_seconds=25.45 exit_code=0`;
+  `STOPPED_ON_LIBDUCKDB_SYS_REBUILD_MARKER=FALSE`.
+- Existing adapter regressions, each expected `60s` / ceiling `120s`, passed
+  on the same combined package graph:
+  `cargo test -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-features --release --locked --offline frozen_namespace_sql_resolution_contract -- --nocapture` —
+  `1 passed; 0 failed; 115 filtered out; finished in 0.58s`; elapsed `0.81s`, exit `0`.
+  `cargo test -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-features --release --locked --offline frozen_standard_type_macro_preludes -- --nocapture` —
+  `1 passed; 0 failed; 115 filtered out; finished in 1.51s`; elapsed `1.71s`, exit `0`.
+  Both reported no DuckDB rebuild marker.
+- Formatting gates: `cargo fmt --all` exit `0` in `3.58s`; final
+  `cargo fmt --all -- --check` after the last Rust edit exit `0` in `3.83s`.
+- Scoped release lint gate, expected `60s` / ceiling `120s`:
+  `cargo clippy -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-targets --all-features --release --locked --offline -- -D warnings` —
+  `Finished release profile [optimized] target(s) in 1.53s`; elapsed `1.59s`,
+  exit `0`, no DuckDB rebuild marker.
+- Warmed combined-root release build, expected `60s` / ceiling `120s`:
+  `cargo build -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --tests --all-features --release --locked --offline` —
+  `Finished release profile [optimized] target(s) in 0.19s`; elapsed `0.21s`,
+  exit `0`, no DuckDB rebuild marker.
+- Existing Cargo manifest warnings from external rust-analyzer workspaces
+  remain nonfatal (`unused manifest key 'lints.cargo'`); the environment
+  blueprint was reviewed and no maintenance command was needed for this code.
+- Commit sha: final local REQ-RUST-028.2 commit is pending this validated
+  journal entry and final diff review. No resolver, frozen-copy, native,
+  sysroot, or corpus replay was run; no push or PR was made.
+
+## REQ-RUST-028.2 — SQL-STATEMENT-TIMING-REVIEW — 2026-11-13
+
+- Final code review found the success/failure elapsed timer began just before
+  writing the `started` event, so it included JSON serialization and stderr
+  output time. Moved `Instant::now()` to immediately after that event and just
+  before `Connection::execute_batch`, making the reported duration measure the
+  statement call rather than its start-marker emission.
+- After this production edit, reran the focused and relevant existing tests
+  on the approved combined adapter+CLI release graph, each with expected
+  `60s` / ceiling `120s`: the six `namespace_import_statement_trace::tests`
+  passed (`0.23s`, command elapsed `25.08s`); `frozen_namespace_sql_resolution_contract`
+  passed (`0.58s`, elapsed `0.79s`); `frozen_standard_type_macro_preludes`
+  passed (`1.51s`, elapsed `1.68s`). Each exited `0` with no DuckDB rebuild
+  marker. Logs: `focused-final.log`, `frozen-sql-final.log`, and
+  `frozen-preludes-final.log` in
+  `/home/ubuntu/hld-current-test-artifacts/20261113T015943Z-namespace-import-statement-trace-resume/`.
+- `cargo fmt --all -- --check`: exit `0`, elapsed `3.71s`, expected `60s` /
+  ceiling `120s` (`fmt-check-after-timer.log`).
+- `cargo clippy -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --all-targets --all-features --release --locked --offline -- -D warnings`:
+  `Finished release profile [optimized] target(s) in 1.52s`; elapsed `1.58s`,
+  exit `0`, no DuckDB rebuild marker (`release-clippy-after-timer.log`).
+- `cargo build -p parseltongue-duckdb-analysis-adapter -p parseltongue-cli-dispatcher-binary --tests --all-features --release --locked --offline`:
+  `Finished release profile [optimized] target(s) in 0.18s`; elapsed `0.21s`,
+  exit `0`, no DuckDB rebuild marker (`release-build-after-timer.log`).
+- This closes the instrumentation measurement review. Commit sha remains
+  pending the immediately following local commit; no resolver, frozen-copy,
+  native, sysroot, or corpus replay was run, and no push or PR was made.

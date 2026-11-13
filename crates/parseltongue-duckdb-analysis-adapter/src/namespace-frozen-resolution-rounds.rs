@@ -72,9 +72,13 @@ pub(super) fn resolve_namespace_sql_rounds(
         eprintln!(
             "stage=namespace-resolution-step round={round} step=import-bindings event=started"
         );
-        connection
-            .execute_batch(include_str!("namespace-import-binding-rounds.sql"))
-            .map_err(error)?;
+        super::namespace_import_statement_trace::execute_import_binding_statements(
+            connection,
+            super::namespace_import_statement_trace::IMPORT_BINDING_SQL_SCRIPT,
+            scope,
+            round,
+            |event| eprintln!("{event}"),
+        )?;
         let digest = recompute_binding_rows(connection, scope).map_err(error)?;
         eprintln!(
             "stage=namespace-resolution-step round={round} step=binding-digest event=complete"
