@@ -1241,3 +1241,240 @@ Python AST syntax: 6 files parsed; test methods=121; non-four-word names=[]; mis
 
 diff checks: exit 0, no output
 ```
+
+### REQ-SOP-RUNNER-022 — RED
+
+The first synthetic helper tests were added before validator implementation. Actual command/output:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py' -v
+Ran 6 tests in 0.002s
+FAILED (errors=6)
+NotImplementedError at parse_s3_evidence_json, validate_s3_evidence_receipt, and validate_s3_prerequisite_evidence
+```
+
+The failures reproduce the unimplemented strict JSON, numeric receipt, timeout, and duplicate-reference
+contracts; no Cargo, mapper, corpus, or native Rust command was run.
+
+### REQ-SOP-RUNNER-022 — schema and later evidence collection
+
+Schema v1 requires `schema_version`, `run_id`, `milestone`, exact runtime `identity_binding`, four global
+prerequisite families (`fixture_suite`, separate `fmt`/`clippy` build receipts, `dependency_audit`, and
+`release_provenance`), and a per-pinned-repository `repository_binding` plus distinct P2 metadata/check
+receipts. Each reference is `{path,size_bytes,sha256,blake3}`. Receipt JSON binds family, scope, exact
+argv/cwd/environment, finite elapsed/timeout, completion/timeout/exit fields, and complete stdout/stderr
+descriptors. The runner loads and freezes inputs in prepared context; it does not create receipts or expose
+an identity-freezer command. Missing inputs stay BLOCKED; observed nonzero/identity/hash contradictions are
+FAIL. Hashes establish byte consistency, not independent proof that a command ran as claimed.
+
+Truthful nonqualifying example (intentionally incomplete; never evidence of a successful run):
+
+```json
+{"schema_version":1,"run_id":"example-not-run","milestone":"M1","identity_binding":{},"global_prerequisites":{},"repositories":{}}
+```
+
+Later collection recipe: first prepare/freeze the exact mapper, runner source, lockfiles, parser pin/bundle,
+R1 patch, toolchain, config/environment, repository snapshots and P2 unit policy. Do not derive a new
+identity from the receipt bundle. Run each required command separately from its bound workspace cwd; for
+example production checks use `cargo fmt --all -- --check`, `cargo clippy --message-format=json --workspace
+--all-targets --all-features -- -D warnings`, unfiltered `cargo test --workspace`, the pinned normal-edge
+`cargo tree`, and the separate release build. For each pinned repository, run offline+locked metadata and
+the exact `cargo check --workspace --lib --bins --message-format=json` policy. Preserve raw stdout/stderr
+outside project/corpus/output roots; record actual argv, cwd, non-secret relevant environment, elapsed,
+timeout and exit result. Compute every descriptor from the retained bytes with the runner's existing
+SHA-256/BLAKE3 identity helpers, then finalize manifest references only after commands finish. Do not
+substitute a hand-authored PASS flag or example bundle.
+
+Validator GREEN after subsequent P2, source-inventory and publication-token integration changes:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 31 tests in 0.086s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 121 tests in 1.231s
+OK
+
+PYTHONPYCACHEPREFIX=/tmp/s3-intake-pycache python3 -m py_compile tools/hld-current-qualification-runner.py tools/s3-prerequisite-evidence-intake.py tools/test_sop_qualification_runner.py tools/test_s3_prerequisite_evidence_intake.py
+exit 0
+```
+
+No-refactor checkpoint: the current review batch changes only the scoped runner, helper, tests and this
+journal; no Cargo, mapper, corpus, native Rust test, production crate, or shared documentation was run or
+edited. Full external-receipt authenticity remains outside this validator's claim.
+
+## REQ-SOP-RUNNER-022 — append-only implementation checkpoint
+
+This REQ-022 overview and historical STUB checkpoint are now placed after all pre-existing HEAD content;
+the original journal bytes are unchanged. The former STUB is superseded by the implementation and results
+below. This local runner requirement adds no Cargo evidence and no mapper, corpus, or native-Rust command.
+It traces to SPEC §4 REQ 001–004, 010, 014–017, 020–022 at M0/M1/M2 applicability and SOP §1 P1–P5,
+§2 S3, and §3 M0–M2. Shared SPEC/SOP/AGENTS remain unchanged.
+
+### REQ-SOP-RUNNER-022 — historical STUB checkpoint
+
+The initial planned pure API was `parse_s3_evidence_json`, `validate_s3_evidence_bundle`, command-family
+validators, and source-backed fixture inventory, with a runner I/O adapter. The initial test plan covered
+duplicate/malformed JSON, receipt identity/file integrity, command grammar, source fixture accounting and
+conditional ignores, gate aggregation, freeze mutation, and pre-mapper stop. The RED implementation stub
+was replaced by the strict helper and adapter exercised in the recorded GREEN results below.
+
+The optional input is `--s3-prerequisite-evidence PATH`. The helper is pure over strict-decoded documents,
+receipt/log bytes, runtime identity, source-derived repository bindings, and frozen Rust fixture inventory;
+it never executes manifest-supplied commands. The runner freezes manifest/receipt/log bytes and present and
+absent identities, checks those identities at boundaries, records five gate families, and blocks/fails
+before S3 output or mapping unless all prerequisites and the internal run/repository/identity token pass.
+Public PASS maps cannot promote a run; HARNESS ONLY synthetic evidence leaves the overall run
+`HARNESS ONLY`. Top-level wrong run/milestone/identity violations propagate FAIL to fallback gate rows,
+while a later repository's P2 result remains repository-scoped and does not fail `serde`.
+
+### Exact schema v1 fields
+
+The manifest has exactly `schema_version`, `run_id`, `milestone`, `identity_binding`,
+`global_prerequisites`, and `repositories`. `schema_version` is integer 1 (not bool). The runtime identity
+binds the run/milestone, mapper path and SHA-256/BLAKE3, runner/source and lock identities, parser/R1
+identities, toolchain/configuration, and relevant secret-free environment. `global_prerequisites` contains
+`fixture_suite`, `build_evidence` with separate `fmt`/`clippy`, `dependency_audit`, and `release_provenance`.
+The repository map is exactly the pinned repository set; each value has exactly `repository_binding` and
+`p2_offline_qualification`, containing two independent P2 receipt references (`p2_metadata`, `p2_check`).
+
+Each reference has exactly `{path,size_bytes,sha256,blake3}` and names a unique retained regular file by a
+relative non-alias path. A receipt has exactly `{schema_version,receipt_id,family,scope,identity_binding,
+argv,cwd,relevant_environment,elapsed_seconds,timeout_seconds,completion_status,timed_out,exit_status,
+stdout,stderr}`; P2 receipts additionally require `repository_binding`. The `stdout` and `stderr`
+descriptors each have exactly `{path,size_bytes,sha256,blake3,complete}`; `complete` must be true. Receipt
+and descriptor sizes/hashes are checked against retained bytes. Duplicate JSON keys/nonfinite numbers,
+unsupported shapes, absent data, and incomplete streams cannot produce PASS; observed command/test/build/
+dependency/hash/identity violations are FAIL. A receipt hash proves byte consistency, not who produced it.
+
+### Required command argv table
+
+| Receipt family / scope | Required argv after frozen PATH-dispatched Cargo |
+| --- | --- |
+| `fixture_suite` / production | `test --workspace` (unfiltered) |
+| `fmt` / production | `fmt --all -- --check` |
+| `clippy` / production | `clippy --message-format=json --workspace --all-targets --all-features -- -D warnings` |
+| `dependency_audit` / production | `tree --package parseltongue-cli-dispatcher-binary --edges normal --prefix none --format {p}` |
+| `release_build` / production | `build --release --package parseltongue-cli-dispatcher-binary --bin parseltongue --message-format=json` |
+| `p2_metadata` / each pinned repo | `metadata --format-version 1 --offline --locked` |
+| `p2_check` / each pinned repo | `check --workspace --lib --bins --offline --locked --message-format=json` |
+
+The actual argv[0] must be the current PATH-dispatched Cargo executable whose frozen file identity is in
+the runtime binding; an arbitrary same-basename executable is not accepted. P2 source inventory includes
+canonical `src_path`; Cargo metadata target sources and check-artifact `target.src_path` plus
+`manifest_path` are compared to the expected unit. Missing path data is BLOCKED, observed mismatch is FAIL,
+and unsupported external/ambiguous target paths stay BLOCKED.
+
+### Bounded future receipt collection
+
+Prepare the ordinary runner context first and keep its identity helpers and repository/unit bindings; never
+derive expected identity or argv from receipts. Run each required command separately in the bound cwd.
+Capture monotonic start/end readings and calculate elapsed with `time.monotonic()`, recording configured
+timeout, completion, and actual exit. A timed-out command with no complete result remains BLOCKED; exit 124
+alone is not an assertion failure. A separately observed failed test, explicit build-finished false, or
+completed nonzero remains FAIL even if a sibling stream/receipt is incomplete. Retain exact raw stdout and
+stderr bytes outside project/corpus/report/artifact roots; do not normalize, truncate, or fabricate them.
+After stream completion, compute byte count, SHA-256 and BLAKE3 with the runner's identity helpers, then
+write receipt and manifest references. The runner never executes an arbitrary manifest command or offers an
+evidence-creation shortcut. Do not fabricate real command/test/dependency/build evidence.
+
+External receipt honesty is not authenticated by hashes, and command output alone cannot authenticate that
+a historical command ran. Missing exact M2 crosswalk names in THIS checkout remain required-but-unproven
+and BLOCKED; no aliases/waivers are inferred. The child-ignore exception is conditional only: accept the
+exact `test_child_fixture_waits_release` ignored source/reason only when source-backed and all three named
+active child tests passed; absent child support is not required, and an unsupported claimed ignored row is
+BLOCKED. The three manual-profile ignores remain source-backed only.
+
+### Actual final integration RED and GREEN logs
+
+Before implementation, P2 source/manifest regressions recorded:
+
+```text
+Ran 5 tests in 0.027s
+FAILED (failures=4)
+test_p2_metadata_source_fails: BLOCKED != FAIL
+test_p2_metadata_manifest_fails: BLOCKED != FAIL
+test_p2_artifact_source_fails: BLOCKED != FAIL
+test_p2_artifact_manifest_fails: BLOCKED != FAIL
+test_p2_missing_source_blocks: ok
+```
+
+The initial runner adapter RED was `Ran 3 tests in 0.241s` / `FAILED (failures=1, errors=2)`: wrong
+identity raised `KeyError: 'validation_error'`; intake priority raised
+`AttributeError: module 'sop_qualification_runner' has no attribute 'merge_s3_intake_error'`; external
+source path reported `RunnerPreconditionBlockedError not raised`. The wrong-identity regression was then
+extended through `serde` S3 pre-mapper stop.
+
+```text
+Focused helper GREEN: Ran 5 tests in 0.027s / OK
+Focused runner GREEN: Ran 4 tests in 0.235s / OK
+
+Helper suite: Ran 70 tests in 0.290s / OK
+Runner suite: Ran 136 tests in 2.408s / OK
+Process-tree suite: Ran 6 tests in 0.342s / OK
+```
+
+### Test traceability and final checkpoint
+
+The complete method-name list for tests previously unreferenced in the journal is appended next; every
+test has a `REQ-SOP-RUNNER-*` docstring tag and four underscore-delimited words after `test_`. The final
+AST/name/tag/traceability and whitespace command outputs follow that list. No-refactor checkpoint: only
+the scoped runner, pure intake helper, tests and this journal changed; no Cargo, native Rust, mapper,
+corpus, or production evidence command was run, and no commit was made.
+
+Tests previously absent from this journal, now cross-listed for traceability:
+
+Runner:
+`test_s3_identity_bound_harness` `test_s3_intake_failure_priority` `test_s3_identity_failure_stops`
+`test_s3_intake_error_priority` `test_s3_native_skip_blocks` `test_workspace_inherited_proc_macro`
+`test_workspace_custom_crate_blocks` `test_workspace_external_source_blocks`
+`test_s3_component_cannot_promote` `test_s3_fail_precedes_blocked` `test_s3_prerequisite_blocks_mapper`
+`test_intake_mutated_bytes_fail` `test_parent_symlink_replacement_fails`
+`test_external_member_overlap_blocks` `test_config_appears_pre_freeze` `test_config_appears_post_freeze`
+`test_receipt_appears_pre_freeze` `test_intake_fail_over_blocks` `test_frozen_evidence_mutation_fails`
+`test_frozen_evidence_deletion_fails` `test_evidence_symlink_retarget_fails`
+`test_duplicate_page_stops_collection`
+
+Helper:
+`test_json_rejects_duplicate_keys` `test_json_rejects_nonfinite_numbers`
+`test_receipt_rejects_boolean_version` `test_receipt_rejects_boolean_elapsed`
+`test_bad_reference_shape_blocks` `test_missing_receipt_schema_blocks` `test_missing_receipt_exit_blocks`
+`test_nested_receipt_identity_fails` `test_receipt_rejects_timeout_success`
+`test_manifest_rejects_duplicate_references` `test_manifest_schema_version_blocks`
+`test_valid_bundle_returns_tokens` `test_identity_mismatch_fails_bundle` `test_hash_mismatch_fails_bundle`
+`test_missing_log_blocks_bundle` `test_truncated_log_blocks_bundle` `test_fixture_filter_blocks_bundle`
+`test_native_skip_blocks_bundle` `test_forbidden_tree_fails_gate` `test_analysis_tree_dependencies_fail`
+`test_pinned_parser_tree_passes` `test_release_mismatch_fails_gate` `test_p2_target_override_blocks`
+`test_p2_feature_override_blocks` `test_manual_ignore_passes_bundle` `test_unknown_ignore_blocks_fixture`
+`test_child_absent_ignore_blocks` `test_child_exception_active_passes` `test_failed_fixture_sets_fail`
+`test_nonzero_then_missing_fails` `test_fixture_failure_beats_truncated`
+`test_forbidden_tree_lacks_p2` `test_missing_then_nonzero_fails` `test_m2_missing_crosswalk_blocks`
+`test_source_macro_ambiguity_blocks` `test_duplicate_receipt_id_fails`
+`test_duplicate_receipt_contents_fail` `test_p2_feature_mismatch_fails`
+`test_async_source_inventory_matches` `test_detached_test_attribute_blocks`
+`test_wrong_runtime_run_fails` `test_wrong_pinned_repository_fails` `test_selected_unit_policy_fails`
+`test_command_target_selector_blocks` `test_fixture_section_counts_block` `test_fixture_measured_rows_block`
+`test_clippy_warning_stderr_fails` `test_tree_full_rows_block` `test_tree_server_families_fail`
+`test_release_missing_artifact_blocks` `test_release_identity_context_blocks`
+`test_release_package_locator_fails` `test_release_version_only_pkgid`
+`test_timeout_fixture_receipt_blocks` `test_timeout_fixture_failure_fails`
+`test_unknown_target_override_blocks` `test_wrong_dispatched_cargo_blocks`
+`test_release_binary_source_fails` `test_release_malformed_target_blocks`
+`test_release_success_beats_truncated` `test_release_missing_success_blocks`
+`test_p2_missing_finish_blocks` `test_p2_failure_beats_truncated`
+`test_metadata_nested_malformed_blocks` `test_malformed_receipt_id_blocks`
+
+### Receipt recipe correction — read-only identity preparation
+
+“Prepare the ordinary runner context first” means assemble the expected binding with read-only identity
+helpers only: capture the source snapshots, lock/config/toolchain identities and registry, then call
+`build_s3_expected_identity` and `build_s3_repository_bindings`. Choose a fresh run ID and calculate the
+exact PLANNED runner-owned report/artifact run-directory paths, but exclude those exact paths from the
+identity registry; do not create them. Do not invoke `prepare_execution_context` or
+`execute_qualification_run` and do not precreate either owned run directory before the receipt manifest is
+complete. Retain the expected identity and repository bindings externally, run the fixed bounded receipt
+commands using those bindings, retain/hash their raw streams, and assemble the complete manifest. Only
+then invoke the runner once with that manifest and the fresh run ID. Never reuse a run ID or owned
+directory from a failed or incomplete preparation. No automatic identity freezer or receipt-collection
+command is added.

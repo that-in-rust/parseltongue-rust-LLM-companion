@@ -10,12 +10,13 @@ import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import platform
 import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from typing import Any
 
 sys.dont_write_bytecode = True
@@ -35,6 +36,14 @@ SOURCE_SUFFIXES = {
 }
 GENERATED_SOURCE_DIRECTORY_NAMES = {".git", "target"}
 S3_COMPONENT_NAMES = ("mapping", "measurement", "process_access_audit", "publication")
+S3_GATE_NAMES = ("fixture_suite", "build_evidence", "dependency_audit",
+                 "p2_offline_qualification", "release_provenance")
+S3_RELEVANT_ENVIRONMENT_NAMES = {
+    "PATH", "CARGO_HOME", "RUSTUP_HOME", "RUSTUP_TOOLCHAIN", "RUSTC", "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER", "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET",
+    "CARGO_TARGET_DIR", "RUSTC_BOOTSTRAP", "CC", "CXX", "AR", "CFLAGS", "CXXFLAGS", "CPPFLAGS",
+    "LDFLAGS", "PKG_CONFIG", "PKG_CONFIG_PATH", "PKG_CONFIG_LIBDIR",
+}
 MAX_COMMAND_EVENT_BYTES = 16_384
 MAX_COMMAND_JOURNAL_BYTES = 8 * 1024 * 1024
 MAX_COMMAND_EVENT_COUNT = 512
@@ -71,6 +80,9 @@ production_measurements = load_runner_support_module(
 process_auditor = load_runner_support_module(
     "hld_runner_process_auditor", PROJECT_ROOT / "tools/process-tree-access-auditor.py"
 )
+s3_evidence_intake = load_runner_support_module(
+    "hld_runner_s3_evidence_intake", PROJECT_ROOT / "tools/s3-prerequisite-evidence-intake.py"
+)
 
 
 def current_utc_timestamp_text() -> str:
@@ -84,10 +96,11 @@ def probe_toolchain_versions() -> Mapping[str, Mapping[str, Any]]:
         if not executable_path:
             versions[tool_name] = {
                 "path": None, "canonical_path": None,
-                "version": "unavailable", "return_code": None,
+                "version": "unavailable", "return_code": None, "file_identity": None,
             }
             continue
-        canonical_path = str(Path(executable_path).resolve())
+        file_identity = capture_frozen_file_identity(Path(executable_path))
+        canonical_path = str(Path(executable_path).resolve(strict=True))
         try:
             result = subprocess.run([executable_path, "--version"], text=True,
                                     capture_output=True, check=False)
@@ -95,9 +108,10 @@ def probe_toolchain_versions() -> Mapping[str, Mapping[str, Any]]:
             versions[tool_name] = {
                 "path": executable_path, "canonical_path": canonical_path,
                 "version": "unavailable", "return_code": None,
-                "error": str(error),
+                "error": str(error), "file_identity": file_identity,
             }
             continue
+        verify_frozen_file_identity(file_identity)
         version_text = result.stdout.strip() or result.stderr.strip() or "unavailable"
         versions[tool_name] = {
             "path": executable_path,
@@ -105,6 +119,7 @@ def probe_toolchain_versions() -> Mapping[str, Mapping[str, Any]]:
             "version": version_text if result.returncode == 0 else "unavailable",
             "return_code": result.returncode,
             "error": result.stderr.strip() if result.returncode != 0 else None,
+            "file_identity": file_identity,
         }
     return versions
 
@@ -194,7 +209,7 @@ def build_initial_repository_state() -> dict[str, Any]:
 
 
 def calculate_overall_run_status(manifest_value: Mapping[str, Any]) -> str:
-    if manifest_value.get("execution_identity") == "HARNESS ONLY" and "harness_probe" in manifest_value:
+    if manifest_value.get("execution_identity") == "HARNESS ONLY":
         return "HARNESS ONLY"
     statuses = []
     for repository_state in manifest_value["repositories"].values():
@@ -222,6 +237,15 @@ def calculate_overall_run_status(manifest_value: Mapping[str, Any]) -> str:
     if any(status == "PASS" for status in statuses):
         return "IN PROGRESS"
     return "NOT STARTED"
+
+
+def merge_s3_intake_error(current_error, new_error):
+    if current_error is None:
+        return new_error
+    priority = {"PASS": 0, "BLOCKED": 1, "FAIL": 2}
+    current_status = current_error[0] if isinstance(current_error, tuple) and current_error else "BLOCKED"
+    new_status = new_error[0] if isinstance(new_error, tuple) and new_error else "BLOCKED"
+    return new_error if priority.get(new_status, 1) > priority.get(current_status, 1) else current_error
 
 
 def persist_run_manifest(run_state: Mapping[str, Any]) -> None:
@@ -418,8 +442,16 @@ def capture_frozen_file_identity(file_path: Path) -> Mapping[str, Any]:
 
 
 def verify_frozen_file_identity(file_identity: Mapping[str, Any]) -> None:
+    file_path = Path(file_identity["path"]).absolute()
+    current_path = Path(file_path.anchor)
+    for component in file_path.parts[1:-1]:
+        current_path /= component
+        if current_path.is_symlink():
+            raise RunnerFrozenInputMutationError(
+                f"frozen file ancestor became a symlink: {current_path}"
+            )
     try:
-        current_identity = capture_frozen_file_identity(Path(file_identity["path"]))
+        current_identity = capture_frozen_file_identity(file_path)
     except RunnerPreconditionBlockedError as error:
         raise RunnerFrozenInputMutationError(
             f"frozen file can no longer be verified: {file_identity['path']}: {error}"
@@ -437,8 +469,16 @@ def capture_optional_frozen_file_identity(file_path: Path) -> Mapping[str, Any]:
 
 
 def verify_optional_frozen_file_identity(file_identity: Mapping[str, Any]) -> None:
+    file_path = Path(file_identity["path"]).absolute()
+    current_path = Path(file_path.anchor)
+    for component in file_path.parts[1:-1]:
+        current_path /= component
+        if current_path.is_symlink():
+            raise RunnerFrozenInputMutationError(
+                f"optional frozen file ancestor became a symlink: {current_path}"
+            )
     try:
-        current = capture_optional_frozen_file_identity(Path(file_identity["path"]))
+        current = capture_optional_frozen_file_identity(file_path)
     except RunnerPreconditionBlockedError as error:
         raise RunnerFrozenInputMutationError(
             f"optional frozen file can no longer be verified: {file_identity['path']}: {error}"
@@ -1078,6 +1118,7 @@ def build_runner_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--harness-only", action="store_true")
     parser.add_argument("--r4-evidence", type=Path)
     parser.add_argument("--r5-evidence", type=Path)
+    parser.add_argument("--s3-prerequisite-evidence", type=Path)
     return parser
 
 
@@ -1198,15 +1239,66 @@ def resolve_output_source_roots(arguments: argparse.Namespace) -> Mapping[str, P
     return source_roots
 
 
+def canonicalize_non_symlink_path(path_value: Path, allow_missing: bool) -> Path:
+    path = Path(path_value).expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if ".." in path.parts:
+        raise RunnerPreconditionBlockedError(f"path aliases containing '..' are unsupported: {path}")
+    current_path = Path(path.anchor)
+    for component in path.parts[1:]:
+        current_path /= component
+        if current_path.is_symlink():
+            raise RunnerPreconditionBlockedError(f"symlink path components are unsupported: {current_path}")
+        if current_path.exists() and current_path != path and not current_path.is_dir():
+            raise RunnerPreconditionBlockedError(f"path component is not a directory: {current_path}")
+    if not allow_missing and not path.exists():
+        raise RunnerPreconditionBlockedError(f"path does not exist: {path}")
+    return path.resolve(strict=not allow_missing)
+
+
+def validate_s3_evidence_path(arguments, output_paths, source_roots) -> None:
+    evidence_value = getattr(arguments, "s3_prerequisite_evidence", None)
+    run_id = arguments.run_id
+    output_directories = [output_paths["report_root"] / run_id, output_paths["artifact_root"] / run_id]
+    source_paths = [PROJECT_ROOT, *source_roots.values()]
+    if evidence_value is not None:
+        evidence_path = canonicalize_non_symlink_path(Path(evidence_value), allow_missing=True)
+        for source_path in source_paths:
+            if source_output_paths_overlap(evidence_path, Path(source_path).resolve()):
+                raise RunnerPreconditionBlockedError(
+                    f"S3 prerequisite evidence must be external to source roots: {evidence_path} overlaps {source_path}"
+                )
+        for output_directory in output_directories:
+            if source_output_paths_overlap(evidence_path, output_directory):
+                raise RunnerPreconditionBlockedError(
+                    f"S3 evidence cannot overlap a newly owned output directory: {evidence_path}"
+                )
+        arguments.s3_prerequisite_evidence = evidence_path
+    target_directory_value = os.environ.get("CARGO_TARGET_DIR")
+    if target_directory_value:
+        target_directory = canonicalize_non_symlink_path(Path(target_directory_value), allow_missing=True)
+        for source_path in source_paths:
+            if source_output_paths_overlap(target_directory, Path(source_path).resolve()):
+                raise RunnerPreconditionBlockedError(
+                    f"CARGO_TARGET_DIR must be external to source roots: {target_directory} overlaps {source_path}"
+                )
+        for output_directory in output_directories:
+            if source_output_paths_overlap(target_directory, output_directory):
+                raise RunnerPreconditionBlockedError("CARGO_TARGET_DIR overlaps a newly owned output directory")
+
+
 def validate_run_output_paths(arguments: argparse.Namespace) -> Mapping[str, Path]:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", arguments.run_id):
         raise RunnerPreconditionBlockedError("run identifier must be a safe, unique path component")
+    source_roots = resolve_output_source_roots(arguments)
     output_paths = validate_output_root_paths(
         arguments.report_root,
         arguments.artifact_root,
         PROJECT_ROOT,
-        resolve_output_source_roots(arguments),
+        source_roots,
     )
+    validate_s3_evidence_path(arguments, output_paths, source_roots)
     arguments.report_root = output_paths["report_root"]
     arguments.artifact_root = output_paths["artifact_root"]
     return output_paths
@@ -1218,11 +1310,18 @@ def capture_identity_registry(
     corpus_roots: Mapping[str, Path],
     excluded_paths: Sequence[Path],
     executable_identities: Sequence[Mapping[str, Any]],
+    extra_frozen_paths: Sequence[Path] = (),
+    optional_frozen_paths: Sequence[Path] = (),
+    expected_frozen_files: Mapping[str, Mapping[str, Any]] | None = None,
+    expected_optional_files: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> Mapping[str, Any]:
     frozen_files = {}
     for file_path in manifest_paths:
         file_identity = capture_frozen_file_identity(file_path)
-        frozen_files[file_identity["path"]] = file_identity
+        expected_identity = (expected_frozen_files or {}).get(file_identity["path"])
+        if expected_identity is not None and dict(file_identity) != dict(expected_identity):
+            raise RunnerFrozenInputMutationError(f"frozen input changed while freezing: {file_identity['path']}")
+        frozen_files[file_identity["path"]] = dict(expected_identity or file_identity)
     lock_files = {str((project_root / "Cargo.lock").absolute()): capture_optional_frozen_file_identity(project_root / "Cargo.lock")}
     for corpus_root in corpus_roots.values():
         lock_path = corpus_root / "Cargo.lock"
@@ -1243,8 +1342,23 @@ def capture_identity_registry(
     }
     for executable_identity in executable_identities:
         frozen_files[executable_identity["path"]] = dict(executable_identity)
+    for file_path in extra_frozen_paths:
+        file_identity = capture_frozen_file_identity(file_path)
+        expected_identity = (expected_frozen_files or {}).get(file_identity["path"])
+        if expected_identity is not None and file_identity != expected_identity:
+            raise RunnerFrozenInputMutationError(f"evidence changed while freezing: {file_identity['path']}")
+        frozen_files[file_identity["path"]] = dict(expected_identity or file_identity)
+    optional_files = {}
+    for file_path in optional_frozen_paths:
+        file_key = str(Path(file_path).absolute())
+        current_identity = capture_optional_frozen_file_identity(Path(file_path))
+        expected_identity = (expected_optional_files or {}).get(file_key)
+        if expected_identity is not None and dict(current_identity) != dict(expected_identity):
+            raise RunnerFrozenInputMutationError(f"optional frozen input changed while freezing: {file_key}")
+        optional_files[file_key] = dict(expected_identity or current_identity)
     return {
         "frozen_files": frozen_files,
+        "optional_files": optional_files,
         "lock_files": lock_files,
         "source_snapshots": source_snapshots,
         "permitted_lock_paths_by_root": {
@@ -1259,6 +1373,8 @@ def verify_identity_registry(registry: Mapping[str, Any]) -> None:
     for identity in registry["frozen_files"].values():
         verify_frozen_file_identity(identity)
     for identity in registry["lock_files"].values():
+        verify_optional_frozen_file_identity(identity)
+    for identity in registry.get("optional_files", {}).values():
         verify_optional_frozen_file_identity(identity)
     excluded_paths = [Path(path) for path in registry["excluded_paths"]]
     permitted_lock_paths_by_root = registry.get("permitted_lock_paths_by_root", {})
@@ -1275,9 +1391,617 @@ def verify_identity_registry(registry: Mapping[str, Any]) -> None:
             raise RunnerFrozenInputMutationError(f"frozen source snapshot changed: {root_path}")
 
 
-def make_identity_boundary_callback(registry: Mapping[str, Any]):
+def capture_s3_evidence_environment() -> Mapping[str, str]:
+    environment = {}
+    for name, value in os.environ.items():
+        if name not in S3_RELEVANT_ENVIRONMENT_NAMES and not name.startswith(
+            ("PARSELTONGUE_", "CARGO_PROFILE_", "CARGO_TARGET_", "CC_", "CFLAGS_", "CXXFLAGS_",
+             "AR_", "PKG_CONFIG_")
+        ):
+            continue
+        if re.search(r"(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH|PRIVATE_KEY)", name, re.IGNORECASE):
+            continue
+        environment[name] = value
+    return dict(sorted(environment.items()))
+
+
+def find_cargo_configuration_files(project_root, corpus_roots, environment):
+    candidate_paths = set()
+    roots = [Path(project_root), *[Path(root) for root in corpus_roots.values()]]
+    for root in roots:
+        current = root.resolve()
+        while True:
+            candidate_paths.update(current / ".cargo" / name for name in ("config.toml", "config"))
+            if current.parent == current:
+                break
+            current = current.parent
+    cargo_home = environment.get("CARGO_HOME")
+    if cargo_home is not None:
+        cargo_home_path = Path(cargo_home).expanduser()
+        if not cargo_home_path.is_absolute():
+            cargo_home_path = Path.cwd() / cargo_home_path
+    else:
+        cargo_home_path = Path.home() / ".cargo"
+    candidate_paths.update(cargo_home_path / name for name in ("config.toml", "config"))
+    return sorted(candidate_paths, key=str)
+
+
+def cargo_configuration_override_reason(configuration_paths):
+    for config_path in configuration_paths:
+        if not Path(config_path).exists():
+            continue
+        try:
+            document = tomllib.loads(Path(config_path).read_text())
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            return f"Cargo config cannot be parsed: {config_path}: {error}"
+        build = document.get("build", {})
+        if not isinstance(build, Mapping):
+            return f"Cargo config build table is not an object: {config_path}"
+        forbidden_build_keys = {
+            "target", "target-dir", "rustflags", "rustc", "rustc-wrapper", "rustc-workspace-wrapper",
+        }
+        if forbidden_build_keys.intersection(build):
+            return f"Cargo config changes target/compiler policy: {config_path}"
+        target_tables = document.get("target", {})
+        if isinstance(target_tables, Mapping):
+            for target_config in target_tables.values():
+                if isinstance(target_config, Mapping) and {"rustflags", "linker"}.intersection(target_config):
+                    return f"Cargo target config changes cfg/compiler policy: {config_path}"
+        configured_environment = document.get("env", {})
+        if isinstance(configured_environment, Mapping) and any(
+            re.search(r"(?:SKIP|FILTER|IGNORE|NO_NATIVE)", str(name), re.IGNORECASE)
+            for name in configured_environment
+        ):
+            return f"Cargo config injects an unsupported test-skip environment: {config_path}"
+        if isinstance(configured_environment, Mapping) and any(
+            str(name).startswith(("CARGO_TARGET_", "CARGO_BUILD_TARGET", "RUSTFLAGS", "RUSTC"))
+            for name in configured_environment
+        ):
+            return f"Cargo config injects target/cfg/compiler environment: {config_path}"
+    return None
+
+
+def s3_configuration_blocked_gates(environment, configuration_reason):
+    blocked = {}
+    native_skip = any(
+        re.search(r"(?:SKIP|FILTER|IGNORE|NO_NATIVE)", name, re.IGNORECASE) and value
+        for name, value in environment.items()
+    )
+    target_or_compiler_override = any(environment.get(name) for name in (
+        "CARGO_BUILD_TARGET", "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC",
+        "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
+    )) or any(name.startswith("CARGO_TARGET_") and name != "CARGO_TARGET_DIR" and value
+             for name, value in environment.items()) or any(
+                 name.startswith("CARGO_PROFILE_") and value for name, value in environment.items()
+             )
+    if native_skip:
+        blocked["fixture_suite"] = "native test skip/filter environment is unsupported"
+    if target_or_compiler_override:
+        for gate in ("fixture_suite", "build_evidence", "release_provenance", "p2_offline_qualification"):
+            blocked[gate] = "unsupported Cargo target/compiler configuration affects this prerequisite"
+    if configuration_reason:
+        if "test-skip" in configuration_reason or "native test skip" in configuration_reason:
+            blocked["fixture_suite"] = configuration_reason
+        elif "target/compiler" in configuration_reason or "target/cfg/compiler" in configuration_reason:
+            for gate in ("fixture_suite", "build_evidence", "release_provenance", "p2_offline_qualification"):
+                blocked[gate] = configuration_reason
+        else:
+            for gate in S3_GATE_NAMES:
+                blocked[gate] = configuration_reason
+    return blocked
+
+
+def read_workspace_unit_inventory(repository_root):
+    root = Path(repository_root).resolve(strict=True)
+    root_manifest_path = root / "Cargo.toml"
+    try:
+        root_manifest = tomllib.loads(root_manifest_path.read_text())
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise RunnerPreconditionBlockedError(f"workspace manifest cannot be parsed: {root_manifest_path}: {error}") from error
+    workspace = root_manifest.get("workspace", {})
+    members = workspace.get("members") if isinstance(workspace, Mapping) else None
+    excluded = workspace.get("exclude", []) if isinstance(workspace, Mapping) else []
+    member_paths = {root_manifest_path.resolve()} if "package" in root_manifest else set()
+    if members is not None:
+        if not isinstance(members, list) or not members:
+            raise RunnerPreconditionBlockedError(f"workspace member patterns are unsupported: {root_manifest_path}")
+        for pattern in members:
+            matches = list(root.glob(pattern))
+            if not matches:
+                raise RunnerPreconditionBlockedError(f"workspace member pattern matched nothing: {pattern}")
+            for match in matches:
+                manifest_path = (match / "Cargo.toml") if match.is_dir() else match
+                if manifest_path.name == "Cargo.toml" and manifest_path.is_file():
+                    member_paths.add(manifest_path.resolve())
+    for pattern in excluded:
+        for match in root.glob(pattern):
+            excluded_path = (match / "Cargo.toml") if match.is_dir() else match
+            member_paths.discard(excluded_path.resolve())
+    if not member_paths:
+        raise RunnerPreconditionBlockedError(f"workspace has no Cargo package manifests: {root_manifest_path}")
+    workspace_package = workspace.get("package", {}) if isinstance(workspace, Mapping) else {}
+    selected_units = []
+    for manifest_path in sorted(member_paths, key=str):
+        if not manifest_path.is_relative_to(root):
+            raise RunnerPreconditionBlockedError(f"workspace member escapes pinned source root: {manifest_path}")
+        try:
+            manifest = tomllib.loads(manifest_path.read_text())
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            raise RunnerPreconditionBlockedError(f"member manifest cannot be parsed: {manifest_path}: {error}") from error
+        package = manifest.get("package")
+        if not isinstance(package, Mapping) or not isinstance(package.get("name"), str):
+            raise RunnerPreconditionBlockedError(f"workspace member has no package identity: {manifest_path}")
+        package_name = package["name"]
+        edition_value = package.get("edition", workspace_package.get("edition"))
+        if isinstance(edition_value, Mapping) and edition_value.get("workspace") is True:
+            edition = workspace_package.get("edition")
+        else:
+            edition = edition_value
+        if not isinstance(edition, str):
+            raise RunnerPreconditionBlockedError(f"workspace package edition is not explicit: {manifest_path}")
+        lib = manifest.get("lib", {})
+        if not isinstance(lib, Mapping):
+            raise RunnerPreconditionBlockedError(f"lib target table is invalid: {manifest_path}")
+        lib_relative_path = lib.get("path", "src/lib.rs")
+        if not isinstance(lib_relative_path, str) or not lib_relative_path:
+            raise RunnerPreconditionBlockedError(f"lib target source path is unsupported: {manifest_path}")
+        lib_path = manifest_path.parent / lib_relative_path
+        if "lib" in manifest or (package.get("autolib", True) and lib_path.is_file()):
+            lib_source_path = canonicalize_non_symlink_path(lib_path, allow_missing=False)
+            if not lib_source_path.is_relative_to(root):
+                raise RunnerPreconditionBlockedError(f"lib target source escapes pinned checkout: {lib_path}")
+            crate_types = lib.get("crate-type", ["lib"])
+            if isinstance(crate_types, str):
+                crate_types = [crate_types]
+            if (not isinstance(crate_types, list) or not crate_types
+                    or any(not isinstance(crate_type, str) or not crate_type for crate_type in crate_types)):
+                raise RunnerPreconditionBlockedError(f"lib crate types are unsupported: {manifest_path}")
+            proc_macro = lib.get("proc-macro", False)
+            if not isinstance(proc_macro, bool):
+                raise RunnerPreconditionBlockedError(f"lib proc-macro policy is malformed: {manifest_path}")
+            unsupported_types = set(crate_types) - {"lib", "rlib", "proc-macro"}
+            if unsupported_types:
+                raise RunnerPreconditionBlockedError(
+                    f"P2 does not support lib crate types {sorted(unsupported_types)}: {manifest_path}"
+                )
+            if proc_macro or "proc-macro" in crate_types:
+                if set(crate_types) - {"lib", "proc-macro"}:
+                    raise RunnerPreconditionBlockedError(f"proc-macro crate types are unsupported: {manifest_path}")
+                kind = ["proc-macro"]
+            else:
+                kind = sorted(set(crate_types))
+            selected_units.append({
+                "manifest_path": str(manifest_path), "target_name": lib.get("name", package_name.replace("-", "_")),
+                "kind": kind, "edition": edition, "src_path": str(lib_source_path),
+            })
+        explicit_bins = manifest.get("bin", [])
+        if isinstance(explicit_bins, Mapping):
+            explicit_bins = [explicit_bins]
+        if not isinstance(explicit_bins, list):
+            raise RunnerPreconditionBlockedError(f"bin targets are invalid: {manifest_path}")
+        bin_targets = {}
+        for binary in explicit_bins:
+            if not isinstance(binary, Mapping):
+                raise RunnerPreconditionBlockedError(f"bin target is invalid: {manifest_path}")
+            name = binary.get("name")
+            target_path = binary.get("path", f"src/bin/{name}.rs" if name else "")
+            if not isinstance(name, str) or not isinstance(target_path, str) or not target_path:
+                raise RunnerPreconditionBlockedError(f"bin target identity is incomplete: {manifest_path}")
+            bin_targets[name] = target_path
+        if package.get("autobins", True):
+            main_path = manifest_path.parent / "src/main.rs"
+            if main_path.is_file():
+                bin_targets.setdefault(package_name, "src/main.rs")
+            bin_root = manifest_path.parent / "src/bin"
+            if bin_root.is_dir():
+                for target_path in bin_root.glob("*.rs"):
+                    bin_targets.setdefault(target_path.stem, str(target_path.relative_to(manifest_path.parent)))
+                for target_path in bin_root.glob("*/main.rs"):
+                    bin_targets.setdefault(target_path.parent.name, str(target_path.relative_to(manifest_path.parent)))
+        explicit_bin_names = {binary.get("name") for binary in explicit_bins if isinstance(binary, Mapping)}
+        for name, relative_target_path in bin_targets.items():
+            target_file = manifest_path.parent / relative_target_path
+            if name in explicit_bin_names or target_file.is_file():
+                source_path = canonicalize_non_symlink_path(target_file, allow_missing=False)
+                if not source_path.is_relative_to(root):
+                    raise RunnerPreconditionBlockedError(f"bin target source escapes pinned checkout: {target_file}")
+                selected_units.append({
+                    "manifest_path": str(manifest_path), "target_name": name,
+                    "kind": ["bin"], "edition": edition, "src_path": str(source_path),
+                })
+    if not selected_units:
+        raise RunnerPreconditionBlockedError(f"workspace has zero statically selected lib/bin targets: {root}")
+    selected_units.sort(key=lambda unit: (unit["manifest_path"], unit["target_name"], tuple(unit["kind"])))
+    return {
+        "workspace_members": [str(path) for path in sorted(member_paths, key=str)],
+        "selected_units": selected_units,
+    }
+
+
+def collect_manifest_s3_references(manifest_document):
+    references = []
+
+    def visit(value):
+        if isinstance(value, Mapping):
+            if {"path", "size_bytes", "sha256", "blake3"}.issubset(value):
+                references.append(value)
+            else:
+                for nested_value in value.values():
+                    visit(nested_value)
+        elif isinstance(value, list):
+            for nested_value in value:
+                visit(nested_value)
+
+    if isinstance(manifest_document, Mapping):
+        visit(manifest_document.get("global_prerequisites"))
+        visit(manifest_document.get("repositories"))
+    return references
+
+
+def derive_production_source_test_inventory(project_root):
+    tracked_paths = run_read_only_git_command(project_root, ["ls-files", "-z", "--", "crates"]).split("\0")
+    source_contents = {}
+    ambiguous_reasons = []
+    for relative_path in tracked_paths:
+        if not relative_path or Path(relative_path).suffix != ".rs":
+            continue
+        source_path = Path(project_root) / relative_path
+        try:
+            source_contents[relative_path] = source_path.read_text()
+        except (OSError, UnicodeError) as error:
+            ambiguous_reasons.append(f"frozen Rust source cannot be read: {relative_path}: {error}")
+    inventory = s3_evidence_intake.derive_source_fixture_inventory(source_contents)
+    if ambiguous_reasons:
+        inventory["ambiguous_reason"] = "; ".join(
+            filter(None, [inventory.get("ambiguous_reason"), *ambiguous_reasons])
+        )
+    return inventory
+
+
+def read_s3_evidence_inputs(evidence_manifest_path, b3_provider, b3_tool_identity, forbidden_roots=()):
+    input_state = {
+        "manifest_document": None, "file_bytes_by_path": {}, "blake3_by_path": {},
+        "frozen_paths": [], "optional_paths": [], "frozen_identities": {},
+        "optional_identities": {}, "intake_error": None,
+    }
+
+    def record_intake_error(status, reason):
+        input_state["intake_error"] = merge_s3_intake_error(
+            input_state["intake_error"], (status, str(reason)),
+        )
+
+    def record_optional_path(path_value):
+        identity = capture_optional_frozen_file_identity(Path(path_value))
+        path_key = identity["path"]
+        if identity["exists"]:
+            missing_identity = {"path": path_key, "exists": False}
+            input_state["optional_identities"].setdefault(path_key, missing_identity)
+            input_state["optional_paths"].append(Path(path_key))
+            raise RunnerFrozenInputMutationError(f"missing evidence appeared during intake: {path_key}")
+        previous_identity = input_state["optional_identities"].get(path_key)
+        if previous_identity is not None and dict(previous_identity) != dict(identity):
+            raise RunnerFrozenInputMutationError(f"optional evidence changed during intake: {path_key}")
+        input_state["optional_identities"][path_key] = identity
+        input_state["optional_paths"].append(Path(path_key))
+
+    if evidence_manifest_path is None:
+        record_intake_error("BLOCKED", "S3 prerequisite manifest was not supplied")
+        return input_state
+    manifest_path = Path(evidence_manifest_path)
+    try:
+        manifest_canonical = canonicalize_non_symlink_path(manifest_path, allow_missing=True)
+    except RunnerPreconditionBlockedError as error:
+        record_intake_error("BLOCKED", error)
+        return input_state
+    if not manifest_canonical.exists():
+        try:
+            record_optional_path(manifest_canonical)
+        except (RunnerPreconditionBlockedError, RunnerContractViolationError) as error:
+            status = "FAIL" if isinstance(error, RunnerContractViolationError) else "BLOCKED"
+            record_intake_error(status, error)
+        record_intake_error("BLOCKED", f"S3 prerequisite manifest is missing: {manifest_canonical}")
+        return input_state
+    if manifest_canonical.is_symlink() or not manifest_canonical.is_file():
+        record_intake_error("FAIL", f"S3 prerequisite manifest is not a regular non-symlink file: {manifest_canonical}")
+        return input_state
+    for forbidden_root in forbidden_roots:
+        root = Path(forbidden_root).resolve()
+        if manifest_canonical.is_relative_to(root) or root.is_relative_to(manifest_canonical):
+            record_intake_error("BLOCKED", "S3 evidence must be external to source and output roots")
+            return input_state
+    try:
+        manifest_identity_before = capture_frozen_file_identity(manifest_canonical)
+        input_state["frozen_paths"].append(manifest_canonical)
+        input_state["frozen_identities"][manifest_identity_before["path"]] = manifest_identity_before
+        manifest_bytes = manifest_canonical.read_bytes()
+        if hashlib.sha256(manifest_bytes).hexdigest() != manifest_identity_before["sha256"]:
+            raise RunnerFrozenInputMutationError("manifest bytes changed during intake")
+        verify_frozen_file_identity(manifest_identity_before)
+        input_state["manifest_document"] = s3_evidence_intake.parse_s3_evidence_json(
+            manifest_bytes.decode("utf-8"), "S3 prerequisite manifest"
+        )
+    except (OSError, UnicodeError, RunnerPreconditionBlockedError, RunnerContractViolationError,
+            s3_evidence_intake.S3EvidenceBlockedError,
+            s3_evidence_intake.S3EvidenceViolationError) as error:
+        status = "FAIL" if isinstance(error, (RunnerContractViolationError,
+                                               s3_evidence_intake.S3EvidenceViolationError)) else "BLOCKED"
+        record_intake_error(status, error)
+        return input_state
+    evidence_root = manifest_path.parent.resolve()
+
+    def read_member(relative_path):
+        if not isinstance(relative_path, str) or not relative_path or "\\" in relative_path:
+            raise RunnerPreconditionBlockedError("evidence member path must be relative POSIX text")
+        member = PurePosixPath(relative_path)
+        if member.is_absolute() or any(part in {"", ".", ".."} for part in relative_path.split("/")):
+            raise RunnerPreconditionBlockedError(f"unsafe evidence member path: {relative_path}")
+        path = evidence_root.joinpath(*member.parts)
+        canonical_path = canonicalize_non_symlink_path(path, allow_missing=True)
+        if not canonical_path.is_relative_to(evidence_root):
+            raise RunnerPreconditionBlockedError(f"evidence member escapes manifest directory: {relative_path}")
+        path_key = str(canonical_path.absolute())
+        if canonical_path.exists() and path_key in input_state["optional_identities"]:
+            if not input_state["optional_identities"][path_key]["exists"]:
+                raise RunnerFrozenInputMutationError(f"missing evidence appeared during intake: {relative_path}")
+        if not canonical_path.exists():
+            if path_key in input_state["frozen_identities"]:
+                raise RunnerFrozenInputMutationError(f"evidence disappeared during intake: {relative_path}")
+            record_optional_path(canonical_path)
+            return None
+        if canonical_path.is_symlink() or not canonical_path.is_file():
+            raise RunnerContractViolationError(f"evidence member is not a regular non-symlink file: {relative_path}")
+        for forbidden_root in forbidden_roots:
+            root = Path(forbidden_root).resolve()
+            if canonical_path.is_relative_to(root) or root.is_relative_to(canonical_path):
+                raise RunnerPreconditionBlockedError("S3 evidence member overlaps a source/output root")
+        file_identity = capture_frozen_file_identity(canonical_path)
+        initial_identity = input_state["frozen_identities"].get(file_identity["path"])
+        if initial_identity is not None and dict(initial_identity) != dict(file_identity):
+            raise RunnerFrozenInputMutationError(f"evidence changed during intake: {relative_path}")
+        input_state["frozen_paths"].append(canonical_path)
+        input_state["frozen_identities"][file_identity["path"]] = initial_identity or file_identity
+        file_bytes = canonical_path.read_bytes()
+        if hashlib.sha256(file_bytes).hexdigest() != file_identity["sha256"]:
+            raise RunnerFrozenInputMutationError(f"evidence bytes changed during intake: {relative_path}")
+        verify_frozen_file_identity(file_identity)
+        digest = calculate_b3_file_digest(
+            canonical_path, b3_provider, file_identity, provider_identity=b3_tool_identity,
+        )
+        input_state["file_bytes_by_path"][relative_path] = file_bytes
+        input_state["blake3_by_path"][relative_path] = digest
+        return file_bytes
+
+    for reference in collect_manifest_s3_references(input_state["manifest_document"]):
+        relative_path = reference.get("path") if isinstance(reference, Mapping) else None
+        try:
+            receipt_bytes = read_member(relative_path)
+            if receipt_bytes is None:
+                continue
+            receipt_document = s3_evidence_intake.parse_s3_evidence_json(
+                receipt_bytes.decode("utf-8"), str(relative_path)
+            )
+            if not isinstance(receipt_document, Mapping):
+                continue
+            for stream_name in ("stdout", "stderr"):
+                descriptor = receipt_document.get(stream_name)
+                if isinstance(descriptor, Mapping) and isinstance(descriptor.get("path"), str):
+                    read_member(descriptor["path"])
+        except (OSError, UnicodeError, RunnerPreconditionBlockedError,
+                RunnerContractViolationError, s3_evidence_intake.S3EvidenceBlockedError,
+                s3_evidence_intake.S3EvidenceViolationError) as error:
+            status = "FAIL" if isinstance(error, (RunnerContractViolationError,
+                                                   s3_evidence_intake.S3EvidenceViolationError)) else "BLOCKED"
+            record_intake_error(status, error)
+    input_state["frozen_paths"] = list(dict.fromkeys(input_state["frozen_paths"]))
+    input_state["optional_paths"] = list(dict.fromkeys(input_state["optional_paths"]))
+    return input_state
+
+
+def build_s3_repository_bindings(corpus_records, corpus_roots, source_snapshots,
+                                 lock_files, p2_configuration_reason):
+    bindings = {}
+    for repository_name in DEFAULT_REPOSITORY_ORDER:
+        root = corpus_roots[repository_name]
+        try:
+            workspace_inventory = read_workspace_unit_inventory(root)
+            p2_reason = p2_configuration_reason
+        except RunnerPreconditionBlockedError as error:
+            workspace_inventory = {"workspace_members": [], "selected_units": []}
+            p2_reason = str(error)
+        bindings[repository_name] = {
+            "pinned_name": repository_name,
+            "pinned_commit": corpus_records[repository_name]["corpus_source_commit_hash"],
+            "checkout_path": str(root),
+            "source_snapshot": source_snapshots[repository_name],
+            "lock_identity": lock_files[str((root / "Cargo.lock").absolute())],
+            "selected_policy": {
+                "workspace_selector": "--workspace", "target_selectors": ["--lib", "--bins"],
+                "features": "default", "per_unit_cfg": "compiler-default", "target": "compiler-default",
+            },
+            **workspace_inventory,
+            "p2_policy_supported": p2_reason is None,
+            "p2_blocked_reason": p2_reason,
+        }
+    return bindings
+
+
+def build_s3_expected_identity(arguments, run_state, mapper_identity, pin_summary,
+                               registry, toolchain_versions, cargo_configuration_paths,
+                               p2_configuration_reason, evidence_environment=None):
+    frozen_files = registry["frozen_files"]
+    parser_manifest_path = str((PROJECT_ROOT / "docs/phase-20261111/parser-source-pin-manifest.json").resolve())
+    parser_manifest = json.loads(Path(parser_manifest_path).read_text())
+    parser_bundle_path = str((PROJECT_ROOT / parser_manifest["parser_source_bundle_path"]).resolve())
+    r1_patch_path = str(Path(pin_summary["r1_patch_path"]).resolve())
+    production_manifest_path = (PROJECT_ROOT / "crates/parseltongue-cli-dispatcher-binary/Cargo.toml").resolve(strict=True)
+    try:
+        production_document = tomllib.loads(production_manifest_path.read_text())
+        root_document = tomllib.loads((PROJECT_ROOT / "Cargo.toml").read_text())
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise RunnerPreconditionBlockedError(f"production Cargo identity cannot be parsed: {error}") from error
+    production_package = production_document.get("package")
+    if not isinstance(production_package, Mapping) or not isinstance(production_package.get("name"), str):
+        raise RunnerPreconditionBlockedError("production Cargo package name is unavailable")
+    package_version = production_package.get("version")
+    if isinstance(package_version, Mapping) and package_version.get("workspace") is True:
+        workspace_package = root_document.get("workspace", {}).get("package", {})
+        package_version = workspace_package.get("version") if isinstance(workspace_package, Mapping) else None
+    if not isinstance(package_version, str) or not package_version:
+        raise RunnerPreconditionBlockedError("production Cargo package version is unavailable")
+    production_bin_targets = production_document.get("bin")
+    if not isinstance(production_bin_targets, list):
+        raise RunnerPreconditionBlockedError("production [[bin]] target inventory is unavailable")
+    production_bins = [target for target in production_bin_targets
+                       if isinstance(target, Mapping) and target.get("name") == "parseltongue"]
+    if len(production_bins) != 1 or not isinstance(production_bins[0].get("path"), str):
+        raise RunnerPreconditionBlockedError("production parseltongue bin source is unavailable or ambiguous")
+    production_bin_source = (production_manifest_path.parent / production_bins[0]["path"]).resolve(strict=True)
+    frozen_production_manifest = frozen_files.get(str(production_manifest_path))
+    frozen_production_bin_source = frozen_files.get(str(production_bin_source))
+    frozen_root_manifest = frozen_files.get(str((PROJECT_ROOT / "Cargo.toml").resolve()))
+    if frozen_production_manifest is None or frozen_production_bin_source is None or frozen_root_manifest is None:
+        raise RunnerPreconditionBlockedError("production package identity files were not frozen in the registry")
+    config_file_identities = []
+    for config_path in cargo_configuration_paths:
+        config_key = str(Path(config_path).absolute())
+        if config_key in frozen_files:
+            config_file_identities.append({"exists": True, **dict(frozen_files[config_key])})
+        elif config_key in registry.get("optional_files", {}):
+            config_file_identities.append(dict(registry["optional_files"][config_key]))
+        else:
+            raise RunnerPreconditionBlockedError(f"Cargo config identity was not frozen: {config_key}")
+    toolchain_executables = {}
+    for tool_name, version_record in toolchain_versions.items():
+        identity = version_record.get("file_identity") if isinstance(version_record, Mapping) else None
+        if isinstance(identity, Mapping) and identity.get("path") in frozen_files:
+            toolchain_executables[tool_name] = dict(frozen_files[identity["path"]])
+        else:
+            toolchain_executables[tool_name] = None
+    environment = (
+        dict(evidence_environment) if evidence_environment is not None
+        else capture_s3_evidence_environment()
+    )
+    unsupported_gates = s3_configuration_blocked_gates(environment, p2_configuration_reason)
+    return {
+        "run_id": arguments.run_id,
+        "milestone": arguments.milestone,
+        "mapper": {
+            "canonical_path": mapper_identity["canonical_path"],
+            "sha256": mapper_identity["sha256"], "blake3": mapper_identity["blake3"],
+        },
+        "runner_source_snapshot": registry["source_snapshots"][str(PROJECT_ROOT.resolve())],
+        "production_cargo_lock": registry["lock_files"][str((PROJECT_ROOT / "Cargo.lock").absolute())],
+        "parser_pin_bundle": {
+            "pin_manifest": frozen_files[parser_manifest_path],
+            "bundle": frozen_files[parser_bundle_path],
+        },
+        "r1_patch": frozen_files[r1_patch_path],
+        "toolchain_versions": toolchain_versions,
+        "toolchain_executables": toolchain_executables,
+        "relevant_environment": environment,
+        "configuration": {
+            "project_root": str(PROJECT_ROOT.resolve()),
+            "production_manifest": str(production_manifest_path),
+            "production_manifest_identity": frozen_production_manifest,
+            "workspace_manifest_identity": frozen_root_manifest,
+            "production_package_name": production_package["name"],
+            "production_package_version": package_version,
+            "production_bin_source": str(production_bin_source),
+            "production_bin_source_identity": frozen_production_bin_source,
+            "production_package": production_package["name"],
+            "production_binary": "parseltongue",
+            "selected_p2_policy": {
+                "workspace_selector": "--workspace", "target_selectors": ["--lib", "--bins"],
+                "features": "default", "per_unit_cfg": "compiler-default", "target": "compiler-default",
+            },
+            "cargo_config_file_identities": config_file_identities,
+            "p2_configuration_blocked_reason": p2_configuration_reason,
+            "unsupported_prerequisite_gates": unsupported_gates,
+            "mode": arguments.mode,
+            "corpus_manifest": str(Path(arguments.corpus_manifest).resolve()),
+            "project_root_overrides": [str(value) for value in arguments.project_root],
+        },
+    }
+
+
+def prepare_s3_evidence_qualification(arguments, run_state, evidence_inputs,
+                                      expected_identity, expected_repository_bindings,
+                                      source_test_inventory):
+    intake_error = evidence_inputs.get("intake_error")
+    intake_status, intake_reason = intake_error if intake_error is not None else ("PASS", None)
+    validation_error = None
+    validation_result = {"repository_results": {}, "tokens_by_repository": {}}
+    if isinstance(evidence_inputs.get("manifest_document"), Mapping):
+        try:
+            validation_result = s3_evidence_intake.validate_s3_prerequisite_evidence(
+                evidence_inputs["manifest_document"], evidence_inputs.get("file_bytes_by_path", {}),
+                evidence_inputs.get("blake3_by_path", {}), expected_identity, expected_repository_bindings,
+                source_test_inventory, arguments.milestone,
+            )
+        except s3_evidence_intake.S3EvidenceViolationError as error:
+            validation_error = ("FAIL", str(error))
+        except s3_evidence_intake.S3EvidenceBlockedError as error:
+            validation_error = ("BLOCKED", str(error))
+    repository_results = {
+        repository_name: validation_result["repository_results"].get(repository_name,
+            {gate: {"status": validation_error[0] if validation_error else "BLOCKED",
+                    "reason": validation_error[1] if validation_error else
+                    "S3 prerequisite evidence was unavailable"} for gate in S3_GATE_NAMES})
+        for repository_name in DEFAULT_REPOSITORY_ORDER
+    }
+    unsupported_gates = expected_identity.get("configuration", {}).get("unsupported_prerequisite_gates", {})
+    for repository_result in repository_results.values():
+        for gate_name, gate_reason in unsupported_gates.items():
+            if gate_name in repository_result and repository_result[gate_name].get("status") != "FAIL":
+                repository_result[gate_name] = {"status": "BLOCKED", "reason": gate_reason}
+    tokens = dict(validation_result.get("tokens_by_repository", {}))
+    for repository_name, gate_results in repository_results.items():
+        if intake_error is not None or any(value.get("status") != "PASS" for value in gate_results.values()):
+            tokens.pop(repository_name, None)
+    qualification_status = "PASS"
+    status_priority = {"PASS": 0, "BLOCKED": 1, "FAIL": 2}
+    statuses = [intake_status]
+    if validation_error:
+        statuses.append(validation_error[0])
+    statuses.extend(value.get("status", "BLOCKED") for results in repository_results.values()
+                    for value in results.values())
+    qualification_status = max(statuses, key=lambda value: status_priority.get(value, 1))
+    result = {
+        **validation_result, "manifest_document": evidence_inputs.get("manifest_document"),
+        "repository_results": repository_results, "identity_binding": expected_identity,
+        "tokens_by_repository": tokens,
+        "intake_status": {"status": intake_status, "reason": intake_reason},
+        "qualification_status": qualification_status,
+        "validation_error": validation_error,
+    }
+    run_state["manifest"]["s3_prerequisite_intake"] = {
+        "manifest_path": str(getattr(arguments, "s3_prerequisite_evidence", None))
+        if getattr(arguments, "s3_prerequisite_evidence", None) else None,
+        "status": intake_status, "reason": intake_reason,
+        "qualification_status": qualification_status, "validation_error": validation_error,
+        "repository_results": repository_results,
+    }
+    return result
+
+
+def make_identity_boundary_callback(registry: Mapping[str, Any], expected_environment=None,
+                                   mapper_identity=None, b3_provider=None, b3_tool_identity=None):
     def verify_boundary(phase_name: str, command_values: Sequence[str]) -> None:
         verify_identity_registry(registry)
+        if expected_environment is not None and capture_s3_evidence_environment() != expected_environment:
+            raise RunnerFrozenInputMutationError(
+                f"relevant environment changed at frozen identity boundary: {phase_name}"
+            )
+        if phase_name in {
+            "before S3 prerequisite evidence validation", "after S3 prerequisite evidence validation",
+            "before S3 prerequisite gate", "after S3 prerequisite gate",
+        } and mapper_identity is not None and b3_provider is not None:
+            current_mapper_digest = calculate_b3_file_digest(
+                Path(mapper_identity["canonical_path"]), b3_provider, mapper_identity,
+                provider_identity=b3_tool_identity,
+            )
+            if current_mapper_digest != mapper_identity.get("blake3"):
+                raise RunnerFrozenInputMutationError("frozen mapper BLAKE3 identity changed across S3 gates")
     return verify_boundary
 
 
@@ -1300,44 +2024,62 @@ def record_s3_stage_transition(
 
 
 def finalize_s3_component_qualification(
-    run_state: Mapping[str, Any], repository_name: str
+    run_state: Mapping[str, Any], repository_name: str,
+    qualification_token=None, expected_identity_binding=None,
 ) -> str:
     repository_state = run_state["manifest"]["repositories"][repository_name]
     components = repository_state["s3_components"]
-    missing_components = [name for name, status in components.items() if status != "PASS"]
-    gate_reasons = {
-        "fixture_suite": "SPEC §4 negative/stale/collision/cancellation fixture suite was not supplied or run",
-        "build_evidence": "current-run production build evidence was not supplied or identity-bound",
-        "dependency_audit": "production cargo tree/dependency audit evidence was not supplied",
-        "p2_offline_qualification": "selected workspace offline cargo check P2 evidence was not supplied",
-        "release_provenance": "current-run release build/source/executable provenance was not supplied",
-    }
-    if any(status == "FAIL" for status in components.values()):
+    missing_components = [name for name in S3_COMPONENT_NAMES if components.get(name) != "PASS"]
+    unexpected_components = sorted(set(components) - set(S3_COMPONENT_NAMES))
+    gates = repository_state["s3_qualification_gates"]
+    gate_statuses = {name: gates.get(name, {}).get("status", "NOT STARTED") for name in S3_GATE_NAMES}
+    token_is_valid = False
+    if isinstance(qualification_token, s3_evidence_intake.S3EvidenceQualificationToken):
+        expected_digest = hashlib.sha256(json.dumps(
+            expected_identity_binding, sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest()
+        token_is_valid = (
+            qualification_token.run_identifier == run_state["manifest"].get("run_id")
+            and qualification_token.repository_name == repository_name
+            and qualification_token.identity_digest == expected_digest
+        )
+    if any(status == "FAIL" for status in components.values()) or unexpected_components or "FAIL" in gate_statuses.values():
         step_status = "FAIL"
         continuation_status = "FAIL"
-        reason = f"S3 component contract failed: {missing_components}"
-    elif missing_components:
+        reason = (
+            f"S3 component/prerequisite contract failed: components={missing_components}; "
+            f"unexpected_components={unexpected_components}; gates={gate_statuses}"
+        )
+    elif run_state["manifest"].get("execution_identity") == "HARNESS ONLY" or missing_components or \
+         "PASS" not in {gate_statuses.get(name) for name in S3_GATE_NAMES} or any(
+        gate_statuses[name] != "PASS" for name in S3_GATE_NAMES
+    ) or not token_is_valid:
         step_status = "BLOCKED"
         continuation_status = "BLOCKED"
-        reason = f"S3 components are incomplete: {missing_components}"
+        reason = (
+            f"S3 requires four mapping components and five identity-bound prerequisites; "
+            f"harness_only={run_state['manifest'].get('execution_identity') == 'HARNESS ONLY'}; "
+            f"missing_components={missing_components}; gates={gate_statuses}; internal_token_valid={token_is_valid}"
+        )
     else:
-        step_status = "BLOCKED"
-        continuation_status = "COMPONENTS COMPLETE"
-        reason = "mapping components passed; full S3 remains BLOCKED on independent prerequisites"
-    for gate_name, gate_reason in gate_reasons.items():
-        repository_state["s3_qualification_gates"][gate_name] = {
-            "status": "BLOCKED", "reason": gate_reason,
-        }
+        step_status = "PASS"
+        continuation_status = "PASS"
+        reason = "all four mapping components and all five identity-bound prerequisites passed"
     record_s3_stage_transition(
         run_state, repository_name, step_status, (), reason,
-        "S3.full-qualification-prerequisites-missing" if step_status == "BLOCKED"
-        else "S3.component-contract-failure",
+        "S3.full-qualification-complete" if step_status == "PASS"
+        else "S3.full-qualification-prerequisites-missing" if step_status == "BLOCKED"
+        else "S3.component-or-prerequisite-contract-failure",
     )
-    gate_summary = "; ".join(f"{name}: BLOCKED ({value})" for name, value in gate_reasons.items())
+    gate_summary = "; ".join(
+        f"{name}: {gates.get(name, {}).get('status', 'NOT STARTED')} "
+        f"({gates.get(name, {}).get('reason', 'no validation result')})"
+        for name in S3_GATE_NAMES
+    )
     append_persistent_report_entry(
         run_state,
         f"- S3 `{repository_name}` components `{json.dumps(components, sort_keys=True)}`; "
-        f"qualification **{step_status}** — {reason}. Missing gates: {gate_summary}.",
+        f"qualification **{step_status}** — {reason}. Prerequisites: {gate_summary}.",
     )
     persist_run_manifest(run_state)
     return continuation_status
@@ -1569,6 +2311,9 @@ def prepare_execution_context(
         raise RunnerContractViolationError("runner repository HEAD changed while freezing source inputs")
 
     manifest_paths = [
+        PROJECT_ROOT / "Cargo.toml",
+        PROJECT_ROOT / "crates/parseltongue-cli-dispatcher-binary/Cargo.toml",
+        PROJECT_ROOT / "crates/parseltongue-cli-dispatcher-binary/src/main.rs",
         Path(arguments.corpus_manifest),
         PROJECT_ROOT / "docs/phase-20261111/parser-source-pin-manifest.json",
         PROJECT_ROOT / "docs/phase-20261111/oracle-source-build-manifest.json",
@@ -1601,12 +2346,68 @@ def prepare_execution_context(
             manifest_paths.append(Path(blake3.__file__).resolve())
     elif b3_tool_identity is not None:
         manifest_paths.append(Path(b3_tool_identity["path"]))
+    evidence_environment = capture_s3_evidence_environment()
+    toolchain_versions = probe_toolchain_versions()
+    toolchain_executable_identities = [
+        value["file_identity"] for value in toolchain_versions.values()
+        if isinstance(value, Mapping) and isinstance(value.get("file_identity"), Mapping)
+    ]
+    p2_configuration_reason = None
+    if any(evidence_environment.get(name) for name in (
+        "CARGO_BUILD_TARGET", "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER",
+        "RUSTC_WORKSPACE_WRAPPER", "RUSTC",
+    )) or any(name.startswith("CARGO_TARGET_") and name != "CARGO_TARGET_DIR" and value
+              for name, value in evidence_environment.items()) or any(
+                  name.startswith("CARGO_PROFILE_") and value for name, value in evidence_environment.items()
+              ):
+        p2_configuration_reason = "environment supplies unsupported P2 target/cfg/compiler wrapper overrides"
+    elif any(re.search(r"(?:SKIP|FILTER|IGNORE|NO_NATIVE)", name, re.IGNORECASE) and value
+             for name, value in evidence_environment.items()):
+        p2_configuration_reason = "environment supplies an unsupported native test skip/filter override"
+    cargo_configuration_paths = find_cargo_configuration_files(PROJECT_ROOT, corpus_roots, evidence_environment)
+    cargo_configuration_candidate_paths = list(cargo_configuration_paths)
+    cargo_configuration_initial_identities = {}
+    absent_cargo_configuration_identities = {}
+    present_cargo_configuration_paths = []
+    for config_path in cargo_configuration_paths:
+        try:
+            config_identity = capture_optional_frozen_file_identity(config_path)
+        except RunnerPreconditionBlockedError as error:
+            p2_configuration_reason = p2_configuration_reason or str(error)
+            continue
+        if config_identity["exists"]:
+            present_cargo_configuration_paths.append(config_path)
+            cargo_configuration_initial_identities[config_identity["path"]] = {
+                key: value for key, value in config_identity.items() if key != "exists"
+            }
+        else:
+            absent_cargo_configuration_identities[config_identity["path"]] = config_identity
+    p2_configuration_reason = p2_configuration_reason or cargo_configuration_override_reason(cargo_configuration_paths)
+    manifest_paths.extend(present_cargo_configuration_paths)
+    evidence_inputs = read_s3_evidence_inputs(
+        getattr(arguments, "s3_prerequisite_evidence", None), b3_provider, b3_tool_identity,
+        forbidden_roots=[PROJECT_ROOT, *corpus_roots.values(), Path(run_state["run_directory"]),
+                         artifact_run_directory],
+    )
+    evidence_inputs["optional_paths"].extend(
+        Path(path) for path in absent_cargo_configuration_identities
+    )
+    evidence_inputs["optional_identities"].update(absent_cargo_configuration_identities)
+    expected_frozen_files = {
+        **cargo_configuration_initial_identities,
+        **evidence_inputs["frozen_identities"],
+    }
     registry = capture_identity_registry(
         PROJECT_ROOT,
         manifest_paths,
         corpus_roots,
         excluded_paths,
-        [mapper_identity, indexer_identity, strace_identity, *([b3_tool_identity] if b3_tool_identity else [])],
+        [mapper_identity, indexer_identity, strace_identity, *toolchain_executable_identities,
+         *([b3_tool_identity] if b3_tool_identity else [])],
+        extra_frozen_paths=evidence_inputs["frozen_paths"],
+        optional_frozen_paths=evidence_inputs["optional_paths"],
+        expected_frozen_files=expected_frozen_files,
+        expected_optional_files=evidence_inputs["optional_identities"],
     )
     if registry["frozen_files"].get(corpus_manifest_identity["path"]) != corpus_manifest_identity:
         raise RunnerContractViolationError("corpus pin manifest changed while freezing execution inputs")
@@ -1615,6 +2416,29 @@ def prepare_execution_context(
             raise RunnerContractViolationError(f"source changed while freezing {repository_name}")
     if registry["source_snapshots"][str(PROJECT_ROOT.resolve())] != root_snapshot:
         raise RunnerContractViolationError("runner source changed while freezing repository inputs")
+    expected_identity = build_s3_expected_identity(
+        arguments, run_state, mapper_identity, pin_summary, registry, toolchain_versions,
+        cargo_configuration_candidate_paths, p2_configuration_reason, evidence_environment,
+    )
+    expected_repository_bindings = build_s3_repository_bindings(
+        corpus_records, corpus_roots, source_snapshots, registry["lock_files"], p2_configuration_reason,
+    )
+    source_test_inventory = derive_production_source_test_inventory(PROJECT_ROOT)
+    if any(value.get("version") in {None, "", "unavailable"} or not isinstance(value.get("file_identity"), Mapping)
+           for value in toolchain_versions.values() if isinstance(value, Mapping)):
+        evidence_inputs["intake_error"] = merge_s3_intake_error(
+            evidence_inputs.get("intake_error"),
+            ("BLOCKED", "current rustc/cargo version could not be established for S3 evidence binding"),
+        )
+    identity_guard = make_identity_boundary_callback(
+        registry, evidence_environment, mapper_identity, b3_provider, b3_tool_identity,
+    )
+    identity_guard("before S3 prerequisite evidence validation", [])
+    s3_evidence = prepare_s3_evidence_qualification(
+        arguments, run_state, evidence_inputs, expected_identity,
+        expected_repository_bindings, source_test_inventory,
+    )
+    identity_guard("after S3 prerequisite evidence validation", [])
     manifest_value = run_state["manifest"]
     manifest_value["input_identity"] = {
         "mapper": mapper_identity,
@@ -1635,7 +2459,7 @@ def prepare_execution_context(
         "platform": platform.platform(),
         "machine": platform.machine(),
         "mapper_identity": f"sha256:{mapper_identity['sha256']}",
-        "toolchain_versions": probe_toolchain_versions(),
+        "toolchain_versions": toolchain_versions,
     }
     manifest_value["configuration"] = {
         "milestone": arguments.milestone,
@@ -1662,7 +2486,11 @@ def prepare_execution_context(
         "corpus_roots": corpus_roots,
         "source_snapshots": source_snapshots,
         "registry": registry,
-        "identity_guard": make_identity_boundary_callback(registry),
+        "identity_guard": identity_guard,
+        "s3_evidence": s3_evidence,
+        "s3_expected_identity": expected_identity,
+        "s3_repository_bindings": expected_repository_bindings,
+        "s3_source_test_inventory": source_test_inventory,
         "artifact_run_directory": artifact_run_directory,
         "report_run_directory": Path(run_state["run_directory"]),
     }
@@ -1782,6 +2610,7 @@ def execute_repository_sop_stages(
     execution_context: Mapping[str, Any],
     arguments: argparse.Namespace,
 ) -> str:
+    execution_context["identity_guard"]("before S1", [])
     report_repository_directory = Path(run_state["run_directory"]) / repository_name
     report_repository_directory.mkdir(parents=True, exist_ok=False)
     artifact_repository_directory = Path(execution_context["artifact_run_directory"]) / repository_name
@@ -1827,6 +2656,7 @@ def execute_repository_sop_stages(
             nonlocal current_step, current_commands, metadata_complete
             s1_command_metadata = collect_transition_command_metadata(command_event_callback, "S1")
             current_commands = [json.dumps(value["argv"]) for value in s1_command_metadata]
+            execution_context["identity_guard"]("after S1", [])
             record_persistent_run_transition(
                 run_state, repository_name, "S1", "PASS", current_commands,
                 f"fresh full generation {metadata_result['generation']} has matching status/schema metadata",
@@ -1836,6 +2666,7 @@ def execute_repository_sop_stages(
             metadata_complete = True
             current_step = "S2"
             current_commands = []
+            execution_context["identity_guard"]("before S2", [])
 
         def record_s2_command_event(phase, command_values, outcome):
             command_stage = "S2" if metadata_complete else "S1"
@@ -1861,6 +2692,7 @@ def execute_repository_sop_stages(
         )
         if coverage_summary.get("scope_literal_sop_pass") is not True:
             raise RunnerPreconditionBlockedError("S2 full pagination result did not pass strict validation")
+        execution_context["identity_guard"]("after S2", [])
         run_state["manifest"]["repositories"][repository_name]["coverage_summary"] = coverage_summary
         coverage_summary["commands_jsonl_path"] = str(command_journal_path.resolve())
         run_state["manifest"]["repositories"][repository_name]["coverage_summary"] = coverage_summary
@@ -1893,6 +2725,62 @@ def execute_repository_sop_stages(
         )
 
         current_step = "S3"
+        execution_context["identity_guard"]("before S3 prerequisite gate", [])
+        evidence_context = execution_context.get("s3_evidence", {})
+        evidence_results = evidence_context.get("repository_results", {}).get(repository_name, {})
+        repository_state = run_state["manifest"]["repositories"][repository_name]
+        repository_state["s3_qualification_gates"] = {
+            gate_name: dict(evidence_results.get(gate_name, {
+                "status": "BLOCKED", "reason": "S3 prerequisite evidence was not validated for this repository",
+            }))
+            for gate_name in S3_GATE_NAMES
+        }
+        failing_gate = next((name for name in S3_GATE_NAMES
+                             if repository_state["s3_qualification_gates"][name]["status"] == "FAIL"), None)
+        incomplete_gates = [name for name in S3_GATE_NAMES
+                            if repository_state["s3_qualification_gates"][name]["status"] != "PASS"]
+        intake_status = evidence_context.get("intake_status", {}).get("status", "BLOCKED")
+        qualification_token = evidence_context.get("tokens_by_repository", {}).get(repository_name)
+        expected_identity = execution_context.get("s3_expected_identity", evidence_context.get("identity_binding"))
+        token_is_valid = False
+        if isinstance(qualification_token, s3_evidence_intake.S3EvidenceQualificationToken) and isinstance(
+            expected_identity, Mapping
+        ):
+            expected_digest = hashlib.sha256(json.dumps(
+                expected_identity, sort_keys=True, separators=(",", ":"),
+            ).encode()).hexdigest()
+            token_is_valid = (
+                qualification_token.run_identifier == run_state["manifest"].get("run_id")
+                and qualification_token.repository_name == repository_name
+                and qualification_token.identity_digest == expected_digest
+            )
+        if failing_gate is not None or intake_status == "FAIL":
+            gate_status = "FAIL"
+        elif incomplete_gates or intake_status != "PASS" or not token_is_valid:
+            gate_status = "BLOCKED"
+        else:
+            gate_status = "PASS"
+        execution_context["identity_guard"]("after S3 prerequisite gate", [])
+        if gate_status != "PASS":
+            gate_reason = (
+                f"S3 prerequisite {failing_gate} failed"
+                if failing_gate is not None else
+                "S3 evidence intake failed" if intake_status == "FAIL" else
+                f"S3 prerequisites are incomplete: {incomplete_gates}; "
+                f"intake={intake_status}; internal_token_valid={token_is_valid}"
+            )
+            record_s3_stage_transition(
+                run_state, repository_name, gate_status, (), gate_reason,
+                "S3.prerequisite-evidence-failed" if failing_gate else "S3.prerequisite-evidence-missing",
+            )
+            append_persistent_report_entry(
+                run_state,
+                f"- S3 `{repository_name}` prerequisite results "
+                f"`{json.dumps(repository_state['s3_qualification_gates'], sort_keys=True)}`; "
+                f"qualification **{gate_status}** — stopped before mapper/output creation.",
+            )
+            persist_run_manifest(run_state)
+            return gate_status
         final_stage = "syntax-spans" if arguments.milestone == "M1" else "name-resolution"
         production_output_directory = artifact_repository_directory / "production"
         production_output_directory.mkdir(parents=False, exist_ok=False)
@@ -1999,7 +2887,12 @@ def execute_repository_sop_stages(
             "RSS is nominal 10-ms sampled, not an exact peak; target filter is exact-path-only, not recursive; "
             "memory acceptance remains DEFERRED.",
         )
-        return finalize_s3_component_qualification(run_state, repository_name)
+        execution_context["identity_guard"]("after S3", [])
+        return finalize_s3_component_qualification(
+            run_state, repository_name,
+            execution_context.get("s3_evidence", {}).get("tokens_by_repository", {}).get(repository_name),
+            execution_context.get("s3_expected_identity"),
+        )
     except RunnerFrozenInputMutationError as error:
         run_state["manifest"]["input_integrity_status"] = "FAIL"
         run_state["manifest"]["input_integrity_reason"] = str(error)
@@ -2249,7 +3142,9 @@ def execute_qualification_run(
             ),
         )
         run_state["manifest"]["repository_execution_order"] = ordered_result["attempted_repositories"]
+        execution_context["identity_guard"]("before finalization", [])
         finalize_unimplemented_milestone_gates(run_state, execution_context, arguments)
+        execution_context["identity_guard"]("after finalization", [])
         record_finalization_outcome(run_state, "PASS", "reports and separate milestone gates were finalized")
     except RunnerFrozenInputMutationError as error:
         if run_state["manifest"]["preflight"].get("status") == "PASS":

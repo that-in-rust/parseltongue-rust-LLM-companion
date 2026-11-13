@@ -124,7 +124,16 @@ def create_preflight_fixture(root_path: Path) -> dict[str, object]:
         "oracle_source_patch_path": "docs/phase-20261111/parser.patch",
     }
     project_files: dict[str, str | bytes] = {
+        "Cargo.toml": (
+            '[workspace]\nmembers = ["crates/parseltongue-cli-dispatcher-binary"]\n'
+            '[workspace.package]\nversion = "0.1.0"\nedition = "2024"\n'
+        ),
         "Cargo.lock": "",
+        "crates/parseltongue-cli-dispatcher-binary/Cargo.toml": (
+            '[package]\nname = "parseltongue-cli-dispatcher-binary"\nversion.workspace = true\n'
+            'edition.workspace = true\n[[bin]]\nname = "parseltongue"\npath = "src/main.rs"\n'
+        ),
+        "crates/parseltongue-cli-dispatcher-binary/src/main.rs": "fn main() {}\n",
         "docs/phase-20261111/corpus-source-pin-manifest.json": json.dumps(corpus_records),
         "docs/phase-20261111/parser-source-pin-manifest.json": json.dumps(parser_manifest),
         "docs/phase-20261111/oracle-source-build-manifest.json": json.dumps(oracle_manifest),
@@ -152,6 +161,279 @@ def create_preflight_fixture(root_path: Path) -> dict[str, object]:
         "rust_analyzer_commit": rust_analyzer_commit,
         "patch_digest": patch_digest,
         "binaries": binaries,
+    }
+
+
+def create_identity_bound_s3_fixture(root_path: Path, fixture_failed: bool = False,
+                                     malformed_sibling: bool = False, native_skip: bool = False):
+    project_root = root_path / "identity-project"
+    package_name = "parseltongue-cli-dispatcher-binary"
+    production_directory = f"crates/{package_name}"
+    test_names = sorted(runner.s3_evidence_intake.M0_TEST_NAMES | runner.s3_evidence_intake.M1_TEST_NAMES)
+    fixture_rows = [f"test fixture::{name} ... {'FAILED' if fixture_failed and index == 0 else 'ok'}"
+                    for index, name in enumerate(test_names)]
+    passed = len(test_names) - int(fixture_failed)
+    failed = int(fixture_failed)
+    fixture_output = "\n".join([
+        f"running {len(test_names)} tests", *fixture_rows,
+        f"test result: {'FAILED' if fixture_failed else 'ok'}. {passed} passed; {failed} failed; "
+        "0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+    ])
+    production_manifest = f"{production_directory}/Cargo.toml"
+    production_source = f"{production_directory}/src/main.rs"
+    parser_manifest = "docs/phase-20261111/parser-source-pin-manifest.json"
+    parser_bundle = "docs/phase-20261111/parser.bundle"
+    r1_patch = "docs/phase-20261111/parser.patch"
+    corpus_manifest = "docs/phase-20261111/corpus-source-pin-manifest.json"
+    config_path = ".cargo/config.toml"
+    config_text = '[env]\nPARSELTONGUE_SKIP_NATIVE_TESTS = "1"\n' if native_skip else '[term]\ncolor = "never"\n'
+    project_files: dict[str, str | bytes] = {
+        "Cargo.toml": (
+            '[workspace]\nmembers = ["crates/parseltongue-cli-dispatcher-binary"]\nresolver = "3"\n'
+            '[workspace.package]\nversion = "0.1.0"\nedition = "2024"\n'
+        ),
+        "Cargo.lock": "",
+        production_manifest: (
+            '[package]\nname = "parseltongue-cli-dispatcher-binary"\nversion.workspace = true\n'
+            'edition.workspace = true\n[[bin]]\nname = "parseltongue"\npath = "src/main.rs"\n'
+        ),
+        production_source: "fn main() {}\n",
+        f"{production_directory}/tests/required.rs": "\n".join(
+            f"#[test]\nfn {name}() {{}}" for name in test_names
+        ) + "\n",
+        parser_manifest: json.dumps({"parser_source_bundle_path": parser_bundle}),
+        parser_bundle: b"synthetic parser bundle\n",
+        r1_patch: b"synthetic frozen R1 patch\n",
+        corpus_manifest: "[]\n",
+        "docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md": "# synthetic SOP\n",
+        "docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md": "# synthetic SPEC\n",
+        config_path: config_text,
+    }
+    create_committed_git_repository(project_root, project_files)
+
+    corpus_roots = {}
+    corpus_records = {}
+    for repository_name in runner.DEFAULT_REPOSITORY_ORDER:
+        corpus_root = root_path / "corpora" / repository_name
+        commit = create_committed_git_repository(corpus_root, {
+            "Cargo.toml": (
+                f'[package]\nname = "{repository_name}"\nversion = "0.1.0"\n'
+                'edition.workspace = true\n[workspace]\n[workspace.package]\nedition = "2024"\n'
+                '[lib]\npath = "src/lib.rs"\n'
+            ),
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+            "src/main.rs": "fn main() {}\n",
+        })
+        corpus_roots[repository_name] = corpus_root.resolve()
+        corpus_records[repository_name] = {"corpus_source_commit_hash": commit}
+
+    binary_root = root_path / "toolchain-bin"
+    binary_root.mkdir()
+    executable_identities = []
+    toolchain_versions = {}
+    for tool_name in ("cargo", "rustc", "mapper"):
+        binary_path = binary_root / ("parseltongue" if tool_name == "mapper" else tool_name)
+        binary_path.write_text(f"#!/bin/sh\nprintf '{tool_name} harness\\n'\n")
+        binary_path.chmod(0o755)
+        identity = dict(runner.capture_frozen_file_identity(binary_path))
+        identity["canonical_path"] = str(binary_path.resolve())
+        identity["blake3"] = hashlib.sha256(b"harness-blake3:" + binary_path.read_bytes()).hexdigest()
+        executable_identities.append(identity)
+        if tool_name != "mapper":
+            toolchain_versions[tool_name] = {
+                "path": str(binary_path), "canonical_path": str(binary_path.resolve()),
+                "version": f"{tool_name} 1.90.0", "return_code": 0,
+                "file_identity": identity,
+            }
+    mapper_identity = executable_identities[-1]
+    environment = {"PATH": str(binary_root), "CARGO_HOME": str(root_path / "cargo-home")}
+    with patch.object(runner, "PROJECT_ROOT", project_root), patch.object(
+        runner, "capture_s3_evidence_environment", return_value=environment,
+    ):
+        cargo_configuration_paths = runner.find_cargo_configuration_files(
+            project_root, corpus_roots, environment,
+        )
+        present_configs = [path for path in cargo_configuration_paths if path.exists()]
+        absent_configs = [path for path in cargo_configuration_paths if not path.exists()]
+        manifest_paths = [
+            project_root / "Cargo.toml", project_root / production_manifest,
+            project_root / production_source,
+            project_root / parser_manifest, project_root / parser_bundle, project_root / r1_patch,
+            project_root / corpus_manifest, project_root / "docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md",
+            project_root / "docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md",
+            *present_configs,
+        ]
+        optional_identities = {
+            str(path.absolute()): runner.capture_optional_frozen_file_identity(path)
+            for path in absent_configs
+        }
+        registry = runner.capture_identity_registry(
+            project_root, manifest_paths, corpus_roots, (), executable_identities,
+            optional_frozen_paths=absent_configs, expected_optional_files=optional_identities,
+        )
+        source_snapshots = {
+            name: registry["source_snapshots"][str(root)] for name, root in corpus_roots.items()
+        }
+        arguments = SimpleNamespace(
+            run_id="identity-bound-harness", milestone="M1", mode="execute",
+            corpus_manifest=str(project_root / corpus_manifest), project_root=[],
+        )
+        run_state = runner.create_persistent_run_report(
+            root_path / "reports", arguments.run_id, "M1", harness_only_flag=True,
+        )
+        pin_summary = {
+            "r1_patch_path": str(project_root / r1_patch),
+            "r1_patch_sha256": hashlib.sha256((project_root / r1_patch).read_bytes()).hexdigest(),
+        }
+        p2_configuration_reason = runner.cargo_configuration_override_reason(present_configs)
+        expected_identity = runner.build_s3_expected_identity(
+            arguments, run_state, mapper_identity, pin_summary, registry, toolchain_versions,
+            cargo_configuration_paths, p2_configuration_reason,
+        )
+        expected_repositories = runner.build_s3_repository_bindings(
+            corpus_records, corpus_roots, source_snapshots, registry["lock_files"],
+            p2_configuration_reason,
+        )
+        source_inventory = runner.derive_production_source_test_inventory(project_root)
+
+    evidence_root = root_path / "evidence"
+    evidence_root.mkdir()
+
+    def blake3_test_digest(content: bytes) -> str:
+        return hashlib.sha256(b"harness-blake3:" + content).hexdigest()
+
+    def store_file(relative_path: str, contents: str | bytes):
+        content = contents.encode() if isinstance(contents, str) else contents
+        target = evidence_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        return {
+            "path": relative_path, "size_bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(), "blake3": blake3_test_digest(content),
+        }
+
+    cargo = toolchain_versions["cargo"]["path"]
+    receipt_number = 0
+
+    def add_receipt(family, scope, argv, stdout="", stderr="", repository_binding=None):
+        nonlocal receipt_number
+        receipt_number += 1
+        receipt_id = f"s3-harness-receipt-{receipt_number}"
+        stdout_path = f"logs/{receipt_id}.stdout"
+        stderr_path = f"logs/{receipt_id}.stderr"
+        stdout_ref = store_file(stdout_path, stdout)
+        stderr_ref = store_file(stderr_path, stderr)
+        receipt = {
+            "schema_version": 1, "receipt_id": receipt_id, "family": family, "scope": scope,
+            "identity_binding": expected_identity, "argv": argv,
+            "cwd": (repository_binding["checkout_path"] if repository_binding
+                    else expected_identity["configuration"]["project_root"]),
+            "relevant_environment": expected_identity["relevant_environment"],
+            "elapsed_seconds": 0.25, "timeout_seconds": 30.0,
+            "completion_status": "completed", "timed_out": False, "exit_status": 0,
+            "stdout": {**stdout_ref, "complete": True},
+            "stderr": {**stderr_ref, "complete": True},
+        }
+        if repository_binding is not None:
+            receipt["repository_binding"] = repository_binding
+        return store_file(f"receipts/{receipt_id}.json", json.dumps(receipt, sort_keys=True))
+
+    fixture_ref = add_receipt(
+        "fixture_suite", "production_workspace", [cargo, "test", "--workspace"], fixture_output,
+    )
+    fmt_ref = add_receipt("fmt", "production_workspace", [cargo, "fmt", "--all", "--", "--check"])
+    clippy_ref = (
+        store_file("receipts/malformed-clippy.json", b'{"schema_version":') if malformed_sibling else
+        add_receipt(
+            "clippy", "production_workspace",
+            [cargo, "clippy", "--message-format=json", "--workspace", "--all-targets", "--all-features",
+             "--", "-D", "warnings"],
+            json.dumps({"reason": "build-finished", "success": True}),
+        )
+    )
+    tree_ref = add_receipt(
+        "dependency_audit", "production_workspace",
+        [cargo, "tree", "--package", package_name, "--edges", "normal", "--prefix", "none", "--format", "{p}"],
+        f"{package_name} v0.1.0\nra_ap_syntax v0.0.0\n",
+    )
+    production_config = expected_identity["configuration"]
+    production_manifest_path = str(project_root / production_manifest)
+    production_source_path = str(project_root / production_source)
+    release_output = "\n".join([
+        json.dumps({
+            "reason": "compiler-artifact",
+            "package_id": f"path+file://{Path(production_manifest_path).parent}#0.1.0",
+            "manifest_path": production_manifest_path,
+            "target": {"name": "parseltongue", "kind": ["bin"],
+                       "src_path": production_source_path},
+            "executable": mapper_identity["canonical_path"],
+            "profile": {"test": False, "opt_level": "3"},
+        }),
+        json.dumps({"reason": "build-finished", "success": True}),
+    ])
+    release_ref = add_receipt(
+        "release_build", "production_workspace",
+        [cargo, "build", "--release", "--package", package_name, "--bin", "parseltongue",
+         "--message-format=json"], release_output,
+    )
+    global_prerequisites = {
+        "fixture_suite": [fixture_ref], "build_evidence": {"fmt": fmt_ref, "clippy": clippy_ref},
+        "dependency_audit": [tree_ref], "release_provenance": [release_ref],
+    }
+    repositories = {}
+    for repository_name, binding in expected_repositories.items():
+        workspace_manifest = binding["workspace_members"][0]
+        package_dir = Path(workspace_manifest).parent
+        package_id = f"path+file://{package_dir}#{repository_name}@0.1.0"
+        edition = next(unit["edition"] for unit in binding["selected_units"])
+        metadata = {
+            "workspace_members": [package_id],
+            "packages": [{
+                "id": package_id, "name": repository_name, "edition": edition,
+                "manifest_path": workspace_manifest,
+                "targets": [{"name": unit["target_name"], "kind": unit["kind"],
+                             "src_path": unit["src_path"]}
+                            for unit in binding["selected_units"]],
+            }],
+            "resolve": {"nodes": [{"id": package_id, "features": []}]},
+        }
+        metadata_ref = add_receipt(
+            "p2_metadata", repository_name,
+            [cargo, "metadata", "--format-version", "1", "--offline", "--locked"],
+            json.dumps(metadata), repository_binding=binding,
+        )
+        check_messages = [json.dumps({
+            "reason": "compiler-artifact", "package_id": package_id, "features": [],
+            "manifest_path": unit["manifest_path"],
+            "target": {"name": unit["target_name"], "kind": unit["kind"], "edition": unit["edition"],
+                       "src_path": unit["src_path"]},
+            "profile": {"test": False},
+        }) for unit in binding["selected_units"]]
+        check_messages.append(json.dumps({"reason": "build-finished", "success": True}))
+        check_ref = add_receipt(
+            "p2_check", repository_name,
+            [cargo, "check", "--workspace", "--lib", "--bins", "--offline", "--locked",
+             "--message-format=json"], "\n".join(check_messages), repository_binding=binding,
+        )
+        repositories[repository_name] = {
+            "repository_binding": binding, "p2_offline_qualification": [metadata_ref, check_ref],
+        }
+    manifest = {
+        "schema_version": 1, "run_id": arguments.run_id, "milestone": "M1",
+        "identity_binding": expected_identity, "global_prerequisites": global_prerequisites,
+        "repositories": repositories,
+    }
+    manifest_path = root_path / "evidence" / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    return {
+        "project_root": project_root, "corpus_roots": corpus_roots, "registry": registry,
+        "expected_identity": expected_identity, "expected_repositories": expected_repositories,
+        "source_inventory": source_inventory, "arguments": arguments, "run_state": run_state,
+        "manifest_path": manifest_path, "mapper_identity": mapper_identity,
+        "cargo_configuration_paths": cargo_configuration_paths,
+        "configuration_reason": p2_configuration_reason,
+        "blake3_test_digest": blake3_test_digest,
     }
 
 
@@ -202,6 +484,216 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary_directory.cleanup()
+
+    def grant_synthetic_s3_token(self, context, run_state, repository_name):
+        binding = {"run_id": run_state["manifest"]["run_id"]}
+        identity_digest = hashlib.sha256(
+            json.dumps(binding, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        context["s3_expected_identity"] = binding
+        run_state["manifest"]["repositories"][repository_name]["s3_qualification_gates"] = {
+            name: {"status": "PASS", "reason": "synthetic harness"} for name in runner.S3_GATE_NAMES
+        }
+        context["s3_evidence"] = {
+            "repository_results": {repository_name: {
+                name: {"status": "PASS", "reason": "synthetic harness"} for name in runner.S3_GATE_NAMES
+            }},
+            "intake_status": {"status": "PASS", "reason": "synthetic harness"},
+            "tokens_by_repository": {repository_name: runner.s3_evidence_intake.S3EvidenceQualificationToken(
+                run_state["manifest"]["run_id"], repository_name, identity_digest,
+            )},
+        }
+
+    def prepare_identity_bound_evidence(self, fixture):
+        def digest_evidence(path, *_args, **_kwargs):
+            return fixture["blake3_test_digest"](Path(path).read_bytes())
+
+        with patch.object(runner, "calculate_b3_file_digest", side_effect=digest_evidence):
+            evidence_inputs = runner.read_s3_evidence_inputs(
+                fixture["manifest_path"], "python-blake3:harness-only", None,
+                forbidden_roots=(fixture["project_root"], *fixture["corpus_roots"].values(),
+                                 self.root_path / "reports", self.root_path / "artifacts"),
+            )
+        return runner.prepare_s3_evidence_qualification(
+            fixture["arguments"], fixture["run_state"], evidence_inputs,
+            fixture["expected_identity"], fixture["expected_repositories"], fixture["source_inventory"],
+        )
+
+    def test_s3_identity_bound_harness(self):
+        """REQ-SOP-RUNNER-022: real builder/evidence path validates tokens but keeps harness S3 unqualified."""
+        fixture = create_identity_bound_s3_fixture(self.root_path)
+        identity = fixture["expected_identity"]
+        self.assertEqual(identity["configuration"]["production_package_name"],
+                         "parseltongue-cli-dispatcher-binary")
+        self.assertEqual(identity["configuration"]["production_package_version"], "0.1.0")
+        self.assertEqual(identity["configuration"]["production_manifest_identity"]["path"],
+                         identity["configuration"]["production_manifest"])
+        self.assertEqual(
+            identity["configuration"]["production_bin_source"],
+            str(fixture["project_root"] / "crates/parseltongue-cli-dispatcher-binary/src/main.rs"),
+        )
+        self.assertEqual(identity["configuration"]["production_bin_source_identity"]["path"],
+                         identity["configuration"]["production_bin_source"])
+        self.assertTrue(any(not value["exists"] for value in identity["configuration"]["cargo_config_file_identities"]))
+        self.assertEqual(identity["toolchain_versions"]["cargo"]["path"],
+                         identity["toolchain_executables"]["cargo"]["path"])
+        self.assertEqual(identity["toolchain_versions"]["rustc"]["path"],
+                         identity["toolchain_executables"]["rustc"]["path"])
+        runner.verify_identity_registry(fixture["registry"])
+        evidence = self.prepare_identity_bound_evidence(fixture)
+        runner.verify_identity_registry(fixture["registry"])
+        self.assertEqual(evidence["intake_status"]["status"], "PASS")
+        repository_results = evidence["repository_results"]["serde"]
+        self.assertTrue(all(value["status"] == "PASS" for value in repository_results.values()))
+        token = evidence["tokens_by_repository"]["serde"]
+        self.assertEqual(token.run_identifier, fixture["arguments"].run_id)
+        self.assertEqual(token.repository_name, "serde")
+        self.assertEqual(token.identity_digest, hashlib.sha256(json.dumps(
+            identity, sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest())
+        repository = fixture["run_state"]["manifest"]["repositories"]["serde"]
+        repository["s3_components"].update({name: "PASS" for name in runner.S3_COMPONENT_NAMES})
+        repository["s3_qualification_gates"] = repository_results
+        result = runner.finalize_s3_component_qualification(
+            fixture["run_state"], "serde", token, identity,
+        )
+        self.assertEqual(result, "BLOCKED")
+        self.assertEqual(repository["steps"]["S3"], "BLOCKED")
+        self.assertEqual(fixture["run_state"]["manifest"]["overall_status"], "HARNESS ONLY")
+
+    def test_s3_intake_failure_priority(self):
+        """REQ-SOP-RUNNER-022: a malformed sibling cannot mask a validated failed fixture receipt."""
+        fixture = create_identity_bound_s3_fixture(
+            self.root_path, fixture_failed=True, malformed_sibling=True,
+        )
+        evidence = self.prepare_identity_bound_evidence(fixture)
+        self.assertEqual(evidence["intake_status"]["status"], "BLOCKED")
+        self.assertEqual(
+            evidence["repository_results"]["serde"]["fixture_suite"]["status"], "FAIL",
+        )
+        self.assertEqual(evidence["tokens_by_repository"], {})
+        self.assertEqual(
+            fixture["run_state"]["manifest"]["s3_prerequisite_intake"]["status"], "BLOCKED",
+        )
+
+    def test_s3_identity_failure_stops(self):
+        """REQ-SOP-RUNNER-022: wrong manifest identity fails serde before mapping."""
+        fixture = create_identity_bound_s3_fixture(self.root_path)
+        manifest_document = json.loads(fixture["manifest_path"].read_text())
+        manifest_document["identity_binding"]["run_id"] = "wrong-run"
+        fixture["manifest_path"].write_text(json.dumps(manifest_document))
+        evidence = self.prepare_identity_bound_evidence(fixture)
+        self.assertEqual(evidence["qualification_status"], "FAIL")
+        self.assertEqual(evidence["validation_error"][0], "FAIL")
+        self.assertTrue(all(
+            item["status"] == "FAIL" for item in evidence["repository_results"]["serde"].values()
+        ))
+
+        repository_name = "serde"
+        source_root = fixture["corpus_roots"][repository_name]
+        artifact_root = self.root_path / "artifacts" / "identity-failure"
+        artifact_root.mkdir(parents=True)
+        coverage_summary = {
+            "scope_literal_sop_pass": True, "scope_coverage_entry_count": 1,
+            "missed_source_file_count": 0, "index_generation_timestamp_value": "generation-a",
+            "index_graph_node_count": 1, "index_graph_edge_count": 1,
+            "index_partial_file_count": 0, "index_unusable_file_count": 0,
+            "scope_truncated_informational": False, "response_digest_manifest_path": "digest.json",
+        }
+
+        def collect_coverage(*positional, **_keywords):
+            positional[6]({"generation": "generation-a"})
+            return dict(coverage_summary)
+
+        execution_context = {
+            "artifact_run_directory": artifact_root,
+            "corpus_roots": {repository_name: source_root},
+            "corpus_records": {repository_name: {
+                "corpus_repository_short_name": repository_name,
+                "corpus_source_checkout_path": str(source_root),
+            }},
+            "source_snapshots": {repository_name: {
+                "head_commit": "fixture-head", "source_tree_sha256": "a" * 64,
+            }},
+            "indexer_path": Path("/fixture/indexer"),
+            "mapper_identity": {"canonical_path": "/fixture/mapper", "sha256": "a" * 64},
+            "identity_guard": lambda *_args: None,
+            "b3_provider": "python-blake3:harness-only", "b3_tool_identity": None,
+            "s3_evidence": evidence, "s3_expected_identity": fixture["expected_identity"],
+        }
+        with patch.object(runner, "run_fresh_index_stage", return_value={
+            "command": ["/fixture/indexer", "cli", "index_repository", "--repo-path", str(source_root),
+                        "--mode", "full"],
+            "result": {"status": "indexed", "indexed_at": "generation-a"},
+        }), patch.object(runner.coverage_inventory, "collect_index_coverage_inventory",
+                         side_effect=collect_coverage), \
+             patch.object(runner.production_measurements, "measure_corpus_production_stages") as measure_mapper:
+            status = runner.execute_repository_sop_stages(
+                repository_name, fixture["run_state"], execution_context,
+                SimpleNamespace(milestone="M1"),
+            )
+        repository = fixture["run_state"]["manifest"]["repositories"][repository_name]
+        self.assertEqual(status, "FAIL")
+        self.assertEqual(repository["steps"]["S3"], "FAIL")
+        self.assertFalse((artifact_root / repository_name / "production").exists())
+        measure_mapper.assert_not_called()
+        self.assertEqual(fixture["run_state"]["manifest"]["repositories"]["tokio"]["steps"]["S1"],
+                         "NOT STARTED")
+
+    def test_s3_intake_error_priority(self):
+        """REQ-SOP-RUNNER-022: unavailable toolchain cannot replace an observed intake FAIL."""
+        current = ("FAIL", "trusted manifest identity mismatch")
+        self.assertEqual(
+            runner.merge_s3_intake_error(current, ("BLOCKED", "cargo or rustc unavailable")), current,
+        )
+
+    def test_s3_native_skip_blocks(self):
+        """REQ-SOP-RUNNER-022: Cargo-configured native skips block fixture evidence and tokens."""
+        fixture = create_identity_bound_s3_fixture(self.root_path, native_skip=True)
+        evidence = self.prepare_identity_bound_evidence(fixture)
+        self.assertEqual(evidence["repository_results"]["serde"]["fixture_suite"]["status"], "BLOCKED")
+        self.assertEqual(evidence["tokens_by_repository"], {})
+
+    def test_workspace_inherited_proc_macro(self):
+        """REQ-SOP-RUNNER-022: inherited edition and proc-macro targets are inventoried from Cargo TOML."""
+        root = self.root_path / "inherited-proc-macro"
+        (root / "src").mkdir(parents=True)
+        (root / "Cargo.toml").write_text(
+            '[package]\nname="fixture-macro"\nversion="0.1.0"\nedition.workspace=true\n'
+            '[workspace]\n[workspace.package]\nedition="2024"\n[lib]\nproc-macro=true\n'
+        )
+        (root / "src/lib.rs").write_text("extern crate proc_macro;\n")
+        inventory = runner.read_workspace_unit_inventory(root)
+        self.assertEqual(inventory["selected_units"], [{
+            "manifest_path": str((root / "Cargo.toml").resolve()),
+            "target_name": "fixture_macro", "kind": ["proc-macro"], "edition": "2024",
+            "src_path": str((root / "src/lib.rs").resolve()),
+        }])
+
+    def test_workspace_custom_crate_blocks(self):
+        """REQ-SOP-RUNNER-022: unsupported Cargo crate types block P2 instead of disappearing."""
+        root = self.root_path / "unsupported-crate-type"
+        (root / "src").mkdir(parents=True)
+        (root / "Cargo.toml").write_text(
+            '[package]\nname="fixture-lib"\nversion="0.1.0"\nedition="2021"\n'
+            '[lib]\ncrate-type=["cdylib"]\n'
+        )
+        (root / "src/lib.rs").write_text("pub fn fixture() {}\n")
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            runner.read_workspace_unit_inventory(root)
+
+    def test_workspace_external_source_blocks(self):
+        """REQ-SOP-RUNNER-022: Cargo targets outside the pinned checkout are unsupported."""
+        root = self.root_path / "external-target"
+        (root / "src").mkdir(parents=True)
+        outside_source = self.root_path / "external.rs"
+        outside_source.write_text("pub fn external() {}\n")
+        (root / "Cargo.toml").write_text(
+            f'[package]\nname="external-target"\nversion="0.1.0"\nedition="2021"\n'
+            f'[lib]\npath="{outside_source}"\n'
+        )
+        with self.assertRaises(runner.RunnerPreconditionBlockedError):
+            runner.read_workspace_unit_inventory(root)
 
     def build_output_validation_fixture(self):
         project_root = self.root_path / "output-project"
@@ -495,12 +987,328 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         """REQ-SOP-RUNNER-009: successful mapping components leave full S3 BLOCKED."""
         run_state = runner.create_persistent_run_report(self.root_path / "runs", "s3-component", "M1")
         repository_state = run_state["manifest"]["repositories"]["serde"]
-        repository_state["s3_components"]["mapping"] = "PASS"
+        repository_state["s3_components"].update({component: "PASS" for component in runner.S3_COMPONENT_NAMES})
         result = runner.finalize_s3_component_qualification(run_state, "serde")
         self.assertEqual(result, "BLOCKED")
         self.assertEqual(repository_state["steps"]["S3"], "BLOCKED")
-        self.assertEqual(repository_state["s3_qualification_gates"]["fixture_suite"]["status"], "BLOCKED")
+        self.assertEqual(repository_state["s3_qualification_gates"]["fixture_suite"]["status"], "NOT STARTED")
         self.assertEqual(run_state["manifest"]["overall_status"], "BLOCKED")
+
+    def test_s3_component_cannot_promote(self):
+        """REQ-SOP-RUNNER-022: component-only summaries cannot promote supplied prerequisite PASS values."""
+        state = runner.create_persistent_run_report(self.root_path / "runs", "component-only", "M1")
+        repository = state["manifest"]["repositories"]["serde"]
+        repository["s3_components"] = {name: "PASS" for name in runner.S3_COMPONENT_NAMES}
+        repository["s3_qualification_gates"] = {name: {"status": "PASS", "reason": None}
+                                                 for name in runner.S3_GATE_NAMES}
+        result = runner.finalize_s3_component_qualification(
+            state, "serde", qualification_token=None, expected_identity_binding={"run_id": "component-only"},
+        )
+        self.assertEqual(result, "BLOCKED")
+        self.assertEqual(repository["steps"]["S3"], "BLOCKED")
+        self.assertEqual(repository["s3_qualification_gates"]["fixture_suite"]["status"], "PASS")
+
+    def test_s3_fail_precedes_blocked(self):
+        """REQ-SOP-RUNNER-022: any prerequisite FAIL takes priority over BLOCKED gates."""
+        state = runner.create_persistent_run_report(self.root_path / "runs", "failed-gate", "M1")
+        repository = state["manifest"]["repositories"]["serde"]
+        repository["s3_components"] = {name: "PASS" for name in runner.S3_COMPONENT_NAMES}
+        repository["s3_qualification_gates"] = {
+            name: {"status": "FAIL" if name == "fixture_suite" else "BLOCKED", "reason": "synthetic"}
+            for name in runner.S3_GATE_NAMES
+        }
+        result = runner.finalize_s3_component_qualification(
+            state, "serde", qualification_token=None, expected_identity_binding={"run_id": "failed-gate"},
+        )
+        self.assertEqual(result, "FAIL")
+        self.assertEqual(repository["steps"]["S3"], "FAIL")
+
+    def test_s3_prerequisite_blocks_mapper(self):
+        """REQ-SOP-RUNNER-022: public PASS summaries without an internal token stop before output or mapping."""
+        run_state = runner.create_persistent_run_report(self.root_path / "runs", "intake-blocked", "M1")
+        artifact_run_directory = self.root_path / "artifacts" / "intake-blocked"
+        artifact_run_directory.mkdir(parents=True)
+        source_root = self.root_path / "source"
+        source_root.mkdir()
+        missing_inputs = runner.read_s3_evidence_inputs(None, "python-blake3:test", None)
+        expected_identity = {"run_id": "intake-blocked", "milestone": "M1"}
+        s3_evidence = runner.prepare_s3_evidence_qualification(
+            SimpleNamespace(run_id="intake-blocked", milestone="M1", s3_prerequisite_evidence=None),
+            run_state, missing_inputs, expected_identity, {}, {"tests": [], "ambiguous_reason": None},
+        )
+        s3_evidence["repository_results"]["serde"] = {
+            name: {"status": "PASS", "reason": "forged public summary"} for name in runner.S3_GATE_NAMES
+        }
+        s3_evidence["tokens_by_repository"] = {}
+        gate_results = s3_evidence["repository_results"]["serde"]
+        execution_context = {
+            "artifact_run_directory": artifact_run_directory,
+            "corpus_roots": {"serde": source_root},
+            "corpus_records": {"serde": {"corpus_repository_short_name": "serde",
+                                            "corpus_source_checkout_path": str(source_root)}},
+            "source_snapshots": {"serde": {"head_commit": "fixture-head", "source_tree_sha256": "a" * 64}},
+            "indexer_path": Path("/fixture/indexer"),
+            "mapper_identity": {"canonical_path": "/fixture/mapper", "sha256": "b" * 64},
+            "identity_guard": lambda *_args: None,
+            "b3_provider": "python-blake3:fixture", "b3_tool_identity": None,
+            "s3_evidence": s3_evidence,
+            "s3_expected_identity": expected_identity,
+        }
+        coverage_summary = {
+            "scope_literal_sop_pass": True, "scope_coverage_entry_count": 1,
+            "missed_source_file_count": 0, "index_generation_timestamp_value": "generation-a",
+            "index_graph_node_count": 1, "index_graph_edge_count": 1,
+            "index_partial_file_count": 0, "index_unusable_file_count": 0,
+            "scope_truncated_informational": False, "response_digest_manifest_path": "digest.json",
+        }
+
+        def collect_coverage(*positional, **_keywords):
+            positional[6]({"generation": "generation-a"})
+            return dict(coverage_summary)
+
+        with patch.object(runner, "run_fresh_index_stage", return_value={
+            "command": ["/fixture/indexer", "cli", "index_repository", "--repo-path", str(source_root), "--mode", "full"],
+            "result": {"status": "indexed", "indexed_at": "generation-a"},
+        }), patch.object(runner.coverage_inventory, "collect_index_coverage_inventory",
+                         side_effect=collect_coverage), \
+             patch.object(runner.production_measurements, "measure_corpus_production_stages") as measure_mapper:
+            status = runner.execute_repository_sop_stages(
+                "serde", run_state, execution_context,
+                SimpleNamespace(run_id="intake-blocked", milestone="M1", s3_prerequisite_evidence=None),
+            )
+
+        self.assertEqual(status, "BLOCKED")
+        self.assertEqual(run_state["manifest"]["repositories"]["serde"]["steps"]["S2"], "PASS")
+        self.assertEqual(run_state["manifest"]["repositories"]["serde"]["steps"]["S3"], "BLOCKED")
+        self.assertEqual(
+            {name: gate["status"] for name, gate in
+             run_state["manifest"]["repositories"]["serde"]["s3_qualification_gates"].items()},
+            {name: "PASS" for name in runner.S3_GATE_NAMES},
+        )
+        self.assertFalse((artifact_run_directory / "serde" / "production").exists())
+        measure_mapper.assert_not_called()
+        self.assertEqual(run_state["manifest"]["repositories"]["rust-analyzer"]["steps"]["S1"], "NOT STARTED")
+
+    def create_evidence_registry_fixture(self, fixture_name):
+        project_root = self.root_path / fixture_name / "project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='registry-fixture'\nversion='0.1.0'\n",
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        evidence_path = self.root_path / fixture_name / "external-evidence.json"
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_text("initial receipt bytes")
+        registry = runner.capture_identity_registry(
+            project_root, (), {}, (), (), extra_frozen_paths=(evidence_path,),
+        )
+        return evidence_path, registry
+
+    def build_s3_manifest_reference(self, relative_path, content=b"member"):
+        return {
+            "path": relative_path,
+            "size_bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "blake3": "0" * 64,
+        }
+
+    def build_s3_manifest_file(self, manifest_path, references):
+        manifest_path.write_text(json.dumps({
+            "global_prerequisites": {"fixture_suite": references},
+            "repositories": {},
+        }))
+        return manifest_path
+
+    def test_intake_mutated_bytes_fail(self):
+        """REQ-SOP-RUNNER-022: changed manifest, receipt, or log bytes fail intake."""
+        original_read_bytes = Path.read_bytes
+        for target_name in ("manifest", "receipt", "stdout"):
+            with self.subTest(target_name=target_name):
+                case_root = self.root_path / f"mutated-{target_name}"
+                case_root.mkdir()
+                manifest_path = case_root / "manifest.json"
+                receipt_path = case_root / "receipts" / "receipt.json"
+                stdout_path = case_root / "logs" / "stdout.log"
+                stderr_path = case_root / "logs" / "stderr.log"
+                receipt_path.parent.mkdir()
+                stdout_path.parent.mkdir()
+                stdout_path.write_bytes(b"stdout")
+                stderr_path.write_bytes(b"stderr")
+                receipt_bytes = json.dumps({
+                    "stdout": {"path": "logs/stdout.log"},
+                    "stderr": {"path": "logs/stderr.log"},
+                }).encode()
+                receipt_path.write_bytes(receipt_bytes)
+                reference = self.build_s3_manifest_reference("receipts/receipt.json", receipt_bytes)
+                self.build_s3_manifest_file(manifest_path, [reference])
+                target_path = {
+                    "manifest": manifest_path,
+                    "receipt": receipt_path,
+                    "stdout": stdout_path,
+                }[target_name]
+
+                def alter_read_bytes(path):
+                    content = original_read_bytes(path)
+                    return content + b" altered" if path == target_path else content
+
+                with patch.object(Path, "read_bytes", alter_read_bytes), patch.object(
+                    runner, "calculate_b3_file_digest", return_value="0" * 64,
+                ):
+                    result = runner.read_s3_evidence_inputs(manifest_path, "python-blake3:test", None)
+                self.assertEqual(result["intake_error"][0], "FAIL")
+
+    def test_parent_symlink_replacement_fails(self):
+        """REQ-SOP-RUNNER-022: replacing a frozen file parent with same-byte symlink fails."""
+        project_root = self.root_path / "parent-link-project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='registry-fixture'\nversion='0.1.0'\n",
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        parent_path = self.root_path / "evidence-parent"
+        parent_path.mkdir()
+        evidence_path = parent_path / "receipt.json"
+        evidence_path.write_bytes(b"same evidence bytes")
+        registry = runner.capture_identity_registry(
+            project_root, (), {}, (), (), extra_frozen_paths=(evidence_path,),
+        )
+        real_parent = self.root_path / "evidence-parent-real"
+        parent_path.rename(real_parent)
+        parent_path.symlink_to(real_parent, target_is_directory=True)
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_external_member_overlap_blocks(self):
+        """REQ-SOP-RUNNER-022: external manifest members inside source/output roots block."""
+        project_root = self.root_path / "project"
+        project_root.mkdir()
+        source_path = project_root / "src.rs"
+        source_path.write_bytes(b"source member")
+        artifact_root = self.root_path / "artifacts"
+        artifact_root.mkdir()
+        artifact_path = artifact_root / "artifact.log"
+        artifact_path.write_bytes(b"artifact member")
+        manifest_path = self.root_path / "external-manifest.json"
+        references = [
+            self.build_s3_manifest_reference("project/src.rs", source_path.read_bytes()),
+            self.build_s3_manifest_reference("artifacts/artifact.log", artifact_path.read_bytes()),
+        ]
+        self.build_s3_manifest_file(manifest_path, references)
+        result = runner.read_s3_evidence_inputs(
+            manifest_path, "python-blake3:test", None, forbidden_roots=(project_root, artifact_root),
+        )
+        self.assertEqual(result["intake_error"][0], "BLOCKED")
+        self.assertIn("overlaps a source/output root", result["intake_error"][1])
+
+    def test_config_appears_pre_freeze(self):
+        """REQ-SOP-RUNNER-022: absent Cargo config appearing before registry is rejected."""
+        project_root = self.root_path / "config-project-before"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='registry-fixture'\nversion='0.1.0'\n",
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        config_path = self.root_path / "cargo-home-before" / ".cargo" / "config.toml"
+        initial_identity = runner.capture_optional_frozen_file_identity(config_path)
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text("[build]\ntarget-dir='late'\n")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.capture_identity_registry(
+                project_root, (), {}, (), (), optional_frozen_paths=(config_path,),
+                expected_optional_files={str(config_path.absolute()): initial_identity},
+            )
+
+    def test_config_appears_post_freeze(self):
+        """REQ-SOP-RUNNER-022: absent Cargo config appearing after registry is rejected."""
+        project_root = self.root_path / "config-project-after"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='registry-fixture'\nversion='0.1.0'\n",
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        config_path = self.root_path / "cargo-home-after" / ".cargo" / "config.toml"
+        initial_identity = runner.capture_optional_frozen_file_identity(config_path)
+        registry = runner.capture_identity_registry(
+            project_root, (), {}, (), (), optional_frozen_paths=(config_path,),
+            expected_optional_files={str(config_path.absolute()): initial_identity},
+        )
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text("[build]\ntarget-dir='late'\n")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_receipt_appears_pre_freeze(self):
+        """REQ-SOP-RUNNER-022: missing receipt appearing before registry is rejected."""
+        project_root = self.root_path / "receipt-project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='registry-fixture'\nversion='0.1.0'\n",
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        manifest_path = self.root_path / "receipt-manifest.json"
+        reference = self.build_s3_manifest_reference("missing-receipt.json")
+        self.build_s3_manifest_file(manifest_path, [reference])
+        evidence_inputs = runner.read_s3_evidence_inputs(manifest_path, "python-blake3:test", None)
+        receipt_path = manifest_path.parent / reference["path"]
+        self.assertFalse(evidence_inputs["optional_identities"][str(receipt_path.absolute())]["exists"])
+        receipt_path.write_bytes(b"receipt appeared")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.capture_identity_registry(
+                project_root, (), {}, (), (), extra_frozen_paths=evidence_inputs["frozen_paths"],
+                optional_frozen_paths=evidence_inputs["optional_paths"],
+                expected_frozen_files=evidence_inputs["frozen_identities"],
+                expected_optional_files=evidence_inputs["optional_identities"],
+            )
+
+    def test_intake_fail_over_blocks(self):
+        """REQ-SOP-RUNNER-022: later intake FAIL overrides earlier unsafe-path BLOCKED."""
+        manifest_path = self.root_path / "intake-priority.json"
+        directory_path = self.root_path / "member-directory"
+        directory_path.mkdir()
+        references = [
+            self.build_s3_manifest_reference("../blocked-first.json"),
+            self.build_s3_manifest_reference("member-directory"),
+        ]
+        self.build_s3_manifest_file(manifest_path, references)
+        result = runner.read_s3_evidence_inputs(manifest_path, "python-blake3:test", None)
+        self.assertEqual(result["intake_error"][0], "FAIL")
+        self.assertIn("not a regular non-symlink file", result["intake_error"][1])
+
+    def test_frozen_evidence_mutation_fails(self):
+        """REQ-SOP-RUNNER-022: post-freeze receipt mutation fails identity verification."""
+        evidence_path, registry = self.create_evidence_registry_fixture("evidence-mutation")
+        evidence_path.write_text("changed receipt bytes")
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_frozen_evidence_deletion_fails(self):
+        """REQ-SOP-RUNNER-022: post-freeze receipt deletion fails identity verification."""
+        evidence_path, registry = self.create_evidence_registry_fixture("evidence-deletion")
+        evidence_path.unlink()
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
+
+    def test_evidence_symlink_retarget_fails(self):
+        """REQ-SOP-RUNNER-022: post-freeze symlink retargeting fails identity verification."""
+        project_root = self.root_path / "evidence-symlink" / "project"
+        create_committed_git_repository(project_root, {
+            "Cargo.toml": "[package]\nname='registry-fixture'\nversion='0.1.0'\n",
+            "Cargo.lock": "",
+            "src/lib.rs": "pub fn fixture() {}\n",
+        })
+        first_target = self.root_path / "evidence-symlink" / "first.json"
+        second_target = self.root_path / "evidence-symlink" / "second.json"
+        first_target.write_text("first")
+        second_target.write_text("second")
+        evidence_path = self.root_path / "evidence-symlink" / "receipt.json"
+        evidence_path.symlink_to(first_target)
+        registry = runner.capture_identity_registry(
+            project_root, (), {}, (), (), extra_frozen_paths=(evidence_path,),
+        )
+        evidence_path.unlink()
+        evidence_path.symlink_to(second_target)
+        with self.assertRaises(runner.RunnerFrozenInputMutationError):
+            runner.verify_identity_registry(registry)
 
     def test_preflight_failure_affects_overall(self):
         """REQ-SOP-RUNNER-011: terminal preflight BLOCKED contributes to overall status."""
@@ -576,6 +1384,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         tools_directory.mkdir(parents=True)
         support_files = (
             "hld-current-qualification-runner.py",
+            "s3-prerequisite-evidence-intake.py",
             "corpus-index-coverage-inventory.py",
             "corpus-production-stage-measurements.py",
             "process-tree-access-auditor.py",
@@ -1753,6 +2562,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             self.assertEqual(versions[tool_name]["version"], f"{tool_name} shim-version")
             self.assertEqual(versions[tool_name]["path"], str(invocation_path))
             self.assertEqual(versions[tool_name]["canonical_path"], str(shim_path.resolve()))
+            self.assertEqual(versions[tool_name]["file_identity"]["path"], str(invocation_path))
 
     def test_planning_creates_truthful_report(self):
         """REQ-SOP-RUNNER-001: planning persists statuses without mapper or oracle execution."""
@@ -1872,6 +2682,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "b3_provider": "python-blake3:harness-fixture",
             "b3_tool_identity": None,
         }
+        self.grant_synthetic_s3_token(execution_context, run_state, repository_name)
 
         with patch.object(runner, "run_guarded_child_process", return_value={
                  "return_code": 0, "stdout": index_result, "stdout_bytes": index_result.encode(), "stderr": "",
@@ -2024,6 +2835,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
             "b3_provider": "python-blake3:harness-fixture",
             "b3_tool_identity": None,
         }
+        self.grant_synthetic_s3_token(execution_context, run_state, repository_name)
         with patch.object(runner, "run_fresh_index_stage", return_value={
                  "command": ["/fixture/indexer", "cli", "index_repository", "--repo-path", str(source_root),
                              "--mode", "full"],
@@ -2062,6 +2874,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         run_state = runner.create_persistent_run_report(report_root, "artifact-integration", "M1")
 
         def record_component_success(repository_name, state, context, _arguments):
+            self.grant_synthetic_s3_token(context, state, repository_name)
             runner.record_persistent_run_transition(state, repository_name, "S1", "PASS")
             runner.record_persistent_run_transition(state, repository_name, "S2", "PASS")
             repository_state = state["manifest"]["repositories"][repository_name]
@@ -2080,7 +2893,10 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
                 state, f"- `{repository_name}` generation `generation-{repository_name}`, sampled wall time `0.5s`, "
                 "whole-tree RSS `900000000` bytes."
             )
-            return runner.finalize_s3_component_qualification(state, repository_name)
+            return runner.finalize_s3_component_qualification(
+                state, repository_name, context["s3_evidence"]["tokens_by_repository"][repository_name],
+                context["s3_expected_identity"],
+            )
 
         def invalidated_identity_guard(*_arguments):
             raise runner.RunnerContractViolationError("frozen source changed after mapping")
