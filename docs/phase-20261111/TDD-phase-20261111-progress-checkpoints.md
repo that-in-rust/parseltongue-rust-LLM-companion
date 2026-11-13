@@ -4658,3 +4658,45 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   and rejection query. Remaining: update SPEC/SOP/AGENTS/backward design,
   run the affected suites and scoped gates, review the final diff, and
   record the local GREEN/REFACTOR commits.
+
+## HLD-RECURSIVE-PATHS-REFACTOR — 2026-11-13
+
+- The same ordered cycle fixture was renamed from
+  test_hld_cycle_self_rules to the exact SPEC name
+  test_hld_cycle_self_edges after the focused GREEN run; assertions and
+  inputs were unchanged. The final affected-suite output below verifies the
+  requested name.
+- Formatting and whitespace gates:
+  cargo fmt --all -- --check
+  git diff --check
+  Output: exit 0; no diagnostics.
+- Full affected library suites, E=60s, 2x ceiling=120s:
+  cargo test -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p
+  parseltongue-duckdb-analysis-adapter --lib --all-features --release
+  --locked --offline
+  Output: core 3 passed; adapter 128 passed; traits 1 passed; 0 failed.
+  The renamed test_hld_cycle_self_edges reported ok. Elapsed 23.57s, peak
+  RSS 635,968 KiB, process-tree peak 923,926,528 bytes (2,060 samples).
+  Exit 0; no memory cap was configured.
+- Scoped warnings-denied Clippy, E=45s, 2x ceiling=90s:
+  cargo clippy -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter
+  -p parseltongue-cli-dispatcher-binary --all-targets --all-features
+  --release --locked --offline -- -D warnings
+  Output: Finished release profile [optimized] target(s) in 2.39s;
+  exit 0, elapsed 2.49s, peak RSS 368,644 KiB, process-tree peak
+  696,262,656 bytes (233 samples).
+- Scoped release build, E=60s, 2x ceiling=120s:
+  cargo build -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-duckdb-analysis-adapter
+  --all-features --release --locked --offline
+  Output: Finished release profile [optimized] target(s) in 8.43s;
+  exit 0, elapsed 8.50s, peak RSS 345,868 KiB, process-tree peak
+  421,715,968 bytes (806 samples). No libduckdb-sys C++ rebuild started.
+- Cargo continued to emit the known warning:
+  unused manifest key `lints.cargo` from rust-analyzer parser/syntax manifests.
+  It was previously diagnosed; no toolchain change or workaround was made.
+- The recursive CTE and output decoding need no further semantic refactor.
+  Rollups, Turso publication, frozen-stage checks, source producers and CLI
+  completion remain out of scope. GREEN/REFACTOR commit closure follows.
