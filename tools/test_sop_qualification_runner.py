@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -354,7 +355,8 @@ def create_identity_bound_s3_fixture(root_path: Path, fixture_failed: bool = Fal
     )
     tree_ref = add_receipt(
         "dependency_audit", "production_workspace",
-        [cargo, "tree", "--package", package_name, "--edges", "normal", "--prefix", "none", "--format", "{p}"],
+        [cargo, "tree", "--package", package_name, "--edges", "normal", "--prefix", "none", "--format", "{p}",
+         "--offline", "--locked"],
         f"{package_name} v0.1.0\nra_ap_syntax v0.0.0\n",
     )
     production_config = expected_identity["configuration"]
@@ -485,6 +487,26 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
     def tearDown(self):
         self.temporary_directory.cleanup()
 
+    def make_dependency_collector_identity(self):
+        cargo_path = self.root_path / "frozen-cargo"
+        cargo_path.write_text("harness only\n")
+        cargo_identity = runner.capture_frozen_file_identity(cargo_path)
+        return {
+            "configuration": {
+                "project_root": str(runner.PROJECT_ROOT.resolve()),
+                "production_package_name": "parseltongue-cli-dispatcher-binary",
+                "p2_configuration_blocked_reason": None, "unsupported_prerequisite_gates": {},
+            },
+            "toolchain_versions": {"cargo": {"path": str(cargo_path), "version": "cargo harness"}},
+            "toolchain_executables": {"cargo": cargo_identity},
+            "relevant_environment": runner.capture_s3_evidence_environment(),
+        }
+
+    def make_dependency_collector_evidence(self):
+        return {"manifest_document": {
+            "global_prerequisites": {"dependency_audit": [{"path": "receipts/dependency-tree.json"}]},
+        }}
+
     def grant_synthetic_s3_token(self, context, run_state, repository_name):
         binding = {"run_id": run_state["manifest"]["run_id"]}
         identity_digest = hashlib.sha256(
@@ -514,9 +536,38 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
                 forbidden_roots=(fixture["project_root"], *fixture["corpus_roots"].values(),
                                  self.root_path / "reports", self.root_path / "artifacts"),
             )
+        expected_identity = fixture["expected_identity"]
+        package_name = expected_identity["configuration"]["production_package_name"]
+        stdout_bytes = f"{package_name} v0.1.0\nra_ap_syntax v0.0.0\n".encode()
+
+        def stream(name, content):
+            path = f"/harness-only/{name}"
+            return {
+                "path": path, "raw_bytes": content, "size_bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "blake3": fixture["blake3_test_digest"](content),
+                "complete": True,
+                "file_identity": {"path": path, "size_bytes": len(content),
+                                  "sha256": hashlib.sha256(content).hexdigest(), "is_symlink": False},
+            }
+
+        cargo_path = expected_identity["toolchain_versions"]["cargo"]["path"]
+        dependency_reference = runner.s3_evidence_intake._mint_runner_owned_dependency_tree_reference(
+            identity_digest=hashlib.sha256(json.dumps(
+                expected_identity, sort_keys=True, separators=(",", ":"),
+            ).encode()).hexdigest(),
+            argv=[cargo_path, "tree", "--package", package_name, "--edges", "normal", "--prefix", "none",
+                  "--format", "{p}", "--offline", "--locked"],
+            cwd=expected_identity["configuration"]["project_root"],
+            relevant_environment=expected_identity["relevant_environment"],
+            elapsed_seconds=0.1, timeout_seconds=60.0, timed_out=False,
+            completion_status="completed", exit_status=0,
+            stdout=stream("stdout", stdout_bytes), stderr=stream("stderr", b""),
+        )
         return runner.prepare_s3_evidence_qualification(
             fixture["arguments"], fixture["run_state"], evidence_inputs,
-            fixture["expected_identity"], fixture["expected_repositories"], fixture["source_inventory"],
+            expected_identity, fixture["expected_repositories"], fixture["source_inventory"],
+            dependency_reference,
         )
 
     def test_s3_identity_bound_harness(self):
@@ -560,6 +611,411 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         self.assertEqual(result, "BLOCKED")
         self.assertEqual(repository["steps"]["S3"], "BLOCKED")
         self.assertEqual(fixture["run_state"]["manifest"]["overall_status"], "HARNESS ONLY")
+
+    def test_dependency_collector_token_harness(self):
+        """REQ-SOP-RUNNER-022.D: HARNESS ONLY collector output binds helper tokens to fixed argv."""
+        fixture = create_identity_bound_s3_fixture(self.root_path)
+        expected_identity = fixture["expected_identity"]
+        evidence_root = fixture["manifest_path"].parent
+        manifest_document = json.loads(fixture["manifest_path"].read_text())
+        file_bytes = {}
+        blake3_by_path = {}
+        for path in evidence_root.rglob("*"):
+            if not path.is_file() or path == fixture["manifest_path"]:
+                continue
+            relative_path = path.relative_to(evidence_root).as_posix()
+            content = path.read_bytes()
+            file_bytes[relative_path] = content
+            blake3_by_path[relative_path] = fixture["blake3_test_digest"](content)
+        evidence_inputs = {
+            "manifest_document": manifest_document,
+            "file_bytes_by_path": file_bytes,
+            "blake3_by_path": blake3_by_path,
+        }
+        expected_stdout = b"parseltongue-cli-dispatcher-binary v0.1.0\nra_ap_syntax v0.0.0\n"
+        constructed_commands = []
+        guard_phases = []
+
+        class FakeProcess:
+            pid = os.getpid()
+            returncode = None
+
+            def wait(self, timeout=None):
+                self.returncode = 0
+                return 0
+
+        def fake_popen(command, **kwargs):
+            constructed_commands.append(list(command))
+            kwargs["stdout"].write(expected_stdout)
+            kwargs["stderr"].write(b"")
+            return FakeProcess()
+
+        def fake_b3sum(command, **kwargs):
+            return SimpleNamespace(returncode=0, stdout=("a" * 64 + "  output\n").encode(), stderr=b"")
+
+        def identity_guard(phase_name, command):
+            guard_phases.append((phase_name, list(command)))
+
+        artifact_root = self.root_path / "artifacts" / "tree-collector"
+        with patch.object(runner, "PROJECT_ROOT", fixture["project_root"]), \
+             patch.dict(os.environ, expected_identity["relevant_environment"], clear=True), \
+             patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum):
+            self.assertIsNone(runner.collect_dependency_tree_reference(
+                {}, expected_identity, fixture["registry"], identity_guard, artifact_root,
+                "/fixture/b3sum", None,
+            ))
+            self.assertEqual(constructed_commands, [])
+            unsupported_identity = json.loads(json.dumps(expected_identity))
+            unsupported_identity["configuration"]["p2_configuration_blocked_reason"] = "unsupported harness context"
+            self.assertIsNone(runner.collect_dependency_tree_reference(
+                evidence_inputs, unsupported_identity, fixture["registry"], identity_guard,
+                artifact_root / "unsupported", "/fixture/b3sum", None,
+            ))
+            self.assertEqual(constructed_commands, [])
+            reference = runner.collect_dependency_tree_reference(
+                evidence_inputs, expected_identity, fixture["registry"], identity_guard,
+                artifact_root, "/fixture/b3sum", None,
+            )
+            self.assertIsInstance(reference, runner.s3_evidence_intake.RunnerOwnedDependencyTreeReference)
+            fixed_command = [
+                expected_identity["toolchain_versions"]["cargo"]["path"], "tree", "--package",
+                expected_identity["configuration"]["production_package_name"], "--edges", "normal",
+                "--prefix", "none", "--format", "{p}", "--offline", "--locked",
+            ]
+            self.assertEqual(constructed_commands[0], fixed_command)
+            result = runner.prepare_s3_evidence_qualification(
+                fixture["arguments"], fixture["run_state"], evidence_inputs, expected_identity,
+                fixture["expected_repositories"], fixture["source_inventory"], reference,
+            )
+            self.assertTrue(result["tokens_by_repository"])
+            self.assertTrue(all(
+                gates["dependency_audit"]["status"] == "PASS"
+                for gates in result["repository_results"].values()
+            ))
+            receipt_path = manifest_document["global_prerequisites"]["dependency_audit"][0]["path"]
+            malicious_receipt = json.loads(file_bytes[receipt_path])
+            malicious_receipt["argv"].append("--malicious")
+            malicious_inputs = {**evidence_inputs, "file_bytes_by_path": dict(file_bytes)}
+            malicious_inputs["file_bytes_by_path"][receipt_path] = json.dumps(malicious_receipt).encode()
+            second_reference = runner.collect_dependency_tree_reference(
+                malicious_inputs, expected_identity, fixture["registry"], identity_guard,
+                artifact_root / "second", "/fixture/b3sum", None,
+            )
+            self.assertIsNotNone(second_reference)
+            self.assertEqual(constructed_commands[1], fixed_command)
+            Path(second_reference.stdout.path).write_bytes(b"mutated retained output")
+            with self.assertRaises(runner.RunnerFrozenInputMutationError):
+                runner.verify_identity_registry(fixture["registry"])
+        self.assertTrue(any(name == "before S3 dependency tree collection" for name, _ in guard_phases))
+        self.assertTrue(any(name == "after S3 dependency tree collection" for name, _ in guard_phases))
+
+    def test_collector_slow_guard_timing(self):
+        """REQ-SOP-RUNNER-022.D: slow identity guards do not inflate command timeout elapsed time."""
+        fixture = create_identity_bound_s3_fixture(self.root_path)
+        expected_identity = fixture["expected_identity"]
+        package_name = expected_identity["configuration"]["production_package_name"]
+        expected_stdout = f"{package_name} v0.1.0\nra_ap_syntax v0.0.0\n".encode()
+        evidence_inputs = {"manifest_document": {"global_prerequisites": {"dependency_audit": [{}]}}}
+        constructed_commands = []
+        guard_phases = []
+        timeout_seconds = 0.05
+
+        class FakeProcess:
+            pid = os.getpid()
+            returncode = None
+
+            def wait(self, timeout=None):
+                self.returncode = 0
+                return 0
+
+        def fake_popen(command, **kwargs):
+            constructed_commands.append(list(command))
+            kwargs["stdout"].write(expected_stdout)
+            kwargs["stderr"].write(b"")
+            return FakeProcess()
+
+        def fake_blake3(file_path, *_args, **_kwargs):
+            return fixture["blake3_test_digest"](Path(file_path).read_bytes())
+
+        def slow_identity_guard(phase_name, command):
+            guard_phases.append(phase_name)
+            if phase_name in {"before S3 dependency tree collection", "after S3 dependency tree collection"}:
+                time.sleep(0.06)
+
+        artifact_directory = self.root_path / "artifacts" / "slow-guard-tree"
+        with patch.object(runner, "PROJECT_ROOT", fixture["project_root"]), \
+             patch.dict(os.environ, expected_identity["relevant_environment"], clear=True), \
+             patch.object(runner, "DEPENDENCY_TREE_TIMEOUT_SECONDS", timeout_seconds), \
+             patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner, "calculate_b3_file_digest", side_effect=fake_blake3):
+            reference = runner.collect_dependency_tree_reference(
+                evidence_inputs, expected_identity, fixture["registry"], slow_identity_guard,
+                artifact_directory, "/fixture/b3sum", None,
+            )
+            self.assertIsInstance(reference, runner.s3_evidence_intake.RunnerOwnedDependencyTreeReference)
+            gate_status, gate_reason = runner.s3_evidence_intake._evaluate_dependency_audit_records(
+                [{"receipt": {"timed_out": False, "exit_status": 0},
+                  "log_bytes": {"stdout": expected_stdout}}],
+                expected_identity, reference,
+            )
+        observation = json.loads((artifact_directory / "s3-dependency-tree-observation.json").read_text())
+        self.assertEqual(len(constructed_commands), 1)
+        self.assertTrue({"before S3 dependency tree collection", "after S3 dependency tree collection"}
+                        .issubset(guard_phases))
+        self.assertFalse(observation["timed_out"])
+        self.assertLessEqual(observation["elapsed_seconds"], timeout_seconds)
+        self.assertGreater(observation["collection_elapsed_seconds"], timeout_seconds)
+        self.assertEqual(gate_status, "PASS", gate_reason)
+
+    def test_dependency_tree_timeout_reaps(self):
+        """REQ-SOP-RUNNER-022.D: HARNESS ONLY timeout kills and bounds process-group cleanup."""
+        cargo_path = self.root_path / "frozen-cargo"
+        cargo_path.write_text("harness only\n")
+        cargo_identity = runner.capture_frozen_file_identity(cargo_path)
+        expected_identity = {
+            "configuration": {
+                "project_root": str(runner.PROJECT_ROOT.resolve()),
+                "production_package_name": "parseltongue-cli-dispatcher-binary",
+                "p2_configuration_blocked_reason": None, "unsupported_prerequisite_gates": {},
+            },
+            "toolchain_versions": {"cargo": {"path": str(cargo_path), "version": "cargo harness"}},
+            "toolchain_executables": {"cargo": cargo_identity},
+            "relevant_environment": runner.capture_s3_evidence_environment(),
+        }
+        partial_stdout = b"parseltongue-cli-dispatcher-binary v0.1.0\n"
+        wait_timeouts = []
+
+        class TimedOutProcess:
+            pid = 45678
+            returncode = None
+
+            def wait(self, timeout=None):
+                wait_timeouts.append(timeout)
+                if len(wait_timeouts) == 1:
+                    raise subprocess.TimeoutExpired("cargo tree", timeout)
+                self.returncode = -9
+                return -9
+
+        def fake_popen(_command, **kwargs):
+            kwargs["stdout"].write(partial_stdout)
+            kwargs["stderr"].write(b"partial diagnostic")
+            return TimedOutProcess()
+
+        def fake_b3sum(_command, **_kwargs):
+            return SimpleNamespace(returncode=0, stdout=("b" * 64 + "  output\n").encode(), stderr=b"")
+
+        with patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum), \
+             patch.object(runner.os, "killpg") as kill_process_group:
+            reference = runner.collect_dependency_tree_reference(
+                self.make_dependency_collector_evidence(), expected_identity, {}, lambda *_args: None,
+                self.root_path / "artifacts" / "timeout", "/fixture/b3sum", None,
+            )
+        self.assertTrue(reference.timed_out)
+        self.assertEqual(reference.completion_status, "timed_out")
+        self.assertEqual(reference.read_stream("stdout"), partial_stdout)
+        self.assertEqual(wait_timeouts, [60.0, runner.DEPENDENCY_TREE_CLEANUP_TIMEOUT_SECONDS])
+        kill_process_group.assert_called_once_with(45678, runner.signal.SIGKILL)
+
+    def test_collector_stream_race_fails(self):
+        """REQ-SOP-RUNNER-022.D: output replacement between read and identity capture is FAIL."""
+        expected_identity = self.make_dependency_collector_identity()
+        artifact_root = self.root_path / "artifacts" / "race"
+        stdout_path = artifact_root / "s3-dependency-tree.stdout"
+        expected_stdout = b"parseltongue-cli-dispatcher-binary v0.1.0\nparser-pin v1.0.0\n"
+        original_capture = runner.capture_frozen_file_identity
+        replaced = False
+
+        class CompletedProcess:
+            pid = os.getpid()
+            returncode = 0
+
+            def wait(self, timeout=None):
+                return 0
+
+        def fake_popen(_command, **kwargs):
+            kwargs["stdout"].write(expected_stdout)
+            kwargs["stderr"].write(b"")
+            return CompletedProcess()
+
+        def fake_b3sum(_command, **_kwargs):
+            return SimpleNamespace(returncode=0, stdout=("c" * 64 + "  output\n").encode(), stderr=b"")
+
+        def replace_before_identity_capture(path):
+            nonlocal replaced
+            if Path(path) == stdout_path and not replaced:
+                replacement_path = stdout_path.with_name("replacement-output")
+                replacement_path.write_bytes(b"replacement after retained read\n")
+                os.replace(replacement_path, stdout_path)
+                replaced = True
+            return original_capture(path)
+
+        with patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum), \
+             patch.object(runner, "capture_frozen_file_identity", side_effect=replace_before_identity_capture):
+            with self.assertRaises(runner.RunnerFrozenInputMutationError):
+                runner.collect_dependency_tree_reference(
+                    self.make_dependency_collector_evidence(), expected_identity, {}, lambda *_args: None,
+                    artifact_root, "/fixture/b3sum", None,
+                )
+        observation = json.loads((artifact_root / "s3-dependency-tree-observation.json").read_text())
+        self.assertIn("stdout", observation["stream_capture_errors"])
+
+    def test_dependency_source_mutation_fails(self):
+        """REQ-SOP-RUNNER-022.D: mocked Cargo input mutation is caught by the real registry guard."""
+        fixture = create_identity_bound_s3_fixture(self.root_path)
+        expected_identity = fixture["expected_identity"]
+        expected_environment = dict(expected_identity["relevant_environment"])
+        expected_environment["PATH"] = os.pathsep.join((expected_environment["PATH"], os.environ["PATH"]))
+        expected_identity["relevant_environment"] = expected_environment
+        frozen_path = next(
+            Path(identity["path"])
+            for identity in fixture["registry"]["frozen_files"].values()
+            if Path(identity["path"]) == fixture["project_root"] / "Cargo.toml"
+        )
+        original_bytes = frozen_path.read_bytes()
+        phases = []
+        cargo_commands = []
+        stdout_bytes = b"parseltongue-cli-dispatcher-binary v0.1.0\nparser-pin v1.0.0\n"
+
+        class CompletedProcess:
+            pid = os.getpid()
+            returncode = 0
+
+            def wait(self, timeout=None):
+                return 0
+
+        original_popen = runner.subprocess.Popen
+
+        def fake_popen(command, **kwargs):
+            if len(command) < 2 or command[1] != "tree":
+                return original_popen(command, **kwargs)
+            cargo_commands.append(list(command))
+            kwargs["stdout"].write(stdout_bytes)
+            kwargs["stderr"].write(b"")
+            frozen_path.write_bytes(original_bytes + b"\nsource mutation during collection\n")
+            return CompletedProcess()
+
+        def fake_b3sum(command, **_kwargs):
+            if command[0] != "/fixture/b3sum":
+                return original_run(command, **_kwargs)
+            path = Path(command[-1])
+            digest = fixture["blake3_test_digest"](path.read_bytes())
+            return SimpleNamespace(returncode=0, stdout=f"{digest}  {path}\n".encode(), stderr=b"")
+
+        identity_guard = runner.make_identity_boundary_callback(
+            fixture["registry"], expected_identity["relevant_environment"], fixture["mapper_identity"],
+            "/fixture/b3sum",
+        )
+
+        def recording_guard(phase_name, command):
+            phases.append(phase_name)
+            identity_guard(phase_name, command)
+
+        artifact_root = self.root_path / "artifacts" / "source-mutation"
+        original_run = runner.subprocess.run
+        with patch.object(runner, "PROJECT_ROOT", fixture["project_root"]), \
+             patch.dict(os.environ, expected_environment, clear=True), \
+             patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum):
+            with self.assertRaises(runner.RunnerFrozenInputMutationError):
+                runner.collect_dependency_tree_reference(
+                    self.make_dependency_collector_evidence(), expected_identity, fixture["registry"], recording_guard,
+                    artifact_root, "/fixture/b3sum", None,
+                )
+        observation = json.loads((artifact_root / "s3-dependency-tree-observation.json").read_text())
+        self.assertTrue(observation["guard_error"])
+        self.assertIn("after S3 dependency tree collection", phases)
+        self.assertEqual(len(cargo_commands), 1)
+
+    def test_unreaped_timeout_forbidden_fails(self):
+        """REQ-SOP-RUNNER-022.D: forbidden retained rows FAIL when timed-out cleanup cannot reap."""
+        expected_identity = self.make_dependency_collector_identity()
+        artifact_root = self.root_path / "artifacts" / "unreaped"
+        partial_stdout = b"parseltongue-cli-dispatcher-binary v0.1.0\nra_ap_ide v0.0.0\n"
+        wait_timeouts = []
+        phases = []
+
+        class UnreapedProcess:
+            pid = 45679
+            returncode = None
+
+            def wait(self, timeout=None):
+                wait_timeouts.append(timeout)
+                raise subprocess.TimeoutExpired("cargo tree", timeout)
+
+        def fake_popen(_command, **kwargs):
+            kwargs["stdout"].write(partial_stdout)
+            kwargs["stderr"].write(b"partial error\n")
+            return UnreapedProcess()
+
+        def fake_b3sum(_command, **_kwargs):
+            return SimpleNamespace(returncode=0, stdout=("d" * 64 + "  output\n").encode(), stderr=b"")
+
+        with patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum), \
+             patch.object(runner.os, "killpg") as kill_process_group:
+            with self.assertRaises(runner.RunnerContractViolationError):
+                runner.collect_dependency_tree_reference(
+                    self.make_dependency_collector_evidence(), expected_identity, {},
+                    lambda phase, _command: phases.append(phase), artifact_root, "/fixture/b3sum", None,
+                )
+        observation = json.loads((artifact_root / "s3-dependency-tree-observation.json").read_text())
+        self.assertFalse(observation["process_reaped"])
+        self.assertEqual(observation["forbidden_runtime_rows"], ["ra-ap-ide"])
+        self.assertEqual(wait_timeouts, [60.0, runner.DEPENDENCY_TREE_CLEANUP_TIMEOUT_SECONDS])
+        self.assertEqual(kill_process_group.call_count, 2)
+        self.assertIn("after S3 dependency tree collection", phases)
+
+    def test_collector_hash_failure_forbidden(self):
+        """REQ-SOP-RUNNER-022.D: hash failure cannot discard an observed forbidden partial row."""
+        expected_identity = self.make_dependency_collector_identity()
+        artifact_root = self.root_path / "artifacts" / "hash-failure"
+        partial_stdout = b"parseltongue-cli-dispatcher-binary v0.1.0\nra_ap_ide v0.0.0\n"
+
+        class CompletedProcess:
+            pid = os.getpid()
+            returncode = 7
+
+            def wait(self, timeout=None):
+                return 7
+
+        def fake_popen(_command, **kwargs):
+            kwargs["stdout"].write(partial_stdout)
+            kwargs["stderr"].write(b"hash unavailable\n")
+            return CompletedProcess()
+
+        with patch.object(runner.subprocess, "Popen", side_effect=fake_popen), \
+             patch.object(runner.subprocess, "run", side_effect=runner.RunnerPreconditionBlockedError("hash unavailable")):
+            with self.assertRaises(runner.RunnerContractViolationError):
+                runner.collect_dependency_tree_reference(
+                    self.make_dependency_collector_evidence(), expected_identity, {}, lambda *_args: None,
+                    artifact_root, "/fixture/b3sum", None,
+                )
+        observation = json.loads((artifact_root / "s3-dependency-tree-observation.json").read_text())
+        self.assertEqual(observation["forbidden_runtime_rows"], ["ra-ap-ide"])
+
+    def test_collector_spawn_failure_guards(self):
+        """REQ-SOP-RUNNER-022.D: post-collection guard runs even when process spawn fails."""
+        expected_identity = self.make_dependency_collector_identity()
+        artifact_root = self.root_path / "artifacts" / "spawn-failure"
+        phases = []
+
+        def failed_popen(_command, **_kwargs):
+            raise FileNotFoundError("harness cargo spawn failure")
+
+        def fake_b3sum(_command, **_kwargs):
+            return SimpleNamespace(returncode=0, stdout=("e" * 64 + "  output\n").encode(), stderr=b"")
+
+        with patch.object(runner.subprocess, "Popen", side_effect=failed_popen), \
+             patch.object(runner.subprocess, "run", side_effect=fake_b3sum):
+            result = runner.collect_dependency_tree_reference(
+                self.make_dependency_collector_evidence(), expected_identity, {},
+                lambda phase, _command: phases.append(phase), artifact_root, "/fixture/b3sum", None,
+            )
+        self.assertIsNone(result)
+        self.assertIn("after S3 dependency tree collection", phases)
 
     def test_s3_intake_failure_priority(self):
         """REQ-SOP-RUNNER-022: a malformed sibling cannot mask a validated failed fixture receipt."""

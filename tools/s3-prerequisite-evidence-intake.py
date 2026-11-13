@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 import hashlib
 import json
 import math
 from pathlib import PurePosixPath
 import re
+from typing import Any
 from urllib.parse import unquote
 
 
@@ -79,6 +81,106 @@ class S3EvidenceQualificationToken:
         self.run_identifier = run_identifier
         self.repository_name = repository_name
         self.identity_digest = identity_digest
+
+
+_RUNNER_DEPENDENCY_REFERENCE_AUTHORITY = object()
+
+
+@dataclass(frozen=True, slots=True)
+class _RunnerOwnedDependencyTreeStream:
+    path: str
+    raw_bytes: bytes
+    size_bytes: int
+    sha256: str
+    blake3: str
+    complete: bool
+    file_identity: tuple[tuple[str, Any], ...]
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class RunnerOwnedDependencyTreeReference:
+    identity_digest: str
+    argv: tuple[str, ...]
+    cwd: str
+    relevant_environment: tuple[tuple[str, str], ...]
+    elapsed_seconds: float
+    timeout_seconds: float
+    timed_out: bool
+    completion_status: str
+    exit_status: int | None
+    stdout: _RunnerOwnedDependencyTreeStream
+    stderr: _RunnerOwnedDependencyTreeStream
+    _authority: object
+
+    def __init__(self, authority, **values):
+        if authority is not _RUNNER_DEPENDENCY_REFERENCE_AUTHORITY:
+            raise TypeError("runner-owned dependency references require runner authority")
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "_authority", authority)
+
+    def read_stream(self, stream_name):
+        if self._authority is not _RUNNER_DEPENDENCY_REFERENCE_AUTHORITY:
+            raise S3EvidenceBlockedError("runner-owned dependency reference authority is invalid")
+        stream = self.stdout if stream_name == "stdout" else self.stderr if stream_name == "stderr" else None
+        if stream is None:
+            raise S3EvidenceBlockedError("runner-owned dependency stream name is invalid")
+        content = stream.raw_bytes
+        identity = dict(stream.file_identity)
+        if (len(content) != stream.size_bytes or hashlib.sha256(content).hexdigest() != stream.sha256
+                or identity.get("path") != stream.path or identity.get("size_bytes") != stream.size_bytes
+                or identity.get("sha256") != stream.sha256 or identity.get("is_symlink") is not False):
+            raise S3EvidenceViolationError("runner-owned dependency output changed after capture")
+        return content
+
+
+def _mint_runner_owned_dependency_tree_reference(
+    *, identity_digest, argv, cwd, relevant_environment, elapsed_seconds, timeout_seconds,
+    timed_out, completion_status, exit_status, stdout, stderr,
+):
+    def stream_value(value):
+        if not isinstance(value, Mapping):
+            raise S3EvidenceBlockedError("runner-owned dependency stream record is malformed")
+        raw_bytes = value.get("raw_bytes")
+        file_identity = value.get("file_identity")
+        if (not isinstance(raw_bytes, bytes) or not isinstance(file_identity, Mapping)
+                or not isinstance(value.get("path"), str)
+                or isinstance(value.get("size_bytes"), bool) or not isinstance(value.get("size_bytes"), int)
+                or value["size_bytes"] < 0 or not isinstance(value.get("sha256"), str)
+                or not HEX_DIGEST_RE.fullmatch(value["sha256"])
+                or not isinstance(value.get("blake3"), str) or not HEX_DIGEST_RE.fullmatch(value["blake3"])
+                or not isinstance(value.get("complete"), bool)
+                or file_identity.get("path") != value.get("path")
+                or file_identity.get("size_bytes") != value.get("size_bytes")
+                or file_identity.get("sha256") != value.get("sha256")
+                or file_identity.get("is_symlink") is not False):
+            raise S3EvidenceBlockedError("runner-owned dependency stream bytes or identity are absent")
+        return _RunnerOwnedDependencyTreeStream(
+            value.get("path"), raw_bytes, value.get("size_bytes"), value.get("sha256"),
+            value.get("blake3"), value.get("complete"), tuple(sorted(file_identity.items())),
+        )
+
+    if (not isinstance(identity_digest, str) or not HEX_DIGEST_RE.fullmatch(identity_digest)
+            or not isinstance(argv, Sequence) or isinstance(argv, (str, bytes))
+            or not argv or any(not isinstance(value, str) for value in argv)
+            or not isinstance(cwd, str) or not isinstance(relevant_environment, Mapping)
+            or isinstance(elapsed_seconds, bool) or not isinstance(elapsed_seconds, (int, float))
+            or isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float))
+            or timeout_seconds <= 0 or not isinstance(timed_out, bool)
+            or completion_status not in {"completed", "timed_out"}
+            or timed_out != (completion_status == "timed_out")
+            or (exit_status is not None and (isinstance(exit_status, bool) or not isinstance(exit_status, int)))
+            or (not timed_out and exit_status is None)):
+        raise S3EvidenceBlockedError("runner-owned dependency reference metadata is malformed")
+    return RunnerOwnedDependencyTreeReference(
+        _RUNNER_DEPENDENCY_REFERENCE_AUTHORITY,
+        identity_digest=identity_digest,
+        argv=tuple(argv), cwd=cwd,
+        relevant_environment=tuple(sorted(relevant_environment.items())),
+        elapsed_seconds=float(elapsed_seconds), timeout_seconds=float(timeout_seconds),
+        timed_out=timed_out, completion_status=completion_status, exit_status=exit_status,
+        stdout=stream_value(stdout), stderr=stream_value(stderr),
+    )
 
 
 def _strict_json_equal(left, right):
@@ -267,7 +369,13 @@ def validate_s3_evidence_receipt(
         except UnicodeDecodeError as error:
             raise S3EvidenceBlockedError(f"receipt {stream_name} is not complete UTF-8 text") from error
     _validate_command_family_contract(receipt_document, expected_identity_binding)
-    return {"receipt": dict(receipt_document), "logs": log_texts, "log_paths": log_paths}
+    return {
+        "receipt": dict(receipt_document), "logs": log_texts,
+        "log_bytes": {stream_name: file_bytes_by_path[
+            receipt_document[stream_name]["path"]
+        ] for stream_name in ("stdout", "stderr")},
+        "log_paths": log_paths,
+    }
 
 
 def _validate_command_family_contract(receipt_document, expected_identity_binding):
@@ -339,10 +447,13 @@ def _validate_command_family_contract(receipt_document, expected_identity_bindin
                 or any(value not in {"--nocapture"} for value in test_args)):
             raise S3EvidenceBlockedError("fixture receipt must be an unfiltered production-workspace cargo test")
     elif family == "dependency_audit":
+        expected_package = expected_identity_binding.get("configuration", {}).get("production_package_name")
+        expected_arguments = [
+            "tree", "--package", expected_package, "--edges", "normal", "--prefix", "none", "--format", "{p}",
+        ]
         filtered = [value for value in arguments if value not in optional]
-        if filtered != ["tree", "--package", "parseltongue-cli-dispatcher-binary", "--edges", "normal",
-                        "--prefix", "none", "--format", "{p}"]:
-            raise S3EvidenceBlockedError("dependency receipt must be the full-depth production normal tree")
+        if not isinstance(expected_package, str) or filtered != expected_arguments:
+            raise S3EvidenceBlockedError("dependency receipt must be the full-depth production normal tree command")
     elif family == "release_build":
         filtered = [value for value in arguments if value not in optional]
         if filtered != ["build", "--release", "--package", "parseltongue-cli-dispatcher-binary",
@@ -540,6 +651,53 @@ def parse_fixture_test_output(stdout_text, stderr_text, source_test_inventory, m
     return {"rows": rows, "summaries": summaries, "status": "PASS"}
 
 
+def _forbidden_dependency_tree_names(stdout_bytes):
+    try:
+        text = stdout_bytes.decode("utf-8", errors="replace") if isinstance(stdout_bytes, bytes) else ""
+    except Exception:
+        return []
+    roots = (
+        "ide", "hir", "base-db", "salsa", "ra-ap-ide", "ra-ap-hir", "ra-ap-base-db", "ra-ap-salsa",
+        "oracle-semantic-export-harness", "proc-macro-srv", "proc-macro-server",
+        "ra-ap-proc-macro-srv", "ra-ap-proc-macro-server",
+    )
+    found = set()
+    for line in text.splitlines():
+        match = re.match(r"^\s*([A-Za-z0-9_-]+)(?:\s+v|\s*$)", line)
+        if match is None:
+            continue
+        name = match.group(1).lower().replace("_", "-")
+        if any(name == root or name.startswith(root + "-") for root in roots):
+            found.add(name)
+    return sorted(found)
+
+
+def _partial_dependency_tree_outputs(manifest_document, file_bytes_by_path):
+    global_prerequisites = manifest_document.get("global_prerequisites")
+    references = global_prerequisites.get("dependency_audit") if isinstance(global_prerequisites, Mapping) else None
+    if not isinstance(references, list):
+        return []
+    outputs = []
+    for receipt_reference in references:
+        try:
+            receipt_path = validate_s3_evidence_reference(receipt_reference)
+            receipt_bytes = file_bytes_by_path.get(receipt_path)
+            if not isinstance(receipt_bytes, bytes):
+                continue
+            receipt_document = json.loads(receipt_bytes.decode("utf-8"))
+            descriptor = receipt_document.get("stdout") if isinstance(receipt_document, Mapping) else None
+            if not isinstance(descriptor, Mapping):
+                continue
+            stream_reference = {key: descriptor[key] for key in RECEIPT_REFERENCE_KEYS if key in descriptor}
+            stream_path = validate_s3_evidence_reference(stream_reference)
+            content = file_bytes_by_path.get(stream_path)
+        except (UnicodeError, json.JSONDecodeError, S3EvidenceBlockedError, S3EvidenceViolationError):
+            continue
+        if isinstance(content, bytes):
+            outputs.append(content)
+    return outputs
+
+
 def validate_s3_prerequisite_evidence(
     manifest_document,
     file_bytes_by_path,
@@ -548,6 +706,7 @@ def validate_s3_prerequisite_evidence(
     expected_repository_bindings,
     source_test_inventory,
     milestone,
+    dependency_reference=None,
 ):
     if not isinstance(manifest_document, Mapping):
         raise S3EvidenceBlockedError("S3 evidence manifest must be an object")
@@ -579,6 +738,20 @@ def validate_s3_prerequisite_evidence(
     gate_references = []
     gate_observations = {name: [] for name in GLOBAL_GATE_NAMES}
     gate_observations["p2_offline_qualification"] = []
+    for stdout_bytes in _partial_dependency_tree_outputs(manifest_document, file_bytes_by_path):
+        forbidden = _forbidden_dependency_tree_names(stdout_bytes)
+        if forbidden:
+            gate_observations["dependency_audit"].append((
+                "FAIL", f"forbidden runtime dependency rows: {forbidden}", "production_workspace",
+            ))
+        configuration = expected_identity_binding.get("configuration", {})
+        expected_package = configuration.get("production_package_name") if isinstance(configuration, Mapping) else None
+        try:
+            _validate_dependency_tree_root(stdout_bytes, expected_package, expected_identity_binding)
+        except S3EvidenceViolationError as error:
+            gate_observations["dependency_audit"].append(("FAIL", str(error), "production_workspace"))
+        except S3EvidenceBlockedError as error:
+            gate_observations["dependency_audit"].append(("BLOCKED", str(error), "production_workspace"))
 
     if not isinstance(global_prerequisites, Mapping):
         for gate_name in GLOBAL_GATE_NAMES:
@@ -776,6 +949,7 @@ def validate_s3_prerequisite_evidence(
         return {
             "gate": gate_name, "scope": scope, "family": actual_family,
             "receipt": receipt_result["receipt"], "logs": receipt_result["logs"],
+            "log_bytes": receipt_result["log_bytes"],
         }
 
     for gate_name, reference, expected_family, scope, repository_binding in gate_references:
@@ -808,7 +982,8 @@ def validate_s3_prerequisite_evidence(
         records = [record for record in receipt_records if record["gate"] == gate_name]
         try:
             gate_status, reason = _evaluate_gate_receipts(
-                gate_name, records, source_test_inventory, milestone, expected_identity_binding
+                gate_name, records, source_test_inventory, milestone, expected_identity_binding,
+                dependency_reference=dependency_reference if gate_name == "dependency_audit" else None,
             )
         except S3EvidenceViolationError as error:
             gate_status, reason = "FAIL", str(error)
@@ -852,7 +1027,11 @@ def validate_s3_prerequisite_evidence(
 
 
 def _evaluate_gate_receipts(gate_name, records, source_test_inventory, milestone,
-                            expected_identity_binding, repository_binding=None):
+                            expected_identity_binding, repository_binding=None, dependency_reference=None):
+    if gate_name == "dependency_audit":
+        return _evaluate_dependency_audit_records(
+            records, expected_identity_binding, dependency_reference,
+        )
     if not records:
         return "BLOCKED", "no receipt is retained for this prerequisite"
     observations = []
@@ -889,8 +1068,6 @@ def _evaluate_gate_receipts(gate_name, records, source_test_inventory, milestone
                     diagnostics.append(diagnostic["level"])
                 if any(level in {"warning", "error"} for level in diagnostics):
                     raise S3EvidenceViolationError("clippy output contains warning/error diagnostics")
-            elif record["family"] == "dependency_audit":
-                _validate_dependency_tree_output(record["logs"]["stdout"])
             elif record["family"] == "release_build":
                 _validate_release_build_output(record["logs"]["stdout"], expected_identity_binding)
             elif record["family"] == "p2_metadata":
@@ -910,6 +1087,133 @@ def _evaluate_gate_receipts(gate_name, records, source_test_inventory, milestone
     return _combine_gate_observations("PASS", "all retained receipts satisfy the gate contract", observations)
 
 
+def _evaluate_dependency_audit_records(records, expected_identity_binding, dependency_reference):
+    observations = []
+    supplied_outputs = [record.get("log_bytes", {}).get("stdout") for record in records]
+    reference_stdout = None
+    reference_stderr = None
+    reference_is_valid = isinstance(dependency_reference, RunnerOwnedDependencyTreeReference)
+    if reference_is_valid:
+        for stream_name in ("stdout", "stderr"):
+            try:
+                stream_bytes = dependency_reference.read_stream(stream_name)
+            except S3EvidenceViolationError as error:
+                observations.append(("FAIL", str(error)))
+                stream_bytes = None
+            except S3EvidenceBlockedError as error:
+                observations.append(("BLOCKED", str(error)))
+                stream_bytes = None
+            if stream_name == "stdout":
+                reference_stdout = stream_bytes
+            else:
+                reference_stderr = stream_bytes
+    else:
+        observations.append(("BLOCKED", "runner-owned dependency tree reference is missing or unsupported"))
+
+    retained_outputs = [*supplied_outputs, reference_stdout]
+    for output in retained_outputs:
+        forbidden = _forbidden_dependency_tree_names(output)
+        if forbidden:
+            observations.append(("FAIL", f"forbidden runtime dependency rows: {forbidden}"))
+
+    expected_digest = hashlib.sha256(json.dumps(
+        expected_identity_binding, sort_keys=True, separators=(",", ":"),
+    ).encode()).hexdigest()
+    expected_configuration = expected_identity_binding.get("configuration", {})
+    expected_toolchain = expected_identity_binding.get("toolchain_versions", {})
+    cargo_identity = expected_toolchain.get("cargo") if isinstance(expected_toolchain, Mapping) else None
+    expected_cargo_path = cargo_identity.get("path") if isinstance(cargo_identity, Mapping) else None
+    expected_package = expected_configuration.get("production_package_name") if isinstance(
+        expected_configuration, Mapping
+    ) else None
+    expected_cwd = expected_configuration.get("project_root") if isinstance(expected_configuration, Mapping) else None
+    expected_argv = [
+        expected_cargo_path, "tree", "--package", expected_package, "--edges", "normal", "--prefix", "none",
+        "--format", "{p}", "--offline", "--locked",
+    ]
+    expected_environment = expected_identity_binding.get("relevant_environment")
+    reference_matches_context = False
+    reference_streams_complete = False
+    if reference_is_valid:
+        reference_matches_context = (
+            dependency_reference.identity_digest == expected_digest
+            and list(dependency_reference.argv) == expected_argv
+            and dependency_reference.cwd == expected_cwd
+            and isinstance(expected_environment, Mapping)
+            and dict(dependency_reference.relevant_environment) == dict(expected_environment)
+        )
+        reference_streams_complete = (
+            dependency_reference.stdout.complete is True and dependency_reference.stderr.complete is True
+        )
+        if not reference_matches_context:
+            observations.append(("BLOCKED", "runner-owned dependency tree reference does not match frozen context"))
+        elif dependency_reference.timed_out or dependency_reference.completion_status != "completed":
+            observations.append(("BLOCKED", "runner-owned dependency tree reference timed out or is incomplete"))
+        elif dependency_reference.exit_status != 0:
+            observations.append(("FAIL", "runner-owned dependency tree command exited nonzero"))
+        elif not reference_streams_complete:
+            observations.append(("BLOCKED", "runner-owned dependency tree stream is incomplete"))
+        if reference_matches_context and (dependency_reference.elapsed_seconds < 0
+                or dependency_reference.elapsed_seconds > dependency_reference.timeout_seconds):
+            observations.append(("BLOCKED", "runner-owned dependency tree timing is incomplete"))
+
+    if reference_matches_context and isinstance(reference_stdout, bytes):
+        try:
+            _validate_dependency_tree_root(reference_stdout, expected_package, expected_identity_binding)
+        except S3EvidenceViolationError as error:
+            observations.append(("FAIL", str(error)))
+        except S3EvidenceBlockedError as error:
+            observations.append(("BLOCKED", str(error)))
+
+    reference_ready = (
+        reference_matches_context and not dependency_reference.timed_out
+        and dependency_reference.completion_status == "completed" and dependency_reference.exit_status == 0
+        and reference_streams_complete and isinstance(reference_stdout, bytes) and isinstance(reference_stderr, bytes)
+    )
+    reference_tree_valid = False
+    if reference_ready:
+        try:
+            _validate_dependency_tree_output(reference_stdout, expected_package, expected_identity_binding)
+            reference_tree_valid = True
+        except S3EvidenceViolationError as error:
+            observations.append(("FAIL", str(error)))
+        except S3EvidenceBlockedError as error:
+            observations.append(("BLOCKED", str(error)))
+
+    if len(records) != 1:
+        observations.append(("BLOCKED", "dependency audit requires exactly one supplied receipt"))
+    for record in records:
+        receipt = record.get("receipt", {})
+        if receipt.get("timed_out"):
+            observations.append(("BLOCKED", "supplied dependency receipt timed out"))
+        elif receipt.get("exit_status") != 0:
+            observations.append(("FAIL", "supplied dependency receipt command exited nonzero"))
+        supplied_stdout = record.get("log_bytes", {}).get("stdout")
+        if not isinstance(supplied_stdout, bytes):
+            observations.append(("BLOCKED", "supplied dependency tree stdout is incomplete"))
+            continue
+        try:
+            _validate_dependency_tree_root(supplied_stdout, expected_package, expected_identity_binding)
+        except S3EvidenceViolationError as error:
+            observations.append(("FAIL", str(error)))
+        except S3EvidenceBlockedError as error:
+            observations.append(("BLOCKED", str(error)))
+        if receipt.get("timed_out") or receipt.get("exit_status") != 0:
+            continue
+        try:
+            _validate_dependency_tree_output(supplied_stdout, expected_package, expected_identity_binding)
+        except S3EvidenceViolationError as error:
+            observations.append(("FAIL", str(error)))
+        except S3EvidenceBlockedError as error:
+            observations.append(("BLOCKED", str(error)))
+        if reference_tree_valid:
+            if supplied_stdout.replace(b"\r\n", b"\n") != reference_stdout.replace(b"\r\n", b"\n"):
+                observations.append(("FAIL", "supplied dependency rows differ from runner-owned ordered rows"))
+    return _combine_gate_observations(
+        "PASS", "runner-owned dependency tree reference and supplied receipt match", observations,
+    )
+
+
 def _combine_gate_observations(status, reason, observations):
     all_observations = [(status, reason)] + [(item[0], item[1]) for item in observations]
     final_status = "FAIL" if any(item[0] == "FAIL" for item in all_observations) else (
@@ -919,29 +1223,50 @@ def _combine_gate_observations(status, reason, observations):
     return final_status, "; ".join(dict.fromkeys(reasons))
 
 
-def _validate_dependency_tree_output(stdout_text):
-    if not isinstance(stdout_text, str):
-        raise S3EvidenceBlockedError("dependency tree output is not text")
-    rows = [line.strip() for line in stdout_text.splitlines() if line.strip()]
-    if not rows:
-        raise S3EvidenceBlockedError("dependency tree output is empty")
-    package_names = []
+def _validate_dependency_tree_output(stdout_bytes, expected_package, expected_identity_binding):
+    if isinstance(stdout_bytes, str):
+        stdout_bytes = stdout_bytes.encode("utf-8")
+    if not isinstance(stdout_bytes, bytes):
+        raise S3EvidenceBlockedError("dependency tree output is not retained bytes")
+    forbidden = _forbidden_dependency_tree_names(stdout_bytes)
+    if forbidden:
+        raise S3EvidenceViolationError(f"forbidden runtime dependency rows: {forbidden}")
+    _validate_dependency_tree_root(stdout_bytes, expected_package, expected_identity_binding)
+    try:
+        normalized_text = stdout_bytes.replace(b"\r\n", b"\n").decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise S3EvidenceBlockedError("dependency tree output is not complete UTF-8 text") from error
+    rows = normalized_text.split("\n")
+    if rows and rows[-1] == "":
+        rows.pop()
+    if not rows or any(not row for row in rows):
+        raise S3EvidenceBlockedError("dependency tree output contains no complete ordered rows")
+    parsed_rows = []
     for row in rows:
         match = re.fullmatch(r"([A-Za-z0-9_-]+) v([^\s()]+)(?: \((.+)\))?", row)
-        if not match:
-            raise S3EvidenceBlockedError("dependency tree output does not match parseable {p} rows")
-        package_names.append(match.group(1).lower().replace("_", "-"))
-    if package_names[0] != "parseltongue-cli-dispatcher-binary":
-        raise S3EvidenceViolationError("dependency tree root is not the production CLI package")
-    forbidden_roots = (
-        "ide", "hir", "base-db", "salsa", "ra-ap-ide", "ra-ap-hir", "ra-ap-base-db", "ra-ap-salsa",
-        "oracle-semantic-export-harness", "proc-macro-srv", "proc-macro-server",
-        "ra-ap-proc-macro-srv", "ra-ap-proc-macro-server",
-    )
-    found = [name for name in package_names
-             if any(name == root or name.startswith(root + "-") for root in forbidden_roots)]
-    if found:
-        raise S3EvidenceViolationError(f"forbidden runtime dependency rows: {sorted(set(found))}")
+        if match is None:
+            raise S3EvidenceBlockedError("dependency tree output does not match exact {p} rows")
+        parsed_rows.append((match.group(1), match.group(2)))
+
+
+def _validate_dependency_tree_root(stdout_bytes, expected_package, expected_identity_binding):
+    if isinstance(stdout_bytes, str):
+        stdout_bytes = stdout_bytes.encode("utf-8")
+    if not isinstance(stdout_bytes, bytes):
+        raise S3EvidenceBlockedError("dependency tree output is not retained bytes")
+    configuration = expected_identity_binding.get("configuration", {})
+    expected_version = configuration.get("production_package_version") if isinstance(configuration, Mapping) else None
+    if not isinstance(expected_package, str) or not isinstance(expected_version, str):
+        raise S3EvidenceBlockedError("frozen production root name/version is unavailable")
+    try:
+        first_row = stdout_bytes.replace(b"\r\n", b"\n").split(b"\n", 1)[0].decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise S3EvidenceBlockedError("dependency tree root is not complete UTF-8 text") from error
+    match = re.fullmatch(r"([A-Za-z0-9_-]+) v([^\s()]+)(?: \((.+)\))?", first_row)
+    if match is None:
+        raise S3EvidenceBlockedError("dependency tree output does not start with an exact {p} root row")
+    if (match.group(1), match.group(2)) != (expected_package, expected_version):
+        raise S3EvidenceViolationError("dependency tree root name/version differs from frozen production package")
 
 
 def _cargo_json_messages(stdout_text, fail_on_diagnostic=False):
@@ -1249,7 +1574,9 @@ def _validate_p2_check_output(stdout_text, metadata_text, repository_binding):
         if target.get("edition") != expected["edition"]:
             raise S3EvidenceViolationError("P2 artifact edition differs from metadata unit edition")
         if sorted(features) != expected["features"]:
-            raise S3EvidenceViolationError("P2 artifact feature context differs from Cargo metadata")
+            raise S3EvidenceBlockedError(
+                "P2 metadata/artifact feature mismatch leaves per-unit feature context unproven"
+            )
         if key in artifact_map:
             raise S3EvidenceViolationError("P2 compiler-artifact row is duplicated")
         artifact_map[key] = artifact

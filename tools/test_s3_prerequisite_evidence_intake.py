@@ -151,7 +151,7 @@ class SyntheticEvidenceBundle:
         tree = self._receipt(
             "dependency_audit", "production_workspace",
             ["cargo", "tree", "--package", "parseltongue-cli-dispatcher-binary", "--edges", "normal",
-             "--prefix", "none", "--format", "{p}"],
+             "--prefix", "none", "--format", "{p}", "--offline", "--locked"],
             "parseltongue-cli-dispatcher-binary v0.1.0\nparser-pin v1.0.0\n",
         )
         release = self._receipt(
@@ -297,6 +297,8 @@ def iter_manifest_references(value):
 
 
 class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
+    baseline_tree_bytes = b"parseltongue-cli-dispatcher-binary v0.1.0\nparser-pin v1.0.0\n"
+
     def test_json_rejects_duplicate_keys(self):
         """REQ-SOP-RUNNER-022: strict JSON rejects duplicate object keys."""
         with self.assertRaises(intake.S3EvidenceBlockedError):
@@ -409,11 +411,50 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
                 with self.assertRaises(intake.S3EvidenceBlockedError):
                     self.build_bundle_result(bundle)
 
-    def build_bundle_result(self, bundle):
+    def make_dependency_reference(
+        self, bundle, stdout_bytes=None, stderr_bytes=b"", *, timed_out=False,
+        exit_status=0, identity_digest=None, argv=None, stdout_complete=True, stderr_complete=True,
+    ):
+        stdout_bytes = self.baseline_tree_bytes if stdout_bytes is None else stdout_bytes
+        expected_identity = bundle.expected_identity
+        package_name = expected_identity["configuration"]["production_package_name"]
+        cargo_path = expected_identity["toolchain_versions"]["cargo"]["path"]
+        identity_digest = identity_digest or hashlib.sha256(json.dumps(
+            expected_identity, sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest()
+
+        def stream(name, content, complete):
+            path = f"/runner-owned/{bundle.receipt_counter}-{name}"
+            return {
+                "path": path, "raw_bytes": content, "size_bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(), "blake3": synthetic_blake3_digest(content),
+                "complete": complete,
+                "file_identity": {
+                    "path": path, "size_bytes": len(content),
+                    "sha256": hashlib.sha256(content).hexdigest(), "is_symlink": False,
+                },
+            }
+
+        return intake._mint_runner_owned_dependency_tree_reference(
+            identity_digest=identity_digest,
+            argv=argv or [cargo_path, "tree", "--package", package_name, "--edges", "normal",
+                          "--prefix", "none", "--format", "{p}", "--offline", "--locked"],
+            cwd=expected_identity["configuration"]["project_root"],
+            relevant_environment=expected_identity["relevant_environment"],
+            elapsed_seconds=0.5, timeout_seconds=60.0, timed_out=timed_out,
+            completion_status="timed_out" if timed_out else "completed", exit_status=exit_status,
+            stdout=stream("stdout", stdout_bytes, stdout_complete),
+            stderr=stream("stderr", stderr_bytes, stderr_complete),
+        )
+
+    def build_bundle_result(self, bundle, dependency_reference=None):
+        if dependency_reference is None:
+            dependency_reference = self.make_dependency_reference(bundle)
         return intake.validate_s3_prerequisite_evidence(
             bundle.manifest, bundle.file_bytes, bundle.blake3_by_path,
             bundle.expected_identity, bundle.expected_repositories,
             bundle.source_inventory, bundle.expected_identity["milestone"],
+            dependency_reference=dependency_reference,
         )
 
     def test_valid_bundle_returns_tokens(self):
@@ -581,14 +622,18 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
         for name in ("ide", "hir", "base_db", "salsa", "ra_ap_ide", "ra_ap_hir", "ra_ap_salsa"):
             with self.subTest(name=name), self.assertRaises(intake.S3EvidenceViolationError):
                 intake._validate_dependency_tree_output(
-                    f"parseltongue-cli-dispatcher-binary v0.1.0\n{name} v1.0.0\n"
+                    f"parseltongue-cli-dispatcher-binary v0.1.0\n{name} v1.0.0\n",
+                    "parseltongue-cli-dispatcher-binary",
+                    {"configuration": {"production_package_version": "0.1.0"}},
                 )
 
     def test_pinned_parser_tree_passes(self):
         """REQ-SOP-RUNNER-022: pinned parser/syntax/mbe/tt/span crates remain permitted."""
         intake._validate_dependency_tree_output(
             "parseltongue-cli-dispatcher-binary v0.1.0\n"
-            "ra_ap_syntax v1.0.0\nra_ap_mbe v1.0.0\nra_ap_tt v1.0.0\nra_ap_span v1.0.0\n"
+            "ra_ap_syntax v1.0.0\nra_ap_mbe v1.0.0\nra_ap_tt v1.0.0\nra_ap_span v1.0.0\n",
+            "parseltongue-cli-dispatcher-binary",
+            {"configuration": {"production_package_version": "0.1.0"}},
         )
 
     def test_release_mismatch_fails_gate(self):
@@ -772,8 +817,8 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
         result = self.build_bundle_result(bundle)
         self.assertEqual(result["repository_results"]["serde"]["build_evidence"]["status"], "FAIL")
 
-    def test_p2_feature_mismatch_fails(self):
-        """REQ-SOP-RUNNER-022: observed P2 artifact feature identity mismatch is FAIL."""
+    def test_p2_feature_context_blocks(self):
+        """REQ-SOP-RUNNER-022.P: unsupported P2 unit feature context remains BLOCKED."""
         bundle = SyntheticEvidenceBundle()
         metadata_path = bundle.receipt_paths("p2_metadata", "serde")[0]
         receipt = json.loads(bundle.file_bytes[metadata_path])
@@ -782,7 +827,205 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
         metadata["resolve"]["nodes"][0]["features"] = ["feature-not-in-check"]
         bundle.refresh_log(metadata_path, "stdout", json.dumps(metadata))
         result = self.build_bundle_result(bundle)
-        self.assertEqual(result["repository_results"]["serde"]["p2_offline_qualification"]["status"], "FAIL")
+        self.assertEqual(result["repository_results"]["serde"]["p2_offline_qualification"]["status"], "BLOCKED")
+
+    def test_tree_reference_required_blocks(self):
+        """REQ-SOP-RUNNER-022.D: supplied dependency rows alone cannot issue qualification tokens."""
+        bundle = SyntheticEvidenceBundle()
+        result = intake.validate_s3_prerequisite_evidence(
+            bundle.manifest, bundle.file_bytes, bundle.blake3_by_path,
+            bundle.expected_identity, bundle.expected_repositories,
+            bundle.source_inventory, bundle.expected_identity["milestone"],
+        )
+        self.assertEqual(
+            result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED",
+        )
+        self.assertEqual(result["tokens_by_repository"], {})
+
+    def test_tree_root_only_fails(self):
+        """REQ-SOP-RUNNER-022.D: root-only submitted rows fail exact current-tree comparison."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", "parseltongue-cli-dispatcher-binary v0.1.0\n")
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+        self.assertEqual(result["tokens_by_repository"], {})
+
+    def test_tree_root_version_fails(self):
+        """REQ-SOP-RUNNER-022.D: a non-frozen production root version is FAIL."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", self.baseline_tree_bytes.replace(b"v0.1.0", b"v9.9.9").decode())
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_root_malformed_fails(self):
+        """REQ-SOP-RUNNER-022.D: wrong frozen root remains FAIL before a malformed suffix and absent reference."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", "wrong-root v9.9.9\nmalformed tree suffix\n")
+        result = intake.validate_s3_prerequisite_evidence(
+            bundle.manifest, bundle.file_bytes, bundle.blake3_by_path,
+            bundle.expected_identity, bundle.expected_repositories,
+            bundle.source_inventory, bundle.expected_identity["milestone"],
+        )
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+        self.assertEqual(result["tokens_by_repository"], {})
+
+    def test_dependency_legacy_receipt_passes(self):
+        """REQ-SOP-RUNNER-022.D: schema-v1 tree receipts may omit optional offline/locked flags."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_receipt(tree_path, lambda receipt: receipt.update(argv=receipt["argv"][:-2]))
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "PASS")
+
+    def test_dependency_unknown_flag_blocks(self):
+        """REQ-SOP-RUNNER-022.D: unknown supplied tree flags are blocked while runner argv stays separate."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_receipt(tree_path, lambda receipt: receipt["argv"].append("--unknown"))
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
+        self.assertEqual(result["tokens_by_repository"], {})
+
+    def test_tree_suffix_omission_fails(self):
+        """REQ-SOP-RUNNER-022.D: omission of a suffix row fails against the independent reference."""
+        bundle = SyntheticEvidenceBundle()
+        reference_rows = self.baseline_tree_bytes + b"unrelated-pin v3.0.0\n"
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", reference_rows.decode())
+        reference = self.make_dependency_reference(bundle, reference_rows)
+        bundle.refresh_log(tree_path, "stdout", self.baseline_tree_bytes.decode())
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_interior_omission_fails(self):
+        """REQ-SOP-RUNNER-022.D: an interior omitted row fails without sorting or deduplication."""
+        bundle = SyntheticEvidenceBundle()
+        reference_rows = b"parseltongue-cli-dispatcher-binary v0.1.0\na-pin v1.0.0\nb-pin v1.0.0\nc-pin v1.0.0\n"
+        supplied_rows = b"parseltongue-cli-dispatcher-binary v0.1.0\na-pin v1.0.0\nc-pin v1.0.0\n"
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", reference_rows.decode())
+        reference = self.make_dependency_reference(bundle, reference_rows)
+        bundle.refresh_log(tree_path, "stdout", supplied_rows.decode())
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_order_mismatch_fails(self):
+        """REQ-SOP-RUNNER-022.D: inserted duplicate or reordered rows fail exact comparison."""
+        swapped_reference = (
+            b"parseltongue-cli-dispatcher-binary v0.1.0\nfirst-pin v1.0.0\nsecond-pin v2.0.0\n"
+        )
+        swapped_rows = (
+            b"parseltongue-cli-dispatcher-binary v0.1.0\nsecond-pin v2.0.0\nfirst-pin v1.0.0\n"
+        )
+        for changed_rows, reference_rows in (
+            (self.baseline_tree_bytes + b"parser-pin v1.0.0\n", self.baseline_tree_bytes),
+            (swapped_rows, swapped_reference),
+        ):
+            with self.subTest(changed_rows=changed_rows):
+                bundle = SyntheticEvidenceBundle()
+                tree_path = bundle.receipt_paths("dependency_audit")[0]
+                bundle.refresh_log(tree_path, "stdout", reference_rows.decode())
+                reference = self.make_dependency_reference(bundle, reference_rows)
+                bundle.refresh_log(tree_path, "stdout", changed_rows.decode())
+                result = self.build_bundle_result(bundle, reference)
+                self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_reference_incomplete_blocks(self):
+        """REQ-SOP-RUNNER-022.D: incomplete retained internal streams cannot qualify with exit zero."""
+        bundle = SyntheticEvidenceBundle()
+        reference = self.make_dependency_reference(bundle, stdout_complete=False)
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
+        self.assertEqual(result["tokens_by_repository"], {})
+
+    def test_tree_duplicate_reference_passes(self):
+        """REQ-SOP-RUNNER-022.D: valid repeated rows pass only when exactly present in the reference."""
+        bundle = SyntheticEvidenceBundle()
+        duplicate_rows = self.baseline_tree_bytes + b"parser-pin v1.0.0\n"
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", duplicate_rows.decode())
+        result = self.build_bundle_result(bundle, self.make_dependency_reference(bundle, duplicate_rows))
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "PASS")
+
+    def test_tree_crlf_only_passes(self):
+        """REQ-SOP-RUNNER-022.D: CRLF-to-LF normalization is the only row normalization."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", self.baseline_tree_bytes.replace(b"\n", b"\r\n").decode())
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "PASS")
+
+    def test_tree_whitespace_mismatch_fails(self):
+        """REQ-SOP-RUNNER-022.D: whitespace changes are not normalized in ordered tree rows."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.refresh_log(tree_path, "stdout", (b" " + self.baseline_tree_bytes).decode())
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_forged_reference_blocks(self):
+        """REQ-SOP-RUNNER-022.D: serialized dictionaries cannot forge the internal reference capability."""
+        bundle = SyntheticEvidenceBundle()
+        for forged in ({"runner_owned": True}, True, "serialized-reference"):
+            with self.subTest(forged=forged):
+                result = self.build_bundle_result(bundle, forged)
+                self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
+                self.assertEqual(result["tokens_by_repository"], {})
+
+    def test_tree_stale_reference_blocks(self):
+        """REQ-SOP-RUNNER-022.D: a reference bound to another identity cannot qualify this run."""
+        bundle = SyntheticEvidenceBundle()
+        stale_rows = self.baseline_tree_bytes + b"stale-extra v9.0.0\n"
+        reference = self.make_dependency_reference(
+            bundle, stale_rows, identity_digest="f" * 64,
+        )
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
+
+    def test_tree_timeout_output_blocks(self):
+        """REQ-SOP-RUNNER-022.D: a timed-out retained reference remains BLOCKED without forbidden rows."""
+        bundle = SyntheticEvidenceBundle()
+        reference = self.make_dependency_reference(bundle, timed_out=True, exit_status=124)
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "BLOCKED")
+
+    def test_tree_nonzero_reference_fails(self):
+        """REQ-SOP-RUNNER-022.D: a completed internal tree command with nonzero exit is FAIL."""
+        bundle = SyntheticEvidenceBundle()
+        reference = self.make_dependency_reference(bundle, exit_status=7)
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_partial_forbidden_fails(self):
+        """REQ-SOP-RUNNER-022.D: a forbidden row in a timed-out partial reference is FAIL."""
+        bundle = SyntheticEvidenceBundle()
+        partial = b"parseltongue-cli-dispatcher-binary v0.1.0\nra_ap_ide v0.0.0\n"
+        reference = self.make_dependency_reference(bundle, partial, timed_out=True, exit_status=124)
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_incomplete_forbidden_fails(self):
+        """REQ-SOP-RUNNER-022.D: forbidden partial supplied rows outrank malformed sibling evidence."""
+        bundle = SyntheticEvidenceBundle()
+        tree_path = bundle.receipt_paths("dependency_audit")[0]
+        bundle.manifest["global_prerequisites"]["build_evidence"]["clippy"] = bundle._reference(
+            "receipts/malformed-clippy.json", b'{"schema_version":',
+        )
+        bundle.refresh_log(tree_path, "stdout", "malformed sibling\nra_ap_ide v0.0.0\n")
+        bundle.refresh_receipt(tree_path, lambda receipt: receipt["stdout"].update({"complete": False}))
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
+
+    def test_tree_reference_mutation_fails(self):
+        """REQ-SOP-RUNNER-022.D: changed retained bytes cannot preserve reference authority."""
+        bundle = SyntheticEvidenceBundle()
+        reference = self.make_dependency_reference(bundle)
+        object.__setattr__(reference.stdout, "raw_bytes", b"mutated")
+        result = self.build_bundle_result(bundle, reference)
+        self.assertEqual(result["repository_results"]["serde"]["dependency_audit"]["status"], "FAIL")
 
     def test_async_source_inventory_matches(self):
         """REQ-SOP-RUNNER-022: async test functions are included in frozen source inventory."""
@@ -878,7 +1121,9 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
         """REQ-SOP-RUNNER-022: dependency tree rows must parse completely."""
         with self.assertRaises(intake.S3EvidenceBlockedError):
             intake._validate_dependency_tree_output(
-                "parseltongue-cli-dispatcher-binary v0.1.0\nparser-pin v1.0.0 trailing garbage\n"
+                b"parseltongue-cli-dispatcher-binary v0.1.0\nparser-pin v1.0.0 trailing garbage\n",
+                "parseltongue-cli-dispatcher-binary",
+                {"configuration": {"production_package_version": "0.1.0"}},
             )
 
     def test_tree_server_families_fail(self):
@@ -887,7 +1132,9 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
                      "ra_ap_proc_macro_srv", "proc-macro-server"):
             with self.subTest(name=name), self.assertRaises(intake.S3EvidenceViolationError):
                 intake._validate_dependency_tree_output(
-                    f"parseltongue-cli-dispatcher-binary v0.1.0\n{name} v1.0.0\n"
+                    f"parseltongue-cli-dispatcher-binary v0.1.0\n{name} v1.0.0\n".encode(),
+                    "parseltongue-cli-dispatcher-binary",
+                    {"configuration": {"production_package_version": "0.1.0"}},
                 )
 
     def test_release_missing_artifact_blocks(self):

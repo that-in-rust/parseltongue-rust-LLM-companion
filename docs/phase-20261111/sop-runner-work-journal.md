@@ -1712,3 +1712,293 @@ The full-checkout frozen-source limitation also remains: tracked `.claude/skills
 directory, which the snapshot helper cannot capture as a regular file. The before/after `crates/`
 source snapshot covers the exact tracked source prefix read by the inventory; no claim is made that the
 full checkout snapshot succeeded.
+
+### Runner-owned dependency-tree cross-check and P2 classification — HARNESS ONLY
+
+The external dependency-audit receipt remains required in schema v1. No receipt schema field, CLI
+option, or manifest reference was added. `prepare_s3_evidence_qualification`,
+`validate_s3_prerequisite_evidence`, and the dependency-audit evaluator accept an optional internal
+reference; absence or an unsupported/serialized value is BLOCKED. The reference is an immutable
+in-process capability minted through the runner collection path, bound to the canonical expected
+identity digest, fixed argv, frozen project root, and relevant environment. Its private authority
+guard protects the manifest boundary, not arbitrary Python code executing inside the process.
+
+Collection is placed after registry, expected identity, and guard creation and before helper
+validation, outside the mapper-traced process. It uses the frozen Cargo dispatch path and package
+name, and no receipt-supplied argv, flags, or cwd:
+
+```text
+cargo tree --package <frozen production package> --edges normal --prefix none --format {p} --offline --locked
+cwd: frozen PROJECT_ROOT
+```
+
+The collector snapshots the current relevant secret-free environment and checks it against frozen
+identity; identity guards run before and after collection and retained stdout/stderr file identities
+are checked at later boundaries. Full stdout and stderr are spooled to exclusive files in the owned
+artifact run directory, without the event recorder's 16 KiB limit or a row/RAM acceptance cap. The
+observation retains argv, cwd, relevant environment, monotonic elapsed time, completion/timeout/exit
+state, stream byte counts, SHA-256, and BLAKE3. Timeout is 60 seconds: `cargo tree --offline --locked`
+does not compile and is normally a short local resolution, while this cap allows for slow filesystem
+or machine contention and still bounds a hung child. On timeout, the collector kills the process
+group and waits no more than the additional 5-second cleanup bound, preserving partial streams.
+
+The helper scans forbidden rows in both retained supplied and runner-owned output before
+completeness/timeout handling, so an observed forbidden row remains FAIL even when a sibling receipt
+is malformed or incomplete. It binds the root name and version exactly to frozen identity and
+compares complete successful output as ordered raw rows after CRLF-to-LF normalization only. It does
+not trim, sort, deduplicate, or discard blank rows. Valid repeated rows pass only when present in the
+same reference output. Missing, unsupported, stale, incomplete, or timed-out current reference is
+BLOCKED; a completed nonzero reference command is FAIL; valid wrong root/version or full-row mismatch
+is FAIL. A successful internal reference is required for a qualification token.
+
+P2 remains strict: exact metadata/artifact feature equality and target coverage are unchanged; there
+is no subset/union acceptance, metadata-as-unit-graph claim, or nightly-policy change. The only P2
+change is classification of metadata/artifact feature mismatch as BLOCKED with reason
+`P2 metadata/artifact feature mismatch leaves per-unit feature context unproven`. A missing
+required-features artifact remains BLOCKED. No Cargo or production qualification command was run for
+this implementation. The resolver-v2 mismatch remains an unsupported context, not a qualification.
+
+### RED/GREEN regressions
+
+The initial RED run showed `test_tree_reference_required_blocks` receiving PASS without an internal
+reference (expected BLOCKED) and `test_p2_feature_context_blocks` receiving FAIL for unsupported
+metadata/artifact context (expected BLOCKED). After implementation, helper and runner regressions
+passed. The helper references are synthetic HARNESS ONLY and use an independent baseline, never the
+mutated receipt's stdout. Coverage includes root-only and wrong-version output; interior/suffix
+omission with rehashed receipts; inserted duplicate/order mismatch; exact matching including actual
+duplicate rows; CRLF-only equivalence and other-whitespace mismatch; absent/forged/stale references;
+timeout, partial, and completed-nonzero references; forbidden-row precedence over malformed or
+incomplete receipts; retained-output mutation; fixed argv despite a malicious receipt flag; skipped
+collection for absent/unsupported evidence; and collector-to-adapter-to-helper/token integration
+with only the process boundary mocked.
+
+Regression methods: `test_p2_feature_context_blocks`, `test_tree_reference_required_blocks`,
+`test_tree_root_only_fails`, `test_tree_root_version_fails`, `test_tree_suffix_omission_fails`,
+`test_tree_interior_omission_fails`, `test_tree_order_mismatch_fails`,
+`test_tree_duplicate_reference_passes`, `test_tree_crlf_only_passes`,
+`test_tree_whitespace_mismatch_fails`, `test_tree_forged_reference_blocks`,
+`test_tree_stale_reference_blocks`, `test_tree_timeout_output_blocks`,
+`test_tree_nonzero_reference_fails`, `test_tree_partial_forbidden_fails`,
+`test_tree_incomplete_forbidden_fails`, `test_tree_reference_mutation_fails`,
+`test_dependency_collector_token_harness`, and `test_dependency_tree_timeout_reaps`.
+
+Exact suite results:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 89 tests in 0.559s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 138 tests in 2.584s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.374s
+OK
+```
+
+The runner collector's subprocess and BLAKE3 process boundaries were mocked in HARNESS ONLY tests;
+the exact Cargo command was not invoked. No qualification is claimed from these synthetic tests, and
+no commit or push is part of this checkpoint.
+
+### Final static verification
+
+Four Python files parsed with `compile`/AST. The four-word naming, REQ docstring, and journal
+traceability check printed:
+
+```text
+Python AST syntax: 4 files parsed
+test methods=227; non-four-word names=[]; missing REQ tags=[]; missing journal traceability=[]
+```
+
+`git diff --check`: exit 0, no output.
+
+### Bounded collector review corrections — HARNESS ONLY
+
+The collector now reads from still-open `x+b` output streams and compares each descriptor's
+`fstat` device/inode with the path's `lstat` identity before and after identity capture and hashing.
+It compares captured bytes with the path identity before registering the output for later boundary
+checks. A detected mutation is persisted in the observation and raised as FAIL, not downgraded to
+missing authority. Retained partial stdout is scanned and the forbidden-row finding is persisted
+before incomplete authority is discarded; forbidden rows still raise FAIL when hashing fails or
+timeout cleanup cannot reap the child. An after-collection identity guard runs from `finally` for
+every attempted spawn, including Popen failures. Unreaped output cannot mint an internal reference.
+
+Internal stdout/stderr stream handles retain and validate their `complete` boolean. Incomplete
+streams cannot authorize ordered comparison, while retained forbidden rows and exact root
+name/version findings remain observable. Root validation precedes parsing suffix rows, so a wrong
+root followed by malformed text remains FAIL without a reference. External schema-v1 dependency
+receipts preserve the prior optional `--offline`/`--locked` argv acceptance; unknown supplied flags
+remain BLOCKED. The runner-owned command remains fixed in code with both flags, independent of
+receipt argv. No schema or P2 matching-policy change was made.
+
+RED runs before the collector/helper corrections:
+
+```text
+helper focused regressions: Ran 4 tests in 0.025s; FAILED (failures=2)
+test_dependency_legacy_receipt_passes: BLOCKED != PASS
+test_tree_reference_incomplete_blocks: PASS != BLOCKED
+
+collector focused regressions: Ran 5 tests in 0.226s; FAILED (failures=5)
+test_collector_stream_race_fails: mutation was not raised
+test_unreaped_timeout_forbidden_fails: forbidden partial row was not raised as FAIL
+test_collector_hash_failure_forbidden: forbidden partial row was not raised as FAIL
+test_collector_spawn_failure_guards: after guard was not called
+```
+
+The first source-mutation test harness also intercepted the registry guard's real Git subprocess
+while mocking BLAKE3. It was corrected to mock only the fixed Cargo/BLAKE3 boundaries and delegate
+other subprocesses; `test_dependency_source_mutation_fails` then passed using the real registry
+guard. The root-order test was corrected to call validation without an auto-generated reference;
+with the early root check disabled, the regression produced `BLOCKED` instead of its required
+`FAIL` (one test, one failure).
+
+GREEN suites after corrections:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_s3_prerequisite_evidence_intake.py'
+Ran 93 tests in 0.510s
+OK
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_sop_qualification_runner.py'
+Ran 143 tests in 3.117s
+OK
+```
+
+Coverage added for legacy and unknown supplied argv, incomplete internal streams, root-before-suffix
+failure, a genuine swap of distinct interior rows, output path replacement between open-stream read
+and identity capture, real-registry source mutation during the mocked child, unreaped timeout plus
+forbidden partial output, hash failure plus forbidden partial output, and after-guard on spawn
+failure. The subprocess tests are HARNESS ONLY; no Cargo command or qualification was run. No commit
+or push was made.
+
+Review regression methods: `test_tree_root_malformed_fails`,
+`test_dependency_legacy_receipt_passes`, `test_dependency_unknown_flag_blocks`,
+`test_tree_reference_incomplete_blocks`, `test_collector_stream_race_fails`,
+`test_dependency_source_mutation_fails`, `test_unreaped_timeout_forbidden_fails`,
+`test_collector_hash_failure_forbidden`, and `test_collector_spawn_failure_guards`.
+
+### Resolver-v2 fixture collector verification attempt — BLOCKED before collection
+
+Only the existing `/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace` fixture was
+inspected. Its workspace manifest declares resolver 2 and members `consumer`/`shared`; the frozen
+requested package is `resolver-v2-consumer v0.1.0`, with local normal dependency
+`resolver-v2-shared v0.1.0`. `dev-extra` is only on the dev-dependency declaration and the gated
+bin requires `gated-bin`. Its lock lists those two packages. Cargo dispatch lookup found
+`/home/ubuntu/.cargo/bin/cargo`; no Cargo version probe was run, so the exact version/context remains
+HARNESS ONLY / unprobed. No `.cargo/config` appeared in the workspace file listing.
+
+The provider discovery command
+`command -v b3sum || true; command -v b3 || true; command -v cargo || true; python3 -c 'import importlib.util; print("python_blake3", importlib.util.find_spec("blake3"))'`
+printed only `/home/ubuntu/.cargo/bin/cargo` and `python_blake3 None`; the `b3sum` and `b3` lookups
+were empty. A search of existing system/user bin locations found no BLAKE3 executable, and Node
+reported `node_blake3 unavailable`. The existing runner preflight returned exactly
+`RunnerPreconditionBlockedError large artifact BLAKE3 provider is unavailable`. No provider was
+installed or substituted. Because this production prerequisite blocks collection, no identity
+registry was frozen, no collector or Cargo command ran, no before/after guards ran, and no stream
+hashes or output comparison exist. The fixed command that was not executed was:
+
+```text
+/home/ubuntu/.cargo/bin/cargo tree --package resolver-v2-consumer --edges normal --prefix none --format {p} --offline --locked
+cwd: /home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace
+```
+
+The requested 20-second harness timeout was not applied because no invocation occurred; actual
+fixture timeout is N/A. Production defaults remain 60 seconds plus a 5-second cleanup bound. No
+raw streams or omission comparison were produced. Full details are retained at
+`/home/ubuntu/resolver-v2-tree-collector-verification.md`.
+
+Requested follow-up checks:
+
+```text
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile tools/hld-current-qualification-runner.py tools/s3-prerequisite-evidence-intake.py tools/test_sop_qualification_runner.py tools/test_s3_prerequisite_evidence_intake.py
+Exit code 0; no output
+
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 tools/process-tree-contract-tests.py
+Ran 6 tests in 0.416s
+OK
+
+git diff --check
+Exit code 0; no output
+```
+
+No production code was changed, no Cargo/production/corpus command ran, and no qualification is
+claimed. No commit or push was made.
+
+### Resolver-v2 fixture collector run completed — HARNESS ONLY
+
+After the initial BLAKE3-provider blocker, the explicitly authorized binary-only install succeeded
+outside the repo:
+
+```text
+python3 -m pip install --only-binary=:all: --target /home/ubuntu/resolver-v2-blake3-wheel-1.0.8 blake3==1.0.8
+Successfully installed blake3-1.0.8
+```
+
+The runner detected `python-blake3:1.0.8` from that target; the package reported version 1.0.8 and
+the known empty-input vector `af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262`.
+No synthetic stream hashes were used.
+
+The external HARNESS ONLY driver at `/home/ubuntu/resolver-v2-tree-collector-harness.py` used the
+existing resolver-v2 path-only workspace and fixed command twice, with
+`DEPENDENCY_TREE_TIMEOUT_SECONDS=20.0` patched in-process (production remains 60 seconds plus 5
+seconds cleanup):
+
+```text
+PYTHONPATH=/home/ubuntu/resolver-v2-blake3-wheel-1.0.8:/home/ubuntu/repos/parseltongue-rust-LLM-companion/tools PYTHONDONTWRITEBYTECODE=1 python3 /home/ubuntu/resolver-v2-tree-collector-harness.py
+
+/home/ubuntu/.cargo/bin/cargo tree --package resolver-v2-consumer --edges normal --prefix none --format {p} --offline --locked
+cwd: /home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace
+```
+
+No Cargo version, metadata, check, build, or other Cargo command was run. Exact toolchain version
+remains HARNESS ONLY / unprobed. The fixture is not a Git checkout, so the production Git-index
+snapshot helper cannot apply. The external harness transparently used an explicit full non-`target`
+fixture path inventory with the existing `capture_frozen_file_identity`, standard identity registry,
+`verify_identity_registry`, and a path-set guard. It also froze Cargo shim and resolved executable,
+Cargo config candidates, runner/helper sources, and the installed BLAKE3 provider files. Guards
+before and after both collector calls passed with no mutation.
+
+The collector retained observations and raw stdout/stderr in
+`/home/ubuntu/resolver-v2-tree-collector-run-1/` and
+`/home/ubuntu/resolver-v2-tree-collector-run-2/`. Both fixed commands completed and were reaped with
+exit 0, no timeout, and complete streams. Elapsed times were 0.678797331s and 0.679927683s. Both
+produced identical 208-byte stdout:
+
+```text
+resolver-v2-consumer v0.1.0 (/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace/consumer)
+resolver-v2-shared v0.1.0 (/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace/shared)
+```
+
+Each stdout SHA-256 was `e9b68ecebfa3a2453f2493095a2545acad2d7743a8042d766b38209b48c1c11d` and BLAKE3
+was `a5f13aa41a60e006c8bdad14e3171ad124ff9717172f9aae8c27cd955002e632`. Each stderr was empty
+(0 bytes), SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, BLAKE3
+`af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262`.
+
+The helper gate comparing run 1's real stream with run 2's independent reference returned PASS.
+Removing the final `resolver-v2-shared` row from run 1 returned FAIL with
+`supplied dependency rows differ from runner-owned ordered rows`. This fixture has two rows, so a
+suffix omission was testable but there was no interior row. Full report:
+`/home/ubuntu/resolver-v2-tree-collector-verification.md`.
+
+No production code changed, no qualification is claimed, and no commit or push was made.
+
+### Dependency-tree command timing excludes guards
+
+The collector now records `elapsed_seconds` only from immediately before `Popen` through wait and
+any bounded process-group cleanup. A separate `collection_elapsed_seconds` records the broader
+collector duration, including identity guards and stream capture/hashing. The hard child timeout
+remains 60 seconds with a bounded 5-second cleanup; command construction, authority, and evidence
+policy are unchanged.
+
+The mocked regression `test_collector_slow_guard_timing` uses a 50ms command timeout and 60ms sleeps
+in the before/after identity guards. RED on the old implementation recorded
+`elapsed_seconds=0.06293139699846506`, exceeding the 50ms limit. GREEN asserts the bounded command
+elapsed stays within the timeout, full collection elapsed exceeds it, and the completed reference
+still passes the helper gate. The runner suite passed all 144 tests in 3.242s; `py_compile` exited 0.
+
+The fixture's earlier observation values 0.678797331s and 0.679927683s were recorded before this
+timing correction and included collection guards/capture/hashing. They remain historical observed
+collection durations and are not reinterpreted as subprocess-only command elapsed times. No Cargo
+command was run for this fix.

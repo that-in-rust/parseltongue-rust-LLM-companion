@@ -13,9 +13,12 @@ import os
 from pathlib import Path, PurePosixPath
 import platform
 import re
+import signal
 import shutil
+import stat
 import subprocess
 import sys
+import time
 import tomllib
 from typing import Any
 
@@ -47,6 +50,8 @@ S3_RELEVANT_ENVIRONMENT_NAMES = {
 MAX_COMMAND_EVENT_BYTES = 16_384
 MAX_COMMAND_JOURNAL_BYTES = 8 * 1024 * 1024
 MAX_COMMAND_EVENT_COUNT = 512
+DEPENDENCY_TREE_TIMEOUT_SECONDS = 60.0
+DEPENDENCY_TREE_CLEANUP_TIMEOUT_SECONDS = 5.0
 
 
 class RunnerPreconditionBlockedError(RuntimeError):
@@ -1071,6 +1076,268 @@ def run_guarded_child_process(
     }
 
 
+def collect_dependency_tree_reference(
+    evidence_inputs: Mapping[str, Any], expected_identity: Mapping[str, Any],
+    registry: Mapping[str, Any], identity_guard: Callable[[str, Sequence[str]], None],
+    artifact_run_directory: Path, b3_provider: str | None, b3_tool_identity=None,
+):
+    manifest_document = evidence_inputs.get("manifest_document")
+    if not isinstance(manifest_document, Mapping):
+        return None
+    global_prerequisites = manifest_document.get("global_prerequisites")
+    dependency_references = (
+        global_prerequisites.get("dependency_audit") if isinstance(global_prerequisites, Mapping) else None
+    )
+    if not isinstance(dependency_references, list) or not dependency_references:
+        return None
+    configuration = expected_identity.get("configuration")
+    toolchain_versions = expected_identity.get("toolchain_versions")
+    cargo_record = toolchain_versions.get("cargo") if isinstance(toolchain_versions, Mapping) else None
+    cargo_identity = expected_identity.get("toolchain_executables", {}).get("cargo")
+    if (not isinstance(configuration, Mapping) or configuration.get("p2_configuration_blocked_reason")
+            or configuration.get("unsupported_prerequisite_gates")
+            or not isinstance(cargo_record, Mapping) or cargo_record.get("version") in {None, "", "unavailable"}
+            or not isinstance(cargo_record.get("path"), str) or not isinstance(cargo_identity, Mapping)
+            or not isinstance(b3_provider, str)):
+        return None
+    package_name = configuration.get("production_package_name")
+    project_root = configuration.get("project_root")
+    if not isinstance(package_name, str) or not isinstance(project_root, str):
+        return None
+    command = [
+        cargo_record["path"], "tree", "--package", package_name, "--edges", "normal", "--prefix", "none",
+        "--format", "{p}", "--offline", "--locked",
+    ]
+    cwd = Path(project_root).resolve(strict=True)
+    if cwd != PROJECT_ROOT.resolve():
+        return None
+    artifact_run_directory = Path(artifact_run_directory)
+    stdout_path = artifact_run_directory / "s3-dependency-tree.stdout"
+    stderr_path = artifact_run_directory / "s3-dependency-tree.stderr"
+    observation_path = artifact_run_directory / "s3-dependency-tree-observation.json"
+    observation = {
+        "argv": command, "cwd": str(cwd),
+        "relevant_environment": dict(expected_identity.get("relevant_environment", {})),
+        "timeout_seconds": DEPENDENCY_TREE_TIMEOUT_SECONDS,
+        "timed_out": False, "completion_status": "not_started", "exit_status": None,
+        "streams": {}, "forbidden_runtime_rows": [],
+    }
+    process = None
+    guard_error = None
+    command_error = None
+    mutation_error = None
+    observation_error = None
+    output_collision_error = None
+    timed_out = False
+    reaped = False
+    attempted = False
+    stream_records = {}
+    stream_capture_errors = {}
+    forbidden_runtime_rows = []
+    hash_error = None
+    output_identities = registry.setdefault("runner_owned_output_identities", {})
+    collection_started = time.monotonic()
+    command_started = None
+    command_finished = None
+    stdout_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def verify_open_output_path(output_file, output_path, expected_device=None, expected_inode=None):
+        descriptor_stat = os.fstat(output_file.fileno())
+        try:
+            path_stat = output_path.lstat()
+        except OSError as error:
+            raise RunnerFrozenInputMutationError(
+                f"runner-owned dependency {output_path.name} path changed during capture"
+            ) from error
+        if (not stat.S_ISREG(path_stat.st_mode) or path_stat.st_dev != descriptor_stat.st_dev
+                or path_stat.st_ino != descriptor_stat.st_ino
+                or (expected_device is not None and descriptor_stat.st_dev != expected_device)
+                or (expected_inode is not None and descriptor_stat.st_ino != expected_inode)):
+            raise RunnerFrozenInputMutationError(
+                f"runner-owned dependency {output_path.name} path no longer names its open output file"
+            )
+        return descriptor_stat.st_dev, descriptor_stat.st_ino
+
+    def capture_stream(name, output_file, output_path):
+        nonlocal forbidden_runtime_rows, hash_error, mutation_error
+        complete = process is not None and reaped and not timed_out
+        opened_device = None
+        opened_inode = None
+        raw_bytes = None
+        try:
+            output_file.flush()
+            os.fsync(output_file.fileno())
+            output_file.seek(0)
+            raw_bytes = output_file.read()
+            sha256 = hashlib.sha256(raw_bytes).hexdigest()
+            observation["streams"][name] = {
+                "path": str(output_path), "size_bytes": len(raw_bytes), "sha256": sha256,
+                "complete": complete,
+            }
+            if name == "stdout":
+                forbidden_runtime_rows = sorted(set(
+                    s3_evidence_intake._forbidden_dependency_tree_names(raw_bytes)
+                ))
+                observation["forbidden_runtime_rows"] = forbidden_runtime_rows
+            opened_device, opened_inode = verify_open_output_path(output_file, output_path)
+            verify_open_output_path(output_file, output_path, opened_device, opened_inode)
+            file_identity = capture_frozen_file_identity(output_path)
+            verify_open_output_path(output_file, output_path, opened_device, opened_inode)
+            if (file_identity["path"] != str(output_path.resolve(strict=True))
+                    or file_identity["size_bytes"] != len(raw_bytes)
+                    or file_identity["sha256"] != sha256 or file_identity["is_symlink"] is not False):
+                raise RunnerFrozenInputMutationError(
+                    f"runner-owned dependency {name} changed during open-file capture"
+                )
+            output_identities[file_identity["path"]] = dict(file_identity)
+            blake3 = calculate_b3_file_digest(
+                output_path, b3_provider, file_identity, identity_guard, b3_tool_identity,
+            )
+            verify_open_output_path(output_file, output_path, opened_device, opened_inode)
+            stream_record = {
+                "path": file_identity["path"], "size_bytes": len(raw_bytes), "sha256": sha256,
+                "blake3": blake3, "complete": complete, "raw_bytes": raw_bytes,
+                "file_identity": file_identity,
+            }
+            stream_records[name] = stream_record
+            observation["streams"][name]["blake3"] = blake3
+        except RunnerFrozenInputMutationError as error:
+            mutation_error = mutation_error or error
+            stream_capture_errors[name] = str(error)
+        except (OSError, RunnerPreconditionBlockedError, RunnerContractViolationError) as error:
+            hash_error = hash_error or str(error)
+            stream_capture_errors[name] = str(error)
+            if opened_device is not None:
+                try:
+                    verify_open_output_path(output_file, output_path, opened_device, opened_inode)
+                except RunnerFrozenInputMutationError as mutation:
+                    mutation_error = mutation_error or mutation
+                    stream_capture_errors[name] = str(mutation)
+        if raw_bytes is None:
+            observation["streams"].setdefault(name, {
+                "path": str(output_path), "size_bytes": None, "sha256": None, "complete": False,
+            })
+
+    try:
+        with stdout_path.open("x+b") as stdout_file, stderr_path.open("x+b") as stderr_file:
+            try:
+                verify_frozen_file_identity(cargo_identity)
+                child_environment = os.environ.copy()
+                if capture_s3_evidence_environment() != observation["relevant_environment"]:
+                    raise RunnerFrozenInputMutationError(
+                        "relevant environment changed before S3 dependency tree collection"
+                    )
+                identity_guard("before S3 dependency tree collection", command)
+                attempted = True
+                command_started = time.monotonic()
+                try:
+                    try:
+                        process = subprocess.Popen(
+                            command, cwd=str(cwd), env=child_environment, stdin=subprocess.DEVNULL,
+                            stdout=stdout_file, stderr=stderr_file, start_new_session=True,
+                        )
+                    except (OSError, subprocess.SubprocessError) as error:
+                        command_error = str(error)
+                    if process is not None:
+                        try:
+                            process.wait(timeout=DEPENDENCY_TREE_TIMEOUT_SECONDS)
+                            reaped = True
+                        except subprocess.TimeoutExpired:
+                            try:
+                                os.killpg(process.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            except OSError:
+                                command_error = command_error or f"cannot kill dependency process group: {error}"
+                            timed_out = True
+                            try:
+                                process.wait(timeout=DEPENDENCY_TREE_CLEANUP_TIMEOUT_SECONDS)
+                                reaped = True
+                            except subprocess.TimeoutExpired:
+                                reaped = False
+                                try:
+                                    os.killpg(process.pid, signal.SIGKILL)
+                                except OSError:
+                                    pass
+                        except (OSError, subprocess.SubprocessError) as error:
+                            command_error = command_error or str(error)
+                finally:
+                    command_finished = time.monotonic()
+            except RunnerFrozenInputMutationError as error:
+                guard_error = error
+            except (OSError, subprocess.SubprocessError) as error:
+                command_error = str(error)
+            capture_stream("stdout", stdout_file, stdout_path)
+            capture_stream("stderr", stderr_file, stderr_path)
+    except FileExistsError as error:
+        output_collision_error = RunnerPreconditionBlockedError(
+            f"refusing to reuse dependency tree output: {error}"
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        command_error = command_error or str(error)
+    finally:
+        elapsed_seconds = (
+            command_finished - command_started
+            if command_started is not None and command_finished is not None else None
+        )
+        if attempted:
+            try:
+                identity_guard("after S3 dependency tree collection", command)
+            except Exception as error:
+                guard_error = guard_error or error
+        collection_elapsed_seconds = time.monotonic() - collection_started
+        observation.update({
+            "elapsed_seconds": elapsed_seconds,
+            "collection_elapsed_seconds": collection_elapsed_seconds,
+            "timed_out": timed_out,
+            "completion_status": (
+                "timed_out" if timed_out else "completed" if process is not None and reaped else
+                "guard_failed" if guard_error is not None else "command_failed" if command_error else "not_started"
+            ),
+            "exit_status": process.returncode if process is not None else None,
+            "process_reaped": reaped,
+            "command_error": command_error,
+            "guard_error": str(guard_error) if guard_error else None,
+            "stream_capture_errors": stream_capture_errors,
+            "forbidden_runtime_rows": forbidden_runtime_rows,
+            "streams": {name: {key: value for key, value in record.items() if key != "raw_bytes"}
+                        for name, record in stream_records.items()} | {
+                            name: value for name, value in observation["streams"].items()
+                            if name not in stream_records
+                        },
+        })
+        try:
+            write_json_atomically(observation_path, observation)
+        except OSError as error:
+            observation_error = str(error)
+    if mutation_error is not None:
+        raise mutation_error
+    if forbidden_runtime_rows:
+        raise RunnerContractViolationError(f"forbidden runtime dependency rows: {forbidden_runtime_rows}")
+    if guard_error is not None:
+        raise guard_error
+    if output_collision_error is not None:
+        raise output_collision_error
+    if (process is None or not reaped or hash_error is not None or command_error is not None
+            or observation_error is not None
+            or set(stream_records) != {"stdout", "stderr"}):
+        return None
+    identity_digest = hashlib.sha256(json.dumps(
+        expected_identity, sort_keys=True, separators=(",", ":"),
+    ).encode()).hexdigest()
+    try:
+        return s3_evidence_intake._mint_runner_owned_dependency_tree_reference(
+            identity_digest=identity_digest, argv=command, cwd=str(cwd),
+            relevant_environment=observation["relevant_environment"],
+            elapsed_seconds=elapsed_seconds, timeout_seconds=DEPENDENCY_TREE_TIMEOUT_SECONDS,
+            timed_out=timed_out, completion_status=observation["completion_status"],
+            exit_status=observation["exit_status"], stdout=stream_records["stdout"],
+            stderr=stream_records["stderr"],
+        )
+    except s3_evidence_intake.S3EvidenceBlockedError:
+        return None
+
+
 def run_ordered_repository_sequence(
     repository_names: Sequence[str],
     repository_action: Callable[[str], str],
@@ -1376,6 +1643,8 @@ def verify_identity_registry(registry: Mapping[str, Any]) -> None:
         verify_optional_frozen_file_identity(identity)
     for identity in registry.get("optional_files", {}).values():
         verify_optional_frozen_file_identity(identity)
+    for identity in registry.get("runner_owned_output_identities", {}).values():
+        verify_frozen_file_identity(identity)
     excluded_paths = [Path(path) for path in registry["excluded_paths"]]
     permitted_lock_paths_by_root = registry.get("permitted_lock_paths_by_root", {})
     for root_path, expected_snapshot in registry["source_snapshots"].items():
@@ -1926,7 +2195,7 @@ def build_s3_expected_identity(arguments, run_state, mapper_identity, pin_summar
 
 def prepare_s3_evidence_qualification(arguments, run_state, evidence_inputs,
                                       expected_identity, expected_repository_bindings,
-                                      source_test_inventory):
+                                      source_test_inventory, dependency_reference=None):
     intake_error = evidence_inputs.get("intake_error")
     intake_status, intake_reason = intake_error if intake_error is not None else ("PASS", None)
     validation_error = None
@@ -1936,7 +2205,7 @@ def prepare_s3_evidence_qualification(arguments, run_state, evidence_inputs,
             validation_result = s3_evidence_intake.validate_s3_prerequisite_evidence(
                 evidence_inputs["manifest_document"], evidence_inputs.get("file_bytes_by_path", {}),
                 evidence_inputs.get("blake3_by_path", {}), expected_identity, expected_repository_bindings,
-                source_test_inventory, arguments.milestone,
+                source_test_inventory, arguments.milestone, dependency_reference=dependency_reference,
             )
         except s3_evidence_intake.S3EvidenceViolationError as error:
             validation_error = ("FAIL", str(error))
@@ -1995,6 +2264,7 @@ def make_identity_boundary_callback(registry: Mapping[str, Any], expected_enviro
         if phase_name in {
             "before S3 prerequisite evidence validation", "after S3 prerequisite evidence validation",
             "before S3 prerequisite gate", "after S3 prerequisite gate",
+            "before S3 dependency tree collection", "after S3 dependency tree collection",
         } and mapper_identity is not None and b3_provider is not None:
             current_mapper_digest = calculate_b3_file_digest(
                 Path(mapper_identity["canonical_path"]), b3_provider, mapper_identity,
@@ -2434,9 +2704,13 @@ def prepare_execution_context(
         registry, evidence_environment, mapper_identity, b3_provider, b3_tool_identity,
     )
     identity_guard("before S3 prerequisite evidence validation", [])
+    dependency_reference = collect_dependency_tree_reference(
+        evidence_inputs, expected_identity, registry, identity_guard,
+        artifact_run_directory, b3_provider, b3_tool_identity,
+    )
     s3_evidence = prepare_s3_evidence_qualification(
         arguments, run_state, evidence_inputs, expected_identity,
-        expected_repository_bindings, source_test_inventory,
+        expected_repository_bindings, source_test_inventory, dependency_reference,
     )
     identity_guard("after S3 prerequisite evidence validation", [])
     manifest_value = run_state["manifest"]
