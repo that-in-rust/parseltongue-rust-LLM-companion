@@ -45,6 +45,92 @@ struct NamespaceSourceFileContext {
     source_macro_crate_bindings: BTreeMap<usize, CrateCompilationUnitKey>,
     source_expansion_provenance_rows: Vec<[u8; 32]>,
     source_original_directory_path: PathBuf,
+    source_unit_compilation_identity_key: String,
+    source_unit_rust_edition_value: String,
+    source_unit_target_cfg_values: BTreeSet<String>,
+    source_parse_context_kind: String,
+    body_owner_occurrence_key: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MacroExpansionFragmentKind {
+    Items,
+    Statements,
+    Expression,
+}
+
+impl MacroExpansionFragmentKind {
+    fn parse_fragment_context_kind(self) -> &'static str {
+        match self {
+            Self::Items => "items",
+            Self::Statements => "statements",
+            Self::Expression => "expression",
+        }
+    }
+}
+
+fn build_namespace_syntax_input(
+    file: &NamespaceSourceFileContext,
+    directory: &Path,
+) -> super::SyntaxFileInputData {
+    super::SyntaxFileInputData {
+        file_source_absolute_path: file.source_file_absolute_path.clone(),
+        file_source_content_bytes: file.source_file_original_text.as_bytes().to_vec(),
+        unit_compilation_identity_key: file.source_unit_compilation_identity_key.clone(),
+        unit_rust_edition_value: file.source_unit_rust_edition_value.clone(),
+        unit_target_cfg_values: file.source_unit_target_cfg_values.clone(),
+        file_module_directory_path: directory.to_string_lossy().into_owned(),
+        unit_metadata_environment_values: BTreeMap::new(),
+        file_parse_context_kind: file.source_parse_context_kind.clone(),
+        file_expansion_provenance_chain: file
+            .source_expansion_provenance_rows
+            .iter()
+            .map(encode_digest_hex_value)
+            .collect(),
+    }
+}
+
+fn classify_macro_expansion_fragment(node: &SyntaxNode) -> Option<MacroExpansionFragmentKind> {
+    if node.ancestors().any(|ancestor| {
+        matches!(
+            ancestor.kind(),
+            SyntaxKind::MACRO_TYPE | SyntaxKind::MACRO_PAT
+        )
+    }) {
+        return None;
+    }
+    if node.parent().is_some_and(|parent| {
+        matches!(
+            parent.kind(),
+            SyntaxKind::SOURCE_FILE
+                | SyntaxKind::ITEM_LIST
+                | SyntaxKind::ASSOC_ITEM_LIST
+                | SyntaxKind::EXTERN_ITEM_LIST
+        )
+    }) {
+        return Some(MacroExpansionFragmentKind::Items);
+    }
+    if node.parent().is_some_and(|parent| {
+        matches!(
+            parent.kind(),
+            SyntaxKind::STMT_LIST | SyntaxKind::MACRO_STMTS
+        )
+    }) {
+        return Some(MacroExpansionFragmentKind::Statements);
+    }
+    let macro_expr = node
+        .ancestors()
+        .skip(1)
+        .find(|ancestor| ancestor.kind() == SyntaxKind::MACRO_EXPR)?;
+    if macro_expr.parent().is_some_and(|statement| {
+        statement.kind() == SyntaxKind::EXPR_STMT
+            && statement.parent().is_some_and(|list| {
+                matches!(list.kind(), SyntaxKind::STMT_LIST | SyntaxKind::MACRO_STMTS)
+            })
+    }) {
+        return Some(MacroExpansionFragmentKind::Statements);
+    }
+    Some(MacroExpansionFragmentKind::Expression)
 }
 
 struct MacroInvocationSourceContext {
@@ -55,6 +141,8 @@ struct MacroInvocationSourceContext {
     macro_argument_crate_bindings: BTreeMap<usize, CrateCompilationUnitKey>,
     macro_source_provenance_rows: Vec<[u8; 32]>,
     macro_invocation_source_directory: PathBuf,
+    macro_expansion_fragment_kind: MacroExpansionFragmentKind,
+    body_owner_occurrence_key: Option<String>,
 }
 
 #[derive(Default)]
@@ -784,6 +872,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             .projection_macro_source_rows
             .get(&invocation.invocation_site_occurrence_key)
             .ok_or_else(|| build_name_projection_error("macro invocation source context absent"))?;
+        let fragment_kind = context.macro_expansion_fragment_kind;
+        let body_owner = context.body_owner_occurrence_key.clone();
         let invocation_value =
             encode_occurrence_identity_value(&invocation.invocation_site_occurrence_key);
         let digest = *blake3::hash(invocation_value.to_string().as_bytes()).as_bytes();
@@ -878,7 +968,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             RustSourceEditionKind::Edition2021 => Edition::Edition2021,
             RustSourceEditionKind::Edition2024 => Edition::Edition2024,
         };
-        let parsed = parse_compatible_rust_syntax(&normalized, "items", edition)?;
+        let parse_context = fragment_kind.parse_fragment_context_kind();
+        let parsed = parse_compatible_rust_syntax(&normalized, parse_context, edition)?;
         if let Some(error) = parsed.errors().first() {
             return Err(build_name_projection_error(format!(
                 "macro expansion {path}: {error}"
@@ -896,32 +987,32 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             source_macro_crate_bindings: crates,
             source_expansion_provenance_rows: provenance.clone(),
             source_original_directory_path: source_directory,
+            source_unit_compilation_identity_key: read_record_string_value(
+                &self.projection_unit_record_value,
+                "unit_compilation_identity_key",
+            )?
+            .into(),
+            source_unit_rust_edition_value: read_record_string_value(
+                &self.projection_unit_record_value,
+                "unit_rust_edition_value",
+            )?
+            .into(),
+            source_unit_target_cfg_values: self.projection_target_cfg_values.clone(),
+            source_parse_context_kind: parse_context.into(),
+            body_owner_occurrence_key: body_owner.clone(),
         };
         let chain = provenance
             .iter()
             .map(encode_digest_hex_value)
             .collect::<Vec<_>>();
-        let syntax = super::extract_file_syntax_core(
-            &super::SyntaxFileInputData {
-                file_source_absolute_path: file.source_file_absolute_path.clone(),
-                file_source_content_bytes: source.as_bytes().to_vec(),
-                unit_compilation_identity_key: read_record_string_value(
-                    &self.projection_unit_record_value,
-                    "unit_compilation_identity_key",
-                )?
-                .into(),
-                unit_rust_edition_value: read_record_string_value(
-                    &self.projection_unit_record_value,
-                    "unit_rust_edition_value",
-                )?
-                .into(),
-                unit_target_cfg_values: self.projection_target_cfg_values.clone(),
-                file_module_directory_path: directory.to_string_lossy().into_owned(),
-                unit_metadata_environment_values: BTreeMap::new(),
-                file_parse_context_kind: "items".into(),
-                file_expansion_provenance_chain: chain.clone(),
-            },
+        let syntax_input = build_namespace_syntax_input(&file, &directory);
+        let originating_invocation_identity =
+            encode_occurrence_identity_value(&invocation.invocation_site_occurrence_key);
+        let syntax = super::extract_macro_context_syntax(
+            &syntax_input,
             Some(&normalized),
+            file.body_owner_occurrence_key.as_deref(),
+            Some(&originating_invocation_identity),
         )?;
         let origins=expanded.macro_token_origin_rows.iter().map(|origin|{
             let output=origin.token_output_byte_range.read_source_range_pair();
@@ -953,13 +1044,21 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             .checked_add(1)
             .ok_or_else(|| build_name_projection_error("legacy scope revision overflow"))?;
         rows.extend(self.read_legacy_lookup_updates()?);
-        rows.push(super::build_syntax_output_record("file-source-text-table",path.clone(),json!({
-            "file_source_absolute_path":path,"file_content_digest_full":content,"file_source_byte_count":source.len(),"file_expansion_provenance_chain":chain,
-        })));
+        if included.is_none() {
+            rows.push(super::build_syntax_output_record(
+                "file-source-text-table",
+                path.clone(),
+                json!({
+                    "file_source_absolute_path":path,"file_content_digest_full":content,"file_source_byte_count":source.len(),"file_expansion_provenance_chain":chain,
+                }),
+            ));
+        }
         rows.push(super::build_syntax_output_record("macro-expanded-item-table",encode_digest_hex_value(&digest),json!({
             "macro_invocation_identity_record":invocation_value,"macro_invocation_provenance_chain":chain,
             "macro_virtual_source_path":path,"macro_expanded_source_text":source,"macro_token_origin_rows":origins,
             "macro_matched_arm_index":expanded.macro_matched_arm_index,"macro_resolution_state_kind":"expanded",
+            "macro_expansion_fragment_kind":fragment_kind.parse_fragment_context_kind(),
+            "macro_enclosing_body_owner_occurrence_key":body_owner,
         })));
         let input = &self.projection_resolution_input_rows;
         Ok(NameExpansionRoundRows {
@@ -1037,6 +1136,19 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 .parent()
                 .ok_or_else(|| build_name_projection_error("source directory absent"))?
                 .to_owned(),
+            source_unit_compilation_identity_key: read_record_string_value(
+                &self.projection_unit_record_value,
+                "unit_compilation_identity_key",
+            )?
+            .into(),
+            source_unit_rust_edition_value: read_record_string_value(
+                &self.projection_unit_record_value,
+                "unit_rust_edition_value",
+            )?
+            .into(),
+            source_unit_target_cfg_values: self.projection_target_cfg_values.clone(),
+            source_parse_context_kind: "items".into(),
+            body_owner_occurrence_key: None,
         };
         let parent = Path::new(path)
             .parent()
@@ -1392,18 +1504,24 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 });
         }
         if let Some(call) = ast::MacroCall::cast(node.clone())
-            && node.parent().is_some_and(|parent| {
-                matches!(
-                    parent.kind(),
-                    SyntaxKind::SOURCE_FILE
-                        | SyntaxKind::ITEM_LIST
-                        | SyntaxKind::ASSOC_ITEM_LIST
-                        | SyntaxKind::EXTERN_ITEM_LIST
-                )
-            })
+            && let Some(fragment_kind) = classify_macro_expansion_fragment(node)
         {
             self.seed_native_macro_bindings()?;
             let occurrence = self.build_source_occurrence_key(file, node)?;
+            let syntax_input = build_namespace_syntax_input(file, directory);
+            let enclosing_owner = node
+                .ancestors()
+                .skip(1)
+                .find(super::check_syntax_item_node)
+                .map(|owner| {
+                    super::build_syntax_occurrence_key(
+                        &syntax_input,
+                        &owner,
+                        &file.source_crlf_removed_offsets,
+                    )
+                    .0
+                })
+                .or_else(|| file.body_owner_occurrence_key.clone());
             let argument = call.token_tree();
             let start = argument
                 .as_ref()
@@ -1429,6 +1547,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     macro_argument_crate_bindings: file.source_macro_crate_bindings.clone(),
                     macro_source_provenance_rows: file.source_expansion_provenance_rows.clone(),
                     macro_invocation_source_directory: file.source_original_directory_path.clone(),
+                    macro_expansion_fragment_kind: fragment_kind,
+                    body_owner_occurrence_key: enclosing_owner,
                 },
             );
             self.projection_resolution_input_rows

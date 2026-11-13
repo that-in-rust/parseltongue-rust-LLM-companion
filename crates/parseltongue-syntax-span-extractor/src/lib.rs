@@ -87,10 +87,10 @@ fn parse_compatible_rust_syntax(
             }
         },
     );
-    let entry = if context == "expression" {
-        TopEntryPoint::Expr
-    } else {
-        TopEntryPoint::SourceFile
+    let entry = match context {
+        "statements" => TopEntryPoint::MacroStmts,
+        "expression" => TopEntryPoint::Expr,
+        _ => TopEntryPoint::SourceFile,
     };
     let mut builder = SyntaxTreeBuilder::default();
     let exhausted = lexed.intersperse_trivia(&entry.parse(&input), &mut |step| match step {
@@ -402,6 +402,15 @@ fn extract_file_syntax_core(
     input: &SyntaxFileInputData,
     syntax_override: Option<&str>,
 ) -> Result<SyntaxFileExtractionResult, StoreBackendFailureError> {
+    extract_macro_context_syntax(input, syntax_override, None, None)
+}
+
+fn extract_macro_context_syntax(
+    input: &SyntaxFileInputData,
+    syntax_override: Option<&str>,
+    owner_fallback: Option<&str>,
+    originating_invocation_identity: Option<&Value>,
+) -> Result<SyntaxFileExtractionResult, StoreBackendFailureError> {
     let source = std::str::from_utf8(&input.file_source_content_bytes).map_err(|error| {
         build_syntax_stage_failure(format!(
             "{} non-UTF-8 at offset {}",
@@ -608,7 +617,8 @@ fn extract_file_syntax_core(
             .ancestors()
             .skip(1)
             .find(check_syntax_item_node)
-            .map(|n| build_syntax_occurrence_key(input, &n, &removed).0);
+            .map(|n| build_syntax_occurrence_key(input, &n, &removed).0)
+            .or_else(|| owner_fallback.map(str::to_owned));
         let range = node.text_range();
         let start = restore_source_byte_offset(range.start(), &removed);
         let end = restore_source_byte_offset(range.end(), &removed);
@@ -618,6 +628,9 @@ fn extract_file_syntax_core(
             "site_syntax_kind_value":kind,"site_syntax_source_text":&source[start..end],
             "site_owner_occurrence_key":owner,"site_resolution_status_kind":"pending",
             "site_unresolved_reason_kind":Value::Null,"span_expansion_provenance_chain":input.file_expansion_provenance_chain});
+        if let Some(invocation) = originating_invocation_identity {
+            payload["site_originating_macro_invocation_identity"] = invocation.clone();
+        }
         if let Some(call) = ast::MacroCall::cast(node.clone()) {
             let name = call
                 .path()

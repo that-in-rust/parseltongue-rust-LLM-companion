@@ -120,6 +120,47 @@ WHEN macro_rules! or built-in macros expand at item/body position, THEN ≥99% o
 SHALL match PRIMARY's canonical produced-item and body-site sets. Each expanded item SHALL carry
 macro origin, invocation occurrence key and expansion provenance. Ordinary include! files join the closure.
 
+#### Authorized declarative body-macro delivery slice
+
+For this slice, an internal `MacroExpansionFragmentKind` discriminator SHALL have exactly the
+`Items`, `Statements`, and `Expression` variants. Item invocations SHALL retain the existing
+`SourceFile` parse behavior; statement fragments SHALL use the parser's genuine `MacroStmts`
+entrypoint, and expression fragments SHALL use its genuine `Expr` entrypoint. No source wrapper,
+synthetic offset, or module boundary may be added around an expansion.
+
+The visitor SHALL classify direct item-list calls as `Items`, block statement invocations as
+`Statements` (including expression-statement macros where the AST establishes statement context),
+and initializer, argument, and tail-expression `MacroExpr` calls as `Expression`. `MacroType` and
+`MacroPat` positions SHALL remain deferred. Expanded body-site rows SHALL preserve exact source byte
+ranges/text, owner occurrence identity, provenance, token-origin mapping, and an explicit link to
+the originating invocation. Ownerless sites SHALL inherit the enclosing body owner derived using
+the same syntax-occurrence fields as `build_syntax_occurrence_key`; an AST-local item owner SHALL
+take precedence. Nested calls in generated function bodies SHALL retain their immediate invocation
+identity and a provenance chain connecting the outer invocation.
+
+Body expansions SHALL use `body-site-reference-table` and its existing `name-resolution` write
+allowance, plus the existing macro-expansion evidence table; no parallel expansion engine or table
+is allowed. Fragment kind and invocation identity SHALL be persisted in existing expansion
+evidence. Expanded local items/imports SHALL remain in the invocation block's lexical scope, and
+generated local items SHALL own their own body-site rows. Resolution targets SHALL remain pending;
+this slice SHALL NOT perform type inference. Built-in expression expansion remains unavailable for
+the separate follow-up, while existing `include!` behavior SHALL not regress.
+
+Focused executable test mapping for this delivery slice:
+
+| req_id | test_id | test_type | persisted assertion |
+| --- | --- | --- | --- |
+| REQ-RUST-006.2 | `test_macro_rules_items_match` | CLI integration | Exact structured set of item/body invocation identities, fragment kinds, generated items, provenance, and token-origin rows. |
+| REQ-RUST-006.2 | `test_body_macro_sites_match` | CLI integration | Exact structured set of nested body-site kind/range/text/owner/invocation/provenance tuples and origin rows. |
+| REQ-RUST-006.2 | `test_body_fragment_context_routing` | CLI integration | Initializer and tail calls are expressions; direct block macros use statements; no fabricated sites. |
+| REQ-RUST-006.2 | `test_generated_function_owner_identity` | CLI integration | Exact nested invocation identity and chain; generated FN owner is hashed from the expected virtual source path, range, kind, and parent chain. |
+| REQ-RUST-006.2 | `test_local_scope_binding_isolation` | CLI integration | Every matching local_function and LocalMarker item/import shares the expected non-module block scope; no matching binding is at module scope. |
+| REQ-RUST-006.2 | `test_nested_macro_token_origins` | CLI integration | Nested $crate retains its definition-crate origin through expansion; a simple identifier argument maps to its nested invocation virtual-source range. |
+| REQ-RUST-006.2 | `test_legacy_macro_shadow_restoration` | CLI integration | Before-definition lookup remains unresolved; local shadow is selected and outer binding is restored. |
+| REQ-RUST-006.2 | `test_macro_output_rerun_determinism` | CLI integration | Stable-input reruns yield the same sorted persisted structured sets. |
+| REQ-RUST-006.2 | `test_malformed_fragment_publication_rollback` | CLI integration | Malformed fragment emits no failed completion/output and preserves the previous publication. |
+| REQ-RUST-006.2 | `test_deferred_macro_position_retention` | CLI integration | Type/pattern invocations remain unexpanded; resolution is not inferred. |
+
 ### REQ-RUST-013.1 — proc-macro shapes
 
 WHEN an invocation matches proc-macro-shape-table by Cargo package ID/version and macro name, THEN
