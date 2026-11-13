@@ -19,6 +19,10 @@ use std::{
 };
 use syntax::{AstNode, SyntaxNode, ast};
 
+#[cfg(test)]
+#[path = "raw-macro-expansion-bridge.rs"]
+mod raw_macro_expansion_bridge;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OracleWorkspaceExportConfig {
     pub workspace_source_root_path: PathBuf,

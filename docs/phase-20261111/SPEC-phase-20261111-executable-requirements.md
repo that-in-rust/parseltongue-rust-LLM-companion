@@ -473,6 +473,14 @@ Every entry names a clause assertion, not merely a requirement-level coverage cl
 006 → S4, S5
   test_macro_rules_items_match: item/body invocation sets and origin/invocation provenance.
   test_body_macro_sites_match: nested body expansions and matched call-site tuples.
+029 → S4
+  test_raw_macro_expansion_bytes: resolved FnLike declarative call, independent canonical bytes and ordered emitted-token intervals.
+  test_macro_token_origin_positions: duplicate output occurrences retain separate positions and source span/context origins.
+  test_expr_invisible_group_topology: real expression topology plus an isolated nested-invisible renderer proof preserve topology while flattening only invisible delimiters.
+  test_joint_hidden_spacing_preserved: isolated raw-TT renderer proof asserts Joint and JointHidden event paths, intervals, spacing, and input spans.
+  test_unicode_output_byte_ranges: UTF-8 canonical and source ranges use exact byte offsets.
+  test_macro_token_limit_boundary: exact 2,097,152-token boundary accepted and boundary-plus-one rejected without large allocation.
+  test_macro_expansion_error_typed: unmatched declarative rule preserves a typed expansion error.
 013 → S4, S5
   test_macro_shapes_match_oracle: every invocation, each shape exercised, version/signature diff on failure.
   test_unknown_proc_macro_unresolved: absent shape/version produces one proc_macro reason.
@@ -971,4 +979,80 @@ test_id: test_oracle_capability_reports_paths
 test_type: unit
 assertion: source manifest reports the limited mapped-path capability value
 metric: exact oracle_export_support_kind value mapped_semantic_paths
+```
+
+## REQ-RUST-029.0 — raw-macro-expansion-proof
+
+WHEN a test fixture contains a resolved function-like declarative macro call,
+THEN the oracle-only test bridge SHALL obtain the actual MacroCallId through
+Semantics, obtain its argument TopSubtree and span through the public
+macro_arg_considering_derives chain, and expand the definition with that same
+call ID. It SHALL preserve the matched-arm value and typed expansion error and
+enforce the rust-analyzer token limit of 2,097,152 before rendering.
+
+WHEN the bridge renders the raw expanded token tree, THEN it SHALL independently
+produce the canonical text by rendering each leaf with to_string(), appending
+a space except after Spacing::Joint, emitting concrete delimiters with no
+extra space after an open delimiter and one space after a close delimiter, and
+emitting no delimiter bytes for invisible subtrees. It SHALL retain the raw TT
+path, delimiter topology, span range/anchor/context, spacing, and exact UTF-8
+byte interval for each emitted event. It SHALL not call the production macro
+expander/renderer or use production output as a byte expectation.
+Concrete groups present in the RA raw expression expansion, including
+precedence parentheses around expression captures, SHALL remain in the
+canonical bytes; the renderer SHALL neither remove nor reinterpret them as
+invisible delimiters.
+
+WHEN a captured token is emitted more than once, THEN each output occurrence
+SHALL have a distinct TT path and output interval even when source span and
+context are shared. $crate, definition-only tokens, expression-capture
+invisible topology, Unicode byte offsets, and Joint/JointHidden spacing SHALL
+be covered explicitly. A nested invisible renderer fixture MAY be isolated
+from RA expansion, but SHALL not be represented as a topology emitted by the
+RA expression expansion. AST-token associations, where asserted, SHALL be
+token-boundary checked and reject ambiguous matches; no whole-AST projection
+or fabricated identity hash is part of this test-only proof.
+
+This requirement qualifies only the bounded private oracle-test bridge. It
+does not change production expansion, output schema, CLI capability, pins, or
+the broader S4/S5 family gates and does not constitute corpus qualification.
+
+Verification mapping:
+
+```text
+req_id: REQ-RUST-029.0
+test_id: test_raw_macro_expansion_bytes
+test_type: unit
+assertion: resolved FnLike declarative call yields the hard-coded canonical byte string and ordered emitted-event intervals
+metric: exact bytes, TT paths, event kinds, and UTF-8 ranges
+req_id: REQ-RUST-029.0
+test_id: test_macro_token_origin_positions
+test_type: unit
+assertion: duplicate captures resolve to one invocation source span; $crate and definition-only call resolve inside the template with definition-origin anchor/context
+metric: exact output ranges, source slices (including the adjacent source dollar for $crate), distinct paths, and anchor/context equality/inequality checks
+req_id: REQ-RUST-029.0
+test_id: test_expr_invisible_group_topology
+test_type: unit
+assertion: real captured-expression output has exact invisible-root/concrete-parenthesis topology; an isolated nested-invisible tree flattens bytes while preserving topology/spans
+metric: exact TT paths, delimiter kinds/ranges, emitted delimiter metadata, and equality of isolated root/nested spans with the input TT span
+req_id: REQ-RUST-029.0
+test_id: test_joint_hidden_spacing_preserved
+test_type: unit
+assertion: isolated renderer fixture emits no separator only for Joint punctuation, not JointHidden
+metric: exact bytes, token paths [0]/[1], intervals 0..1/1..2, spacing values, and root delimiter spans equal to input TT span
+req_id: REQ-RUST-029.0
+test_id: test_unicode_output_byte_ranges
+test_type: unit
+assertion: Unicode emitted text and original source slices use UTF-8 byte offsets
+metric: exact byte ranges and byte-slice equality
+req_id: REQ-RUST-029.0
+test_id: test_macro_token_limit_boundary
+test_type: unit
+assertion: count-only guard accepts 2,097,152 and returns typed TokenLimit at 2,097,153 without constructing a giant TT
+metric: exact boundary values and typed error fields
+req_id: REQ-RUST-029.0
+test_id: test_macro_expansion_error_typed
+test_type: unit
+assertion: an actual resolved unmatched macro invocation retains the typed RA expansion error and does not become an empty success
+metric: error variant present and expansion result remains unsuccessful
 ```

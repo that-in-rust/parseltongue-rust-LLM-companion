@@ -800,3 +800,79 @@ Follow-up GREEN and checks
 - Final workspace clippy: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.64s`; `elapsed_seconds=0.74 exit_code=0`.
 - Logs: `/home/ubuntu/oracle-disagreement-validation-eecdf0d/fmt-final-review.log`, `focused-final-review.log`, `cli-final-review.log`, and `clippy-final-review.log`. No adapter or release build was rerun, per scope.
 - Journal correction: the earlier intermediate `clippy-followup.log` was overwritten by the passing rerun, so it does not retain the initial `expect_used` failure despite the preceding note. The failed command/output appeared in the tool result and is described above; `clippy-final-review.log` contains the final passing output.
+
+### REQ-RUST-029.0 — oracle-only raw macro bridge
+
+SPEC phase
+- Verified REQ-RUST-029.0 and parent REQ-RUST-028.1 were unused in the visible tree; added the reserved oracle-only contract and exact test mappings before implementation.
+- Scope is private cfg(test) proof in the oracle harness only. No production expansion, output format/schema, CLI capability, dependency, pin, lockfile, or mapper changes.
+- Planned tests: test_raw_macro_expansion_bytes, test_macro_token_origin_positions, test_expr_invisible_group_topology, test_joint_hidden_spacing_preserved, test_unicode_output_byte_ranges, test_macro_token_limit_boundary, and test_macro_expansion_error_typed.
+- No checks run in this phase; implementation and verification follow.
+
+STUB phase
+- Added the single cfg(test) private bridge module under primary_path_export_rows and declared the seven tagged tests plus typed result/error record signatures.
+- STUB check command: cargo check --release --offline --locked --tests --manifest-path tools/oracle-semantic-export-harness/Cargo.toml with CARGO_TARGET_DIR set to the existing repository target directory. Timing and output pending.
+- STUB check: Finished release profile [optimized] target(s) in 25.64s; elapsed_seconds=25.67 exit_code=0. The command reused the root release cache and emitted only dead-code warnings for unimplemented stubs plus the known pinned rust-analyzer manifest warning: unused manifest key lints.cargo. Cargo 1.99.1 stable explicitly identifies that key as nightly-only; this is a pinned-manifest warning, not a missing environment.
+
+RED phase
+- Focused command using the full module test path: cargo test --release --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml primary_path_export_rows::raw_macro_expansion_bridge::test_raw_macro_expansion_bytes -- --exact --nocapture.
+- Controlled stub RED: not yet implemented at raw-macro-expansion-bridge.rs:61; test failed with a not-yet-implemented panic, 0 passed / 1 failed, elapsed_seconds=0.17 exit_code=101. The first abbreviated --exact filter selected zero tests and was discarded; the full-path invocation above is the valid RED.
+
+Implementation compile attempt 1
+- The focused release test compile identified test-bridge-only API/type mistakes: nonexistent AstIdDeclarativeMacroExt import, sibling loader module path, Copy derives on Vec/Range records, VfsPath conversion needing AbsPathBuf, and decl_macro_expander returning a reference rather than Option. The RA private error struct must also be matched by its public type without destructuring private fields. Corrected these locally; no RA or production files changed. Command elapsed_seconds=0.87 exit_code=101.
+
+Implementation compile and correction notes
+- Focused compile attempt 2 found the missing SubtreeView::len API and expected string-slice mismatch; the limit guard now uses the exact pinned RA tt.top_subtree().count() path. A subsequent focused test caught cross-Semantics AST use, corrected by parsing and expanding through one Semantics instance.
+- Raw expansion showed that RA emitted a concrete parenthesis group around the captured expression before multiplication. The hard-coded expected bytes/events were updated from the independently specified emission rule to preserve that raw group; no flatten/reparse normalization was added.
+
+GREEN phase and release gates
+- Focused tests: cargo test --release --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml raw_macro_expansion_bridge -- --nocapture; 7 passed, 0 failed; elapsed_seconds=9.39 exit_code=0.
+- Full oracle harness: cargo test --release --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml; 41 passed, 0 failed; elapsed_seconds=21.03 exit_code=0.
+- Formatting: cargo fmt --all -- --check; no diagnostics; elapsed_seconds=6.49 exit_code=0.
+- Clippy: cargo clippy --release --all-targets --all-features --offline --locked --manifest-path tools/oracle-semantic-export-harness/Cargo.toml -- -Dwarnings; Finished release profile [optimized] target(s) in 0.67s; elapsed_seconds=0.73 exit_code=0.
+- Release build: cargo build --release --offline --locked --all-features --manifest-path tools/oracle-semantic-export-harness/Cargo.toml; Finished release profile [optimized] target(s) in 3.66s; elapsed_seconds=3.70 exit_code=0.
+- JointHidden is proven with a separate minimal TT built from a span of the real expansion because its emitted second path colon is Alone. Final focused tests and full harness tests passed after the final source edit.
+
+Final verification after retaining the call-site span in the result record
+- Focused bridge tests: 7 passed, 0 failed; elapsed_seconds=8.09 exit_code=0.
+- Full oracle harness release tests: 41 passed, 0 failed; elapsed_seconds=20.94 exit_code=0.
+- cargo fmt --all -- --check: no diagnostics; elapsed_seconds=6.16 exit_code=0.
+- Clippy with all targets/features and -Dwarnings: Finished release profile [optimized] target(s) in 0.66s; elapsed_seconds=0.71 exit_code=0.
+- Release build with all features: Finished release profile [optimized] target(s) in 0.14s; elapsed_seconds=0.16 exit_code=0.
+
+Expression topology follow-up and final gates
+- Added a separate passthrough!($value:expr) source call inside a multiplication context so the expression-capture proof is not conflated with the generated-function golden.
+- First expected-byte attempt omitted RA's concrete parentheses and failed with left "(café () + 1 ) " vs right "café () + 1 ". A subsequent attempt to require an additional nested invisible subtree found no such subtree and failed at the lookup.
+- Final proof records the actual expression expansion's invisible root (empty TT path, byte range 0..16) and verifies that it emits no token event at the root path. Raw canonical bytes remain exactly "(café () + 1 ) "; the concrete precedence parentheses are preserved, not reparsed or normalized. No nested invisible expression subtree was observed in this source case.
+- Updated the SPEC mapping to state this verified root-topology property rather than claim nested expression groups.
+- Final focused bridge suite: 7 passed, 0 failed; elapsed_seconds=3.97 exit_code=0.
+- Final complete oracle harness suite: 41 passed, 0 failed; elapsed_seconds=20.90 exit_code=0.
+- Final expression-topology focused test: 1 passed, 0 failed; elapsed_seconds=7.13 exit_code=0.
+- Final formatting: cargo fmt --all -- --check; no diagnostics; elapsed_seconds=5.19 exit_code=0.
+- Final clippy: Finished release profile [optimized] target(s) in 1.19s with -Dwarnings; elapsed_seconds=1.29 exit_code=0.
+- Final all-features release build: Finished release profile [optimized] target(s) in 0.20s; elapsed_seconds=0.23 exit_code=0.
+
+Final ordered TT-path verification
+- Added the full expected depth-first TT-path vector for every emitted event in the canonical-byte proof, alongside the exact canonical string, event kind, spacing, and byte-range table.
+- Focused canonical proof: 1 passed, 0 failed; elapsed_seconds=7.70 exit_code=0.
+- Focused bridge suite: 7 passed, 0 failed; elapsed_seconds=4.50 exit_code=0.
+- Full oracle harness suite: 41 passed, 0 failed; elapsed_seconds=19.12 exit_code=0.
+- Formatting: cargo fmt --all -- --check; no diagnostics; elapsed_seconds=6.40 exit_code=0.
+- Clippy: Finished release profile [optimized] target(s) in 0.65s with -Dwarnings; elapsed_seconds=0.74 exit_code=0.
+- All-features release build: Finished release profile [optimized] target(s) in 0.15s; elapsed_seconds=0.17 exit_code=0.
+
+## REQ-RUST-029.0 REFACTOR checkpoint
+
+- Kept the bridge private and test-only under primary_path_export_rows; production expansion, loader, mapper, schema, CLI, capability, dependency, pin, and lock files remain outside the change.
+- Resolved each source span only after asserting its anchored file is the fixture file. The public path converts span::EditionedFileId with EditionedFileId::from_span_file_id, then uses HirFileId::from(...).ast_id_map(db).get_erased(ast_id).text_range().start(); no guessed anchor offset or original_range is used. Captured café outputs remain 26..31 and 56..61 and share the same source span/slice. The raw $crate span covers source crate; the test verifies the immediately preceding source byte is $ and the combined source slice is $crate. definition_only maps into the template. Definition anchors/contexts agree with one another and differ from the invocation capture.
+- The direct HirFileId::from(span.anchor.file_id) expression did not compile because the span crate's EditionedFileId differs from base_db::EditionedFileId; the public from_span_file_id conversion is required before the HirFileId/AstIdMap lookup. The first origin assertion also showed that the $crate raw span selects crate, not $crate; the source-dollar adjacency is now explicitly checked. Both failed attempts are retained as separate logs; the third focused run passed.
+- The real RA expression expansion records root []/Invisible/0..16, concrete parentheses [0]/Parenthesis/0..16 and [0, 1]/Parenthesis/7..10, with delimiter event spans equal to the raw subtree delimiter spans. Its canonical bytes remain exactly (café () + 1 ) ; the actual concrete parentheses are raw TT and SHALL remain. A separate TopSubtreeBuilder renderer proof uses a span from the real expansion to demonstrate nested invisible flattening while retaining root/nested topology at [] and [0]; this is isolated renderer evidence and is not attributed to the RA expression expansion. The Joint/JointHidden proof asserts paths [0]/[1], intervals 0..1/1..2, spacings, and root delimiter spans equal to the input span.
+- No redundant duplicate assert_ne! was present: the path, output-range, anchor, and context inequalities assert distinct properties. Bridge function/type/test identifiers follow the four-word naming rule; the four-word SPEC heading is raw-macro-expansion-proof.
+- Formatting correction: prior root cargo fmt --all -- --check entries are historical root-workspace results and did not verify the standalone oracle harness. The standalone check first identified formatting in the new bridge; cargo fmt --manifest-path tools/oracle-semantic-export-harness/Cargo.toml formatted it. The final standalone cargo fmt --manifest-path tools/oracle-semantic-export-harness/Cargo.toml -- --check passes. No other harness file was formatter-modified.
+- Final offline/locked checks used the existing repository target cache and were captured without reusing failure-log paths:
+  - Focused bridge: test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 3.56s; elapsed_seconds=7.30 exit_code=0. Log: /home/ubuntu/oracle-macro-bridge-req029-followup-1794532476/focused-bridge-final-attempt3.log.
+  - Full harness: test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.17s; elapsed_seconds=16.56 exit_code=0. Log: /home/ubuntu/oracle-macro-bridge-req029-followup-1794532476/full-harness-final-attempt1.log.
+  - Standalone harness format check: elapsed_seconds=0.17 exit_code=0. Log: /home/ubuntu/oracle-macro-bridge-req029-followup-1794532476/harness-fmt-final-attempt3.log.
+  - Clippy all targets/features, release, -Dwarnings: Finished release profile [optimized] target(s) in 0.64s; elapsed_seconds=0.69 exit_code=0. Log: /home/ubuntu/oracle-macro-bridge-req029-followup-1794532476/harness-clippy-final-attempt1.log.
+  - All-features release build: Finished release profile [optimized] target(s) in 0.27s; elapsed_seconds=0.33 exit_code=0. Log: /home/ubuntu/oracle-macro-bridge-req029-followup-1794532476/harness-build-final-attempt1.log.
+- Cargo 1.99.1 on the active stable toolchain repeatedly reports the pinned rust-analyzer manifests' unsupported lints.cargo key (unused manifest key lints.cargo; nightly-only Cargo lint support). The repo blueprint has no Rust setup step and neither checkout has a rust-toolchain file; the warning did not prevent any requested check from completing. No toolchain or environment change was made.
