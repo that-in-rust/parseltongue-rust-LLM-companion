@@ -472,6 +472,92 @@ class S3PrerequisiteEvidenceIntakeTests(unittest.TestCase):
         result = self.build_bundle_result(bundle)
         self.assertEqual(result["repository_results"]["serde"]["fixture_suite"]["status"], "BLOCKED")
 
+    def test_fixture_release_profile_passes(self):
+        """REQ-SOP-RUNNER-022: explicit standard release profile preserves the unfiltered fixture argv."""
+        bundle = SyntheticEvidenceBundle()
+        receipt_path = bundle.receipt_paths("fixture_suite")[0]
+        bundle.refresh_receipt(receipt_path, lambda receipt: receipt["argv"].insert(2, "--release"))
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["fixture_suite"]["status"], "PASS")
+        receipt = json.loads(bundle.file_bytes[receipt_path])
+        self.assertEqual(receipt["argv"][1:], ["test", "--release", "--workspace"])
+
+    def test_clippy_release_profile_passes(self):
+        """REQ-SOP-RUNNER-022: explicit standard release profile preserves strict clippy argv."""
+        bundle = SyntheticEvidenceBundle()
+        receipt_path = bundle.receipt_paths("clippy")[0]
+        bundle.refresh_receipt(receipt_path, lambda receipt: receipt["argv"].insert(2, "--release"))
+        result = self.build_bundle_result(bundle)
+        self.assertEqual(result["repository_results"]["serde"]["build_evidence"]["status"], "PASS")
+        receipt = json.loads(bundle.file_bytes[receipt_path])
+        self.assertEqual(receipt["argv"][1:], [
+            "clippy", "--release", "--message-format=json", "--workspace", "--all-targets",
+            "--all-features", "--", "-D", "warnings",
+        ])
+
+    def test_release_profile_misuse_blocks(self):
+        """REQ-SOP-RUNNER-022: package, skip, custom-profile and unknown flags stay rejected."""
+        def package_filter(argv):
+            argv[2:2] = ["--release", "--package", "parseltongue"]
+
+        def custom_profile(argv):
+            argv[2:2] = ["--release", "--profile", "release"]
+
+        def unknown_option(argv):
+            argv[2:2] = ["--release", "--unknown-option"]
+
+        def skipped_fixture(argv):
+            argv.insert(2, "--release")
+            argv.extend(["--", "--skip", "test_fixture"])
+
+        def duplicate_release(argv):
+            argv[2:2] = ["--release", "--release"]
+
+        def release_after_separator(argv):
+            argv.extend(["--", "--release"])
+
+        def release_before_subcommand(argv):
+            argv.insert(1, "--release")
+
+        mutations = (
+            ("fixture_suite", package_filter), ("fixture_suite", custom_profile),
+            ("fixture_suite", unknown_option), ("fixture_suite", skipped_fixture),
+            ("fixture_suite", duplicate_release), ("fixture_suite", release_after_separator),
+            ("fixture_suite", release_before_subcommand),
+            ("clippy", package_filter), ("clippy", custom_profile), ("clippy", unknown_option),
+            ("clippy", duplicate_release), ("clippy", release_after_separator),
+            ("clippy", release_before_subcommand),
+        )
+        for family, mutate in mutations:
+            with self.subTest(family=family, mutate=mutate.__name__):
+                bundle = SyntheticEvidenceBundle()
+                receipt_path = bundle.receipt_paths(family)[0]
+                bundle.refresh_receipt(receipt_path, lambda receipt: mutate(receipt["argv"]))
+                if mutate.__name__ in {"package_filter", "custom_profile", "unknown_option", "skipped_fixture"}:
+                    receipt = json.loads(bundle.file_bytes[receipt_path])
+                    release_position = receipt["argv"].index("--release")
+                    separator_position = (
+                        receipt["argv"].index("--") if "--" in receipt["argv"] else len(receipt["argv"])
+                    )
+                    self.assertEqual(receipt["argv"].count("--release"), 1)
+                    self.assertGreater(release_position, 1)
+                    self.assertLess(release_position, separator_position)
+                result = self.build_bundle_result(bundle)
+                gate_name = "fixture_suite" if family == "fixture_suite" else "build_evidence"
+                self.assertEqual(result["repository_results"]["serde"][gate_name]["status"], "BLOCKED")
+
+        bundle = SyntheticEvidenceBundle()
+        receipt_path = bundle.receipt_paths("clippy")[0]
+        def release_environment_mismatch(receipt):
+            receipt["argv"].insert(2, "--release")
+            receipt["relevant_environment"].update({"CARGO_PROFILE_RELEASE_DEBUG": "0"})
+
+        bundle.refresh_receipt(receipt_path, release_environment_mismatch)
+        receipt = json.loads(bundle.file_bytes[receipt_path])
+        self.assertIn("--release", receipt["argv"])
+        result = self.build_bundle_result(bundle)
+        self.assertNotEqual(result["repository_results"]["serde"]["build_evidence"]["status"], "PASS")
+
     def test_native_skip_blocks_bundle(self):
         """REQ-SOP-RUNNER-022: native-skip environment overrides cannot qualify fixture tests."""
         bundle = SyntheticEvidenceBundle()

@@ -1478,3 +1478,237 @@ commands using those bindings, retain/hash their raw streams, and assemble the c
 then invoke the runner once with that manifest and the fresh run ID. Never reuse a run ID or owned
 directory from a failed or incomplete preparation. No automatic identity freezer or receipt-collection
 command is added.
+
+### REQ-SOP-RUNNER-022.R — explicit standard release-profile receipts
+
+Policy review before implementation:
+
+- `docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md` §S3, lines 77–82, requires the
+  applicable fixture/build suite, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo test`, production `cargo tree`, and a separate release build of the production binary from
+  the oracle harness. It does not prescribe a debug profile for fixture or Clippy commands, or prohibit
+  an explicit standard `--release` on either command.
+- The same SOP's gate summary at line 392 and `AGENTS.md` lines 64–66 require Clippy, tests, and a
+  release build; neither explicitly prohibits release-profile fixture/Clippy receipts. The separate
+  production release-build requirement remains in force.
+
+No policy prohibition was found. For `fixture_suite` and `clippy`, exactly one literal Cargo-level
+`--release` is accepted only after the command name and before `--`. The receipt's original argv remains
+unchanged and is the profile evidence; the validator does not infer or relabel a debug invocation as
+release. Workspace/all-target/all-feature coverage, Clippy JSON output and `-D warnings`, and the
+unfiltered fixture contract remain exact. Package filters, `--skip`, positional test filters, custom
+`--profile`, unknown options, duplicate/misplaced `--release`, and environment identity overrides remain
+rejected. P2 command and feature matching was not changed.
+
+Traceability for this subclause (each test has the `REQ-SOP-RUNNER-022` doc tag):
+`test_fixture_release_profile_passes`, `test_clippy_release_profile_passes`,
+`test_release_profile_misuse_blocks`.
+
+Actual RED, before the command validator change:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_fixture_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_clippy_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_release_profile_misuse_blocks
+test_fixture_release_profile_passes ... FAIL
+test_clippy_release_profile_passes ... FAIL
+test_release_profile_misuse_blocks ... ok
+AssertionError: 'BLOCKED' != 'PASS' (fixture_suite)
+AssertionError: 'BLOCKED' != 'PASS' (build_evidence)
+Ran 3 tests in 0.053s
+FAILED (failures=2)
+```
+
+Actual GREEN after the minimal allowlist change:
+
+```text
+PYTHONPATH=tools PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_fixture_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_clippy_release_profile_passes test_s3_prerequisite_evidence_intake.S3PrerequisiteEvidenceIntakeTests.test_release_profile_misuse_blocks
+test_fixture_release_profile_passes ... ok
+test_clippy_release_profile_passes ... ok
+test_release_profile_misuse_blocks ... ok
+Ran 3 tests in 0.083s
+OK
+```
+
+The positive tests assert that `--release` is present in the retained argv. The negative matrix covers
+package selection, custom profiles, unknown flags, a fixture `--skip`, duplicate or misplaced release
+flags, and an environment field not matching the frozen binding. No Cargo command was run for this
+implementation.
+
+### Real frozen source-inventory observation
+
+The existing pure `derive_production_source_test_inventory` was run on the real tracked `crates/` source
+at base commit `36f4042644285a2c2f26593a06ed4a6882ce74ef`; no compilation or target command was run.
+`capture_frozen_source_snapshot` was called before and after inventory derivation with
+`project_root / "crates"`, the same tracked source prefix enumerated by the derivation:
+
+```text
+source root: /home/ubuntu/repos/parseltongue-rust-LLM-companion/crates
+HEAD before/after: 36f4042644285a2c2f26593a06ed4a6882ce74ef
+source_tree_sha256 before/after: 456adfe775f377b59d11eb248c923db472f6a3e2ef4c996d99373af6834c3637
+tracked source files before/after: 94
+snapshot_unchanged: true
+source inventory tests: 208
+ambiguity status: AMBIGUOUS
+```
+
+A repository-root snapshot attempt is unsupported because tracked `.claude/skills` is a directory
+symlink and the snapshot helper requires regular file inputs (`frozen input is not a regular file:
+/home/ubuntu/repos/parseltongue-rust-LLM-companion/.claude/skills`). The source-only `crates/` snapshot
+avoids that unrelated path and covers the exact tracked source prefix read by the inventory derivation.
+
+Ambiguity reasons returned by the existing derivation (no names were inferred or aliased):
+
+- macro-generated test inventory is ambiguous in
+  `crates/parseltongue-port-macro-expander/src/macro-expansion-rule-parts/macro-expansion-match-parts/macro-token-transcription-logic.rs`
+- macro-generated test inventory is ambiguous in
+  `crates/parseltongue-port-macro-expander/src/macro-expansion-rule-parts/rule-match-expansion-logic.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-cli-dispatcher-binary/tests/oracle-comparison-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-cli-dispatcher-binary/tests/stage-export-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-cli-dispatcher-binary/tests/workspace-cli-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-core-row-types/src/lib.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-crate-graph-loader/tests/graph-stage-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-crate-graph-loader/tests/sysroot-context-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/bounded-constructor-policy-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-binding-round-strata.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-import-endpoint-rounds.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-path-candidate-records.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/namespace-scope-relation-records.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/published-generation-copy-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/row-resolution-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-duckdb-analysis-adapter/src/sibling-namespace-accuracy-fixtures.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-port-macro-expander/src/builtin-expansion-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-port-macro-expander/src/declarative-expansion-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-stage-worker-scheduler/tests/worker-stage-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/src/legacy-macro-scope-records.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/src/namespace-legacy-source-fixtures.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/src/syntax-namespace-record-codec.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-syntax-span-extractor/tests/syntax-stage-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-table-store-traits/src/lib.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-turso-store-adapter/tests/stage-store-contract-tests.rs`
+- test function could not be inventoried unambiguously in
+  `crates/parseltongue-turso-store-adapter/tests/workspace-dependency-build-gates.rs`
+
+Required-name comparison used the existing `M0_TEST_NAMES`, `M1_TEST_NAMES`, and `M2_TEST_NAMES` sets
+against the 208 derived source names:
+
+```text
+missing required M1 names: test_no_analysis_crates_linked
+missing required M2 names (M0 + M1 + M2):
+  test_body_macro_sites_match
+  test_macro_rules_items_match
+  test_nameres_matches_oracle_paths
+  test_no_analysis_crates_linked
+  test_oracle_disagreements_keep_reasons
+missing additional M2 names:
+  test_body_macro_sites_match
+  test_macro_rules_items_match
+  test_nameres_matches_oracle_paths
+  test_oracle_disagreements_keep_reasons
+```
+
+These missing names remain BLOCKED in this checkout; the observed inventory ambiguity is not waived.
+The Python suite budget was `<30s` expected and `120s` maximum per suite; final measured results after the
+code change were helper `Ran 73 tests in 0.383s / OK`, runner `Ran 136 tests in 2.532s / OK`, and process
+tree `Ran 6 tests in 0.343s / OK`. No-refactor checkpoint: only the helper, helper tests, and this scoped
+journal changed in this follow-up; no production Rust source, P2 matching logic, SOP, or AGENTS file was
+edited, and no commit or push was made.
+
+### Supplemental test traceability
+
+The final static traceability check also identified earlier runner/helper tests that were not yet
+cross-listed in this append-only journal. Their existing REQ-tagged docstrings remain authoritative;
+this list records the names without changing prior checkpoints:
+
+Runner:
+`test_output_checkout_root_blocks` `test_output_source_ancestor_blocks`
+`test_output_source_subtree_blocks` `test_corpus_ancestor_root_blocks`
+`test_corpus_root_output_blocks` `test_output_symlink_bypass_blocks`
+`test_output_symlink_alias_blocks` `test_output_safe_paths_validate`
+`test_outputs_block_before_writes` `test_output_exclusions_detect_mutations`
+`test_selected_locks_are_frozen` `test_selected_lock_modification_fails`
+`test_selected_lock_deletion_fails` `test_unselected_lock_stays_blocked`
+`test_publication_map_accepts_complete` `test_publication_map_requires_stages`
+`test_publication_map_requires_generation` `test_static_status_cannot_publish`
+`test_unaddressed_sends_require_proof` `test_socketpair_local_send_passes`
+`test_annotated_unix_fd_allowed` `test_stale_socket_proof_rejected`
+`test_socketpair_inode_fd_untrusted` `test_execveat_relative_path_blocks`
+`test_failed_exec_payload_blocks` `test_failed_forbidden_exec_blocks`
+`test_mapper_failure_retains_samples` `test_target_failure_skips_status`
+`test_runner_persists_skipped_states`
+
+Helper:
+`test_p2_metadata_source_fails` `test_p2_metadata_manifest_fails`
+`test_p2_artifact_source_fails` `test_p2_artifact_manifest_fails`
+`test_p2_missing_source_blocks`
+
+### Authorized resolver-v2 fixture exception — HARNESS ONLY
+
+The only Cargo invocations authorized for this fixture were run in the external, dependency-free,
+two-package resolver-v2 workspace at
+`/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/workspace`. Both commands used a 20-second
+timeout and completed successfully:
+
+```text
+argv: cargo metadata --offline --format-version 1
+elapsed_monotonic_seconds=0.037953; timed_out=false; exit_status=0
+
+argv: cargo check --offline --locked --workspace --lib --bins --message-format=json
+elapsed_monotonic_seconds=0.157697; timed_out=false; exit_status=0
+```
+
+Exact cwd, argv arrays, timeout, stream sizes/hashes, and unmodified raw stdout/stderr are retained in
+`/home/ubuntu/parseltongue-resolver-v2-fixture-1794529914/observations/command-records.json` and the
+adjacent `metadata.stdout`, `metadata.stderr`, `check.stdout`, and `check.stderr`; the short report is
+`feature-resolution-observation.md` in the same directory. Both commands took less than the expected
+10 seconds. The `cargo check` build-finished record succeeded.
+
+In `resolve.nodes`, `resolver-v2-shared` has `baseline`, `default`, and `dev-extra`; its emitted lib
+artifact has only `baseline` and `default`. The consumer node and its emitted lib/bin artifacts all have
+`default`. Metadata lists the consumer lib, default bin, feature-gated bin, and shared lib; the gated
+bin was not emitted because its required `gated-bin` feature was disabled. This exact feature mismatch
+is recorded without a subset or union shortcut. This fixture is **HARNESS ONLY**, not qualification:
+P2 feature matching was not changed and no S3/P2 qualification is claimed. Current P2 remains BLOCKED
+pending a parent decision on retaining exact package-level equality or defining future unit-attributed
+Cargo evidence.
+
+### Source-inventory absence wording clarification
+
+The listed “missing required” names mean only that the existing pure inventory derivation did not
+return those names. Because that inventory reports `AMBIGUOUS`, this does not establish that any of
+these tests are absent from Rust source. They remain unproven and BLOCKED; no alias or waiver was used:
+
+```text
+M1 derived-name gap: test_no_analysis_crates_linked
+M2 derived-name gap: test_body_macro_sites_match, test_macro_rules_items_match,
+  test_nameres_matches_oracle_paths, test_no_analysis_crates_linked,
+  test_oracle_disagreements_keep_reasons
+```
+
+The full-checkout frozen-source limitation also remains: tracked `.claude/skills` is a symlink to a
+directory, which the snapshot helper cannot capture as a regular file. The before/after `crates/`
+source snapshot covers the exact tracked source prefix read by the inventory; no claim is made that the
+full checkout snapshot succeeded.

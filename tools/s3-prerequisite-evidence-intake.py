@@ -312,6 +312,14 @@ def _validate_command_family_contract(receipt_document, expected_identity_bindin
             raise S3EvidenceBlockedError("fmt receipt must prove full-workspace cargo fmt --all -- --check")
     elif family == "clippy":
         filtered = [value for value in arguments if value not in optional]
+        release_positions = [index for index, value in enumerate(filtered) if value == "--release"]
+        separator = filtered.index("--") if "--" in filtered else len(filtered)
+        if release_positions and (
+            len(release_positions) != 1 or release_positions[0] == 0 or release_positions[0] >= separator
+        ):
+            raise S3EvidenceBlockedError("clippy release profile must be the single Cargo --release option")
+        if release_positions:
+            filtered.pop(release_positions[0])
         if filtered != ["clippy", "--message-format=json", "--workspace", "--all-targets", "--all-features",
                         "--", "-D", "warnings"]:
             raise S3EvidenceBlockedError("clippy receipt must use workspace/all-targets/all-features and -D warnings")
@@ -320,6 +328,11 @@ def _validate_command_family_contract(receipt_document, expected_identity_bindin
         separator = filtered.index("--") if "--" in filtered else len(filtered)
         cargo_args = filtered[:separator]
         test_args = filtered[separator + 1:] if separator < len(filtered) else []
+        release_positions = [index for index, value in enumerate(cargo_args) if value == "--release"]
+        if release_positions and (len(release_positions) != 1 or release_positions[0] == 0):
+            raise S3EvidenceBlockedError("fixture release profile must be the single Cargo --release option")
+        if release_positions:
+            cargo_args.pop(release_positions[0])
         if (not cargo_args or cargo_args[0] != "test" or "--workspace" not in cargo_args
                 or any(value in cargo_args for value in ("--package", "-p", "--exclude", "--all", "--no-default-features"))
                 or any(value not in {"--workspace", "--all-targets", "--all-features"} for value in cargo_args[1:])
