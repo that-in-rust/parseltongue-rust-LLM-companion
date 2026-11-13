@@ -4489,4 +4489,19 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   the stable-toolchain warning was previously diagnosed and no toolchain
   change was made.
 - Local GREEN commit follows these scoped gates; its SHA is recorded in the
-  next append-only phase entry.
+ next append-only phase entry.
+
+## HLD-MATERIALIZER-REFACTOR — 2026-11-13
+
+- GREEN commit: 3d472bbc32435a444989fe483c3dd0ac1c5567b0.
+- Reviewed the committed direct-projection diff against the bounded scope.
+  No additional semantic refactor was warranted. The Clippy simplification,
+  formatting and test-only DuckDB memory diagnostics are already in the
+  GREEN commit.
+- No Rust source, manifest or configuration changed after the GREEN commit.
+  Therefore the final scoped formatter, Clippy, affected-test and release-build
+  outputs recorded in the preceding GREEN entry apply to this exact tree and
+  were not rerun.
+- This is the explicit no-additional-refactor checkpoint. Only this
+  append-only journal record remains to be committed for the REFACTOR phase;
+  its SHA will be recorded in the subsequent commit-closure entry.
