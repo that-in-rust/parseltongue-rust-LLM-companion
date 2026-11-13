@@ -3749,3 +3749,17 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   positions, M4, and an all-five integrated qualification. The five include
   regressions were individually green; no combined/all-five suite was run.
   No native, sysroot, corpus, or full workspace test suite was run.
+
+### REQ-RUST-006.2 REFACTOR — no-further-change checkpoint
+
+- GREEN implementation commit: 5a80c13e5fb23d24f4bca13a50a29e4220cda45c,
+  based on slice base e3868ab149dc2969c41db127ee486df776509a0a.
+- Post-fix verification recorded above: both required macro fixtures and all
+  five include fixtures passed individually; workspace Clippy, release build,
+  formatting check, and diff check passed. Release executable SHA256:
+  ecf9f6ba69917bcf4baaa9ce922a1f8ca7ab37fb34164f2f7a4728cba68397ea.
+- No code, test, or SPEC changes were made after the GREEN commit; this
+  checkpoint is documentation-only. S5 and full REQ-RUST-006 completion are
+  not claimed. Builtin expression macros beyond ordinary include, deferred
+  type/pattern positions, M4, and all-five integrated qualification remain
+  follow-ups.
