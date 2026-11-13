@@ -1,0 +1,45 @@
+{
+  "benchmark_phase_ordinal_value": 1,
+  "benchmark_repository_short_name": "itoa",
+  "benchmark_repository_remote_url": "https://github.com/dtolnay/itoa",
+  "benchmark_source_release_tag": "1.0.18",
+  "benchmark_source_commit_hash": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+  "benchmark_source_checkout_path": "/home/ubuntu/repos/rust-tools/itoa",
+  "benchmark_manifest_digest_sha256": "44ca1ae5d9b48743305b57f3367051289512037e7836b8b3693b68d48dec0483",
+  "benchmark_configuration_policy_values": {
+    "package": "itoa",
+    "version": "1.0.18",
+    "target_name": "itoa",
+    "target_kind": "lib",
+    "edition": "2021",
+    "host_triple": "x86_64-unknown-linux-gnu",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "enabled_features": [],
+    "test_cfg": false,
+    "qualification_profile": "dev",
+    "optional_no_panic_enabled": false,
+    "build_script_present": false,
+    "enabled_normal_third_party_dependencies": []
+  },
+  "benchmark_source_inventory_records": [
+    {
+      "path": "src/lib.rs",
+      "sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+      "bytes": 16904,
+      "lines": 466
+    },
+    {
+      "path": "src/u128_ext.rs",
+      "sha256": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c",
+      "bytes": 695,
+      "lines": 22
+    }
+  ],
+  "benchmark_excluded_target_values": ["tests", "benches", "examples", "fuzz"],
+  "benchmark_lockfile_status_kind": "NOT_CAPTURED",
+  "benchmark_lockfile_digest_sha256": null,
+  "benchmark_configuration_freeze_status": "NOT_FROZEN",
+  "benchmark_expected_reference_status": "NOT_STARTED",
+  "benchmark_production_comparison_status": "NOT_STARTED",
+  "benchmark_build_qualification_status": "NOT_STARTED"
+}

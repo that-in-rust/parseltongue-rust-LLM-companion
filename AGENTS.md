@@ -8,6 +8,8 @@
  Unit tests passing = progress, never done.
  Any production change after a run invalidates it: new run, all five repos, one frozen release executable digest.
  Status is reported per SOP step (PASS / FAIL / BLOCKED / not-started) with measured numbers — no bare percentages.
+ Phase 1 development repeatedly tests pinned itoa (SOP §1.1); its bounded benchmark PASS is not
+ an all-five milestone DONE. Phase 2 retains the original five-repository acceptance contract.
 ```
 
 ## Canonical paths (phase-20261111)
@@ -83,7 +85,8 @@ Journal entry (append to JOURNAL after EVERY phase, never edit old entries):
 
 ### Budgets before big runs
 
-- Always run serde first; only then the other four repos.
+- First use the single pinned itoa Phase 1 benchmark (SOP §1.1). For Phase 2
+  qualification, run serde first; only then rust-analyzer, ripgrep, tokio and cargo-modules.
 - Kill a correctness run only if it exceeds 2× its expected wall time; until all-five DuckDB S5 exists, do not set an interim DuckDB memory cap and measure/report effective engine limits plus whole-tree peak RSS. After S5, enforce the unchanged final target ≤500 MB whole process tree.
 - 2026-11-12 revision: interim DuckDB cap removed by user decision; memory is measured and reported only until all-five S5 exists. Final ≤500 MB target remains unchanged.
 - Measure memory and time before arguing design.

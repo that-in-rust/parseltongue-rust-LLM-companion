@@ -4276,3 +4276,39 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
 - Implementation commit remains `b5d6a8e1c73849e208d517fec39ada986d2e473d`;
   this exact-output correction will be recorded in a local journal-only
   commit. No replay or push was performed.
+
+## PHASE-ONE-BENCHMARK-SELECTION — 2026-11-13
+
+- Documentation-only revision to development order, using existing
+  REQ-RUST-009.2/012.1/019.1/020.1/025.0. No Rust, runner, schema validator,
+  expected graph or executable changed; STUB/RED/GREEN code phases do not apply.
+- Selected itoa 1.0.18 at `af77385d0daf4d0e949e81f2588be2e44f69f086`:
+  complete selected library is two source files, 488 lines / 17,599 bytes.
+  The clean pin and three file SHA-256 digests are recorded in
+  `phase-one-benchmark-pin.json`. Rejected continuing the partial serde pilot
+  as the first golden reference: its earlier examined scope was not exhaustive.
+- SOP §1.1 now defines source-only expected-graph construction/freeze, recurring
+  stage checks, exact semantic comparison and a bounded Phase 1 exit. Phase 2
+  retains serde → rust-analyzer → ripgrep → tokio → cargo-modules and the existing
+  all-five release gates. SPEC, root rules, audit docs and status are aligned.
+- Validation: `git diff --check` exited 0. Inline `python3` assertions checked
+  clean HEAD, manifest/source SHA-256, complete source inventory and sizes,
+  manifest feature/dependency declarations, absent build script, unchanged
+  original corpus manifest and new relative documentation links:
+
+  ```text
+  PASS: immutable source pin and clean checkout
+  PASS: manifest/source hashes and complete 2-file inventory (488 lines, 17599 bytes)
+  PASS: empty default features, optional no-panic disabled, no build.rs
+  PASS: original five-repository corpus manifest unchanged
+  PASS: Phase 1 documentation links resolve
+  NOT RUN: builds, production mapping, oracle export, zcode, qualification
+  ```
+
+- Initial validation attempt could not import `tomllib`; corrected the inline
+  script to check the exact hashed manifest without installing anything.
+  No build or qualification result is inferred from these documentation checks.
+- Next: provision/freeze the benchmark context and create its independent
+  reference when work resumes. Lockfile/config freeze, expected graph and
+  comparison remain unstarted. Agents/native diagnosis remain halted.
+  This documentation set is saved in one local commit; no push or PR.

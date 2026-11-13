@@ -58,7 +58,9 @@ resolved by source/PRIMARY evidence.
 
 ### Source-grounded evidence and authority
 
-The first bounded pilot is the pinned serde facade crate-root reexport scope:
+The active Phase 1 pilot is now the entire selected itoa library under
+[production SOP §1.1](../SOP-phase-20261111-hld-current-e2e-test.md#11-phase-1--one-small-repeatedly-tested-hld-current-benchmark).
+The earlier bounded pilot was the pinned serde facade crate-root reexport scope:
 commit `aa7913ad0211fef960df68e7812a6211145a888c`, package `serde` 1.0.229,
 `serde/src/lib.rs` plus the corresponding `serde_core` crate-root declarations
 and their manifests. Record the exact feature/target context; the package's
@@ -102,7 +104,8 @@ a Rust RED/GREEN cycle.
 
 ## Implementation Plan
 
-1. Review this contract and the one-repository serde source-scope draft.
+1. Review this contract and create the pinned itoa Phase 1 source-derived reference
+   under SOP §1.1. Keep the earlier serde source-scope draft as historical evidence.
 2. Implement the validator only after approval, using STUB → RED → GREEN →
    REFACTOR with journal evidence for every phase.
 3. Run Pass A, freeze its artifact, then Pass B only if a matching production

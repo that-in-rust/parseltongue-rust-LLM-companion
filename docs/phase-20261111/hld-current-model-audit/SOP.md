@@ -13,14 +13,39 @@ version and index coverage, zcode version, requested model and actual reported
 model identity (or `null`), prompt digest, seeds and output hashes. Never pool
 the five repository denominators. Keep the production export's content SHA-256
 separate from `run_generation_digest_value`, compilation identity and source-
-pin compatibility. Follow the corpus pin manifest; keep pinned sources
+pin compatibility. Follow the Phase 1 or Phase 2 pin manifest as applicable; keep pinned sources
 read-only.
 
-The first bounded source scope is the serde 1.0.229 crate-root facade at
+## Phase 1 benchmark selection — 2026-11-13
+
+The active first benchmark is now **itoa 1.0.18**, commit
+`af77385d0daf4d0e949e81f2588be2e44f69f086`, as pinned in
+[phase-one-benchmark-pin.json](../phase-one-benchmark-pin.json).
+Follow [production SOP §1.1](../SOP-phase-20261111-hld-current-e2e-test.md#11-phase-1--one-small-repeatedly-tested-hld-current-benchmark):
+both complete library source files (488 lines), lib target, empty features,
+test cfg OFF, 64-bit Linux target, all active declarative expansions and private
+evidence chains. Keep canonical external `core` targets, without treating the
+whole sysroot as benchmark-local source. Tests/benches/examples/fuzz and the
+optional `no-panic` proc macro are excluded by target/configuration, not by
+observed mapper failures.
+
+Build source-only Pass A before the production HLD exporter is ready; the absence
+of that exporter blocks Pass B, not source reading or reference drafting.
+Do not reuse the serde draft as itoa expectations. A model may assist, but full
+scope/evidence/identity verification and the frozen reference are required for
+Phase 1 acceptance whether or not an optional model reviewer runs. Preserve raw
+model output separately. Compare all expected/actual semantic rows, not just an
+S8 sample; unresolved reference claims cannot become an accepted empty graph.
+This selection does not authorize a new zcode/agent run by itself.
+
+### Historical serde pilot
+
+The earlier bounded source scope was the serde 1.0.229 crate-root facade at
 commit `aa7913ad0211fef960df68e7812a6211145a888c`: `serde/src/lib.rs` and the
 corresponding `serde_core` crate-root declarations/manifests. The source
 checkout is verified at that commit and clean. This limited scope is not a
-complete serde HLD expectation.
+complete serde HLD expectation. Retain its draft and provenance as historical
+evidence. Phase 2 still uses the original five corpus repositories.
 
 ## Pass A — independent source derivation
 

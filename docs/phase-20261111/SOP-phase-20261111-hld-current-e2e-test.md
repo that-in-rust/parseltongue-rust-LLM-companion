@@ -4,7 +4,9 @@ Name: hld-current-test-procedure. Status: planned executable procedure, not a re
 Inputs: PRD-phase-20261111-compiling-hld.md and SPEC-phase-20261111-executable-requirements.md.
 SPEC owns requirement/test names and scoring; PRD owns scope; this SOP applies those contracts.
 Full S1–S10 runs apply at M8/releases. Intermediate milestone subsets are listed in §3.
-Every applicable corpus gate runs on all five repos, never a tune/held-out split.
+Phase 1 uses the single small benchmark in §1.1 for continuous development testing.
+Phase 2 retains every applicable corpus gate on all five repos, never a tune/held-out split.
+Phase 1 PASS is not an all-five milestone or release PASS.
 
 ## 0. Witnesses and boundaries
 
@@ -25,7 +27,8 @@ Every applicable corpus gate runs on all five repos, never a tune/held-out split
 
 ## 1. Preconditions
 
-P1: pin clean corpus commits: rust-analyzer, ripgrep, tokio, serde, cargo-modules (SPEC §8).
+P1: Phase 1 pins itoa using §1.1. Phase 2 pins clean corpus commits:
+rust-analyzer, ripgrep, tokio, serde, cargo-modules (SPEC §8), running serde first.
 Record full hashes, lockfile digest, source snapshot and all tool/config versions.
 P2: qualify selected workspace lib+bin targets once with offline cargo check outside production.
 Do not infer that unrelated fixtures or inactive modules parse.
@@ -42,6 +45,113 @@ Placeholders: $REPO absolute checkout, $CMP indexed project, $OUT persistent out
 hld-current-test-runs/<run-id>/<repo-name>. Create it before commands.
 Owned command/flag names below are planned contracts, not claims that implementations already exist.
 External tool flags/property names keep their upstream spelling.
+
+### 1.1 Phase 1 — one small, repeatedly tested HLD-current benchmark
+
+This 2026-11-13 revision changes the development order, not the final correctness
+contract. **Use only [dtolnay/itoa 1.0.18](https://github.com/dtolnay/itoa/tree/af77385d0daf4d0e949e81f2588be2e44f69f086)
+for Phase 1.** Its immutable source/configuration policy is
+[phase-one-benchmark-pin.json](phase-one-benchmark-pin.json). Keep the five-repository
+[corpus manifest](corpus-source-pin-manifest.json) unchanged for Phase 2.
+
+Measured at commit `af77385d0daf4d0e949e81f2588be2e44f69f086`:
+- Entire library source: `src/lib.rs` (466 lines) and `src/u128_ext.rs` (22 lines):
+  **488 lines / 17,599 bytes**, including comments and blank lines.
+- One Rust 2021 library target. The selected empty feature set has no enabled
+  third-party normal dependencies, no build script and no enabled proc macro.
+  Optional `no-panic` is OFF; tests, benches, examples, fuzz and dev-dependencies
+  are outside the semantic target. Cargo lock resolution may still need their
+  manifests/packages; do not claim that offline provisioning is already complete.
+- Small enough to read in full, but nontrivial: public `Buffer` methods, the
+  `Integer` trait, sealed/private helpers, declarative macro-generated impls,
+  primitive types, cfg-dependent pointer-sized impls and external `core` targets.
+  Macros, generics and unsafe syntax are **not** excluded to make the graph easier.
+
+**Fixed scope and preflight**
+
+1. Read both library files in full, including private bodies. Use the lib target,
+   empty enabled features, `cfg(test)=false`, and x86_64-unknown-linux-gnu for both
+   host and target. Enumerate all active declarative expansions, including the
+   64-bit pointer-width branches; account for inactive cfg branches explicitly.
+   This is the complete selected library, not a handpicked source excerpt.
+2. Before an accepted run, freeze rustc/Cargo versions, sysroot source identity,
+   full per-unit cfg/features/edition/role, source digests and Cargo lock digest.
+   There is no tracked upstream lockfile: provision and retain one once in a
+   qualification copy outside production, then use it unchanged with
+   `cargo check --offline --locked --lib --target x86_64-unknown-linux-gnu`.
+   A missing lock/cache, unresolved per-unit context or mismatched identity is
+   BLOCKED. Do not alter the upstream manifest or enable `no-panic` to provision it.
+3. Keep `core`/primitive dependencies as canonical external endpoints. External
+   definition evidence and sysroot identity are required, but the expected HLD
+   does not recursively enumerate all sysroot internals as benchmark-local nodes.
+   This scope does not authorize stubbing production resolution or bypassing its
+   process/dependency rules. A small source repo does not itself fix the native
+   resolver timeout.
+
+**Build the expected table first — source-only Pass A**
+
+4. An LLM may propose the expected nodes, relations and private evidence chains
+   from the pinned source/configuration; codebase-memory is navigation only.
+   Start this before waiting for the production M8 exporter. Do not feed mapper
+   output into reference construction. Apply REQ-RUST-019.1/009.2 and §2.4 of SPEC:
+   effective visibility, canonical external endpoints, reexports where present,
+   private-chain collapse, deduplication and genuine self-edge/cycle rules.
+5. Store `phase-one-expected-nodes.json`, `phase-one-expected-edges.json`,
+   `phase-one-expected-rollups.json` and `phase-one-evidence-inventory.json` in
+   the run's `itoa/` directory. Reuse the existing full compilation/occurrence
+   identity contract; these filenames are not new identity or production schemas.
+   Every expected row needs exact source ranges/digests and supporting evidence;
+   macro-produced rows need invocation ancestry and expansion/token provenance.
+   Also retain intermediate path, macro item/body-site and signature expectations
+   in the inventory so earlier stages can be tested before HLD exists.
+6. Check every declared source scope, generated item/site and claim against source
+   and deterministic pinned-oracle evidence where applicable. Account for the
+   entire selected universe, including non-selected items; an output-only sample
+   cannot establish completeness. Unsupported identity/expansion mappings or
+   unresolved claims remain BLOCKED/DRAFT, not an empty accepted table. Preserve
+   raw model output separately from reviewed corrections and record model/prompt
+   provenance. The model is not acceptance authority.
+7. Canonically serialize, hash and freeze the reviewed reference **before** Pass B.
+   Report expected-set counts and scope/exclusions. Do not rewrite expected rows
+   to match a failing mapper. A source/config/semantic-reference correction needs
+   a separately justified reference revision and a new freeze; a mapper-only
+   change reuses the same frozen reference.
+
+**Constant regression loop — frozen Pass B**
+
+8. After each production change affecting mapping, identities or HLD, run the
+   affected focused tests and the available M0–M8 subset below on this same pin.
+   After each integration checkpoint, rerun all currently implemented applicable
+   stages on itoa. Retain one new report and executable digest per run. This
+   defines the required loop; no scheduler/CI job or runner support is claimed
+   to be implemented by this documentation change.
+9. Compare intermediate sets and, once available, the complete HLD node/edge/
+   evidence sets and roll-ups against the frozen reference. For this small golden
+   benchmark require exact semantic equality: no unexplained extra/missing/wrong
+   row, no invented extracted edge, no unaccounted scope, and exact deduplicated
+   file/folder counters. Differences require source-grounded adjudication, not
+   a relaxed denominator. Retain the existing PRIMARY and S8/S9 authority.
+10. Report each SOP step as PASS / FAIL / BLOCKED / NOT STARTED with counts,
+    discrepancies, hashes, time and whole-process-tree RSS. Declare expected time
+    E before each command and kill at 2E; memory remains measured-only under R9.
+    Unsupported future stages stay NOT STARTED; missing prerequisite evidence
+    is BLOCKED. No fake empty rows, placeholder keys or zero-denominator PASS.
+
+**Phase 1 exit:** a reviewed, fully accounted frozen expected graph plus a
+same-context production HLD export with exact agreement, valid evidence/roll-ups,
+and deterministic semantic output at the supported 1/4/16 worker counts.
+Run all applicable S1–S10 gates; constructs absent from itoa are explicitly
+unexercised, never evidence of general proc-macro/async/reexport coverage.
+Do not require unrelated Phase 2 shapes to label this bounded benchmark passed,
+and do not call that M3–M8 all-five completion. The final 500 MB release target
+remains deferred per R9, not silently satisfied by this small repository.
+
+**Phase 2:** only after Phase 1, expand qualification in order:
+serde → rust-analyzer → ripgrep → tokio → cargo-modules. Existing thresholds,
+fixtures and all-five milestone/release rules remain mandatory. Preserve prior
+serde drafts as historical partial evidence; they are not the Phase 1 reference.
+At adoption, the itoa source pin is verified but its lock/config freeze, expected
+graph, build qualification and production comparisons are all NOT STARTED.
 
 ## 2. Steps S1–S10
 
@@ -331,7 +441,8 @@ Final 008 coverage is mandatory here at M8 even when M7 was skipped.
 
 ## 3. Milestone subsets and verdict
 
-SPEC M0–M8 is authoritative. All applicable corpus comparisons use all five pinned repos.
+SPEC M0–M8 is authoritative. Phase 1 repeatedly applies the available subset to itoa
+under §1.1; Phase 2 applies corpus comparisons to all five originally pinned repos.
 Unavailable future stages are NOT silently marked passed.
 
 - M0: S3 skeleton/build/dependency/identity fixtures; S4 harness build/provenance smoke fixtures only.
@@ -351,13 +462,16 @@ FAIL: contract failure, sampled miss, forbidden production access/spawn, nondete
 coverage/memory/agreement gate; PT-EXTRA is rate-gated, not automatically zero-tolerance.
 BLOCKED: missing precondition, incomplete coverage pagination or unavailable oracle evidence; never PASS.
 A codebase-memory omission cannot turn an oracle-proven error into KNOWN-GAP.
-Do not patch production during a run: fix, then start a new applicable run on all five.
+Do not patch production during a run: fix, then start a new applicable run.
+Use itoa in Phase 1; all five in Phase 2. Never reuse an old executable's PASS.
 
 ## 4. Persistent report
 
 Write hld-current-test-runs/<run-id>/hld-current-test-report.md, append-only per run.
 Artifact ordinal/worker/attempt suffixes are data values, not extra semantic name words.
 Record:
+- Phase (1 or 2); Phase 1 reference revision/digest, complete expected/actual counts,
+  all graph differences and unexercised constructs. Never aggregate itoa with Phase 2.
 - Corpus/source/lock/tool/config hashes, PRIMARY/SECONDARY manifests, harness source/executable hashes.
 - Generation keys and workspace/shared-library manifests, completed stages and exact applicable tests.
 - Index generation/counts, every coverage page and caveats; production exec/read audit and stderr.

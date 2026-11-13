@@ -2,6 +2,15 @@
 
 Rewritten in place after every run report. History lives in the TDD journal and run reports.
 
+Development-order revision (2026-11-13): Phase 1 is pinned itoa 1.0.18
+(`af77385d0daf4d0e949e81f2588be2e44f69f086`), 488 library-source lines in two
+files; see SOP §1.1 and `phase-one-benchmark-pin.json`. Source inventory/pin
+verified only. Reference graph, qualification and S1–S10 benchmark runs:
+NOT STARTED; lockfile NOT CAPTURED; configuration/reference NOT FROZEN.
+All implementation agents and the native diagnostic remain halted by user order.
+The following native/milestone entries are historical evidence, not itoa results.
+Phase 2 preserves all-five acceptance, starting with serde.
+
 Last updated: 2026-11-13 · Latest full native runtime measurement remains the isolated M2 retry from integrated HEAD `825d760e8685d8d4d95ab8acd2267edf3687847b`: the supervisor enforced 2,400s, total command elapsed 2,410.252s including bounded descendant cleanup, exit 124, peak whole-tree RSS 9,234,448 KiB sampled every 0.2s; no assertion/result line. Live stderr reached completed copy/normalization and resolution rounds; its last marker was round 3 import-bindings started, with exact active query unknown. REQ-RUST-028.1 now adds operational refresh traces and a bounded generated-import fixture; its focused checks passed but do not change the native S3 status. The current source includes that instrumentation and remains unqualified. No all-five PASS, production qualification, or frozen release exists; the three-attempt stop rule bars another full native retry.
 
 ```text

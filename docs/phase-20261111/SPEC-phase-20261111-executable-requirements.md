@@ -534,6 +534,24 @@ never linked into production. S1/S2 are external-tool preconditions/coverage che
 
 ## 5. Implementation plan — authoritative M0–M8
 
+Development order (2026-11-13): Phase 1 is the single pinned itoa library in
+[SOP §1.1](SOP-phase-20261111-hld-current-e2e-test.md#11-phase-1--one-small-repeatedly-tested-hld-current-benchmark)
+and [phase-one-benchmark-pin.json](phase-one-benchmark-pin.json).
+Construct and independently verify its expected HLD from source before production
+comparison, then repeatedly test each available stage against that frozen reference.
+The scoped expected node/edge sets, evidence and roll-ups require exact agreement;
+REQ-RUST-009.2/012.1/019.1/020.1 still apply. A future stage is NOT STARTED,
+not a passing empty table. This revision specifies a benchmark procedure, not
+implemented runner support, a completed expected graph, or a passing run.
+
+Phase 2 retains the original five-repository corpus, scored serde first, then
+rust-analyzer, ripgrep, tokio and cargo-modules. M0–M8 completion and release gates
+remain all-five; a Phase 1 benchmark PASS is separately named and does not satisfy
+them. Optional model review remains non-authoritative under REQ-RUST-025.0.
+The Phase 1 reference must account for the entire selected library and active
+macro expansions, but not recursively enumerate external sysroot internals.
+No proc-macro-shape result may be inferred from itoa with `no-panic` disabled.
+
 - M0: workspace skeleton, L1 IDs/errors, fake store, dependency gates, pinned oracle harness/build manifest.
   RED: 010, identity fixtures under 012; no final HLD export expected yet.
 - M1: graph/ingest/parser, Turso runtime, generation markers, scheduler.
@@ -810,6 +828,9 @@ retain/move its contract cases and syntax projection rather than discarding
 their specification or extraction logic.
 
 ### §5 milestone-plan appended revision
+
+The 2026-11-13 Phase 1 order above supersedes the serde-first development order
+in the following historical plan; serde remains first for Phase 2 qualification.
 
 Land bundled DuckDB skeleton and offline/budget/copy contracts; delete obsolete
 in-memory/profiling paths, preserving resolver contracts. Then SQL resolution
