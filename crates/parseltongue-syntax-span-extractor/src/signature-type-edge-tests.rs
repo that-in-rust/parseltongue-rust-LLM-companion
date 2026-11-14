@@ -301,3 +301,81 @@ fn test_impl_self_type_edge() {
         "Self in an impl is the impl's self type; Self in a trait declaration names no item"
     );
 }
+
+/// REQ-RUST-018.2
+#[test]
+fn test_builtin_target_one_node() {
+    let source = "struct Buffer; fn a(x: u8) -> u8 { loop {} } fn b(y: &str, z: [u8; 4]) {}";
+    let (store, input) = make_call_fixture_graph(source);
+    for name in ["u8", "str"] {
+        for (start, _) in source.match_indices(name) {
+            store.rows.lock().unwrap().push(make_call_fixture_row(
+                "path-resolution-site-records",
+                json!({
+                    "site_compilation_scope_record":{"unit_semantic_identity_record":
+                        encode_compilation_unit_value(&make_call_fixture_unit())},
+                    "site_source_absolute_path":"/fixture/src/lib.rs",
+                    "site_source_range_start":start, "site_source_range_end":start + name.len(),
+                    "site_expansion_provenance_chain":[], "path_resolution_state_kind":"resolved",
+                    "path_target_symbol_rows":[{"target_symbol_kind_value":"Builtin",
+                        "target_builtin_name_value":name, "target_namespace_kind_values":["type"]}]
+                }),
+            ));
+        }
+    }
+    let target = |name: &str| -> HldTargetIdentityValue {
+        NameSymbolTargetKey::Builtin(name.to_owned()).into()
+    };
+    let edge = |owner: &str, name: &str, nth: usize| {
+        let start = source.match_indices(name).nth(nth).unwrap().0;
+        (
+            owner.to_owned(),
+            HldEdgeResolutionValue::Extracted {
+                target: target(name),
+            },
+            format!("{start}:{name}"),
+        )
+    };
+    let mut edges = read_type_fixture_edges(source, &store, &input);
+    edges.sort_by_key(|(_, _, site)| site.split(':').next().unwrap().parse::<usize>().unwrap());
+    assert_eq!(
+        edges,
+        vec![
+            edge("a", "u8", 0),
+            edge("a", "u8", 1),
+            edge("b", "str", 1),
+            edge("b", "u8", 2),
+        ],
+        "each builtin type path is one edge to that builtin; the array length is not a type"
+    );
+
+    let edges = resolve_signature_type_edges(
+        &store,
+        &make_call_fixture_scope(),
+        &input,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    let nodes = collect_builtin_target_nodes(&edges);
+    assert_eq!(
+        nodes
+            .iter()
+            .map(|node| {
+                (
+                    node.node_target_reference.clone(),
+                    node.node_input_category,
+                    node.node_qualified_path_text.as_str(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        vec![
+            (target("str"), HldNodeInputCategory::Builtin, "str"),
+            (target("u8"), HldNodeInputCategory::Builtin, "u8"),
+        ],
+        "one node per builtin name, however many edges reach it"
+    );
+    let mut graph = input.clone();
+    graph.input_node_records.extend(nodes);
+    graph.input_edge_records.extend(edges);
+    assert_eq!(validate_full_graph_input(&graph).map(|_| ()), Ok(()));
+}

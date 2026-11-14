@@ -141,6 +141,35 @@ pub fn resolve_signature_type_edges(
     Ok(edges)
 }
 
+/// One `Builtin` node per builtin name the edges target, in name order, so
+/// that every stored edge ends at a node.
+pub fn collect_builtin_target_nodes(edges: &[HldEdgeInputRecord]) -> Vec<HldNodeInputRecord> {
+    edges
+        .iter()
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted {
+                target: target @ HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)),
+            } => Some((name, (edge.run_generation_digest_value, target))),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>()
+        .into_iter()
+        .map(|(name, (generation, target))| HldNodeInputRecord {
+            run_generation_digest_value: generation,
+            node_target_reference: target.clone(),
+            node_input_category: HldNodeInputCategory::Builtin,
+            node_item_kind_value: None,
+            node_owner_kind_value: None,
+            node_function_body_ancestry_flag: false,
+            node_effective_visibility_kind: None,
+            node_reachable_outside_crate_flag: None,
+            node_source_relative_path: None,
+            node_qualified_path_text: name.clone(),
+            node_signature_text: None,
+        })
+        .collect()
+}
+
 /// What every signature row of one graph is joined against.
 struct SignatureEdgeGraphScope<'a> {
     context: &'a ImplHeaderSourceContext<'a>,
@@ -260,7 +289,7 @@ fn build_type_path_edge(
 
 /// The graph node a type path names. `Self` in an impl member is the impl
 /// header's resolved self type. Any other path has exactly one stored
-/// resolution with exactly one target. The target must be an item node.
+/// resolution with exactly one target. The target is an item node or a builtin.
 fn resolve_type_path_target(
     path: &Value,
     evidence: &Value,
@@ -285,11 +314,17 @@ fn resolve_type_path_target(
         else {
             return Ok(None);
         };
-        let Some(identity) = graph.context.read_single_target_identity(symbol)? else {
+        if symbol["target_symbol_kind_value"] == "Builtin" {
+            json!({"target_identity_variant_kind":"builtin",
+                "target_builtin_name_value":symbol["target_builtin_name_value"]})
+        } else if let Some(identity) = graph.context.read_single_target_identity(symbol)? {
+            identity
+        } else {
             return Ok(None);
-        };
-        identity
+        }
     };
-    let target = HldTargetIdentityValue::from(decode_symbol_target_value(&identity)?);
-    Ok(graph.endpoints.contains(&target).then_some(target))
+    let target = decode_symbol_target_value(&identity)?;
+    let builtin = matches!(target, NameSymbolTargetKey::Builtin(_));
+    let target = HldTargetIdentityValue::from(target);
+    Ok((builtin || graph.endpoints.contains(&target)).then_some(target))
 }
