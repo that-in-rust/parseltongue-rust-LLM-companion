@@ -2522,7 +2522,7 @@ def finalize_artifact_digest_best_effort(
 
 
 def read_canonical_sop_path():
-    return PROJECT_ROOT / "docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md"
+    return PROJECT_ROOT / "docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md"
 
 
 def prepare_execution_context(

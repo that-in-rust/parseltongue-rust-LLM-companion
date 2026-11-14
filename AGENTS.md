@@ -101,7 +101,7 @@ cargo build --release --workspace --all-targets --all-features
 `docs/phase-20261113/` is the only current documentation.
 
 ```text
-SOP      SOP-phase-20261113-full-item-dependency-graph.md    steps S1–S4 that decide PASS
+SOP      SOP-itoa-full-item-graph-acceptance.md    steps S1–S4 that decide PASS
 PRD      PRD-phase-20261113-dependency-graph-hld.md          what is built and what is out of scope
 ARCH     ARCH-phase-20261113-pipeline-graph-tables.md        pipeline, tables, graph rules
 TARGET   itoa-target-dataset/                                the expected itoa graph and its builder

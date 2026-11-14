@@ -118,6 +118,6 @@ resolve each before claiming completeness for its affected source facts.
 - [PRD: product intent and decisions](PRD-phase-20261113-dependency-graph-hld.md)
 - [SPEC: executable contracts and active open points](SPEC-phase-20261113-executable-requirements.md)
 - [Architecture: pipeline and table boundaries](ARCH-phase-20261113-pipeline-graph-tables.md)
-- [SOP: source-backed verification](SOP-phase-20261113-full-item-dependency-graph.md)
+- [SOP: source-backed verification](SOP-itoa-full-item-graph-acceptance.md)
 
 This is a scope/decision record, not implementation or test evidence.

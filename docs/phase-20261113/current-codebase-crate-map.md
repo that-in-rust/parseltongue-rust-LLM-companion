@@ -2,7 +2,7 @@
 
 What the code is today, measured at commit `745881721` on 2026-11-14. This file describes
 the tree as it stands; it is not a requirement, a plan or a run result. The
-[SOP](SOP-phase-20261113-full-item-dependency-graph.md) cites it for command names and for
+[SOP](SOP-itoa-full-item-graph-acceptance.md) cites it for command names and for
 which stage does what. Re-measure after a structural change instead of editing by hand.
 
 ## How it was measured

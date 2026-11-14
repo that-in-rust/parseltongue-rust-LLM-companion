@@ -138,7 +138,7 @@ def create_preflight_fixture(root_path: Path) -> dict[str, object]:
         "docs/phase-20261111/corpus-source-pin-manifest.json": json.dumps(corpus_records),
         "docs/phase-20261111/parser-source-pin-manifest.json": json.dumps(parser_manifest),
         "docs/phase-20261111/oracle-source-build-manifest.json": json.dumps(oracle_manifest),
-        "docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md": "# SOP fixture\n",
+        "docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md": "# SOP fixture\n",
         "docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md": "# SPEC fixture\n",
         "docs/phase-20261111/parser.patch": patch_bytes,
         "docs/phase-20261111/parser.bundle": b"fixture parser bundle\n",
@@ -206,7 +206,7 @@ def create_identity_bound_s3_fixture(root_path: Path, fixture_failed: bool = Fal
         parser_bundle: b"synthetic parser bundle\n",
         r1_patch: b"synthetic frozen R1 patch\n",
         corpus_manifest: "[]\n",
-        "docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md": "# synthetic SOP\n",
+        "docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md": "# synthetic SOP\n",
         "docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md": "# synthetic SPEC\n",
         config_path: config_text,
     }
@@ -261,7 +261,7 @@ def create_identity_bound_s3_fixture(root_path: Path, fixture_failed: bool = Fal
             project_root / "Cargo.toml", project_root / production_manifest,
             project_root / production_source,
             project_root / parser_manifest, project_root / parser_bundle, project_root / r1_patch,
-            project_root / corpus_manifest, project_root / "docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md",
+            project_root / corpus_manifest, project_root / "docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md",
             project_root / "docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md",
             *present_configs,
         ]
@@ -485,7 +485,7 @@ class SopQualificationRunnerContractTests(unittest.TestCase):
         with patch.object(runner, "PROJECT_ROOT", Path("/fixture/project")):
             self.assertEqual(
                 runner.read_canonical_sop_path(),
-                Path("/fixture/project/docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md"),
+                Path("/fixture/project/docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md"),
             )
 
     def setUp(self):

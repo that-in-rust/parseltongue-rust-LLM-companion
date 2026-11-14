@@ -26,7 +26,7 @@ source files
 ```
 
 Scope: [PRD](PRD-phase-20261113-dependency-graph-hld.md). Proof:
-[SOP](SOP-phase-20261113-full-item-dependency-graph.md). Crates and files:
+[SOP](SOP-itoa-full-item-graph-acceptance.md). Crates and files:
 [crate map](current-codebase-crate-map.md).
 
 ## 1 — The pipeline as built

@@ -2120,7 +2120,7 @@ incomplete/frozen-boundary contracts; component evidence does not qualify the co
 ## 7. Implementation plan
 
 Development order (2026-11-13): Phase 1 is the single pinned itoa library in
-[SOP §1.1](SOP-phase-20261113-full-item-dependency-graph.md#11-phase-1--pinned-source-vertical-hld-acceptance)
+[SOP §1.1](SOP-itoa-full-item-graph-acceptance.md#11-phase-1--pinned-source-vertical-hld-acceptance)
 and [phase-one-benchmark-pin.json](../phase-20261111/phase-one-benchmark-pin.json).
 Construct and independently verify its expected full-item-dependency-graph and detailed evidence
 from source before production comparison, then repeatedly test each available stage against

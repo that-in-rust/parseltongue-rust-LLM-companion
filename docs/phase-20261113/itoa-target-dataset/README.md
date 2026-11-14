@@ -37,7 +37,7 @@ zip -FS -r /home/ubuntu/hld-current-test-artifacts/itoa-reference-review-2026111
   docs/phase-20261113/PRD-phase-20261113-dependency-graph-hld.md \
   docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md \
   docs/phase-20261113/ARCH-phase-20261113-pipeline-graph-tables.md \
-  docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md \
+  docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md \
   docs/phase-20261111/itoa-hld-current-benchmark/itoa-hld-backward-design.md \
   docs/phase-20261111/TDD-phase-20261111-progress-checkpoints.md \
   docs/phase-20261111/phase-one-benchmark-pin.json \

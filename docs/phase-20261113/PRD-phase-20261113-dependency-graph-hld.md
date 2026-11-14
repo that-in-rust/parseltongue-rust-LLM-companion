@@ -24,7 +24,7 @@ proven   <Buffer as Default>::default --calls--> Buffer::new, from source throug
 next     Buffer::format --calls--> private::Sealed::write
 ```
 
-Proof procedure: [SOP](SOP-phase-20261113-full-item-dependency-graph.md). Design:
+Proof procedure: [SOP](SOP-itoa-full-item-graph-acceptance.md). Design:
 [ARCH](ARCH-phase-20261113-pipeline-graph-tables.md). Expected graph:
 [itoa-target-dataset](itoa-target-dataset/). History: [log](phase1-log-p1.md).
 
