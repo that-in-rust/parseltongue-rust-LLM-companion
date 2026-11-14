@@ -18,7 +18,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "file_public_area",
       "label": "area:src/lib.rs",
       "owner": "crate_root",
@@ -46,7 +45,6 @@
         "crate_root"
       ],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "module",
       "label": "itoa",
       "owner": "crate_root",
@@ -72,7 +70,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "module",
       "label": "u128_ext",
       "owner": "area:src/lib.rs",
@@ -98,7 +95,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "use_statement",
       "label": "use core::hint",
       "owner": "area:src/lib.rs",
@@ -124,7 +120,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "use_statement",
       "label": "use core::mem::{self, MaybeUninit}",
       "owner": "area:src/lib.rs",
@@ -150,7 +145,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "use_statement",
       "label": "use core::str",
       "owner": "area:src/lib.rs",
@@ -176,7 +170,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "struct",
       "label": "Buffer",
       "owner": "area:src/lib.rs",
@@ -202,7 +195,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<Buffer as Default>::default",
       "owner": "impl@76",
@@ -228,7 +220,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<Buffer as Clone>::clone",
       "owner": "impl@86",
@@ -254,7 +245,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "Buffer::new",
       "owner": "impl@93",
@@ -280,7 +270,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "Buffer::format",
       "owner": "impl@93",
@@ -306,7 +295,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "trait",
       "label": "Integer",
       "owner": "area:src/lib.rs",
@@ -332,7 +320,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "Integer::MAX_STR_LEN",
       "owner": "Integer",
@@ -358,7 +345,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "module",
       "label": "private",
       "owner": "area:src/lib.rs",
@@ -384,7 +370,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "trait",
       "label": "private::Sealed",
       "owner": "private",
@@ -410,7 +395,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "private::Sealed::Buffer",
       "owner": "private::Sealed",
@@ -436,7 +420,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "private::Sealed::write",
       "owner": "private::Sealed",
@@ -469,7 +452,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i128,u128)",
       "owner": "area:src/lib.rs",
@@ -502,7 +484,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i16,u16)",
       "owner": "area:src/lib.rs",
@@ -535,7 +516,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i32,u32)",
       "owner": "area:src/lib.rs",
@@ -568,7 +548,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i64,u64)",
       "owner": "area:src/lib.rs",
@@ -601,7 +580,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i8,u8)",
       "owner": "area:src/lib.rs",
@@ -633,7 +611,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<u128 as Integer>::MAX_STR_LEN",
       "owner": "impl@143",
@@ -665,7 +642,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<u16 as Integer>::MAX_STR_LEN",
       "owner": "impl@143",
@@ -697,7 +673,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<u32 as Integer>::MAX_STR_LEN",
       "owner": "impl@143",
@@ -729,7 +704,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<u64 as Integer>::MAX_STR_LEN",
       "owner": "impl@143",
@@ -761,7 +735,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<u8 as Integer>::MAX_STR_LEN",
       "owner": "impl@143",
@@ -794,7 +767,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<u128 as private::Sealed>::Buffer",
       "owner": "impl@147",
@@ -827,7 +799,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<u16 as private::Sealed>::Buffer",
       "owner": "impl@147",
@@ -860,7 +831,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<u32 as private::Sealed>::Buffer",
       "owner": "impl@147",
@@ -893,7 +863,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<u64 as private::Sealed>::Buffer",
       "owner": "impl@147",
@@ -926,7 +895,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<u8 as private::Sealed>::Buffer",
       "owner": "impl@147",
@@ -959,7 +927,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<u128 as private::Sealed>::write",
       "owner": "impl@147",
@@ -992,7 +959,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<u16 as private::Sealed>::write",
       "owner": "impl@147",
@@ -1025,7 +991,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<u32 as private::Sealed>::write",
       "owner": "impl@147",
@@ -1058,7 +1023,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<u64 as private::Sealed>::write",
       "owner": "impl@147",
@@ -1091,7 +1055,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<u8 as private::Sealed>::write",
       "owner": "impl@147",
@@ -1123,7 +1086,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<i128 as Integer>::MAX_STR_LEN",
       "owner": "impl@159",
@@ -1155,7 +1117,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<i16 as Integer>::MAX_STR_LEN",
       "owner": "impl@159",
@@ -1187,7 +1148,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<i32 as Integer>::MAX_STR_LEN",
       "owner": "impl@159",
@@ -1219,7 +1179,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<i64 as Integer>::MAX_STR_LEN",
       "owner": "impl@159",
@@ -1251,7 +1210,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<i8 as Integer>::MAX_STR_LEN",
       "owner": "impl@159",
@@ -1284,7 +1242,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<i128 as private::Sealed>::Buffer",
       "owner": "impl@163",
@@ -1317,7 +1274,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<i16 as private::Sealed>::Buffer",
       "owner": "impl@163",
@@ -1350,7 +1306,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<i32 as private::Sealed>::Buffer",
       "owner": "impl@163",
@@ -1383,7 +1338,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<i64 as private::Sealed>::Buffer",
       "owner": "impl@163",
@@ -1416,7 +1370,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<i8 as private::Sealed>::Buffer",
       "owner": "impl@163",
@@ -1449,7 +1402,6 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<i128 as private::Sealed>::write",
       "owner": "impl@163",
@@ -1482,7 +1434,6 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<i16 as private::Sealed>::write",
       "owner": "impl@163",
@@ -1515,7 +1466,6 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<i32 as private::Sealed>::write",
       "owner": "impl@163",
@@ -1548,7 +1498,6 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<i64 as private::Sealed>::write",
       "owner": "impl@163",
@@ -1581,7 +1530,6 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<i8 as private::Sealed>::write",
       "owner": "impl@163",
@@ -1613,7 +1561,6 @@
         "invocation_line": 215,
         "macro": "impl_Integer_size"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<isize as Integer>::MAX_STR_LEN",
       "owner": "impl@194",
@@ -1645,7 +1592,6 @@
         "invocation_line": 216,
         "macro": "impl_Integer_size"
       },
-      "interface_selected": true,
       "item_kind": "associated_constant",
       "label": "<usize as Integer>::MAX_STR_LEN",
       "owner": "impl@194",
@@ -1678,7 +1624,6 @@
         "invocation_line": 215,
         "macro": "impl_Integer_size"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<isize as private::Sealed>::Buffer",
       "owner": "impl@199",
@@ -1711,7 +1656,6 @@
         "invocation_line": 216,
         "macro": "impl_Integer_size"
       },
-      "interface_selected": true,
       "item_kind": "associated_type",
       "label": "<usize as private::Sealed>::Buffer",
       "owner": "impl@199",
@@ -1744,7 +1688,6 @@
         "invocation_line": 215,
         "macro": "impl_Integer_size"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<isize as private::Sealed>::write",
       "owner": "impl@199",
@@ -1777,7 +1720,6 @@
         "invocation_line": 216,
         "macro": "impl_Integer_size"
       },
-      "interface_selected": true,
       "item_kind": "associated_function",
       "label": "<usize as private::Sealed>::write",
       "owner": "impl@199",
@@ -1803,7 +1745,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "struct",
       "label": "DecimalPairs",
       "owner": "area:src/lib.rs",
@@ -1829,7 +1770,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "static",
       "label": "DECIMAL_PAIRS",
       "owner": "area:src/lib.rs",
@@ -1855,7 +1795,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "function",
       "label": "divmod100",
       "owner": "area:src/lib.rs",
@@ -1881,7 +1820,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "function",
       "label": "slice_buffer_to_str",
       "owner": "area:src/lib.rs",
@@ -1907,7 +1845,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "trait",
       "label": "Unsigned",
       "owner": "area:src/lib.rs",
@@ -1933,7 +1870,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "associated_function",
       "label": "Unsigned::fmt",
       "owner": "Unsigned",
@@ -1965,7 +1901,6 @@
         "invocation_line": 330,
         "macro": "impl_Unsigned"
       },
-      "interface_selected": false,
       "item_kind": "associated_function",
       "label": "<u16 as Unsigned>::fmt",
       "owner": "impl@261",
@@ -1997,7 +1932,6 @@
         "invocation_line": 331,
         "macro": "impl_Unsigned"
       },
-      "interface_selected": false,
       "item_kind": "associated_function",
       "label": "<u32 as Unsigned>::fmt",
       "owner": "impl@261",
@@ -2029,7 +1963,6 @@
         "invocation_line": 332,
         "macro": "impl_Unsigned"
       },
-      "interface_selected": false,
       "item_kind": "associated_function",
       "label": "<u64 as Unsigned>::fmt",
       "owner": "impl@261",
@@ -2061,7 +1994,6 @@
         "invocation_line": 329,
         "macro": "impl_Unsigned"
       },
-      "interface_selected": false,
       "item_kind": "associated_function",
       "label": "<u8 as Unsigned>::fmt",
       "owner": "impl@261",
@@ -2087,7 +2019,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "associated_function",
       "label": "<u128 as Unsigned>::fmt",
       "owner": "impl@334",
@@ -2113,7 +2044,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "function",
       "label": "enc_16lsd",
       "owner": "area:src/lib.rs",
@@ -2139,7 +2069,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": false,
       "item_kind": "function",
       "label": "div_rem_1e16",
       "owner": "area:src/lib.rs",
@@ -2165,7 +2094,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "file_public_area",
       "label": "area:src/u128_ext.rs",
       "owner": "crate_root",
@@ -2191,7 +2119,6 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
-      "interface_selected": true,
       "item_kind": "function",
       "label": "u128_ext::mulhi",
       "owner": "area:src/u128_ext.rs",
@@ -2221,5 +2148,5 @@
     ],
     "whole_source_coverage_claimed": false
   },
-  "source_pin_path": "/home/ubuntu/repos/parseltongue-integration/docs/phase-20261111/phase-one-benchmark-pin.json"
+  "source_pin_path": "/home/ubuntu/repos/parseltongue-rust-LLM-companion/docs/phase-20261111/phase-one-benchmark-pin.json"
 }

@@ -17,49 +17,21 @@
     "independent_compiler_oracle_verification": "NOT_FROZEN",
     "status": "LLM_PARSED_DRAFT"
   },
-  "collapse_policy": {
-    "OD-9": "OPEN_ALTERNATE_PROPOSAL",
-    "current_decided_relations": [
-      "calls",
-      "derives",
-      "implements",
-      "reads",
-      "reexports",
-      "uses_type"
-    ],
-    "derived_collapsed_rows": 0,
-    "forbidden_at_every_hop": [
-      "contains",
-      "imports"
-    ],
-    "od9_suppression_applied": false
-  },
   "counts": {
-    "blocked_collapsible_candidate_edges": 265,
     "blocked_edges": 339,
     "blocked_nodes": 47,
     "candidate_edges": 368,
     "candidate_nodes": 73,
     "eligible_edges": 29,
     "eligible_nodes": 26,
-    "excluded_rollup_edges": 4,
-    "expected_collapsed_edges": 0,
-    "expected_dependency_edges": 11,
-    "expected_direct_edges": 11,
-    "expected_interface_nodes": 15
+    "impl_block_records": 33,
+    "unresolved_or_inactive_sites": 10
   },
   "open_decisions": [
     "OD-2",
     "OD-7",
-    "OD-8",
-    "OD-9"
+    "OD-8"
   ],
-  "prior_draft_observation": {
-    "candidate_edges": 368,
-    "candidate_nodes": 73,
-    "counts_are_acceptance_constants": false,
-    "eligibility_classification": "NOT_AVAILABLE_IN_PRIOR_DRAFT"
-  },
   "production_comparison_status": "NOT_RUN",
   "relation_kind_counts": {
     "calls": 102,
@@ -71,10 +43,6 @@
     "reexports": 0,
     "uses_type": 98
   },
-  "rollup_exclusion_reason_counts": {
-    "BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED": 4
-  },
-  "rollup_status": "BLOCKED",
   "source_coverage": {
     "known_uncovered_constructs": [
       "operators",
@@ -83,5 +51,10 @@
       "repeated_same_line_sites"
     ],
     "whole_source_coverage_claimed": false
+  },
+  "target_kind_counts": {
+    "builtin": 55,
+    "external": 119,
+    "node": 194
   }
 }
