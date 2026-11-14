@@ -638,12 +638,17 @@ fn validate_graph_input_records(
         let source_record = node_records
             .get(&edge_record.edge_source_reference)
             .ok_or(HldMaterializationValidationError::MissingLocalEndpoint)?;
-        if !matches!(
-            source_record.node_input_category,
-            HldNodeInputCategory::LocalItem
-                | HldNodeInputCategory::FilePublicArea
-                | HldNodeInputCategory::CrateRoot
-        ) {
+        // An impl block is not a node, so `impl Trait for u8` is sourced at the builtin.
+        let builtin_source = source_record.node_input_category == HldNodeInputCategory::Builtin
+            && edge_record.edge_relation_kind_value == HldRelationKindValue::Implements;
+        if !builtin_source
+            && !matches!(
+                source_record.node_input_category,
+                HldNodeInputCategory::LocalItem
+                    | HldNodeInputCategory::FilePublicArea
+                    | HldNodeInputCategory::CrateRoot
+            )
+        {
             return Err(HldMaterializationValidationError::InvalidEdgeRecord);
         }
         let target_reference = match &edge_record.edge_resolution_value {
@@ -714,8 +719,8 @@ fn validate_graph_input_records(
             .evidence_site_occurrence_key
             .read_semantic_occurrence_parts()
             .unit_compilation_identity_key;
-        if read_hld_target_unit(&edge_record.edge_source_reference)?.as_ref()
-            != Some(site_unit_identity)
+        if read_hld_target_unit(&edge_record.edge_source_reference)?
+            .map_or(!builtin_source, |unit| &unit != site_unit_identity)
         {
             return Err(HldMaterializationValidationError::InvalidEvidenceIdentity);
         }

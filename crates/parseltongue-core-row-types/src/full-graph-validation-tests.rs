@@ -194,3 +194,56 @@ fn test_full_foreign_ownership_retained() {
         assert_eq!(validate_full_graph_input(&input), Ok(()));
     }
 }
+
+/// The fixture with one builtin node, and its one edge re-sourced to that
+/// builtin under `relation`.
+fn build_builtin_source_fixture(relation: HldRelationKindValue) -> HldMaterializationInputRecord {
+    let mut input = build_full_graph_fixture();
+    let builtin: HldTargetIdentityValue = NameSymbolTargetKey::Builtin("u8".into()).into();
+    input.input_node_records.push(HldNodeInputRecord {
+        run_generation_digest_value: RunGenerationDigestValue([0; 32]),
+        node_target_reference: builtin.clone(),
+        node_input_category: HldNodeInputCategory::Builtin,
+        node_item_kind_value: None,
+        node_owner_kind_value: None,
+        node_function_body_ancestry_flag: false,
+        node_effective_visibility_kind: None,
+        node_reachable_outside_crate_flag: None,
+        node_source_relative_path: None,
+        node_qualified_path_text: "u8".into(),
+        node_signature_text: None,
+    });
+    let edge = &mut input.input_edge_records[0];
+    edge.edge_source_reference = builtin.clone();
+    edge.edge_relation_kind_value = relation;
+    edge.edge_evidence_row_key.evidence_source_occurrence_key = builtin;
+    edge.edge_evidence_row_key.evidence_relation_kind_value = relation;
+    edge.edge_dispatch_metadata_text = None;
+    input
+}
+
+/// REQ-RUST-047.0
+#[test]
+fn test_builtin_source_implements_only() {
+    let input = build_builtin_source_fixture(HldRelationKindValue::Implements);
+    assert_eq!(validate_full_graph_input(&input), Ok(()));
+    for relation in [
+        HldRelationKindValue::UsesType,
+        HldRelationKindValue::Calls,
+        HldRelationKindValue::Contains,
+    ] {
+        assert_eq!(
+            validate_full_graph_input(&build_builtin_source_fixture(relation)),
+            Err(HldMaterializationValidationError::InvalidEdgeRecord),
+            "{relation:?}"
+        );
+    }
+    let mut foreign = input;
+    foreign.input_unit_provenance_records[0]
+        .unit_compilation_identity_key
+        .unit_cargo_target_name = "other".into();
+    assert_eq!(
+        validate_full_graph_input(&foreign),
+        Err(HldMaterializationValidationError::MissingUnitProvenance)
+    );
+}
