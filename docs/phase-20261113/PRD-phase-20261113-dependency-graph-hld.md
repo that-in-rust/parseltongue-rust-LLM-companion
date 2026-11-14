@@ -1,66 +1,58 @@
-# PRD — full dependency graph of Rust code that compiles
+# PRD — full item dependency graph of itoa
 
 ## The answer
 
-**Build one product: the `full-item-dependency-graph` of a compiling Rust workspace, produced
-deterministically by Rust code from real source, with no LLM in production. Every item outside
-a function body is a node, private ones included, and every dependency proven from source is an
-edge with evidence. Every higher-level view (interface level, HLD, roll-ups) is a query over
-that graph.**
+**This phase builds one thing: the full item dependency graph of pinned itoa 1.0.18, produced
+deterministically by Rust code from the real source, with no LLM in production. Every item
+outside a function body is a node, private ones included, and every dependency proven from
+source is an edge with evidence. The phase is done when that graph equals the frozen expected
+itoa graph.**
 
-An external coding agent reads the graph and its evidence to reason about control flow and data
-flow before editing.
+Out of scope for this phase: every other repository, any rust-analyzer export or oracle
+comparison, and every higher-abstraction table (interface level, HLD, file and folder
+roll-ups). Those are later queries over this graph, not part of it.
 
-Status on 2026-11-14: **Phase 1 is in progress and not passed; Phase 2 is not started.**
+Status on 2026-11-14: **in progress, not passed.**
 
 ```text
-bounded itoa run, sysroot excluded, marked incomplete by the code
-nodes   45    43 items + 2 file areas
-edges  104    43 contains + 61 calls; 2 calls resolved, 59 stored unresolved with a reason
-kinds    2 of 8 produced: contains, calls
+itoa run today, sysroot excluded, marked incomplete by the code
+nodes   45    43 items + 2 file areas                       draft expected: 73
+edges  104    43 contains + 61 calls                        draft expected: 368
+              2 calls resolved, 59 stored unresolved with a reason
+kinds    2 of the 6 that itoa needs: contains, calls
 proven   <Buffer as Default>::default --calls--> Buffer::new, from source through frozen readback
 next     Buffer::format --calls--> private::Sealed::write
 ```
 
-This document claims no complete graph, no whole-itoa agreement and no budget met.
+Proof procedure: [SOP](SOP-phase-20261113-full-item-dependency-graph.md). Design:
+[ARCH](ARCH-phase-20261113-pipeline-graph-tables.md). Expected graph:
+[itoa-target-dataset](itoa-target-dataset/). History: [log](phase1-log-p1.md).
 
-Contracts: [SPEC](SPEC-phase-20261113-executable-requirements.md). Design:
-[ARCH](ARCH-phase-20261113-pipeline-graph-tables.md). Proof procedure:
-[SOP](SOP-phase-20261113-full-item-dependency-graph.md). History: [log](phase1-log-p1.md).
-Deferred work: [backlog](phase1-abstractions-decision-backlog.md).
+## 1 — What is built
 
-## 1 — What the product is
+One graph in two tables: `item-effective-visibility-records` (one row per node) and
+`edge-evidence-record-table` (one row per edge fact). Each row links back to the source range
+that proves it.
 
-One logical graph stored in two tables: `item-effective-visibility-records` (one row per node)
-and `edge-evidence-record-table` (one row per edge fact). Rows link to retained source, span,
-signature, body and resolution evidence.
+Graph rules:
 
-Graph rules (D6):
-
-1. The full graph is built first. A level adds no fact; it only filters, collapses and counts.
-2. Nodes: every module, function, struct, enum, trait, type alias, const, static and associated
+1. Nodes: every module, function, struct, enum, trait, type alias, const, static and associated
    item, private items included. Nothing inside a function body. Impl blocks are not nodes.
-3. One file-area node per source file, separate from its module node. It contains the file's
+2. One file-area node per source file, separate from its module node. It contains the file's
    top-level nodes.
-4. Each `use` outside a function body is a node, with one `imports` edge per resolved binding.
-5. An inline module is an ordinary module node with its own scope.
-6. Every extracted edge is stored, private to private included. Eight kinds: `calls`,
-   `uses_type`, `implements`, `reexports`, `contains`, `derives`, `imports`, `reads`.
-7. A call, type use or read targets the real item. The `use` line is evidence, never the target.
-8. The full graph is the two tables above. No table is added.
-9. The interface level keeps the crate root, non-private items, file-area nodes and `use` nodes.
-   Private items remain as steps in evidence paths.
-10. Collapse walks only `calls`, `uses_type`, `implements`, `reexports`, `derives`, `reads`. A
-    `contains` or `imports` edge is never a step of a collapsed path.
+3. Each `use` outside a function body is a node, with one `imports` edge per resolved binding.
+4. An inline module is an ordinary module node with its own scope.
+5. Every extracted edge is stored uncollapsed, private to private included. The edge type has
+   eight kinds: `calls`, `uses_type`, `implements`, `reexports`, `contains`, `derives`,
+   `imports`, `reads`. itoa needs six of them; it has no `derives` or `reexports`.
+6. A call, type use or read targets the real item. The `use` line is evidence, never the target.
+7. The graph is the two tables above. No table is added.
 
 What is never guessed:
 
 - Unknown visibility and unknown reachability are stored as unknown.
 - A site that cannot be resolved is stored unresolved with one typed reason.
 - A generic or dynamic call targets the trait method, not a guessed implementation.
-
-Rules 9 and 10 and the HLD tables are deferred queries; see the backlog. They are not Phase 1
-exit requirements.
 
 ## 2 — How it is built
 
@@ -69,7 +61,7 @@ Ownership:
 - **Rust** parses, expands macros, lowers signatures, infers within bodies, resolves calls and
   creates canonical identities.
 - **DuckDB** does relational work on a copy of one published generation: name-resolution
-  rounds, item and container projection, joins, deduplication, and later the derived levels.
+  rounds, item and container projection, joins and deduplication.
 - **Turso** holds durable rows, generations, frozen snapshots and atomic publication.
 - No third database. No memory crosses a stage boundary; every stage reads and writes declared
   tables.
@@ -81,41 +73,23 @@ stage                                writes                                    s
 0   crate graph                      crate-dependency-graph-table              built
 1   source ingest                    file-source-text-table                    built
 2/3 syntax walker                    span, signature-detail, body-site rows    built
-4+5 name resolution + item macros    bindings, path-resolution sites,          built, not qualified
+4+5 name resolution + item macros    bindings, path-resolution sites,          built
                                      macro-expanded items
 6   signature-type-lowering-stage    lowered signatures, impl-header-index     impl headers only
-7   semantic-edge-evidence-stage     edge-evidence-record-table                bounded: contains, calls
--   item-effective-visibility-stage  item-effective-visibility-records         bounded: visibility unknown
-9   hld-current-materialization      five HLD tables                           top-level containment only; deferred
-10  coverage banner                  per-level coverage                        partial
-11  oracle edge differ (offline)     oracle-edge-agreement-table               path sites only
+7   semantic-edge-evidence-stage     edge-evidence-record-table                contains and calls only
+-   item-effective-visibility-stage  item-effective-visibility-records         visibility stored unknown
 ```
 
-`--mapping-final-stage-kind` selects how far a run goes:
+The run for this phase is
+`parseltongue map-workspace-full-run --mapping-final-stage-kind full-item-dependency-graph`.
 
-```text
-syntax-spans                    stages 0–3
-name-resolution (default)       stages 0–5, plus impl-header rows
-full-item-dependency-graph      the above, then the bounded stage 7 and visibility rows, frozen
-original-top-level-containment  an earlier checkpoint: top-level containment only, run through
-                                the HLD builder into the five HLD tables
-```
-
-Only the last one writes HLD tables from real source, and only for top-level containment. The
-HLD builder is otherwise tested on fixtures.
-
-Process boundary (D1, D4, D5): production may start only `cargo metadata --offline`,
-`rustc --print cfg` and `rustc --print sysroot`. It never compiles, never runs build scripts or
-proc macros, never reads `target/`, and never uses the network.
-
-Source of algorithms: rust-analyzer logic is ported over persisted rows. Its analysis database
-(`hir`, `ide`, `salsa`) is never linked into production; only the offline oracle harness uses it.
+Process boundary: production may start only `cargo metadata --offline`, `rustc --print cfg`
+and `rustc --print sysroot`. It never compiles, never runs build scripts or proc macros, never
+reads `target/`, and never uses the network.
 
 ## 3 — How it is proven
 
 Only the SOP decides PASS. Unit tests are progress.
-
-### Phase 1 — pinned itoa, exact comparison
 
 ```text
 repository  dtolnay/itoa 1.0.18, commit af77385d0daf4d0e949e81f2588be2e44f69f086
@@ -128,17 +102,17 @@ Acceptance:
 - **A1** The production binary runs on the pinned source with no pre-resolved input.
 - **A2** Every expected node and edge is present with full identity and evidence range.
 - **A3** No unexplained extra, missing or wrong node, edge or evidence row.
-- **A4** Unresolved and inactive sites match the reviewed inventory. A reason does not excuse a
-  resolvable missing edge, and a sysroot-excluded run is not complete coverage.
+- **A4** Unresolved and inactive sites match the reviewed list. A reason does not excuse a
+  resolvable missing edge.
 - **A5** Source, configuration and executable digests, time, peak memory and disk are recorded.
 - **A6** Frozen readback preserves evidence and generation identity; a cancelled or failed run
   leaves the previous output serving; output is identical at 1, 4 and 16 workers.
 
-The expected graph must be reviewed and frozen before comparison. Today's
-[itoa-target-dataset](itoa-target-dataset/) is an unreviewed LLM-parsed draft and is never
+The expected graph is written from the pinned source, reviewed row by row and frozen before
+comparison. Today's dataset is an unreviewed draft. It is comparison data only, never
 production input.
 
-Relationships the reference must contain:
+Build order, one real-source test per relationship:
 
 ```text
 done  <Buffer as Default>::default --calls--> Buffer::new
@@ -150,113 +124,64 @@ next  Buffer::format --calls--> private::Sealed::write          one generic edge
       Buffer::format --calls--> core::hint::unreachable_unchecked   the use node is evidence
       use nodes of lib.rs --imports--> core::hint, core::mem, core::mem::MaybeUninit, core::str
       file-area nodes --contains--> their top-level nodes
-last  whole library equal to the frozen reference (A1–A6)
+last  whole library equal to the frozen expected graph (A1–A6)
 ```
 
-Method: one real-source test per relationship; expected rows live only in the test; fix the
-earliest missing producer; add only general behaviour, nothing keyed on itoa names.
+Method: expected rows live only in the test; fix the earliest missing producer; add only
+general behaviour, nothing keyed on itoa names.
 
-The next target (REQ-RUST-042.0) must prove `i: I -> Integer -> private::Sealed -> write` and
-emit exactly one generic target, with distractor, shadowing, ambiguity and rename checks.
-
-### Phase 2 — five repositories
-
-Order: serde, rust-analyzer, ripgrep, tokio, cargo-modules. All five qualify equally (D2).
-
-```text
-M0  skeleton, core ids and errors, oracle harness build
-M1  crate graph, ingest, parser, Turso runtime, generations
-M2  name resolution + macros, built-ins, lang items
-M3  proc-macro shapes checked against real oracle expansions (D3)
-M4  signature lowering, impl index
-M5  body inference: locals, inherent methods, autoderef
-M6  trait methods in scope; ≥ 95% coverage on all five allows skipping M7
-M7  optional trait-solver adapter
-M8  derived levels, roll-ups, banner; full S1–S10 on all five with one executable
-```
-
-Per-repository gates, scored against the PRIMARY oracle export:
-
-```text
-path resolution                        ≥ 99.5%
-macro expansion items and body sites   ≥ 99%
-proc-macro shape expansions            = 100%
-impl relations                         ≥ 99.5%
-method targets, precision              ≥ 99%
-method targets, coverage               ≥ 95%   mandatory at M8
-selection, visibility, reachability    = 100%
-```
-
-Budgets:
-
-- Memory: measured on every run with no interim cap. After all five repositories have working
-  end-to-end results, whole-process-tree peak ≤ 500,000,000 bytes.
-- Time target: body inference under 30 minutes on 4 cores for rust-analyzer. Not measured yet.
-- Disk and per-stage time are reported, with no threshold.
+The next target must prove `i: I -> Integer -> private::Sealed -> write` and emit exactly one
+generic target, with distractor, shadowing, ambiguity and rename checks.
 
 ## Reference
 
-### Scope and context
-
-- Map lib and bin targets of the workspace and their normal dependency closure.
-- Exclude tests, benches, examples, dev-dependencies and build-script targets. `cfg(test)` is off.
-- The semantic source set is the files reachable from mapped module trees under active `cfg`,
-  plus includes and macro expansions. Other `.rs` files are stored byte-exact only.
-- Items under inactive `cfg` are counted as unresolved `cfg_inactive`, never dropped.
-- A compilation unit is Cargo package id + target name and kind + host/target context. Features,
-  `cfg` and edition are per unit. Equal names or bytes never merge two units.
-- Unresolved reasons, one per site, in this order: `cfg_inactive`, `build_script`, `proc_macro`,
-  `external_source_missing`, `unknown_receiver`, `trait_solver_needed`
-  (`SiteUnresolvedReasonKind`).
-- KL1: sites that depend on build-script output are a known limitation, identified only by
-  paired oracle evidence. It never excuses an oracle-proven error.
-
 ### Pins
 
+- itoa: [phase-one-benchmark-pin.json](../phase-20261111/phase-one-benchmark-pin.json).
 - Turso `=0.9.0-pre.5`, concurrent writes. A busy publication is tried up to 6 times, waiting
   10, 20, 40, 80, then 160 ms.
 - DuckDB `=1.20000.1`, bundled, no extensions, no external access, run-local temp directory.
-- Oracle: rust-analyzer `2a362a41a8eb6e090f1a12d9b712df85af6f0c33` plus the local parser patch.
-- Repositories, commits, reuse mode and licenses: SPEC section 10. Copied code keeps its
-  headers. cargo-modules (MPL-2.0) is idea-only.
 
 ### Decisions in force
 
-- **D1–D6, KL1:** as stated above.
-- **AD-1, sysroot:** interim option B. Measured on 2026-11-13: itoa with the sysroot (619 units
-  parsed) did not finish name resolution within 2,400 s (exit 124, nothing published). That run
-  report has since been deleted; the figures are from the PRD and journal of that day.
-  Development runs therefore use `--sysroot-source-scope-kind excluded` (REQ-RUST-038.0), and
-  edges into `core` are stored unresolved. Phase 1 cannot pass this way; the sysroot path must
-  be made to work.
-- **AD-2, body paths:** calls are resolved in Rust, reading persisted namespace and impl rows.
-- **AD-3, nodes:** projected in DuckDB and written under `item-effective-visibility-stage`.
-- **AD-4, inference:** build only what the current target needs; store the rest unresolved.
-- **AD-5, reference:** an expected graph written from the pinned source and reviewed, with the
-  oracle as a cross-check. It is comparison data only.
-- **OD-7, containment:** each item has one lexical source container. File-level items and impl
+- **Calls** are resolved in Rust, reading persisted namespace and impl rows.
+- **Nodes** are projected in DuckDB and written under `item-effective-visibility-stage`.
+- **Inference:** build only what the current target needs; store the rest unresolved.
+- **Expected graph:** written from the pinned source and reviewed. No oracle.
+- **Containment:** each item has one lexical source container. File-level items and impl
   members belong to the file area; nested items belong to their inline module or trait. Impl
   identity, self type and trait are metadata, never a second parent.
+- **Memory:** measured and reported on every run; no cap in this phase.
 
 ### Open
 
-- **OD-2** Identity and container of macro-generated items.
-- **OD-4** Enum variants and struct fields: nodes, or evidence only.
-- **OD-7** (rest) How a file's module node relates to its file-area node.
-- **OD-8** May `reads` and `uses_type` start at a non-function item? itoa needs it for
-  `const MAX_STR_LEN` and the array length in `Buffer`. Lean: yes.
+- **Targets in `core`.** 119 of the 368 draft edges point into `core`. Resolving them needs
+  the sysroot source in the run; measured on 2026-11-13, that run did not finish name
+  resolution in 2,400 s (the run report is deleted). Runs today use
+  `--sysroot-source-scope-kind excluded` and store those edges unresolved. Until decided, such
+  a run cannot pass.
+- **Macro-generated items.** Their identity and container. 45 of the 73 draft nodes come from
+  `impl_Integer`, `impl_Integer_size` and `impl_Unsigned` invocations.
+- **Enum variants and struct fields:** nodes, or evidence only.
+- **File module and file area:** how a file's module node relates to its file-area node.
+- **Non-function sources:** may `reads` and `uses_type` start at a non-function item? itoa
+  needs it for `const MAX_STR_LEN` and the array length in `Buffer`. Lean: yes.
+- **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for
+  sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
+  are compared (A4).
 
-- **Edge reasons** Graph edge rows use a second reason type in code, `HldUnresolvedReasonKind`:
-  missing target, ambiguous target, cfg inactive, external source missing, trait solver needed,
-  other. It has no `build_script`, `proc_macro` or `unknown_receiver`, and adds three values
-  the list above lacks. One list must win before unresolved edges are compared in Phase 1 (A4).
-
-OD-4, OD-7 and OD-8 block the affected reference rows from being frozen.
+The four middle points block the affected expected rows from being frozen.
 
 ### Out of scope
 
+- Any repository other than itoa.
+- Any rust-analyzer export, oracle harness or oracle comparison.
+- Interface level, HLD tables, file and folder roll-ups, coverage banner.
 - Recovering code that does not compile; any LLM or training.
 - Running proc macros or build scripts, or reading their outputs.
-- Test, bench and example targets; all-feature exploration.
-- Intent tables, incremental remap, CLI query verbs.
-- In Phase 1: the five repositories, the derived levels, and memory or speed optimisation.
+- Test, bench and example targets; feature exploration.
+- Memory or speed optimisation.
+
+Code for some of these exists in the repository from earlier work (the HLD builder, the
+`original-top-level-containment` stage, the oracle comparison command). This phase does not
+use, extend or test against it.
