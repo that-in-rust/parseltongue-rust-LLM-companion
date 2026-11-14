@@ -4,7 +4,7 @@
 Candidate identities remain symbolic. This script checks every cited source anchor against the
 pinned source and writes the candidate nodes, edges and unresolved sites. It writes no
 production rows.
-Usage: itoa-target-dataset-builder.py --source-root PATH --pin-file PATH --output-directory PATH
+Usage: itoa-expected-graph-builder.py --source-root PATH --pin-file PATH --output-directory PATH
 """
 import argparse, collections, hashlib, importlib.util, json, pathlib, subprocess
 
@@ -18,7 +18,7 @@ parser.add_argument("--output-directory", default=str(HERE))
 args = parser.parse_args()
 PIN_PATH = pathlib.Path(args.pin_file).resolve()
 PIN = json.loads(PIN_PATH.read_text())
-RULE_SPEC = importlib.util.spec_from_file_location("itoa_reference_graph_rules", HERE / "itoa-reference-graph-rules.py")
+RULE_SPEC = importlib.util.spec_from_file_location("itoa_expected_graph_rules", HERE / "itoa-expected-graph-rules.py")
 RULES = importlib.util.module_from_spec(RULE_SPEC)
 RULE_SPEC.loader.exec_module(RULES)
 SRC = pathlib.Path(args.source_root or args.source or PIN["benchmark_source_checkout_path"]).resolve()
@@ -336,10 +336,10 @@ candidate_header = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
                         "known_uncovered_constructs": ["operators", "body_types", "literals", "repeated_same_line_sites"]},
                     "canonical_identity_status": "SYMBOLIC_NONCANONICAL", "production_input": False,
                     "source_commit": source_commit, "source_pin_file": PIN_PATH.name}
-dump("itoa-full-graph-nodes.json", {**candidate_header, "row_count": len(node_rows), "rows": node_rows})
-dump("itoa-full-graph-edges.json", {**candidate_header, "row_count": len(edge_rows),
+dump("itoa-expected-graph-nodes.json", {**candidate_header, "row_count": len(node_rows), "rows": node_rows})
+dump("itoa-expected-graph-edges.json", {**candidate_header, "row_count": len(edge_rows),
                                      "relation_kind_counts": RULES.relation_counts(edge_rows), "rows": edge_rows})
-dump("itoa-local-verification-subset.json", {"artifact_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+dump("itoa-unblocked-rows-subset.json", {"artifact_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
      "candidate_provenance": candidate_provenance,
      "nodes": eligible_nodes, "edges": classified["eligible_edges"],
      "counts": {"candidate_nodes": len(node_rows), "eligible_nodes": len(eligible_nodes),
@@ -349,8 +349,8 @@ blocked_rows = {"candidate_provenance": candidate_provenance,
                 "unresolved_or_inactive_sites": unresolved,
                 "blocker_counts": dict(sorted(collections.Counter(blocker for row in
                     classified["blocked_nodes"] + classified["blocked_edges"] for blocker in row["blockers"]).items()))}
-dump("itoa-blocked-candidate-index.json", blocked_rows)
-dump("itoa-impl-block-records.json", {"artifact_status": "LLM_PARSED_DRAFT_NOT_PRODUCTION",
+dump("itoa-blocked-rows-reasons.json", blocked_rows)
+dump("itoa-expected-impl-blocks.json", {"artifact_status": "LLM_PARSED_DRAFT_NOT_PRODUCTION",
      "candidate_provenance": candidate_provenance, "rows": impls})
 dump("itoa-expected-unresolved-sites.json", {"artifact_status": "BLOCKED_DIAGNOSTIC_EXPECTATIONS", "rows": unresolved})
 
@@ -365,7 +365,7 @@ summary = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
            "source_coverage": {"whole_source_coverage_claimed": False,
                "known_uncovered_constructs": ["operators", "body_types", "literals", "repeated_same_line_sites"]},
            "open_decisions": ["OD-2", "OD-7", "OD-8"], "production_comparison_status": "NOT_RUN"}
-dump("itoa-target-dataset-summary.json", summary)
+dump("itoa-expected-graph-summary.json", summary)
 md = "# itoa expected full item graph: summary\n\n"
 md += "**Status: LLM_PARSED_DRAFT_NOT_FROZEN.** Written by Devin from reading the pinned source. Not reviewed, not frozen, never a production input. Identities are symbolic labels, not production keys.\n\n"
 md += "Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, body types, literals and repeated same-line sites are not covered. Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.\n\n"
@@ -373,5 +373,5 @@ md += "```text\n" + "\n".join(f"{key}: {value}" for key, value in counts.items()
 md += "\n".join(f"relation {key}: {value}" for key, value in summary["relation_kind_counts"].items()) + "\n"
 md += "\n".join(f"target {key}: {value}" for key, value in target_kind_counts.items()) + "\n"
 md += f"source commit: {source_commit}\n```\n"
-(OUT / "itoa-target-dataset-summary.md").write_text(md)
+(OUT / "itoa-expected-graph-summary.md").write_text(md)
 print(md)

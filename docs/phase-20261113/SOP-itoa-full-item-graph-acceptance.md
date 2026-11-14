@@ -75,7 +75,7 @@ and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md).
 - Regenerate and test the expected graph:
 
 ```bash
-python3 docs/phase-20261113/itoa-target-dataset/itoa-target-dataset-builder.py \
+python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py \
   --pin-file docs/phase-20261111/phase-one-benchmark-pin.json \
   --source-root /home/ubuntu/repos/rust-tools/itoa \
   --output-directory docs/phase-20261113/itoa-target-dataset

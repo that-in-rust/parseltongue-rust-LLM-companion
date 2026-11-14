@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 
 
-RULE_PATH = Path(__file__).with_name("itoa-reference-graph-rules.py")
-BUILDER_PATH = Path(__file__).with_name("itoa-target-dataset-builder.py")
-RULE_SPEC = importlib.util.spec_from_file_location("itoa_reference_graph_rules", RULE_PATH)
+RULE_PATH = Path(__file__).with_name("itoa-expected-graph-rules.py")
+BUILDER_PATH = Path(__file__).with_name("itoa-expected-graph-builder.py")
+RULE_SPEC = importlib.util.spec_from_file_location("itoa_expected_graph_rules", RULE_PATH)
 RULES = importlib.util.module_from_spec(RULE_SPEC)
 RULE_SPEC.loader.exec_module(RULES)
 
@@ -38,7 +38,7 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertEqual("LLM_PARSED_DRAFT", result["edges"][0]["candidate_status"])
 
     def test_candidate_provenance_metadata_explicit(self):
-        summary = json.loads(RULE_PATH.with_name("itoa-target-dataset-summary.json").read_text())
+        summary = json.loads(RULE_PATH.with_name("itoa-expected-graph-summary.json").read_text())
         provenance = summary["candidate_provenance"]
         self.assertEqual("LLM_PARSED_DRAFT", provenance["status"])
         self.assertEqual("Devin", provenance["author"])
@@ -100,8 +100,8 @@ class ReferenceGraphRulesTests(unittest.TestCase):
             left_files = {path.name: path.read_bytes() for path in Path(left).iterdir()}
             right_files = {path.name: path.read_bytes() for path in Path(right).iterdir()}
         self.assertEqual(left_files, right_files)
-        self.assertIn("itoa-full-graph-edges.json", left_files)
-        self.assertIn("itoa-local-verification-subset.json", left_files)
+        self.assertIn("itoa-expected-graph-edges.json", left_files)
+        self.assertIn("itoa-unblocked-rows-subset.json", left_files)
 
     def test_source_pin_digest_mismatch(self):
         with self.assertRaises(ValueError):
@@ -136,7 +136,7 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertEqual(source_names, RULES.BUILTIN_PRIMITIVES)
 
     def test_candidate_coverage_gaps_explicit(self):
-        full = json.loads(RULE_PATH.with_name("itoa-full-graph-nodes.json").read_text())
+        full = json.loads(RULE_PATH.with_name("itoa-expected-graph-nodes.json").read_text())
         coverage = full.get("source_coverage", {})
         self.assertIn("whole_source_coverage_claimed", coverage)
         self.assertFalse(coverage.get("whole_source_coverage_claimed", True))
