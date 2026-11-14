@@ -168,7 +168,11 @@ parseltongue export-published-stage-rows --workspace-store-file-path "$STORE" \
 
 Pass:
 
-- All stages for the milestone are marked complete and published.
+- All stages for the milestone are marked complete and published. Limit today: the banner
+  reports publication for the first four stages only and hard-codes signature lowering, call
+  resolution and visibility as "not yet implemented". For a full-graph run, read
+  `workspace_required_stage_names` and `workspace_full_map_completeness_kind` from
+  `workspace-config-state-records`; the value `incomplete` is not a pass.
 - Direct children are exactly the three allowed commands. Beneath `cargo metadata`, only
   `rustc -vV` and Cargo's stdin `--print` discovery probe are allowed.
 - No file under `target/` is read except Cargo's `.rustc_info.json`.
@@ -293,8 +297,9 @@ M7   M6 with the solver adapter
 M8   full S1–S10 and every SPEC contract
 ```
 
-Use `--mapping-final-stage-kind syntax-spans` for an M1-only run; the default is
-`name-resolution`.
+`--mapping-final-stage-kind` accepts `syntax-spans` (M1-only run), `name-resolution` (the
+default), `full-item-dependency-graph`, and `original-top-level-containment` (an earlier
+checkpoint that publishes HLD tables for top-level containment only; not used for any gate).
 
 ### Runner and report
 
