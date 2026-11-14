@@ -122,8 +122,10 @@ build, and the 11 real-source tests plus the new ones.
     run with the sysroot removes the flag.
   - Recommended: flagged. The run is already marked `incomplete` and cannot be an SOP PASS
     without the sysroot, so nothing is accepted on the weaker proof.
-- **Q2: lookup order.** rustc checks methods from a type parameter's bounds before methods of
-  other traits in scope. The design relies on it; confirm with a small program compiled by
-  rustc before step 4.
+- **Q2: lookup order. Answered.** rustc checks methods from a type parameter's bounds before
+  methods of other traits in scope, so traits outside the bound chain never compete (R7).
+  Confirmed 2026-11-14 with rustc 1.99.1: with `I: Integer`, `Integer: Sealed`, and a second
+  trait in scope whose blanket impl also has `write`, `i.write()` compiles and calls
+  `Sealed::write`.
 - **Q3: `I::MAX_STR_LEN` on line 109** uses the same bound chain and gives a `reads` edge.
   It is left to [part 4](part-4-signatures-other-edge-kinds.md) so this part stays one edge.
