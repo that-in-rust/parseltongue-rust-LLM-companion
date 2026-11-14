@@ -101,13 +101,15 @@ cargo build --release --workspace --all-targets --all-features
 `docs/phase-20261113/` is the only current documentation.
 
 ```text
-PRD      PRD-phase-20261113-dependency-graph-hld.md          what and why
-SPEC     SPEC-phase-20261113-executable-requirements.md      REQ-RUST ids and their tests
+SOP      SOP-phase-20261113-full-item-dependency-graph.md    steps S1–S4 that decide PASS
+PRD      PRD-phase-20261113-dependency-graph-hld.md          what is built and what is out of scope
 ARCH     ARCH-phase-20261113-pipeline-graph-tables.md        pipeline, tables, graph rules
-SOP      SOP-phase-20261113-full-item-dependency-graph.md    steps S1–S10 that decide PASS
+TARGET   itoa-target-dataset/                                the expected itoa graph and its builder
 LOG      phase1-log-p1.md                                    the single progress record, newest first
 BACKLOG  phase1-abstractions-decision-backlog.md             deferred work and open decisions
 MAP      current-codebase-crate-map.md                       crates, files, verbs, stages as measured
+SPEC     SPEC-phase-20261113-executable-requirements.md      NOT current: written for the wider
+                                                             scope; to be rewritten after ARCH
 ```
 
 - These files state only what is in force. Edit in place; no revision sections. History goes
@@ -116,36 +118,37 @@ MAP      current-codebase-crate-map.md                       crates, files, verb
   then the few points that support it, then reference detail. Short, specific, no repetition.
 - One document at a time, in commits of at most about 200 changed lines, each pushed to
   `research/tiny-rust-code-mapper` before the next starts.
-- A change to architecture or to a pin updates SPEC, ARCH, SOP and this file in the same commit.
+- A change to architecture or to a pin updates ARCH, SOP and this file in the same commit.
 - Everything else under `docs/` is history. Exception: code and tools still read these files in
   `docs/phase-20261111/`, so do not move or delete them without updating the readers:
-  `parser-source-pin-manifest.json`, `corpus-source-pin-manifest.json`,
-  `oracle-source-build-manifest.json`, `phase-one-benchmark-pin.json`,
+  `phase-one-benchmark-pin.json` (the itoa pin) and `parser-source-pin-manifest.json`. Three
+  more are read only by the older five-repository tools under `tools/`:
+  `corpus-source-pin-manifest.json`, `oracle-source-build-manifest.json`,
   `SPEC-phase-20261111-executable-requirements.md`.
 
 ### Commands
 
 ```bash
-# build the graph for one repository
+# build the graph for itoa
 parseltongue map-workspace-full-run \
-  --workspace-root-path-value <repo> \
+  --workspace-root-path-value /home/ubuntu/repos/rust-tools/itoa \
   --workspace-store-file-path <store.db> \
   --worker-thread-count-value 2 \
   --mapping-final-stage-kind full-item-dependency-graph
 
 # read it back
 parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \
-  --stage-owned-table-name <table>
-parseltongue export-mapped-unit-manifest --workspace-store-file-path <store.db>
-parseltongue status-coverage-banner-show --workspace-store-file-path <store.db>
+  --stage-owned-table-name item-effective-visibility-records     # nodes
+parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \
+  --stage-owned-table-name edge-evidence-record-table            # edges
+
+# the real-source tests that decide progress
+cargo test --release -p parseltongue-cli-dispatcher-binary \
+  --test itoa-source-acceptance-tests -- --test-threads=1
 ```
 
-- Final-stage values: `syntax-spans`, `name-resolution` (default),
-  `original-top-level-containment`, `full-item-dependency-graph`.
-- SOP runner: `tools/hld-current-qualification-runner.py`. It writes the report to
-  `hld-current-test-runs/<run-id>/hld-current-test-report.md` (commit it) and large artifacts to
-  `~/hld-current-test-artifacts/<run-id>/` (never commit). Neither folder holds a run today.
-- Oracle: `tools/oracle-semantic-export-harness`, built from the pinned rust-analyzer.
+- The binary has other final-stage values and verbs from earlier work (HLD publication,
+  coverage banner, oracle comparison). This phase does not use them.
 
 ### Code
 
@@ -173,8 +176,8 @@ parseltongue status-coverage-banner-show --workspace-store-file-path <store.db>
 
 ```text
 ~/repos/parseltongue-rust-LLM-companion   this repository
-~/repos/rust-tools                        shallow reference clones: itoa, serde, ripgrep, tokio,
-                                          cargo-modules, rust-analyzer and others
+~/repos/rust-tools/itoa                   the pinned source under test
+~/repos/rust-tools/rust-analyzer          parser crates the build depends on
 ~/repos/clarity-cli                       shallow clone of the clarity CLI
 ```
 
@@ -183,7 +186,6 @@ parseltongue status-coverage-banner-show --workspace-store-file-path <store.db>
   upstream commit.
 - DuckDB's bundled C++ build is slow and memory-heavy. Use
   `CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CXXFLAGS=-g0`.
-- `tools/oracle-semantic-export-harness/target` can reach 10 GiB and is safe to delete.
 
 ### Navigation aids
 
