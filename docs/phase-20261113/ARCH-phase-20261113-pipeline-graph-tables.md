@@ -94,7 +94,7 @@ level  table                                  owner stage                       
        name-resolution-scope-records
        module-scope-binding-table
        macro-expanded-item-table
-5      syntax-namespace-input-* (six)         syntax-spans                       produced
+5      syntax-namespace-input-* (six)         syntax-namespace-input-records     produced
        lang-item-definition-table
 6      field-signature-detail-table           syntax-spans                       produced; text only
        body-site-reference-table
@@ -105,9 +105,10 @@ Supporting tables:
 
 - Inputs: `file-source-text-table`, `span-byte-ownership-ranges`,
   `crate-dependency-graph-table`, `workspace-config-state-records`.
-- Control: `stage-run-generation-records`, `frozen-stage-publication-records`,
-  `frozen-stage-unit-memberships`, `workspace-generation-publication-manifest`.
-- Offline only: `oracle-edge-agreement-table`.
+- Work queues: `module-source-closure-requests`, `syntax-file-work-requests`.
+- Control: `stage-run-generation-records`, `frozen-stage-publication-records`.
+- Not on the graph chain: `oracle-edge-agreement-table` (offline comparison),
+  `analysis-resolution-receipt-records` (name-resolution run receipts).
 
 The registry of table owners is `STAGE_OWNED_TABLE_NAMES` in
 `parseltongue-turso-store-adapter/src/stage-table-store-backend.rs`.
