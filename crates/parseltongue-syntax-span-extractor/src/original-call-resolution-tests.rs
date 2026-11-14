@@ -5,8 +5,8 @@ use crate::{SyntaxFileInputData, extract_file_syntax_rows, persist_impl_header_r
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, path::Path, sync::Mutex};
 
-struct OriginalCallFixtureStore {
-    rows: Mutex<Vec<StageTableRowRecord>>,
+pub(crate) struct OriginalCallFixtureStore {
+    pub(crate) rows: Mutex<Vec<StageTableRowRecord>>,
     frozen_read_only_flag: std::sync::atomic::AtomicBool,
 }
 impl StageTableStorePort for OriginalCallFixtureStore {
@@ -91,7 +91,7 @@ pub(crate) fn make_call_syntax_input(source: &str) -> SyntaxFileInputData {
         file_expansion_provenance_chain: vec![],
     }
 }
-fn make_call_fixture_unit() -> CrateCompilationUnitKey {
+pub(crate) fn make_call_fixture_unit() -> CrateCompilationUnitKey {
     CrateCompilationUnitKey {
         unit_cargo_package_identifier: "fixture@1".into(),
         unit_cargo_target_name: "fixture".into(),
@@ -100,7 +100,7 @@ fn make_call_fixture_unit() -> CrateCompilationUnitKey {
         unit_configuration_digest_full: [2; 32],
     }
 }
-fn make_call_fixture_scope() -> StageRunScopeValue {
+pub(crate) fn make_call_fixture_scope() -> StageRunScopeValue {
     StageRunScopeValue {
         run_generation_digest_value: "01".repeat(32),
         stage_attempt_sequence_value: "attempt".into(),
@@ -116,7 +116,7 @@ fn make_call_fixture_occurrence(start: u64, end: u64, text: &str) -> SemanticOcc
     )
     .unwrap()
 }
-fn make_call_fixture_row(table: &str, value: Value) -> StageTableRowRecord {
+pub(crate) fn make_call_fixture_row(table: &str, value: Value) -> StageTableRowRecord {
     StageTableRowRecord {
         stage_owned_table_name: table.into(),
         stage_row_record_key: blake3::hash(value.to_string().as_bytes())
@@ -135,7 +135,7 @@ fn read_call_fixture_values(store: &OriginalCallFixtureStore, table: &str) -> Ve
 }
 // Namespace outcomes are supplied at the existing stage seam. This is a component
 // fixture, not the parent's real-source/DuckDB integration acceptance test.
-fn make_call_fixture_graph(
+pub(crate) fn make_call_fixture_graph(
     source: &str,
 ) -> (OriginalCallFixtureStore, HldMaterializationInputRecord) {
     let rows = extract_file_syntax_rows(&make_call_syntax_input(source))
