@@ -108,7 +108,7 @@ TARGET   itoa-target-dataset/                                the expected itoa g
 LOG      phase1-log-p1.md                                    the single progress record, newest first
 BACKLOG  phase1-abstractions-decision-backlog.md             deferred work and open decisions
 MAP      current-codebase-crate-map.md                       crates, files, verbs, stages as measured
-SPEC     SPEC-phase-20261113-executable-requirements.md      NOT current: written for the wider
+SPEC     SPEC-wider-scope-requirements-not-current.md      NOT current: written for the wider
                                                              scope; to be rewritten after ARCH
 ```
 

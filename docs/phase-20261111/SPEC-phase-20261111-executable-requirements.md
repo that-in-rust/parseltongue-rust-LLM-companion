@@ -1,6 +1,6 @@
 # Executable specs — phase-20261111: HLD for Rust code that compiles
 
-> History. Replaced on 2026-11-13 by `docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md`,
+> History. Replaced on 2026-11-13 by `docs/phase-20261113/SPEC-wider-scope-requirements-not-current.md`,
 > which keeps every requirement id and test name and states only what is in force. Do not edit or
 > cite this file as current.
 

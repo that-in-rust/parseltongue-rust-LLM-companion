@@ -116,7 +116,7 @@ resolve each before claiming completeness for its affected source facts.
 - Keep earlier log entries as history; former subparts 4.6 and 4.7 are deferred,
   while 4.8 concerns full-map publication safety now.
 - [PRD: product intent and decisions](PRD-itoa-full-item-graph-scope.md)
-- [SPEC: executable contracts and active open points](SPEC-phase-20261113-executable-requirements.md)
+- [SPEC: executable contracts and active open points](SPEC-wider-scope-requirements-not-current.md)
 - [Architecture: pipeline and table boundaries](ARCH-itoa-full-item-graph-pipeline.md)
 - [SOP: source-backed verification](SOP-itoa-full-item-graph-acceptance.md)
 
