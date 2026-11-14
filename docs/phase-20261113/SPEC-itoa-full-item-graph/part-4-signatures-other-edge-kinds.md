@@ -1,11 +1,11 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a steps 1 to 6 of 7 BUILT (items, `Self`, builtins, unresolved rows). 4b to 4d are stubs.**
+**State: 4a BUILT for original signatures (all 7 steps). 4b to 4d are stubs.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
-4a  uses_type from signatures   REQ-RUST-018.2   all four target outcomes built; step 7 left
+4a  uses_type from signatures   REQ-RUST-018.2   BUILT; Q3 and Q4 stay open
 4b  implements from impl headers                 stub
 4c  reads of consts and statics                  stub
 4d  imports from use nodes                       stub
@@ -162,6 +162,21 @@ A `Self` whose impl header is unresolved stores nothing until step 6.
 - Gates pass: 457 tests passed, 0 failed, 4 ignored; the 17 real-source tests pass (165.9 s).
 - The stage log line now prints `nodes=51`.
 - Not done: step 7 (refactor pass and one run's cost over the whole process tree).
+
+**After step 7**, the last step of 4a:
+
+- Refactor: the resolver builds a builtin's identity directly instead of through a JSON
+  value. A builtin row without a name is now a typed error, not a silent skip.
+- Gates pass on the refactored code: format, lint, release build; 457 tests passed,
+  0 failed, 4 ignored; the 17 real-source tests pass (174.0 s).
+- Cost of one run of that executable (sha256 `fc23c1c4…35d10932`), sysroot excluded,
+  2 workers: 14.1 s wall, 360 MB peak over the whole process tree, 9.3 MB store,
+  51 nodes and 138 edges.
+- Three runs of the executable just before the refactor: 12.5 to 12.6 s, 370 to 381 MB.
+- How memory was measured: resident memory summed over the process tree, sampled about
+  every 17 ms (the SOP asks for 10 ms). The tree's peak equals its largest process.
+- Left open by 4a: declared types of consts and statics (Q3), `Self::Buffer` projections
+  (Q4), and signatures of macro-generated items (part 5).
 
 ## 7 — Open questions
 

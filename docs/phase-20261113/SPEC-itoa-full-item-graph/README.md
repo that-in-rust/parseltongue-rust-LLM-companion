@@ -16,7 +16,7 @@ part  file                                       requirements                   
                                                  043.0 045.0
 2     part-2-first-call-default-new.md           034.0 036.0                    PARTLY
 3     part-3-generic-call-format-write.md        042.0                          BUILT (one shape)
-4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a steps 1-6 of 7 BUILT; 4b-4d stubs
+4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a BUILT; 4b-4d stubs
 5     part-5-macro-generated-items.md            046.0                          NOT STARTED
 6     part-6-targets-in-core.md                  (decision first)               BLOCKED
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED

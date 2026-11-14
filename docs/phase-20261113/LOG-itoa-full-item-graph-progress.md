@@ -11,8 +11,8 @@ from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4a step 7 (refactor pass, one run's cost), then 4b `implements`.
-  Steps 1 to 6 of 7 are built.
+- **Next target:** part 4b, `implements` edges from impl headers. Its part is a stub and is
+  written before any code. Part 4a is built.
 - **Produced today:** `contains`, `calls`, and `uses_type` from signatures (items,
   builtins, unresolved with a reason). Not produced: `reads`, `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
@@ -46,11 +46,10 @@ step                                   state         measured or missing
 - **Tests.** 13 real-source itoa tests pass at commit `b1115a5f4` (114.56 s, release build, one
   thread). Three cover the full graph: `test_original_member_graph_roundtrip`,
   `test_default_new_call_roundtrip` and `test_format_sealed_write_call`.
-- **Workspace gates** at `b1115a5f4`: format, lint and release build pass; 442 tests pass,
+- **Workspace gates** after part 4a: format, lint and release build pass; 457 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
-- **Cost of one run** (one real-source test, 2026-11-15): 17.3 s, 355 MB peak for the largest
-  single process. The whole process tree was last measured on 2026-11-14, before the macro
-  commits were merged: 14.8 s, 411 MB, no memory cap.
+- **Cost of one run** (2026-11-15, after part 4a, sysroot excluded, 2 workers): 14.1 s,
+  360 MB peak over the whole process tree, 9.3 MB store, no memory cap.
 
 The counts above were re-read after part 4a step 6 (51 nodes, 138 edges, 61 calls, 3 resolved).
 Not re-measured on the current commit: the whole-process-tree memory of one run.
@@ -90,6 +89,20 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 06:20 IST — Part 4a step 7: refactor and one run's cost; 4a is built
+
+- Part 4a is built for original signatures: 34 `uses_type` rows on pinned itoa.
+- One run costs 14.1 s and 360 MB peak over the whole process tree, with a 9.3 MB store
+  (sysroot excluded, 2 workers, executable sha256 `fc23c1c4…35d10932`).
+- Memory is resident memory summed over the process tree, sampled about every 17 ms.
+- Refactor: a builtin's identity is built directly; a builtin row without a name is a
+  typed error.
+- Workspace gates on the refactored code: format, lint and release build pass; 457 tests
+  passed, 0 failed, 4 ignored. The 17 real-source tests pass (174.0 s).
+- My first cost run hung: the measuring script let the stderr pipe fill. I killed it,
+  wrote stderr to a file and re-ran. The product was not at fault.
+- Next: part 4b, `implements`. The part file is written first.
 
 ### 2026-11-15 05:50 IST — Part 4a step 6: unresolved type paths are stored with a reason
 

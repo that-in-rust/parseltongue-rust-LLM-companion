@@ -302,11 +302,11 @@ fn resolve_type_path_target(
     source: &HldTargetIdentityValue,
 ) -> Result<Option<HldEdgeResolutionValue>, SignatureTypeEdgeError> {
     let unresolved = |reason| Ok(Some(HldEdgeResolutionValue::Unresolved { reason }));
-    let identity = if path["type_path_self_flag"] == true {
+    let target = if path["type_path_self_flag"] == true {
         match graph.self_types.get(source) {
             None => return Ok(None),
             Some(header) if header["resolution_state_kind"] == "resolved" => {
-                header["target_identity"].clone()
+                decode_symbol_target_value(&header["target_identity"])?
             }
             Some(header) => {
                 return unresolved(read_stored_reason_kind(&header["unresolved_reason_kind"]));
@@ -335,15 +335,18 @@ fn resolve_type_path_target(
         };
         match symbol["target_symbol_kind_value"].as_str() {
             Some("TypeParam" | "ConstParam" | "SelfType") => return Ok(None),
-            Some("Builtin") => json!({"target_identity_variant_kind":"builtin",
-                "target_builtin_name_value":symbol["target_builtin_name_value"]}),
+            Some("Builtin") => symbol["target_builtin_name_value"]
+                .as_str()
+                .map(|name| NameSymbolTargetKey::Builtin(name.to_owned()))
+                .ok_or(SignatureTypeEdgeError::InvalidEvidence {
+                    field: "target_builtin_name_value",
+                })?,
             _ => match graph.context.read_single_target_identity(symbol)? {
-                Some(identity) => identity,
+                Some(identity) => decode_symbol_target_value(&identity)?,
                 None => return unresolved(HldUnresolvedReasonKind::MissingTarget),
             },
         }
     };
-    let target = decode_symbol_target_value(&identity)?;
     let builtin = matches!(target, NameSymbolTargetKey::Builtin(_));
     let target = HldTargetIdentityValue::from(target);
     if builtin || graph.endpoints.contains(&target) {
