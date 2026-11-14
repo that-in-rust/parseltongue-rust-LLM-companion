@@ -335,7 +335,7 @@ candidate_header = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
                     "source_coverage": {"whole_source_coverage_claimed": False,
                         "known_uncovered_constructs": ["operators", "body_types", "literals", "repeated_same_line_sites"]},
                     "canonical_identity_status": "SYMBOLIC_NONCANONICAL", "production_input": False,
-                    "source_commit": source_commit, "source_pin_path": str(PIN_PATH)}
+                    "source_commit": source_commit, "source_pin_file": PIN_PATH.name}
 dump("itoa-full-graph-nodes.json", {**candidate_header, "row_count": len(node_rows), "rows": node_rows})
 dump("itoa-full-graph-edges.json", {**candidate_header, "row_count": len(edge_rows),
                                      "relation_kind_counts": RULES.relation_counts(edge_rows), "rows": edge_rows})
