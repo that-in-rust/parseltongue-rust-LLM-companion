@@ -475,7 +475,7 @@ subparts independently and attempting one large integration at the end.
 
 - [Current PRD, including AD-1 through AD-5](PRD-itoa-full-item-graph-scope.md)
 - [Current executable SPEC, including open graph contracts](SPEC-phase-20261113-executable-requirements.md)
-- [Current pipeline architecture](ARCH-phase-20261113-pipeline-graph-tables.md)
+- [Current pipeline architecture](ARCH-itoa-full-item-graph-pipeline.md)
 - [Current status board](../phase-20261111/current-milestone-status-board.md)
 - [Append-only TDD evidence journal](../phase-20261111/TDD-phase-20261111-progress-checkpoints.md)
 - Previous structural checkpoint report `hld-current-test-runs/20261114T043000Z-structural-verification/` (report removed from the tree on 2026-11-14; last present at commit a2e13a3bd)

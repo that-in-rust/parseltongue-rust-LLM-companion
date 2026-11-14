@@ -26,7 +26,7 @@ What the code produces today, with sysroot excluded: 45 nodes and 104 edges (43 
 Details are in the top entry of [the log](phase1-log-p1.md).
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
-and tables are in the [ARCH](ARCH-phase-20261113-pipeline-graph-tables.md).
+and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md).
 
 ## Rule 1 — The expected graph comes from source, and is frozen before any comparison
 
