@@ -6,16 +6,16 @@ full item dependency graph only.
 ## The answer
 
 **Thirteen requirements in seven parts, in build order. Parts 1 and 2 are built for the
-bounded graph. Part 3 is next: the generic call
-`Buffer::format --calls--> private::Sealed::write`.**
+bounded graph. Part 3 is built for one receiver shape: the generic call
+`Buffer::format --calls--> private::Sealed::write` is stored. Part 4 is next.**
 
 ```text
 part  file                                       requirements                   state
 1     part-1-nodes-and-containment.md            033.0 035.0 038.0 038.1        MET (bounded)
                                                  043.0 045.0
 2     part-2-first-call-default-new.md           034.0 036.0                    PARTLY
-3     part-3-generic-call-format-write.md        042.0                          NEXT
-4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    NOT STARTED
+3     part-3-generic-call-format-write.md        042.0                          BUILT (one shape)
+4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    NEXT, not specified
 5     part-5-macro-generated-items.md            046.0                          NOT STARTED
 6     part-6-targets-in-core.md                  (decision first)               BLOCKED
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED

@@ -1,6 +1,8 @@
 # Part 3 — a method call on a generic receiver
 
-**State: NEXT, not started. Q1 is decided; no open question blocks the build.**
+**State: BUILT for one receiver shape. The target edge is stored from pinned source and the
+workspace gates pass at `b1115a5f4`, with one test skipped as before. Two things are not done:
+type parameters of an enclosing impl or trait, and a rename test on real source.**
 
 **Target:** `Buffer::format --calls--> private::Sealed::write`, from this source:
 
@@ -11,8 +13,8 @@ pub trait Integer: private::Sealed { .. }               // src/lib.rs:119
 pub trait Sealed: Copy { fn write(self, buf: &mut Self::Buffer) -> &str; }   // :128
 ```
 
-**What it takes:** three small additions, in this order: the method-call site carries its
-receiver and method name; bounds and supertraits become rows; the call resolver walks them.
+**What it took:** three small additions, in this order: the method-call site carries its
+receiver and method name; bound rows carry what they bound; the call resolver walks them.
 No type inference is needed, because the receiver is a parameter whose declared type is a
 generic parameter.
 
@@ -90,32 +92,60 @@ DuckDB. Errors extend `OriginalCallResolutionError`; no free-text variant.
 | 042.0 R3 | test_bound_method_ambiguous_candidates | fixture | two bound traits declare the method | unresolved, `AmbiguousTarget` |
 | 042.0 R3 R7 | test_bound_method_name_distractor | fixture | same method name on a trait outside the bound chain | not selected |
 | 042.0 R4 | test_local_receiver_shadow_unresolved | fixture | `let i = 0u8; i.write()` inside the function | unresolved |
-| 042.0 R5 | test_other_receiver_shapes_unresolved | fixture | field, call and `self` receivers | unresolved, `TraitSolverNeeded` |
-| 042.0 R9 | test_missing_source_gap_recorded | real source, CLI, sysroot excluded | the edge's metadata names `Copy` as a trait without source | 1 gap entry |
+| 042.0 R5 | test_other_receiver_shapes_unresolved | fixture | field, reference and cast receivers; a type parameter of the enclosing trait | unresolved, `TraitSolverNeeded` |
+| 042.0 R1 | test_resolve_bound_supertrait_method | fixture | inline and `where` bounds both reach the supertrait's method | 1 edge each |
+| 042.0 R1 | test_bound_method_missing_target | fixture | no bound trait declares the method; method without `self`; no bound | unresolved, `MissingTarget` |
+| 042.0 R9 | test_format_sealed_write_call | real source, CLI, sysroot excluded | the edge's metadata names `Copy` as a trait without source | 1 gap entry |
+| 042.0 R9 | test_missing_source_gap_recorded | fixture | same, on a fixture; `?Sized` and lifetime bounds are skipped | 1 gap entry |
 | 042.0 R9 | test_missing_source_only_unresolved | fixture | the method is declared by no known trait and one chain trait has no source | unresolved, `ExternalSourceMissing` |
 | 042.0 R6 | test_cyclic_supertrait_bounds_terminate | fixture | `trait A: B`, `trait B: A` | terminates, each visited once |
-| 042.0 | test_trait_rename_changes_identity | real source, mutated copy | rename `Sealed` in a copy of the pinned tree | target identity changes, still 1 edge |
-| 045.0 | test_original_member_graph_roundtrip | real source, CLI | existing test still passes; counts move as expected | resolved calls 2 to 3 |
+| 042.0 | test_trait_rename_changes_identity | fixture | traits and method renamed | still 1 edge, to the renamed method |
+| 045.0 | test_original_member_graph_roundtrip | real source, CLI | existing test still passes | pass |
 
-The count in the last row is the expectation; RED measures the real number first.
+All of these exist in code and pass. Two differences from the plan: the rename test runs on a
+fixture, not on a mutated copy of the pinned tree, and it does not compare identities before
+and after. Resolved calls went from 2 to 3 in the measured run; no test asserts that count.
 
 ## 5 — Implementation plan
 
 Each step is its own commit of about 200 lines, with a log entry.
 
-1. STUB and RED: `test_format_sealed_write_call` on pinned itoa. Record how the site is
-   stored today and the reason it carries.
-2. Method-call syntax evidence in `extract_original_call_syntax`, with fixture tests for R5.
-3. Bound evidence on the existing `TYPE_BOUND` rows, `test_generic_bound_rows_written`.
-4. Resolver branch, with fixture tests for R3, R4, R6, R7.
-5. GREEN on the real-source test; add the rename test.
-6. REFACTOR, then the gates below, then re-measure the graph counts and one run's cost.
+1. DONE `9a007b8ec`. RED: `test_format_sealed_write_call` on pinned itoa; the site was stored
+   unresolved with `TraitSolverNeeded`.
+2. DONE `408eb28a5`. Method-call syntax evidence, four fixture tests.
+3. DONE `f80c3932e`. Bound evidence on the existing `TYPE_BOUND` rows.
+4. DONE `ded07eeeb`. Resolver branch; the real-source test is GREEN.
+5. DONE `4940980c0`, `b1115a5f4`. Ten resolver fixture tests.
+6. Gates run (section 6). No refactor was made: the resolver is one function and its index.
+   Counts and cost were measured once, just before step 4's final reshape.
 
 ## 6 — Quality gate results
 
-Not run: no code is written. Gates for this part: `cargo fmt --check`,
-`cargo clippy --all-targets -- -D warnings`, the bounded workspace test run, the release
-build, and the 11 real-source tests plus the new ones.
+Run at `b1115a5f4` with the four commands in `AGENTS.md`:
+
+```text
+format    pass
+lint      pass (release, workspace, all targets, all features, warnings denied)
+tests     442 passed, 0 failed, 4 ignored, in 21 test binaries; 3 min 39 s
+          skipped as before: test_lang_items_in_sysroot (open defect, not a waiver)
+build     pass (release, workspace, all targets)
+real source   13 of 13 itoa tests pass inside that run, 114.56 s
+```
+
+- The four ignored tests are three manual store profiles and one subprocess fixture.
+- Steps 2 to 5 were pushed after gates on the two touched crates only; the workspace gates
+  were run once, after step 5.
+- Only the real-source test has a recorded failing run. The fixture tests were written with or
+  after the code; four deliberate one-line breakages of the resolver each failed one test.
+- Memory: 355 MB peak for the largest single process of one real-source run. Whole process
+  tree was not measured.
+
+Left open by this part:
+
+- A type parameter of the enclosing impl or trait (`impl<I: Integer> W { fn run(i: I) .. }`)
+  stays unresolved. No call in pinned itoa has been shown to need it.
+- `where Self: Trait` bounds and bounds on associated types are not read.
+- A bound with generic arguments (`I: Into<u8>`) makes the call unresolved.
 
 ## 7 — Open questions
 

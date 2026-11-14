@@ -3,15 +3,17 @@
 Two parts. **Current state** is rewritten in place whenever it changes. **Entries** is
 newest first: add each new checkpoint at the top of that section and never edit older ones.
 
-## Current state (2026-11-14)
+## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 45 nodes and
-104 edges, with 2 of 61 calls resolved. One dependency is proven from source:
-`<Buffer as Default>::default --calls--> Buffer::new`. No SOP step has passed and the graph is
+104 edges, with 3 of 61 calls resolved. Two dependencies are proven from source by name:
+`<Buffer as Default>::default --calls--> Buffer::new` and
+`Buffer::format --calls--> private::Sealed::write`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** `Buffer::format --calls--> private::Sealed::write`. It needs generic bounds
-  and supertrait lookup, neither of which is written.
+- **Next target:** part 4, signatures and the four edge kinds not yet produced, starting from
+  `<Buffer as Clone>::clone --calls--> Buffer::new`. Its part file is a stub; it is written
+  with the executable-spec skill before any code.
 - **Produced today:** `contains` and `calls`. Not produced: `uses_type`, `reads`,
   `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
@@ -23,8 +25,8 @@ marked `incomplete`.**
 step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
-3  generic call                        NEXT          format -> Sealed::write
-4  remaining edge kinds                NOT STARTED   uses_type, reads, implements, imports
+3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
+4  remaining edge kinds                NEXT          uses_type, reads, implements, imports
 5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
@@ -38,25 +40,28 @@ step                                   state         measured or missing
   full-item-dependency-graph` on the pinned source writes and reads back a frozen graph.
 - **Nodes.** 45: 43 original items outside function bodies, plus one file area per source file.
   Visibility and reachability are stored as unknown, not guessed.
-- **Edges.** 104: 43 `contains` and 61 `calls`. 2 calls are resolved; 59 are stored unresolved
+- **Edges.** 104: 43 `contains` and 61 `calls`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
-  inherent members are stored as `TraitSolverNeeded`. The split of the 59 by reason has not
+  inherent members are stored as `TraitSolverNeeded`. The split of the 58 by reason has not
   been measured.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 11 real-source itoa tests pass, re-run at commit `bdc380dea` in 104 s. Two of them
-  cover the full graph: `test_original_member_graph_roundtrip` and
-  `test_default_new_call_roundtrip`.
-- **Cost of one run** (measured 2026-11-14, before the macro commits were merged): 14.8 s,
-  411 MB peak for the whole process tree, no memory cap.
+- **Tests.** 13 real-source itoa tests pass at commit `b1115a5f4` (114.56 s, release build, one
+  thread). Three cover the full graph: `test_original_member_graph_roundtrip`,
+  `test_default_new_call_roundtrip` and `test_format_sealed_write_call`.
+- **Workspace gates** at `b1115a5f4`: format, lint and release build pass; 442 tests pass,
+  0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
+- **Cost of one run** (one real-source test, 2026-11-15): 17.3 s, 355 MB peak for the largest
+  single process. The whole process tree was last measured on 2026-11-14, before the macro
+  commits were merged: 14.8 s, 411 MB, no memory cap.
 
-Not re-measured since the three macro commits were merged: the node and edge counts above, the
-run cost, and the workspace gates (format, lint, full test run, release build).
+Not re-measured on the current commit: the node and edge counts above (read during step 4,
+just before its last reshape) and the whole-process-tree memory of one run.
 
 ## What is missing, in build order
 
-1. **Generic calls.** Bound records (`I: Integer`), supertrait traversal
-   (`Integer: private::Sealed`), and method selection that yields one trait method, not
-   every implementation.
+1. **Generic calls, the rest.** Built: a function parameter whose type is that function's own
+   type parameter, with bound and supertrait lookup. Not built: type parameters of an
+   enclosing impl or trait, `where Self` bounds, bounds with generic arguments.
 2. **Body typing.** Types of parameters, `self`, locals and intermediate expressions, as far as
    itoa's calls need them. Everything else stays unresolved with a reason.
 3. **Signature lowering.** Parameter and return types, `Self`, generics and bounds as semantic
@@ -87,6 +92,15 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 02:00 IST — Part 3 closed for one receiver shape; workspace gates run
+
+- Gates at `b1115a5f4`: format and lint pass; 442 tests pass, 0 fail, 4 ignored, in 3 min 39 s
+  with `test_lang_items_in_sysroot` skipped as before; release build passes.
+- Steps 2 to 5 had been pushed after gates on the two touched crates only.
+- Part 3 lists what it leaves open: type parameters of an enclosing impl or trait,
+  `where Self` bounds, bounds with generic arguments, a rename test on real source.
+- Next: write part 4 with the executable-spec skill, then its failing real-source test.
 
 ### 2026-11-15 01:30 IST — Part 3 step 5: resolver fixture tests
 
