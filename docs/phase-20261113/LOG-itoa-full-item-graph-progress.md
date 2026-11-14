@@ -11,9 +11,8 @@ newest first: add each new checkpoint at the top of that section and never edit 
 `Buffer::format --calls--> private::Sealed::write`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4, signatures and the four edge kinds not yet produced, starting from
-  `<Buffer as Clone>::clone --calls--> Buffer::new`. Its part file is a stub; it is written
-  with the executable-spec skill before any code.
+- **Next target:** part 4a, `uses_type` edges from signatures, starting from
+  `Buffer::new --uses_type--> Buffer`. Specified, not built.
 - **Produced today:** `contains` and `calls`. Not produced: `uses_type`, `reads`,
   `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
@@ -42,8 +41,7 @@ step                                   state         measured or missing
   Visibility and reachability are stored as unknown, not guessed.
 - **Edges.** 104: 43 `contains` and 61 `calls`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
-  inherent members are stored as `TraitSolverNeeded`. The split of the 58 by reason has not
-  been measured.
+  inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
 - **Tests.** 13 real-source itoa tests pass at commit `b1115a5f4` (114.56 s, release build, one
   thread). Three cover the full graph: `test_original_member_graph_roundtrip`,
@@ -54,8 +52,8 @@ step                                   state         measured or missing
   single process. The whole process tree was last measured on 2026-11-14, before the macro
   commits were merged: 14.8 s, 411 MB, no memory cap.
 
-Not re-measured on the current commit: the node and edge counts above (read during step 4,
-just before its last reshape) and the whole-process-tree memory of one run.
+The node and call counts above were re-read at `6a2b405b1` (45 nodes, 61 calls, 3 resolved).
+Not re-measured on the current commit: the whole-process-tree memory of one run.
 
 ## What is missing, in build order
 
@@ -92,6 +90,20 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 02:40 IST — Part 4a specified: `uses_type` from signatures
+
+- Part 4 is split into 4a (`uses_type` from signatures, REQ-RUST-018.2), 4b `implements`,
+  4c `reads`, 4d `imports`. Only 4a is written out; the rest stay stubs.
+- Read from a run on pinned itoa before writing: name resolution already stores a resolved
+  row for each type path in a signature (`Buffer`, `Self`, `u8`, `Self::Buffer`), and
+  signature rows exist per parameter, return type, field and bound. No producer joins them.
+- 35 type-path sites in original signatures: 9 name items, 21 builtins, 5 are unresolved.
+- `<Buffer as Clone>::clone --calls--> Buffer::new` was already stored (one of the first two
+  resolved calls), so the first target is `Buffer::new --uses_type--> Buffer` instead.
+- One rule found in code: an edge's target must be a node, so builtin targets need
+  `Builtin` nodes (part 4, Q1).
+- Next: step 1, the failing real-source test `test_new_return_type_edge`.
 
 ### 2026-11-15 02:00 IST — Part 3 closed for one receiver shape; workspace gates run
 
