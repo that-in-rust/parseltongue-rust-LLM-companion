@@ -18,7 +18,7 @@ id      requirement                         state        real-source test on pin
 043.0   one source container per item       MET          test_original_member_graph_roundtrip
 045.0   incomplete graph checkpoint         MET          test_original_member_graph_roundtrip
 034.0   paths inside bodies                 PARTLY       test_default_new_call_roundtrip
-036.0   Type::member lookup                 PARTLY       test_default_new_call_roundtrip
+036.0   Type::member lookup                 PARTLY       test_default_new_call_roundtrip (*)
 032.0   the full item graph                 PARTLY       2 of 6 edge kinds; original items only
 042.0   generic call through a supertrait   NOT STARTED  none
 018.2   signatures and bounds               NOT STARTED  none; impl headers only
@@ -28,6 +28,7 @@ id      requirement                         state        real-source test on pin
 
 MET means the named test passes on pinned source (11 of 11 at commit `15643ec4f`). It does not
 mean the SOP passed: only REQ-RUST-044.0 decides that.
+(*) That test exercises the lookup but its doc comment does not name REQ-RUST-036.0; add the tag.
 
 Out of scope: every other repository, any rust-analyzer export or oracle comparison, and
 every higher-abstraction table (interface level, HLD, file and folder roll-ups).
@@ -163,3 +164,8 @@ Component tests by requirement, counted from doc comments in `crates/`:
 Tests of earlier-work code (name resolution, storage, HLD builder, oracle comparison) cite
 ids defined in [the wider-scope SPEC](../phase-20261111/SPEC-wider-scope-requirements-not-current.md),
 which is history. This phase adds no test against those ids.
+
+Five of the eleven real-source tests are tagged REQ-RUST-040.0 (top-level containment through
+the `original-top-level-containment` stage). They guard source ingest, module ownership and
+visibility scope on pinned itoa, so they stay in the suite, but that stage's output is not
+this phase's deliverable.
