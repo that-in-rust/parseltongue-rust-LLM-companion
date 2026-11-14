@@ -109,6 +109,10 @@ MAP      current-codebase-crate-map.md                       crates, files, verb
 
 - These files state only what is in force. Edit in place; no revision sections. History goes
   in the log.
+- Every document is written answer first (pyramid): the conclusion and current state on top,
+  then the few points that support it, then reference detail. Short, specific, no repetition.
+- One document per commit. Finish it, commit it, push it to `research/tiny-rust-code-mapper`,
+  then start the next.
 - A change to architecture or to a pin updates SPEC, ARCH, SOP and this file in the same commit.
 - Everything else under `docs/` is history. Exception: code and tools still read these files in
   `docs/phase-20261111/`, so do not move or delete them without updating the readers:
