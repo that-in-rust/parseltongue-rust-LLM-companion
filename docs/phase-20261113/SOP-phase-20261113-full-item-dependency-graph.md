@@ -1,143 +1,98 @@
-# SOP — full-item-dependency-graph qualification
+# SOP — itoa full item dependency graph
 
 ## The answer
 
-**This procedure alone decides PASS. A milestone passes when every applicable step S1–S10
-passes on every repository in scope, using one frozen release executable.**
+**PASS means one thing: a production run on pinned itoa 1.0.18 writes a full item dependency
+graph that equals the frozen expected itoa graph, row for row, and does so identically on
+every run.**
 
-- Phase 1 scope: pinned itoa 1.0.18. Phase 2 scope: serde, rust-analyzer, ripgrep, tokio,
-  cargo-modules, in that order.
-- Passing tests, a bounded checkpoint or a planned command are not a PASS.
+- Scope is itoa only, and the full item dependency graph only: nodes, edges, evidence and
+  unresolved sites.
+- Out of scope for this phase: every other repository, any rust-analyzer export or oracle
+  comparison, and every higher-abstraction table (interface level, file and folder roll-ups).
+- Passing unit tests, a bounded checkpoint or a planned command are not a PASS.
 
 Status on 2026-11-14: **no step has passed.**
 
 ```text
-S1      NOT STARTED
-S2      NOT STARTED
-S3      BLOCKED       itoa with sysroot did not finish name resolution in 2,400 s
-S4–S10  NOT STARTED
+S1  freeze inputs and expected graph   NOT STARTED   the expected graph is an unreviewed draft
+S2  gates and production run           PARTLY        runs with sysroot excluded; marked incomplete
+S3  exact comparison                   NOT STARTED   no whole-graph comparison test exists
+S4  determinism, time, memory          NOT STARTED
 ```
 
-The S3 result was measured on 2026-11-13 (619 units parsed, exit 124, nothing published). Its
-run report has since been deleted, so S3 must be re-measured before any work depends on it.
+What the code produces today, with sysroot excluded: 45 nodes and 104 edges (43 `contains`,
+61 `calls` of which 2 are resolved). The draft expected graph has 73 nodes and 368 edges.
+Details are in the top entry of [the log](phase1-log-p1.md).
 
-What exists is a bounded, sysroot-excluded checkpoint on itoa that the code itself marks
-incomplete. Its numbers are in the top entry of [the log](phase1-log-p1.md).
+Scope and decisions are in the [PRD](PRD-phase-20261113-dependency-graph-hld.md); graph rules
+and tables are in the [ARCH](ARCH-phase-20261113-pipeline-graph-tables.md).
 
-Requirement ids and formulas are in the [SPEC](SPEC-phase-20261113-executable-requirements.md);
-scope is in the [PRD](PRD-phase-20261113-dependency-graph-hld.md); graph rules are in the
-[ARCH](ARCH-phase-20261113-pipeline-graph-tables.md).
+## Rule 1 — The expected graph comes from source, and is frozen before any comparison
 
-## Rule 1 — Three witnesses, each with fixed authority
+- The expected graph is [itoa-target-dataset](itoa-target-dataset/): every item node, every
+  dependency edge and every unresolved site of `src/lib.rs` and `src/u128_ext.rs` (488 lines),
+  each with a source range.
+- It is written by reading the pinned source. No tool output is its authority.
+- Today it is a draft (`LLM_PARSED_DRAFT_NOT_FROZEN`). It becomes the reference only after
+  every row is reviewed against the source lines it cites, then serialized, hashed and frozen.
+- Never edit the expected graph to match the mapper. A correction needs a source citation and
+  a new freeze.
 
-- **`parseltongue`** is the thing under test. It never grades itself.
-- **`tools/oracle-semantic-export-harness`** is the answer key. It is built from the pinned
-  rust-analyzer: upstream `2a362a4` plus `tools/parser-const-closure-statements.patch`, commit
-  `bf6b2099d6351c37039b01447a9bb64f9a54a586`. An installed rust-analyzer is not the oracle.
-  - PRIMARY export (build scripts off) is the only scoring denominator.
-  - SECONDARY export (build scripts on) only identifies sites that depend on build scripts.
-- **`codebase-memory-mcp`** is a structural cross-check. A gap or a heuristic edge in it never
-  overrides the oracle and never excuses an oracle-proven error.
-- For Phase 1 there is a fourth: the **frozen expected itoa graph** (Rule 2).
+## Rule 2 — Production reads only the pinned source
 
-Production boundary, checked in S3: the mapper may start exactly three direct child commands,
-`cargo metadata --offline`, `rustc --print cfg` and `rustc --print sysroot`. No compilation, no
-build scripts, no network, no reads under the repository's `target/`.
-
-## Rule 2 — Phase 1 is an exact comparison on itoa, built in this order
-
-1. **Freeze inputs.** Lib target, no features, `cfg(test)` off, host and target
-   `x86_64-unknown-linux-gnu`. Pin: [phase-one-benchmark-pin.json](../phase-20261111/phase-one-benchmark-pin.json).
-   itoa ships no lockfile: create one once in a qualification copy outside production, then run
-   `cargo check --offline --locked --lib --target x86_64-unknown-linux-gnu`.
-2. **Freeze the expected graph before comparing.** Review every node, edge, unresolved site and
-   inactive `cfg` branch of both source files (`src/lib.rs`, `src/u128_ext.rs`; 488 lines)
-   against source and the oracle. Serialize, hash, freeze.
-   [itoa-target-dataset](itoa-target-dataset/) is today's unreviewed draft, not that reference.
-3. **Run production on the pinned source.** Expected rows live only in test assertions. Never
-   feed them, oracle output or fixtures into production, and never hardcode an edge.
-4. **Compare exactly.** Nodes, edges, evidence, unresolved and inactive sets must be equal. No
-   unexplained extra, missing or wrong row. Never edit the expected graph to match the mapper;
-   a correction to it needs a justified new freeze.
-5. **Let the first failing real-source test choose the next work.** Fix only the producer it
-   needs.
-
-Phase 1 exit: frozen expected graph, exact agreement from a production run with sysroot
-included, valid evidence on every row, and identical output at 1, 4 and 16 workers.
-
-`--sysroot-source-scope-kind excluded` is a local diagnostic. Edges into `core` are then stored
-unresolved with a reason. Such a run cannot pass Phase 1.
-
-Constructs itoa does not contain (proc macros, async, re-exports) stay unexercised. Phase 2
-covers them.
+- Expected rows live only in test assertions. Never feed them or fixtures into production, and
+  never hardcode an edge.
+- Production may start exactly three child commands: `cargo metadata --offline`,
+  `rustc --print cfg` and `rustc --print sysroot`. No compilation, no build scripts, no
+  network, no reads under the repository's `target/`.
+- The first failing real-source test chooses the next work. Fix only the producer it needs.
 
 ## Rule 3 — Verdicts are strict
 
-- **PASS:** every applicable check and every per-repository threshold passes.
-- **FAIL:** a contract fails, a sampled row is wrong, production spawns or reads something
-  forbidden, output differs between runs, or a mandatory gate is missed.
-- **BLOCKED:** a precondition, coverage page or oracle export is missing. Never counted as PASS.
-- **NOT STARTED:** the stage does not exist yet. Never counted as PASS.
-- An empty denominator is BLOCKED, not 100%.
-- No pooling across repositories. Each repository passes on its own numbers.
+- **PASS:** nodes, edges, evidence and unresolved sites all equal the frozen expected graph. No
+  extra, missing or wrong row.
+- **FAIL:** any row differs, production spawns or reads something forbidden, or two runs
+  differ.
+- **BLOCKED:** a precondition is missing, for example the expected graph is not frozen.
+- **NOT STARTED:** the producer or the check does not exist yet.
+- A run the code marks `incomplete` cannot pass.
 - A PASS belongs to one executable digest. Any production change needs a new run.
-- Do not patch production during a run. Fix, then start a new run.
-- Memory is measured on every run with no interim cap. After all five repositories pass S5,
-  whole-process-tree peak must be ≤ 500,000,000 bytes.
+- Memory and time are measured and reported on every run. This phase sets no memory cap.
 - Declare the expected wall time before each command; kill it at twice that.
 
 ## Reference
 
-### Preconditions
+### S1 — Freeze inputs and the expected graph
 
-- **P1** Pin sources: itoa for Phase 1; the five repositories in
-  [corpus-source-pin-manifest.json](../phase-20261111/corpus-source-pin-manifest.json) for
-  Phase 2. Record commit, lockfile digest and tool versions.
-- **P2** Qualify the selected lib and bin targets once with offline `cargo check`, outside
-  production.
-- **P3** Provision dependencies, matching sysroot source and proc-macro artifacts offline. A
-  missing proc-macro expansion is BLOCKED.
-- **P4** Build the oracle harness from the pinned commit; record source commit, executable
-  digest and build manifest.
-- **P5** Record machine, OS, memory accounting method and the production executable digest.
-
-Mapper and both oracle exports use the same targets, features, `cfg`, edition and host/target.
-Tests, benches, examples and dev-dependencies are out of scope.
+- Source: itoa 1.0.18, commit `af77385d0daf4d0e949e81f2588be2e44f69f086`, at
+  `/home/ubuntu/repos/rust-tools/itoa`. Pin:
+  [phase-one-benchmark-pin.json](../phase-20261111/phase-one-benchmark-pin.json).
+- Configuration: lib target, no features, `cfg(test)` off, host and target
+  `x86_64-unknown-linux-gnu`.
+- itoa ships no lockfile. Create one once in a copy outside production, then run
+  `cargo check --offline --locked --lib --target x86_64-unknown-linux-gnu`.
+- Regenerate and test the expected graph:
 
 ```bash
-REPO=<absolute checkout>   CMP=<codebase-memory project>   OUT=<run output directory>
+python3 docs/phase-20261113/itoa-target-dataset/itoa-target-dataset-builder.py \
+  --pin-file docs/phase-20261111/phase-one-benchmark-pin.json \
+  --source-root /home/ubuntu/repos/rust-tools/itoa \
+  --output-directory docs/phase-20261113/itoa-target-dataset
+python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+```
+
+Pass: source commit and file digests match the pin; every expected row is reviewed against
+source; the frozen files' digests are recorded.
+
+### S2 — Gates and production run
+
+Run the repository gates in [AGENTS.md](../../AGENTS.md) first. Then:
+
+```bash
+REPO=/home/ubuntu/repos/rust-tools/itoa   OUT=<run output directory>
 STORE="$OUT/workspace-store.db"
-```
 
-### S1 — Structural index
-
-```bash
-codebase-memory-mcp cli index_repository --repo-path "$REPO" --mode full
-codebase-memory-mcp cli index_status --project "$CMP"
-codebase-memory-mcp cli get_graph_schema --project "$CMP"
-```
-
-Pass: the index is `ready` for the pinned checkout; counts recorded. Re-index after any source
-change.
-
-### S2 — Coverage inventory
-
-```bash
-codebase-memory-mcp cli check_index_coverage --project "$CMP" --scopes '["."]' \
-  --scope-limit 20 --scope-offset 0 --diagnostics full --format json
-codebase-memory-mcp cli query_graph --project "$CMP" --graph missed \
-  --query "MATCH (f:File) RETURN f.file_path" --max-rows 200 --format json
-```
-
-Pass: every page fetched (`has_more=false`), entries add up to `scope_total`, each page saved. A
-missed file is missing cross-check evidence only.
-
-### S3 — Gates and production run
-
-Run the repository gates in [AGENTS.md](../../AGENTS.md) first. Then three separate runs, each
-with its own store, so measurement and tracing do not interfere:
-
-```bash
 # 1 timing and memory (untraced)
 python3 tools/process-tree-access-auditor.py sample \
   --memory-sample-output-path "$OUT/process-tree-memory-samples.json" -- \
@@ -145,21 +100,14 @@ python3 tools/process-tree-access-auditor.py sample \
   --workspace-store-file-path "$STORE" --worker-thread-count-value 4 \
   --mapping-final-stage-kind full-item-dependency-graph
 
-# 2 process audit
-strace --seccomp-bpf -f -s 65535 -e trace=execve,connect,clone,clone3,fork,vfork \
+# 2 process and target/ audit (separate store, so tracing does not affect timing)
+strace --seccomp-bpf -f -s 65535 -e trace=execve,connect,clone,clone3,fork,vfork,openat \
   -o "$OUT/production-process-access-audit.txt" \
   parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
   --workspace-store-file-path "$OUT/audit-store.db" --worker-thread-count-value 4 \
   --mapping-final-stage-kind full-item-dependency-graph
 
-# 3 target/ read audit
-strace --seccomp-bpf -f -s 65535 -e trace=openat -P "$REPO/target" \
-  -o "$OUT/production-target-access-audit.txt" \
-  parseltongue map-workspace-full-run --workspace-root-path-value "$REPO" \
-  --workspace-store-file-path "$OUT/target-store.db" --worker-thread-count-value 4 \
-  --mapping-final-stage-kind full-item-dependency-graph
-
-parseltongue status-coverage-banner-show --workspace-store-file-path "$STORE" --json
+# 3 export the graph
 parseltongue export-published-stage-rows --workspace-store-file-path "$STORE" \
   --stage-owned-table-name item-effective-visibility-records > "$OUT/full-graph-nodes.json"
 parseltongue export-published-stage-rows --workspace-store-file-path "$STORE" \
@@ -168,152 +116,61 @@ parseltongue export-published-stage-rows --workspace-store-file-path "$STORE" \
 
 Pass:
 
-- All stages for the milestone are marked complete and published. Limit today: the banner
-  reports publication for the first four stages only and hard-codes signature lowering, call
-  resolution and visibility as "not yet implemented". For a full-graph run, read
-  `workspace_required_stage_names` and `workspace_full_map_completeness_kind` from
-  `workspace-config-state-records`; the value `incomplete` is not a pass.
+- The run publishes, and `workspace_full_map_completeness_kind` in
+  `workspace-config-state-records` is not `incomplete`.
 - Direct children are exactly the three allowed commands. Beneath `cargo metadata`, only
-  `rustc -vV` and Cargo's stdin `--print` discovery probe are allowed.
+  `rustc -vV` and Cargo's stdin `--print` probe are allowed.
 - No file under `target/` is read except Cargo's `.rustc_info.json`.
-- The lockfile digest is unchanged; a missing lockfile is an explicit validation error.
 - Time and memory come only from the untraced run.
-- Before DuckDB analysis starts: only a published, non-cancelled generation is copied; row
-  counts and content digests match on both sides; DuckDB runs with extension install/load and
-  external access off, a run-local temp directory, and its effective `memory_limit` reported.
 
-### S4 — Oracle exports
+`--sysroot-source-scope-kind excluded` is how the code runs today. Targets in `core` are then
+stored unresolved with a reason. See the open decision below.
 
-```bash
-parseltongue export-mapped-unit-manifest --workspace-store-file-path "$STORE" > "$OUT/mapped-unit-manifest.json"
+### S3 — Exact comparison
 
-oracle-semantic-export-harness --workspace-source-root-path "$REPO" \
-  --mapped-unit-manifest-path "$OUT/mapped-unit-manifest.json" \
-  --oracle-artifact-cache-output "$OUT/oracle-artifact-cache.json"
+Compare the exported nodes and edges with the frozen expected graph:
 
-for KIND in PRIMARY SECONDARY; do
-  oracle-semantic-export-harness --workspace-source-root-path "$REPO" \
-    --mapped-unit-manifest-path "$OUT/mapped-unit-manifest.json" \
-    --oracle-macro-cache-manifest "$OUT/oracle-artifact-cache.json" \
-    --oracle-configuration-kind "$KIND" \
-    --oracle-path-export-output "$OUT/oracle-$KIND-path-export.json"
-done
-```
+- **Nodes:** every item outside a function body, private items included; one file-area node
+  per source file; one node per active `use`; items generated by a macro carry the invocation
+  they came from.
+- **Edges:** every dependency between items, uncollapsed, private to private included, of the
+  kinds `contains`, `calls`, `uses_type`, `reads`, `implements`, `imports`. itoa has no
+  `derives` or `reexports`; the expected count for both is zero.
+- **Evidence:** every edge cites the exact source range of the site that proves it. An edge
+  through an import targets the real item and keeps the `use` as evidence.
+- **Unresolved sites:** each is stored with a typed reason and matches the expected list.
 
-Pass: both exports come from the same manifest, cache and source generation (digests recorded),
-with proc macros on and test `cfg` off.
-
-Limit today: the harness exports path-resolution sites only. Macro expansion items, impl
-relations, method and call targets, signature references and visibility are required for full
-S4 and are not exported yet. Until they are, S4 and S5 cannot pass beyond path sites.
-
-### S5 — Per-site comparison
+The comparison runs as real-source tests in
+`crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs`:
 
 ```bash
-parseltongue oracle-edge-differ-run --workspace-store-file-path "$STORE" \
-  --primary-semantic-input-path "$OUT/oracle-PRIMARY-path-export.json" \
-  --secondary-semantic-input-path "$OUT/oracle-SECONDARY-path-export.json" \
-  --agreement-store-file-path "$OUT/oracle-edge-agreement-store.db"
+cargo test --release -p parseltongue-cli-dispatcher-binary \
+  --test itoa-source-acceptance-tests -- --test-threads=1
 ```
 
-Per-repository gates, with PRIMARY sites as the denominator:
+Limits today:
 
-```text
-REQ-RUST-005  path resolution                         ≥ 99.5%
-REQ-RUST-006  macro expansion items and body sites    ≥ 99%
-REQ-RUST-013  proc-macro shape expansions             = 100%
-REQ-RUST-018  impl relations                          ≥ 99.5%
-REQ-RUST-007  method targets, precision               ≥ 99%
-REQ-RUST-008  method targets, coverage                ≥ 95%   (mandatory at M8)
-REQ-RUST-019  selection, visibility, reachability     = 100%
-```
+- 11 tests exist and check parts of the graph, including `default -> Buffer::new`. No test
+  compares the whole graph.
+- The expected graph names items by symbolic label; production uses canonical identities. The
+  mapping between the two has to be defined before whole-graph comparison.
 
-- Every site gets exactly one result and, if unresolved, the earliest reason in this order:
-  `cfg_inactive`, `build_script`, `proc_macro`, `external_source_missing`,
-  `unknown_receiver`, `trait_solver_needed`.
-- Graph edge rows currently carry a different reason type (`HldUnresolvedReasonKind`). Until the
-  PRD open point "Edge reasons" is settled, unresolved edges cannot be scored and that part of
-  the comparison is BLOCKED.
-- Inactive and PRIMARY-absent sites are exclusions. A PRIMARY-visible unresolved site is a miss.
-- A wrong extracted target is never excused by a reason.
-- Report raw counts, exclusions and rates.
+### S4 — Determinism, time, memory
 
-### S6 — Structural cross-check
+- Run production twice at each of 1, 4 and 16 workers. Export nodes and edges as in S2 and
+  compare with `cmp`. Any difference is FAIL.
+- Record wall time, whole-process-tree peak memory (10 ms samples) and store size.
 
-Compare `.rs` file, item and impl counts from codebase-memory with production for the same
-active source set. Explain every difference (inactive `cfg`, body items, macro expansion). A
-difference prompts an oracle check; it does not decide pass or fail by itself.
+### Report
 
-### S7 — Edge triage
+Each run writes one entry at the top of [the log](phase1-log-p1.md): source and executable
+digests; each step PASS / FAIL / BLOCKED / NOT STARTED with row counts; the first differing
+row; time and peak memory. A step with no entry was not observed.
 
-Use codebase-memory `CALLS` edges only to locate candidates, then score production rows against
-PRIMARY per site:
+### Open decision
 
-```text
-AGREE      correct
-PT-EXTRA   extracted but wrong              method rate must be ≤ 1%
-PT-BUG     PRIMARY-visible, not extracted   counts against REQ-RUST-008
-KNOWN-GAP  excluded for a verified reason
-```
-
-### S8 — Sampled evidence review
-
-- Sample `min(50, row count)` edge rows without replacement, seed 42: rank row keys by
-  BLAKE3-256 of seed, key length and key bytes; take the smallest.
-- Open the stored source and evidence for each. One false edge or missing evidence is FAIL.
-- Zero rows gives zero samples and BLOCKED, not a pass.
-
-### S9 — Graph proof
-
-Full graph, active now:
-
-- Every item outside a function body is a node, private items included.
-- One file-area node per source file; one node per active `use`.
-- Every extracted edge is present uncollapsed, including private to private.
-- An edge through an import targets the real item and keeps the `use` as evidence.
-- Visibility and outside-crate reachability match PRIMARY, or are stored as unknown.
-
-Derived levels, applied only once they are built: every derived node, edge and path hop exists
-in the full graph, and no collapsed path contains a `contains` or `imports` hop.
-
-### S10 — Determinism, memory, time
-
-- Run production twice at each of 1, 4 and 16 workers. Export the node and edge tables as in S3
-  and compare with `cmp`. Any difference is FAIL.
-- Every query whose output is consumed has a total `ORDER BY`.
-- Record whole-process-tree peak memory (10 ms samples), wall time per stage and disk size.
-
-### Milestone subsets
-
-```text
-M0   S3 build and identity fixtures; S4 harness build only
-M1   S1, S2, S3 input/store fixtures; S10 input-row determinism
-M2   S1–S3; S4/S5 path gates, proc-macro sites excluded and reported
-M3   M2 plus proc-macro shape gates, exclusions removed
-M4   M3 plus signatures and impl headers; S6 impl triage
-M5   M4 plus body inference precision; S7
-M6   M5 with traits in scope; ≥ 95% coverage on all five allows skipping M7
-M7   M6 with the solver adapter
-M8   full S1–S10 and every SPEC contract
-```
-
-`--mapping-final-stage-kind` accepts `syntax-spans` (M1-only run), `name-resolution` (the
-default), `full-item-dependency-graph`, and `original-top-level-containment` (an earlier
-checkpoint that publishes HLD tables for top-level containment only; not used for any gate).
-
-### Runner and report
-
-```bash
-python3 tools/hld-current-qualification-runner.py --run-id <run-id> --milestone M2 \
-  --mode execute --mapper-binary target/release/parseltongue
-```
-
-- The runner supports milestones M1 and M2 only. Later milestones are run by hand from the
-  steps above until it is extended.
-- Report: `hld-current-test-runs/<run-id>/hld-current-test-report.md`, committed. Large
-  artifacts: `~/hld-current-test-artifacts/<run-id>/`, not committed; the report records each
-  path and digest. No run exists in either folder today.
-- The report states: phase; source, lock, tool and executable digests; stages completed; per
-  step PASS / FAIL / BLOCKED / NOT STARTED with counts, rates and exclusions; the first failing
-  check; time and peak memory; the sample seed and keys.
-- A gate with no report entry was not observed.
+**Targets outside itoa.** 119 of the 368 draft edges point at items in `core`, and 55 at
+builtin types. Resolving a `core` target to an item needs the sysroot source in the run; on
+2026-11-13 that run did not finish name resolution in 2,400 s. Until decided, an edge into
+`core` counts as matched only when production resolves it, so a sysroot-excluded run cannot
+pass.
