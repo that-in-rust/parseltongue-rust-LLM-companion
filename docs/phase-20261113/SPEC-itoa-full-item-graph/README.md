@@ -5,10 +5,10 @@ full item dependency graph only.
 
 ## The answer
 
-**Thirteen requirements in seven parts, in build order. Parts 1 and 2 are built for the
+**Fourteen requirements in seven parts, in build order. Parts 1 and 2 are built for the
 bounded graph. Part 3 is built for one receiver shape: the generic call
-`Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is next and specified: `uses_type` edges from signatures, first
-`Buffer::new --uses_type--> Buffer`.**
+`Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is built: `uses_type` rows from original signatures. Part 4b is next and
+specified: `implements` rows from impl headers, first `u128 --implements--> Unsigned`.**
 
 ```text
 part  file                                       requirements                   state
@@ -16,7 +16,8 @@ part  file                                       requirements                   
                                                  043.0 045.0
 2     part-2-first-call-default-new.md           034.0 036.0                    PARTLY
 3     part-3-generic-call-format-write.md        042.0                          BUILT (one shape)
-4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a BUILT; 4b-4d stubs
+4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a BUILT; 4c 4d stubs
+4b    part-4b-implements-from-impl-headers.md    047.0                          SPECIFIED
 5     part-5-macro-generated-items.md            046.0                          NOT STARTED
 6     part-6-targets-in-core.md                  (decision first)               BLOCKED
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED
@@ -62,7 +63,7 @@ every higher-abstraction table (interface level, HLD, file and folder roll-ups).
 PRD acceptance                        requirement                  SOP step
 A1 production binary, real source     033.0                        S2
 A2 every expected node and edge       032.0 034.0 036.0 042.0      S3
-                                      018.2 046.0 035.0 043.0
+                                      018.2 047.0 046.0 035.0 043.0
 A3 no extra, missing or wrong row     044.0                        S3
 A4 unresolved and inactive sites      034.0 038.1 044.0            S3
 A5 digests, time, memory, disk        044.0                        S2, S4
@@ -74,15 +75,16 @@ A6 frozen readback, failure safety,   045.0 044.0                  S2, S4
 
 ```bash
 cargo test --release -p parseltongue-cli-dispatcher-binary \
-  --test itoa-source-acceptance-tests -- --test-threads=1          # 11 real-source tests
+  --test itoa-source-acceptance-tests -- --test-threads=1          # 17 real-source tests
 ```
 
-Component tests by requirement, counted from doc comments in `crates/`:
+Doc comments naming each requirement in `crates/`, counted 2026-11-15 (one comment can
+cover several tests):
 
 ```text
-045.0  38    043.0  12    034.0  10    036.0  8    032.0  7
-035.0   4    033.0   2    038.0   2    038.1  1    044.0  2 (validator and round-trip only)
-042.0   0    018.2   0    046.0  0
+042.0  17    045.0  15    018.2  15    034.0  10    032.0  7
+043.0   6    036.0   5    038.0   4    033.0   2    035.0  1
+038.1   1    044.0   1    046.0   0    047.0   0
 ```
 
 ### Open points across parts

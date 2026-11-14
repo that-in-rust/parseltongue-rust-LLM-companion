@@ -193,9 +193,9 @@ A `Self` whose impl header is unresolved stores nothing until step 6.
 
 ## Stubs: 4b to 4d
 
-- **4b `implements`.** One edge per impl header from the self type to the trait. Impl headers
-  already resolve both. Open: the source when the self type is a builtin (`impl Unsigned for
-  u128`), and trait targets in `core` (part 6).
+- **4b `implements`.** Specified in
+  [part-4b-implements-from-impl-headers.md](part-4b-implements-from-impl-headers.md)
+  (REQ-RUST-047.0). Not built.
 - **4c `reads`.** Paths to consts and statics in bodies and initializers
   (`I::MAX_STR_LEN`, `DECIMAL_PAIRS.0`). Part of REQ-RUST-032.0.
 - **4d `imports`.** One edge per `use` node to what it names. All four in itoa point into

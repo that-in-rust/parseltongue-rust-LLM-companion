@@ -11,8 +11,8 @@ from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4b, `implements` edges from impl headers. Its part is a stub and is
-  written before any code. Part 4a is built.
+- **Next target:** part 4b, `implements` edges from impl headers (REQ-RUST-047.0). It is
+  specified, not built: 32 rows expected on itoa. Part 4a is built.
 - **Produced today:** `contains`, `calls`, and `uses_type` from signatures (items,
   builtins, unresolved with a reason). Not produced: `reads`, `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
@@ -89,6 +89,19 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 06:40 IST — Part 4b specified: `implements` from impl headers
+
+- Part 4b is written before any code: REQ-RUST-047.0, one `implements` row per trait impl
+  header, from the self type to the trait.
+- Measured on pinned itoa: 33 impl headers. 32 name a trait; 29 resolve both ends and 3
+  (`Buffer` to `Default`, `Clone`, `Copy`) have a trait in `core`, so they are unresolved.
+- That matches the expected graph's 32 `implements` rows by count.
+- One contract change is needed: the validator must accept a builtin source for
+  `implements` only (`impl Unsigned for u128`).
+- 28 of the 32 headers are macro-generated; their site is in expanded text. Whether the
+  frozen store accepts that is open (Q1 of the part).
+- Next: step 1, the failing real-source test `test_unsigned_impl_builtin_source`.
 
 ### 2026-11-15 06:20 IST — Part 4a step 7: refactor and one run's cost; 4a is built
 
