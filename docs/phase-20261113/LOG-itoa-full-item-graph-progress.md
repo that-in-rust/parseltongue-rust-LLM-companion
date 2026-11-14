@@ -39,7 +39,9 @@ step                                   state         measured or missing
 - **Nodes.** 45: 43 original items outside function bodies, plus one file area per source file.
   Visibility and reachability are stored as unknown, not guessed.
 - **Edges.** 104: 43 `contains` and 61 `calls`. 2 calls are resolved; 59 are stored unresolved
-  with a reason (`unsupported_trait`, `unsupported_inherent`).
+  with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
+  inherent members are stored as `TraitSolverNeeded`. The split of the 59 by reason has not
+  been measured.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
 - **Tests.** 11 real-source itoa tests pass, re-run at commit `bdc380dea` in 104 s. Two of them
   cover the full graph: `test_original_member_graph_roundtrip` and
