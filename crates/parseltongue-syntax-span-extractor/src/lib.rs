@@ -46,7 +46,7 @@ pub use impl_header_implements_records::{
 mod signature_type_edge_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
 pub use signature_type_edge_records::{
-    SignatureTypeEdgeError, collect_builtin_target_nodes, resolve_signature_type_edges,
+    SignatureTypeEdgeError, collect_builtin_endpoint_nodes, resolve_signature_type_edges,
 };
 #[path = "legacy-macro-source-events.rs"]
 mod legacy_macro_source_events;

@@ -141,15 +141,25 @@ pub fn resolve_signature_type_edges(
     Ok(edges)
 }
 
-/// One `Builtin` node per builtin name the edges target, in name order, so
-/// that every stored edge ends at a node.
-pub fn collect_builtin_target_nodes(edges: &[HldEdgeInputRecord]) -> Vec<HldNodeInputRecord> {
+/// One `Builtin` node per builtin name the edges start from or end at, in
+/// name order, so that every stored edge joins two nodes.
+pub fn collect_builtin_endpoint_nodes(edges: &[HldEdgeInputRecord]) -> Vec<HldNodeInputRecord> {
     edges
         .iter()
-        .filter_map(|edge| match &edge.edge_resolution_value {
-            HldEdgeResolutionValue::Extracted {
-                target: target @ HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)),
-            } => Some((name, (edge.run_generation_digest_value, target))),
+        .flat_map(|edge| {
+            let target = match &edge.edge_resolution_value {
+                HldEdgeResolutionValue::Extracted { target } => Some(target),
+                _ => None,
+            };
+            [Some(&edge.edge_source_reference), target]
+                .into_iter()
+                .flatten()
+                .map(move |endpoint| (edge.run_generation_digest_value, endpoint))
+        })
+        .filter_map(|(generation, endpoint)| match endpoint {
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)) => {
+                Some((name, (generation, endpoint)))
+            }
             _ => None,
         })
         .collect::<BTreeMap<_, _>>()

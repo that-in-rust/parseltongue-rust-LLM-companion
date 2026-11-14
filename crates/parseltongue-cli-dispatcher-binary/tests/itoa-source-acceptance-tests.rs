@@ -700,7 +700,6 @@ fn test_clone_self_type_edge() {
 
 /// REQ-RUST-047.0
 #[test]
-#[ignore = "RED until part 4b step 4 stores implements rows"]
 fn test_unsigned_impl_builtin_source() {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");

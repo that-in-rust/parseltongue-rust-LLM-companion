@@ -171,3 +171,26 @@ fn test_inherent_negative_no_edge() {
         "an inherent impl and a negative impl implement nothing"
     );
 }
+
+/// REQ-RUST-047.0
+#[test]
+fn test_builtin_source_one_node() {
+    let source = "struct Buffer; trait Make {} impl Make for u8 {} impl Make for u8 {}";
+    let (store, input) = make_header_fixture(source, |_| {});
+    let set = resolve_impl_header_edges(
+        &store,
+        &make_call_fixture_scope(),
+        &input,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    assert_eq!(set.implements_edge_records.len(), 2);
+    let nodes = crate::collect_builtin_endpoint_nodes(&set.implements_edge_records);
+    assert_eq!(nodes.len(), 1, "two headers on u8 share one u8 node");
+    assert_eq!(nodes[0].node_input_category, HldNodeInputCategory::Builtin);
+    assert_eq!(nodes[0].node_qualified_path_text, "u8");
+    let mut graph = input.clone();
+    graph.input_node_records.extend(nodes);
+    graph.input_edge_records.extend(set.implements_edge_records);
+    assert_eq!(validate_full_graph_input(&graph), Ok(()));
+}

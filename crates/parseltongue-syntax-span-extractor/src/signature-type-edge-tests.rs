@@ -364,7 +364,7 @@ fn test_builtin_target_one_node() {
         &RunCancelFlagValue::default(),
     )
     .unwrap();
-    let nodes = collect_builtin_target_nodes(&edges);
+    let nodes = collect_builtin_endpoint_nodes(&edges);
     assert_eq!(
         nodes
             .iter()

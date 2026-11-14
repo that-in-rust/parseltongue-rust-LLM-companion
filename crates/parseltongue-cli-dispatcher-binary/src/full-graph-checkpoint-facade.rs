@@ -49,20 +49,33 @@ pub(crate) fn publish_full_graph_checkpoint(
         cancel,
     )
     .map_err(map_full_graph_error)?;
+    let implements = parseltongue_syntax_span_extractor::resolve_impl_header_edges(
+        store,
+        &source_snapshot,
+        &input,
+        cancel,
+    )
+    .map_err(map_full_graph_error)?;
+    let (type_use_count, implements_count) =
+        (type_uses.len(), implements.implements_edge_records.len());
+    let mut semantic = type_uses;
+    semantic.extend(implements.implements_edge_records);
     input
         .input_node_records
-        .extend(parseltongue_syntax_span_extractor::collect_builtin_target_nodes(&type_uses));
+        .extend(parseltongue_syntax_span_extractor::collect_builtin_endpoint_nodes(&semantic));
     input.input_node_records.sort();
     eprintln!(
-        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} type_uses={} completeness=incomplete",
+        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} completeness=incomplete",
         input.input_node_records.len(),
         input.input_edge_records.len(),
         calls.len(),
         resolved,
-        type_uses.len()
+        type_use_count,
+        implements_count,
+        implements.headers_without_source
     );
     input.input_edge_records.extend(calls);
-    input.input_edge_records.extend(type_uses);
+    input.input_edge_records.extend(semantic);
     input.input_edge_records.sort();
     input.input_edge_records.dedup();
     let graph_snapshot = full_graph_input_store
