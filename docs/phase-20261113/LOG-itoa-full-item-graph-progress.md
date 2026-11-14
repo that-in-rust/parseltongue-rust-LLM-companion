@@ -88,6 +88,19 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-15 01:30 IST — Part 3 step 5: resolver fixture tests
+
+- Ten fixture tests on a small bound-method graph (`make_bound_fixture_graph`): supertrait
+  method through inline and `where` bounds, two candidates, same-name distractors, rebound
+  receiver, other receiver shapes, cyclic supertraits, missing source with and without a
+  found target, no candidate, renamed traits and method. Extractor crate: 55 + 17 pass.
+- They were written after the code, so none has a failing run. As a substitute, four
+  one-line breakages of the resolver were tried and each made exactly one test fail:
+  rebinding check removed, type-parameter-owner check removed, method name ignored, visited
+  set ignored. A fifth (missing source blocks the edge) did not compile, so it shows nothing.
+- No direct breakage was tried for the two-candidate or distractor tests.
+- Next: refactor pass, workspace gates, then close part 3.
+
 ### 2026-11-15 01:00 IST — Part 3 step 4: GREEN, `Buffer::format` calls `private::Sealed::write`
 
 - `test_format_sealed_write_call` passes on pinned itoa. The stored edge targets the trait

@@ -854,3 +854,140 @@ fn test_resolve_bound_supertrait_method() {
         );
     }
 }
+
+/// REQ-RUST-042.0
+#[test]
+fn test_bound_method_ambiguous_candidates() {
+    let source = "trait A { fn write(self); } trait B { fn write(self); } fn run<I: A + B>(i: I) { i.write(); }";
+    assert_eq!(
+        read_bound_call_result(source).0,
+        Err(HldUnresolvedReasonKind::AmbiguousTarget)
+    );
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_bound_method_name_distractor() {
+    let source = format!(
+        "trait Other {{ fn write(self); }} fn write() {{}} {BOUND_SOURCE} trait Late {{ fn write(self); }}"
+    );
+    let (store, input) = make_bound_fixture_graph(&source);
+    let edges = read_call_fixture_edges(&store, &input);
+    let HldEdgeResolutionValue::Extracted { target } = &edges[0].edge_resolution_value else {
+        panic!("expected an edge, got {:?}", edges[0].edge_resolution_value);
+    };
+    // The target is the `write` that Sealed contains, not another one of that name.
+    let sealed = input
+        .input_node_records
+        .iter()
+        .find(|node| node.node_qualified_path_text == "Sealed")
+        .unwrap();
+    assert!(input.input_edge_records.iter().any(|edge| {
+        edge.edge_source_reference == sealed.node_target_reference
+            && edge.edge_resolution_value
+                == HldEdgeResolutionValue::Extracted {
+                    target: target.clone(),
+                }
+    }));
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_local_receiver_shadow_unresolved() {
+    let source = BOUND_SOURCE.replace("{ i.write(); }", "{ let i = 1u8; i.write(); }");
+    let (outcome, dispatch) = read_bound_call_result(&source);
+    assert_eq!(outcome, Err(HldUnresolvedReasonKind::TraitSolverNeeded));
+    assert!(dispatch["bound_dispatch_evidence"].is_null());
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_other_receiver_shapes_unresolved() {
+    for source in [
+        BOUND_SOURCE.replace("(i: I) { i.write(); }", "(i: (I,)) { i.0.write(); }"),
+        BOUND_SOURCE.replace("(i: I) { i.write(); }", "(i: &I) { i.write(); }"),
+        BOUND_SOURCE.replace("(i: I) { i.write(); }", "(i: I) { (i as I).write(); }"),
+        BOUND_SOURCE.replace(
+            "fn run<I: Integer>(i: I) { i.write(); }",
+            "trait Host<I: Integer> { fn run(i: I) { i.write(); } }",
+        ),
+    ] {
+        assert_eq!(
+            read_bound_call_result(&source).0,
+            Err(HldUnresolvedReasonKind::TraitSolverNeeded),
+            "{source}"
+        );
+    }
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_cyclic_supertrait_bounds_terminate() {
+    let source = "trait A: B {} trait B: A { fn write(self); } fn run<I: A>(i: I) { i.write(); }";
+    let (outcome, dispatch) = read_bound_call_result(source);
+    assert_eq!(outcome, Ok("write".to_owned()));
+    assert_eq!(
+        dispatch["bound_dispatch_evidence"]["bound_chain"],
+        json!(["I", "A", "B"]),
+        "each trait is visited once"
+    );
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_missing_source_gap_recorded() {
+    let source = BOUND_SOURCE.replace("trait Sealed {", "trait Sealed: Copy + ?Sized + 'static {");
+    let (outcome, dispatch) = read_bound_call_result(&source);
+    assert_eq!(outcome, Ok("write".to_owned()));
+    assert_eq!(
+        dispatch["bound_dispatch_evidence"],
+        json!({"bound_chain":["I", "Integer", "Sealed"],"missing_source_traits":["Copy"]})
+    );
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_missing_source_only_unresolved() {
+    let source = "fn run<I: Copy>(i: I) { i.write(); }";
+    let (outcome, dispatch) = read_bound_call_result(source);
+    assert_eq!(outcome, Err(HldUnresolvedReasonKind::ExternalSourceMissing));
+    assert_eq!(
+        dispatch["bound_dispatch_evidence"]["missing_source_traits"],
+        json!(["Copy"])
+    );
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_bound_method_missing_target() {
+    for source in [
+        // No bound trait declares the method.
+        BOUND_SOURCE.replace("fn write(self);", "fn other(self);"),
+        // An associated function without `self` is not callable as a method.
+        BOUND_SOURCE.replace("fn write(self);", "fn write();"),
+        // No bound at all.
+        BOUND_SOURCE.replace("<I: Integer>", "<I>"),
+    ] {
+        assert_eq!(
+            read_bound_call_result(&source).0,
+            Err(HldUnresolvedReasonKind::MissingTarget),
+            "{source}"
+        );
+    }
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_trait_rename_changes_identity() {
+    // Nothing is keyed on itoa's names: renamed traits and method resolve the same way.
+    let source = BOUND_SOURCE
+        .replace("Sealed", "Hidden")
+        .replace("Integer", "Number")
+        .replace("write", "emit");
+    let (outcome, dispatch) = read_bound_call_result(&source);
+    assert_eq!(outcome, Ok("emit".to_owned()));
+    assert_eq!(
+        dispatch["bound_dispatch_evidence"]["bound_chain"],
+        json!(["I", "Number", "Hidden"])
+    );
+}
