@@ -473,6 +473,65 @@ fn test_default_new_call_roundtrip() {
     );
 }
 
+/// REQ-RUST-042.0
+#[test]
+fn test_format_sealed_write_call() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let format = locate_original_member_node(&input, &spans, "format");
+    let write = locate_original_member_node(&input, &spans, "write");
+    let source = fs::read(root.join("src/lib.rs")).unwrap();
+    let expected_site = b"i.write(unsafe { &mut *buf_ptr })";
+    let calls = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            let site = edge
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key
+                .read_semantic_occurrence_parts();
+            let (start, end) = site.span_byte_range_value.read_source_range_pair();
+            edge.edge_source_reference == format.node_target_reference
+                && edge.edge_relation_kind_value == HldRelationKindValue::Calls
+                && source[start as usize..end as usize] == expected_site[..]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        calls.len(),
+        1,
+        "exactly one stored call for the i.write site in Buffer::format"
+    );
+    let call = calls[0];
+    assert_eq!(
+        call.edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: write.node_target_reference.clone()
+        },
+        "the generic receiver call must target the trait method private::Sealed::write"
+    );
+    let dispatch = call.edge_dispatch_metadata_text.as_deref().unwrap_or("");
+    assert!(
+        dispatch.contains("Integer") && dispatch.contains("Sealed"),
+        "dispatch metadata must carry the bound chain, got {dispatch:?}"
+    );
+    let write_targets = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_source_reference == format.node_target_reference
+                && edge.edge_relation_kind_value == HldRelationKindValue::Calls
+                && matches!(
+                    edge.edge_resolution_value,
+                    HldEdgeResolutionValue::Extracted { .. }
+                )
+        })
+        .count();
+    assert_eq!(
+        write_targets, 1,
+        "Buffer::format has one resolved call: no fan-out to implementations"
+    );
+}
+
 /// REQ-RUST-033.0 / REQ-RUST-035.0 / REQ-RUST-043.0
 #[test]
 fn test_impl_header_row_contents() {

@@ -88,6 +88,19 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-14 23:40 IST — Part 3 step 1: RED on the generic call
+
+- Test `test_format_sealed_write_call` (REQ-RUST-042.0) added. It runs the production CLI on
+  pinned itoa and fails at the intended assertion: 1 test selected, 0 passed, 1 failed, 13 s.
+- What it shows: the `i.write(unsafe { &mut *buf_ptr })` site is stored once, as a `calls`
+  edge from `Buffer::format`, unresolved with `TraitSolverNeeded`. The trait method
+  `private::Sealed::write` is already a graph node.
+- Counts re-measured on this run, unchanged after the macro commits: 45 nodes, 104 edges,
+  61 calls, 2 resolved. Peak memory of the test process tree's largest process: 362 MB.
+- Decision recorded the same day: an edge whose chain has a trait without source is stored
+  and names the gap (PRD, Decisions in force; part 3, R9).
+- Next: step 2, method-call syntax evidence in `extract_original_call_syntax`.
+
 ### 2026-11-14 23:10 IST — SPEC is a folder; part 3 specified, not built
 
 - The SPEC is now `SPEC-itoa-full-item-graph/`: an index plus one part per target in build
