@@ -19,7 +19,7 @@ source files
   -> DuckDB  item nodes + contains edges                              built: bounded
   -> Rust    calls edges                                              built: type-relative paths only
   -> Turso   frozen full graph, read back and compared                built: marked incomplete
-  -> DuckDB  derived levels (interface, roll-ups)                     deferred; fixtures only
+  -> DuckDB  derived levels (interface, roll-ups)                     deferred; not fed by this graph
 ```
 
 Product: [PRD](PRD-phase-20261113-dependency-graph-hld.md). Contracts:
@@ -71,8 +71,10 @@ Four facts in the code that shape the remaining work:
 - **C2** Header paths are resolved. Full signature types (parameters, returns, bounds) are not
   lowered, so nothing can type a receiver.
 - **C3** itoa with the sysroot did not finish step 5 in 2,400 s. Development runs exclude it.
-- **C4** The derived-level builder takes typed records, not tables. It works on fixtures; no
-  complete real-source input reaches it.
+- **C4** The derived-level builder takes typed records, not tables. Real source reaches it by
+  one route only: the `original-top-level-containment` stage, an earlier checkpoint that feeds
+  it top-level `contains` edges from itoa and publishes the level-0 tables. The full graph of
+  step 7 does not feed it; everything else about it is tested on fixtures.
 
 ## 2 — The tables, top to bottom
 
@@ -81,7 +83,7 @@ facts it is built from.
 
 ```text
 level  table                                  owner stage                        state
-0      hld-current-interface-nodes            hld-current-materialization-stage  deferred
+0      hld-current-interface-nodes            hld-current-materialization-stage  deferred; containment only
        hld-current-dependency-edges
        hld-edge-evidence-paths
        hld-file-level-rollup
