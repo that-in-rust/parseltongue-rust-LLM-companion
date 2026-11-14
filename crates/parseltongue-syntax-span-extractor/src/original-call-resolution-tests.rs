@@ -645,3 +645,212 @@ fn test_capture_type_bound_evidence() {
         ]
     );
 }
+
+/// A fixture graph for bound-method calls: every active `fn` and `trait` is a
+/// node, every trait contains the functions written inside it, and a bound's
+/// trait path resolves to the trait of that name. A name with no trait in the
+/// source stands for a trait whose source is absent.
+fn make_bound_fixture_graph(
+    source: &str,
+) -> (OriginalCallFixtureStore, HldMaterializationInputRecord) {
+    let rows = extract_file_syntax_rows(&make_call_syntax_input(source))
+        .unwrap()
+        .stage_unit_output_rows;
+    let store = OriginalCallFixtureStore {
+        rows: Mutex::new(rows),
+        frozen_read_only_flag: std::sync::atomic::AtomicBool::new(false),
+    };
+    let unit = encode_compilation_unit_value(&make_call_fixture_unit());
+    let range = |span: &Value| {
+        (
+            span["span_byte_start_offset"].as_u64().unwrap(),
+            span["span_byte_end_offset"].as_u64().unwrap(),
+        )
+    };
+    let identify = |span: &Value| -> HldTargetIdentityValue {
+        let (start, end) = range(span);
+        NameSymbolTargetKey::Definition(make_call_fixture_occurrence(
+            start,
+            end,
+            span["span_source_code_text"].as_str().unwrap(),
+        ))
+        .into()
+    };
+    let items = read_call_fixture_values(&store, "span-reference-text-table")
+        .into_iter()
+        .filter(|span| {
+            span["span_configuration_active_flag"] == true
+                && matches!(
+                    span["span_syntax_kind_value"].as_str(),
+                    Some("FN" | "TRAIT")
+                )
+        })
+        .collect::<Vec<_>>();
+    let traits = items
+        .iter()
+        .filter(|span| span["span_syntax_kind_value"] == "TRAIT")
+        .collect::<Vec<_>>();
+    let metadata = |span: &Value| json!({"target_symbol_kind_value":"Trait", "target_source_file_path":"/fixture/src/lib.rs", "target_source_range_start":span["span_byte_start_offset"], "target_source_range_end":span["span_byte_end_offset"], "target_compilation_scope_record":{"unit_semantic_identity_record":unit}});
+    let mut extra = vec![
+        make_call_fixture_row(
+            "crate-dependency-graph-table",
+            json!({"unit_compilation_identity_key":"raw-unit", "unit_package_root_path":"/fixture"}),
+        ),
+        make_call_fixture_row(
+            "syntax-namespace-input-scopes",
+            json!({"scope_cargo_unit_key":"raw-unit", "scope_module_identity_key":{"scope_semantic_path_parts":[], "scope_compilation_unit_key":unit}}),
+        ),
+    ];
+    for found in &traits {
+        let HldTargetIdentityValue::Symbol(symbol) = identify(found) else {
+            unreachable!()
+        };
+        extra.push(make_call_fixture_row(
+            "syntax-namespace-input-items",
+            json!({"binding_target_identity_key":encode_symbol_target_value(&symbol), "binding_target_metadata_value":metadata(found)}),
+        ));
+    }
+    for bound in read_call_fixture_values(&store, "field-signature-detail-table") {
+        let path = &bound["bound_syntax_evidence"]["trait_type_source"];
+        let Some(name) = path["type_source_text"].as_str() else {
+            continue;
+        };
+        let mut row = json!({
+            "site_compilation_scope_record":{"unit_semantic_identity_record":unit},
+            "site_source_absolute_path":"/fixture/src/lib.rs",
+            "site_source_range_start":path["span_byte_start_offset"],
+            "site_source_range_end":path["span_byte_end_offset"],
+            "site_expansion_provenance_chain":[]
+        });
+        match traits
+            .iter()
+            .find(|found| found["span_declared_name_value"] == name)
+        {
+            Some(found) => {
+                row["path_resolution_state_kind"] = json!("resolved");
+                row["path_target_symbol_rows"] = json!([metadata(found)]);
+            }
+            None => {
+                row["path_resolution_state_kind"] = json!("unresolved");
+                row["path_unresolved_reason_kind"] = json!("external_source_missing");
+                row["path_target_symbol_rows"] = json!([]);
+            }
+        }
+        extra.push(make_call_fixture_row("path-resolution-site-records", row));
+    }
+    store.rows.lock().unwrap().extend(extra);
+    let generation = RunGenerationDigestValue([1; 32]);
+    let nodes = items
+        .iter()
+        .map(|span| HldNodeInputRecord {
+            run_generation_digest_value: generation,
+            node_target_reference: identify(span),
+            node_input_category: HldNodeInputCategory::LocalItem,
+            node_item_kind_value: Some(if span["span_syntax_kind_value"] == "FN" {
+                HldItemKindValue::Function
+            } else {
+                HldItemKindValue::Trait
+            }),
+            node_owner_kind_value: None,
+            node_function_body_ancestry_flag: false,
+            node_effective_visibility_kind: Some(HldEffectiveVisibilityKind::PrivateEquivalent),
+            node_reachable_outside_crate_flag: Some(false),
+            node_source_relative_path: Some("src/lib.rs".into()),
+            node_qualified_path_text: span["span_declared_name_value"].as_str().unwrap().into(),
+            node_signature_text: None,
+        })
+        .collect();
+    let edges = traits
+        .iter()
+        .flat_map(|owner| {
+            let (start, end) = range(owner);
+            let identify = &identify;
+            items
+                .iter()
+                .filter(move |item| {
+                    let (inner_start, inner_end) = range(item);
+                    item["span_syntax_kind_value"] == "FN"
+                        && start < inner_start
+                        && inner_end <= end
+                })
+                .map(move |item| {
+                    let (inner_start, inner_end) = range(item);
+                    HldEdgeInputRecord {
+                        run_generation_digest_value: generation,
+                        edge_source_reference: identify(owner),
+                        edge_relation_kind_value: HldRelationKindValue::Contains,
+                        edge_resolution_value: HldEdgeResolutionValue::Extracted {
+                            target: identify(item),
+                        },
+                        edge_evidence_row_key: HldEvidenceRowKey {
+                            evidence_site_occurrence_key: make_call_fixture_occurrence(
+                                inner_start,
+                                inner_end,
+                                item["span_source_code_text"].as_str().unwrap(),
+                            ),
+                            evidence_source_occurrence_key: identify(owner),
+                            evidence_relation_kind_value: HldRelationKindValue::Contains,
+                            evidence_target_reference_value: Some(identify(item)),
+                        },
+                        edge_dispatch_metadata_text: None,
+                    }
+                })
+        })
+        .collect();
+    (
+        store,
+        HldMaterializationInputRecord {
+            run_generation_digest_value: generation,
+            stage_attempt_sequence_value: "attempt".into(),
+            semantic_input_completeness_kind: HldInputCompletenessKind::IncompleteTypedInput,
+            source_coverage_kind: HldSourceCoverageKind::FullSemantic,
+            input_unit_provenance_records: vec![HldUnitProvenanceRecord {
+                unit_compilation_identity_key: make_call_fixture_unit(),
+                unit_origin_kind: HldUnitOriginKind::Workspace,
+            }],
+            input_node_records: nodes,
+            input_edge_records: edges,
+        },
+    )
+}
+
+/// The one call edge of a bound fixture as (target node name or unresolved
+/// reason, dispatch record).
+fn read_bound_call_result(source: &str) -> (Result<String, HldUnresolvedReasonKind>, Value) {
+    let (store, input) = make_bound_fixture_graph(source);
+    let edges = read_call_fixture_edges(&store, &input);
+    assert_eq!(edges.len(), 1, "one call site in the fixture");
+    let outcome = match &edges[0].edge_resolution_value {
+        HldEdgeResolutionValue::Extracted { target } => Ok(input
+            .input_node_records
+            .iter()
+            .find(|node| node.node_target_reference == *target)
+            .unwrap()
+            .node_qualified_path_text
+            .clone()),
+        HldEdgeResolutionValue::Unresolved { reason } => Err(*reason),
+        other => panic!("unexpected resolution {other:?}"),
+    };
+    let dispatch =
+        serde_json::from_str(edges[0].edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+    (outcome, dispatch)
+}
+
+const BOUND_SOURCE: &str = "trait Sealed { fn write(self); } trait Integer: Sealed {} fn run<I: Integer>(i: I) { i.write(); }";
+
+/// REQ-RUST-042.0
+#[test]
+fn test_resolve_bound_supertrait_method() {
+    for source in [
+        BOUND_SOURCE.to_owned(),
+        BOUND_SOURCE.replace("<I: Integer>(i: I)", "<I>(i: I) where I: Integer"),
+    ] {
+        let (outcome, dispatch) = read_bound_call_result(&source);
+        assert_eq!(outcome, Ok("write".to_owned()), "{source}");
+        assert_eq!(dispatch["dispatch_kind"], "generic_bound_trait_method");
+        assert_eq!(
+            dispatch["bound_dispatch_evidence"],
+            json!({"bound_chain":["I", "Integer", "Sealed"],"missing_source_traits":[]})
+        );
+    }
+}
