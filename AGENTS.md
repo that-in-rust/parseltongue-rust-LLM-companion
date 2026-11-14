@@ -101,15 +101,15 @@ cargo build --release --workspace --all-targets --all-features
 `docs/phase-20261113/` is the only current documentation.
 
 ```text
-SOP      SOP-itoa-full-item-graph-acceptance.md    steps S1–S4 that decide PASS
-PRD      PRD-itoa-full-item-graph-scope.md          what is built and what is out of scope
-ARCH     ARCH-itoa-full-item-graph-pipeline.md        pipeline, tables, graph rules
-TARGET   itoa-target-dataset/                                the expected itoa graph and its builder
-LOG      LOG-itoa-full-item-graph-progress.md                                    the single progress record, newest first
-BACKLOG  BACKLOG-deferred-work-open-decisions.md             deferred work and open decisions
-MAP      MAP-parseltongue-crates-as-measured.md                       crates, files, verbs, stages as measured
-SPEC     SPEC-wider-scope-requirements-not-current.md      NOT current: written for the wider
-                                                             scope; to be rewritten after ARCH
+SOP      SOP-itoa-full-item-graph-acceptance.md         steps S1–S4 that decide PASS
+PRD      PRD-itoa-full-item-graph-scope.md              what is built and what is out of scope
+ARCH     ARCH-itoa-full-item-graph-pipeline.md          pipeline, tables, graph rules
+TARGET   itoa-target-dataset/                           the expected itoa graph and its builder
+LOG      LOG-itoa-full-item-graph-progress.md           the single progress record, newest first
+BACKLOG  BACKLOG-deferred-work-open-decisions.md        deferred work and open decisions
+MAP      MAP-parseltongue-crates-as-measured.md         crates, files, verbs, stages as measured
+SPEC     SPEC-wider-scope-requirements-not-current.md   written for the wider scope; to be
+                                                        rewritten after ARCH
 ```
 
 - These files state only what is in force. Edit in place; no revision sections. History goes
