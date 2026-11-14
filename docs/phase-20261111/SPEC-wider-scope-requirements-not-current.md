@@ -1,4 +1,9 @@
-# Executable specs — phase-20261113: full dependency graph, HLD levels derived from it
+# Executable specs — wider scope (history)
+
+> History. Moved here from `docs/phase-20261113/` on 2026-11-14. It covers five repositories,
+> the HLD levels and the oracle comparison, none of which is in the current phase. The current
+> contract is `docs/phase-20261113/SPEC-itoa-full-item-graph-requirements.md`. This file is
+> kept because tests of earlier-work code still cite requirement ids defined only here.
 
 Status: contracts. This file states only what is in force now; it replaces
 `docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md`, which is kept as history.
@@ -10,7 +15,7 @@ use four words. A named test contract is not a passing test; section 6 says whic
 
 **Active Phase 1:** detailed full-map production, evidence and comparison (REQ-RUST-044.0).
 Interface selection, HLD collapse, roll-ups, derived publication and projection-only decisions
-are deferred in the [backlog](BACKLOG-deferred-work-open-decisions.md). Their existing
+are deferred in the [backlog](../phase-20261113/BACKLOG-deferred-work-open-decisions.md). Their existing
 contracts and regressions remain valid when invoked; they are not Phase 1 exit gates.
 The original-top-level mode is a retained diagnostic, not the full-map implementation path.
 
@@ -2120,8 +2125,8 @@ incomplete/frozen-boundary contracts; component evidence does not qualify the co
 ## 7. Implementation plan
 
 Development order (2026-11-13): Phase 1 is the single pinned itoa library in
-[SOP §1.1](SOP-itoa-full-item-graph-acceptance.md#11-phase-1--pinned-source-vertical-hld-acceptance)
-and [phase-one-benchmark-pin.json](../phase-20261111/phase-one-benchmark-pin.json).
+[SOP §1.1](../phase-20261113/SOP-itoa-full-item-graph-acceptance.md#11-phase-1--pinned-source-vertical-hld-acceptance)
+and [phase-one-benchmark-pin.json](phase-one-benchmark-pin.json).
 Construct and independently verify its expected full-item-dependency-graph and detailed evidence
 from source before production comparison, then repeatedly test each available stage against
 that frozen reference. The scoped node/edge, evidence and diagnostic sets require exact agreement;
