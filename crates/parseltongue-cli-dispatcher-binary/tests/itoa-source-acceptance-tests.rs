@@ -553,7 +553,6 @@ fn test_format_sealed_write_call() {
 
 /// REQ-RUST-018.2
 #[test]
-#[ignore = "RED until part 4a step 3: no producer for uses_type edges yet"]
 fn test_new_return_type_edge() {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");

@@ -42,14 +42,23 @@ pub(crate) fn publish_full_graph_checkpoint(
             )
         })
         .count();
+    let type_uses = parseltongue_syntax_span_extractor::resolve_signature_type_edges(
+        store,
+        &source_snapshot,
+        &input,
+        cancel,
+    )
+    .map_err(map_full_graph_error)?;
     eprintln!(
-        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} completeness=incomplete",
+        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} type_uses={} completeness=incomplete",
         input.input_node_records.len(),
         input.input_edge_records.len(),
         calls.len(),
-        resolved
+        resolved,
+        type_uses.len()
     );
     input.input_edge_records.extend(calls);
+    input.input_edge_records.extend(type_uses);
     input.input_edge_records.sort();
     input.input_edge_records.dedup();
     let graph_snapshot = full_graph_input_store

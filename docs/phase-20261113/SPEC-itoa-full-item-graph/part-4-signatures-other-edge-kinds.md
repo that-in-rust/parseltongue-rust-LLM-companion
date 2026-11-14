@@ -1,11 +1,11 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a SPECIFIED, not built. 4b to 4d are stubs.**
+**State: 4a steps 1 to 3 of 7 BUILT (edges to items). 4b to 4d are stubs.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
-4a  uses_type from signatures   REQ-RUST-018.2   specified below; next to build
+4a  uses_type from signatures   REQ-RUST-018.2   item targets built; Self, builtins, unresolved next
 4b  implements from impl headers                 stub
 4c  reads of consts and statics                  stub
 4d  imports from use nodes                       stub
@@ -108,10 +108,20 @@ before its push.
 
 ## 6 — Quality gate results
 
-Not run: no code is written. Measured before writing this part, on pinned itoa with the
-sysroot excluded: 67 path rows in original signatures; 35 are type paths that name
-something other than a type parameter. Expected from them: 9 edges to items, 21 to builtins,
-5 unresolved. These are the numbers step 7 is checked against.
+**After step 3**, on pinned itoa with the sysroot excluded:
+
+- Workspace gates pass: format, lint, release build; 450 tests passed, 0 failed, 4 ignored;
+  `test_lang_items_in_sysroot` skipped as before. The 14 real-source tests pass (140.9 s).
+- The graph holds 45 nodes and 111 edges (was 104): 7 `uses_type` edges, all to items.
+- All 7 are rows of the expected graph: `Buffer::new` and `default` to `Buffer`;
+  `Buffer::format` and `Unsigned` to `Integer`; `Integer` to `private::Sealed`;
+  `Sealed::write` and `Unsigned::fmt` to `private::Sealed::Buffer` (written `Self::Buffer`).
+- Not stored yet, by step: 1 `Self` (step 4), 21 builtin sites (step 5), 6 unresolved
+  sites (step 6: 4 `MaybeUninit`/`Copy` with missing source, `Self::Buffer` in
+  `impl Unsigned for u128`).
+- Correction: this part first said 9 edges to items. Two of those nine were impl-header
+  paths, which belong to 4b. The signature count is 7.
+- Not measured: one run's cost.
 
 ## 7 — Open questions
 

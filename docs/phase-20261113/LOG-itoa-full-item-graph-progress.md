@@ -6,13 +6,13 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 45 nodes and
-104 edges, with 3 of 61 calls resolved. Two dependencies are proven from source by name:
-`<Buffer as Default>::default --calls--> Buffer::new` and
-`Buffer::format --calls--> private::Sealed::write`. No SOP step has passed and the graph is
+111 edges, with 3 of 61 calls resolved and 7 `uses_type` edges. Three dependencies are proven
+from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
+`Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4a, `uses_type` edges from signatures, starting from
-  `Buffer::new --uses_type--> Buffer`. Specified, not built.
+- **Next target:** part 4a step 4, `Self` in a signature through the impl header
+  (`<Buffer as Clone>::clone --uses_type--> Buffer`). Steps 1 to 3 of 7 are built.
 - **Produced today:** `contains` and `calls`. Not produced: `uses_type`, `reads`,
   `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
@@ -52,7 +52,7 @@ step                                   state         measured or missing
   single process. The whole process tree was last measured on 2026-11-14, before the macro
   commits were merged: 14.8 s, 411 MB, no memory cap.
 
-The node and call counts above were re-read at `6a2b405b1` (45 nodes, 61 calls, 3 resolved).
+The counts above were re-read after part 4a step 3 (45 nodes, 111 edges, 61 calls, 3 resolved).
 Not re-measured on the current commit: the whole-process-tree memory of one run.
 
 ## What is missing, in build order
@@ -90,6 +90,22 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 04:15 IST — Part 4a step 3: `uses_type` edges to items are stored
+
+- `Buffer::new --uses_type--> Buffer` is produced from pinned itoa and read back frozen;
+  `test_new_return_type_edge` passes with its `#[ignore]` removed.
+- One run now stores 45 nodes and 111 edges (was 104): 7 `uses_type` edges. Calls are
+  unchanged at 61 sites, 3 resolved. All 7 are rows of the expected graph (listed in part 4).
+- `resolve_signature_type_edges` joins signature rows to the path rows name resolution
+  already stored. It looks no name up. A bare `Self`, a builtin and an unresolved path store
+  nothing yet (steps 4 to 6).
+- RED first: 4 fixture tests failed against a stub that returned no edges; 7 pass now.
+- Workspace gates: format, lint and release build pass; 450 tests passed, 0 failed,
+  4 ignored. The 14 real-source tests pass (140.9 s).
+- Found: `static` and `const` declared types have no signature row, so
+  `DECIMAL_PAIRS --uses_type--> DecimalPairs` cannot be produced yet (part 4, Q3).
+- No refactor made. Next: step 4, `Self` through the impl header.
 
 ### 2026-11-15 03:30 IST — Part 4a step 2: signature rows list their type paths
 
