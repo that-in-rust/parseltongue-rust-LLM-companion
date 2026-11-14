@@ -35,8 +35,13 @@ mod original_call_resolution_records;
 pub use original_call_resolution_records::{
     OriginalCallResolutionError, resolve_original_call_edges,
 };
+#[path = "impl-header-implements-records.rs"]
+mod impl_header_implements_records;
 #[path = "legacy-macro-scope-records.rs"]
 mod legacy_macro_scope_records;
+pub use impl_header_implements_records::{
+    ImplHeaderEdgeError, ImplHeaderEdgeSet, resolve_impl_header_edges,
+};
 #[path = "signature-type-edge-records.rs"]
 mod signature_type_edge_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
