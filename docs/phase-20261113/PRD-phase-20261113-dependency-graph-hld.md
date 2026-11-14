@@ -196,7 +196,8 @@ Budgets:
 - A compilation unit is Cargo package id + target name and kind + host/target context. Features,
   `cfg` and edition are per unit. Equal names or bytes never merge two units.
 - Unresolved reasons, one per site, in this order: `cfg_inactive`, `build_script`, `proc_macro`,
-  `external_source_missing`, `unknown_receiver`, `trait_solver_needed`.
+  `external_source_missing`, `unknown_receiver`, `trait_solver_needed`
+  (`SiteUnresolvedReasonKind`).
 - KL1: sites that depend on build-script output are a known limitation, identified only by
   paired oracle evidence. It never excuses an oracle-proven error.
 
@@ -234,6 +235,11 @@ Budgets:
 - **OD-7** (rest) How a file's module node relates to its file-area node.
 - **OD-8** May `reads` and `uses_type` start at a non-function item? itoa needs it for
   `const MAX_STR_LEN` and the array length in `Buffer`. Lean: yes.
+
+- **Edge reasons** Graph edge rows use a second reason type in code, `HldUnresolvedReasonKind`:
+  missing target, ambiguous target, cfg inactive, external source missing, trait solver needed,
+  other. It has no `build_script`, `proc_macro` or `unknown_receiver`, and adds three values
+  the list above lacks. One list must win before unresolved edges are compared in Phase 1 (A4).
 
 OD-4, OD-7 and OD-8 block the affected reference rows from being frozen.
 
