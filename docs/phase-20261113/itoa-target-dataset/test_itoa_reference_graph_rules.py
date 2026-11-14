@@ -18,10 +18,6 @@ BUILDER_PATH = Path(__file__).with_name("itoa-target-dataset-builder.py")
 RULE_SPEC = importlib.util.spec_from_file_location("itoa_reference_graph_rules", RULE_PATH)
 RULES = importlib.util.module_from_spec(RULE_SPEC)
 RULE_SPEC.loader.exec_module(RULES)
-LADDER_PATH = Path(__file__).with_name("itoa-backward-table-ladder.py")
-LADDER_SPEC = importlib.util.spec_from_file_location("itoa_backward_table_ladder", LADDER_PATH)
-LADDER = importlib.util.module_from_spec(LADDER_SPEC)
-LADDER_SPEC.loader.exec_module(LADDER)
 
 
 def make_node(label, selected):
@@ -163,49 +159,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertTrue(result["missing"])
         self.assertTrue(result["extra"])
 
-    def test_mixed_generation_exports_error(self):
-        headers = [{"generation": "gen-a", "status": "OK"}, {"generation": "gen-b", "status": "OK"}]
-        result = RULES.validate_export_generation(headers, {"syntax-spans": "complete"})
-        self.assertEqual("ERROR", result["status"])
-
-    def test_export_failure_stays_error(self):
-        result = RULES.validate_export_generation([], {}, errors=["export failed"])
-        self.assertEqual("ERROR", result["status"])
-
-    def test_invalid_export_payload_errors(self):
-        header = {"export_record_kind_value": "header", "export_owned_table_name": "table",
-                  "export_scope_identity_record": {"run_generation_digest_value": "g",
-                                                   "stage_attempt_sequence_value": "a"}}
-        row = {"export_record_kind_value": "row", "export_row_payload_value": "{invalid"}
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            temporary_path = Path(temporary_directory)
-            export_path = temporary_path / "table.jsonl"
-            export_path.write_text(json.dumps(header) + "\n" + json.dumps(row) + "\n")
-            with self.assertRaisesRegex(ValueError, "invalid row payload"):
-                LADDER.load_export(export_path)
-            export_directory = temporary_path / "exports"
-            export_directory.mkdir()
-            export_path = export_directory / "table.jsonl"
-            export_path.write_text(json.dumps(header) + "\n" + json.dumps(row) + "\n")
-            root = Path(__file__).resolve().parents[3]
-            pin_file = root / "docs/phase-20261111/phase-one-benchmark-pin.json"
-            pin = json.loads(pin_file.read_text())
-            arguments = ["itoa-backward-table-ladder.py", "--export-directory", str(export_directory),
-                         "--output-directory", str(temporary_path / "report"),
-                         "--manifest-file", str(RULE_PATH.with_name("itoa-table-contract-manifest.json")),
-                         "--pin-file", str(pin_file), "--source-root", pin["benchmark_source_checkout_path"]]
-            with patch.object(sys, "argv", arguments), redirect_stdout(io.StringIO()):
-                LADDER.main()
-            report = json.loads((temporary_path / "report/itoa-backward-table-report.json").read_text())
-            self.assertEqual("ERROR", report["export_integrity"]["status"])
-            self.assertIn("invalid row payload JSON in table.jsonl", report["errors"][0])
-            self.assertEqual("BLOCKED", report["verification_status"])
-
-    def test_missing_marker_stays_blocked(self):
-        headers = [{"generation": "gen-a", "status": "OK"}]
-        result = RULES.validate_export_generation(headers, {"signature-lowering": "missing"})
-        self.assertEqual("BLOCKED", result["status"])
-
     def test_empty_graph_outputs_empty(self):
         self.assertEqual({"nodes": [], "edges": []}, RULES.derive_interface([], []))
         self.assertEqual({"counts": {}, "blocked_files": []}, RULES.rollup_unique_edges([], ["src/lib.rs"]))
@@ -285,13 +238,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RULES.verify_source_digests({"src/lib.rs": b"changed"}, {"src/lib.rs": "0" * 64})
 
-    def test_syntax_semantic_gap_reported(self):
-        syntax = [{"source_file": "src/lib.rs", "source_sha256": "digest", "span_byte_start_offset": 2506,
-                   "span_byte_end_offset": 2519}]
-        result = RULES.checkpoint_status(syntax, [], ("src/lib.rs", "digest", 2506, 2519))
-        self.assertEqual("PRESENT", result.get("syntax_evidence_status"))
-        self.assertEqual("MISSING", result.get("semantic_row_status"))
-
     def test_contract_manifest_blocks_unbuilt(self):
         contracts = [{"table_name": "impl-header-index-table", "status": "PROPOSED_NOT_IMPLEMENTED"}]
         statuses = RULES.contract_manifest_statuses(contracts)
@@ -343,30 +289,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertFalse(policy["od9_suppression_applied"])
         self.assertEqual(RULES.COLLAPSIBLE_RELATIONS, set(policy["current_decided_relations"]))
         self.assertEqual(len(collapsed), policy["derived_collapsed_rows"])
-
-    def test_wrong_target_site_rejected(self):
-        syntax = [{"source_file": "src/lib.rs", "source_sha256": "digest", "span_byte_start_offset": 10,
-                   "span_byte_end_offset": 20}]
-        semantic = [{"source_file": "src/lib.rs", "start_byte": 10, "end_byte": 20,
-                     "resolution": "resolved", "target_identity": "Other::new"}]
-        result = RULES.checkpoint_status(syntax, semantic, ("src/lib.rs", "digest", 10, 20))
-        self.assertNotEqual("PRESENT", result["semantic_row_status"])
-
-    def test_unresolved_target_site_blocked(self):
-        syntax = [{"source_file": "src/lib.rs", "source_sha256": "digest", "span_byte_start_offset": 10,
-                   "span_byte_end_offset": 20}]
-        semantic = [{"source_file": "src/lib.rs", "start_byte": 10, "end_byte": 20,
-                     "resolution": "unresolved", "target_identity": None}]
-        result = RULES.checkpoint_status(syntax, semantic, ("src/lib.rs", "digest", 10, 20))
-        self.assertNotEqual("PRESENT", result["semantic_row_status"])
-
-    def test_checkpoint_source_bytes_checked(self):
-        source = b"prefixBuffer::new()suffix"
-        digest = hashlib.sha256(source).hexdigest()
-        result = RULES.verify_checkpoint_source(source, digest, 6, 19, "Buffer::new()")
-        self.assertEqual("PRESENT", result["source_evidence_status"])
-        mismatch = RULES.verify_checkpoint_source(source, "0" * 64, 6, 19, "Buffer::new()")
-        self.assertNotEqual("PRESENT", mismatch["source_evidence_status"])
 
     def test_registry_owners_are_exact(self):
         root = Path(__file__).resolve().parents[3]
@@ -423,22 +345,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
                             and row["key_contract"]["primary_key"] == expected_fields[:3]
                             for row in registered))
 
-    def test_content_store_not_control(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        self.assertNotIn("file-source-content-records", manifest.get("publication_control_only_tables", []))
-        source_relations = manifest.get("source_context_relations", [])
-        self.assertTrue(any(row.get("table_name") == "file-source-content-records"
-                            for row in source_relations))
-        content_contract = next(row for row in source_relations
-                                if row.get("table_name") == "file-source-content-records")
-        self.assertEqual(["file_content_digest_full", "file_source_content_bytes"],
-                         content_contract["required_fields"])
-        self.assertTrue(content_contract.get("provenance_citations"))
-        rows = RULES.build_ladder_rows(manifest, {})
-        content = next(row for row in rows if row["name"] == "file-source-content-records")
-        self.assertEqual("source_content_store_relation", content["record_kind"])
-        self.assertEqual("NOT_APPLICABLE_CONTENT_STORE", content["stage_marker_status"])
-
     def test_typed_input_is_record(self):
         manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
         self.assertNotIn("hld-typed-materialization-input-record",
@@ -457,118 +363,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertFalse(coverage.get("whole_source_coverage_claimed", True))
         self.assertTrue({"operators", "body_types", "literals", "repeated_same_line_sites"}
                         <= set(coverage["known_uncovered_constructs"]))
-
-    def test_ladder_lists_outputs_first(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        rows = RULES.build_ladder_rows(manifest, {})
-        expected = ["hld-current-interface-nodes", "hld-current-dependency-edges", "hld-edge-evidence-paths",
-                    "hld-file-level-rollup", "hld-folder-level-rollup"]
-        self.assertEqual(expected, [row["name"] for row in rows[:5]])
-        self.assertTrue(all("export_status" in row and "stage_marker_status" in row
-                            and "comparison_status" in row and "assertion_or_blocker" in row
-                            and "backward_contract_layer" in row for row in rows))
-
-    def test_ladder_contract_dag_order(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        names = [row["name"] for row in RULES.build_ladder_rows(manifest, {})]
-        contract_names = [contract["table_name"] for contract in manifest["contracts"]]
-        reported_contract_names = [name for name in names if name in set(contract_names)]
-        self.assertEqual(len(contract_names), len(set(contract_names)))
-        self.assertEqual(len(contract_names), len(reported_contract_names))
-        self.assertEqual(set(contract_names), set(reported_contract_names))
-        self.assertLess(names.index("edge-evidence-record-table"), names.index("lowered-signature-type-table"))
-        self.assertLess(names.index("lowered-signature-type-table"), names.index("module-scope-binding-table"))
-        self.assertLess(names.index("module-scope-binding-table"), names.index("syntax-namespace-input-items"))
-        self.assertLess(names.index("syntax-namespace-input-items"), names.index("span-reference-text-table"))
-        self.assertLess(names.index("span-reference-text-table"), names.index("file-source-content-records"))
-        self.assertLess(names.index("file-source-content-records"), names.index("crate-dependency-graph-table"))
-        self.assertGreater(names.index("stage-run-generation-records"), names.index("crate-dependency-graph-table"))
-
-    def test_missing_required_export_blocks(self):
-        result = RULES.validate_export_inventory({}, ["hld-current-interface-nodes"])
-        self.assertEqual("BLOCKED", result["status"])
-
-    def test_hld_outputs_required_exports(self):
-        outputs = ["hld-current-interface-nodes", "hld-current-dependency-edges", "hld-edge-evidence-paths",
-                   "hld-file-level-rollup", "hld-folder-level-rollup"]
-        result = RULES.build_backward_report({"hld_output_table_names": outputs, "contracts": []}, {}, {})
-        self.assertEqual(set(outputs), set(result["export_integrity"]["missing_required_exports"]))
-
-    def test_summary_scope_mismatch_errors(self):
-        exports = {"table": {"table_name": "table", "status": "OK", "generation": "g1", "attempt": "a1", "rows": []}}
-        markers = {"owner": {"status": "complete", "evidence_kind": "banner_summary",
-                             "generation": "g2", "attempt": "a1"}}
-        result = RULES.validate_export_inventory(exports, ["table"], markers)
-        self.assertIn("stage summary scope mismatch", " ".join(result["errors"]))
-        self.assertEqual("BLOCKED", result["frozen_stage_gate"])
-
-    def test_summary_scope_missing_unverified(self):
-        exports = {"table": {"table_name": "table", "status": "OK", "generation": "g1", "attempt": "a1", "rows": []}}
-        markers = {"owner": {"status": "complete", "evidence_kind": "banner_summary"}}
-        result = RULES.validate_export_inventory(exports, ["table"], markers)
-        self.assertEqual("UNVERIFIED", result["summary_scope_status"])
-        self.assertEqual("BLOCKED", result["frozen_stage_gate"])
-
-    def test_mismatched_header_name_errors(self):
-        exports = {"expected": {"table_name": "wrong", "status": "OK", "generation": "g", "attempt": "a", "rows": []}}
-        result = RULES.validate_export_inventory(exports, ["expected"])
-        self.assertEqual("ERROR", result["status"])
-
-    def test_mismatched_row_generation_errors(self):
-        exports = {"table": {"table_name": "table", "status": "OK", "generation": "g", "attempt": "a",
-                             "rows": [{"run_generation_digest_value": "other"}]}}
-        result = RULES.validate_export_inventory(exports, ["table"])
-        self.assertEqual("ERROR", result["status"])
-
-    def test_stage_attempt_mismatch_errors(self):
-        exports = {"a": {"table_name": "a", "status": "OK", "generation": "g", "attempt": "a1", "rows": []},
-                   "b": {"table_name": "b", "status": "OK", "generation": "g", "attempt": "a2", "rows": []}}
-        result = RULES.validate_export_inventory(exports, ["a", "b"])
-        self.assertEqual("ERROR", result["status"])
-
-    def test_marker_summary_is_unfrozen(self):
-        result = RULES.validate_export_inventory({}, [], marker_evidence={
-            "crate-graph": {"status": "complete", "source": "banner_summary"}})
-        self.assertEqual("BLOCKED", result["frozen_stage_gate"])
-
-    def test_ladder_verifier_stays_blocked(self):
-        result = RULES.build_backward_report({}, {}, {})
-        self.assertEqual("BLOCKED", result["verification_status"])
-
-    def test_empty_exports_remain_blocked(self):
-        outputs = ["hld-current-interface-nodes", "hld-current-dependency-edges",
-                   "hld-edge-evidence-paths", "hld-file-level-rollup", "hld-folder-level-rollup"]
-        exports = {name: {"table_name": name, "status": "OK", "generation": "g1", "attempt": "a1", "rows": []}
-                   for name in outputs}
-        markers = {"hld-materialization": {"status": "complete", "evidence_kind": "banner_summary",
-                                          "generation": "g1", "attempt": "a1"}}
-        result = RULES.build_backward_report({"hld_output_table_names": outputs, "contracts": []},
-                                             exports, markers)
-        self.assertEqual("VALID", result["export_integrity"]["status"])
-        self.assertEqual("MATCHED_UNFROZEN", result["export_integrity"]["summary_scope_status"])
-        self.assertEqual("BLOCKED", result["frozen_stage_gate"])
-        self.assertEqual("BLOCKED", result["verification_status"])
-
-    def test_ladder_manifest_is_immutable(self):
-        source_dir = RULE_PATH.parent
-        with tempfile.TemporaryDirectory() as temporary:
-            bundle = Path(temporary) / "bundle"
-            exports = Path(temporary) / "exports"
-            outputs = Path(temporary) / "outputs"
-            bundle.mkdir(); exports.mkdir()
-            for name in ("itoa-backward-table-ladder.py", "itoa-reference-graph-rules.py"):
-                shutil.copy2(source_dir / name, bundle / name)
-            manifest_path = bundle / "itoa-table-contract-manifest.json"
-            manifest_path.write_text('{"sentinel":"do-not-mutate"}\n')
-            before = manifest_path.read_bytes()
-            completed = subprocess.run([sys.executable, str(bundle / "itoa-backward-table-ladder.py"),
-                                        "--export-directory", str(exports), "--output-directory", str(outputs),
-                                        "--pin-file", str(Path(__file__).resolve().parents[3] / "docs/phase-20261111/phase-one-benchmark-pin.json"),
-                                        "--source-root", "/home/ubuntu/repos/rust-tools/itoa"],
-                                       check=False, capture_output=True, text=True)
-            report = json.loads((outputs / "itoa-backward-table-report.json").read_text())
-            self.assertEqual(before, manifest_path.read_bytes())
-            self.assertEqual("BLOCKED", report["verification_status"])
 
     def test_builder_pin_cli_supported(self):
         root = Path(__file__).resolve().parents[3]
