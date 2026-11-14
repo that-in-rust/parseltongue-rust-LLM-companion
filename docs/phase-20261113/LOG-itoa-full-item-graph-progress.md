@@ -2,7 +2,7 @@
 
 This is the evolving log of the path from pinned itoa source to the detailed full
 dependency graph and evidence. Higher-level query abstractions are deferred in the
-[backlog](phase1-abstractions-decision-backlog.md); older entries retain their historical scope.
+[backlog](BACKLOG-deferred-work-open-decisions.md); older entries retain their historical scope.
 
 ## How to update this log
 
@@ -130,7 +130,7 @@ It names the intended complete scoped map, not a claim that it is already comple
   body, resolution and expansion evidence; not one giant physical table.
 
 Abstractions are later queries over this graph. Their work and unrelated decisions stay in the
-[backlog](phase1-abstractions-decision-backlog.md).
+[backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ### Where we stand — expected versus actual
 
@@ -181,7 +181,7 @@ no production edits, runtime tests, commit or push.
 
 **Decision:** focus on the mega dependency map with all scoped semantic details.
 Anything not needed to build, preserve or verify that graph belongs in the
-[abstraction and decision backlog](phase1-abstractions-decision-backlog.md).
+[abstraction and decision backlog](BACKLOG-deferred-work-open-decisions.md).
 
 - The map is one logical graph: canonical nodes/edges plus linked source, signature,
   body, resolution and expansion evidence. Public/private facts remain unfiltered.

@@ -67,7 +67,7 @@ qualification is established.
 4. Macro provenance, fields/variants and non-function dependency decisions still block affected
    full-map reference rows. Frozen full-map readback must not depend on HLD output.
 5. Everything unrelated to building/preserving/verifying this graph is in the
-   [backlog](../phase-20261113/phase1-abstractions-decision-backlog.md): abstractions are later queries over
+   [backlog](../phase-20261113/BACKLOG-deferred-work-open-decisions.md): abstractions are later queries over
    retained facts, not separate semantic pipelines. The broader six SOP/AGENTS process
    corrections still await approval (BF-05); only the requested scope correction is applied.
 

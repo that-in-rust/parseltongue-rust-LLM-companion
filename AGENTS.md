@@ -61,7 +61,7 @@ Scope:
 - Interface levels, collapse and roll-ups are later queries over the stored graph. They are
   not part of this phase.
 - Anything not needed for the itoa full graph goes in
-  [the backlog](docs/phase-20261113/phase1-abstractions-decision-backlog.md). Do not implement an
+  [the backlog](docs/phase-20261113/BACKLOG-deferred-work-open-decisions.md). Do not implement an
   undecided choice; ask, or backlog it.
 - `--sysroot-source-scope-kind excluded` is how runs work today. How edges into `core` are
   judged is an open decision in the PRD; until decided, such a run cannot pass.
@@ -106,7 +106,7 @@ PRD      PRD-itoa-full-item-graph-scope.md          what is built and what is ou
 ARCH     ARCH-itoa-full-item-graph-pipeline.md        pipeline, tables, graph rules
 TARGET   itoa-target-dataset/                                the expected itoa graph and its builder
 LOG      LOG-itoa-full-item-graph-progress.md                                    the single progress record, newest first
-BACKLOG  phase1-abstractions-decision-backlog.md             deferred work and open decisions
+BACKLOG  BACKLOG-deferred-work-open-decisions.md             deferred work and open decisions
 MAP      current-codebase-crate-map.md                       crates, files, verbs, stages as measured
 SPEC     SPEC-wider-scope-requirements-not-current.md      NOT current: written for the wider
                                                              scope; to be rewritten after ARCH
