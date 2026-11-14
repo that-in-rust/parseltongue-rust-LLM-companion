@@ -8,7 +8,7 @@ one lexical source container and exact `Buffer::new()` bytes are checked. Unknow
 and absent reachability remain explicit; strict HLD validation rejects the incomplete graph.
 All three worker patches are consolidated locally and their sessions remain archived/suspended.
 Projection, call resolution and CLI/storage composition are implemented and verified here.
-Current evidence: [newest-first Phase 1 log](../phase1-log-p1.md) and
+Current evidence: [newest-first Phase 1 log](../phase-20261113/phase1-log-p1.md) and
 [append-only TDD journal](TDD-phase-20261111-progress-checkpoints.md).
 The source/executable digests recorded there define the tested uncommitted snapshot.
 Any subsequent production change requires fresh evidence.
@@ -67,7 +67,7 @@ qualification is established.
 4. Macro provenance, fields/variants and non-function dependency decisions still block affected
    full-map reference rows. Frozen full-map readback must not depend on HLD output.
 5. Everything unrelated to building/preserving/verifying this graph is in the
-   [backlog](../phase1-abstractions-decision-backlog.md): abstractions are later queries over
+   [backlog](../phase-20261113/phase1-abstractions-decision-backlog.md): abstractions are later queries over
    retained facts, not separate semantic pipelines. The broader six SOP/AGENTS process
    corrections still await approval (BF-05); only the requested scope correction is applied.
 

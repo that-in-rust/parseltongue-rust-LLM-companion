@@ -28,7 +28,8 @@
  SOP      docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md (S1–S10, milestone subsets, revisions R1–R16)
  JOURNAL  docs/phase-20261111/TDD-phase-20261111-progress-checkpoints.md       (append-only TDD journal)
  STATUS   docs/phase-20261111/current-milestone-status-board.md                (rewritten in place; one page)
- BACKLOG  docs/phase1-abstractions-decision-backlog.md                           (deferred work, decisions, resume triggers)
+ BACKLOG  docs/phase-20261113/phase1-abstractions-decision-backlog.md         (deferred work, decisions, resume triggers)
+ LOG      docs/phase-20261113/phase1-log-p1.md                                 (newest-first Phase 1 evolution log)
  PINS     docs/phase-20261111/{parser-source-pin,oracle-source-build,corpus-source-pin}-manifest.json
  RUNS     hld-current-test-runs/<run-id>/ (committed reports) · ~/hld-current-test-artifacts/<run-id>/ (large, gitignored, digest-recorded)
 ```

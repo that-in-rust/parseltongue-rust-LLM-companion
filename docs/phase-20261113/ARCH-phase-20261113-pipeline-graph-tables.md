@@ -10,7 +10,7 @@ Current verified implementation status is in the
 [status board](../phase-20261111/current-milestone-status-board.md), not inferred from this design.
 
 **Active scope:** the detailed full map and its source/semantic evidence. Higher-level
-abstractions and unrelated decisions are in the [backlog](../phase1-abstractions-decision-backlog.md).
+abstractions and unrelated decisions are in the [backlog](phase1-abstractions-decision-backlog.md).
 One logical graph spans node, edge and linked evidence tables; it is not one physical mega-table.
 Later abstractions are queries over a compatible frozen generation, optionally materialized.
 They reuse these facts rather than reanalyzing source or inventing missing semantic information.

@@ -23,7 +23,7 @@ before editing. Interface/HLD abstractions are later queries over that same grap
 
 **Active Phase 1 scope:** the detailed full map, its evidence and independent comparison.
 Higher-level selection, collapse, roll-ups and their projection-only decisions are deferred to
-the [abstraction and decision backlog](../phase1-abstractions-decision-backlog.md).
+the [abstraction and decision backlog](phase1-abstractions-decision-backlog.md).
 Retained HLD contracts describe later derived products, not Phase 1 exit requirements.
 
 Port rust-analyzer algorithms over persisted rows rather than host its analysis database in production.

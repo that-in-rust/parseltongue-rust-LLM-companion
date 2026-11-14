@@ -64,7 +64,7 @@ required for this bounded checkpoint, and existing HLD publication gates remain 
 
 The heading is retained for existing links; the active checkpoint is now the **detailed full
 map**, not HLD. Higher-level abstraction work and irrelevant decisions are in the
-[backlog](../phase1-abstractions-decision-backlog.md). Retained HLD rules apply when that work
+[backlog](phase1-abstractions-decision-backlog.md). Retained HLD rules apply when that work
 resumes, not to Phase 1 exit. This scope change does not weaken semantic coverage or publication
 safety. **Use only [dtolnay/itoa 1.0.18](https://github.com/dtolnay/itoa/tree/af77385d0daf4d0e949e81f2588be2e44f69f086)
 for Phase 1.** Its immutable source/configuration policy is

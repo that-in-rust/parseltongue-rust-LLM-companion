@@ -54,7 +54,7 @@ The excluded native/sysroot test remains excluded under the prior stop rule.
 Retained single CLI run: **14.810602s / 410,705,920 bytes** sampled whole-process-tree peak;
 DuckDB reports 25.0 GiB effective limit and 2 threads, with no interim cap. Executable SHA-256:
 `ec9d24df192152263ed5bf6cec0db0c3cc20b64a2498886bcc4a1b63fb85fcde`.
-The [bounded run report](../hld-current-test-runs/20261114T140300Z-full-map-implementation/hld-current-test-report.md)
+The [bounded run report](../../hld-current-test-runs/20261114T140300Z-full-map-implementation/hld-current-test-report.md)
 indexes the frozen runtime source manifest/archive, retained database, exact pin and gate logs.
 
 All recovered worker progress remains in this checkout; the three workers remain archived.
@@ -473,12 +473,12 @@ subparts independently and attempting one large integration at the end.
 
 ### Source and evidence pointers
 
-- [Current PRD, including AD-1 through AD-5](phase-20261113/PRD-phase-20261113-dependency-graph-hld.md)
-- [Current executable SPEC, including open graph contracts](phase-20261113/SPEC-phase-20261113-executable-requirements.md)
-- [Current pipeline architecture](phase-20261113/ARCH-phase-20261113-pipeline-graph-tables.md)
-- [Current status board](phase-20261111/current-milestone-status-board.md)
-- [Append-only TDD evidence journal](phase-20261111/TDD-phase-20261111-progress-checkpoints.md)
-- [Previous structural checkpoint report](../hld-current-test-runs/20261114T043000Z-structural-verification/hld-current-test-report.md)
-- [Production publication facade](../crates/parseltongue-cli-dispatcher-binary/src/hld-source-publication-facade.rs)
-- [Impl-header producer](../crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs)
-- [Source acceptance tests](../crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs)
+- [Current PRD, including AD-1 through AD-5](PRD-phase-20261113-dependency-graph-hld.md)
+- [Current executable SPEC, including open graph contracts](SPEC-phase-20261113-executable-requirements.md)
+- [Current pipeline architecture](ARCH-phase-20261113-pipeline-graph-tables.md)
+- [Current status board](../phase-20261111/current-milestone-status-board.md)
+- [Append-only TDD evidence journal](../phase-20261111/TDD-phase-20261111-progress-checkpoints.md)
+- [Previous structural checkpoint report](../../hld-current-test-runs/20261114T043000Z-structural-verification/hld-current-test-report.md)
+- [Production publication facade](../../crates/parseltongue-cli-dispatcher-binary/src/hld-source-publication-facade.rs)
+- [Impl-header producer](../../crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs)
+- [Source acceptance tests](../../crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs)

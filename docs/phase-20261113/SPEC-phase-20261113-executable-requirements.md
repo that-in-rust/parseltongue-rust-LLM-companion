@@ -10,7 +10,7 @@ use four words. A named test contract is not a passing test; section 6 says whic
 
 **Active Phase 1:** detailed full-map production, evidence and comparison (REQ-RUST-044.0).
 Interface selection, HLD collapse, roll-ups, derived publication and projection-only decisions
-are deferred in the [backlog](../phase1-abstractions-decision-backlog.md). Their existing
+are deferred in the [backlog](phase1-abstractions-decision-backlog.md). Their existing
 contracts and regressions remain valid when invoked; they are not Phase 1 exit gates.
 The original-top-level mode is a retained diagnostic, not the full-map implementation path.
 

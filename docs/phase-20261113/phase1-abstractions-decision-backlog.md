@@ -115,9 +115,9 @@ resolve each before claiming completeness for its affected source facts.
 - Record scope changes newest-first in the [Phase 1 evolution log](phase1-log-p1.md).
 - Keep earlier log entries as history; former subparts 4.6 and 4.7 are deferred,
   while 4.8 concerns full-map publication safety now.
-- [PRD: product intent and decisions](phase-20261113/PRD-phase-20261113-dependency-graph-hld.md)
-- [SPEC: executable contracts and active open points](phase-20261113/SPEC-phase-20261113-executable-requirements.md)
-- [Architecture: pipeline and table boundaries](phase-20261113/ARCH-phase-20261113-pipeline-graph-tables.md)
-- [SOP: source-backed verification](phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md)
+- [PRD: product intent and decisions](PRD-phase-20261113-dependency-graph-hld.md)
+- [SPEC: executable contracts and active open points](SPEC-phase-20261113-executable-requirements.md)
+- [Architecture: pipeline and table boundaries](ARCH-phase-20261113-pipeline-graph-tables.md)
+- [SOP: source-backed verification](SOP-phase-20261113-full-item-dependency-graph.md)
 
 This is a scope/decision record, not implementation or test evidence.
