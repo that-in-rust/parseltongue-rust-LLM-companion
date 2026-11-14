@@ -152,6 +152,11 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
 - **Containment:** each item has one lexical source container. File-level items and impl
   members belong to the file area; nested items belong to their inline module or trait. Impl
   identity, self type and trait are metadata, never a second parent.
+- **Missing source (2026-11-14).** Codebases are expected to be partial or broken, so an edge
+  is one of three things: *proven* (every candidate was visible in source); *proven, gap* (one
+  target found, and the edge names the source that was missing, so it is correct if the code
+  compiles); *unresolved* (zero or several targets, with one reason). A PASS run needs zero
+  gap edges, or an explicit accepted list.
 - **Memory:** measured and reported on every run; no cap in this phase.
 
 ### Open

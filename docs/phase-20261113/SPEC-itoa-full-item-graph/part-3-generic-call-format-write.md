@@ -1,6 +1,6 @@
 # Part 3 — a method call on a generic receiver
 
-**State: NEXT, not started. One decision is needed before code (Q1 below).**
+**State: NEXT, not started. Q1 is decided; no open question blocks the build.**
 
 **Target:** `Buffer::format --calls--> private::Sealed::write`, from this source:
 
@@ -43,6 +43,10 @@ that source does not prove.
   only traits reached through the bound chain count.
 - **R8** The edge SHALL carry the bound chain as dispatch metadata
   (`I`, `Integer`, `private::Sealed`) and the source range of the call.
+- **R9** WHEN a trait in the chain has no source in this run and exactly one known candidate
+  declares the method, THEN the edge SHALL still be stored, and its dispatch metadata SHALL
+  name each trait whose source was missing. WHEN no known candidate declares it and a trait
+  in the chain has no source, THEN the site SHALL be unresolved with `ExternalSourceMissing`.
 
 ## 3 — Design by layer
 
@@ -86,6 +90,8 @@ DuckDB. Errors extend `OriginalCallResolutionError`; no free-text variant.
 | 042.0 R3 R7 | test_bound_method_name_distractor | fixture | same method name on a trait outside the bound chain | not selected |
 | 042.0 R4 | test_local_receiver_shadow_unresolved | fixture | `let i = 0u8; i.write()` inside the function | unresolved |
 | 042.0 R5 | test_other_receiver_shapes_unresolved | fixture | field, call and `self` receivers | unresolved, `TraitSolverNeeded` |
+| 042.0 R9 | test_missing_source_gap_recorded | real source, CLI, sysroot excluded | the edge's metadata names `Copy` as a trait without source | 1 gap entry |
+| 042.0 R9 | test_missing_source_only_unresolved | fixture | the method is declared by no known trait and one chain trait has no source | unresolved, `ExternalSourceMissing` |
 | 042.0 R6 | test_cyclic_supertrait_bounds_terminate | fixture | `trait A: B`, `trait B: A` | terminates, each visited once |
 | 042.0 | test_trait_rename_changes_identity | real source, mutated copy | rename `Sealed` in a copy of the pinned tree | target identity changes, still 1 edge |
 | 045.0 | test_original_member_graph_roundtrip | real source, CLI | existing test still passes; counts move as expected | resolved calls 2 to 3 |
@@ -112,16 +118,12 @@ build, and the 11 real-source tests plus the new ones.
 
 ## 7 — Open questions
 
-- **Q1 (decide before step 4): `Sealed: Copy`.** `Copy` is in `core`. In a run without the
-  sysroot its methods are unknown, so "exactly one candidate declares `write`" cannot be
-  fully proven.
-  - *Strict:* store the site unresolved with `ExternalSourceMissing`. The target is then
-    reachable only in a run with the sysroot, which has not finished so far.
-  - *Flagged:* emit the edge when exactly one known candidate declares the method, and record
-    in the dispatch metadata that one trait in the chain had no source. The final acceptance
-    run with the sysroot removes the flag.
-  - Recommended: flagged. The run is already marked `incomplete` and cannot be an SOP PASS
-    without the sysroot, so nothing is accepted on the weaker proof.
+- **Q1: `Sealed: Copy`. Decided 2026-11-14: store the edge and name the gap (R9).** `Copy` is
+  in `core`; without the sysroot its methods are unknown, so "exactly one candidate declares
+  `write`" is not fully proven. Codebases are expected to be partial, so dropping the edge
+  would lose what source does show. If `Copy` also declared `write`, rustc would reject the
+  call as ambiguous, so the edge is correct whenever the code compiles. The rule is general
+  and recorded in the [PRD](../PRD-itoa-full-item-graph-scope.md), "Decisions in force".
 - **Q2: lookup order. Answered.** rustc checks methods from a type parameter's bounds before
   methods of other traits in scope, so traits outside the bound chain never compete (R7).
   Confirmed 2026-11-14 with rustc 1.99.1: with `I: Integer`, `Integer: Sealed`, and a second
