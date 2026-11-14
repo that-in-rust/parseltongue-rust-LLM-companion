@@ -1,11 +1,11 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a steps 1 to 4 of 7 BUILT (edges to items, `Self` included). 4b to 4d are stubs.**
+**State: 4a steps 1 to 5 of 7 BUILT (edges to items, `Self` and builtins). 4b to 4d are stubs.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
-4a  uses_type from signatures   REQ-RUST-018.2   item targets and Self built; builtins, unresolved next
+4a  uses_type from signatures   REQ-RUST-018.2   items, Self and builtins built; unresolved next
 4b  implements from impl headers                 stub
 4c  reads of consts and statics                  stub
 4d  imports from use nodes                       stub
@@ -128,6 +128,17 @@ on `Self`; `test_clone_self_type_edge` passes. Gates pass: 452 tests passed, 0 f
 4 ignored; the 15 real-source tests pass (138.3 s). The edge counts were not re-read; one
 more edge than step 3 is expected (112), since itoa has one `Self` in an original signature.
 A `Self` whose impl header is unresolved stores nothing until step 6.
+
+**After step 5**, measured on one run:
+
+- 51 nodes and 133 edges: 43 `contains`, 61 `calls`, 29 `uses_type`.
+- The 29 are 7 to items, 1 `Self`, and 21 to builtins, the number predicted above.
+- 6 nodes of category `Builtin` were added, one per builtin name the signatures use.
+- `private::Sealed::write --uses_type--> str` is stored with the site on `str`;
+  `test_write_builtin_type_edge` passes.
+- Gates pass: 454 tests passed, 0 failed, 4 ignored; the 16 real-source tests pass (151.3 s).
+- Known defect: the stage log line still prints `nodes=45`, because it is printed before
+  the builtin nodes are added. The frozen readback line prints 51. Fixed in step 6.
 
 ## 7 — Open questions
 

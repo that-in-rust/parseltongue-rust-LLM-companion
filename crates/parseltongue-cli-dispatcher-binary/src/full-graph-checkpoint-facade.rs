@@ -57,6 +57,10 @@ pub(crate) fn publish_full_graph_checkpoint(
         resolved,
         type_uses.len()
     );
+    input
+        .input_node_records
+        .extend(parseltongue_syntax_span_extractor::collect_builtin_target_nodes(&type_uses));
+    input.input_node_records.sort();
     input.input_edge_records.extend(calls);
     input.input_edge_records.extend(type_uses);
     input.input_edge_records.sort();

@@ -621,6 +621,39 @@ fn test_new_return_type_edge() {
 
 /// REQ-RUST-018.2
 #[test]
+fn test_write_builtin_type_edge() {
+    let (input, uses, _buffer, expected_site) = read_signature_type_uses(
+        "write",
+        "fn write(self, buf: &mut Self::Buffer) -> &str;",
+        "str",
+    );
+    let target: HldTargetIdentityValue = NameSymbolTargetKey::Builtin("str".to_owned()).into();
+    let to_str = uses
+        .iter()
+        .filter(|edge| {
+            edge.edge_resolution_value
+                == HldEdgeResolutionValue::Extracted {
+                    target: target.clone(),
+                }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        to_str.len(),
+        1,
+        "Sealed::write names str once in its signature: its return type"
+    );
+    assert_eq!(read_edge_site_range(to_str[0]), expected_site);
+    let nodes = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_target_reference == target)
+        .collect::<Vec<_>>();
+    assert_eq!(nodes.len(), 1, "one node stands for the builtin str");
+    assert_eq!(nodes[0].node_input_category, HldNodeInputCategory::Builtin);
+}
+
+/// REQ-RUST-018.2
+#[test]
 fn test_clone_self_type_edge() {
     let (_input, uses, buffer, expected_site) =
         read_signature_type_uses("clone", "fn clone(&self) -> Self {", "Self");

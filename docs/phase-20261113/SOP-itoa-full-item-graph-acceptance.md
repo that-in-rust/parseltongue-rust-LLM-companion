@@ -21,8 +21,8 @@ S3  exact comparison                   NOT STARTED   no whole-graph comparison t
 S4  determinism, time, memory          NOT STARTED
 ```
 
-What the code produces today, with sysroot excluded: 45 nodes and 111 edges (43 `contains`,
-61 `calls` of which 3 are resolved, 7 `uses_type`). The draft expected graph has 73 nodes and 368 edges.
+What the code produces today, with sysroot excluded: 51 nodes and 133 edges (43 `contains`,
+61 `calls` of which 3 are resolved, 29 `uses_type`). The draft expected graph has 73 nodes and 368 edges.
 Details are in the top entry of [the log](LOG-itoa-full-item-graph-progress.md).
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules

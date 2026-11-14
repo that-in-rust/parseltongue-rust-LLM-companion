@@ -5,16 +5,16 @@ newest first: add each new checkpoint at the top of that section and never edit 
 
 ## Current state (2026-11-15)
 
-**The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 45 nodes and
-111 edges, with 3 of 61 calls resolved and 7 `uses_type` edges. Three dependencies are proven
+**The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 51 nodes and
+133 edges, with 3 of 61 calls resolved and 29 `uses_type` edges. Three dependencies are proven
 from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4a step 5, `uses_type` edges to builtins (`u8`, `str`, `usize`) and
-  one node per builtin. Steps 1 to 4 of 7 are built.
-- **Produced today:** `contains`, `calls`, and `uses_type` to items from signatures. Not
-  produced: `uses_type` to builtins, `reads`, `implements`, `imports`.
+- **Next target:** part 4a step 6, unresolved `uses_type` rows with a reason (6 sites in
+  itoa). Steps 1 to 5 of 7 are built.
+- **Produced today:** `contains`, `calls`, and `uses_type` from signatures to items and
+  builtins. Not produced: unresolved `uses_type` rows, `reads`, `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
   ([itoa-target-dataset](itoa-target-dataset/)). Nothing can be accepted against it yet.
 
@@ -52,7 +52,7 @@ step                                   state         measured or missing
   single process. The whole process tree was last measured on 2026-11-14, before the macro
   commits were merged: 14.8 s, 411 MB, no memory cap.
 
-The counts above were re-read after part 4a step 3 (45 nodes, 111 edges, 61 calls, 3 resolved).
+The counts above were re-read after part 4a step 5 (51 nodes, 133 edges, 61 calls, 3 resolved).
 Not re-measured on the current commit: the whole-process-tree memory of one run.
 
 ## What is missing, in build order
@@ -90,6 +90,22 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 05:15 IST — Part 4a step 5: builtin types are targets, with one node each
+
+- `private::Sealed::write --uses_type--> str` is stored from pinned itoa, site on `str`;
+  `test_write_builtin_type_edge` passes.
+- One run now stores 51 nodes and 133 edges: 43 `contains`, 61 `calls`, 29 `uses_type`
+  (7 to items, 1 `Self`, 21 to builtins). Six `Builtin` nodes were added, one per name.
+- This also confirms step 4's expected count: 8 `uses_type` before builtins.
+- RED first: the fixture test found 0 edges where 4 are expected; the real-source test
+  found 0 edges to `str` where 1 is expected.
+- One failed attempt: the frozen graph did not match its input, because the builtin nodes
+  were appended after the node list was sorted. The facade now sorts after adding them.
+- Workspace gates: format, lint and release build pass; 454 tests passed, 0 failed,
+  4 ignored. The 16 real-source tests pass (151.3 s).
+- Known defect: the stage log line prints `nodes=45`; the readback line prints 51.
+- No refactor made. Next: step 6, unresolved rows with a reason.
 
 ### 2026-11-15 04:45 IST — Part 4a step 4: `Self` in a signature is the impl's self type
 
