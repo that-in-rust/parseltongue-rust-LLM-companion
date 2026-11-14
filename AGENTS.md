@@ -107,7 +107,7 @@ ARCH     ARCH-itoa-full-item-graph-pipeline.md        pipeline, tables, graph ru
 TARGET   itoa-target-dataset/                                the expected itoa graph and its builder
 LOG      LOG-itoa-full-item-graph-progress.md                                    the single progress record, newest first
 BACKLOG  BACKLOG-deferred-work-open-decisions.md             deferred work and open decisions
-MAP      current-codebase-crate-map.md                       crates, files, verbs, stages as measured
+MAP      MAP-parseltongue-crates-as-measured.md                       crates, files, verbs, stages as measured
 SPEC     SPEC-wider-scope-requirements-not-current.md      NOT current: written for the wider
                                                              scope; to be rewritten after ARCH
 ```

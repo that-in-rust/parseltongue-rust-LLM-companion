@@ -27,7 +27,7 @@ source files
 
 Scope: [PRD](PRD-itoa-full-item-graph-scope.md). Proof:
 [SOP](SOP-itoa-full-item-graph-acceptance.md). Crates and files:
-[crate map](current-codebase-crate-map.md).
+[crate map](MAP-parseltongue-crates-as-measured.md).
 
 ## 1 — The pipeline as built
 
