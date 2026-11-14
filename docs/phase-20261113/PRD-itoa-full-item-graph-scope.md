@@ -24,7 +24,8 @@ proven   <Buffer as Default>::default --calls--> Buffer::new, from source throug
 next     Buffer::format --calls--> private::Sealed::write
 ```
 
-Proof procedure: [SOP](SOP-itoa-full-item-graph-acceptance.md). Design:
+Proof procedure: [SOP](SOP-itoa-full-item-graph-acceptance.md). Requirements:
+[SPEC](SPEC-itoa-full-item-graph-requirements.md). Design:
 [ARCH](ARCH-itoa-full-item-graph-pipeline.md). Expected graph:
 [itoa-target-dataset](itoa-target-dataset/). History: [log](LOG-itoa-full-item-graph-progress.md).
 
