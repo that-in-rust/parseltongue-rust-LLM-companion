@@ -594,3 +594,54 @@ fn test_locate_enclosing_generic_owner() {
     );
     assert_eq!(nested["receiver_generic_owner_kind"], Value::Null);
 }
+
+/// REQ-RUST-042.0
+#[test]
+fn test_capture_type_bound_evidence() {
+    let source = "trait A: B + ?Sized {}\nfn run<I: A + 'static>(i: I) where I: m::C<u8> {}\n";
+    let bounds = extract_file_syntax_rows(&make_call_syntax_input(source))
+        .unwrap()
+        .stage_unit_output_rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "field-signature-detail-table")
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .filter(|row| row["site_syntax_kind_value"] == "TYPE_BOUND")
+        .map(|row| {
+            let bound = &row["bound_syntax_evidence"];
+            (
+                row["site_syntax_source_text"].as_str().unwrap().to_owned(),
+                bound["bound_subject_kind"].as_str().unwrap().to_owned(),
+                bound["bound_subject_name_value"]
+                    .as_str()
+                    .map(str::to_owned),
+                bound["bound_form_kind"].as_str().unwrap().to_owned(),
+                bound["trait_type_source"]["type_simple_path_flag"].as_bool(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let row = |text: &str, subject: &str, name: Option<&str>, form: &str, simple| {
+        (
+            text.to_owned(),
+            subject.to_owned(),
+            name.map(str::to_owned),
+            form.to_owned(),
+            simple,
+        )
+    };
+    assert_eq!(
+        bounds,
+        vec![
+            row("B", "supertrait", None, "trait", Some(true)),
+            row("?Sized", "supertrait", None, "other", None),
+            row("A", "type_parameter", Some("I"), "trait", Some(true)),
+            row("'static", "type_parameter", Some("I"), "lifetime", None),
+            row(
+                "m::C<u8>",
+                "where_predicate",
+                Some("I"),
+                "trait",
+                Some(false)
+            ),
+        ]
+    );
+}

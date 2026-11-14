@@ -61,19 +61,20 @@ What exists today (read in the code, not assumed):
 Additions:
 
 ```text
-L1  parseltongue-core-row-types
-    a bound record: owner item, generic parameter name (or the trait itself for a
-    supertrait), the occurrence of the bound's path, where it was written
-    (inline | where | supertrait). An enum for the method-call receiver shape.
 L3  parseltongue-syntax-span-extractor
-    extract_original_call_syntax   also fills receiver text and range, method name,
-                                   and the receiver shape, for METHOD_CALL_EXPR
-    a new extractor                writes one bound row per bound and per supertrait
-    resolve_original_call_edges    new branch: parameter -> generic parameter -> bounds ->
-                                   supertraits (visited set) -> trait members by name
-L3  parseltongue-turso-store-adapter
-    one new table, generic-bound-source-records, owned by signature-type-lowering-stage,
-    registered in STAGE_OWNED_TABLE_NAMES
+    extract_original_call_syntax   BUILT. Each METHOD_CALL_EXPR row carries
+                                   method_receiver_evidence: receiver shape, method name,
+                                   the parameter's declared type, type-parameter owner,
+                                   rebinding flag
+    extract_type_bound_syntax      BUILT. Each TYPE_BOUND row carries bound_syntax_evidence:
+                                   what is bounded (type parameter, supertrait, where
+                                   subject) and the trait path with its source range
+    resolve_original_call_edges    NOT BUILT. New branch: parameter -> type parameter ->
+                                   bounds -> supertraits (visited set) -> trait members
+
+No new table and no new record type. `field-signature-detail-table` already had one row per
+`TYPE_BOUND`, owned by its function or trait, so the bound evidence is added to that row
+instead of the separate table first planned here.
 ```
 
 No new trait seam: rows are read through the existing `StageTableStorePort`. No change to
@@ -105,7 +106,7 @@ Each step is its own commit of about 200 lines, with a log entry.
 1. STUB and RED: `test_format_sealed_write_call` on pinned itoa. Record how the site is
    stored today and the reason it carries.
 2. Method-call syntax evidence in `extract_original_call_syntax`, with fixture tests for R5.
-3. Bound rows: record type, extractor, table registration, `test_generic_bound_rows_written`.
+3. Bound evidence on the existing `TYPE_BOUND` rows, `test_generic_bound_rows_written`.
 4. Resolver branch, with fixture tests for R3, R4, R6, R7.
 5. GREEN on the real-source test; add the rename test.
 6. REFACTOR, then the gates below, then re-measure the graph counts and one run's cost.

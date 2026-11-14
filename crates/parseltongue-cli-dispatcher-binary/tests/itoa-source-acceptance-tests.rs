@@ -532,6 +532,37 @@ fn test_format_sealed_write_call() {
     );
 }
 
+/// REQ-RUST-042.0
+#[test]
+fn test_generic_bound_rows_written() {
+    let (_directory, _root, database, _input) = run_original_graph_fixture();
+    let bounds = read_published_stage_rows(&database, "field-signature-detail-table")
+        .into_iter()
+        .filter(|row| {
+            row["site_syntax_kind_value"] == "TYPE_BOUND"
+                && row["span_expansion_provenance_chain"] == json!([])
+        })
+        .collect::<Vec<_>>();
+    for (text, subject, name) in [
+        ("Integer", "type_parameter", json!("I")),
+        ("private::Sealed", "supertrait", Value::Null),
+        ("Copy", "supertrait", Value::Null),
+    ] {
+        let found = bounds
+            .iter()
+            .filter(|row| {
+                let bound = &row["bound_syntax_evidence"];
+                bound["trait_type_source"]["type_source_text"] == text
+                    && bound["bound_subject_kind"] == subject
+                    && bound["bound_subject_name_value"] == name
+                    && bound["bound_form_kind"] == "trait"
+                    && bound["trait_type_source"]["type_simple_path_flag"] == true
+            })
+            .count();
+        assert_eq!(found, 1, "one original bound row for {text} as {subject}");
+    }
+}
+
 /// REQ-RUST-033.0 / REQ-RUST-035.0 / REQ-RUST-043.0
 #[test]
 fn test_impl_header_row_contents() {

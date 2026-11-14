@@ -382,6 +382,68 @@ fn extract_method_receiver_syntax(call: &ast::MethodCallExpr) -> Value {
     })
 }
 
+/// Syntax-only evidence for one bound: what it bounds (a type parameter, the
+/// trait itself as a supertrait, or a `where` subject) and the trait path.
+/// Lifetime bounds and modified bounds (`?Sized`, `for<'a> ..`) carry no path.
+pub(super) fn extract_type_bound_syntax(
+    input: &SyntaxFileInputData,
+    bound: &ast::TypeBound,
+    removed: &[usize],
+) -> Value {
+    let bounded = bound
+        .syntax()
+        .parent()
+        .filter(|list| list.kind() == SyntaxKind::TYPE_BOUND_LIST)
+        .and_then(|list| list.parent());
+    let (subject, name) = match bounded {
+        Some(owner) if owner.kind() == SyntaxKind::TYPE_PARAM => (
+            "type_parameter",
+            owner
+                .children()
+                .find_map(ast::Name::cast)
+                .map(|name| name.text().trim_start_matches("r#").to_owned()),
+        ),
+        Some(owner) if owner.kind() == SyntaxKind::TRAIT => ("supertrait", None),
+        Some(owner) if owner.kind() == SyntaxKind::WHERE_PRED => (
+            "where_predicate",
+            match ast::WherePred::cast(owner).and_then(|predicate| predicate.ty()) {
+                Some(ast::Type::PathType(subject)) => subject
+                    .path()
+                    .and_then(|path| read_single_segment_name(&path)),
+                _ => None,
+            },
+        ),
+        _ => ("other", None),
+    };
+    let path = match bound.ty() {
+        Some(ast::Type::PathType(found)) => found.path(),
+        _ => None,
+    }
+    .filter(|path| path.syntax().text_range() == bound.syntax().text_range());
+    let form = if bound.lifetime().is_some() {
+        "lifetime"
+    } else if path.is_some() {
+        "trait"
+    } else {
+        "other"
+    };
+    let trait_source = path.map(|path| {
+        let range = path.syntax().text_range();
+        let start = restore_source_byte_offset(range.start(), removed);
+        let end = restore_source_byte_offset(range.end(), removed);
+        let simple = !path.syntax().descendants().any(|child| {
+            matches!(
+                child.kind(),
+                SyntaxKind::GENERIC_ARG_LIST
+                    | SyntaxKind::TYPE_ANCHOR
+                    | SyntaxKind::PARENTHESIZED_ARG_LIST
+            )
+        });
+        json!({"span_byte_start_offset":start,"span_byte_end_offset":end,"type_source_text":std::str::from_utf8(&input.file_source_content_bytes[start..end]).ok(),"type_simple_path_flag":simple})
+    });
+    json!({"bound_subject_kind":subject,"bound_subject_name_value":name,"bound_form_kind":form,"trait_type_source":trait_source})
+}
+
 fn read_plain_identifier_text(expr: &ast::Expr) -> Option<String> {
     let ast::Expr::PathExpr(expr) = expr else {
         return None;

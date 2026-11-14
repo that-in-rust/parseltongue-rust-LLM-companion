@@ -88,6 +88,19 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-15 00:30 IST — Part 3 step 3: bound evidence, without a new table
+
+- Every `TYPE_BOUND` row in `field-signature-detail-table` now carries
+  `bound_syntax_evidence`: what is bounded (a type parameter by name, the trait itself as a
+  supertrait, or a `where` subject) and the trait path with its source range.
+- Plan change: part 3 first called for a new table. The rows already existed, one per bound,
+  owned by their function or trait, so the evidence went onto them. Part 3 is updated.
+- Real-source test `test_generic_bound_rows_written` passes on pinned itoa: one row each for
+  `I: Integer`, `Integer: private::Sealed`, `Sealed: Copy`. One fixture test passes.
+- Not covered: `where Self: Trait` (no subject name is recorded), bounds on associated types.
+- `test_format_sealed_write_call` is still RED: the resolver does not read any of this yet.
+- Next: step 4, the resolver branch.
+
 ### 2026-11-15 00:05 IST — Part 3 step 2: method-call syntax evidence
 
 - Every `METHOD_CALL_EXPR` site row now carries `method_receiver_evidence`: whether the

@@ -647,6 +647,12 @@ fn extract_macro_context_syntax(
                     &active_flags,
                 );
         }
+        if let Some(bound) = ast::TypeBound::cast(node.clone()) {
+            payload["bound_syntax_evidence"] =
+                original_call_resolution_records::extract_type_bound_syntax(
+                    input, &bound, &removed,
+                );
+        }
         if matches!(kind.as_str(), "CALL_EXPR" | "METHOD_CALL_EXPR") {
             payload["call_syntax_evidence"] =
                 original_call_resolution_records::extract_original_call_syntax(
