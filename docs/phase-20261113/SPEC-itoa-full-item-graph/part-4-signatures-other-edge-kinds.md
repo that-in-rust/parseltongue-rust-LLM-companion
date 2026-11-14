@@ -1,11 +1,11 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a steps 1 to 3 of 7 BUILT (edges to items). 4b to 4d are stubs.**
+**State: 4a steps 1 to 4 of 7 BUILT (edges to items, `Self` included). 4b to 4d are stubs.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
-4a  uses_type from signatures   REQ-RUST-018.2   item targets built; Self, builtins, unresolved next
+4a  uses_type from signatures   REQ-RUST-018.2   item targets and Self built; builtins, unresolved next
 4b  implements from impl headers                 stub
 4c  reads of consts and statics                  stub
 4d  imports from use nodes                       stub
@@ -122,6 +122,12 @@ before its push.
 - Correction: this part first said 9 edges to items. Two of those nine were impl-header
   paths, which belong to 4b. The signature count is 7.
 - Not measured: one run's cost.
+
+**After step 4:** `<Buffer as Clone>::clone --uses_type--> Buffer` is stored, with the site
+on `Self`; `test_clone_self_type_edge` passes. Gates pass: 452 tests passed, 0 failed,
+4 ignored; the 15 real-source tests pass (138.3 s). The edge counts were not re-read; one
+more edge than step 3 is expected (112), since itoa has one `Self` in an original signature.
+A `Self` whose impl header is unresolved stores nothing until step 6.
 
 ## 7 — Open questions
 

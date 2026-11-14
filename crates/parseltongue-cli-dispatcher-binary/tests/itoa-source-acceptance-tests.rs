@@ -5,9 +5,10 @@
 #![allow(clippy::unwrap_used)]
 
 use parseltongue_core_row_types::{
-    HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldInputCompletenessKind, HldItemKindValue,
-    HldMaterializationInputRecord, HldNodeInputCategory, HldNodeInputRecord, HldOwnerKindValue,
-    HldRelationKindValue, HldTargetIdentityValue, NameSymbolTargetKey, RunCancelFlagValue,
+    HldEdgeInputRecord, HldEdgeResolutionValue, HldEffectiveVisibilityKind,
+    HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
+    HldNodeInputCategory, HldNodeInputRecord, HldOwnerKindValue, HldRelationKindValue,
+    HldTargetIdentityValue, NameSymbolTargetKey, RunCancelFlagValue,
     validate_hld_materialization_input,
 };
 use parseltongue_table_store_traits::{
@@ -551,25 +552,54 @@ fn test_format_sealed_write_call() {
     );
 }
 
-/// REQ-RUST-018.2
-#[test]
-fn test_new_return_type_edge() {
+/// The `uses_type` edges of one original function, and the byte range of
+/// `path` inside `signature` in src/lib.rs.
+fn read_signature_type_uses(
+    owner: &str,
+    signature: &str,
+    path: &str,
+) -> (
+    HldMaterializationInputRecord,
+    Vec<HldEdgeInputRecord>,
+    HldNodeInputRecord,
+    (u64, u64),
+) {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");
-    let new = locate_original_member_node(&input, &spans, "new");
-    let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT");
+    let owner = locate_original_member_node(&input, &spans, owner).clone();
+    let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT").clone();
     let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
-    let signature = "pub fn new() -> Buffer {";
-    let site_start = source.find(signature).unwrap() + signature.find("Buffer").unwrap();
-    let expected_site = (site_start as u64, (site_start + "Buffer".len()) as u64);
+    let start = source.find(signature).unwrap() + signature.rfind(path).unwrap();
     let uses = input
         .input_edge_records
         .iter()
         .filter(|edge| {
-            edge.edge_source_reference == new.node_target_reference
+            edge.edge_source_reference == owner.node_target_reference
                 && edge.edge_relation_kind_value == HldRelationKindValue::UsesType
         })
-        .collect::<Vec<_>>();
+        .cloned()
+        .collect();
+    (
+        input,
+        uses,
+        buffer,
+        (start as u64, (start + path.len()) as u64),
+    )
+}
+
+fn read_edge_site_range(edge: &HldEdgeInputRecord) -> (u64, u64) {
+    edge.edge_evidence_row_key
+        .evidence_site_occurrence_key
+        .read_semantic_occurrence_parts()
+        .span_byte_range_value
+        .read_source_range_pair()
+}
+
+/// REQ-RUST-018.2
+#[test]
+fn test_new_return_type_edge() {
+    let (_input, uses, buffer, expected_site) =
+        read_signature_type_uses("new", "pub fn new() -> Buffer {", "Buffer");
     assert_eq!(
         uses.len(),
         1,
@@ -583,15 +613,30 @@ fn test_new_return_type_edge() {
         "the return type resolves to the struct Buffer"
     );
     assert_eq!(
-        uses[0]
-            .edge_evidence_row_key
-            .evidence_site_occurrence_key
-            .read_semantic_occurrence_parts()
-            .span_byte_range_value
-            .read_source_range_pair(),
+        read_edge_site_range(&uses[0]),
         expected_site,
         "the site is the type path itself, not the whole signature"
     );
+}
+
+/// REQ-RUST-018.2
+#[test]
+fn test_clone_self_type_edge() {
+    let (_input, uses, buffer, expected_site) =
+        read_signature_type_uses("clone", "fn clone(&self) -> Self {", "Self");
+    assert_eq!(
+        uses.len(),
+        1,
+        "clone names one type in its signature: Self, its return type"
+    );
+    assert_eq!(
+        uses[0].edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: buffer.node_target_reference.clone()
+        },
+        "Self is the impl's self type, the struct Buffer"
+    );
+    assert_eq!(read_edge_site_range(&uses[0]), expected_site);
 }
 
 /// REQ-RUST-042.0

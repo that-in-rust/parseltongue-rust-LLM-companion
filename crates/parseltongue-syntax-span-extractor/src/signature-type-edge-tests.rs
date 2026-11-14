@@ -276,3 +276,28 @@ fn test_reject_type_edge_scope() {
         Err(SignatureTypeEdgeError::InvalidScope)
     ));
 }
+
+/// REQ-RUST-018.2
+#[test]
+fn test_impl_self_type_edge() {
+    let source = "struct Buffer; trait Make { fn make() -> Self; } \
+        impl Make for Buffer { fn make() -> Self { loop {} } } \
+        impl Buffer { fn pair(self, other: &Self) -> Option<Self> { loop {} } }";
+    let (store, input) = make_call_fixture_graph(source);
+    let buffer = read_fixture_node_target(&input, "Buffer");
+    let site = |nth: usize| {
+        let start = source.match_indices("Self").nth(nth).unwrap().0;
+        format!("{start}:Self")
+    };
+    let mut edges = read_type_fixture_edges(source, &store, &input);
+    edges.sort_by_key(|(_, _, site)| site.split(':').next().unwrap().parse::<usize>().unwrap());
+    assert_eq!(
+        edges,
+        vec![
+            ("make".to_owned(), buffer.clone(), site(1)),
+            ("pair".to_owned(), buffer.clone(), site(2)),
+            ("pair".to_owned(), buffer, site(3)),
+        ],
+        "Self in an impl is the impl's self type; Self in a trait declaration names no item"
+    );
+}

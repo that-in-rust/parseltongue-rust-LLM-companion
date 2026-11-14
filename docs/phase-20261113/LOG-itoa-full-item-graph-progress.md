@@ -11,10 +11,10 @@ from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4a step 4, `Self` in a signature through the impl header
-  (`<Buffer as Clone>::clone --uses_type--> Buffer`). Steps 1 to 3 of 7 are built.
-- **Produced today:** `contains` and `calls`. Not produced: `uses_type`, `reads`,
-  `implements`, `imports`.
+- **Next target:** part 4a step 5, `uses_type` edges to builtins (`u8`, `str`, `usize`) and
+  one node per builtin. Steps 1 to 4 of 7 are built.
+- **Produced today:** `contains`, `calls`, and `uses_type` to items from signatures. Not
+  produced: `uses_type` to builtins, `reads`, `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
   ([itoa-target-dataset](itoa-target-dataset/)). Nothing can be accepted against it yet.
 
@@ -90,6 +90,21 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 04:45 IST — Part 4a step 4: `Self` in a signature is the impl's self type
+
+- `<Buffer as Clone>::clone --uses_type--> Buffer` is stored from pinned itoa, site on
+  `Self`; `test_clone_self_type_edge` passes.
+- The resolver reads the self type from the impl header row of the member. `Self` in a trait
+  declaration has no header, so it stores nothing.
+- RED: the fixture test failed first (0 edges, 3 expected). The real-source test did not
+  compile on its first run, so I checked it by disabling the new branch: it failed with
+  0 edges where 1 is expected.
+- Workspace gates: format, lint and release build pass; 452 tests passed, 0 failed,
+  4 ignored. The 15 real-source tests pass (138.3 s).
+- Not re-read: the edge counts. 112 edges and 8 `uses_type` are expected.
+- Refactor: the resolver's shared inputs moved into one struct, `SignatureEdgeGraphScope`.
+- Next: step 5, builtin targets and their nodes.
 
 ### 2026-11-15 04:15 IST — Part 4a step 3: `uses_type` edges to items are stored
 

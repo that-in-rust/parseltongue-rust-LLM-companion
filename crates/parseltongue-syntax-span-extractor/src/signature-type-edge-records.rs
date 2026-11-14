@@ -10,7 +10,10 @@ use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
 use ra_ap_syntax::{AstNode, SyntaxKind, SyntaxNode, ast};
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 #[cfg(test)]
 #[path = "signature-type-edge-tests.rs"]
@@ -120,31 +123,64 @@ pub fn resolve_signature_type_edges(
         })
         .map(|node| &node.node_target_reference)
         .collect::<BTreeSet<_>>();
+    let graph = SignatureEdgeGraphScope {
+        context: &context,
+        endpoints: &endpoints,
+        self_types: &read_member_self_types(store, source_scope)?,
+        generation: input.run_generation_digest_value,
+    };
     let mut edges = Vec::new();
     for row in read_impl_stage_values(store, source_scope, "field-signature-detail-table")? {
         if cancel.check_stage_work_cancelled() {
             return Err(SignatureTypeEdgeError::Cancelled);
         }
-        edges.extend(build_signature_row_edges(
-            &row,
-            &context,
-            &endpoints,
-            input.run_generation_digest_value,
-        )?);
+        edges.extend(build_signature_row_edges(&row, &graph)?);
     }
     edges.sort();
     edges.dedup();
     Ok(edges)
 }
 
+/// What every signature row of one graph is joined against.
+struct SignatureEdgeGraphScope<'a> {
+    context: &'a ImplHeaderSourceContext<'a>,
+    endpoints: &'a BTreeSet<&'a HldTargetIdentityValue>,
+    /// Impl member identity to the stored resolution of its impl's self type.
+    self_types: &'a BTreeMap<HldTargetIdentityValue, Value>,
+    generation: RunGenerationDigestValue,
+}
+
+/// Each impl member mapped to its impl header's self type resolution, so
+/// `Self` in a member signature is read from the header and never looked up.
+fn read_member_self_types(
+    store: &dyn StageTableStorePort,
+    source_scope: &StageRunScopeValue,
+) -> Result<BTreeMap<HldTargetIdentityValue, Value>, SignatureTypeEdgeError> {
+    let mut self_types = BTreeMap::new();
+    for header in read_impl_stage_values(store, source_scope, "impl-header-index-table")? {
+        let members = header["impl_member_occurrence_rows"].as_array().ok_or(
+            SignatureTypeEdgeError::InvalidEvidence {
+                field: "impl_member_occurrence_rows",
+            },
+        )?;
+        for member in members {
+            let key = decode_occurrence_identity_value(&member["member_semantic_occurrence_key"])?;
+            self_types.insert(
+                NameSymbolTargetKey::Definition(key).into(),
+                header["impl_self_type_resolution"].clone(),
+            );
+        }
+    }
+    Ok(self_types)
+}
+
 /// The edges of one signature row: none unless the row is original source,
 /// lists its type paths, and is owned by an active item that is a graph node.
 fn build_signature_row_edges(
     row: &Value,
-    context: &ImplHeaderSourceContext<'_>,
-    endpoints: &BTreeSet<&HldTargetIdentityValue>,
-    generation: RunGenerationDigestValue,
+    graph: &SignatureEdgeGraphScope<'_>,
 ) -> Result<Vec<HldEdgeInputRecord>, SignatureTypeEdgeError> {
+    let context = graph.context;
     let (Some(paths), Some(owner)) = (
         row["type_path_source_rows"].as_array(),
         row["site_owner_occurrence_key"].as_str(),
@@ -163,12 +199,12 @@ fn build_signature_row_edges(
         decode_occurrence_identity_value(&context.occurrence(source_span)?)?,
     )
     .into();
-    if !endpoints.contains(&source) {
+    if !graph.endpoints.contains(&source) {
         return Ok(Vec::new());
     }
     paths
         .iter()
-        .map(|path| build_type_path_edge(row, path, context, endpoints, &source, generation))
+        .map(|path| build_type_path_edge(row, path, graph, &source))
         .filter_map(Result::transpose)
         .collect()
 }
@@ -176,11 +212,10 @@ fn build_signature_row_edges(
 fn build_type_path_edge(
     row: &Value,
     path: &Value,
-    context: &ImplHeaderSourceContext<'_>,
-    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+    graph: &SignatureEdgeGraphScope<'_>,
     source: &HldTargetIdentityValue,
-    generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, SignatureTypeEdgeError> {
+    let context = graph.context;
     let text =
         path["type_source_text"]
             .as_str()
@@ -197,16 +232,17 @@ fn build_type_path_edge(
         "span_expansion_provenance_chain":row["span_expansion_provenance_chain"]
     });
     let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
-    let Some(target) = resolve_type_path_target(path, &evidence, context, endpoints)? else {
+    let Some(target) = resolve_type_path_target(path, &evidence, graph, source)? else {
         return Ok(None);
     };
     let metadata = json!({
         "type_use_kind":"signature",
         "signature_row_kind":row["site_syntax_kind_value"],
-        "type_source_text":text
+        "type_source_text":text,
+        "type_path_self_flag":path["type_path_self_flag"]
     });
     Ok(Some(HldEdgeInputRecord {
-        run_generation_digest_value: generation,
+        run_generation_digest_value: graph.generation,
         edge_source_reference: source.clone(),
         edge_relation_kind_value: HldRelationKindValue::UsesType,
         edge_resolution_value: HldEdgeResolutionValue::Extracted {
@@ -222,30 +258,38 @@ fn build_type_path_edge(
     }))
 }
 
-/// The graph node a type path names: the path has exactly one stored
-/// resolution with exactly one target, and that target is an item node.
+/// The graph node a type path names. `Self` in an impl member is the impl
+/// header's resolved self type. Any other path has exactly one stored
+/// resolution with exactly one target. The target must be an item node.
 fn resolve_type_path_target(
     path: &Value,
     evidence: &Value,
-    context: &ImplHeaderSourceContext<'_>,
-    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+    graph: &SignatureEdgeGraphScope<'_>,
+    source: &HldTargetIdentityValue,
 ) -> Result<Option<HldTargetIdentityValue>, SignatureTypeEdgeError> {
-    if path["type_path_self_flag"] == true {
-        return Ok(None);
-    }
-    let [record] = context.read_type_path_records(evidence, path)? else {
-        return Ok(None);
-    };
-    let Some([symbol]) = record["path_target_symbol_rows"]
-        .as_array()
-        .map(Vec::as_slice)
-        .filter(|_| record["path_resolution_state_kind"] == "resolved")
-    else {
-        return Ok(None);
-    };
-    let Some(identity) = context.read_single_target_identity(symbol)? else {
-        return Ok(None);
+    let identity = if path["type_path_self_flag"] == true {
+        match graph.self_types.get(source) {
+            Some(header) if header["resolution_state_kind"] == "resolved" => {
+                header["target_identity"].clone()
+            }
+            _ => return Ok(None),
+        }
+    } else {
+        let [record] = graph.context.read_type_path_records(evidence, path)? else {
+            return Ok(None);
+        };
+        let Some([symbol]) = record["path_target_symbol_rows"]
+            .as_array()
+            .map(Vec::as_slice)
+            .filter(|_| record["path_resolution_state_kind"] == "resolved")
+        else {
+            return Ok(None);
+        };
+        let Some(identity) = graph.context.read_single_target_identity(symbol)? else {
+            return Ok(None);
+        };
+        identity
     };
     let target = HldTargetIdentityValue::from(decode_symbol_target_value(&identity)?);
-    Ok(endpoints.contains(&target).then_some(target))
+    Ok(graph.endpoints.contains(&target).then_some(target))
 }
