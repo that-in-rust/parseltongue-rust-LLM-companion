@@ -506,3 +506,91 @@ fn test_preserve_supplied_frozen_snapshot() {
         HldEdgeResolutionValue::Extracted { .. }
     ));
 }
+
+fn read_method_receiver_evidence(source: &str, text: &str) -> Value {
+    extract_file_syntax_rows(&make_call_syntax_input(source))
+        .unwrap()
+        .stage_unit_output_rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "body-site-reference-table")
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .find(|row| {
+            row["site_syntax_kind_value"] == "METHOD_CALL_EXPR"
+                && row["site_syntax_source_text"] == text
+        })
+        .unwrap()["call_syntax_evidence"]["method_receiver_evidence"]
+        .clone()
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_capture_generic_receiver_evidence() {
+    let evidence = read_method_receiver_evidence(
+        "trait T { fn go(self); }\nfn run<I: T>(i: I) { i.go() }\n",
+        "i.go()",
+    );
+    assert_eq!(
+        evidence,
+        json!({
+            "receiver_shape_kind":"parameter_identifier",
+            "receiver_declared_name_value":"i",
+            "method_declared_name_value":"go",
+            "method_generic_arguments_flag":false,
+            "receiver_parameter_type_text":"I",
+            "receiver_generic_owner_kind":"function",
+            "receiver_rebinding_flag":false,
+        })
+    );
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_classify_other_receiver_shapes() {
+    let source = "struct S { f: u8 }\nfn make() -> u8 { 0 }\nimpl S { fn run(self, n: u8) {\n self.go(); self.f.go(); make().go(); (n).go(); n.go(); } }\n";
+    for text in ["self.go()", "self.f.go()", "make().go()", "(n).go()"] {
+        let evidence = read_method_receiver_evidence(source, text);
+        assert_eq!(evidence["receiver_shape_kind"], "other", "{text}");
+        assert_eq!(
+            evidence["receiver_generic_owner_kind"],
+            Value::Null,
+            "{text}"
+        );
+    }
+    let concrete = read_method_receiver_evidence(source, "n.go()");
+    assert_eq!(concrete["receiver_shape_kind"], "parameter_identifier");
+    assert_eq!(concrete["receiver_parameter_type_text"], "u8");
+    assert_eq!(concrete["receiver_generic_owner_kind"], Value::Null);
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_flag_rebound_receiver_names() {
+    for body in [
+        "let i = 0u8; i.go()",
+        "let f = |i: u8| i.go(); f(0)",
+        "if let Some(i) = Some(0u8) { i.go() }",
+        "rebind!(i); i.go()",
+    ] {
+        let source = format!("fn run<I: T>(i: I) {{ {body} }}\n");
+        let evidence = read_method_receiver_evidence(&source, "i.go()");
+        assert_eq!(evidence["receiver_rebinding_flag"], true, "{body}");
+    }
+    let later =
+        read_method_receiver_evidence("fn run<I: T>(i: I, j: I) { i.go(); show!(j) }\n", "i.go()");
+    assert_eq!(later["receiver_rebinding_flag"], false);
+}
+
+/// REQ-RUST-042.0
+#[test]
+fn test_locate_enclosing_generic_owner() {
+    let member = read_method_receiver_evidence(
+        "struct S<I>(I);\nimpl<I: T> S<I> { fn run(i: I) { i.go() } }\n",
+        "i.go()",
+    );
+    assert_eq!(member["receiver_generic_owner_kind"], "enclosing_item");
+    let nested = read_method_receiver_evidence(
+        "struct S<I>(I);\nimpl<I: T> S<I> { fn run() { fn inner(i: I) { i.go() } } }\n",
+        "i.go()",
+    );
+    assert_eq!(nested["receiver_generic_owner_kind"], Value::Null);
+}

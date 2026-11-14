@@ -8,7 +8,10 @@ use crate::syntax_namespace_record_codec::{
 use crate::{SyntaxFileInputData, restore_source_byte_offset};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
-use ra_ap_syntax::{AstNode, SyntaxKind, SyntaxNode, ast};
+use ra_ap_syntax::{
+    AstNode, SyntaxKind, SyntaxNode,
+    ast::{self, HasGenericArgs, HasGenericParams, HasName},
+};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, path::Path};
 
@@ -342,7 +345,127 @@ pub(super) fn extract_original_call_syntax(
     let shadowed = prefix
         .as_ref()
         .is_some_and(|prefix| check_call_lexical_shadowing(prefix, node));
-    json!({"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed})
+    let receiver =
+        ast::MethodCallExpr::cast(node.clone()).map(|call| extract_method_receiver_syntax(&call));
+    json!({"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"method_receiver_evidence":receiver})
+}
+
+/// Syntax-only evidence for `receiver.method(..)`. Nothing is resolved here:
+/// the record says whether the receiver is a plain parameter name, what type
+/// that parameter declares, and whether that type is a type parameter.
+fn extract_method_receiver_syntax(call: &ast::MethodCallExpr) -> Value {
+    let function = call.syntax().ancestors().find_map(ast::Fn::cast);
+    let receiver = call
+        .receiver()
+        .and_then(|expr| read_plain_identifier_text(&expr));
+    let parameter = receiver
+        .as_deref()
+        .zip(function.as_ref())
+        .and_then(|(name, function)| find_named_function_parameter(function, name));
+    let declared = parameter.as_ref().and_then(read_simple_type_name);
+    let owner = declared
+        .as_deref()
+        .zip(function.as_ref())
+        .and_then(|(name, function)| find_type_parameter_owner(function, name));
+    let rebound = receiver
+        .as_deref()
+        .zip(function.as_ref())
+        .is_some_and(|(name, function)| check_receiver_name_rebound(function, call, name));
+    json!({
+        "receiver_shape_kind":if parameter.is_some() {"parameter_identifier"} else {"other"},
+        "receiver_declared_name_value":receiver,
+        "method_declared_name_value":call.name_ref().map(|name| name.text().trim_start_matches("r#").to_owned()),
+        "method_generic_arguments_flag":call.generic_arg_list().is_some(),
+        "receiver_parameter_type_text":declared,
+        "receiver_generic_owner_kind":owner,
+        "receiver_rebinding_flag":rebound,
+    })
+}
+
+fn read_plain_identifier_text(expr: &ast::Expr) -> Option<String> {
+    let ast::Expr::PathExpr(expr) = expr else {
+        return None;
+    };
+    read_single_segment_name(&expr.path()?)
+}
+
+/// One unqualified segment without generic arguments; never `self` or `Self`.
+fn read_single_segment_name(path: &ast::Path) -> Option<String> {
+    let segment = path.segment()?;
+    if path.qualifier().is_some()
+        || segment.generic_arg_list().is_some()
+        || segment.syntax().children().count() != 1
+    {
+        return None;
+    }
+    let name = segment.name_ref()?;
+    name.syntax()
+        .first_token()
+        .is_some_and(|token| token.kind() == SyntaxKind::IDENT)
+        .then(|| name.text().trim_start_matches("r#").to_owned())
+}
+
+fn find_named_function_parameter(function: &ast::Fn, name: &str) -> Option<ast::Param> {
+    function.param_list()?.params().find(|parameter| {
+        matches!(parameter.pat(), Some(ast::Pat::IdentPat(pattern))
+            if pattern.pat().is_none()
+                && pattern.name().is_some_and(|found| found.text().trim_start_matches("r#") == name))
+    })
+}
+
+fn read_simple_type_name(parameter: &ast::Param) -> Option<String> {
+    let ast::Type::PathType(declared) = parameter.ty()? else {
+        return None;
+    };
+    read_single_segment_name(&declared.path()?)
+}
+
+/// A type parameter of the function itself, or of the impl or trait the
+/// function is a direct member of. A nested function sees neither.
+fn find_type_parameter_owner(function: &ast::Fn, name: &str) -> Option<&'static str> {
+    let declares = |list: Option<ast::GenericParamList>| {
+        list.is_some_and(|list| {
+            list.type_or_const_params().any(|parameter| {
+                matches!(parameter, ast::TypeOrConstParam::Type(found)
+                    if found.name().is_some_and(|found| found.text().trim_start_matches("r#") == name))
+            })
+        })
+    };
+    if declares(function.generic_param_list()) {
+        return Some("function");
+    }
+    let container = function
+        .syntax()
+        .parent()
+        .filter(|list| list.kind() == SyntaxKind::ASSOC_ITEM_LIST)?
+        .parent()?;
+    let outer = ast::Impl::cast(container.clone())
+        .map(|item| item.generic_param_list())
+        .or_else(|| ast::Trait::cast(container).map(|item| item.generic_param_list()))?;
+    declares(outer).then_some("enclosing_item")
+}
+
+/// Conservative: any binding or local item of that name anywhere in the body,
+/// or an earlier macro call that is handed the name, may rebind the receiver.
+fn check_receiver_name_rebound(function: &ast::Fn, call: &ast::MethodCallExpr, name: &str) -> bool {
+    let Some(body) = function.body() else {
+        return false;
+    };
+    let call_start = call.syntax().text_range().start();
+    body.syntax().descendants().any(|node| {
+        if node.kind() == SyntaxKind::MACRO_CALL {
+            return node.text_range().start() < call_start
+                && node
+                    .descendants_with_tokens()
+                    .filter_map(|element| element.into_token())
+                    .any(|token| token.kind() == SyntaxKind::IDENT && token.text() == name);
+        }
+        (node.kind() == SyntaxKind::IDENT_PAT || crate::check_syntax_item_node(&node))
+            && node
+                .children()
+                .filter_map(ast::Name::cast)
+                .any(|found| found.text().trim_start_matches("r#") == name)
+    })
 }
 
 fn check_call_lexical_shadowing(prefix: &ast::Path, call: &SyntaxNode) -> bool {

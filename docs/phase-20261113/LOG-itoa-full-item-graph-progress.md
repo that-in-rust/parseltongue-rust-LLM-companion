@@ -88,6 +88,20 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-15 00:05 IST — Part 3 step 2: method-call syntax evidence
+
+- Every `METHOD_CALL_EXPR` site row now carries `method_receiver_evidence`: whether the
+  receiver is a plain parameter name, the method name, the parameter's declared type when it
+  is one plain name, whether that name is a type parameter of the function or of its impl or
+  trait, and whether the receiver name may be rebound.
+- Rebinding is conservative: any binding or local item of that name anywhere in the body, or
+  an earlier macro call that is handed the name, sets the flag.
+- Syntax only. The resolver does not read the new record yet, so no edge changes and the
+  real-source test is still RED.
+- 4 new fixture tests pass (crate: 44 + 17 pass; format and lint clean for the crate). They
+  were written together with the code, so no separate failing run is recorded for them.
+- Next: step 3, bound and supertrait rows.
+
 ### 2026-11-14 23:40 IST — Part 3 step 1: RED on the generic call
 
 - Test `test_format_sealed_write_call` (REQ-RUST-042.0) added. It runs the production CLI on
