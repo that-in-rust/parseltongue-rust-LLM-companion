@@ -37,6 +37,8 @@ pub use original_call_resolution_records::{
 };
 #[path = "legacy-macro-scope-records.rs"]
 mod legacy_macro_scope_records;
+#[path = "signature-type-edge-records.rs"]
+mod signature_type_edge_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
 #[path = "legacy-macro-source-events.rs"]
 mod legacy_macro_source_events;
@@ -652,6 +654,11 @@ fn extract_macro_context_syntax(
                 original_call_resolution_records::extract_type_bound_syntax(
                     input, &bound, &removed,
                 );
+        }
+        let type_paths =
+            signature_type_edge_records::extract_signature_type_paths(input, &node, &removed);
+        if !type_paths.is_null() {
+            payload["type_path_source_rows"] = type_paths;
         }
         if matches!(kind.as_str(), "CALL_EXPR" | "METHOD_CALL_EXPR") {
             payload["call_syntax_evidence"] =

@@ -20,7 +20,7 @@ use std::{
 
 #[cfg(test)]
 #[path = "original-call-resolution-tests.rs"]
-mod original_call_resolution_tests;
+pub(crate) mod original_call_resolution_tests;
 
 #[derive(Debug, thiserror::Error)]
 pub enum OriginalCallResolutionError {

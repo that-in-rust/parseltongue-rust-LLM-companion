@@ -78,7 +78,7 @@ impl StageTableStorePort for OriginalCallFixtureStore {
     }
 }
 
-fn make_call_syntax_input(source: &str) -> SyntaxFileInputData {
+pub(crate) fn make_call_syntax_input(source: &str) -> SyntaxFileInputData {
     SyntaxFileInputData {
         file_source_absolute_path: "/fixture/src/lib.rs".into(),
         file_source_content_bytes: source.as_bytes().to_vec(),

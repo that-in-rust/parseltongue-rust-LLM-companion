@@ -91,6 +91,23 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-15 03:30 IST — Part 4a step 2: signature rows list their type paths
+
+- Each parameter, return type, field, generic parameter, where-predicate and bound row in
+  `field-signature-detail-table` now carries `type_path_source_rows`: range, text and a
+  bare-`Self` flag for every type path it holds.
+- A path is listed once, on the nearest row that holds it (a bound's path is on the bound
+  row, not also on its type parameter). Paths under an expression are not listed. Rows under
+  an expression of their item (closure parameters) carry no list.
+- RED first: 3 fixture tests selected, 3 failed because no row had a list. GREEN: the
+  extractor crate's 58 unit tests and 17 contract tests pass.
+- Known limit: `Foo<LEN>` with a const `LEN` parses as a type argument, so it is listed as
+  a type path. Step 6 will store it unresolved, not as an edge.
+- Workspace gates: format, lint and release build pass; 445 tests passed, 0 failed,
+  5 ignored; `test_lang_items_in_sysroot` skipped as before.
+- No refactor needed: one new function of about 30 lines.
+- Next: step 3, the resolver for item targets and the facade call.
+
 ### 2026-11-15 03:00 IST — Part 4a step 1: RED on the first `uses_type` edge
 
 - `test_new_return_type_edge` (REQ-RUST-018.2) runs the production CLI on pinned itoa and
