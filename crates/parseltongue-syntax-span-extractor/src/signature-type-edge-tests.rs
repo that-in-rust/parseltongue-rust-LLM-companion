@@ -296,9 +296,17 @@ fn test_impl_self_type_edge() {
         vec![
             ("make".to_owned(), buffer.clone(), site(1)),
             ("pair".to_owned(), buffer.clone(), site(2)),
+            (
+                "pair".to_owned(),
+                HldEdgeResolutionValue::Unresolved {
+                    reason: HldUnresolvedReasonKind::TraitSolverNeeded
+                },
+                format!("{}:Option<Self>", source.find("Option").unwrap())
+            ),
             ("pair".to_owned(), buffer, site(3)),
         ],
-        "Self in an impl is the impl's self type; Self in a trait declaration names no item"
+        "Self in an impl is the impl's self type; Self in a trait declaration names no item; \
+         a path name resolution never recorded is unresolved"
     );
 }
 
@@ -378,4 +386,93 @@ fn test_builtin_target_one_node() {
     graph.input_node_records.extend(nodes);
     graph.input_edge_records.extend(edges);
     assert_eq!(validate_full_graph_input(&graph).map(|_| ()), Ok(()));
+}
+
+/// REQ-RUST-018.2
+#[test]
+fn test_self_unresolved_header_reason() {
+    let source = "struct Buffer; impl Missing { fn make() -> Self { loop {} } }";
+    let (store, input) = make_call_fixture_graph(source);
+    let start = source.find("Missing").unwrap();
+    store.rows.lock().unwrap().push(make_call_fixture_row(
+        "path-resolution-site-records",
+        json!({
+            "site_compilation_scope_record":{"unit_semantic_identity_record":
+                encode_compilation_unit_value(&make_call_fixture_unit())},
+            "site_source_absolute_path":"/fixture/src/lib.rs",
+            "site_source_range_start":start, "site_source_range_end":start + 7,
+            "site_expansion_provenance_chain":[], "path_resolution_state_kind":"unresolved",
+            "path_unresolved_reason_kind":"external_source_missing", "path_target_symbol_rows":[]
+        }),
+    ));
+    crate::persist_impl_header_rows(
+        &store,
+        &make_call_fixture_scope(),
+        Path::new("/fixture"),
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        read_type_fixture_edges(source, &store, &input),
+        vec![(
+            "make".to_owned(),
+            HldEdgeResolutionValue::Unresolved {
+                reason: HldUnresolvedReasonKind::ExternalSourceMissing
+            },
+            format!("{}:Self", source.find("Self").unwrap())
+        )],
+        "Self carries the reason its impl header's self type was left unresolved with"
+    );
+}
+
+/// REQ-RUST-018.2
+#[test]
+fn test_ambiguous_type_path_reason() {
+    let source = "struct Buffer; fn make(a: Twin, b: Gone) { loop {} }";
+    let (store, input) = make_call_fixture_graph(source);
+    let twin = source.find("Twin").unwrap();
+    let gone = source.find("Gone").unwrap();
+    let target = json!({"target_symbol_kind_value":"Struct",
+        "target_source_file_path":"/fixture/src/lib.rs"});
+    store.rows.lock().unwrap().push(make_call_fixture_row(
+        "path-resolution-site-records",
+        json!({
+            "site_compilation_scope_record":{"unit_semantic_identity_record":
+                encode_compilation_unit_value(&make_call_fixture_unit())},
+            "site_source_absolute_path":"/fixture/src/lib.rs",
+            "site_source_range_start":twin, "site_source_range_end":twin + 4,
+            "site_expansion_provenance_chain":[], "path_resolution_state_kind":"resolved",
+            "path_unresolved_reason_kind":null, "path_target_symbol_rows":[target.clone(), target]
+        }),
+    ));
+    store.rows.lock().unwrap().push(make_call_fixture_row(
+        "path-resolution-site-records",
+        json!({
+            "site_compilation_scope_record":{"unit_semantic_identity_record":
+                encode_compilation_unit_value(&make_call_fixture_unit())},
+            "site_source_absolute_path":"/fixture/src/lib.rs",
+            "site_source_range_start":gone, "site_source_range_end":gone + 4,
+            "site_expansion_provenance_chain":[], "path_resolution_state_kind":"unresolved",
+            "path_unresolved_reason_kind":"cfg_inactive", "path_target_symbol_rows":[]
+        }),
+    ));
+    let unresolved = |reason| HldEdgeResolutionValue::Unresolved { reason };
+    let mut edges = read_type_fixture_edges(source, &store, &input);
+    edges.sort_by_key(|(_, _, site)| site.clone());
+    assert_eq!(
+        edges,
+        vec![
+            (
+                "make".to_owned(),
+                unresolved(HldUnresolvedReasonKind::AmbiguousTarget),
+                format!("{twin}:Twin")
+            ),
+            (
+                "make".to_owned(),
+                unresolved(HldUnresolvedReasonKind::CfgInactive),
+                format!("{gone}:Gone")
+            ),
+        ],
+        "several targets are ambiguous; a recorded reason is kept"
+    );
 }

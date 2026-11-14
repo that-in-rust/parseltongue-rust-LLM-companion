@@ -261,8 +261,12 @@ fn build_type_path_edge(
         "span_expansion_provenance_chain":row["span_expansion_provenance_chain"]
     });
     let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
-    let Some(target) = resolve_type_path_target(path, &evidence, graph, source)? else {
+    let Some(resolution) = resolve_type_path_target(path, &evidence, graph, source)? else {
         return Ok(None);
+    };
+    let target = match &resolution {
+        HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
+        _ => None,
     };
     let metadata = json!({
         "type_use_kind":"signature",
@@ -274,57 +278,87 @@ fn build_type_path_edge(
         run_generation_digest_value: graph.generation,
         edge_source_reference: source.clone(),
         edge_relation_kind_value: HldRelationKindValue::UsesType,
-        edge_resolution_value: HldEdgeResolutionValue::Extracted {
-            target: target.clone(),
-        },
+        edge_resolution_value: resolution,
         edge_evidence_row_key: HldEvidenceRowKey {
             evidence_site_occurrence_key: occurrence,
             evidence_source_occurrence_key: source.clone(),
             evidence_relation_kind_value: HldRelationKindValue::UsesType,
-            evidence_target_reference_value: Some(target),
+            evidence_target_reference_value: target,
         },
         edge_dispatch_metadata_text: Some(metadata.to_string()),
     }))
 }
 
-/// The graph node a type path names. `Self` in an impl member is the impl
-/// header's resolved self type. Any other path has exactly one stored
-/// resolution with exactly one target. The target is an item node or a builtin.
+/// What a type path names: an item node, a builtin, or nothing provable,
+/// with one reason. `None` when the path names no item at all (a type
+/// parameter, or `Self` outside an impl).
+///
+/// `Self` in an impl member is read from the impl header's stored self type.
+/// Any other path is read from its stored name resolution row.
 fn resolve_type_path_target(
     path: &Value,
     evidence: &Value,
     graph: &SignatureEdgeGraphScope<'_>,
     source: &HldTargetIdentityValue,
-) -> Result<Option<HldTargetIdentityValue>, SignatureTypeEdgeError> {
+) -> Result<Option<HldEdgeResolutionValue>, SignatureTypeEdgeError> {
+    let unresolved = |reason| Ok(Some(HldEdgeResolutionValue::Unresolved { reason }));
     let identity = if path["type_path_self_flag"] == true {
         match graph.self_types.get(source) {
+            None => return Ok(None),
             Some(header) if header["resolution_state_kind"] == "resolved" => {
                 header["target_identity"].clone()
             }
-            _ => return Ok(None),
+            Some(header) => {
+                return unresolved(read_stored_reason_kind(&header["unresolved_reason_kind"]));
+            }
         }
     } else {
-        let [record] = graph.context.read_type_path_records(evidence, path)? else {
-            return Ok(None);
+        let record = match graph.context.read_type_path_records(evidence, path)? {
+            [] => return unresolved(HldUnresolvedReasonKind::TraitSolverNeeded),
+            [record] => record,
+            _ => return unresolved(HldUnresolvedReasonKind::AmbiguousTarget),
         };
-        let Some([symbol]) = record["path_target_symbol_rows"]
+        let targets = record["path_target_symbol_rows"]
             .as_array()
             .map(Vec::as_slice)
-            .filter(|_| record["path_resolution_state_kind"] == "resolved")
-        else {
-            return Ok(None);
+            .unwrap_or(&[]);
+        let symbol = match (record["path_resolution_state_kind"].as_str(), targets) {
+            (Some("resolved"), [symbol]) => symbol,
+            (Some("ambiguous"), _) | (_, [_, _, ..]) => {
+                return unresolved(HldUnresolvedReasonKind::AmbiguousTarget);
+            }
+            _ => {
+                return unresolved(read_stored_reason_kind(
+                    &record["path_unresolved_reason_kind"],
+                ));
+            }
         };
-        if symbol["target_symbol_kind_value"] == "Builtin" {
-            json!({"target_identity_variant_kind":"builtin",
-                "target_builtin_name_value":symbol["target_builtin_name_value"]})
-        } else if let Some(identity) = graph.context.read_single_target_identity(symbol)? {
-            identity
-        } else {
-            return Ok(None);
+        match symbol["target_symbol_kind_value"].as_str() {
+            Some("TypeParam" | "ConstParam" | "SelfType") => return Ok(None),
+            Some("Builtin") => json!({"target_identity_variant_kind":"builtin",
+                "target_builtin_name_value":symbol["target_builtin_name_value"]}),
+            _ => match graph.context.read_single_target_identity(symbol)? {
+                Some(identity) => identity,
+                None => return unresolved(HldUnresolvedReasonKind::MissingTarget),
+            },
         }
     };
     let target = decode_symbol_target_value(&identity)?;
     let builtin = matches!(target, NameSymbolTargetKey::Builtin(_));
     let target = HldTargetIdentityValue::from(target);
-    Ok((builtin || graph.endpoints.contains(&target)).then_some(target))
+    if builtin || graph.endpoints.contains(&target) {
+        Ok(Some(HldEdgeResolutionValue::Extracted { target }))
+    } else {
+        unresolved(HldUnresolvedReasonKind::MissingTarget)
+    }
+}
+
+/// The graph reason for a reason name resolution stored. A path stored
+/// without a reason needs more than name lookup to resolve.
+fn read_stored_reason_kind(reason: &Value) -> HldUnresolvedReasonKind {
+    match reason.as_str() {
+        Some("external_source_missing") => HldUnresolvedReasonKind::ExternalSourceMissing,
+        Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,
+        _ => HldUnresolvedReasonKind::TraitSolverNeeded,
+    }
 }
