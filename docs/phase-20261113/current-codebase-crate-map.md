@@ -38,6 +38,9 @@ Arrows read "depends on". The number is how many file-level edges clarity found.
  macro-span-records       -> (no cross-crate edge found by clarity)
 ```
 
+`macro-span-records` is used by `port-macro-expander` under the dependency name `ra_ap_span`
+(a path override in the workspace `Cargo.toml`), which is why clarity sees no edge.
+
 Every crate name carries the `parseltongue-` prefix, dropped above for width.
 
 Layering as the edges show it:
@@ -104,6 +107,7 @@ Flags:
  --mapping-final-stage-kind        --sysroot-source-scope-kind
  --stage-owned-table-name          --stage-row-filter-value
  --primary-semantic-input-path     --secondary-semantic-input-path --agreement-store-file-path
+ --json
 ```
 
 `--mapping-final-stage-kind` takes one of four values; `name-resolution` is the default:
@@ -111,7 +115,8 @@ Flags:
 ```text
  syntax-spans                     stop after source closure and syntax extraction
  name-resolution                  stop after namespace analysis (default)
- original-top-level-containment   diagnostic: file areas and top-level contains edges only
+ original-top-level-containment   earlier checkpoint: top-level contains edges only, run through
+                                  the HLD builder and published as the five HLD tables
  full-item-dependency-graph       the active Phase 1 stage, described below
 ```
 
@@ -143,8 +148,9 @@ Unresolved calls are kept as rows with a reason, not dropped.
 
 The stage does not select interface nodes, collapse paths, build roll-ups or switch the serving
 manifest. That code exists separately (`hld-materialization-duckdb-store.rs`,
-`hld-graph-publication-turso.rs`) and is exercised by component tests on typed fixtures, not
-by this stage.
+`hld-graph-publication-turso.rs`). It is reached from real source only by the
+`original-top-level-containment` stage (`publish_original_source_hld`), for top-level
+containment; everything else about it is exercised by component tests on typed fixtures.
 
 ## Real-source tests on pinned itoa
 
