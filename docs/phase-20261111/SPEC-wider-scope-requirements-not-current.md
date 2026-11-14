@@ -2,7 +2,7 @@
 
 > History. Moved here from `docs/phase-20261113/` on 2026-11-14. It covers five repositories,
 > the HLD levels and the oracle comparison, none of which is in the current phase. The current
-> contract is `docs/phase-20261113/SPEC-itoa-full-item-graph-requirements.md`. This file is
+> contract is `docs/phase-20261113/SPEC-itoa-full-item-graph/README.md`. This file is
 > kept because tests of earlier-work code still cite requirement ids defined only here.
 
 Status: contracts. This file states only what is in force now; it replaces

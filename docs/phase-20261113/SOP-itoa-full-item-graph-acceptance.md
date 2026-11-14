@@ -27,7 +27,7 @@ Details are in the top entry of [the log](LOG-itoa-full-item-graph-progress.md).
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
 and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md); requirement ids and their
-tests are in the [SPEC](SPEC-itoa-full-item-graph-requirements.md).
+tests are in the [SPEC](SPEC-itoa-full-item-graph/README.md).
 
 ## Rule 1 — The expected graph comes from source, and is frozen before any comparison
 

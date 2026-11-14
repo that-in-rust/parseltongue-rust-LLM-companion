@@ -75,6 +75,9 @@ Scope:
 - **Small commits.** One focused change per commit, at most about 200 changed lines, with a
   message that says what changed and why. Push after each. Do not hold work back for a full
   rewrite. Only a delete-only commit may be larger.
+- **Spec first.** Before code for a new target, write its part file in the SPEC folder with
+  the skill `rust-executable-specs-spec-first-architecture` (seven sections), and update the
+  index in the same commit. Parts not yet picked stay stubs.
 - **Test first.** Write a failing real-source test on pinned itoa, make it pass with the smallest general change, refactor. A RED or GREEN
   claim needs a nonzero selected-test count and a test that reached the intended behaviour.
 - **Gates before every push of code:**
@@ -108,7 +111,8 @@ TARGET   itoa-target-dataset/                           the expected itoa graph 
 LOG      LOG-itoa-full-item-graph-progress.md           the single progress record, newest first
 BACKLOG  BACKLOG-deferred-work-open-decisions.md        deferred work and open decisions
 MAP      MAP-parseltongue-crates-as-measured.md         crates, files, verbs, stages as measured
-SPEC     SPEC-itoa-full-item-graph-requirements.md      the REQ-RUST ids in force, state and tests
+SPEC     SPEC-itoa-full-item-graph/                     README.md is the index; one part file per
+                                                        target, in build order
 ```
 
 - These files state only what is in force. Edit in place; no revision sections. History goes
