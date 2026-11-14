@@ -3,7 +3,7 @@
 Status: contracts. This file states only what is in force now; it replaces
 `docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md`, which is kept as history.
 Requirement ids and test names are unchanged, so code and journal references still resolve;
-section 9 maps every superseded id. Product intent: PRD-phase-20261113-dependency-graph-hld.md.
+section 9 maps every superseded id. Product intent: PRD-itoa-full-item-graph-scope.md.
 Design: ARCH-phase-20261113-pipeline-graph-tables.md. Procedure: the phase-20261111 SOP.
 **M** denotes observations, not targets. New owned identifiers, columns and artifact basenames
 use four words. A named test contract is not a passing test; section 6 says which exist in code.

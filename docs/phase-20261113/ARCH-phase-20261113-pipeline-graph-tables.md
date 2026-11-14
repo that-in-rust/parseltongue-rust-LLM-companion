@@ -25,7 +25,7 @@ source files
   -> Turso   frozen full graph, read back and compared                built: marked incomplete
 ```
 
-Scope: [PRD](PRD-phase-20261113-dependency-graph-hld.md). Proof:
+Scope: [PRD](PRD-itoa-full-item-graph-scope.md). Proof:
 [SOP](SOP-itoa-full-item-graph-acceptance.md). Crates and files:
 [crate map](current-codebase-crate-map.md).
 

@@ -34,7 +34,7 @@ The review ZIP is regenerated from the repository root after the tests and build
 zip -FS -r /home/ubuntu/hld-current-test-artifacts/itoa-reference-review-20261114.zip \
   AGENTS.md \
   docs/phase-20261113/itoa-target-dataset \
-  docs/phase-20261113/PRD-phase-20261113-dependency-graph-hld.md \
+  docs/phase-20261113/PRD-itoa-full-item-graph-scope.md \
   docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md \
   docs/phase-20261113/ARCH-phase-20261113-pipeline-graph-tables.md \
   docs/phase-20261113/SOP-itoa-full-item-graph-acceptance.md \

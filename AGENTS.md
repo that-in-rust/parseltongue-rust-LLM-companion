@@ -102,7 +102,7 @@ cargo build --release --workspace --all-targets --all-features
 
 ```text
 SOP      SOP-itoa-full-item-graph-acceptance.md    steps S1–S4 that decide PASS
-PRD      PRD-phase-20261113-dependency-graph-hld.md          what is built and what is out of scope
+PRD      PRD-itoa-full-item-graph-scope.md          what is built and what is out of scope
 ARCH     ARCH-phase-20261113-pipeline-graph-tables.md        pipeline, tables, graph rules
 TARGET   itoa-target-dataset/                                the expected itoa graph and its builder
 LOG      phase1-log-p1.md                                    the single progress record, newest first

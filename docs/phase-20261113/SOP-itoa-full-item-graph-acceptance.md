@@ -25,7 +25,7 @@ What the code produces today, with sysroot excluded: 45 nodes and 104 edges (43 
 61 `calls` of which 2 are resolved). The draft expected graph has 73 nodes and 368 edges.
 Details are in the top entry of [the log](phase1-log-p1.md).
 
-Scope and decisions are in the [PRD](PRD-phase-20261113-dependency-graph-hld.md); graph rules
+Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
 and tables are in the [ARCH](ARCH-phase-20261113-pipeline-graph-tables.md).
 
 ## Rule 1 — The expected graph comes from source, and is frozen before any comparison

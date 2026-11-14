@@ -473,7 +473,7 @@ subparts independently and attempting one large integration at the end.
 
 ### Source and evidence pointers
 
-- [Current PRD, including AD-1 through AD-5](PRD-phase-20261113-dependency-graph-hld.md)
+- [Current PRD, including AD-1 through AD-5](PRD-itoa-full-item-graph-scope.md)
 - [Current executable SPEC, including open graph contracts](SPEC-phase-20261113-executable-requirements.md)
 - [Current pipeline architecture](ARCH-phase-20261113-pipeline-graph-tables.md)
 - [Current status board](../phase-20261111/current-milestone-status-board.md)

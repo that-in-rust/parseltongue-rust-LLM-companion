@@ -1,6 +1,6 @@
 # PRD — phase-20261111: HLD for Rust code that compiles
 
-> History. Replaced on 2026-11-13 by `docs/phase-20261113/PRD-phase-20261113-dependency-graph-hld.md`,
+> History. Replaced on 2026-11-13 by `docs/phase-20261113/PRD-itoa-full-item-graph-scope.md`,
 > which states what is in force now. Do not edit or cite this file as current.
 
 Status: draft. Owner: human-architect-intent-author.
