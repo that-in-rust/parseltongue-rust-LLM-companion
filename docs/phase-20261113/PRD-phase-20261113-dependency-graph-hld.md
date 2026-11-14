@@ -202,7 +202,8 @@ Budgets:
 
 ### Pins
 
-- Turso `=0.9.0-pre.5`, concurrent writes with 5 retries (10, 20, 40, 80, 160 ms).
+- Turso `=0.9.0-pre.5`, concurrent writes. A busy publication is tried up to 6 times, waiting
+  10, 20, 40, 80, then 160 ms.
 - DuckDB `=1.20000.1`, bundled, no extensions, no external access, run-local temp directory.
 - Oracle: rust-analyzer `2a362a41a8eb6e090f1a12d9b712df85af6f0c33` plus the local parser patch.
 - Repositories, commits, reuse mode and licenses: SPEC section 10. Copied code keeps its
@@ -211,10 +212,12 @@ Budgets:
 ### Decisions in force
 
 - **D1–D6, KL1:** as stated above.
-- **AD-1, sysroot:** interim option B. itoa with the sysroot (619 files) did not finish name
-  resolution in 2,400 s, so development runs use `--sysroot-source-scope-kind excluded`
-  (REQ-RUST-038.0). Edges into `core` are stored unresolved. Phase 1 cannot pass this way; the
-  sysroot path must be made to work.
+- **AD-1, sysroot:** interim option B. Measured on 2026-11-13: itoa with the sysroot (619 units
+  parsed) did not finish name resolution within 2,400 s (exit 124, nothing published). That run
+  report has since been deleted; the figures are from the PRD and journal of that day.
+  Development runs therefore use `--sysroot-source-scope-kind excluded` (REQ-RUST-038.0), and
+  edges into `core` are stored unresolved. Phase 1 cannot pass this way; the sysroot path must
+  be made to work.
 - **AD-2, body paths:** calls are resolved in Rust, reading persisted namespace and impl rows.
 - **AD-3, nodes:** projected in DuckDB and written under `item-effective-visibility-stage`.
 - **AD-4, inference:** build only what the current target needs; store the rest unresolved.
