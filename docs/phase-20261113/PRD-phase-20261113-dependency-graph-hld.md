@@ -512,6 +512,7 @@ A recommendation is given where the evidence supports one. None is decided.
             resolution within its declared 2,400 s limit; exit 124, parent peak RSS 8.32 GiB,
             nothing published. Report:
             hld-current-test-runs/20261113T151000Z-itoa-unchanged-pipeline/
+            (removed from the tree on 2026-11-14; last present at commit a2e13a3bd)
 
  in force   option B, as an explicit interim, by the rule under "recommend" below. Taken by
             the agent after the measurement; the user was told and may reverse it.

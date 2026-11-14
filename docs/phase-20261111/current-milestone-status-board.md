@@ -29,7 +29,7 @@ Any subsequent production change requires fresh evidence.
   The filtered test is `test_lang_items_in_sysroot`; the full workspace gate is **not PASS**.
 - Python SOP runner: **146 passed / 2.950s**. No changes to that runner in this implementation.
 
-Current [bounded run report](../../hld-current-test-runs/20261114T140300Z-full-map-implementation/hld-current-test-report.md):
+Current bounded run report `hld-current-test-runs/20261114T140300Z-full-map-implementation/` (report removed from the tree on 2026-11-14; last present at commit a2e13a3bd):
 **14.810602s / 410,705,920 bytes** for the retained single CLI run. Measured DuckDB limit:
 25.0 GiB, 2 threads; no interim cap. Executable SHA-256:
 `ec9d24df192152263ed5bf6cec0db0c3cc20b64a2498886bcc4a1b63fb85fcde`.
