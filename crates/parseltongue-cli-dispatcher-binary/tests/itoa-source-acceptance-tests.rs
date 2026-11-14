@@ -698,6 +698,48 @@ fn test_clone_self_type_edge() {
     assert_eq!(read_edge_site_range(&uses[0]), expected_site);
 }
 
+/// REQ-RUST-047.0
+#[test]
+#[ignore = "RED until part 4b step 4 stores implements rows"]
+fn test_unsigned_impl_builtin_source() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let unsigned = locate_original_kind_node(&input, &spans, "Unsigned", "TRAIT").clone();
+    let source: HldTargetIdentityValue = NameSymbolTargetKey::Builtin("u128".to_owned()).into();
+    let text = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let start = (text.find("impl Unsigned for u128 {").unwrap() + "impl ".len()) as u64;
+    let rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_relation_kind_value == HldRelationKindValue::Implements
+                && edge.edge_source_reference == source
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rows.len(),
+        1,
+        "itoa has one original trait impl header on u128: impl Unsigned for u128"
+    );
+    assert_eq!(
+        rows[0].edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: unsigned.node_target_reference.clone()
+        }
+    );
+    assert_eq!(
+        read_edge_site_range(rows[0]),
+        (start, start + "Unsigned".len() as u64)
+    );
+    let nodes = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_target_reference == source)
+        .collect::<Vec<_>>();
+    assert_eq!(nodes.len(), 1, "one node stands for the builtin u128");
+    assert_eq!(nodes[0].node_input_category, HldNodeInputCategory::Builtin);
+}
+
 /// REQ-RUST-042.0
 #[test]
 fn test_generic_bound_rows_written() {
