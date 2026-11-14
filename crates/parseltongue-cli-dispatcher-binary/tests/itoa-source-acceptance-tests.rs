@@ -231,15 +231,24 @@ fn locate_original_member_node<'a>(
     spans: &[Value],
     name: &str,
 ) -> &'a HldNodeInputRecord {
+    locate_original_kind_node(input, spans, name, "FN")
+}
+
+fn locate_original_kind_node<'a>(
+    input: &'a HldMaterializationInputRecord,
+    spans: &[Value],
+    name: &str,
+    kind: &str,
+) -> &'a HldNodeInputRecord {
     let spans = spans
         .iter()
         .filter(|span| {
             span["span_expansion_provenance_chain"] == json!([])
                 && span["span_declared_name_value"] == name
-                && span["span_syntax_kind_value"] == "FN"
+                && span["span_syntax_kind_value"] == kind
         })
         .collect::<Vec<_>>();
-    assert_eq!(spans.len(), 1, "pin must have one original {name} method");
+    assert_eq!(spans.len(), 1, "pin must have one original {kind} {name}");
     input
         .input_node_records
         .iter()
@@ -539,6 +548,50 @@ fn test_format_sealed_write_call() {
     assert_eq!(
         write_targets, 1,
         "Buffer::format has one resolved call: no fan-out to implementations"
+    );
+}
+
+/// REQ-RUST-018.2
+#[test]
+#[ignore = "RED until part 4a step 3: no producer for uses_type edges yet"]
+fn test_new_return_type_edge() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let new = locate_original_member_node(&input, &spans, "new");
+    let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT");
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let signature = "pub fn new() -> Buffer {";
+    let site_start = source.find(signature).unwrap() + signature.find("Buffer").unwrap();
+    let expected_site = (site_start as u64, (site_start + "Buffer".len()) as u64);
+    let uses = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_source_reference == new.node_target_reference
+                && edge.edge_relation_kind_value == HldRelationKindValue::UsesType
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        uses.len(),
+        1,
+        "Buffer::new names one type in its signature: its return type"
+    );
+    assert_eq!(
+        uses[0].edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: buffer.node_target_reference.clone()
+        },
+        "the return type resolves to the struct Buffer"
+    );
+    assert_eq!(
+        uses[0]
+            .edge_evidence_row_key
+            .evidence_site_occurrence_key
+            .read_semantic_occurrence_parts()
+            .span_byte_range_value
+            .read_source_range_pair(),
+        expected_site,
+        "the site is the type path itself, not the whole signature"
     );
 }
 

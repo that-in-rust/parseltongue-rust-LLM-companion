@@ -91,6 +91,20 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-15 03:00 IST — Part 4a step 1: RED on the first `uses_type` edge
+
+- `test_new_return_type_edge` (REQ-RUST-018.2) runs the production CLI on pinned itoa and
+  asks for one `uses_type` edge from `Buffer::new` to the struct `Buffer`, with the site on
+  the `Buffer` of `-> Buffer`.
+- RED, 1 test selected, 12.9 s: it reached the assertion and found 0 `uses_type` edges from
+  `Buffer::new` (expected 1). Nothing produces that edge kind.
+- The test is committed with `#[ignore]` so the workspace test gate stays green; step 3
+  removes the attribute. It was run without the attribute for the RED result above.
+- Workspace gates with the test ignored: format, lint and release build pass; 442 tests
+  passed, 0 failed, 5 ignored (the four from before plus this one);
+  `test_lang_items_in_sysroot` skipped as before.
+- Next: step 2, type-path ranges on signature rows.
+
 ### 2026-11-15 02:40 IST — Part 4a specified: `uses_type` from signatures
 
 - Part 4 is split into 4a (`uses_type` from signatures, REQ-RUST-018.2), 4b `implements`,
