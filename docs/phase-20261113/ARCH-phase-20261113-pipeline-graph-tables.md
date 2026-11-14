@@ -1,29 +1,31 @@
-# ARCH — pipeline, full graph and tables
+# ARCH — pipeline, graph and tables for the itoa full item graph
 
 ## The answer
 
-**One pipeline turns source into one stored graph. Rust produces facts, DuckDB does the
-relational work, Turso keeps the durable frozen result. Every stage reads tables and writes
-tables; nothing else crosses a stage boundary.**
+**One pipeline turns the pinned itoa source into one stored graph of items and their
+dependencies. Rust produces facts, DuckDB does the relational work, Turso keeps the durable
+frozen result. Every stage reads tables and writes tables; nothing else crosses a stage
+boundary.**
 
-Built today: source to resolved names for whole workspaces, then a bounded graph step that
+Scope: itoa only, the full item graph only. No other repository, no oracle, no
+higher-abstraction table.
+
+Built today: source to resolved names, then a bounded graph step that
 writes item nodes, `contains` edges and `calls` edges and reads them back from a frozen
-generation. Not built: type lowering, body inference, method lookup, and six of the eight edge
-kinds.
+generation. Not built: type lowering, body inference, method lookup, and the other four edge
+kinds itoa needs (`uses_type`, `reads`, `implements`, `imports`).
 
 ```text
 source files
   -> Rust    crate graph, ingest, one parse per file                  built
-  -> DuckDB  name resolution rounds  <->  Rust item-macro expander    built, not qualified
+  -> DuckDB  name resolution rounds  <->  Rust item-macro expander    built
   -> Rust    impl headers                                             built: header paths only
   -> DuckDB  item nodes + contains edges                              built: bounded
   -> Rust    calls edges                                              built: type-relative paths only
   -> Turso   frozen full graph, read back and compared                built: marked incomplete
-  -> DuckDB  derived levels (interface, roll-ups)                     deferred; not fed by this graph
 ```
 
-Product: [PRD](PRD-phase-20261113-dependency-graph-hld.md). Contracts:
-[SPEC](SPEC-phase-20261113-executable-requirements.md). Proof:
+Scope: [PRD](PRD-phase-20261113-dependency-graph-hld.md). Proof:
 [SOP](SOP-phase-20261113-full-item-dependency-graph.md). Crates and files:
 [crate map](current-codebase-crate-map.md).
 
@@ -62,37 +64,27 @@ step  function (crate)                                          writes
   2. `resolve_original_call_edges` (Rust) resolves body calls against namespace and impl rows.
   3. `FullGraphInputStorePort` writes the graph to Turso, reads the frozen copy back, and fails
      unless it equals what was derived.
-  4. The result is marked `incomplete`. No derived level is published from it.
+  4. The result is marked `incomplete`.
 
-Four facts in the code that shape the remaining work:
+Three facts in the code that shape the remaining work:
 
 - **C1** Name resolution takes only import and signature paths (`NameResolutionPathKind`). Body
   paths are stored as text in `body-site-reference-table`; only step 7 reads them.
 - **C2** Header paths are resolved. Full signature types (parameters, returns, bounds) are not
   lowered, so nothing can type a receiver.
 - **C3** itoa with the sysroot did not finish step 5 in 2,400 s. Development runs exclude it.
-- **C4** The derived-level builder takes typed records, not tables. Real source reaches it by
-  one route only: the `original-top-level-containment` stage, an earlier checkpoint that feeds
-  it top-level `contains` edges from itoa and publishes the level-0 tables. The full graph of
-  step 7 does not feed it; everything else about it is tested on fixtures.
 
 ## 2 — The tables, top to bottom
 
-Levels 1 and 2 are the full graph, the product. Level 0 is derived from it. Levels 3–7 are the
-facts it is built from.
+Levels 1 and 2 are the full graph, the deliverable. Levels 3–7 are the facts it is built from.
 
 ```text
 level  table                                  owner stage                        state
-0      hld-current-interface-nodes            hld-current-materialization-stage  deferred; containment only
-       hld-current-dependency-edges
-       hld-edge-evidence-paths
-       hld-file-level-rollup
-       hld-folder-level-rollup
 1      edge-evidence-record-table             semantic-edge-evidence-stage       bounded: contains, calls
 2      item-effective-visibility-records      item-effective-visibility-stage    bounded: visibility unknown
 3      impl-header-index-table                signature-type-lowering-stage      header paths only
        lowered-signature-type-table                                              no producer
-4      path-resolution-site-records           name-resolution                    produced, not qualified
+4      path-resolution-site-records           name-resolution                    produced
        name-resolution-scope-records
        module-scope-binding-table
        macro-expanded-item-table
@@ -109,8 +101,7 @@ Supporting tables:
   `crate-dependency-graph-table`, `workspace-config-state-records`.
 - Work queues: `module-source-closure-requests`, `syntax-file-work-requests`.
 - Control: `stage-run-generation-records`, `frozen-stage-publication-records`.
-- Not on the graph chain: `oracle-edge-agreement-table` (offline comparison),
-  `analysis-resolution-receipt-records` (name-resolution run receipts).
+- Run receipts: `analysis-resolution-receipt-records`.
 
 The registry of table owners is `STAGE_OWNED_TABLE_NAMES` in
 `parseltongue-turso-store-adapter/src/stage-table-store-backend.rs`.
@@ -146,7 +137,7 @@ Edges:
 - **F3** A target is a graph node, a canonical external item, or a builtin primitive type.
 - **F4** A generic or trait call targets the trait method once, with the bound chain in dispatch
   metadata. It never fans out to implementations.
-- **F5** `pub use` gives one `reexports` edge per resolved binding.
+- **F5** `pub use` gives one `reexports` edge per resolved binding. itoa has none.
 - **F6** Every extracted edge is stored, private to private included. Nothing is collapsed.
 - **F7** A file-area node `contains` each top-level node of its file.
 - **F8** A `use` node `imports` each item it binds.
@@ -164,24 +155,12 @@ Identity:
 - **I3** Malformed identity, a missing local endpoint, a conflicting duplicate or a wrong
   generation is a typed error before publication.
 
-Derived levels (deferred):
-
-- **L1–L3** The interface level keeps the crate root, non-private nodes, file-area nodes and
-  `use` nodes.
-- **L4–L6** Collapse walks from a kept node through dropped private nodes to the first kept or
-  external target. Every distinct path is kept as evidence; cycles stop; an unresolved step
-  ends the path with no edge.
-- **L10** Collapse never walks a `contains` or `imports` edge.
-- **L8–L9** Roll-ups count interface edges by file and folder.
-
 Open:
 
-- **G10** Enum variants and struct fields: nodes or evidence (PRD OD-4).
+- **G10** Enum variants and struct fields: nodes or evidence (PRD, open).
 - **F12** Does a `pub use` carry both an `imports` and a `reexports` edge?
-- **F14** May `reads` and `uses_type` start at a non-function item (PRD OD-8)?
-- **I4** How a macro-generated item maps back to its original file (PRD OD-2).
-- **L7, L11** Interface-level treatment of crate-root private items and of items in a dropped
-  module. Deferred with the levels.
+- **F14** May `reads` and `uses_type` start at a non-function item (PRD, open)?
+- **I4** How a macro-generated item maps back to its original file (PRD, open).
 
 ## 4 — What remains, in build order
 
@@ -197,7 +176,7 @@ next  Buffer::format -> private::Sealed::write           signature bounds (I: In
       u128 write -> Unsigned::fmt -> div_rem_1e16        calls inside macro-generated impls;
         -> u128_ext::mulhi                               concrete-receiver impl selection
       use nodes -> imports; reads of MAX_STR_LEN         imports and reads producers
-last  whole library equals the frozen reference          all of the above, sysroot included
+last  whole library equals the frozen expected graph     all of the above; targets in core as decided
 ```
 
 What reading itoa's source showed:
@@ -234,7 +213,7 @@ How unclear each piece still is (1 clear, 5 needs a decision or an experiment):
 4  type-relative lookup beyond Buffer::new (E2)
 4  calls with a concrete receiver (E5)
 4  macro-generated identity and evidence (E6)
-4  freezing the expected itoa graph
+4  reviewing and freezing the expected itoa graph
 3  method call on a generic receiver (next target)
 3  lowered signature types; uses_type and implements rules
 3  effective visibility (E8)
