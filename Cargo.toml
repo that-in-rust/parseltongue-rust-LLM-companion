@@ -12,7 +12,6 @@ members = [
     "crates/parseltongue-macro-span-records",
 ]
 resolver = "3"
-exclude = ["tools/oracle-semantic-export-harness"]
 
 [workspace.package]
 version = "0.1.0"
