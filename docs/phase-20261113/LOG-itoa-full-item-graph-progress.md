@@ -88,6 +88,19 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-14 23:10 IST — SPEC is a folder; part 3 specified, not built
+
+- The SPEC is now `SPEC-itoa-full-item-graph/`: an index plus one part per target in build
+  order. Each part is written with the rust-executable-specs skill when it is picked.
+- Part 3 (`Buffer::format --calls--> private::Sealed::write`, REQ-RUST-042.0) is written:
+  eight rules, design, ten tests named, six build steps. No code yet.
+- Read in the code: the `i.write` site is already a `METHOD_CALL_EXPR` row; the resolver only
+  handles path calls. Missing: method-call syntax evidence, bound rows, one resolver branch.
+- Checked with rustc 1.99.1: a type parameter's bound methods win over other traits in scope.
+- Waiting on one decision: `Sealed: Copy` reaches `core`, so uniqueness of `write` is not
+  fully provable without the sysroot (part 3, Q1).
+- Next: step 1 of part 3, the failing real-source test `test_format_sealed_write_call`.
+
 ### 2026-11-14 22:45 IST — Documents cut to the itoa full item graph
 
 - Scope fixed: itoa only, full item graph only. Other repositories, rust-analyzer export,
