@@ -18,6 +18,9 @@ S3      BLOCKED       itoa with sysroot did not finish name resolution in 2,400 
 S4–S10  NOT STARTED
 ```
 
+The S3 result was measured on 2026-11-13 (619 units parsed, exit 124, nothing published). Its
+run report has since been deleted, so S3 must be re-measured before any work depends on it.
+
 What exists is a bounded, sysroot-excluded checkpoint on itoa that the code itself marks
 incomplete. Its numbers are in the top entry of [the log](phase1-log-p1.md).
 
@@ -224,6 +227,9 @@ REQ-RUST-019  selection, visibility, reachability     = 100%
 - Every site gets exactly one result and, if unresolved, the earliest reason in this order:
   `cfg_inactive`, `build_script`, `proc_macro`, `external_source_missing`,
   `unknown_receiver`, `trait_solver_needed`.
+- Graph edge rows currently carry a different reason type (`HldUnresolvedReasonKind`). Until the
+  PRD open point "Edge reasons" is settled, unresolved edges cannot be scored and that part of
+  the comparison is BLOCKED.
 - Inactive and PRIMARY-absent sites are exclusions. A PRIMARY-visible unresolved site is a miss.
 - A wrong extracted target is never excused by a reason.
 - Report raw counts, exclusions and rates.
