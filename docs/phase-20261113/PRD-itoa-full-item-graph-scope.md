@@ -26,7 +26,7 @@ next     Buffer::format --calls--> private::Sealed::write
 
 Proof procedure: [SOP](SOP-itoa-full-item-graph-acceptance.md). Design:
 [ARCH](ARCH-itoa-full-item-graph-pipeline.md). Expected graph:
-[itoa-target-dataset](itoa-target-dataset/). History: [log](phase1-log-p1.md).
+[itoa-target-dataset](itoa-target-dataset/). History: [log](LOG-itoa-full-item-graph-progress.md).
 
 ## 1 — What is built
 

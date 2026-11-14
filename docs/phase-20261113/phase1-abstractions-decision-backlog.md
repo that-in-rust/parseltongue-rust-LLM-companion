@@ -112,7 +112,7 @@ resolve each before claiming completeness for its affected source facts.
 
 - Add new deferred work here with a stable ID, reason and reactivation trigger.
 - Never defer a correctness blocker merely because it is difficult.
-- Record scope changes newest-first in the [Phase 1 evolution log](phase1-log-p1.md).
+- Record scope changes newest-first in the [Phase 1 evolution log](LOG-itoa-full-item-graph-progress.md).
 - Keep earlier log entries as history; former subparts 4.6 and 4.7 are deferred,
   while 4.8 concerns full-map publication safety now.
 - [PRD: product intent and decisions](PRD-itoa-full-item-graph-scope.md)

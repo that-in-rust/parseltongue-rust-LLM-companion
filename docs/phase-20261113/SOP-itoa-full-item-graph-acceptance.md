@@ -23,7 +23,7 @@ S4  determinism, time, memory          NOT STARTED
 
 What the code produces today, with sysroot excluded: 45 nodes and 104 edges (43 `contains`,
 61 `calls` of which 2 are resolved). The draft expected graph has 73 nodes and 368 edges.
-Details are in the top entry of [the log](phase1-log-p1.md).
+Details are in the top entry of [the log](LOG-itoa-full-item-graph-progress.md).
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
 and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md).
@@ -163,7 +163,7 @@ Limits today:
 
 ### Report
 
-Each run writes one entry at the top of [the log](phase1-log-p1.md): source and executable
+Each run writes one entry at the top of [the log](LOG-itoa-full-item-graph-progress.md): source and executable
 digests; each step PASS / FAIL / BLOCKED / NOT STARTED with row counts; the first differing
 row; time and peak memory. A step with no entry was not observed.
 

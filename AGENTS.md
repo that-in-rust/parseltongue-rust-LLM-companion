@@ -17,7 +17,7 @@ against them.
 
 Where we are (2026-11-14): a bounded checkpoint on pinned itoa, marked `incomplete` by the
 code itself. Current numbers and the next target are the top entry of
-[the log](docs/phase-20261113/phase1-log-p1.md). Read it before answering "how far".
+[the log](docs/phase-20261113/LOG-itoa-full-item-graph-progress.md). Read it before answering "how far".
 
 ## Rule 1 — Only source-backed facts count
 
@@ -105,7 +105,7 @@ SOP      SOP-itoa-full-item-graph-acceptance.md    steps S1–S4 that decide PAS
 PRD      PRD-itoa-full-item-graph-scope.md          what is built and what is out of scope
 ARCH     ARCH-itoa-full-item-graph-pipeline.md        pipeline, tables, graph rules
 TARGET   itoa-target-dataset/                                the expected itoa graph and its builder
-LOG      phase1-log-p1.md                                    the single progress record, newest first
+LOG      LOG-itoa-full-item-graph-progress.md                                    the single progress record, newest first
 BACKLOG  phase1-abstractions-decision-backlog.md             deferred work and open decisions
 MAP      current-codebase-crate-map.md                       crates, files, verbs, stages as measured
 SPEC     SPEC-wider-scope-requirements-not-current.md      NOT current: written for the wider
