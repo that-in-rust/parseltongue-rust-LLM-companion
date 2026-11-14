@@ -1,17 +1,13 @@
 import hashlib
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 
 
-FORBIDDEN_HOPS = {"contains", "imports"}
-COLLAPSIBLE_RELATIONS = {"calls", "uses_type", "implements", "reexports", "derives", "reads"}
 RELATION_KINDS = ("calls", "uses_type", "implements", "reexports", "contains", "derives", "imports", "reads")
 ELIGIBLE_LOCAL_ONLY = "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC"
 CANDIDATE_STATUS = "LLM_PARSED_DRAFT"
 BUILTIN_PRIMITIVES = {"bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize",
                       "i8", "i16", "i32", "i64", "i128", "isize", "f16", "f32", "f64", "f128"}
-OUTPUTS = ["hld-current-interface-nodes", "hld-current-dependency-edges", "hld-edge-evidence-paths",
-           "hld-file-level-rollup", "hld-folder-level-rollup"]
 
 
 def _node_blockers(row):
@@ -114,44 +110,6 @@ def relation_counts(edges):
     return {relation: counts.get(relation, 0) for relation in RELATION_KINDS}
 
 
-def derive_interface(nodes, edges):
-    selected = {node["label"] for node in nodes if node.get("interface_selected")}
-    outgoing = defaultdict(list)
-    for edge in edges:
-        if edge.get("eligibility_status", ELIGIBLE_LOCAL_ONLY) == ELIGIBLE_LOCAL_ONLY:
-            outgoing[edge["source"]].append(edge)
-    grouped = {}
-
-    def walk(source, current, visited, evidence):
-        for edge in outgoing[current]:
-            relation = edge["relation"]
-            target = edge["target"]
-            if relation in FORBIDDEN_HOPS:
-                if not evidence and (target in selected or edge.get("target_kind") in {"external", "builtin"}):
-                    key = (source, relation, target, "direct")
-                    grouped.setdefault(key, set()).add((edge.get("evidence_key", target),))
-                continue
-            path = evidence + (edge.get("evidence_key", target),)
-            terminal = target in selected or edge.get("target_kind") in {"external", "builtin"}
-            if terminal:
-                via = "collapsed" if evidence else "direct"
-                key = (source, relation, target, via)
-                grouped.setdefault(key, set()).add(path)
-            elif relation in COLLAPSIBLE_RELATIONS and target not in visited:
-                walk(source, target, visited | {target}, path)
-
-    for source in sorted(selected):
-        walk(source, source, {source}, ())
-    rows = []
-    for key in sorted(grouped):
-        source, relation, target, via = key
-        paths = [list(path) for path in sorted(grouped[key])]
-        rows.append({"source": source, "relation": relation, "target": target, "via": via,
-                     "path_count": len(paths), "evidence_paths": paths,
-                     "edge_identity": (source, relation, target, via)})
-    return {"nodes": sorted(selected), "edges": rows}
-
-
 def compare_semantic_rows(expected, actual, canonical=True):
     if not canonical:
         return {"status": "BLOCKED", "missing": [], "extra": [], "reason": "canonical identities unavailable"}
@@ -164,61 +122,6 @@ def compare_semantic_rows(expected, actual, canonical=True):
     extra = sorted((key, count - expected_keys.get(key, 0)) for key, count in actual_keys.items()
                    if count > expected_keys.get(key, 0))
     return {"status": "PASS" if not missing and not extra else "FAIL", "missing": missing, "extra": extra}
-
-
-def rollup_unique_edges(edges, known_files):
-    known = set(known_files)
-    unique = defaultdict(set)
-    blocked_files = set()
-    for edge in edges:
-        blockers = set(edge.get("blockers", []))
-        macro_file = edge.get("macro_invocation_file")
-        if "MACRO_FILE_ASSIGNMENT_UNRESOLVED" in blockers and macro_file in known:
-            blocked_files.add(macro_file)
-        if edge.get("eligibility_status", ELIGIBLE_LOCAL_ONLY) != ELIGIBLE_LOCAL_ONLY:
-            continue
-        source_file = edge.get("source_file")
-        if source_file not in known:
-            continue
-        identity = edge.get("edge_identity", (edge.get("source"), edge.get("target"), edge.get("relation"), edge.get("via")))
-        unique[source_file].add(json.dumps(identity, sort_keys=True, default=str))
-    counts = {path: len(unique.get(path, set())) for path in sorted(known) if path in unique}
-    return {"counts": counts, "blocked_files": sorted(blocked_files)}
-
-
-def group_expected_rollup_edges(expected_edges, source_edges, nodes, known_files):
-    node_by_label = {row["label"]: row for row in nodes}
-    builtin_targets = {row.get("target") for row in source_edges if row.get("target_kind") == "builtin"}
-    known = set(known_files)
-    file_groups, folder_groups = defaultdict(set), defaultdict(set)
-    excluded = []
-    for row in expected_edges:
-        source = node_by_label.get(row["source"])
-        target = node_by_label.get(row["target"])
-        reason = None
-        if target is None and row["target"] in builtin_targets:
-            reason = "BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED"
-        elif source is None:
-            reason = "SOURCE_NODE_MAPPING_MISSING"
-        elif target is None:
-            reason = "TARGET_NODE_MAPPING_MISSING"
-        elif source.get("file") not in known:
-            reason = "SOURCE_FILE_MAPPING_MISSING"
-        elif target.get("file") not in known:
-            reason = "TARGET_FILE_MAPPING_MISSING"
-        identity = (row["source"], row["relation"], row["target"], row["via"])
-        if reason:
-            excluded.append({"source": row["source"], "relation": row["relation"],
-                             "target": row["target"], "via": row["via"], "reason": reason})
-            continue
-        source_file, target_file = source["file"], target["file"]
-        file_groups[(source_file, target_file, row["relation"], row["via"])].add(identity)
-        source_folder = source_file.rsplit("/", 1)[0] if "/" in source_file else "."
-        target_folder = target_file.rsplit("/", 1)[0] if "/" in target_file else "."
-        folder_groups[(source_folder, target_folder, row["relation"], row["via"])].add(identity)
-    excluded.sort(key=lambda row: (row["source"], row["relation"], row["target"], row["via"], row["reason"]))
-    return {"file_groups": file_groups, "folder_groups": folder_groups,
-            "excluded_rollup_edges": excluded}
 
 
 def verify_source_digests(source_files, expected_digests):

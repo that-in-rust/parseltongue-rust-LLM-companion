@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Builds the itoa full-graph target dataset (LLM_PARSED_DRAFT, not production input).
 
-Candidate identities remain symbolic. This script checks cited source anchors and derives the
-interface level without writing production rows.
+Candidate identities remain symbolic. This script checks every cited source anchor against the
+pinned source and writes the candidate nodes, edges and unresolved sites. It writes no
+production rows.
 Usage: itoa-target-dataset-builder.py --source-root PATH --pin-file PATH --output-directory PATH
 """
 import argparse, collections, hashlib, importlib.util, json, pathlib, subprocess
@@ -301,8 +302,6 @@ for row in nodes.values():
     candidate = dict(row)
     candidate["source_evidence"] = source_evidence(row["file"], row["start_line"], row["source_anchor"])
     candidate["file_assignment_status"] = "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP" if row.get("generated_by") else "SOURCE_FILE_CANDIDATE"
-    candidate["interface_selected"] = row["item_kind"] in ("file_public_area", "use_statement") or \
-        "crate_root" in row["flags"] or row["effective_visibility"] in ("public", "restricted_non_private")
     node_rows.append(candidate)
 edge_rows = []
 for row in edges.values():
@@ -324,41 +323,6 @@ for row in unresolved:
 
 classified = RULES.classify_candidates(node_rows, edge_rows)
 eligible_nodes = classified["eligible_nodes"]
-selected_nodes = [row for row in eligible_nodes if row["interface_selected"]]
-selected_labels = {row["label"] for row in selected_nodes}
-eligible_slices = []
-for row in classified["eligible_edges"]:
-    if row["source"] not in selected_labels and row["source"] not in {n["label"] for n in eligible_nodes}:
-        continue
-    for site in row["source_evidence_sites"]:
-        eligible_slices.append({**row, "evidence_key": f"{row['source']}|{site['source_path']}:{site['byte_range']}"})
-derived = RULES.derive_interface(eligible_nodes, eligible_slices)
-all_hld_edge_candidates = derived["edges"]
-blocked_collapsed = [row for row in classified["blocked_edges"]
-                     if row.get("relation") in RULES.COLLAPSIBLE_RELATIONS]
-expected_edges = list(all_hld_edge_candidates)
-expected_edges.sort(key=lambda row: (row["source"], row["relation"], row["target"], row["via"]))
-expected_nodes = [row for row in selected_nodes if row["label"] in set(derived["nodes"])]
-expected_node_rows = [{key: row[key] for key in ("label", "item_kind", "effective_visibility", "file", "source_evidence")}
-                      for row in expected_nodes]
-expected_paths = [{"source": row["source"], "relation": row["relation"], "target": row["target"],
-                   "via": row["via"], "evidence_path": path,
-                   "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL"}
-                  for row in expected_edges for path in row["evidence_paths"]]
-
-known_files = [L, X]
-rollup_groups = RULES.group_expected_rollup_edges(
-    expected_edges, classified["eligible_edges"], eligible_nodes, known_files)
-file_groups = rollup_groups["file_groups"]
-folder_groups = rollup_groups["folder_groups"]
-excluded_rollup_edges = rollup_groups["excluded_rollup_edges"]
-macro_blocked_paths = sorted({row["generated_by"].get("invocation_file") for row in classified["blocked_nodes"]
-                              if row.get("generated_by") and row["generated_by"].get("invocation_file") in known_files})
-file_rollup_rows = [{"source_file": key[0], "target_file": key[1], "relation": key[2], "via": key[3], "edge_count": len(value)}
-                    for key, value in sorted(file_groups.items())]
-folder_rollup_rows = [{"source_folder": key[0], "target_folder": key[1], "relation": key[2], "via": key[3], "edge_count": len(value)}
-                      for key, value in sorted(folder_groups.items())]
-rollup_status = "BLOCKED" if macro_blocked_paths or excluded_rollup_edges else "PARTIAL_LOCAL_ONLY_DIAGNOSTIC"
 
 def dump(name, value):
     (OUT / name).write_text(RULES.serialize_dataset(value))
@@ -382,7 +346,6 @@ dump("itoa-local-verification-subset.json", {"artifact_status": "ELIGIBLE_LOCAL_
                 "candidate_edges": len(edge_rows), "eligible_edges": len(classified["eligible_edges"])}})
 blocked_rows = {"candidate_provenance": candidate_provenance,
                 "nodes": classified["blocked_nodes"], "edges": classified["blocked_edges"],
-                "blocked_collapsed_edges": blocked_collapsed,
                 "unresolved_or_inactive_sites": unresolved,
                 "blocker_counts": dict(sorted(collections.Counter(blocker for row in
                     classified["blocked_nodes"] + classified["blocked_edges"] for blocker in row["blockers"]).items()))}
@@ -390,49 +353,25 @@ dump("itoa-blocked-candidate-index.json", blocked_rows)
 dump("itoa-impl-block-records.json", {"artifact_status": "LLM_PARSED_DRAFT_NOT_PRODUCTION",
      "candidate_provenance": candidate_provenance, "rows": impls})
 dump("itoa-expected-unresolved-sites.json", {"artifact_status": "BLOCKED_DIAGNOSTIC_EXPECTATIONS", "rows": unresolved})
-dump("itoa-expected-interface-nodes.json", {"artifact_status": "PARTIAL_BLOCKED_EXPECTATION", "rows": expected_node_rows})
-dump("itoa-expected-dependency-edges.json", {"artifact_status": "PARTIAL_BLOCKED_EXPECTATION_CURRENT_SIX_KIND_COLLAPSE", "rows": expected_edges})
-dump("itoa-expected-evidence-paths.json", {"artifact_status": "SYMBOLIC_SOURCE_EVIDENCE_NOT_CANONICAL", "rows": expected_paths})
-dump("itoa-expected-file-rollup.json", {"artifact_status": rollup_status, "known_original_source_paths": known_files,
-     "blocked_rollup_paths": macro_blocked_paths, "blocker_is_invocation_context_not_item_file_assignment": True,
-     "excluded_rollup_edges": excluded_rollup_edges,
-     "rows": file_rollup_rows})
-dump("itoa-expected-folder-rollup.json", {"artifact_status": rollup_status, "known_original_source_paths": sorted({pathlib.PurePosixPath(p).parent.as_posix() for p in known_files}),
-     "blocked_rollup_paths": macro_blocked_paths, "blocker_is_invocation_context_not_item_file_assignment": True,
-     "excluded_rollup_edges": excluded_rollup_edges,
-     "rows": folder_rollup_rows})
-dump("itoa-derived-interface-level.json", {"artifact_status": "DERIVED_ELIGIBLE_DIRECT_ONLY", "nodes": sorted(derived["nodes"]),
-     "edges": expected_edges, "paths": expected_paths})
 
 counts = {"candidate_nodes": len(node_rows), "eligible_nodes": len(eligible_nodes), "blocked_nodes": len(classified["blocked_nodes"]),
           "candidate_edges": len(edge_rows), "eligible_edges": len(classified["eligible_edges"]), "blocked_edges": len(classified["blocked_edges"]),
-          "expected_interface_nodes": len(expected_node_rows), "expected_dependency_edges": len(expected_edges),
-          "expected_direct_edges": sum(row["via"] == "direct" for row in expected_edges),
-          "expected_collapsed_edges": sum(row["via"] == "collapsed" for row in expected_edges),
-          "blocked_collapsible_candidate_edges": len(blocked_collapsed),
-          "excluded_rollup_edges": len(excluded_rollup_edges)}
+          "impl_block_records": len(impls), "unresolved_or_inactive_sites": len(unresolved)}
+target_kind_counts = dict(sorted(collections.Counter(row["target_kind"] for row in edge_rows).items()))
 summary = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
            "candidate_provenance": candidate_provenance, "counts": counts,
-           "rollup_status": rollup_status,
-           "rollup_exclusion_reason_counts": dict(sorted(collections.Counter(
-               row["reason"] for row in excluded_rollup_edges).items())),
-           "prior_draft_observation": {"candidate_nodes": 73, "candidate_edges": 368,
-                                       "eligibility_classification": "NOT_AVAILABLE_IN_PRIOR_DRAFT",
-                                       "counts_are_acceptance_constants": False},
-           "relation_kind_counts": RULES.relation_counts(edge_rows), "blocker_counts": blocked_rows["blocker_counts"],
+           "relation_kind_counts": RULES.relation_counts(edge_rows), "target_kind_counts": target_kind_counts,
+           "blocker_counts": blocked_rows["blocker_counts"],
            "source_coverage": {"whole_source_coverage_claimed": False,
                "known_uncovered_constructs": ["operators", "body_types", "literals", "repeated_same_line_sites"]},
-           "collapse_policy": {"current_decided_relations": sorted(RULES.COLLAPSIBLE_RELATIONS),
-               "forbidden_at_every_hop": sorted(RULES.FORBIDDEN_HOPS),
-               "derived_collapsed_rows": sum(row["via"] == "collapsed" for row in expected_edges),
-               "od9_suppression_applied": False, "OD-9": "OPEN_ALTERNATE_PROPOSAL"},
-           "open_decisions": ["OD-2", "OD-7", "OD-8", "OD-9"], "production_comparison_status": "NOT_RUN"}
+           "open_decisions": ["OD-2", "OD-7", "OD-8"], "production_comparison_status": "NOT_RUN"}
 dump("itoa-target-dataset-summary.json", summary)
-md = "# itoa reference dataset summary\n\n" + "**Status:** LLM_PARSED_DRAFT_NOT_FROZEN; authored by Devin from pinned source; no independent compiler/oracle verification has frozen it. Symbolic identities; never production input.\n\n"
-md += "The complete proposed candidate row set is preserved beside a separate eligible local-only subset and blocker index; it is not whole-source coverage. Known omissions include operators, body types, literals, and repeated same-line sites. The five expected HLD outputs are derived from eligible rows under the current six collapseable kinds (calls, uses_type, implements, reexports, derives, reads); contains/imports are forbidden at every hop. OD-9 remains an alternate proposal, not a revocation. OD-2/OD-7/OD-8 assumptions remain explicit blockers.\n\n"
-md += f"The file/folder roll-ups are partial diagnostics with status {rollup_status}; {len(excluded_rollup_edges)} expected HLD edges are excluded pending source/target mapping. Builtin targets use BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED; exclusions are listed in both roll-up outputs.\n\n"
-md += f"OD-9 did not suppress collapse derivation. The eligible subset currently yields {sum(row['via'] == 'collapsed' for row in expected_edges)} collapsed rows; this is an observed candidate result, not a completeness claim.\n\n"
+md = "# itoa expected full item graph: summary\n\n"
+md += "**Status: LLM_PARSED_DRAFT_NOT_FROZEN.** Written by Devin from reading the pinned source. Not reviewed, not frozen, never a production input. Identities are symbolic labels, not production keys.\n\n"
+md += "Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, body types, literals and repeated same-line sites are not covered. Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.\n\n"
 md += "```text\n" + "\n".join(f"{key}: {value}" for key, value in counts.items()) + "\n"
-md += f"source commit: {source_commit}\nsource digests and byte sizes: {[(row['path'], row['bytes'], row['sha256']) for row in PIN['benchmark_source_inventory_records']]}\nmacro invocation paths blocking roll-ups (not item assignments): {macro_blocked_paths}\n```\n"
+md += "\n".join(f"relation {key}: {value}" for key, value in summary["relation_kind_counts"].items()) + "\n"
+md += "\n".join(f"target {key}: {value}" for key, value in target_kind_counts.items()) + "\n"
+md += f"source commit: {source_commit}\n```\n"
 (OUT / "itoa-target-dataset-summary.md").write_text(md)
 print(md)

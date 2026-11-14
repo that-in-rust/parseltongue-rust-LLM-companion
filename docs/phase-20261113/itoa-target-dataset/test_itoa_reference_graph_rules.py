@@ -1,16 +1,11 @@
-import hashlib
 import importlib.util
-import io
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
 
 
 RULE_PATH = Path(__file__).with_name("itoa-reference-graph-rules.py")
@@ -21,8 +16,7 @@ RULE_SPEC.loader.exec_module(RULES)
 
 
 def make_node(label, selected):
-    return {"label": label, "interface_selected": selected,
-            "effective_visibility": "public" if selected else "private"}
+    return {"label": label, "effective_visibility": "public" if selected else "private"}
 
 
 def make_edge(source, relation, target, evidence, **fields):
@@ -57,41 +51,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertEqual(0, counts["reexports"])
         self.assertEqual(0, counts["derives"])
 
-    def test_collapse_excludes_forbidden_hops(self):
-        nodes = [make_node("public", True), make_node("use", True), make_node("hidden-a", False),
-                 make_node("hidden-b", False), make_node("hidden-c", False), make_node("kept", True)]
-        edges = [
-            make_edge("public", "contains", "hidden-a", "contains-first"),
-            make_edge("hidden-a", "calls", "kept", "call-after-contains"),
-            make_edge("public", "calls", "hidden-b", "call-first"),
-            make_edge("hidden-b", "imports", "kept", "imports-later"),
-            make_edge("use", "imports", "hidden-c", "imports-first"),
-            make_edge("hidden-c", "calls", "kept", "call-after-import"),
-            make_edge("public", "contains", "kept", "direct-contains"),
-            make_edge("use", "imports", "kept", "direct-import"),
-        ]
-        rows = RULES.derive_interface(nodes, edges)["edges"]
-        self.assertTrue(all(row["via"] == "direct" for row in rows if row["relation"] in {"contains", "imports"}))
-        self.assertFalse(any(row["via"] == "collapsed" and row["relation"] in {"contains", "imports"} for row in rows))
-        self.assertEqual({("public", "contains", "kept"), ("use", "imports", "kept")},
-                         {(row["source"], row["relation"], row["target"]) for row in rows})
-
-    def test_forbidden_direct_external_targets(self):
-        nodes = [make_node("public", True)]
-        edges = [
-            make_edge("public", "contains", "external::Item", "contains-external", target_kind="external"),
-            make_edge("public", "contains", "u8", "contains-builtin", target_kind="builtin"),
-            make_edge("public", "imports", "external::Item", "imports-external", target_kind="external"),
-            make_edge("public", "imports", "u8", "imports-builtin", target_kind="builtin"),
-        ]
-        rows = RULES.derive_interface(nodes, edges)["edges"]
-        self.assertEqual(
-            {("public", "contains", "external::Item"), ("public", "contains", "u8"),
-             ("public", "imports", "external::Item"), ("public", "imports", "u8")},
-            {(row["source"], row["relation"], row["target"]) for row in rows},
-        )
-        self.assertTrue(all(row["via"] == "direct" for row in rows))
-
     def test_dangling_node_endpoints_block(self):
         nodes = [make_node("root", True)]
         edges = [
@@ -103,35 +62,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertEqual(2, len(result["blocked_edges"]))
         self.assertTrue(all("DANGLING_NODE_ENDPOINT" in edge["blockers"]
                             for edge in result["blocked_edges"]))
-
-    def test_cycles_stop_repeating_nodes(self):
-        nodes = [make_node("public", True), make_node("left", False), make_node("right", False), make_node("target", True)]
-        edges = [make_edge("public", "calls", "left", "e1"),
-                 make_edge("left", "calls", "right", "e2"),
-                 make_edge("right", "calls", "left", "cycle"),
-                 make_edge("right", "calls", "target", "e3")]
-        rows = RULES.derive_interface(nodes, edges)["edges"]
-        self.assertEqual(1, len(rows))
-        self.assertEqual("collapsed", rows[0]["via"])
-        self.assertEqual([["e1", "e2", "e3"]], rows[0]["evidence_paths"])
-
-    def test_diamond_paths_keep_provenance(self):
-        nodes = [make_node("public", True), make_node("left", False), make_node("right", False), make_node("target", True)]
-        edges = [make_edge("public", "calls", "left", "e1"),
-                 make_edge("public", "calls", "right", "e2"),
-                 make_edge("left", "calls", "target", "e3"),
-                 make_edge("right", "calls", "target", "e4")]
-        rows = RULES.derive_interface(nodes, edges)["edges"]
-        self.assertEqual(1, len(rows))
-        self.assertEqual({("e1", "e3"), ("e2", "e4")}, {tuple(path) for path in rows[0]["evidence_paths"]})
-
-    def test_direct_collapsed_keys_separate(self):
-        nodes = [make_node("public", True), make_node("private", False), make_node("target", True)]
-        edges = [make_edge("public", "calls", "target", "direct"),
-                 make_edge("public", "calls", "private", "first"),
-                 make_edge("private", "calls", "target", "last")]
-        rows = RULES.derive_interface(nodes, edges)["edges"]
-        self.assertEqual({"direct", "collapsed"}, {row["via"] for row in rows})
 
     def test_nonextracted_statuses_stay_blocked(self):
         edges = [
@@ -158,67 +88,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         self.assertEqual("FAIL", result["status"])
         self.assertTrue(result["missing"])
         self.assertTrue(result["extra"])
-
-    def test_empty_graph_outputs_empty(self):
-        self.assertEqual({"nodes": [], "edges": []}, RULES.derive_interface([], []))
-        self.assertEqual({"counts": {}, "blocked_files": []}, RULES.rollup_unique_edges([], ["src/lib.rs"]))
-
-    def test_rollups_count_unique_edges(self):
-        rows = [
-            {"edge_identity": ("src", "dst", "calls", "direct"), "source_file": "src/lib.rs", "path_count": 5},
-            {"edge_identity": ("src", "dst", "calls", "direct"), "source_file": "src/lib.rs", "path_count": 2},
-        ]
-        result = RULES.rollup_unique_edges(rows, ["src/lib.rs"])
-        self.assertEqual({"src/lib.rs": 1}, result.get("counts"))
-
-    def test_rollup_edges_accounted_once(self):
-        nodes = [
-            {"label": "source", "file": "src/lib.rs"},
-            {"label": "local", "file": "src/u128_ext.rs"},
-        ]
-        expected_edges = [
-            {"source": "source", "relation": "calls", "target": "local", "via": "direct"},
-            {"source": "source", "relation": "uses_type", "target": "u32", "via": "direct"},
-        ]
-        source_edges = [
-            {"source": "source", "relation": "calls", "target": "local", "target_kind": "node"},
-            {"source": "source", "relation": "uses_type", "target": "u32", "target_kind": "builtin"},
-        ]
-        result = RULES.group_expected_rollup_edges(
-            expected_edges, source_edges, nodes, ["src/lib.rs", "src/u128_ext.rs"])
-        expected_ids = [(row["source"], row["relation"], row["target"], row["via"])
-                        for row in expected_edges]
-        excluded = result["excluded_rollup_edges"]
-        excluded_ids = [(row["source"], row["relation"], row["target"], row["via"])
-                        for row in excluded]
-        file_ids = [identity for group in result["file_groups"].values() for identity in group]
-        folder_ids = [identity for group in result["folder_groups"].values() for identity in group]
-        self.assertCountEqual(expected_ids, file_ids + excluded_ids)
-        self.assertCountEqual(expected_ids, folder_ids + excluded_ids)
-        self.assertEqual(len(expected_ids), len(file_ids) + len(excluded_ids))
-        self.assertEqual(len(expected_ids), len(folder_ids) + len(excluded_ids))
-        self.assertEqual("BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED", excluded[0]["reason"])
-        dataset = RULE_PATH.parent
-        expected = json.loads((dataset / "itoa-expected-dependency-edges.json").read_text())["rows"]
-        file_rollup = json.loads((dataset / "itoa-expected-file-rollup.json").read_text())
-        folder_rollup = json.loads((dataset / "itoa-expected-folder-rollup.json").read_text())
-        file_exclusions = file_rollup["excluded_rollup_edges"]
-        folder_exclusions = folder_rollup["excluded_rollup_edges"]
-        self.assertEqual(file_exclusions, folder_exclusions)
-        self.assertEqual(len(expected), sum(row["edge_count"] for row in file_rollup["rows"])
-                         + len(file_exclusions))
-        self.assertEqual(len(expected), sum(row["edge_count"] for row in folder_rollup["rows"])
-                         + len(folder_exclusions))
-        self.assertEqual("BLOCKED", file_rollup["artifact_status"])
-        self.assertEqual("BLOCKED", folder_rollup["artifact_status"])
-        self.assertIn("BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED",
-                      {row["reason"] for row in file_exclusions})
-
-    def test_macro_rollup_stays_blocked(self):
-        rows = [{"eligibility_status": "BLOCKED", "blockers": ["MACRO_FILE_ASSIGNMENT_UNRESOLVED"],
-                 "macro_invocation_file": "src/lib.rs"}]
-        result = RULES.rollup_unique_edges(rows, ["src/lib.rs", "src/u128_ext.rs"])
-        self.assertIn("src/lib.rs", result.get("blocked_files", []))
 
     def test_dataset_output_is_deterministic(self):
         first = RULES.serialize_dataset({"z": 1, "a": {"y": 2, "x": 3}})
@@ -265,16 +134,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         vocabulary = source.split("const HLD_BUILTIN_TYPE_NAMES:", 1)[1].split("];", 1)[0]
         source_names = set(re.findall(r'"([^"]+)"', vocabulary))
         self.assertEqual(source_names, RULES.BUILTIN_PRIMITIVES)
-
-    def test_all_six_relations_collapse(self):
-        relations = {"calls", "uses_type", "implements", "reexports", "derives", "reads"}
-        nodes = [make_node("public-a", True), make_node("private", False), make_node("public-b", True)]
-        edges = [edge for relation in relations for edge in (
-            make_edge("public-a", relation, "private", f"{relation}-in"),
-            make_edge("private", relation, "public-b", f"{relation}-out"),
-        )]
-        result = RULES.derive_interface(nodes, edges)
-        self.assertEqual(relations, {row["relation"] for row in result["edges"] if row["via"] == "collapsed"})
 
     def test_candidate_coverage_gaps_explicit(self):
         full = json.loads(RULE_PATH.with_name("itoa-full-graph-nodes.json").read_text())
