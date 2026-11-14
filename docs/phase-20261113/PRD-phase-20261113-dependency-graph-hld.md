@@ -86,13 +86,23 @@ stage                                writes                                    s
 6   signature-type-lowering-stage    lowered signatures, impl-header-index     impl headers only
 7   semantic-edge-evidence-stage     edge-evidence-record-table                bounded: contains, calls
 -   item-effective-visibility-stage  item-effective-visibility-records         bounded: visibility unknown
-9   hld-current-materialization      five HLD tables                           fixtures only; deferred
+9   hld-current-materialization      five HLD tables                           top-level containment only; deferred
 10  coverage banner                  per-level coverage                        partial
 11  oracle edge differ (offline)     oracle-edge-agreement-table               path sites only
 ```
 
-The CLI final stage `full-item-dependency-graph` runs stages 0–5, then writes the bounded
-stage 6, 7 and visibility rows and freezes them.
+`--mapping-final-stage-kind` selects how far a run goes:
+
+```text
+syntax-spans                    stages 0–3
+name-resolution (default)       stages 0–5, plus impl-header rows
+full-item-dependency-graph      the above, then the bounded stage 7 and visibility rows, frozen
+original-top-level-containment  an earlier checkpoint: top-level containment only, run through
+                                the HLD builder into the five HLD tables
+```
+
+Only the last one writes HLD tables from real source, and only for top-level containment. The
+HLD builder is otherwise tested on fixtures.
 
 Process boundary (D1, D4, D5): production may start only `cargo metadata --offline`,
 `rustc --print cfg` and `rustc --print sysroot`. It never compiles, never runs build scripts or
