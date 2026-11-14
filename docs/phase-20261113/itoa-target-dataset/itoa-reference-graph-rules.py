@@ -229,8 +229,3 @@ def verify_source_digests(source_files, expected_digests):
 
 def serialize_dataset(value):
     return json.dumps(value, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-
-
-def contract_manifest_statuses(contracts):
-    return {row["table_name"]: "BLOCKED/NOT_IMPLEMENTED" if row.get("status") == "PROPOSED_NOT_IMPLEMENTED"
-            else row.get("status", "BLOCKED/NOT_IMPLEMENTED") for row in contracts}

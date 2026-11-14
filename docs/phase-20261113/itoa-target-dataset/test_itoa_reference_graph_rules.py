@@ -231,17 +231,12 @@ class ReferenceGraphRulesTests(unittest.TestCase):
             left_files = {path.name: path.read_bytes() for path in Path(left).iterdir()}
             right_files = {path.name: path.read_bytes() for path in Path(right).iterdir()}
         self.assertEqual(left_files, right_files)
-        self.assertIn("itoa-table-contract-manifest.json", left_files)
+        self.assertIn("itoa-full-graph-edges.json", left_files)
         self.assertIn("itoa-local-verification-subset.json", left_files)
 
     def test_source_pin_digest_mismatch(self):
         with self.assertRaises(ValueError):
             RULES.verify_source_digests({"src/lib.rs": b"changed"}, {"src/lib.rs": "0" * 64})
-
-    def test_contract_manifest_blocks_unbuilt(self):
-        contracts = [{"table_name": "impl-header-index-table", "status": "PROPOSED_NOT_IMPLEMENTED"}]
-        statuses = RULES.contract_manifest_statuses(contracts)
-        self.assertEqual("BLOCKED/NOT_IMPLEMENTED", statuses["impl-header-index-table"])
 
     def test_unflagged_contains_allowed(self):
         nodes = [make_node("area", True), make_node("item", True)]
@@ -280,81 +275,6 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         )]
         result = RULES.derive_interface(nodes, edges)
         self.assertEqual(relations, {row["relation"] for row in result["edges"] if row["via"] == "collapsed"})
-
-    def test_od9_does_not_suppress(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        output = json.loads(RULE_PATH.with_name("itoa-expected-dependency-edges.json").read_text())
-        policy = manifest["collapse_policy"]
-        collapsed = [row for row in output["rows"] if row["via"] == "collapsed"]
-        self.assertFalse(policy["od9_suppression_applied"])
-        self.assertEqual(RULES.COLLAPSIBLE_RELATIONS, set(policy["current_decided_relations"]))
-        self.assertEqual(len(collapsed), policy["derived_collapsed_rows"])
-
-    def test_registry_owners_are_exact(self):
-        root = Path(__file__).resolve().parents[3]
-        registry_path = root / "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs"
-        body = registry_path.read_text().split("const STAGE_OWNED_TABLE_NAMES:", 1)[1].split("];", 1)[0]
-        pairs = re.findall(r'\(\s*"([^"\n]+)"\s*,\s*"([^"\n]+)"\s*,?\s*\)', body, re.S)
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        observed = {row["table_name"]: row["owner"] for row in manifest["contracts"]
-                    if row.get("record_kind") == "registered_stage_table"}
-        self.assertEqual(dict(pairs), observed)
-        registered = [row for row in manifest["contracts"]
-                      if row.get("record_kind") == "registered_stage_table"]
-        self.assertTrue(all(row.get("provenance_citations") for row in registered))
-
-    def test_payload_fields_have_provenance(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        contracts = {row["table_name"]: row for row in manifest["contracts"]}
-        item = contracts["syntax-namespace-input-items"]
-        item_fields = item.get("observed_payload_fields", [])
-        self.assertIn("binding_lexical_scope_key", item_fields)
-        self.assertIn("binding_target_identity_key", item_fields)
-        self.assertTrue(item.get("provenance_citations"))
-        path = contracts["path-resolution-site-records"]
-        path_fields = path.get("observed_payload_fields", [])
-        self.assertIn("site_source_range_start", path_fields)
-        self.assertIn("path_target_symbol_rows", path_fields)
-        self.assertNotIn("site_occurrence_key", path_fields)
-        self.assertTrue(path.get("provenance_citations"))
-
-    def test_payload_citations_are_exact(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        contracts = {row["table_name"]: row for row in manifest["contracts"]}
-        item = contracts["syntax-namespace-input-items"]
-        self.assertEqual("OBSERVED_SOURCE_SERIALIZER_FIELDS", item["payload_schema_status"])
-        self.assertNotIn("binding_resolution_evidence_values", item["observed_payload_fields"])
-        self.assertEqual("crates/parseltongue-syntax-span-extractor/src/syntax-namespace-record-codec.rs",
-                         item["field_provenance_citations"][0]["path"])
-        path = contracts["path-resolution-site-records"]
-        self.assertEqual("OBSERVED_SERIALIZED_EXPORT_FIELDS", path["payload_schema_status"])
-        citation = path["field_provenance_citations"][0]
-        self.assertTrue(citation["path"].endswith("exported-table-rows/path-resolution-site-records.json"))
-        self.assertEqual("200527fb15e4e88d064c12943ffaaaa0accaa121bc08fffe76a89fab5cf6339a",
-                         citation["generation"])
-
-    def test_storage_keys_match_schema(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        registered = [row for row in manifest["contracts"]
-                      if row.get("record_kind") == "registered_stage_table"]
-        expected_fields = ["run_generation_digest_value", "stage_attempt_sequence_value",
-                           "stage_row_record_key", "stage_unit_work_key", "stage_row_payload_text"]
-        self.assertTrue(registered)
-        self.assertTrue(all(row["storage_schema_status"] == "EXACT_SQL_DDL"
-                            and row["required_fields"] == expected_fields
-                            and row["key_contract"]["primary_key"] == expected_fields[:3]
-                            for row in registered))
-
-    def test_typed_input_is_record(self):
-        manifest = json.loads(RULE_PATH.with_name("itoa-table-contract-manifest.json").read_text())
-        self.assertNotIn("hld-typed-materialization-input-record",
-                         {row["table_name"] for row in manifest["contracts"]})
-        record = next(row for row in manifest["record_contracts"]
-                      if row.get("record_kind") == "typed_interface"
-                      and row.get("symbol") == "HldMaterializationInputRecord")
-        self.assertEqual(["CompleteTypedInput", "IncompleteTypedInput"], record["completeness_enum_values"])
-        self.assertEqual("CompleteTypedInput", record["input_semantics"]["required_completeness_value"])
-        self.assertIn("may be empty", record["input_semantics"]["input_vectors"])
 
     def test_candidate_coverage_gaps_explicit(self):
         full = json.loads(RULE_PATH.with_name("itoa-full-graph-nodes.json").read_text())
