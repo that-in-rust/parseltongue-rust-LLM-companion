@@ -13,7 +13,10 @@ use ra_ap_syntax::{
     ast::{self, HasGenericArgs, HasGenericParams, HasName},
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 #[cfg(test)]
 #[path = "original-call-resolution-tests.rs"]
@@ -70,6 +73,7 @@ pub fn resolve_original_call_edges(
         })
         .map(|node| &node.node_target_reference)
         .collect::<BTreeSet<_>>();
+    let lookup = build_bound_method_index(store, source_scope, &context, input)?;
     let mut edges = Vec::new();
     for site in read_impl_stage_values(store, source_scope, "body-site-reference-table")? {
         if cancel.check_stage_work_cancelled() {
@@ -80,6 +84,7 @@ pub fn resolve_original_call_edges(
             &context,
             &headers,
             &endpoints,
+            &lookup,
             input.run_generation_digest_value,
         )? {
             edges.push(edge);
@@ -95,6 +100,7 @@ fn build_original_call_edge(
     context: &ImplHeaderSourceContext<'_>,
     headers: &[Value],
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
+    lookup: &BoundMethodLookupIndex,
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, OriginalCallResolutionError> {
     if !matches!(
@@ -159,7 +165,22 @@ fn build_original_call_edge(
         });
     }
     let syntax = &site["call_syntax_evidence"];
-    let resolution = if syntax["call_supported_path_flag"] != true
+    let receiver_evidence = &syntax["method_receiver_evidence"];
+    let bound = if receiver_evidence.is_null() {
+        None
+    } else {
+        Some(resolve_bound_method_target(
+            owner,
+            source_span,
+            receiver_evidence,
+            context,
+            lookup,
+            endpoints,
+        )?)
+    };
+    let resolution = if let Some((found, _)) = &bound {
+        found.clone()
+    } else if syntax["call_supported_path_flag"] != true
         || syntax["call_lexical_shadowing_flag"] != false
     {
         unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded)
@@ -191,6 +212,14 @@ fn build_original_call_edge(
             )?
         }
     };
+    let mut dispatch = json!({
+        "dispatch_kind":"original_associated_function",
+        "call_syntax_evidence":syntax
+    });
+    if let Some((_, evidence)) = bound.filter(|(_, evidence)| !evidence.is_null()) {
+        dispatch["dispatch_kind"] = json!("generic_bound_trait_method");
+        dispatch["bound_dispatch_evidence"] = evidence;
+    }
     let target = match &resolution {
         HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
         _ => None,
@@ -206,14 +235,181 @@ fn build_original_call_edge(
             evidence_relation_kind_value: HldRelationKindValue::Calls,
             evidence_target_reference_value: target,
         },
-        edge_dispatch_metadata_text: Some(
-            json!({
-                "dispatch_kind":"original_associated_function",
-                "call_syntax_evidence":syntax
-            })
-            .to_string(),
-        ),
+        edge_dispatch_metadata_text: Some(dispatch.to_string()),
     }))
+}
+
+/// Bound rows by owner item, traits that declare supertraits, methods with a
+/// `self` parameter, and the graph's containment pairs: all a bound walk needs.
+#[derive(Default)]
+struct BoundMethodLookupIndex {
+    owner_bound_rows: BTreeMap<String, Vec<Value>>,
+    trait_owner_keys: BTreeMap<HldTargetIdentityValue, String>,
+    self_method_targets: Vec<(String, HldTargetIdentityValue)>,
+    contained_item_pairs: BTreeSet<(HldTargetIdentityValue, HldTargetIdentityValue)>,
+}
+
+fn build_bound_method_index(
+    store: &dyn StageTableStorePort,
+    scope: &StageRunScopeValue,
+    context: &ImplHeaderSourceContext<'_>,
+    input: &HldMaterializationInputRecord,
+) -> Result<BoundMethodLookupIndex, OriginalCallResolutionError> {
+    // Rows whose owner is not a graph-identifiable span cannot take part in a walk.
+    let identify = |key: &str| -> Option<HldTargetIdentityValue> {
+        let occurrence = context.occurrence(context.span(key).ok()?).ok()?;
+        Some(
+            NameSymbolTargetKey::Definition(decode_occurrence_identity_value(&occurrence).ok()?)
+                .into(),
+        )
+    };
+    let mut index = BoundMethodLookupIndex::default();
+    for row in read_impl_stage_values(store, scope, "field-signature-detail-table")? {
+        let Some(owner) = row["site_owner_occurrence_key"].as_str().map(str::to_owned) else {
+            continue;
+        };
+        match row["site_syntax_kind_value"].as_str() {
+            Some("TYPE_BOUND") => {
+                if row["bound_syntax_evidence"]["bound_subject_kind"] == "supertrait"
+                    && let Some(identity) = identify(&owner)
+                {
+                    index.trait_owner_keys.insert(identity, owner.clone());
+                }
+                index.owner_bound_rows.entry(owner).or_default().push(row);
+            }
+            Some("SELF_PARAM") => {
+                let Ok(span) = context.span(&owner) else {
+                    continue;
+                };
+                if span["span_syntax_kind_value"] == "FN"
+                    && let Some(name) = span["span_declared_name_value"].as_str()
+                    && let Some(identity) = identify(&owner)
+                {
+                    index
+                        .self_method_targets
+                        .push((name.trim_start_matches("r#").to_owned(), identity));
+                }
+            }
+            _ => {}
+        }
+    }
+    index.contained_item_pairs = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Contains)
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted { target } => {
+                Some((edge.edge_source_reference.clone(), target.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    Ok(index)
+}
+
+/// `parameter.method(..)` where the parameter's declared type is a type
+/// parameter of the enclosing function: the candidates are the methods of the
+/// parameter's bound traits and their supertraits. Exactly one gives an edge to
+/// that trait method; a trait whose source is absent is recorded, not guessed.
+fn resolve_bound_method_target(
+    owner_key: &str,
+    owner_span: &Value,
+    receiver: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    index: &BoundMethodLookupIndex,
+    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+) -> Result<(HldEdgeResolutionValue, Value), OriginalCallResolutionError> {
+    let unproven = (
+        unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded),
+        Value::Null,
+    );
+    let (Some(parameter), Some(method)) = (
+        receiver["receiver_parameter_type_text"].as_str(),
+        receiver["method_declared_name_value"].as_str(),
+    ) else {
+        return Ok(unproven);
+    };
+    if receiver["receiver_shape_kind"] != "parameter_identifier"
+        || receiver["receiver_generic_owner_kind"] != "function"
+        || receiver["receiver_rebinding_flag"] != false
+        || owner_span["span_syntax_kind_value"] != "FN"
+    {
+        return Ok(unproven);
+    }
+    let mut chain = vec![parameter.to_owned()];
+    let mut missing = Vec::new();
+    let mut visited = BTreeSet::new();
+    let mut candidates = BTreeSet::new();
+    let mut pending = vec![(owner_key.to_owned(), false)];
+    while let Some((key, supertraits)) = pending.pop() {
+        let span = context.span(&key)?;
+        for row in index.owner_bound_rows.get(&key).into_iter().flatten() {
+            let bound = &row["bound_syntax_evidence"];
+            let applies = if supertraits {
+                bound["bound_subject_kind"] == "supertrait"
+            } else {
+                matches!(
+                    bound["bound_subject_kind"].as_str(),
+                    Some("type_parameter" | "where_predicate")
+                ) && bound["bound_subject_name_value"] == parameter
+            };
+            if !applies || bound["bound_form_kind"] == "lifetime" {
+                continue;
+            }
+            let text = row["site_syntax_source_text"].as_str().unwrap_or_default();
+            if bound["bound_form_kind"] != "trait" {
+                // `?Sized` relaxes a default and adds no method; other forms are unproven.
+                if text.starts_with('?') {
+                    continue;
+                }
+                return Ok(unproven);
+            }
+            let resolved = context.resolve_type(span, &bound["trait_type_source"], true)?;
+            if resolved["resolution_state_kind"] != "resolved" {
+                if resolved["unresolved_reason_kind"] == "external_source_missing" {
+                    missing.push(text.to_owned());
+                    continue;
+                }
+                return Ok(unproven);
+            }
+            let found: HldTargetIdentityValue =
+                decode_symbol_target_value(&resolved["target_identity"])?.into();
+            if !visited.insert(found.clone()) {
+                continue;
+            }
+            chain.push(text.to_owned());
+            candidates.extend(
+                index
+                    .self_method_targets
+                    .iter()
+                    .filter(|(name, target)| {
+                        name == method
+                            && index
+                                .contained_item_pairs
+                                .contains(&(found.clone(), target.clone()))
+                    })
+                    .map(|(_, target)| target.clone()),
+            );
+            if let Some(next) = index.trait_owner_keys.get(&found) {
+                pending.push((next.clone(), true));
+            }
+        }
+    }
+    let evidence = json!({"bound_chain":chain,"missing_source_traits":missing});
+    let mut found = candidates.into_iter();
+    let resolution = match (found.next(), found.next()) {
+        (Some(target), None) if endpoints.contains(&target) => {
+            HldEdgeResolutionValue::Extracted { target }
+        }
+        (Some(_), Some(_)) => {
+            unresolved_call_target_value(HldUnresolvedReasonKind::AmbiguousTarget)
+        }
+        (None, _) if !missing.is_empty() => {
+            unresolved_call_target_value(HldUnresolvedReasonKind::ExternalSourceMissing)
+        }
+        _ => unresolved_call_target_value(HldUnresolvedReasonKind::MissingTarget),
+    };
+    Ok((resolution, evidence))
 }
 
 fn unresolved_call_target_value(reason: HldUnresolvedReasonKind) -> HldEdgeResolutionValue {

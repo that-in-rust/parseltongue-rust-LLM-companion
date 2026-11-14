@@ -88,6 +88,26 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
+### 2026-11-15 01:00 IST — Part 3 step 4: GREEN, `Buffer::format` calls `private::Sealed::write`
+
+- `test_format_sealed_write_call` passes on pinned itoa. The stored edge targets the trait
+  method, with no fan-out to implementations.
+- Its dispatch record: kind `generic_bound_trait_method`, bound chain
+  `I -> Integer -> private::Sealed`, and `missing_source_traits: ["Copy"]`, because this run
+  excludes the sysroot source. This is the "proven, gap" state decided for Q1.
+- Measured in that run: 45 nodes, 104 edges, 61 call sites, 3 resolved (was 2), 58 unresolved.
+  17.3 s wall; largest single process 355 MB peak (not a process-tree figure). These were
+  taken just before the call site in `build_original_call_edge` was reshaped to shrink the
+  diff; the counts were not re-read after it.
+- On the committed code: all 13 real-source itoa tests pass (113.8 s), extractor crate
+  45 + 17 pass, format and lint clean for the two crates touched.
+- Supported: a receiver that is a plain function parameter whose declared type is a type
+  parameter of that same function. A type parameter of the enclosing impl or trait, and
+  every other receiver shape, stays unresolved with `TraitSolverNeeded`.
+- Not done yet for part 3: the resolver-level fixture tests (ambiguous, distractor, rebinding,
+  cycle, missing source with no candidate, rename), the refactor pass, and the workspace
+  gates (full test run, release build).
+
 ### 2026-11-15 00:30 IST — Part 3 step 3: bound evidence, without a new table
 
 - Every `TYPE_BOUND` row in `field-signature-detail-table` now carries

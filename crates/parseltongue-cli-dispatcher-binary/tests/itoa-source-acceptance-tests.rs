@@ -514,6 +514,16 @@ fn test_format_sealed_write_call() {
         dispatch.contains("Integer") && dispatch.contains("Sealed"),
         "dispatch metadata must carry the bound chain, got {dispatch:?}"
     );
+    let metadata: Value = serde_json::from_str(dispatch).unwrap();
+    assert_eq!(
+        metadata["dispatch_kind"], "generic_bound_trait_method",
+        "the edge says how its target was chosen"
+    );
+    assert_eq!(
+        metadata["bound_dispatch_evidence"],
+        json!({"bound_chain":["I", "Integer", "private::Sealed"],"missing_source_traits":["Copy"]}),
+        "sysroot source is excluded in this run, so Copy is recorded as not inspected"
+    );
     let write_targets = input
         .input_edge_records
         .iter()
