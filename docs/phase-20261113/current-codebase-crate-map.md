@@ -61,6 +61,41 @@ One edge crosses between the two L3 adapters: `duckdb-analysis-adapter` uses
 `turso-store-adapter` from `oracle-path-comparison-storage.rs`, from two test modules and from
 one example. Only the first is production code.
 
+## How much code each crate holds
+
+Counted by codebase-memory (functions and methods) and by line count, test files excluded from
+the first two columns. Test functions are `#[test]` attributes in the crate.
+
+```text
+ crate                      functions   lines   test functions
+ duckdb-analysis-adapter       310     11,187       168
+ syntax-span-extractor         157      5,636        57
+ turso-store-adapter           119      3,939        74
+ port-macro-expander           111      3,916        22
+ cli-dispatcher-binary          51      2,076        69
+ core-row-types                 45      1,930        11
+ table-store-traits             32        494         1
+ macro-span-records             24        236         2
+ crate-graph-loader             12        644        12
+ stage-worker-scheduler          2         67         4
+```
+
+## Which relation kinds have a producer
+
+The type `HldRelationKindValue` has eight kinds. Outside tests and the store codecs, only two
+are ever constructed:
+
+```text
+ contains   original-item-graph-projection.rs      full-item-dependency-graph stage
+            hld-original-source-projection.rs      original-top-level-containment stage
+ calls      original-call-resolution-records.rs    full-item-dependency-graph stage
+ imports, uses_type, reads, implements, reexports, derives
+            appear only in the Turso and DuckDB codecs; no code produces them
+```
+
+No function for signature lowering, body type inference, method lookup or trait selection
+exists in the index.
+
 ## Largest source files per crate
 
 ```text
