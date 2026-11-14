@@ -72,11 +72,11 @@ run cost, and the workspace gates (format, lint, full test run, release build).
 ## Decisions that block freezing the expected graph
 
 ```text
-OD-2  macro-generated items: identity and container        blocks 324 expected edges
-OD-8  may reads and uses_type start at a non-function item  blocks 56
-OD-7  how a file's module node relates to its file area     blocks 2
+OD-2  macro-generated items: identity and container        blocks 279 edges, 45 nodes
+OD-8  may reads and uses_type start at a non-function item  blocks 56 edges
+OD-7  how a file's module node relates to its file area     blocks 2 edges
 OD-4  enum variants and struct fields: nodes or evidence
-core  run with the sysroot source, or accept unresolved     blocks 119
+core  run with the sysroot source, or accept unresolved     blocks 119 edges
 ```
 
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
