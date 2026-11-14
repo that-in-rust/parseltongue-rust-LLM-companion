@@ -8,12 +8,16 @@ use parseltongue_core_row_types::{
     HldFolderRollupRecord, HldGraphEdgeKey, HldInputCompletenessKind, HldItemKindValue,
     HldMaterializationInputRecord, HldMaterializationValidationError, HldNodeInputCategory,
     HldNodeInputRecord, HldOutputCompletenessKind, HldOutputEdgeStatus, HldOwnerKindValue,
-    HldRelationKindValue, HldUnitOriginKind, HldUnitProvenanceRecord, HldUnresolvedReasonKind,
-    HldViaKindValue, NameSymbolTargetKey, RunCancelFlagValue, RunGenerationDigestValue,
-    SemanticOccurrenceKeyValue, SpanByteRangeValue, SpanDigestIdValue,
+    HldRelationKindValue, HldSourceCoverageKind, HldTargetIdentityValue, HldUnitOriginKind,
+    HldUnitProvenanceRecord, HldUnresolvedReasonKind, HldViaKindValue, NameSymbolTargetKey,
+    RunCancelFlagValue, RunGenerationDigestValue, SemanticOccurrenceKeyValue, SpanByteRangeValue,
+    SpanDigestIdValue, StageRunScopeValue, StageUnitWriteRequest,
     validate_hld_materialization_input,
 };
-use parseltongue_table_store_traits::HldGraphAnalysisPort;
+use parseltongue_table_store_traits::{
+    HldGraphAnalysisPort, HldGraphPublicationPort, StageTableStorePort,
+};
+use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn build_hld_fixture_unit(package_name: &str, context_byte: u8) -> CrateCompilationUnitKey {
@@ -59,26 +63,33 @@ fn build_hld_fixture_node(
 ) -> HldNodeInputRecord {
     HldNodeInputRecord {
         run_generation_digest_value: generation,
-        node_target_reference: target,
+        node_target_reference: target.into(),
         node_input_category: category,
         node_item_kind_value: item_kind,
         node_owner_kind_value: owner_kind,
         node_function_body_ancestry_flag: in_function_body,
         node_effective_visibility_kind: visibility,
-        node_reachable_outside_crate_flag: reachable_outside_crate,
+        node_reachable_outside_crate_flag: (category == HldNodeInputCategory::LocalItem)
+            .then_some(reachable_outside_crate),
         node_source_relative_path: source_path.map(str::to_owned),
         node_qualified_path_text: qualified_path.to_owned(),
         node_signature_text: None,
     }
 }
 
-fn build_hld_fixture_edge(
+fn build_hld_fixture_edge<Source, Target>(
     generation: RunGenerationDigestValue,
-    source: NameSymbolTargetKey,
-    target: NameSymbolTargetKey,
+    source: Source,
+    target: Target,
     relation: HldRelationKindValue,
     evidence: SemanticOccurrenceKeyValue,
-) -> HldEdgeInputRecord {
+) -> HldEdgeInputRecord
+where
+    Source: Into<HldTargetIdentityValue>,
+    Target: Into<HldTargetIdentityValue>,
+{
+    let source = source.into();
+    let target = target.into();
     HldEdgeInputRecord {
         run_generation_digest_value: generation,
         edge_source_reference: source.clone(),
@@ -106,6 +117,7 @@ fn build_hld_fixture_input(
         run_generation_digest_value: generation,
         stage_attempt_sequence_value: "attempt-a".into(),
         semantic_input_completeness_kind: HldInputCompletenessKind::CompleteTypedInput,
+        source_coverage_kind: HldSourceCoverageKind::FullSemantic,
         input_unit_provenance_records: provenance,
         input_node_records: nodes,
         input_edge_records: edges,
@@ -160,20 +172,24 @@ fn build_hld_path_node(
     )
 }
 
-fn build_hld_path_edge(
+fn build_hld_path_edge<Source, Target>(
     generation: RunGenerationDigestValue,
     unit_identity: &CrateCompilationUnitKey,
-    source: &NameSymbolTargetKey,
-    target: &NameSymbolTargetKey,
+    source: &Source,
+    target: &Target,
     relation: HldRelationKindValue,
     site_file_name: &str,
     site_offset: u8,
-) -> HldEdgeInputRecord {
+) -> HldEdgeInputRecord
+where
+    Source: Clone + Into<HldTargetIdentityValue>,
+    Target: Clone + Into<HldTargetIdentityValue>,
+{
     let site_path = format!("src/{site_file_name}.rs");
     build_hld_fixture_edge(
         generation,
-        source.clone(),
-        target.clone(),
+        source.clone().into(),
+        target.clone().into(),
         relation,
         build_hld_fixture_occurrence(
             unit_identity,
@@ -184,17 +200,21 @@ fn build_hld_path_edge(
     )
 }
 
-fn expected_hld_edge_key(
+fn expected_hld_edge_key<Source, Target>(
     generation: RunGenerationDigestValue,
-    source: NameSymbolTargetKey,
-    target: NameSymbolTargetKey,
+    source: Source,
+    target: Target,
     relation: HldRelationKindValue,
     via: HldViaKindValue,
-) -> HldGraphEdgeKey {
+) -> HldGraphEdgeKey
+where
+    Source: Into<HldTargetIdentityValue>,
+    Target: Into<HldTargetIdentityValue>,
+{
     HldGraphEdgeKey {
         run_generation_digest_value: generation,
-        edge_source_occurrence_key: source,
-        edge_target_reference_value: target,
+        edge_source_occurrence_key: source.into(),
+        edge_target_reference_value: target.into(),
         edge_relation_kind_value: relation,
         edge_collapse_via_kind: via,
     }
@@ -287,22 +307,27 @@ fn sum_hld_folder_rollups(records: &[HldFolderRollupRecord]) -> usize {
     records.iter().map(|record| record.edge_row_count).sum()
 }
 
-fn build_hld_path_record(
+fn build_hld_path_record<Source, Target, Endpoint>(
     generation: RunGenerationDigestValue,
-    source: NameSymbolTargetKey,
-    target: NameSymbolTargetKey,
+    source: Source,
+    target: Target,
     relation: HldRelationKindValue,
     via: HldViaKindValue,
-    endpoints: Vec<NameSymbolTargetKey>,
+    endpoints: Vec<Endpoint>,
     evidence: Vec<HldEvidenceRowKey>,
-) -> HldEvidencePathRecord {
+) -> HldEvidencePathRecord
+where
+    Source: Into<HldTargetIdentityValue>,
+    Target: Into<HldTargetIdentityValue>,
+    Endpoint: Into<HldTargetIdentityValue>,
+{
     let sites = evidence
         .iter()
         .map(|row| row.evidence_site_occurrence_key.clone())
         .collect();
     HldEvidencePathRecord {
         edge_key: expected_hld_edge_key(generation, source, target, relation, via),
-        ordered_endpoint_path: endpoints,
+        ordered_endpoint_path: endpoints.into_iter().map(Into::into).collect(),
         ordered_evidence_row_keys: evidence,
         ordered_site_occurrence_keys: sites,
     }
@@ -333,6 +358,270 @@ fn collect_hld_edge_counts(
         .iter()
         .map(|edge| (edge.edge_key.clone(), edge.edge_evidence_row_count))
         .collect()
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_hld_symbol_codec_unchanged() {
+    let target_identity = HldTargetIdentityValue::from(NameSymbolTargetKey::Builtin("u8".into()));
+    let encoded_identity =
+        crate::hld_materialization_duckdb_store::encode_hld_target_identity(&target_identity)
+            .unwrap();
+
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&encoded_identity).unwrap(),
+        serde_json::json!(["builtin", "u8"])
+    );
+}
+
+fn build_hld_area_input(
+    evidence_unit: &CrateCompilationUnitKey,
+    evidence_path: &str,
+    relation: HldRelationKindValue,
+) -> HldMaterializationInputRecord {
+    let generation = RunGenerationDigestValue([41; 32]);
+    let unit = build_hld_fixture_unit("structural-area", 41);
+    let path = "src/lib.rs";
+    let area = HldTargetIdentityValue::FilePublicArea(
+        parseltongue_core_row_types::FileAreaIdentityKey::build_file_area_identity(&unit, path)
+            .unwrap(),
+    );
+    let definition = build_hld_fixture_occurrence(&unit, path, 20, 42);
+    let item = HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(definition.clone()));
+    let site = build_hld_fixture_occurrence(evidence_unit, evidence_path, 20, 42);
+    let area_node = HldNodeInputRecord {
+        run_generation_digest_value: generation,
+        node_target_reference: area.clone(),
+        node_input_category: HldNodeInputCategory::FilePublicArea,
+        node_item_kind_value: Some(HldItemKindValue::FilePublicArea),
+        node_owner_kind_value: None,
+        node_function_body_ancestry_flag: false,
+        node_effective_visibility_kind: None,
+        node_reachable_outside_crate_flag: None,
+        node_source_relative_path: Some(path.into()),
+        node_qualified_path_text: "file:src/lib.rs".into(),
+        node_signature_text: None,
+    };
+    let mut item_node = build_hld_fixture_node(
+        generation,
+        NameSymbolTargetKey::Definition(definition),
+        HldNodeInputCategory::LocalItem,
+        Some(HldItemKindValue::Struct),
+        Some(HldOwnerKindValue::Module),
+        false,
+        Some(HldEffectiveVisibilityKind::Public),
+        false,
+        Some(path),
+        "crate::Item",
+    );
+    item_node.node_reachable_outside_crate_flag = None;
+    let mut provenance = vec![HldUnitProvenanceRecord {
+        unit_compilation_identity_key: unit.clone(),
+        unit_origin_kind: HldUnitOriginKind::Workspace,
+    }];
+    if evidence_unit != &unit {
+        provenance.push(HldUnitProvenanceRecord {
+            unit_compilation_identity_key: evidence_unit.clone(),
+            unit_origin_kind: HldUnitOriginKind::Workspace,
+        });
+    }
+    let mut input = build_hld_fixture_input(
+        generation,
+        provenance,
+        vec![area_node, item_node],
+        vec![build_hld_fixture_edge(
+            generation, area, item, relation, site,
+        )],
+    );
+    input.source_coverage_kind = HldSourceCoverageKind::OriginalTopLevelContainment;
+    input
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_area_edge_materialization_roundtrip() {
+    let evidence_unit = build_hld_fixture_unit("structural-area", 41);
+    let input = build_hld_area_input(&evidence_unit, "src/lib.rs", HldRelationKindValue::Contains);
+    let output = materialize_hld_fixture_graph(&input);
+    let area = input.input_node_records[0].node_target_reference.clone();
+    let item = input.input_node_records[1].node_target_reference.clone();
+    let edge = output.materialized_edge_records.first().unwrap();
+
+    assert_eq!(edge.edge_key.edge_source_occurrence_key, area);
+    assert_eq!(edge.edge_key.edge_target_reference_value, item);
+    assert_eq!(
+        edge.edge_key.edge_relation_kind_value,
+        HldRelationKindValue::Contains
+    );
+    assert_eq!(
+        edge.edge_key.edge_collapse_via_kind,
+        HldViaKindValue::Direct
+    );
+    assert!(
+        output
+            .selected_node_records
+            .iter()
+            .any(|node| node.node_target_reference == edge.edge_key.edge_source_occurrence_key)
+    );
+    assert!(
+        output
+            .selected_node_records
+            .iter()
+            .any(|node| node.node_target_reference == edge.edge_key.edge_target_reference_value)
+    );
+    assert!(output.evidence_path_records.iter().any(|path| {
+        path.ordered_endpoint_path
+            == vec![
+                edge.edge_key.edge_source_occurrence_key.clone(),
+                item.clone(),
+            ]
+            && path.ordered_evidence_row_keys
+                == vec![input.input_edge_records[0].edge_evidence_row_key.clone()]
+    }));
+    assert_eq!(edge.edge_evidence_row_count, 1);
+    let file_rollup = &output.file_rollup_records.as_ref().unwrap()[0];
+    let file_bucket = HldEndpointRollupBucket::SourceFile {
+        unit_compilation_identity_key: evidence_unit.clone(),
+        file_source_relative_path: "src/lib.rs".into(),
+    };
+    assert_eq!(file_rollup.source_endpoint_bucket, file_bucket);
+    assert_eq!(file_rollup.target_endpoint_bucket, file_bucket);
+    assert_eq!(
+        file_rollup.edge_relation_kind_value,
+        HldRelationKindValue::Contains
+    );
+    assert_eq!(file_rollup.edge_collapse_via_kind, HldViaKindValue::Direct);
+    assert_eq!(file_rollup.edge_row_count, 1);
+    let folder_rollup = &output.folder_rollup_records.as_ref().unwrap()[0];
+    let folder_bucket = HldFolderEndpointBucket::SourceFolder {
+        unit_compilation_identity_key: evidence_unit,
+        folder_source_relative_path: "src".into(),
+    };
+    assert_eq!(folder_rollup.source_folder_bucket, folder_bucket);
+    assert_eq!(folder_rollup.target_folder_bucket, folder_bucket);
+    assert_eq!(
+        folder_rollup.edge_relation_kind_value,
+        HldRelationKindValue::Contains
+    );
+    assert_eq!(
+        folder_rollup.edge_collapse_via_kind,
+        HldViaKindValue::Direct
+    );
+    assert_eq!(folder_rollup.edge_row_count, 1);
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_area_evidence_path_rejected() {
+    let unit = build_hld_fixture_unit("area-path", 42);
+    let input = build_hld_area_input(&unit, "src/other.rs", HldRelationKindValue::Contains);
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::InvalidEvidenceIdentity)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_area_evidence_unit_rejected() {
+    let other_unit = build_hld_fixture_unit("area-other-unit", 43);
+    let input = build_hld_area_input(&other_unit, "src/lib.rs", HldRelationKindValue::Contains);
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::InvalidEvidenceIdentity)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_structural_imports_edge_rejected() {
+    let unit = build_hld_fixture_unit("structural-imports", 44);
+    let input = build_hld_area_input(&unit, "src/lib.rs", HldRelationKindValue::Imports);
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::StructuralScopeAllowsContainsOnly)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_structural_local_source_rejected() {
+    let unit = build_hld_fixture_unit("structural-local", 45);
+    let mut input = build_hld_area_input(&unit, "src/lib.rs", HldRelationKindValue::Contains);
+    let item = input.input_node_records[1].node_target_reference.clone();
+    input.input_edge_records[0].edge_source_reference = item.clone();
+    input.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_source_occurrence_key = item;
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::InvalidEdgeRecord)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_structural_expanded_node_rejected() {
+    let unit = build_hld_fixture_unit("structural-expanded", 49);
+    let mut input = build_hld_area_input(&unit, "src/lib.rs", HldRelationKindValue::Contains);
+    let expanded = SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+        &unit,
+        "src/lib.rs",
+        SpanByteRangeValue::try_from((20, 21)).unwrap(),
+        SpanDigestIdValue::from([49; 32]),
+        &[[49; 32]],
+    )
+    .unwrap();
+    let target = HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(expanded.clone()));
+    input.input_node_records[1].node_target_reference = target.clone();
+    input.input_edge_records[0].edge_resolution_value = HldEdgeResolutionValue::Extracted {
+        target: target.clone(),
+    };
+    input.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_site_occurrence_key = expanded.clone();
+    input.input_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_target_reference_value = Some(target);
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::InvalidNodeCategory)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_semantic_unknown_reachability_rejected() {
+    let (mut input, _, _, _) = build_hld_validation_input();
+    input.input_node_records[1].node_reachable_outside_crate_flag = None;
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::UnknownReachability)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_area_signature_rejected() {
+    let unit = build_hld_fixture_unit("area-signature", 46);
+    let mut input = build_hld_area_input(&unit, "src/lib.rs", HldRelationKindValue::Contains);
+    input.input_node_records[0].node_signature_text = Some("fake".into());
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::InvalidNodeCategory)
+    );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_local_area_kind_rejected() {
+    let unit = build_hld_fixture_unit("local-area-kind", 47);
+    let mut input = build_hld_area_input(&unit, "src/lib.rs", HldRelationKindValue::Contains);
+    input.input_node_records[1].node_item_kind_value = Some(HldItemKindValue::FilePublicArea);
+    assert_eq!(
+        validate_hld_materialization_input(&input),
+        Err(HldMaterializationValidationError::InvalidNodeCategory)
+    );
 }
 
 /// REQ-RUST-030.0 / REQ-RUST-019.1
@@ -424,6 +713,27 @@ fn test_hld_node_visibility_rules() {
                 "crate::module::private_item",
             ),
             false,
+        ),
+        (
+            "private use statement",
+            build_hld_fixture_node(
+                generation,
+                NameSymbolTargetKey::Definition(build_hld_fixture_occurrence(
+                    &unit_identity,
+                    "src/use.rs",
+                    5,
+                    5,
+                )),
+                HldNodeInputCategory::LocalItem,
+                Some(HldItemKindValue::UseStatement),
+                Some(HldOwnerKindValue::Module),
+                false,
+                Some(HldEffectiveVisibilityKind::PrivateEquivalent),
+                false,
+                Some("src/use.rs"),
+                "crate::private_use",
+            ),
+            true,
         ),
         (
             "function body item",
@@ -733,36 +1043,36 @@ fn test_hld_direct_edge_projection() {
     let expected_edge_keys = [
         HldGraphEdgeKey {
             run_generation_digest_value: generation,
-            edge_source_occurrence_key: source_key.clone(),
-            edge_target_reference_value: declaration_key.clone(),
+            edge_source_occurrence_key: source_key.clone().into(),
+            edge_target_reference_value: declaration_key.clone().into(),
             edge_relation_kind_value: HldRelationKindValue::Calls,
             edge_collapse_via_kind: HldViaKindValue::Direct,
         },
         HldGraphEdgeKey {
             run_generation_digest_value: generation,
-            edge_source_occurrence_key: root_key.clone(),
-            edge_target_reference_value: source_key.clone(),
+            edge_source_occurrence_key: root_key.clone().into(),
+            edge_target_reference_value: source_key.clone().into(),
             edge_relation_kind_value: HldRelationKindValue::Contains,
             edge_collapse_via_kind: HldViaKindValue::Direct,
         },
         HldGraphEdgeKey {
             run_generation_digest_value: generation,
-            edge_source_occurrence_key: source_key.clone(),
-            edge_target_reference_value: builtin_key.clone(),
+            edge_source_occurrence_key: source_key.clone().into(),
+            edge_target_reference_value: builtin_key.clone().into(),
             edge_relation_kind_value: HldRelationKindValue::UsesType,
             edge_collapse_via_kind: HldViaKindValue::Direct,
         },
         HldGraphEdgeKey {
             run_generation_digest_value: generation,
-            edge_source_occurrence_key: source_key.clone(),
-            edge_target_reference_value: external_definition_key.clone(),
+            edge_source_occurrence_key: source_key.clone().into(),
+            edge_target_reference_value: external_definition_key.clone().into(),
             edge_relation_kind_value: HldRelationKindValue::Calls,
             edge_collapse_via_kind: HldViaKindValue::Direct,
         },
         HldGraphEdgeKey {
             run_generation_digest_value: generation,
-            edge_source_occurrence_key: source_key.clone(),
-            edge_target_reference_value: standard_definition_key.clone(),
+            edge_source_occurrence_key: source_key.clone().into(),
+            edge_target_reference_value: standard_definition_key.clone().into(),
             edge_relation_kind_value: HldRelationKindValue::Calls,
             edge_collapse_via_kind: HldViaKindValue::Direct,
         },
@@ -840,6 +1150,7 @@ fn test_hld_direct_edge_projection() {
             ),
         ]
         .into_iter()
+        .map(|(target, origin)| (target.into(), origin))
         .collect()
     );
 
@@ -1089,14 +1400,14 @@ fn build_hld_validation_input() -> (
 
 fn set_hld_builtin_target(input: &mut HldMaterializationInputRecord, name: &str) {
     let target = NameSymbolTargetKey::Builtin(name.into());
-    input.input_node_records[2].node_target_reference = target.clone();
+    input.input_node_records[2].node_target_reference = target.clone().into();
     input.input_node_records[2].node_qualified_path_text = name.into();
     input.input_edge_records[0].edge_resolution_value = HldEdgeResolutionValue::Extracted {
-        target: target.clone(),
+        target: target.clone().into(),
     };
     input.input_edge_records[0]
         .edge_evidence_row_key
-        .evidence_target_reference_value = Some(target);
+        .evidence_target_reference_value = Some(target.into());
 }
 
 fn collect_hld_validation_failures(
@@ -1302,11 +1613,11 @@ fn test_hld_invalid_input_rejection() {
     let mut missing_target = base_input.clone();
     missing_target.input_edge_records[0].edge_resolution_value =
         HldEdgeResolutionValue::Extracted {
-            target: missing_endpoint.clone(),
+            target: missing_endpoint.clone().into(),
         };
     missing_target.input_edge_records[0]
         .edge_evidence_row_key
-        .evidence_target_reference_value = Some(missing_endpoint);
+        .evidence_target_reference_value = Some(missing_endpoint.into());
     cases.push((
         "missing endpoint",
         missing_target,
@@ -1359,13 +1670,13 @@ fn test_hld_invalid_input_rejection() {
     for (resolution, evidence_target) in [
         (
             HldEdgeResolutionValue::Inferred {
-                candidate_target: Some(target_key.clone()),
+                candidate_target: Some(target_key.clone().into()),
             },
             Some(target_key.clone()),
         ),
         (
             HldEdgeResolutionValue::Proposed {
-                candidate_target: Some(target_key.clone()),
+                candidate_target: Some(target_key.clone().into()),
             },
             Some(target_key.clone()),
         ),
@@ -1380,7 +1691,7 @@ fn test_hld_invalid_input_rejection() {
         input.input_edge_records[0].edge_resolution_value = resolution.clone();
         input.input_edge_records[0]
             .edge_evidence_row_key
-            .evidence_target_reference_value = evidence_target;
+            .evidence_target_reference_value = evidence_target.map(Into::into);
         let output = materialize_hld_fixture_graph(&input);
         assert!(output.materialized_edge_records.is_empty());
         assert_eq!(
@@ -1917,6 +2228,181 @@ fn test_hld_diamond_evidence_union() {
         collapsed_same_endpoint_paths[0].ordered_evidence_row_keys,
         collapsed_same_endpoint_paths[1].ordered_evidence_row_keys
     );
+}
+
+/// REQ-RUST-040.0
+#[test]
+fn test_hld_recursive_edge_guards() {
+    let generation = RunGenerationDigestValue([48; 32]);
+    let unit = build_hld_fixture_unit("recursive-guards", 48);
+    let nodes = [
+        ("contains-source", 1, HldEffectiveVisibilityKind::Public),
+        (
+            "contains-private",
+            2,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        ("contains-target", 3, HldEffectiveVisibilityKind::Public),
+        ("imports-source", 4, HldEffectiveVisibilityKind::Public),
+        (
+            "imports-private",
+            5,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        ("imports-target", 6, HldEffectiveVisibilityKind::Public),
+        ("contains-hop-source", 7, HldEffectiveVisibilityKind::Public),
+        (
+            "contains-hop-private",
+            8,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        (
+            "contains-hop-next",
+            9,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        (
+            "contains-hop-target",
+            10,
+            HldEffectiveVisibilityKind::Public,
+        ),
+        ("imports-hop-source", 11, HldEffectiveVisibilityKind::Public),
+        (
+            "imports-hop-private",
+            12,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        (
+            "imports-hop-next",
+            13,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        ("imports-hop-target", 14, HldEffectiveVisibilityKind::Public),
+        ("reads-source", 15, HldEffectiveVisibilityKind::Public),
+        (
+            "reads-private",
+            16,
+            HldEffectiveVisibilityKind::PrivateEquivalent,
+        ),
+        ("reads-target", 17, HldEffectiveVisibilityKind::Public),
+        (
+            "direct-contains-source",
+            18,
+            HldEffectiveVisibilityKind::Public,
+        ),
+        (
+            "direct-contains-target",
+            19,
+            HldEffectiveVisibilityKind::Public,
+        ),
+        (
+            "direct-imports-source",
+            20,
+            HldEffectiveVisibilityKind::Public,
+        ),
+        (
+            "direct-imports-target",
+            21,
+            HldEffectiveVisibilityKind::Public,
+        ),
+    ]
+    .into_iter()
+    .map(|(name, offset, visibility)| {
+        build_hld_path_node(generation, &unit, name, offset, visibility, name)
+    })
+    .collect::<Vec<_>>();
+    let keys = nodes
+        .iter()
+        .map(|node| node.node_target_reference.clone())
+        .collect::<Vec<_>>();
+    let edge = |source, target, relation, site: &str, offset| {
+        build_hld_path_edge(
+            generation,
+            &unit,
+            &keys[source],
+            &keys[target],
+            relation,
+            site,
+            offset,
+        )
+    };
+    let input = build_hld_path_input(
+        generation,
+        &unit,
+        nodes,
+        vec![
+            edge(0, 1, HldRelationKindValue::Contains, "contains-first", 22),
+            edge(1, 2, HldRelationKindValue::Calls, "contains-next", 23),
+            edge(3, 4, HldRelationKindValue::Imports, "imports-first", 24),
+            edge(4, 5, HldRelationKindValue::Calls, "imports-next", 25),
+            edge(6, 7, HldRelationKindValue::Calls, "contains-hop-first", 26),
+            edge(7, 8, HldRelationKindValue::Contains, "contains-hop", 27),
+            edge(8, 9, HldRelationKindValue::Calls, "contains-hop-last", 28),
+            edge(10, 11, HldRelationKindValue::Calls, "imports-hop-first", 29),
+            edge(11, 12, HldRelationKindValue::Imports, "imports-hop", 30),
+            edge(12, 13, HldRelationKindValue::Calls, "imports-hop-last", 31),
+            edge(14, 15, HldRelationKindValue::Reads, "reads-first", 32),
+            edge(15, 16, HldRelationKindValue::Reads, "reads-last", 33),
+            edge(
+                17,
+                18,
+                HldRelationKindValue::Contains,
+                "direct-contains",
+                34,
+            ),
+            edge(19, 20, HldRelationKindValue::Imports, "direct-imports", 35),
+        ],
+    );
+    let output = materialize_hld_fixture_graph(&input);
+    let has_edge = |source, target, relation, via| {
+        output.materialized_edge_records.iter().any(|edge| {
+            edge.edge_key
+                == expected_hld_edge_key(generation, &keys[source], &keys[target], relation, via)
+        })
+    };
+
+    assert!(!has_edge(
+        0,
+        2,
+        HldRelationKindValue::Contains,
+        HldViaKindValue::Collapsed
+    ));
+    assert!(!has_edge(
+        3,
+        5,
+        HldRelationKindValue::Imports,
+        HldViaKindValue::Collapsed
+    ));
+    assert!(!has_edge(
+        6,
+        9,
+        HldRelationKindValue::Calls,
+        HldViaKindValue::Collapsed
+    ));
+    assert!(!has_edge(
+        10,
+        13,
+        HldRelationKindValue::Calls,
+        HldViaKindValue::Collapsed
+    ));
+    assert!(has_edge(
+        14,
+        16,
+        HldRelationKindValue::Reads,
+        HldViaKindValue::Collapsed
+    ));
+    assert!(has_edge(
+        17,
+        18,
+        HldRelationKindValue::Contains,
+        HldViaKindValue::Direct
+    ));
+    assert!(has_edge(
+        19,
+        20,
+        HldRelationKindValue::Imports,
+        HldViaKindValue::Direct
+    ));
 }
 
 /// REQ-RUST-030.0
@@ -2774,7 +3260,7 @@ fn test_hld_rollup_bucket_context() {
         build_hld_file_rollup(
             main_file.clone(),
             HldEndpointRollupBucket::CanonicalExternalIdentity {
-                endpoint_target_reference: missing_key.clone(),
+                endpoint_target_reference: missing_key.clone().into(),
             },
             HldRelationKindValue::UsesType,
             HldViaKindValue::Direct,
@@ -2783,7 +3269,7 @@ fn test_hld_rollup_bucket_context() {
         build_hld_file_rollup(
             main_file.clone(),
             HldEndpointRollupBucket::CanonicalExternalIdentity {
-                endpoint_target_reference: builtin_key.clone(),
+                endpoint_target_reference: builtin_key.clone().into(),
             },
             HldRelationKindValue::Implements,
             HldViaKindValue::Direct,
@@ -2820,7 +3306,7 @@ fn test_hld_rollup_bucket_context() {
         build_hld_folder_rollup(
             hld_source_folder_bucket(first_unit.clone(), "src"),
             HldFolderEndpointBucket::CanonicalExternalIdentity {
-                endpoint_target_reference: missing_key,
+                endpoint_target_reference: missing_key.into(),
             },
             HldRelationKindValue::UsesType,
             HldViaKindValue::Direct,
@@ -2829,7 +3315,7 @@ fn test_hld_rollup_bucket_context() {
         build_hld_folder_rollup(
             hld_source_folder_bucket(first_unit, "src"),
             HldFolderEndpointBucket::CanonicalExternalIdentity {
-                endpoint_target_reference: builtin_key,
+                endpoint_target_reference: builtin_key.into(),
             },
             HldRelationKindValue::Implements,
             HldViaKindValue::Direct,
@@ -2980,4 +3466,356 @@ fn test_hld_order_attempt_determinism() {
     assert!(empty_output.evidence_path_records.is_empty());
     assert_eq!(empty_output.file_rollup_records, Some(Vec::new()));
     assert_eq!(empty_output.folder_rollup_records, Some(Vec::new()));
+}
+
+fn encode_fixture_generation_text(generation: RunGenerationDigestValue) -> String {
+    generation
+        .0
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn build_hld_publication_scope(
+    generation: RunGenerationDigestValue,
+    attempt: &str,
+) -> StageRunScopeValue {
+    StageRunScopeValue {
+        run_generation_digest_value: encode_fixture_generation_text(generation),
+        stage_attempt_sequence_value: attempt.into(),
+    }
+}
+
+fn write_hld_publication_marker(
+    store: &TursoWorkspaceStoreAdapter,
+    scope: &StageRunScopeValue,
+    stage: &str,
+) {
+    store
+        .write_stage_table_unit(
+            &StageUnitWriteRequest {
+                stage_run_scope_value: scope,
+                stage_owner_name_value: stage,
+                stage_unit_work_key: "__complete__",
+                stage_input_stage_names: &[],
+                stage_unit_output_rows: &[],
+            },
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+}
+
+fn complete_hld_publication_stages(store: &TursoWorkspaceStoreAdapter, scope: &StageRunScopeValue) {
+    for stage in [
+        "crate-graph",
+        "source-ingest",
+        "syntax-spans",
+        "syntax-namespace-input-records",
+        "name-resolution",
+        "signature-type-lowering-stage",
+        "item-effective-visibility-stage",
+        "semantic-edge-evidence-stage",
+    ] {
+        write_hld_publication_marker(store, scope, stage);
+    }
+}
+
+fn seal_hld_publication_snapshot(
+    store: &TursoWorkspaceStoreAdapter,
+    scope: &StageRunScopeValue,
+) -> StageRunScopeValue {
+    store
+        .publish_workspace_generation_manifest(
+            scope,
+            &scope.run_generation_digest_value,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap()
+}
+
+#[test]
+/// REQ-RUST-031.0
+fn test_hld_publication_round_trip() {
+    let (input, unit_identity, _, _) = build_hld_validation_input();
+    let output = materialize_hld_fixture_graph(&input);
+    assert_eq!(
+        output.output_completeness_kind,
+        HldOutputCompletenessKind::CompleteGraph
+    );
+    assert!(!output.selected_node_records.is_empty());
+    assert!(!output.materialized_edge_records.is_empty());
+    let store = TursoWorkspaceStoreAdapter::open_turso_workspace_store(":memory:").unwrap();
+    store.initialize_workspace_stage_schema().unwrap();
+    let old_generation = input.run_generation_digest_value;
+    let old_scope = build_hld_publication_scope(old_generation, "old-attempt");
+    complete_hld_publication_stages(&store, &old_scope);
+    let old_frozen = seal_hld_publication_snapshot(&store, &old_scope);
+    let old_output = output.clone();
+    let old_published = store
+        .publish_hld_graph_materialization(
+            &old_frozen,
+            &old_scope,
+            &old_output,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    let new_scope = build_hld_publication_scope(input.run_generation_digest_value, "new-attempt");
+    complete_hld_publication_stages(&store, &new_scope);
+    let new_frozen = seal_hld_publication_snapshot(&store, &new_scope);
+    let published = store
+        .publish_hld_graph_materialization(
+            &new_frozen,
+            &new_scope,
+            &output,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    let table_counts = [
+        (
+            "hld-current-interface-nodes",
+            output.selected_node_records.len(),
+        ),
+        (
+            "hld-current-dependency-edges",
+            output.materialized_edge_records.len(),
+        ),
+        (
+            "hld-edge-evidence-paths",
+            output.evidence_path_records.len(),
+        ),
+        (
+            "hld-file-level-rollup",
+            output.file_rollup_records.as_ref().unwrap().len(),
+        ),
+        (
+            "hld-folder-level-rollup",
+            output.folder_rollup_records.as_ref().unwrap().len(),
+        ),
+    ];
+    for (table, expected_count) in table_counts {
+        let new_rows = store.read_stage_table_rows(&published, table).unwrap();
+        let old_rows = store.read_stage_table_rows(&old_published, table).unwrap();
+        assert_eq!(new_rows.len(), expected_count, "{table}");
+        assert_eq!(old_rows.len(), expected_count, "{table}");
+        assert!(new_rows.iter().all(|row| {
+            serde_json::from_str::<serde_json::Value>(&row.stage_row_payload_text).is_ok()
+        }));
+        let mut new_semantic_rows = new_rows
+            .into_iter()
+            .map(|row| (row.stage_row_record_key, row.stage_row_payload_text))
+            .collect::<Vec<_>>();
+        let mut old_semantic_rows = old_rows
+            .into_iter()
+            .map(|row| (row.stage_row_record_key, row.stage_row_payload_text))
+            .collect::<Vec<_>>();
+        new_semantic_rows.sort_unstable();
+        old_semantic_rows.sort_unstable();
+        assert_eq!(new_semantic_rows, old_semantic_rows, "{table}");
+    }
+    let unit_identity_json = serde_json::json!({
+        "cargo_package_identifier": unit_identity.unit_cargo_package_identifier,
+        "cargo_target_name": unit_identity.unit_cargo_target_name,
+        "cargo_target_kind": unit_identity.unit_cargo_target_kind,
+        "compilation_role_kind": "Target",
+        "configuration_digest_full": vec![21_u8; 32]
+    });
+    let source_occurrence_json = serde_json::json!({
+        "unit_compilation_identity": unit_identity_json,
+        "source_file_path": "src/source.rs",
+        "byte_range": [1, 2],
+        "content_digest_full": vec![1_u8; 32],
+        "expansion_provenance_chain": []
+    });
+    let source_identity_json = serde_json::json!({
+        "kind": "Definition",
+        "occurrence_identity": source_occurrence_json
+    });
+    let builtin_identity_json = serde_json::json!({
+        "kind": "Builtin",
+        "builtin_name": "u8"
+    });
+    let expected_edge_key = serde_json::json!({
+        "generation_digest_full": vec![21_u8; 32],
+        "source_target_identity": source_identity_json,
+        "target_identity": builtin_identity_json,
+        "relation_kind": "Calls",
+        "via_kind": "Direct"
+    });
+    let expected_site_occurrence_json = serde_json::json!({
+        "unit_compilation_identity": unit_identity_json,
+        "source_file_path": "src/callsite.rs",
+        "byte_range": [8, 9],
+        "content_digest_full": vec![8_u8; 32],
+        "expansion_provenance_chain": []
+    });
+    let expected_evidence_identity = serde_json::json!({
+        "site_occurrence_identity": expected_site_occurrence_json,
+        "source_target_identity": source_identity_json,
+        "relation_kind": "Calls",
+        "target_identity": builtin_identity_json
+    });
+    let new_nodes = store
+        .read_stage_table_rows(&published, "hld-current-interface-nodes")
+        .unwrap();
+    let source_node = new_nodes
+        .iter()
+        .find(|row| {
+            serde_json::from_str::<serde_json::Value>(&row.stage_row_payload_text)
+                .is_ok_and(|payload| payload["node_qualified_path_text"] == "crate::source")
+        })
+        .unwrap();
+    let expected_node_key = serde_json::json!({
+        "generation_digest_full": vec![21_u8; 32],
+        "node_target_identity": source_identity_json
+    });
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&source_node.stage_row_record_key).unwrap(),
+        expected_node_key
+    );
+    let source_node_payload: serde_json::Value =
+        serde_json::from_str(&source_node.stage_row_payload_text).unwrap();
+    assert_eq!(
+        source_node_payload["node_target_identity"],
+        source_identity_json
+    );
+    assert_eq!(
+        source_node_payload["node_source_relative_path"],
+        "src/source.rs"
+    );
+    assert_eq!(
+        source_node_payload["node_effective_visibility_kind"],
+        "Public"
+    );
+    assert_eq!(
+        source_node_payload["node_signature_text"],
+        serde_json::Value::Null
+    );
+
+    let new_edges = store
+        .read_stage_table_rows(&published, "hld-current-dependency-edges")
+        .unwrap();
+    let edge_payload: serde_json::Value =
+        serde_json::from_str(&new_edges[0].stage_row_payload_text).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&new_edges[0].stage_row_record_key).unwrap(),
+        expected_edge_key
+    );
+    assert_eq!(edge_payload["edge_key"], expected_edge_key);
+    assert_eq!(edge_payload["edge_source_qualified_path"], "crate::source");
+    assert_eq!(edge_payload["edge_target_qualified_path"], "u8");
+    assert_eq!(
+        edge_payload["edge_source_signature_text"],
+        serde_json::Value::Null
+    );
+    assert_eq!(
+        edge_payload["edge_target_signature_text"],
+        serde_json::Value::Null
+    );
+    assert_eq!(edge_payload["edge_resolution_status_kind"], "Extracted");
+    assert_eq!(edge_payload["edge_evidence_row_count"], 1);
+    assert_eq!(
+        edge_payload["edge_dependency_origin_kind"],
+        "StandardLibrary"
+    );
+
+    let paths = store
+        .read_stage_table_rows(&published, "hld-edge-evidence-paths")
+        .unwrap();
+    let path_key: serde_json::Value = serde_json::from_str(&paths[0].stage_row_record_key).unwrap();
+    assert_eq!(path_key["edge_key"], expected_edge_key);
+    assert_eq!(
+        path_key["ordered_endpoint_identities"],
+        serde_json::json!([source_identity_json, builtin_identity_json])
+    );
+    assert_eq!(
+        path_key["ordered_proof_identities"],
+        serde_json::json!([expected_evidence_identity])
+    );
+    let path_payload: serde_json::Value =
+        serde_json::from_str(&paths[0].stage_row_payload_text).unwrap();
+    assert_eq!(
+        path_payload["ordered_endpoint_path"],
+        serde_json::json!([source_identity_json, builtin_identity_json])
+    );
+    assert_eq!(
+        path_payload["ordered_evidence_row_keys"],
+        serde_json::json!([expected_evidence_identity])
+    );
+    assert_eq!(
+        path_payload["ordered_site_occurrence_keys"],
+        serde_json::json!([expected_site_occurrence_json])
+    );
+
+    let file_rollups = store
+        .read_stage_table_rows(&published, "hld-file-level-rollup")
+        .unwrap();
+    let file_payload: serde_json::Value =
+        serde_json::from_str(&file_rollups[0].stage_row_payload_text).unwrap();
+    assert_eq!(file_payload["source_endpoint_bucket"]["kind"], "SourceFile");
+    assert_eq!(
+        file_payload["source_endpoint_bucket"]["unit_compilation_identity"],
+        unit_identity_json
+    );
+    assert_eq!(
+        file_payload["source_endpoint_bucket"]["file_source_relative_path"],
+        "src/source.rs"
+    );
+    assert_eq!(
+        file_payload["target_endpoint_bucket"]["kind"],
+        "CanonicalExternalIdentity"
+    );
+    assert_eq!(
+        file_payload["target_endpoint_bucket"]["endpoint_target_identity"],
+        builtin_identity_json
+    );
+    assert_eq!(file_payload["relation_kind"], "Calls");
+    assert_eq!(file_payload["via_kind"], "Direct");
+    assert_eq!(file_payload["edge_row_count"], 1);
+
+    let folder_rollups = store
+        .read_stage_table_rows(&published, "hld-folder-level-rollup")
+        .unwrap();
+    let folder_payload: serde_json::Value =
+        serde_json::from_str(&folder_rollups[0].stage_row_payload_text).unwrap();
+    assert_eq!(
+        folder_payload["source_folder_bucket"]["kind"],
+        "SourceFolder"
+    );
+    assert_eq!(
+        folder_payload["source_folder_bucket"]["unit_compilation_identity"],
+        unit_identity_json
+    );
+    assert_eq!(
+        folder_payload["source_folder_bucket"]["folder_source_relative_path"],
+        "src"
+    );
+    assert_eq!(
+        folder_payload["target_folder_bucket"]["kind"],
+        "CanonicalExternalIdentity"
+    );
+    assert_eq!(
+        folder_payload["target_folder_bucket"]["endpoint_target_identity"],
+        builtin_identity_json
+    );
+    assert_eq!(folder_payload["relation_kind"], "Calls");
+    assert_eq!(folder_payload["via_kind"], "Direct");
+    assert_eq!(folder_payload["edge_row_count"], 1);
+    let markers = store
+        .read_stage_table_rows(&published, "stage-run-generation-records")
+        .unwrap();
+    let global = markers
+        .iter()
+        .find(|row| {
+            row.stage_row_record_key == "__marker__/hld-current-materialization-stage/__complete__"
+        })
+        .unwrap();
+    let metadata: serde_json::Value = serde_json::from_str(&global.stage_row_payload_text).unwrap();
+    assert_eq!(
+        metadata["input_snapshot_attempt_key"],
+        new_frozen.stage_attempt_sequence_value
+    );
+    assert_eq!(
+        store.read_workspace_publication_scope().unwrap(),
+        Some(published)
+    );
 }

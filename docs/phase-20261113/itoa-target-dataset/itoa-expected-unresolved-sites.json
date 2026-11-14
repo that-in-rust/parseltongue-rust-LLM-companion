@@ -1,0 +1,235 @@
+{
+  "artifact_status": "BLOCKED_DIAGNOSTIC_EXPECTATIONS",
+  "rows": [
+    {
+      "anchor": "assert!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "body_macro",
+      "line": 138,
+      "occurrences": 5,
+      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "assert!(",
+        "byte_range": [
+          4192,
+          4200
+        ],
+        "line": 138,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "assert!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "body_macro",
+      "line": 139,
+      "occurrences": 5,
+      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "assert!(",
+        "byte_range": [
+          4246,
+          4254
+        ],
+        "line": 139,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "assert!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "body_macro",
+      "line": 140,
+      "occurrences": 5,
+      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "assert!(",
+        "byte_range": [
+          4305,
+          4313
+        ],
+        "line": 140,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "debug_assert!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "body_macro",
+      "line": 232,
+      "occurrences": 1,
+      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "debug_assert!(",
+        "byte_range": [
+          7665,
+          7679
+        ],
+        "line": 232,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "use no_panic::no_panic;",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "use",
+      "line": 60,
+      "occurrences": 1,
+      "reason": "cfg_inactive(feature no-panic off)",
+      "reason_candidate": "cfg_inactive(feature no-panic off)",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "use no_panic::no_panic;",
+        "byte_range": [
+          2091,
+          2114
+        ],
+        "line": 60,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "use no_panic::no_panic;",
+      "eligibility_status": "BLOCKED",
+      "file": "src/u128_ext.rs",
+      "kind": "use",
+      "line": 2,
+      "occurrences": 1,
+      "reason": "cfg_inactive(feature no-panic off)",
+      "reason_candidate": "cfg_inactive(feature no-panic off)",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "use no_panic::no_panic;",
+        "byte_range": [
+          29,
+          52
+        ],
+        "line": 2,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/u128_ext.rs",
+        "source_sha256": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+      }
+    },
+    {
+      "anchor": "impl_Integer_size!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "item_macro",
+      "line": 211,
+      "occurrences": 1,
+      "reason": "cfg_inactive(target_pointer_width is 64)",
+      "reason_candidate": "cfg_inactive(target_pointer_width is 64)",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(",
+        "byte_range": [
+          6686,
+          6705
+        ],
+        "line": 211,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "impl_Integer_size!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "item_macro",
+      "line": 212,
+      "occurrences": 1,
+      "reason": "cfg_inactive(target_pointer_width is 64)",
+      "reason_candidate": "cfg_inactive(target_pointer_width is 64)",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(",
+        "byte_range": [
+          6756,
+          6775
+        ],
+        "line": 212,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "impl_Integer_size!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "item_macro",
+      "line": 213,
+      "occurrences": 1,
+      "reason": "cfg_inactive(target_pointer_width is 64)",
+      "reason_candidate": "cfg_inactive(target_pointer_width is 64)",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(",
+        "byte_range": [
+          6826,
+          6845
+        ],
+        "line": 213,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "anchor": "impl_Integer_size!(",
+      "eligibility_status": "BLOCKED",
+      "file": "src/lib.rs",
+      "kind": "item_macro",
+      "line": 214,
+      "occurrences": 1,
+      "reason": "cfg_inactive(target_pointer_width is 64)",
+      "reason_candidate": "cfg_inactive(target_pointer_width is 64)",
+      "reason_claim_status": "NOT_ASSERTED",
+      "reason_verified": false,
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(",
+        "byte_range": [
+          6896,
+          6915
+        ],
+        "line": 214,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    }
+  ]
+}

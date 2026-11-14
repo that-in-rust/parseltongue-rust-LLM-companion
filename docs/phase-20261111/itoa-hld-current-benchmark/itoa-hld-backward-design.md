@@ -1,5 +1,11 @@
 # itoa HLD backward design
 
+> Revision 2026-11-13: SPEC REQ-RUST-032.0 / 019.2 / 030.1 now govern. The full dependency
+> graph is built first and the HLD is derived from it; private items and `use` lines are
+> full-graph nodes; `imports` and `reads` are relation kinds; collapse never walks `contains`
+> or `imports`. Where this file says private helpers "remain evidence" or lists six relation
+> kinds, read it as the interface level only. Rules: `docs/phase-20261113/ARCH-phase-20261113-pipeline-graph-tables.md` section 5.
+
 ## 1. Rust Work Mode
 
 **Spec Mode + Delivery Mode + Reliability Mode.** Component: Rust analysis

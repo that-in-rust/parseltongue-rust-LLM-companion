@@ -429,11 +429,11 @@ If the model misses ordinary public declarations, improve the representation or 
 
 ## Relationship to Current Parseltongue
 
-The current workspace declares Tree-sitter language bindings, Cozo storage, Notify file watching, and graph-related dependencies in [Cargo.toml](../Cargo.toml). This specialized research targets Rust input even though the current application supports other languages.
+The current workspace declares Tree-sitter language bindings, Cozo storage, Notify file watching, and graph-related dependencies in [Cargo.toml](../../../Cargo.toml). This specialized research targets Rust input even though the current application supports other languages.
 
 The existing [query extractor](../crates/parseltongue-core/src/query_extractor.rs) produces parsed entities and dependency edges. Its ownership helper chooses a containing entity using line ranges. The existing [adjacency representation](../crates/parseltongue-core/src/graph_analysis/adjacency_list_graph_representation.rs) builds graph state from edge triples. These are possible integration points, not implementations of the richer proposal.
 
-Keep the new construction engine behind an extraction boundary so model-led and deterministic results can be compared in the same application. No backend migration is required to test the idea. The separate [research004 architecture](../docs/research004/Arch-v202607210.md) proposes Turso, but the current workspace is not already that rewrite.
+Keep the new construction engine behind an extraction boundary so model-led and deterministic results can be compared in the same application. No backend migration is required to test the idea. The separate [research004 architecture](../Arch-v202607210.md) proposes Turso, but the current workspace is not already that rewrite.
 
 The [Lossfunk experiment brief](01-small-model-interface-graph-research.md) now distinguishes a graph constructor from a candidate ranker. The former tests the application; the latter tests whether a useful improvement can be gained with less learning. Keep those claims separate.
 

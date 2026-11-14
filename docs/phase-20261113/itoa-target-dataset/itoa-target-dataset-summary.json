@@ -1,0 +1,87 @@
+{
+  "artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
+  "blocker_counts": {
+    "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 119,
+    "EXTERNAL_TRAIT_VISIBILITY_UNVERIFIED": 8,
+    "INFERRED_CORE_DEPENDENT_CALL_UNDECIDED": 12,
+    "MACRO_FILE_ASSIGNMENT_UNRESOLVED": 324,
+    "OD-2_MACRO_OWNERSHIP_UNDECIDED": 324,
+    "OD-7_OWNERSHIP_UNDECIDED": 2,
+    "OD-8_NON_FUNCTION_RULE_UNDECIDED": 56,
+    "SOURCE_ITEM_IDENTITY_UNVERIFIED": 29,
+    "SOURCE_SITE_RANGE_UNVERIFIED": 85
+  },
+  "candidate_provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NOT_FROZEN",
+    "status": "LLM_PARSED_DRAFT"
+  },
+  "collapse_policy": {
+    "OD-9": "OPEN_ALTERNATE_PROPOSAL",
+    "current_decided_relations": [
+      "calls",
+      "derives",
+      "implements",
+      "reads",
+      "reexports",
+      "uses_type"
+    ],
+    "derived_collapsed_rows": 0,
+    "forbidden_at_every_hop": [
+      "contains",
+      "imports"
+    ],
+    "od9_suppression_applied": false
+  },
+  "counts": {
+    "blocked_collapsible_candidate_edges": 265,
+    "blocked_edges": 339,
+    "blocked_nodes": 47,
+    "candidate_edges": 368,
+    "candidate_nodes": 73,
+    "eligible_edges": 29,
+    "eligible_nodes": 26,
+    "excluded_rollup_edges": 4,
+    "expected_collapsed_edges": 0,
+    "expected_dependency_edges": 11,
+    "expected_direct_edges": 11,
+    "expected_interface_nodes": 15
+  },
+  "open_decisions": [
+    "OD-2",
+    "OD-7",
+    "OD-8",
+    "OD-9"
+  ],
+  "prior_draft_observation": {
+    "candidate_edges": 368,
+    "candidate_nodes": 73,
+    "counts_are_acceptance_constants": false,
+    "eligibility_classification": "NOT_AVAILABLE_IN_PRIOR_DRAFT"
+  },
+  "production_comparison_status": "NOT_RUN",
+  "relation_kind_counts": {
+    "calls": 102,
+    "contains": 70,
+    "derives": 0,
+    "implements": 32,
+    "imports": 4,
+    "reads": 62,
+    "reexports": 0,
+    "uses_type": 98
+  },
+  "rollup_exclusion_reason_counts": {
+    "BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED": 4
+  },
+  "rollup_status": "BLOCKED",
+  "source_coverage": {
+    "known_uncovered_constructs": [
+      "operators",
+      "body_types",
+      "literals",
+      "repeated_same_line_sites"
+    ],
+    "whole_source_coverage_claimed": false
+  }
+}

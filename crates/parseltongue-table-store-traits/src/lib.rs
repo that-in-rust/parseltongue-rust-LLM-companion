@@ -10,6 +10,14 @@
 mod hld_materialization_analysis_port;
 pub use hld_materialization_analysis_port::*;
 
+#[path = "hld-graph-publication-port.rs"]
+mod hld_graph_publication_port;
+pub use hld_graph_publication_port::*;
+
+#[path = "hld-graph-input-store-port.rs"]
+mod hld_graph_input_store_port;
+pub use hld_graph_input_store_port::*;
+
 use parseltongue_core_row_types::{
     RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
 };

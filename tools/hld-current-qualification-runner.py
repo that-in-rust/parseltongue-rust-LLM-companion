@@ -2521,6 +2521,10 @@ def finalize_artifact_digest_best_effort(
     )
 
 
+def read_canonical_sop_path():
+    return PROJECT_ROOT / "docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md"
+
+
 def prepare_execution_context(
     arguments: argparse.Namespace,
     run_state: Mapping[str, Any],
@@ -2587,7 +2591,7 @@ def prepare_execution_context(
         Path(arguments.corpus_manifest),
         PROJECT_ROOT / "docs/phase-20261111/parser-source-pin-manifest.json",
         PROJECT_ROOT / "docs/phase-20261111/oracle-source-build-manifest.json",
-        PROJECT_ROOT / "docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md",
+        read_canonical_sop_path(),
         PROJECT_ROOT / "docs/phase-20261111/SPEC-phase-20261111-executable-requirements.md",
         Path(pin_summary["r1_patch_path"]),
         PROJECT_ROOT / "tools/hld-current-qualification-runner.py",

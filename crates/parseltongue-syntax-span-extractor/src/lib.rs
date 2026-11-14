@@ -27,6 +27,14 @@ mod syntax_namespace_input_persistence;
 mod syntax_namespace_record_codec;
 pub use persisted_macro_expansion_adapter::prepare_macro_expansion_port;
 pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
+#[path = "impl-header-source-records.rs"]
+mod impl_header_source_records;
+pub use impl_header_source_records::{ImplHeaderSourceError, persist_impl_header_rows};
+#[path = "original-call-resolution-records.rs"]
+mod original_call_resolution_records;
+pub use original_call_resolution_records::{
+    OriginalCallResolutionError, resolve_original_call_edges,
+};
 #[path = "legacy-macro-scope-records.rs"]
 mod legacy_macro_scope_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
@@ -177,6 +185,7 @@ pub struct SourceClosureFileRequest {
     pub source_request_path_candidates: Vec<String>,
     pub source_request_context_kind: String,
     pub source_request_origin_digest: String,
+    pub source_request_origin_kind: String,
 }
 #[derive(Debug)]
 pub struct SyntaxFileExtractionResult {
@@ -531,6 +540,7 @@ fn extract_file_syntax_core(
                 source_request_path_candidates: candidates,
                 source_request_context_kind: "items".into(),
                 source_request_origin_digest: key,
+                source_request_origin_kind: "module_declaration".into(),
             });
         }
     }
@@ -618,6 +628,21 @@ fn extract_file_syntax_core(
             "site_syntax_kind_value":kind,"site_syntax_source_text":&source[start..end],
             "site_owner_occurrence_key":owner,"site_resolution_status_kind":"pending",
             "site_unresolved_reason_kind":Value::Null,"span_expansion_provenance_chain":input.file_expansion_provenance_chain});
+        if let Some(item) = ast::Impl::cast(node.clone()) {
+            payload["impl_header_syntax_record"] =
+                impl_header_source_records::extract_impl_header_syntax(
+                    input,
+                    &item,
+                    &removed,
+                    &active_flags,
+                );
+        }
+        if matches!(kind.as_str(), "CALL_EXPR" | "METHOD_CALL_EXPR") {
+            payload["call_syntax_evidence"] =
+                original_call_resolution_records::extract_original_call_syntax(
+                    input, &node, &removed,
+                );
+        }
         if let Some(call) = ast::MacroCall::cast(node.clone()) {
             let name = call
                 .path()
@@ -650,6 +675,7 @@ fn extract_file_syntax_core(
                         ],
                         source_request_context_kind: context.into(),
                         source_request_origin_digest: key.clone(),
+                        source_request_origin_kind: "macro_include".into(),
                     });
                 } else {
                     payload["site_unresolved_reason_kind"] = json!("build_script");
@@ -675,6 +701,7 @@ fn extract_file_syntax_core(
                 "source_request_path_candidates":request.source_request_path_candidates,
                 "source_request_context_kind":request.source_request_context_kind,
                 "source_request_origin_digest":request.source_request_origin_digest,
+                "source_request_origin_kind":request.source_request_origin_kind,
                 "unit_compilation_identity_key":input.unit_compilation_identity_key,
                 "file_expansion_provenance_chain":input.file_expansion_provenance_chain
             }),

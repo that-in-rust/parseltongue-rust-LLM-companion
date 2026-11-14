@@ -18,7 +18,9 @@ use parseltongue_syntax_span_extractor::{
     persist_namespace_syntax_inputs, read_parser_compiler_identity,
     read_unit_prelude_configuration,
 };
-use parseltongue_table_store_traits::StageTableStorePort;
+use parseltongue_table_store_traits::{
+    FullGraphInputStorePort, HldGraphInputStorePort, HldGraphPublicationPort, StageTableStorePort,
+};
 use parseltongue_turso_store_adapter::TursoWorkspaceStoreAdapter;
 use serde_json::{Value, json};
 use std::{
@@ -27,6 +29,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "full-graph-checkpoint-facade.rs"]
+mod full_graph_checkpoint_facade;
+#[path = "hld-source-publication-facade.rs"]
+mod hld_source_publication_facade;
 #[path = "namespace-pipeline-publication-facade.rs"]
 mod namespace_pipeline_publication_facade;
 #[path = "oracle-path-comparison-facade.rs"]
@@ -102,6 +108,30 @@ fn build_syntax_file_request(
         stage_row_payload_text: value.to_string(),
     }
 }
+fn build_syntax_file_provenance(
+    request: &Value,
+    mapping_final_stage_kind: MappingFinalStageKind,
+) -> Result<Vec<String>, StoreBackendFailureError> {
+    let mut provenance: Vec<String> =
+        serde_json::from_value(request["file_expansion_provenance_chain"].clone())
+            .map_err(build_pipeline_stage_error)?;
+    let origin_kind = read_required_json_string(request, "source_request_origin_kind")?;
+    if !matches!(origin_kind, "module_declaration" | "macro_include") {
+        return Err(build_pipeline_stage_error(format!(
+            "unsupported source request origin kind {origin_kind}"
+        )));
+    }
+    if !matches!(
+        mapping_final_stage_kind,
+        MappingFinalStageKind::OriginalTopLevelContainment
+            | MappingFinalStageKind::FullItemDependencyGraph
+    ) || origin_kind != "module_declaration"
+        || !provenance.is_empty()
+    {
+        provenance.push(read_required_json_string(request, "source_request_origin_digest")?.into());
+    }
+    Ok(provenance)
+}
 fn read_file_module_directory(path: &Path) -> Result<PathBuf, StoreBackendFailureError> {
     let parent = path
         .parent()
@@ -163,6 +193,23 @@ enum SyntaxStageOperationKind {
 enum MappingFinalStageKind {
     SyntaxSpans,
     NameResolution,
+    OriginalTopLevelContainment,
+    FullItemDependencyGraph,
+}
+
+/// REQ-RUST-038.0: whether sysroot crates are added to the mapped crate graph.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SysrootSourceScopeKind {
+    Included,
+    Excluded,
+}
+
+fn parse_sysroot_scope_flag(value: Option<&str>) -> Result<SysrootSourceScopeKind, String> {
+    match value {
+        None | Some("included") => Ok(SysrootSourceScopeKind::Included),
+        Some("excluded") => Ok(SysrootSourceScopeKind::Excluded),
+        Some(other) => Err(format!("unknown sysroot source scope {other}")),
+    }
 }
 fn run_persisted_syntax_stage(
     store: &dyn StageTableStorePort,
@@ -170,6 +217,7 @@ fn run_persisted_syntax_stage(
     cancel: &RunCancelFlagValue,
     workers: usize,
     mode: SyntaxStageOperationKind,
+    mapping_final_stage_kind: MappingFinalStageKind,
 ) -> Result<(), StoreBackendFailureError> {
     let units: BTreeMap<String, Value> = store
         .read_stage_table_rows(scope, "crate-dependency-graph-table")?
@@ -338,11 +386,7 @@ fn run_persisted_syntax_stage(
                     .ok_or_else(|| build_pipeline_stage_error("include parent absent"))?
                     .to_owned()
             };
-            let mut provenance: Vec<String> =
-                serde_json::from_value(request["file_expansion_provenance_chain"].clone())
-                    .map_err(build_pipeline_stage_error)?;
-            provenance
-                .push(read_required_json_string(&request, "source_request_origin_digest")?.into());
+            let provenance = build_syntax_file_provenance(&request, mapping_final_stage_kind)?;
             let job = build_syntax_file_request(
                 read_required_json_string(&request, "unit_compilation_identity_key")?,
                 &path.to_string_lossy(),
@@ -563,6 +607,8 @@ fn prepare_sysroot_staging_scope(
     scope: &StageRunScopeValue,
     cancel: &RunCancelFlagValue,
     workers: usize,
+    sysroot_scope: SysrootSourceScopeKind,
+    mapping_final_stage_kind: MappingFinalStageKind,
 ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
     let files = read_stage_json_records(store, scope, "file-source-text-table")?
         .into_iter()
@@ -574,9 +620,10 @@ fn prepare_sysroot_staging_scope(
         })
         .collect::<Result<BTreeMap<_, _>, StoreBackendFailureError>>()?;
     let requests = read_stage_json_records(store, scope, "syntax-file-work-requests")?;
+    let excluded = sysroot_scope == SysrootSourceScopeKind::Excluded;
     let needed = requests.iter().try_fold(false, |needed, request| {
-        if needed {
-            return Ok(true);
+        if needed || excluded {
+            return Ok(needed);
         }
         let path = read_required_json_string(request, "file_source_absolute_path")?;
         let file = files
@@ -651,17 +698,42 @@ fn prepare_sysroot_staging_scope(
         cancel,
         workers,
         SyntaxStageOperationKind::Discovery,
+        mapping_final_stage_kind,
     )?;
     Ok(next)
 }
+struct WorkspacePipelineStorePorts<'a> {
+    stage: &'a dyn StageTableStorePort,
+    graph_input: &'a dyn HldGraphInputStorePort,
+    full_graph_input_store: &'a dyn FullGraphInputStorePort,
+    graph_publication: &'a dyn HldGraphPublicationPort,
+}
+
+#[derive(Debug, thiserror::Error)]
+enum WorkspaceMappingFailureError {
+    #[error(transparent)]
+    Namespace(#[from] parseltongue_duckdb_analysis_adapter::NamespaceAnalysisPhaseError),
+    #[error(transparent)]
+    ImplHeader(#[from] parseltongue_syntax_span_extractor::ImplHeaderSourceError),
+    #[error(transparent)]
+    Store(#[from] StoreBackendFailureError),
+}
+
 fn run_workspace_mapping_pipeline(
     root: &Path,
     store_path: &Path,
-    store: &dyn StageTableStorePort,
+    stores: WorkspacePipelineStorePorts<'_>,
     cancel: &RunCancelFlagValue,
     workers: usize,
     final_stage: MappingFinalStageKind,
-) -> Result<Value, parseltongue_duckdb_analysis_adapter::NamespaceAnalysisPhaseError> {
+    sysroot_scope: SysrootSourceScopeKind,
+) -> Result<Value, WorkspaceMappingFailureError> {
+    let WorkspacePipelineStorePorts {
+        stage: store,
+        graph_input: graph_input_store,
+        full_graph_input_store,
+        graph_publication: graph_publication_store,
+    } = stores;
     let started = std::time::Instant::now();
     let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?
         .into_iter()
@@ -674,17 +746,51 @@ fn run_workspace_mapping_pipeline(
                     "../../../docs/phase-20261111/parser-source-pin-manifest.json"
                 ))
                 .map_err(build_pipeline_stage_error)?;
+                value["workspace_sysroot_scope_kind"] = json!(match sysroot_scope {
+                    SysrootSourceScopeKind::Included => "included",
+                    SysrootSourceScopeKind::Excluded => "excluded",
+                });
                 value["workspace_required_stage_names"] =
-                    if final_stage == MappingFinalStageKind::NameResolution {
+                    if matches!(final_stage, MappingFinalStageKind::NameResolution) {
                         json!([
                             "crate-graph",
                             "source-ingest",
                             "syntax-spans",
                             "name-resolution"
                         ])
+                    } else if final_stage == MappingFinalStageKind::FullItemDependencyGraph {
+                        json!([
+                            "crate-graph",
+                            "source-ingest",
+                            "syntax-spans",
+                            "syntax-namespace-input-records",
+                            "name-resolution",
+                            "item-effective-visibility-stage",
+                            "semantic-edge-evidence-stage"
+                        ])
+                    } else if final_stage == MappingFinalStageKind::OriginalTopLevelContainment {
+                        json!([
+                            "crate-graph",
+                            "source-ingest",
+                            "syntax-spans",
+                            "syntax-namespace-input-records",
+                            "name-resolution",
+                            "item-effective-visibility-stage",
+                            "semantic-edge-evidence-stage",
+                            "hld-current-materialization-stage"
+                        ])
                     } else {
                         json!(["crate-graph", "source-ingest", "syntax-spans"])
                     };
+                if final_stage == MappingFinalStageKind::OriginalTopLevelContainment {
+                    value["workspace_mapping_scope_kind"] = json!("original-top-level-containment");
+                }
+                if final_stage == MappingFinalStageKind::FullItemDependencyGraph {
+                    value["workspace_mapping_scope_kind"] = json!("full-semantic");
+                    value["workspace_full_map_scope_kind"] =
+                        json!("original-items-partial-semantics");
+                    value["workspace_full_map_completeness_kind"] = json!("incomplete");
+                }
                 row.stage_row_payload_text = value.to_string();
             }
             Ok(row)
@@ -721,13 +827,19 @@ fn run_workspace_mapping_pipeline(
         cancel,
         workers,
         SyntaxStageOperationKind::Discovery,
+        final_stage,
     )?;
     eprintln!(
         "stage=source-closure elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
-    let scope = if final_stage == MappingFinalStageKind::NameResolution {
-        prepare_sysroot_staging_scope(store, &scope, cancel, workers)?
+    let scope = if matches!(
+        final_stage,
+        MappingFinalStageKind::NameResolution
+            | MappingFinalStageKind::OriginalTopLevelContainment
+            | MappingFinalStageKind::FullItemDependencyGraph
+    ) {
+        prepare_sysroot_staging_scope(store, &scope, cancel, workers, sysroot_scope, final_stage)?
     } else {
         scope
     };
@@ -745,13 +857,19 @@ fn run_workspace_mapping_pipeline(
         cancel,
         workers,
         SyntaxStageOperationKind::Extraction,
+        final_stage,
     )?;
     eprintln!(
         "stage=syntax-spans elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
     let started = std::time::Instant::now();
-    if final_stage == MappingFinalStageKind::NameResolution {
+    if matches!(
+        final_stage,
+        MappingFinalStageKind::NameResolution
+            | MappingFinalStageKind::OriginalTopLevelContainment
+            | MappingFinalStageKind::FullItemDependencyGraph
+    ) {
         persist_namespace_syntax_inputs(&scope, store, cancel)?;
         namespace_pipeline_publication_facade::run_namespace_analysis_pipeline(
             &scope,
@@ -764,12 +882,47 @@ fn run_workspace_mapping_pipeline(
         "stage=name-resolution elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
     );
+    if matches!(
+        final_stage,
+        MappingFinalStageKind::NameResolution
+            | MappingFinalStageKind::OriginalTopLevelContainment
+            | MappingFinalStageKind::FullItemDependencyGraph
+    ) {
+        let header_count = parseltongue_syntax_span_extractor::persist_impl_header_rows(
+            store, &scope, root, cancel,
+        )?;
+        eprintln!(
+            "stage=impl-header-source-records rows={header_count} coverage=header-paths-only"
+        );
+    }
     let started = std::time::Instant::now();
-    store.publish_workspace_generation_manifest(
-        &scope,
-        &scope.run_generation_digest_value,
-        cancel,
-    )?;
+    if final_stage == MappingFinalStageKind::OriginalTopLevelContainment {
+        hld_source_publication_facade::publish_original_source_hld(
+            &scope,
+            root,
+            store_path,
+            store,
+            graph_input_store,
+            graph_publication_store,
+            cancel,
+        )?;
+    } else {
+        if final_stage == MappingFinalStageKind::FullItemDependencyGraph {
+            full_graph_checkpoint_facade::publish_full_graph_checkpoint(
+                &scope,
+                root,
+                store_path,
+                store,
+                full_graph_input_store,
+                cancel,
+            )?;
+        }
+        store.publish_workspace_generation_manifest(
+            &scope,
+            &scope.run_generation_digest_value,
+            cancel,
+        )?;
+    }
     eprintln!(
         "stage=generation-publication elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
@@ -795,6 +948,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 | "--workspace-store-file-path"
                 | "--worker-thread-count-value"
                 | "--mapping-final-stage-kind"
+                | "--sysroot-source-scope-kind"
                 | "--stage-owned-table-name"
                 | "--stage-row-filter-value"
                 | "--primary-semantic-input-path"
@@ -897,15 +1051,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let final_stage = match flags.get("--mapping-final-stage-kind").map(String::as_str) {
                 None | Some("name-resolution") => MappingFinalStageKind::NameResolution,
                 Some("syntax-spans") => MappingFinalStageKind::SyntaxSpans,
+                Some("original-top-level-containment") => {
+                    MappingFinalStageKind::OriginalTopLevelContainment
+                }
+                Some("full-item-dependency-graph") => {
+                    MappingFinalStageKind::FullItemDependencyGraph
+                }
                 Some(_) => return Err("unknown mapping final stage".into()),
             };
+            let sysroot_scope = parse_sysroot_scope_flag(
+                flags.get("--sysroot-source-scope-kind").map(String::as_str),
+            )?;
             run_workspace_mapping_pipeline(
                 &root,
                 Path::new(path),
-                &store,
+                WorkspacePipelineStorePorts {
+                    stage: &store,
+                    graph_input: &store,
+                    full_graph_input_store: &store,
+                    graph_publication: &store,
+                },
                 &cancel,
                 workers,
                 final_stage,
+                sysroot_scope,
             )?
         }
         _ => return Err(format!("unknown command {command}").into()),

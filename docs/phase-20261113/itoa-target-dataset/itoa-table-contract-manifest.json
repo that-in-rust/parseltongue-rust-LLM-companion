@@ -1,0 +1,3465 @@
+{
+  "artifact_status": "SOURCE_AUDITED_CONTRACT_DRAFT",
+  "candidate_provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NOT_FROZEN",
+    "status": "LLM_PARSED_DRAFT"
+  },
+  "collapse_policy": {
+    "OD-9": "OPEN_ALTERNATE_PROPOSAL; does not revoke current six-kind rule",
+    "current_decided_relations": [
+      "calls",
+      "derives",
+      "implements",
+      "reads",
+      "reexports",
+      "uses_type"
+    ],
+    "derived_collapsed_rows": 0,
+    "forbidden_at_every_hop": [
+      "contains",
+      "imports"
+    ],
+    "od9_suppression_applied": false
+  },
+  "contracts": [
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "crate and workspace context contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "crate-graph",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 22,
+          "owner": "crate-graph",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "crate-dependency-graph-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "crate and workspace context contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "crate-graph",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 23,
+          "owner": "crate-graph",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "workspace-config-state-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "source-ingest",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 24,
+          "owner": "source-ingest",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "file-source-text-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-spans",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 25,
+          "owner": "syntax-spans",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "span-reference-text-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-spans",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 26,
+          "owner": "syntax-spans",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "span-byte-ownership-ranges",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-spans",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 27,
+          "owner": "syntax-spans",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "field-signature-detail-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-spans",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 28,
+          "owner": "syntax-spans",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "body-site-reference-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-spans",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 29,
+          "owner": "syntax-spans",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "module-source-closure-requests",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-spans",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 30,
+          "owner": "syntax-spans",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-file-work-requests",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "name-resolution",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 31,
+          "owner": "name-resolution",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "module-scope-binding-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "name-resolution",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 32,
+          "owner": "name-resolution",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "name-resolution-scope-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [
+        {
+          "attempt": "45b7540c4ea4fa3d8cb9f52cdb8f050796d3618620bb69c9f665c3f96ec50bf9/frozen/18",
+          "generation": "200527fb15e4e88d064c12943ffaaaa0accaa121bc08fffe76a89fab5cf6339a",
+          "path": "/home/ubuntu/hld-current-test-artifacts/20261113T180000Z-itoa-slice-2/ladder-baseline/exported-table-rows/path-resolution-site-records.json",
+          "row_count": 202,
+          "table": "path-resolution-site-records"
+        }
+      ],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [
+        "path_candidate_target_rows",
+        "path_resolution_state_kind",
+        "path_site_source_text",
+        "path_target_symbol_rows",
+        "path_unresolved_reason_kind",
+        "site_compilation_scope_record",
+        "site_expansion_provenance_chain",
+        "site_path_context_kind",
+        "site_source_absolute_path",
+        "site_source_range_end",
+        "site_source_range_start",
+        "unit_source_root_path"
+      ],
+      "owner": "name-resolution",
+      "payload_schema_status": "OBSERVED_SERIALIZED_EXPORT_FIELDS",
+      "provenance_citations": [
+        {
+          "line": 33,
+          "owner": "name-resolution",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "path-resolution-site-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "ancillary diagnostics",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "oracle-agreement",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 34,
+          "owner": "oracle-agreement",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "oracle-edge-agreement-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "name-resolution",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 35,
+          "owner": "name-resolution",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "analysis-resolution-receipt-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "name-resolution",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 36,
+          "owner": "name-resolution",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "macro-expanded-item-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 38,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "lang-item-definition-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 42,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-namespace-input-scopes",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [
+        {
+          "lines": [
+            250,
+            267
+          ],
+          "path": "crates/parseltongue-syntax-span-extractor/src/syntax-namespace-record-codec.rs",
+          "symbol": "encode_binding_record_value"
+        },
+        {
+          "lines": [
+            89,
+            101
+          ],
+          "path": "crates/parseltongue-syntax-span-extractor/src/syntax-namespace-input-persistence.rs",
+          "symbol": "syntax-namespace-input-items serialization"
+        }
+      ],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [
+        "binding_lexical_scope_key",
+        "binding_resolved_name_text",
+        "binding_namespace_kind_value",
+        "binding_target_identity_key",
+        "binding_target_child_scope",
+        "binding_visibility_scope_kind",
+        "binding_selection_priority_kind",
+        "binding_import_evidence_keys",
+        "binding_target_metadata_value"
+      ],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "OBSERVED_SOURCE_SERIALIZER_FIELDS",
+      "provenance_citations": [
+        {
+          "line": 46,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-namespace-input-items",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 50,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-namespace-input-imports",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 54,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-namespace-input-paths",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 58,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-namespace-input-macros",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 62,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "syntax-namespace-input-externs",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "signature and impl contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "signature-type-lowering-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 66,
+          "owner": "signature-type-lowering-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "lowered-signature-type-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "signature and impl contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "signature-type-lowering-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 69,
+          "owner": "signature-type-lowering-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "impl-header-index-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "direct semantic input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "item-effective-visibility-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 71,
+          "owner": "item-effective-visibility-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "item-effective-visibility-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "direct semantic input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "semantic-edge-evidence-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 74,
+          "owner": "semantic-edge-evidence-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "edge-evidence-record-table",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "hld-current-materialization-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 76,
+          "owner": "hld-current-materialization-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "hld-current-interface-nodes",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "hld-current-materialization-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 80,
+          "owner": "hld-current-materialization-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "hld-current-dependency-edges",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "hld-current-materialization-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 84,
+          "owner": "hld-current-materialization-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "hld-edge-evidence-paths",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "hld-current-materialization-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 87,
+          "owner": "hld-current-materialization-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "hld-file-level-rollup",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "hld-current-materialization-stage",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 89,
+          "owner": "hld-current-materialization-stage",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "hld-folder-level-rollup",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "markers",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 92,
+          "owner": "markers",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "stage-run-generation-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 94,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "legacy-macro-scope-records",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_blocker": "generic envelope can be scope-checked; payload mapping and HLD comparison are not implemented",
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "field_provenance_citations": [],
+      "key_contract": {
+        "primary_key": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value",
+          "stage_row_record_key"
+        ]
+      },
+      "observed_payload_fields": [],
+      "owner": "syntax-namespace-input-records",
+      "payload_schema_status": "PAYLOAD_SCHEMA_NOT_OBSERVED_OR_NOT_DECLARED_BY_REGISTRY",
+      "provenance_citations": [
+        {
+          "line": 98,
+          "owner": "syntax-namespace-input-records",
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "symbol": "STAGE_OWNED_TABLE_NAMES"
+        },
+        {
+          "lines": [
+            275,
+            279
+          ],
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs",
+          "schema": [
+            "run_generation_digest_value",
+            "stage_attempt_sequence_value",
+            "stage_row_record_key",
+            "stage_unit_work_key",
+            "stage_row_payload_text"
+          ],
+          "symbol": "initialize_workspace_stage_schema"
+        },
+        {
+          "lines": [
+            25,
+            29
+          ],
+          "path": "crates/parseltongue-core-row-types/src/stage-pipeline-row-types.rs",
+          "symbol": "StageTableRowRecord"
+        }
+      ],
+      "record_kind": "registered_stage_table",
+      "required_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "row_evidence_assertions": [
+        "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping"
+      ],
+      "row_key_fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_columns": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key",
+        "stage_unit_work_key",
+        "stage_row_payload_text"
+      ],
+      "storage_primary_key": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "stage_row_record_key"
+      ],
+      "storage_schema_status": "EXACT_SQL_DDL",
+      "table_name": "legacy-macro-source-events",
+      "upstream_relationship_status": "NO_TABLE_DECODER_IN_HLD_MATERIALIZER_API",
+      "upstream_tables": []
+    }
+  ],
+  "control_store_relations": [
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "columns": [
+        "manifest_singleton_key_value",
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value"
+      ],
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "key_contract": {
+        "primary_key": [
+          "manifest_singleton_key_value"
+        ]
+      },
+      "owner": "TursoWorkspaceStoreAdapter::initialize_workspace_stage_schema",
+      "primary_key": [
+        "manifest_singleton_key_value"
+      ],
+      "provenance_citations": [
+        {
+          "line": 286,
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs"
+        }
+      ],
+      "record_kind": "control_storage_relation",
+      "required_fields": [
+        "manifest_singleton_key_value",
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value"
+      ],
+      "row_evidence_assertions": [
+        "workspace generation scope is unique"
+      ],
+      "table_name": "workspace-generation-publication-manifest"
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "columns": [
+        "manifest_singleton_key_value",
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value"
+      ],
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "key_contract": {
+        "primary_key": [
+          "manifest_singleton_key_value"
+        ]
+      },
+      "owner": "TursoWorkspaceStoreAdapter::initialize_workspace_stage_schema",
+      "primary_key": [
+        "manifest_singleton_key_value"
+      ],
+      "provenance_citations": [
+        {
+          "line": 287,
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs"
+        }
+      ],
+      "record_kind": "control_storage_relation",
+      "required_fields": [
+        "manifest_singleton_key_value",
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value"
+      ],
+      "row_evidence_assertions": [
+        "analysis input generation scope is unique"
+      ],
+      "table_name": "analysis-input-publication-manifest"
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "columns": [
+        "generation_key",
+        "attempt_key",
+        "source_attempt_key",
+        "publication_revision"
+      ],
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "key_contract": {
+        "primary_key": [
+          "generation_key",
+          "attempt_key"
+        ]
+      },
+      "owner": "TursoWorkspaceStoreAdapter::initialize_workspace_stage_schema",
+      "primary_key": [
+        "generation_key",
+        "attempt_key"
+      ],
+      "provenance_citations": [
+        {
+          "line": 288,
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs"
+        }
+      ],
+      "record_kind": "control_storage_relation",
+      "required_fields": [
+        "generation_key",
+        "attempt_key",
+        "source_attempt_key",
+        "publication_revision"
+      ],
+      "row_evidence_assertions": [
+        "revision identity must match frozen stage proof"
+      ],
+      "table_name": "frozen-stage-publication-records"
+    },
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "columns": [
+        "generation_key",
+        "source_attempt_key",
+        "stage_marker_key",
+        "publication_revision"
+      ],
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "key_contract": {
+        "primary_key": [
+          "generation_key",
+          "source_attempt_key",
+          "stage_marker_key"
+        ]
+      },
+      "owner": "TursoWorkspaceStoreAdapter::initialize_workspace_stage_schema",
+      "primary_key": [
+        "generation_key",
+        "source_attempt_key",
+        "stage_marker_key"
+      ],
+      "provenance_citations": [
+        {
+          "line": 289,
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs"
+        }
+      ],
+      "record_kind": "control_storage_relation",
+      "required_fields": [
+        "generation_key",
+        "source_attempt_key",
+        "stage_marker_key",
+        "publication_revision"
+      ],
+      "row_evidence_assertions": [
+        "unit membership belongs to the exact frozen revision"
+      ],
+      "table_name": "frozen-stage-unit-memberships"
+    }
+  ],
+  "hld_output_table_names": [
+    "hld-current-interface-nodes",
+    "hld-current-dependency-edges",
+    "hld-edge-evidence-paths",
+    "hld-file-level-rollup",
+    "hld-folder-level-rollup"
+  ],
+  "production_input": false,
+  "publication_control_only_tables": [
+    "stage-run-generation-records",
+    "workspace-generation-publication-manifest",
+    "analysis-input-publication-manifest",
+    "frozen-stage-publication-records",
+    "frozen-stage-unit-memberships"
+  ],
+  "record_contracts": [
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "comparison_blocker": "typed row-to-table decoding is not implemented",
+      "completeness_enum_values": [
+        "CompleteTypedInput",
+        "IncompleteTypedInput"
+      ],
+      "direct_table_reads": [],
+      "fields": [
+        "run_generation_digest_value",
+        "stage_attempt_sequence_value",
+        "semantic_input_completeness_kind",
+        "input_unit_provenance_records",
+        "input_node_records",
+        "input_edge_records"
+      ],
+      "input_semantics": {
+        "input_vectors": "may be empty when completeness is CompleteTypedInput",
+        "required_completeness_value": "CompleteTypedInput",
+        "unit_provenance": "required for every referenced compilation unit"
+      },
+      "key_contract": {
+        "fields": [
+          "run_generation_digest_value",
+          "stage_attempt_sequence_value"
+        ],
+        "status": "interface scope only; not a durable table key"
+      },
+      "provenance_citations": [
+        {
+          "lines": [
+            149,
+            156
+          ],
+          "path": "crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs",
+          "symbol": "HldMaterializationInputRecord"
+        },
+        {
+          "lines": [
+            13,
+            16
+          ],
+          "path": "crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs",
+          "symbol": "HldInputCompletenessKind"
+        },
+        {
+          "lines": [
+            326,
+            340
+          ],
+          "path": "crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs",
+          "symbol": "validate_hld_materialization_input"
+        },
+        {
+          "lines": [
+            379,
+            388
+          ],
+          "path": "crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs",
+          "symbol": "validate_hld_materialization_input"
+        },
+        {
+          "line": 124,
+          "path": "crates/parseltongue-duckdb-analysis-adapter/src/hld-materialization-duckdb-store.rs",
+          "symbol": "materialize_hld_graph"
+        }
+      ],
+      "record_kind": "typed_interface",
+      "row_evidence_assertions": [
+        "adapter accepts this typed record; no named upstream table is read directly"
+      ],
+      "source_type": "crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs:149-156",
+      "status": "TYPED_INTERFACE_NOT_A_TABLE_OR_DECODER",
+      "symbol": "HldMaterializationInputRecord"
+    }
+  ],
+  "reference_inputs": [
+    {
+      "comparison_blocker": "candidate identity is symbolic and not canonical production output",
+      "name": "itoa-full-graph-nodes.json",
+      "record_kind": "candidate_reference_file",
+      "row_evidence_assertions": [
+        "source path, byte range and draft classification are retained"
+      ],
+      "source": "LLM_PARSED_DRAFT candidate rows authored by Devin from pinned source; not a registered table"
+    },
+    {
+      "comparison_blocker": "candidate identity is symbolic and not canonical production output",
+      "name": "itoa-full-graph-edges.json",
+      "record_kind": "candidate_reference_file",
+      "row_evidence_assertions": [
+        "relation, target classification and source evidence are retained"
+      ],
+      "source": "LLM_PARSED_DRAFT candidate rows authored by Devin from pinned source; not a registered table"
+    }
+  ],
+  "source_checkpoint": {
+    "anchor_text": "Buffer::new()",
+    "line": 79,
+    "range_status": "EXACT_ANCHOR",
+    "relationship": "<Buffer as Default>::default -> Buffer::new",
+    "semantic_resolution_status": "BLOCKED_NOT_CHECKED_CANONICAL_TARGET",
+    "source_identity_link_status": "UNVERIFIED_GENERATION_LINK",
+    "source_path": "src/lib.rs",
+    "source_range": [
+      2506,
+      2519
+    ],
+    "source_range_evidence_status": "PINNED_SOURCE_BYTES",
+    "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+  },
+  "source_context_relations": [
+    {
+      "applicable_req_ids": [
+        "REQ-RUST-039.0"
+      ],
+      "backward_contract_layer": "source content storage",
+      "columns": [
+        "file_content_digest_full",
+        "file_source_content_bytes"
+      ],
+      "comparison_status": "BLOCKED/NOT_IMPLEMENTED",
+      "key_contract": {
+        "primary_key": [
+          "file_content_digest_full"
+        ]
+      },
+      "owner": "TursoWorkspaceStoreAdapter::initialize_workspace_stage_schema",
+      "primary_key": [
+        "file_content_digest_full"
+      ],
+      "provenance_citations": [
+        {
+          "line": 285,
+          "path": "crates/parseltongue-turso-store-adapter/src/stage-table-store-backend.rs"
+        }
+      ],
+      "record_kind": "source_content_store_relation",
+      "required_fields": [
+        "file_content_digest_full",
+        "file_source_content_bytes"
+      ],
+      "row_evidence_assertions": [
+        "content bytes are stored by file_content_digest_full; digest verification is not checked here"
+      ],
+      "table_name": "file-source-content-records"
+    }
+  ],
+  "source_coverage": {
+    "candidate_rows_preserved": true,
+    "known_uncovered_constructs": [
+      "operators",
+      "body_types",
+      "literals",
+      "repeated_same_line_sites"
+    ],
+    "whole_source_coverage_claimed": false
+  },
+  "source_pin": {
+    "commit": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+    "manifest_sha256": "44ca1ae5d9b48743305b57f3367051289512037e7836b8b3693b68d48dec0483",
+    "repository": "itoa",
+    "source_file_sizes_bytes": {
+      "src/lib.rs": 16904,
+      "src/u128_ext.rs": 695
+    },
+    "source_files": {
+      "src/lib.rs": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+      "src/u128_ext.rs": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+    }
+  },
+  "table_to_materializer_status": "NO_NAMED_TABLE_DECODER; materializer accepts HldMaterializationInputRecord",
+  "top_down_preceding_table_ladder": [
+    {
+      "link_status": "REGISTERED_OUTPUTS_COMPARISON_BLOCKED",
+      "phase": "HLD outputs",
+      "record_kind": "registered_hld_output",
+      "table_names": [
+        "hld-current-interface-nodes",
+        "hld-current-dependency-edges",
+        "hld-edge-evidence-paths",
+        "hld-file-level-rollup",
+        "hld-folder-level-rollup"
+      ]
+    },
+    {
+      "link_status": "LLM_PARSED_DRAFT_CANDIDATES_NOT_PRODUCTION_ROWS",
+      "names": [
+        "itoa-full-graph-nodes.json",
+        "itoa-full-graph-edges.json"
+      ],
+      "phase": "full-graph candidate inputs",
+      "record_kind": "candidate_reference_files"
+    },
+    {
+      "link_status": "TYPED_INTERFACE_NOT_A_TABLE_OR_DECODER",
+      "phase": "typed HLD input",
+      "record_kind": "typed_interface",
+      "symbol": "HldMaterializationInputRecord"
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "item-effective-visibility-stage",
+        "semantic-edge-evidence-stage"
+      ],
+      "phase": "direct semantic input contracts",
+      "table_names": [
+        "item-effective-visibility-records",
+        "edge-evidence-record-table"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "signature-type-lowering-stage"
+      ],
+      "phase": "signature and impl contracts",
+      "table_names": [
+        "lowered-signature-type-table",
+        "impl-header-index-table"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "name-resolution"
+      ],
+      "phase": "resolved namespace contracts",
+      "table_names": [
+        "module-scope-binding-table",
+        "name-resolution-scope-records",
+        "path-resolution-site-records",
+        "analysis-resolution-receipt-records",
+        "macro-expanded-item-table"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "syntax-namespace-input-records"
+      ],
+      "phase": "namespace and macro input contracts",
+      "table_names": [
+        "lang-item-definition-table",
+        "syntax-namespace-input-scopes",
+        "syntax-namespace-input-items",
+        "syntax-namespace-input-imports",
+        "syntax-namespace-input-paths",
+        "syntax-namespace-input-macros",
+        "syntax-namespace-input-externs",
+        "legacy-macro-scope-records",
+        "legacy-macro-source-events"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "syntax-spans",
+        "source-ingest"
+      ],
+      "phase": "body, signature-site and source-span contracts",
+      "table_names": [
+        "file-source-text-table",
+        "span-reference-text-table",
+        "span-byte-ownership-ranges",
+        "field-signature-detail-table",
+        "body-site-reference-table",
+        "module-source-closure-requests",
+        "syntax-file-work-requests"
+      ]
+    },
+    {
+      "assertion_or_blocker": "source bytes relation has exact DDL; its HLD source identity linkage is unverified",
+      "link_status": "EXACT_CONTENT_STORE_DDL_NOT_STAGE_DECODER",
+      "owner_names": [],
+      "phase": "source content storage",
+      "table_names": [
+        "file-source-content-records"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "crate-graph"
+      ],
+      "phase": "crate and workspace context contracts",
+      "table_names": [
+        "crate-dependency-graph-table",
+        "workspace-config-state-records"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "oracle-agreement"
+      ],
+      "phase": "ancillary diagnostics",
+      "table_names": [
+        "oracle-edge-agreement-table"
+      ]
+    },
+    {
+      "link_status": "FROZEN_REVISION_PROOF_NOT_IMPLEMENTED",
+      "phase": "publication and control relations",
+      "record_kind": "publication_control",
+      "table_names": [
+        "stage-run-generation-records",
+        "workspace-generation-publication-manifest",
+        "analysis-input-publication-manifest",
+        "frozen-stage-publication-records",
+        "frozen-stage-unit-memberships"
+      ]
+    }
+  ],
+  "upstream_contract_dag": [
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "item-effective-visibility-stage",
+        "semantic-edge-evidence-stage"
+      ],
+      "phase": "direct semantic input contracts",
+      "table_names": [
+        "item-effective-visibility-records",
+        "edge-evidence-record-table"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "signature-type-lowering-stage"
+      ],
+      "phase": "signature and impl contracts",
+      "table_names": [
+        "lowered-signature-type-table",
+        "impl-header-index-table"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "name-resolution"
+      ],
+      "phase": "resolved namespace contracts",
+      "table_names": [
+        "module-scope-binding-table",
+        "name-resolution-scope-records",
+        "path-resolution-site-records",
+        "analysis-resolution-receipt-records",
+        "macro-expanded-item-table"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "syntax-namespace-input-records"
+      ],
+      "phase": "namespace and macro input contracts",
+      "table_names": [
+        "lang-item-definition-table",
+        "syntax-namespace-input-scopes",
+        "syntax-namespace-input-items",
+        "syntax-namespace-input-imports",
+        "syntax-namespace-input-paths",
+        "syntax-namespace-input-macros",
+        "syntax-namespace-input-externs",
+        "legacy-macro-scope-records",
+        "legacy-macro-source-events"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "syntax-spans",
+        "source-ingest"
+      ],
+      "phase": "body, signature-site and source-span contracts",
+      "table_names": [
+        "file-source-text-table",
+        "span-reference-text-table",
+        "span-byte-ownership-ranges",
+        "field-signature-detail-table",
+        "body-site-reference-table",
+        "module-source-closure-requests",
+        "syntax-file-work-requests"
+      ]
+    },
+    {
+      "assertion_or_blocker": "source bytes relation has exact DDL; its HLD source identity linkage is unverified",
+      "link_status": "EXACT_CONTENT_STORE_DDL_NOT_STAGE_DECODER",
+      "owner_names": [],
+      "phase": "source content storage",
+      "table_names": [
+        "file-source-content-records"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "crate-graph"
+      ],
+      "phase": "crate and workspace context contracts",
+      "table_names": [
+        "crate-dependency-graph-table",
+        "workspace-config-state-records"
+      ]
+    },
+    {
+      "assertion_or_blocker": "registered owners are exact; typed HLD API does not read these table names",
+      "link_status": "BACKWARD_DESIGN_LAYER_NOT_TABLE_DECODER",
+      "owner_names": [
+        "oracle-agreement"
+      ],
+      "phase": "ancillary diagnostics",
+      "table_names": [
+        "oracle-edge-agreement-table"
+      ]
+    }
+  ]
+}

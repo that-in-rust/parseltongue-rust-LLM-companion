@@ -101,7 +101,7 @@ pub(super) fn decode_resolution_scope_value(
     })
 }
 
-fn decode_occurrence_identity_value(
+pub(super) fn decode_occurrence_identity_value(
     value: &Value,
 ) -> Result<SemanticOccurrenceKeyValue, StoreBackendFailureError> {
     let range = &value["span_byte_range_value"];
@@ -134,7 +134,7 @@ fn decode_occurrence_identity_value(
     .map_err(build_name_projection_error)
 }
 
-fn decode_symbol_target_value(
+pub(super) fn decode_symbol_target_value(
     value: &Value,
 ) -> Result<NameSymbolTargetKey, StoreBackendFailureError> {
     match read_record_string_value(value, "target_identity_variant_kind")? {

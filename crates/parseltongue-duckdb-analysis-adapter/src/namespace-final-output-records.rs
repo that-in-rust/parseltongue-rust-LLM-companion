@@ -40,6 +40,8 @@ struct PathNamespaceProduct {
     candidates: TargetNamespaceGroups,
     ambiguous: bool,
     reason: Option<String>,
+    /// REQ-RUST-038.0: set when the path starts at a sysroot crate with no unit in this generation.
+    absent_sysroot_reason: Option<String>,
 }
 
 fn grouped_targets(groups: TargetNamespaceGroups) -> Vec<Value> {
@@ -55,6 +57,10 @@ fn grouped_targets(groups: TargetNamespaceGroups) -> Vec<Value> {
 impl PathNamespaceProduct {
     fn finish(self) -> Value {
         let mut value = self.value;
+        let reason = self.reason.or_else(|| {
+            self.absent_sysroot_reason
+                .filter(|_| !self.ambiguous && self.resolved.is_empty())
+        });
         value["path_resolution_state_kind"] = json!(if self.ambiguous {
             "ambiguous"
         } else if self.resolved.is_empty() {
@@ -64,7 +70,7 @@ impl PathNamespaceProduct {
         });
         value["path_target_symbol_rows"] = json!(grouped_targets(self.resolved));
         value["path_candidate_target_rows"] = json!(grouped_targets(self.candidates));
-        value["path_unresolved_reason_kind"] = json!(self.reason);
+        value["path_unresolved_reason_kind"] = json!(reason);
         value
     }
 }
@@ -180,6 +186,7 @@ impl DuckdbAnalysisStoreAdapter {
                         key,
                         value: parse(&row.get::<_, String>(1).map_err(build_analysis_error)?)?,
                         reason: row.get(2).map_err(build_analysis_error)?,
+                        absent_sysroot_reason: row.get(6).map_err(build_analysis_error)?,
                         ..Default::default()
                     };
                 }

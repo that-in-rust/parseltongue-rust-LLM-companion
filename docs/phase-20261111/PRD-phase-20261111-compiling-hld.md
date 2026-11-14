@@ -1,15 +1,19 @@
 # PRD — phase-20261111: HLD for Rust code that compiles
 
+> History. Replaced on 2026-11-13 by `docs/phase-20261113/PRD-phase-20261113-dependency-graph-hld.md`,
+> which states what is in force now. Do not edit or cite this file as current.
+
 Status: draft. Owner: human-architect-intent-author.
 Executable contracts: SPEC-phase-20261111-executable-requirements.md.
 Procedure: SOP-phase-20261111-hld-current-e2e-test.md.
-Source design: devin-research/Deep-Insight-08.md, narrowed here. This phase's three document basenames
+Source design: docs/devin-research/Deep-Insight-08.md, narrowed here. This phase's three document basenames
 retain their phase-prefixed convention; new owned names follow AGENTS.md's four-word rule.
 **M** marks observed facts; unmeasured budgets are targets, not results.
 
 ## 1. Objective
 
 Build hld-current-dependency-edges for compiling Rust workspaces using CPU tools only, no LLMs/training.
+It is derived from a full-item-dependency-graph of the same source (§17), which is also a product.
 Port rust-analyzer algorithms over persisted rows rather than host its analysis database in production.
 Aim for exact extracted dependencies, report unknowns without guessing, and enforce SPEC's explicit
 precision/coverage gates rather than claiming that compilation guarantees a complete graph.
@@ -17,8 +21,11 @@ precision/coverage gates rather than claiming that compilation guarantees a comp
 D1: cargo metadata --offline. D2: all five repos equally: rust-analyzer, ripgrep, tokio, serde, cargo-modules.
 D3: proc-macro-shape-table checked against real oracle expansions. D4/KL1: never execute build scripts
 or read their saved target/ outputs. D5: rustc only --print cfg / --print sysroot during production.
-D6: HLD nodes are non-private items another file can use, never fn-body items; reexports and external
-reachability use effective visibility, not explicit pub tokens alone.
+D6 (revised 2026-11-13, §17): the pipeline first builds one full-item-dependency-graph holding every
+item outside fn bodies, private items included, and every extracted edge. The HLD is derived from it:
+interface-level nodes are the non-private items another file can use, plus each file's
+file-public-area-node and its use nodes. Never fn-body items. Reexports and external reachability use
+effective visibility, not explicit pub tokens alone.
 
 ## 2. Source closure, targets and context
 
@@ -63,16 +70,20 @@ edge_dependency_origin_kind
 edge_resolution_status_kind
 ```
 
-Relation values: calls, uses_type, implements, reexports, contains, derives.
+Relation values: calls, uses_type, implements, reexports, contains, derives, imports, reads
+(the last two added 2026-11-13, §17).
 Via values: direct/collapsed. Origin values: same_crate/workspace_crate/std/external_crate.
 Every node carries node_reachable_outside_crate; external targets preserve package source and target identity,
 not just crate/version. Full span identity and snapshot are recoverable through the generation/occurrence keys.
 
-D6 selection includes file-top-level, inline-module and top-level impl/trait associated items with effective
-non-private visibility, and excludes all fn-body descendants. Trait/trait-impl members and enum variants inherit
+D6 interface-level selection (a filter over the full graph, §17) includes file-top-level, inline-module and
+top-level impl/trait associated items with effective non-private visibility, every file-public-area-node
+and every use node, and excludes all fn-body descendants. Trait/trait-impl members and enum variants inherit
 their interface visibility; inherent associated items respect their own restrictions.
 External reachability additionally follows ancestor modules and public reexport aliases.
-Private uses are evidence, not nodes; public/restricted reexports produce one edge per resolved binding,
+Every use outside fn bodies is a node with one imports edge per resolved binding; a call, type use or read
+that resolved through it targets the real item and keeps the use as evidence (§17; this replaces "private
+uses are evidence, not nodes"). Public/restricted reexports produce one edge per resolved binding,
 including aliases/globs. SPEC §2.4 defines module/root endpoints and the private-chain collapse algorithm.
 Use the nearest selected enclosing module as source, retaining a private lexical module in evidence;
 the implicit externally addressable crate-root module qualifies as a node. Private-equivalent pub(self) does not.
@@ -95,7 +106,8 @@ Layers:
 - parseltongue-cli-dispatcher-binary wires the production stages.
 - oracle-semantic-export-harness is an external offline test artifact; ide/hir/salsa permitted there only.
 
-Turso is the only database engine. Pin turso =0.9.0-pre.5; M: crates.io stable 0.8.3, maximum prerelease
+Turso is the only database engine (superseded by §16: Turso for writes and serving, DuckDB for analysis).
+Pin turso =0.9.0-pre.5; M: crates.io stable 0.8.3, maximum prerelease
 0.9.0-pre.5. M: the inspected API is async (query/execute/prepare/build) and supports
 TransactionBehavior::Concurrent / BEGIN CONCURRENT. The L3 store adapter owns the runtime; L2 remains sync.
 Source API availability is not measured throughput or a concurrency guarantee.
@@ -286,3 +298,84 @@ non-monotone stratified SQL rounds, not append-only accumulation. Rust macro
 expansion alternates with SQL and writes evidence to Turso. Only final
 HLD/product analysis tables copy back with digest verification. Per-body Rust
 work remains bounded. S5 reports module versus associated-path partitions.
+
+## 17. Full graph first, levels derived (2026-11-13)
+
+User decisions of 2026-11-13. Rules and an itoa example are in
+`docs/phase-20261113/archive-folded-draft-files/Table-Specs-01.md`; executable contracts are SPEC
+REQ-RUST-032.0, 019.2 and 030.1. §16 is unchanged: Turso for durable rows and
+publication, DuckDB for analysis, no third database. None of this is
+implemented; SPEC and SOP record that state.
+
+```text
+ source
+   -> Rust: parse, expand, resolve, infer                 facts
+   -> Turso: full-item-dependency-graph                   stored, never collapsed
+        item-effective-visibility-records   one row per node
+        edge-evidence-record-table          one row per edge fact
+   -> DuckDB: levels                                      filter, collapse, count
+        public-item-l2-interface    hld-current-interface-nodes, hld-current-dependency-edges,
+                                    hld-edge-evidence-paths
+        folder-file-l1-rollup       hld-file-level-rollup, hld-folder-level-rollup
+```
+
+Decided:
+
+```text
+ 1  The full graph is built first and is a product. A level adds no fact; it only filters
+    nodes, collapses paths and counts.
+ 2  Full-graph nodes: every module, function, struct, enum, trait, type alias, const, static
+    and associated item owned by the crate root, a module, a trait or an impl, private
+    items included. Nothing inside a fn body.
+ 3  Each source file has one file-public-area-node, separate from its module node, kept at
+    the interface level even when the module is private. It contains the file's top-level
+    nodes.
+ 4  Each use outside fn bodies is a node, with one imports edge per resolved binding.
+ 5  An inline module is an ordinary module node with its own scope.
+ 6  Every extracted edge is stored, private -> private included. Two relation kinds are
+    added: imports, and reads (a function reading a const, static or associated const).
+ 7  A call, type use or read targets the real item, never the use line; the use line is
+    evidence. A function has edges only to what it uses, not to every import in scope.
+ 8  The full graph reuses the two existing tables above; no table is added.
+ 9  The interface level keeps crate root, non-private items, file-public-area-nodes and
+    use nodes; private items are dropped there and remain as steps in evidence paths.
+ 10 Collapse walks only dependency edges: calls, uses_type, implements, reexports, derives,
+    reads. A contains or imports edge is never a step of a collapsed path; it shows at the
+    interface level only as a direct edge to a kept or external target.
+```
+
+Stage names as registered in the code's Turso registry, with their role under this section.
+Which engine computes visibility and body paths is still open (itoa PRD AD-2, AD-3).
+
+```text
+ stage owner name                    writes                               role
+ syntax-spans .. name-resolution     spans, fields, body sites,           inputs; built
+                                     bindings, path sites, macro items
+ signature-type-lowering-stage       lowered-signature-type-table,        inputs to edges; not built
+                                     impl-header-index-table
+ semantic-edge-evidence-stage        edge-evidence-record-table           every edge, all eight kinds;
+                                                                          not built
+ item-effective-visibility-stage     item-effective-visibility-records    every node, private items, use
+                                                                          nodes and area nodes included;
+                                                                          not built
+ hld-current-materialization-stage   the five HLD tables                  levels; reads only the two
+                                                                          full-graph tables and unit
+                                                                          provenance; built on fixtures
+```
+
+This narrows §5: stage 9 no longer reads span, field, binding or expansion rows itself, and the
+edge facts of stages 6 and 7 reach edge-evidence-record-table under its one owner stage.
+§5's `body-site-pending-table` is `body-site-reference-table` in the code.
+
+Why: an ext-llm-coding-agent edits private helpers as well as calling public items, so it needs
+both the interface view and the detail below it. Storing the detail once and deriving views means
+a change of level rule needs no new extraction.
+
+Not decided (listed in SPEC "Not decided in this revision"): containment detail (one container
+per node, impl members, items inside a dropped private module); reads and uses_type from a
+non-function source; pub use carrying both imports and reexports; enum variants and fields as nodes; file
+assignment of macro-generated items; whether the agent queries the two tables or a published copy;
+private items visible to several files at the interface level.
+
+Cost, not measured: the full graph is larger than the HLD on every repository. Per §12 it is
+measured and reported, not capped, until qualification.

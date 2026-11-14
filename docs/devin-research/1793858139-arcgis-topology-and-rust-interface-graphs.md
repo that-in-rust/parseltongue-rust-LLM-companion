@@ -31,7 +31,7 @@ The limit of the analogy: pipes can connect at a junction. Rust names do not con
 | **Ownership and overview: derive** | Workspace, crate and module ownership; project contracts onto these levels for orientation. Retain source witnesses for aggregate edges. | “Which crate should I inspect next, and which exact contract caused that connection?” A Cargo dependency alone is not an answer to the second question. |
 | **Evidence dependencies: internal only** | Reverse index from imports, definitions, configuration and source snapshots to the assertions they support. | “What must be checked again after this edit?” A comment can move an occurrence without changing the contract. A changed feature can invalidate an edge without changing that file's bytes. |
 
-Keep the [PRD's three HTTP reads](../docs/research004/prd-v20260710.md): fuzzy search, direct callees and direct callers. The CLI export can carry the richer contract graph. Defer shortest paths, centrality and whole-program control/data-flow graphs: none is needed to distinguish a public return type from a private implementation detail.
+Keep the [PRD's three HTTP reads](../research004/prd-v20260710.md): fuzzy search, direct callees and direct callers. The CLI export can carry the richer contract graph. Defer shortest paths, centrality and whole-program control/data-flow graphs: none is needed to distinguish a public return type from a private implementation detail.
 
 ## Archives worth using
 

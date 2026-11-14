@@ -4,7 +4,7 @@ Lossfunk Batch 9 research brief. Proposed experiment, not a model card or a benc
 
 **The artifact we want is a map a Rust systems programmer can hand to another programmer or a code harness.** It says which contracts a downstream crate can name, what each contract depends on, and where in the source to check. The post-trained local model has one job: build and refine that map on code it has not seen during post-training.
 
-The [existing CLI](../README.md) gives us both a distribution path and a serious control. It already indexes code with Tree-sitter and serves dependency queries. The question is not whether a small model can print plausible edges. It is whether the model produces a more accurate *whole graph* than that pipeline on new large Rust OSS repositories, at a cost that makes it reasonable to ship.
+The [existing CLI](../../../README.md) gives us both a distribution path and a serious control. It already indexes code with Tree-sitter and serves dependency queries. The question is not whether a small model can print plausible edges. It is whether the model produces a more accurate *whole graph* than that pipeline on new large Rust OSS repositories, at a cost that makes it reasonable to ship.
 
 ## What the application commits us to
 
@@ -61,7 +61,7 @@ The [signature-extraction study](https://docs.google.com/document/d/10ZGBTTTMrLp
 
 ### The baseline must resolve symbols
 
-The repository [README](../README.md) describes Tree-sitter extraction and forward/reverse graph APIs. It does not prove semantic call accuracy. A fair benchmark needs the current Parseltongue pipeline at a pinned commit, a strengthened deterministic Tree-sitter resolver, and a Rust-aware reference. Use the same source, build configuration and output schema.
+The repository [README](../../../README.md) describes Tree-sitter extraction and forward/reverse graph APIs. It does not prove semantic call accuracy. A fair benchmark needs the current Parseltongue pipeline at a pinned commit, a strengthened deterministic Tree-sitter resolver, and a Rust-aware reference. Use the same source, build configuration and output schema.
 
 [rust-analyzer](https://rust-analyzer.github.io/book/features.html) supports references and macro-related navigation. [SCIP](https://github.com/scip-code/scip) is a code-intelligence format with Rust bindings; [scip-rust](https://github.com/scip-code/scip-rust) documents `rust-analyzer scip .`. SCIP references are not automatically call edges: an adapter must classify call sites and normalize owners. Rust-analyzer is a strong reference, not an infallible oracle, especially for incomplete code, macros, dynamic dispatch and build configurations.
 

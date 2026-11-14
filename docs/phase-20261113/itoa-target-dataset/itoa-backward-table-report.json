@@ -1,0 +1,480 @@
+{
+  "checkpoint": {
+    "actual_source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+    "canonical_mapping_status": "NOT_IMPLEMENTED",
+    "expected_relationship": "<Buffer as Default>::default -> Buffer::new",
+    "expected_source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+    "semantic_comparison_status": "NOT_IMPLEMENTED_CANONICAL_TARGET_MAPPING",
+    "semantic_row_status": "BLOCKED_NOT_CHECKED",
+    "source_check_method": "local source bytes checked against pinned digest and byte range",
+    "source_checked_path": "/home/ubuntu/repos/rust-tools/itoa/src/lib.rs",
+    "source_evidence_status": "PRESENT",
+    "source_identity_link_status": "UNVERIFIED_GENERATION_LINK",
+    "source_path": "src/lib.rs",
+    "source_pin_file": "docs/phase-20261111/phase-one-benchmark-pin.json"
+  },
+  "counts_are_acceptance_evidence": false,
+  "errors": [],
+  "export_integrity": {
+    "attempt": "45b7540c4ea4fa3d8cb9f52cdb8f050796d3618620bb69c9f665c3f96ec50bf9/frozen/18",
+    "errors": [],
+    "frozen_stage_gate": "BLOCKED",
+    "frozen_stage_gate_reason": "exact frozen-revision proof is not implemented; summary markers are not proof",
+    "generation": "200527fb15e4e88d064c12943ffaaaa0accaa121bc08fffe76a89fab5cf6339a",
+    "marker_scope_statuses": {},
+    "missing_required_exports": [
+      "analysis-input-publication-manifest",
+      "analysis-resolution-receipt-records",
+      "crate-dependency-graph-table",
+      "file-source-content-records",
+      "file-source-text-table",
+      "frozen-stage-publication-records",
+      "frozen-stage-unit-memberships",
+      "lang-item-definition-table",
+      "legacy-macro-scope-records",
+      "legacy-macro-source-events",
+      "macro-expanded-item-table",
+      "module-scope-binding-table",
+      "module-source-closure-requests",
+      "name-resolution-scope-records",
+      "oracle-edge-agreement-table",
+      "span-byte-ownership-ranges",
+      "stage-run-generation-records",
+      "syntax-file-work-requests",
+      "syntax-namespace-input-externs",
+      "syntax-namespace-input-items",
+      "syntax-namespace-input-macros",
+      "syntax-namespace-input-scopes",
+      "workspace-config-state-records",
+      "workspace-generation-publication-manifest"
+    ],
+    "status": "BLOCKED",
+    "summary_scope_status": "NOT_SUPPLIED"
+  },
+  "frozen_stage_gate": "BLOCKED",
+  "ladder_rows": [
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "HLD outputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "hld-current-interface-nodes",
+      "record_kind": "registered_hld_output",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "HLD outputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "hld-current-dependency-edges",
+      "record_kind": "registered_hld_output",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "HLD outputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "hld-edge-evidence-paths",
+      "record_kind": "registered_hld_output",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "HLD outputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "hld-file-level-rollup",
+      "record_kind": "registered_hld_output",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "HLD outputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "hld-folder-level-rollup",
+      "record_kind": "registered_hld_output",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "source path, byte range and draft classification are retained",
+      "backward_contract_layer": "full-graph candidate inputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "LOCAL_REFERENCE_AVAILABLE",
+      "name": "itoa-full-graph-nodes.json",
+      "record_kind": "candidate_reference_file",
+      "stage_marker_status": "NOT_APPLICABLE_REFERENCE"
+    },
+    {
+      "assertion_or_blocker": "relation, target classification and source evidence are retained",
+      "backward_contract_layer": "full-graph candidate inputs",
+      "comparison_status": "BLOCKED",
+      "export_status": "LOCAL_REFERENCE_AVAILABLE",
+      "name": "itoa-full-graph-edges.json",
+      "record_kind": "candidate_reference_file",
+      "stage_marker_status": "NOT_APPLICABLE_REFERENCE"
+    },
+    {
+      "assertion_or_blocker": "adapter accepts this typed record; no named upstream table is read directly",
+      "backward_contract_layer": "typed HLD input",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "HldMaterializationInputRecord",
+      "record_kind": "typed_interface",
+      "stage_marker_status": "NOT_APPLICABLE_TYPED_INTERFACE"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "direct semantic input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "item-effective-visibility-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "direct semantic input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "edge-evidence-record-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "signature and impl contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "lowered-signature-type-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "signature and impl contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_EMPTY",
+      "name": "impl-header-index-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "module-scope-binding-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "name-resolution-scope-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_ROWS",
+      "name": "path-resolution-site-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "analysis-resolution-receipt-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "resolved namespace contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "macro-expanded-item-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "lang-item-definition-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "syntax-namespace-input-scopes",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "syntax-namespace-input-items",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_ROWS",
+      "name": "syntax-namespace-input-imports",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_ROWS",
+      "name": "syntax-namespace-input-paths",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "syntax-namespace-input-macros",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "syntax-namespace-input-externs",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "legacy-macro-scope-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "namespace and macro input contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "legacy-macro-source-events",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "file-source-text-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_ROWS",
+      "name": "span-reference-text-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "span-byte-ownership-ranges",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_ROWS",
+      "name": "field-signature-detail-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "EXPORTED_ROWS",
+      "name": "body-site-reference-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "module-source-closure-requests",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "body, signature-site and source-span contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "syntax-file-work-requests",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "content bytes are stored by file_content_digest_full; digest verification is not checked here",
+      "backward_contract_layer": "source content storage",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "file-source-content-records",
+      "record_kind": "source_content_store_relation",
+      "stage_marker_status": "NOT_APPLICABLE_CONTENT_STORE"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "crate and workspace context contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "crate-dependency-graph-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "crate and workspace context contracts",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "workspace-config-state-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "ancillary diagnostics",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "oracle-edge-agreement-table",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "exact table name and generation/attempt envelope; payload comparison blocked without canonical mapping",
+      "backward_contract_layer": "publication and control relations",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "stage-run-generation-records",
+      "record_kind": "registered_stage_table",
+      "stage_marker_status": "MISSING"
+    },
+    {
+      "assertion_or_blocker": "workspace generation scope is unique",
+      "backward_contract_layer": "publication and control relations",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "workspace-generation-publication-manifest",
+      "record_kind": "control_storage_relation",
+      "stage_marker_status": "CONTROL_EVIDENCE_NOT_VERIFIED"
+    },
+    {
+      "assertion_or_blocker": "analysis input generation scope is unique",
+      "backward_contract_layer": "publication and control relations",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "analysis-input-publication-manifest",
+      "record_kind": "control_storage_relation",
+      "stage_marker_status": "CONTROL_EVIDENCE_NOT_VERIFIED"
+    },
+    {
+      "assertion_or_blocker": "revision identity must match frozen stage proof",
+      "backward_contract_layer": "publication and control relations",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "frozen-stage-publication-records",
+      "record_kind": "control_storage_relation",
+      "stage_marker_status": "CONTROL_EVIDENCE_NOT_VERIFIED"
+    },
+    {
+      "assertion_or_blocker": "unit membership belongs to the exact frozen revision",
+      "backward_contract_layer": "publication and control relations",
+      "comparison_status": "BLOCKED",
+      "export_status": "NOT_EXPORTED",
+      "name": "frozen-stage-unit-memberships",
+      "record_kind": "control_storage_relation",
+      "stage_marker_status": "CONTROL_EVIDENCE_NOT_VERIFIED"
+    }
+  ],
+  "production_database_written": false,
+  "report_scope": "export integrity and reference contracts only; not canonical mapping or full HLD qualification",
+  "required_exports": [
+    "hld-current-interface-nodes",
+    "hld-current-dependency-edges",
+    "hld-edge-evidence-paths",
+    "hld-file-level-rollup",
+    "hld-folder-level-rollup",
+    "crate-dependency-graph-table",
+    "workspace-config-state-records",
+    "file-source-text-table",
+    "span-reference-text-table",
+    "span-byte-ownership-ranges",
+    "field-signature-detail-table",
+    "body-site-reference-table",
+    "module-source-closure-requests",
+    "syntax-file-work-requests",
+    "module-scope-binding-table",
+    "name-resolution-scope-records",
+    "path-resolution-site-records",
+    "oracle-edge-agreement-table",
+    "analysis-resolution-receipt-records",
+    "macro-expanded-item-table",
+    "lang-item-definition-table",
+    "syntax-namespace-input-scopes",
+    "syntax-namespace-input-items",
+    "syntax-namespace-input-imports",
+    "syntax-namespace-input-paths",
+    "syntax-namespace-input-macros",
+    "syntax-namespace-input-externs",
+    "lowered-signature-type-table",
+    "impl-header-index-table",
+    "item-effective-visibility-records",
+    "edge-evidence-record-table",
+    "stage-run-generation-records",
+    "legacy-macro-scope-records",
+    "legacy-macro-source-events",
+    "file-source-content-records",
+    "workspace-generation-publication-manifest",
+    "analysis-input-publication-manifest",
+    "frozen-stage-publication-records",
+    "frozen-stage-unit-memberships"
+  ],
+  "source_identity_link_status": "UNVERIFIED_UNLESS_FILE_SOURCE_EXPORT_MATCHES",
+  "verification_status": "BLOCKED"
+}

@@ -2173,7 +2173,9 @@ dependencies = [
  "parseltongue-table-store-traits",
  "parseltongue-turso-store-adapter",
  "serde_json",
+ "sha2",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -2244,6 +2246,7 @@ dependencies = [
  "parser",
  "serde_json",
  "syntax",
+ "thiserror",
 ]
 
 [[package]]

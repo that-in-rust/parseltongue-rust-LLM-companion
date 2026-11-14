@@ -9,15 +9,126 @@ const HLD_BUILTIN_TYPE_NAMES: [&str; 19] = [
     "i64", "i128", "f16", "f32", "f64", "f128",
 ];
 
+#[cfg(test)]
+#[path = "full-graph-validation-tests.rs"]
+mod full_graph_validation_tests;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldInputCompletenessKind {
     CompleteTypedInput,
     IncompleteTypedInput,
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct FileAreaIdentityKey {
+    unit_compilation_identity_key: CrateCompilationUnitKey,
+    file_source_relative_path: String,
+}
+
+impl FileAreaIdentityKey {
+    pub fn build_file_area_identity(
+        unit_compilation_identity_key: &CrateCompilationUnitKey,
+        file_source_relative_path: &str,
+    ) -> Result<Self, FileAreaIdentityError> {
+        unit_compilation_identity_key
+            .validate_crate_unit_identity()
+            .map_err(|_| FileAreaIdentityError::InvalidCompilationUnitIdentity)?;
+        Ok(Self {
+            unit_compilation_identity_key: unit_compilation_identity_key.clone(),
+            file_source_relative_path: normalize_file_area_path(file_source_relative_path)?,
+        })
+    }
+
+    pub fn read_unit_identity_value(&self) -> &CrateCompilationUnitKey {
+        &self.unit_compilation_identity_key
+    }
+
+    pub fn read_source_relative_path(&self) -> &str {
+        &self.file_source_relative_path
+    }
+}
+
+fn normalize_file_area_path(
+    file_source_relative_path: &str,
+) -> Result<String, FileAreaIdentityError> {
+    if file_source_relative_path.starts_with('/')
+        || file_source_relative_path.contains(['\\', ':', '\0'])
+    {
+        return Err(FileAreaIdentityError::InvalidSourceRelativePath);
+    }
+    let path_components = file_source_relative_path
+        .split('/')
+        .filter(|component| !component.is_empty() && *component != ".")
+        .collect::<Vec<_>>();
+    if path_components.is_empty() || path_components.contains(&"..") {
+        return Err(FileAreaIdentityError::InvalidSourceRelativePath);
+    }
+    Ok(path_components.join("/"))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileAreaIdentityError {
+    InvalidCompilationUnitIdentity,
+    InvalidSourceRelativePath,
+}
+
+impl std::fmt::Display for FileAreaIdentityError {
+    fn fmt(&self, error_display_format_sink: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_display_format_sink.write_str(match self {
+            Self::InvalidCompilationUnitIdentity => "file area unit identity is invalid",
+            Self::InvalidSourceRelativePath => "file area source path is invalid",
+        })
+    }
+}
+
+impl std::error::Error for FileAreaIdentityError {}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum HldTargetIdentityValue {
+    Symbol(NameSymbolTargetKey),
+    FilePublicArea(FileAreaIdentityKey),
+}
+
+impl From<NameSymbolTargetKey> for HldTargetIdentityValue {
+    fn from(symbol_identity: NameSymbolTargetKey) -> Self {
+        Self::Symbol(symbol_identity)
+    }
+}
+
+impl From<&NameSymbolTargetKey> for HldTargetIdentityValue {
+    fn from(symbol_identity: &NameSymbolTargetKey) -> Self {
+        Self::Symbol(symbol_identity.clone())
+    }
+}
+
+impl From<&HldTargetIdentityValue> for HldTargetIdentityValue {
+    fn from(target_identity: &HldTargetIdentityValue) -> Self {
+        target_identity.clone()
+    }
+}
+
+impl PartialEq<NameSymbolTargetKey> for HldTargetIdentityValue {
+    fn eq(&self, symbol_identity: &NameSymbolTargetKey) -> bool {
+        matches!(self, Self::Symbol(target_symbol_identity) if target_symbol_identity == symbol_identity)
+    }
+}
+
+impl PartialEq<HldTargetIdentityValue> for NameSymbolTargetKey {
+    fn eq(&self, target_identity: &HldTargetIdentityValue) -> bool {
+        target_identity == self
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum HldSourceCoverageKind {
+    FullSemantic,
+    OriginalTopLevelContainment,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldNodeInputCategory {
     LocalItem,
+    FilePublicArea,
     CrateRoot,
     ExternalDefinition,
     Builtin,
@@ -38,6 +149,13 @@ pub struct HldUnitProvenanceRecord {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldItemKindValue {
+    Union,
+    MacroDefinition,
+    MacroInvocation,
+    ExternBlock,
+    ExternCrate,
+    InlineAssembly,
+    FilePublicArea,
     Module,
     Function,
     Struct,
@@ -60,6 +178,7 @@ pub enum HldItemKindValue {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldOwnerKindValue {
+    ExternBlock,
     CrateRoot,
     Module,
     Trait,
@@ -79,13 +198,13 @@ pub enum HldEffectiveVisibilityKind {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldNodeInputRecord {
     pub run_generation_digest_value: RunGenerationDigestValue,
-    pub node_target_reference: NameSymbolTargetKey,
+    pub node_target_reference: HldTargetIdentityValue,
     pub node_input_category: HldNodeInputCategory,
     pub node_item_kind_value: Option<HldItemKindValue>,
     pub node_owner_kind_value: Option<HldOwnerKindValue>,
     pub node_function_body_ancestry_flag: bool,
     pub node_effective_visibility_kind: Option<HldEffectiveVisibilityKind>,
-    pub node_reachable_outside_crate_flag: bool,
+    pub node_reachable_outside_crate_flag: Option<bool>,
     pub node_source_relative_path: Option<String>,
     pub node_qualified_path_text: String,
     pub node_signature_text: Option<String>,
@@ -95,6 +214,8 @@ pub struct HldNodeInputRecord {
 pub enum HldRelationKindValue {
     Calls,
     UsesType,
+    Imports,
+    Reads,
     Implements,
     Reexports,
     Contains,
@@ -104,9 +225,9 @@ pub enum HldRelationKindValue {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldEvidenceRowKey {
     pub evidence_site_occurrence_key: SemanticOccurrenceKeyValue,
-    pub evidence_source_occurrence_key: NameSymbolTargetKey,
+    pub evidence_source_occurrence_key: HldTargetIdentityValue,
     pub evidence_relation_kind_value: HldRelationKindValue,
-    pub evidence_target_reference_value: Option<NameSymbolTargetKey>,
+    pub evidence_target_reference_value: Option<HldTargetIdentityValue>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -122,23 +243,23 @@ pub enum HldUnresolvedReasonKind {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldEdgeResolutionValue {
     Extracted {
-        target: NameSymbolTargetKey,
+        target: HldTargetIdentityValue,
     },
     Unresolved {
         reason: HldUnresolvedReasonKind,
     },
     Inferred {
-        candidate_target: Option<NameSymbolTargetKey>,
+        candidate_target: Option<HldTargetIdentityValue>,
     },
     Proposed {
-        candidate_target: Option<NameSymbolTargetKey>,
+        candidate_target: Option<HldTargetIdentityValue>,
     },
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldEdgeInputRecord {
     pub run_generation_digest_value: RunGenerationDigestValue,
-    pub edge_source_reference: NameSymbolTargetKey,
+    pub edge_source_reference: HldTargetIdentityValue,
     pub edge_relation_kind_value: HldRelationKindValue,
     pub edge_resolution_value: HldEdgeResolutionValue,
     pub edge_evidence_row_key: HldEvidenceRowKey,
@@ -150,6 +271,7 @@ pub struct HldMaterializationInputRecord {
     pub run_generation_digest_value: RunGenerationDigestValue,
     pub stage_attempt_sequence_value: String,
     pub semantic_input_completeness_kind: HldInputCompletenessKind,
+    pub source_coverage_kind: HldSourceCoverageKind,
     pub input_unit_provenance_records: Vec<HldUnitProvenanceRecord>,
     pub input_node_records: Vec<HldNodeInputRecord>,
     pub input_edge_records: Vec<HldEdgeInputRecord>,
@@ -184,19 +306,19 @@ pub enum HldDependencyOriginKind {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldSelectedNodeRecord {
     pub run_generation_digest_value: RunGenerationDigestValue,
-    pub node_target_reference: NameSymbolTargetKey,
+    pub node_target_reference: HldTargetIdentityValue,
     pub node_qualified_path_text: String,
     pub node_source_relative_path: Option<String>,
     pub node_effective_visibility_kind: Option<HldEffectiveVisibilityKind>,
-    pub node_reachable_outside_crate_flag: bool,
+    pub node_reachable_outside_crate_flag: Option<bool>,
     pub node_signature_text: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldGraphEdgeKey {
     pub run_generation_digest_value: RunGenerationDigestValue,
-    pub edge_source_occurrence_key: NameSymbolTargetKey,
-    pub edge_target_reference_value: NameSymbolTargetKey,
+    pub edge_source_occurrence_key: HldTargetIdentityValue,
+    pub edge_target_reference_value: HldTargetIdentityValue,
     pub edge_relation_kind_value: HldRelationKindValue,
     pub edge_collapse_via_kind: HldViaKindValue,
 }
@@ -216,7 +338,7 @@ pub struct HldMaterializedEdgeRecord {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct HldEvidencePathRecord {
     pub edge_key: HldGraphEdgeKey,
-    pub ordered_endpoint_path: Vec<NameSymbolTargetKey>,
+    pub ordered_endpoint_path: Vec<HldTargetIdentityValue>,
     pub ordered_evidence_row_keys: Vec<HldEvidenceRowKey>,
     pub ordered_site_occurrence_keys: Vec<SemanticOccurrenceKeyValue>,
 }
@@ -231,7 +353,7 @@ pub enum HldEndpointRollupBucket {
         unit_compilation_identity_key: crate::CrateCompilationUnitKey,
     },
     CanonicalExternalIdentity {
-        endpoint_target_reference: NameSymbolTargetKey,
+        endpoint_target_reference: HldTargetIdentityValue,
     },
 }
 
@@ -245,7 +367,7 @@ pub enum HldFolderEndpointBucket {
         unit_compilation_identity_key: crate::CrateCompilationUnitKey,
     },
     CanonicalExternalIdentity {
-        endpoint_target_reference: NameSymbolTargetKey,
+        endpoint_target_reference: HldTargetIdentityValue,
     },
 }
 
@@ -271,6 +393,7 @@ pub struct HldFolderRollupRecord {
 pub struct HldMaterializationOutputRecord {
     pub run_generation_digest_value: RunGenerationDigestValue,
     pub output_completeness_kind: HldOutputCompletenessKind,
+    pub source_coverage_kind: HldSourceCoverageKind,
     pub selected_node_records: Vec<HldSelectedNodeRecord>,
     pub materialized_edge_records: Vec<HldMaterializedEdgeRecord>,
     pub evidence_path_records: Vec<HldEvidencePathRecord>,
@@ -295,6 +418,8 @@ pub enum HldMaterializationValidationError {
     MissingUnitProvenance,
     ConflictingUnitProvenance,
     InvalidEvidenceIdentity,
+    StructuralScopeAllowsContainsOnly,
+    UnknownReachability,
 }
 
 impl std::fmt::Display for HldMaterializationValidationError {
@@ -317,11 +442,84 @@ impl std::fmt::Display for HldMaterializationValidationError {
             Self::MissingUnitProvenance => "compilation unit provenance is missing",
             Self::ConflictingUnitProvenance => "compilation unit provenance conflicts",
             Self::InvalidEvidenceIdentity => "evidence-row identity does not match its relation",
+            Self::StructuralScopeAllowsContainsOnly => {
+                "original top-level scope allows only extracted contains edges"
+            }
+            Self::UnknownReachability => "full semantic local-item reachability is unknown",
         })
     }
 }
 
 impl std::error::Error for HldMaterializationValidationError {}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::items_after_test_module)]
+mod file_area_identity_tests {
+    use super::*;
+
+    fn build_test_unit_identity(digest: u8) -> CrateCompilationUnitKey {
+        CrateCompilationUnitKey {
+            unit_cargo_package_identifier: "fixture-package".into(),
+            unit_cargo_target_name: "fixture-package".into(),
+            unit_cargo_target_kind: "lib".into(),
+            unit_compilation_role_kind: crate::CompilationUnitRoleKind::Target,
+            unit_configuration_digest_full: [digest; 32],
+        }
+    }
+
+    /// REQ-RUST-040.0
+    #[test]
+    fn test_file_area_path_normalizes() {
+        let identity = FileAreaIdentityKey::build_file_area_identity(
+            &build_test_unit_identity(1),
+            "src//./lib.rs",
+        )
+        .unwrap();
+        assert_eq!(identity.read_source_relative_path(), "src/lib.rs");
+        assert_eq!(
+            FileAreaIdentityKey::build_file_area_identity(
+                &build_test_unit_identity(1),
+                "../src/lib.rs",
+            ),
+            Err(FileAreaIdentityError::InvalidSourceRelativePath)
+        );
+    }
+
+    /// REQ-RUST-040.0
+    #[test]
+    fn test_file_area_units_differ() {
+        let first = FileAreaIdentityKey::build_file_area_identity(
+            &build_test_unit_identity(1),
+            "src/lib.rs",
+        )
+        .unwrap();
+        let second = FileAreaIdentityKey::build_file_area_identity(
+            &build_test_unit_identity(2),
+            "src/lib.rs",
+        )
+        .unwrap();
+        assert_ne!(first, second);
+    }
+
+    /// REQ-RUST-040.0
+    #[test]
+    fn test_file_area_invalid_unit_rejected() {
+        let mut unit = build_test_unit_identity(1);
+        unit.unit_cargo_package_identifier.clear();
+        assert_eq!(
+            FileAreaIdentityKey::build_file_area_identity(&unit, "src/lib.rs"),
+            Err(FileAreaIdentityError::InvalidCompilationUnitIdentity)
+        );
+    }
+}
+
+/// Validate canonical full-map facts without requiring HLD qualification.
+pub fn validate_full_graph_input(
+    input_record: &HldMaterializationInputRecord,
+) -> Result<(), HldMaterializationValidationError> {
+    validate_graph_input_records(input_record)
+}
 
 pub fn validate_hld_materialization_input(
     input_record: &HldMaterializationInputRecord,
@@ -329,6 +527,23 @@ pub fn validate_hld_materialization_input(
     if input_record.semantic_input_completeness_kind != HldInputCompletenessKind::CompleteTypedInput
     {
         return Err(HldMaterializationValidationError::IncompleteTypedInput);
+    }
+    validate_graph_input_records(input_record)
+}
+
+fn validate_graph_input_records(
+    input_record: &HldMaterializationInputRecord,
+) -> Result<(), HldMaterializationValidationError> {
+    if input_record.source_coverage_kind == HldSourceCoverageKind::OriginalTopLevelContainment
+        && input_record.input_edge_records.iter().any(|edge| {
+            edge.edge_relation_kind_value != HldRelationKindValue::Contains
+                || !matches!(
+                    edge.edge_resolution_value,
+                    HldEdgeResolutionValue::Extracted { .. }
+                )
+        })
+    {
+        return Err(HldMaterializationValidationError::StructuralScopeAllowsContainsOnly);
     }
 
     let mut unit_origins = BTreeMap::new();
@@ -353,9 +568,15 @@ pub fn validate_hld_materialization_input(
         |mut unit_identities, node_record| {
             if matches!(
                 node_record.node_input_category,
-                HldNodeInputCategory::LocalItem | HldNodeInputCategory::CrateRoot
+                HldNodeInputCategory::LocalItem
+                    | HldNodeInputCategory::FilePublicArea
+                    | HldNodeInputCategory::CrateRoot
             ) {
-                validate_hld_node_input(node_record)?;
+                validate_hld_node_input(
+                    node_record,
+                    input_record.source_coverage_kind,
+                    input_record.semantic_input_completeness_kind,
+                )?;
                 let unit_identity = read_hld_target_unit(&node_record.node_target_reference)?
                     .ok_or(HldMaterializationValidationError::InvalidNodeCategory)?;
                 unit_identities.insert(unit_identity);
@@ -369,7 +590,19 @@ pub fn validate_hld_materialization_input(
         if node_record.run_generation_digest_value != input_record.run_generation_digest_value {
             return Err(HldMaterializationValidationError::GenerationMismatch);
         }
-        validate_hld_node_input(node_record)?;
+        validate_hld_node_input(
+            node_record,
+            input_record.source_coverage_kind,
+            input_record.semantic_input_completeness_kind,
+        )?;
+        if input_record.source_coverage_kind == HldSourceCoverageKind::OriginalTopLevelContainment
+            && !matches!(
+                node_record.node_input_category,
+                HldNodeInputCategory::FilePublicArea | HldNodeInputCategory::LocalItem
+            )
+        {
+            return Err(HldMaterializationValidationError::InvalidNodeCategory);
+        }
         if node_record.node_input_category == HldNodeInputCategory::ExternalDefinition
             && read_hld_target_unit(&node_record.node_target_reference)?
                 .is_some_and(|unit_identity| local_unit_identities.contains(&unit_identity))
@@ -407,7 +640,9 @@ pub fn validate_hld_materialization_input(
             .ok_or(HldMaterializationValidationError::MissingLocalEndpoint)?;
         if !matches!(
             source_record.node_input_category,
-            HldNodeInputCategory::LocalItem | HldNodeInputCategory::CrateRoot
+            HldNodeInputCategory::LocalItem
+                | HldNodeInputCategory::FilePublicArea
+                | HldNodeInputCategory::CrateRoot
         ) {
             return Err(HldMaterializationValidationError::InvalidEdgeRecord);
         }
@@ -422,6 +657,29 @@ pub fn validate_hld_materialization_input(
             HldEdgeResolutionValue::Inferred { candidate_target }
             | HldEdgeResolutionValue::Proposed { candidate_target } => candidate_target.as_ref(),
         };
+        if input_record.source_coverage_kind == HldSourceCoverageKind::OriginalTopLevelContainment {
+            let source_area = match &edge_record.edge_source_reference {
+                HldTargetIdentityValue::FilePublicArea(file_area) => file_area,
+                _ => return Err(HldMaterializationValidationError::InvalidEdgeRecord),
+            };
+            let target_occurrence = match target_reference {
+                Some(HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(
+                    occurrence,
+                ))) => occurrence,
+                _ => return Err(HldMaterializationValidationError::InvalidEvidenceIdentity),
+            };
+            let target_parts = target_occurrence.read_semantic_occurrence_parts();
+            let site_occurrence = &edge_record
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key;
+            if target_parts.unit_compilation_identity_key != source_area.read_unit_identity_value()
+                || target_parts.span_source_file_path != source_area.read_source_relative_path()
+                || !target_parts.span_expansion_provenance_chain.is_empty()
+                || target_occurrence != site_occurrence
+            {
+                return Err(HldMaterializationValidationError::InvalidEvidenceIdentity);
+            }
+        }
         if edge_record
             .edge_evidence_row_key
             .evidence_source_occurrence_key
@@ -464,6 +722,19 @@ pub fn validate_hld_materialization_input(
         if !unit_origins.contains_key(site_unit_identity) {
             return Err(HldMaterializationValidationError::MissingUnitProvenance);
         }
+        let site_path = edge_record
+            .edge_evidence_row_key
+            .evidence_site_occurrence_key
+            .read_semantic_occurrence_parts()
+            .span_source_file_path;
+        if matches!(
+            edge_record.edge_source_reference,
+            HldTargetIdentityValue::FilePublicArea(_)
+        ) && read_hld_target_path(&edge_record.edge_source_reference)
+            .is_some_and(|source_path| source_path != site_path)
+        {
+            return Err(HldMaterializationValidationError::InvalidEvidenceIdentity);
+        }
         if evidence_records
             .insert(&edge_record.edge_evidence_row_key, edge_record)
             .is_some_and(|previous_record| previous_record != edge_record)
@@ -476,6 +747,8 @@ pub fn validate_hld_materialization_input(
 
 fn validate_hld_node_input(
     node_record: &HldNodeInputRecord,
+    source_coverage_kind: HldSourceCoverageKind,
+    input_completeness_kind: HldInputCompletenessKind,
 ) -> Result<(), HldMaterializationValidationError> {
     if node_record.node_qualified_path_text.trim().is_empty() {
         return Err(HldMaterializationValidationError::InvalidNodeCategory);
@@ -484,7 +757,10 @@ fn validate_hld_node_input(
         &node_record.node_input_category,
         &node_record.node_target_reference,
     ) {
-        (HldNodeInputCategory::LocalItem, NameSymbolTargetKey::Definition(occurrence_key)) => {
+        (
+            HldNodeInputCategory::LocalItem,
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence_key)),
+        ) => {
             validate_hld_occurrence_identity(occurrence_key)?;
             if node_record.node_source_relative_path.as_deref()
                 != Some(
@@ -495,6 +771,7 @@ fn validate_hld_node_input(
                 || node_record.node_item_kind_value.is_none()
                 || node_record.node_item_kind_value == Some(HldItemKindValue::Unknown)
                 || node_record.node_owner_kind_value.is_none()
+                || node_record.node_item_kind_value == Some(HldItemKindValue::FilePublicArea)
             {
                 return Err(HldMaterializationValidationError::InvalidNodeCategory);
             }
@@ -507,14 +784,70 @@ fn validate_hld_node_input(
             {
                 return Err(HldMaterializationValidationError::InvalidNodeCategory);
             }
+            if source_coverage_kind == HldSourceCoverageKind::OriginalTopLevelContainment
+                && (node_record.node_function_body_ancestry_flag
+                    || !occurrence_key
+                        .read_semantic_occurrence_parts()
+                        .span_expansion_provenance_chain
+                        .is_empty()
+                    || !matches!(
+                        node_record.node_owner_kind_value,
+                        Some(HldOwnerKindValue::CrateRoot | HldOwnerKindValue::Module)
+                    )
+                    || matches!(
+                        node_record.node_item_kind_value,
+                        Some(
+                            HldItemKindValue::AssociatedFunction
+                                | HldItemKindValue::AssociatedConstant
+                                | HldItemKindValue::AssociatedType
+                                | HldItemKindValue::ImplContainer
+                                | HldItemKindValue::FunctionBodyItem
+                                | HldItemKindValue::GenericParameter
+                        )
+                    ))
+            {
+                return Err(HldMaterializationValidationError::InvalidNodeCategory);
+            }
             match node_record.node_effective_visibility_kind {
+                Some(_)
+                    if input_completeness_kind
+                        == HldInputCompletenessKind::IncompleteTypedInput =>
+                {
+                    Ok(())
+                }
                 Some(HldEffectiveVisibilityKind::Unknown) | None => {
                     Err(HldMaterializationValidationError::UnknownEffectiveVisibility)
+                }
+                Some(_)
+                    if source_coverage_kind == HldSourceCoverageKind::FullSemantic
+                        && node_record.node_reachable_outside_crate_flag.is_none() =>
+                {
+                    Err(HldMaterializationValidationError::UnknownReachability)
                 }
                 Some(_) => Ok(()),
             }
         }
-        (HldNodeInputCategory::CrateRoot, NameSymbolTargetKey::CrateRoot(unit_identity)) => {
+        (
+            HldNodeInputCategory::FilePublicArea,
+            HldTargetIdentityValue::FilePublicArea(file_area_identity),
+        ) => {
+            if node_record.node_item_kind_value != Some(HldItemKindValue::FilePublicArea)
+                || node_record.node_owner_kind_value.is_some()
+                || node_record.node_function_body_ancestry_flag
+                || node_record.node_effective_visibility_kind.is_some()
+                || node_record.node_reachable_outside_crate_flag.is_some()
+                || node_record.node_signature_text.is_some()
+                || node_record.node_source_relative_path.as_deref()
+                    != Some(file_area_identity.read_source_relative_path())
+            {
+                return Err(HldMaterializationValidationError::InvalidNodeCategory);
+            }
+            Ok(())
+        }
+        (
+            HldNodeInputCategory::CrateRoot,
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)),
+        ) => {
             unit_identity
                 .validate_crate_unit_identity()
                 .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity)?;
@@ -522,6 +855,7 @@ fn validate_hld_node_input(
                 || node_record.node_owner_kind_value.is_some()
                 || node_record.node_function_body_ancestry_flag
                 || node_record.node_effective_visibility_kind.is_some()
+                || node_record.node_reachable_outside_crate_flag.is_some()
                 || node_record.node_source_relative_path.is_some()
             {
                 return Err(HldMaterializationValidationError::InvalidNodeCategory);
@@ -530,13 +864,14 @@ fn validate_hld_node_input(
         }
         (
             HldNodeInputCategory::ExternalDefinition,
-            NameSymbolTargetKey::Definition(occurrence_key),
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence_key)),
         ) => {
             validate_hld_occurrence_identity(occurrence_key)?;
             if node_record.node_item_kind_value.is_some()
                 || node_record.node_owner_kind_value.is_some()
                 || node_record.node_function_body_ancestry_flag
                 || node_record.node_effective_visibility_kind.is_some()
+                || node_record.node_reachable_outside_crate_flag.is_some()
                 || node_record
                     .node_source_relative_path
                     .as_deref()
@@ -550,12 +885,16 @@ fn validate_hld_node_input(
             }
             Ok(())
         }
-        (HldNodeInputCategory::Builtin, NameSymbolTargetKey::Builtin(name)) => {
+        (
+            HldNodeInputCategory::Builtin,
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)),
+        ) => {
             if !is_hld_builtin_type(name)
                 || node_record.node_item_kind_value.is_some()
                 || node_record.node_owner_kind_value.is_some()
                 || node_record.node_function_body_ancestry_flag
                 || node_record.node_effective_visibility_kind.is_some()
+                || node_record.node_reachable_outside_crate_flag.is_some()
                 || node_record.node_source_relative_path.is_some()
             {
                 return Err(HldMaterializationValidationError::MalformedBuiltinIdentity);
@@ -585,28 +924,41 @@ fn validate_hld_edge_input(
 }
 
 fn validate_hld_target_key(
-    target_reference: &NameSymbolTargetKey,
+    target_reference: &HldTargetIdentityValue,
 ) -> Result<(), HldMaterializationValidationError> {
     match target_reference {
-        NameSymbolTargetKey::Definition(occurrence_key) => {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence_key)) => {
             validate_hld_occurrence_identity(occurrence_key)
         }
-        NameSymbolTargetKey::GenericParameter(occurrence_key, parameter_name) => {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::GenericParameter(
+            occurrence_key,
+            parameter_name,
+        )) => {
             if parameter_name.trim().is_empty() {
                 return Err(HldMaterializationValidationError::MalformedSemanticOccurrenceIdentity);
             }
             validate_hld_occurrence_identity(occurrence_key)
         }
-        NameSymbolTargetKey::Builtin(name) => {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)) => {
             if !is_hld_builtin_type(name) {
                 Err(HldMaterializationValidationError::MalformedBuiltinIdentity)
             } else {
                 Ok(())
             }
         }
-        NameSymbolTargetKey::CrateRoot(unit_identity) => unit_identity
-            .validate_crate_unit_identity()
-            .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity),
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
+            unit_identity
+                .validate_crate_unit_identity()
+                .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity)
+        }
+        HldTargetIdentityValue::FilePublicArea(file_area_identity) => {
+            FileAreaIdentityKey::build_file_area_identity(
+                file_area_identity.read_unit_identity_value(),
+                file_area_identity.read_source_relative_path(),
+            )
+            .map(|_| ())
+            .map_err(|_| HldMaterializationValidationError::InvalidSourceRelativePath)
+        }
     }
 }
 
@@ -630,19 +982,45 @@ fn validate_hld_occurrence_identity(
 }
 
 fn read_hld_target_unit(
-    target_reference: &NameSymbolTargetKey,
+    target_reference: &HldTargetIdentityValue,
 ) -> Result<Option<CrateCompilationUnitKey>, HldMaterializationValidationError> {
     let unit_identity = match target_reference {
-        NameSymbolTargetKey::Definition(occurrence_key)
-        | NameSymbolTargetKey::GenericParameter(occurrence_key, _) => occurrence_key
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence_key))
+        | HldTargetIdentityValue::Symbol(NameSymbolTargetKey::GenericParameter(
+            occurrence_key,
+            _,
+        )) => occurrence_key
             .read_semantic_occurrence_parts()
             .unit_compilation_identity_key
             .clone(),
-        NameSymbolTargetKey::CrateRoot(unit_identity) => unit_identity.clone(),
-        NameSymbolTargetKey::Builtin(_) => return Ok(None),
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
+            unit_identity.clone()
+        }
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => return Ok(None),
+        HldTargetIdentityValue::FilePublicArea(file_area_identity) => {
+            file_area_identity.read_unit_identity_value().clone()
+        }
     };
     unit_identity
         .validate_crate_unit_identity()
         .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity)?;
     Ok(Some(unit_identity))
+}
+
+fn read_hld_target_path(target_reference: &HldTargetIdentityValue) -> Option<&str> {
+    match target_reference {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence))
+        | HldTargetIdentityValue::Symbol(NameSymbolTargetKey::GenericParameter(occurrence, _)) => {
+            Some(
+                occurrence
+                    .read_semantic_occurrence_parts()
+                    .span_source_file_path,
+            )
+        }
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(_))
+        | HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => None,
+        HldTargetIdentityValue::FilePublicArea(file_area_identity) => {
+            Some(file_area_identity.read_source_relative_path())
+        }
+    }
 }

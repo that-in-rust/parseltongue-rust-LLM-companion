@@ -1,0 +1,115 @@
+{
+  "artifact_status": "SYMBOLIC_SOURCE_EVIDENCE_NOT_CANONICAL",
+  "rows": [
+    {
+      "evidence_path": [
+        "Buffer|src/lib.rs:[2400, 2404]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Buffer",
+      "target": "u8",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Buffer::format|src/lib.rs:[3322, 3330]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "calls",
+      "source": "Buffer::format",
+      "target": "private::Sealed::write",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Buffer::format|src/lib.rs:[3383, 3397]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "reads",
+      "source": "Buffer::format",
+      "target": "Integer::MAX_STR_LEN",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Buffer::format|src/lib.rs:[3194, 3206]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Buffer::format",
+      "target": "Integer",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Buffer::format|src/lib.rs:[3280, 3299]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Buffer::format",
+      "target": "private::Sealed::Buffer",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Buffer::format|src/lib.rs:[3224, 3231]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Buffer::format",
+      "target": "str",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Buffer::new|src/lib.rs:[2894, 2903]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Buffer::new",
+      "target": "Buffer",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Integer|src/lib.rs:[3656, 3673]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Integer",
+      "target": "private::Sealed",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "Integer::MAX_STR_LEN|src/lib.rs:[3826, 3833]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "Integer::MAX_STR_LEN",
+      "target": "usize",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "private::Sealed::write|src/lib.rs:[4054, 4066]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "private::Sealed::write",
+      "target": "private::Sealed::Buffer",
+      "via": "direct"
+    },
+    {
+      "evidence_path": [
+        "private::Sealed::write|src/lib.rs:[4068, 4075]"
+      ],
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "relation": "uses_type",
+      "source": "private::Sealed::write",
+      "target": "str",
+      "via": "direct"
+    }
+  ]
+}

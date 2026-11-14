@@ -25,6 +25,12 @@ fn declared_namespace_source_columns(table: &str) -> Option<&'static [&'static s
     match table {
         "crate-dependency-graph-table" => Some(&[
             "unit_compilation_identity_key",
+            "unit_cargo_package_identifier",
+            "unit_cargo_target_name",
+            "unit_cargo_target_kind",
+            "unit_compilation_role_kind",
+            "unit_source_root_path",
+            "unit_package_root_path",
             "unit_rust_edition_value",
             "unit_normal_dependency_rows",
             "unit_implicit_prelude_flag",
@@ -67,6 +73,7 @@ fn declared_namespace_source_columns(table: &str) -> Option<&'static [&'static s
             "import_binding_alias_text",
             "import_glob_expansion_flag",
             "import_visibility_scope_kind",
+            "import_resolution_source_kind",
         ]),
         "syntax-namespace-input-macros" => Some(&[
             "invocation_site_occurrence_key",

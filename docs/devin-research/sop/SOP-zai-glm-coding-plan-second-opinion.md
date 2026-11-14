@@ -57,7 +57,7 @@ curl -s -G -H "Authorization: Bearer $ZAI_API_KEY" --data-urlencode "startTime=$
 ## 4. The procedure
 ```text
    0. CHECK      quota/limit above. If 5-hour percentage > 70 %, wait or use glm-5.3-flash.
-   1. TIME IT    big reads (whole devin-research/, 60k+ tokens) outside 11:30–15:30 IST Mon–Fri → half the credits.
+   1. TIME IT    big reads (whole docs/devin-research/, 60k+ tokens) outside 11:30–15:30 IST Mon–Fri → half the credits.
    2. PICK MODEL flash for: read-and-summarise, extract, bulk label, grep-like questions.
                  5.3   for: judgement, critique, design opinions, anything you will quote.
                  (slot mapping: ANTHROPIC_DEFAULT_*_MODEL in ~/bin/zcode; override per run with --model)
@@ -70,7 +70,7 @@ curl -s -G -H "Authorization: Bearer $ZAI_API_KEY" --data-urlencode "startTime=$
                  (add Edit,Write,Bash only for a task you want it to change files for; never with --dangerously-skip-permissions
                   on a branch you have not committed)
    5. READ       zcode-runs/<name>.md is the final answer; .err has the harness log. Keep both.
-   6. RECORD     paste the opinion verbatim into devin-research/ with a one-paragraph "where we disagree"; commit.
+   6. RECORD     paste the opinion verbatim into docs/devin-research/ with a one-paragraph "where we disagree"; commit.
                  Never silently merge its claims into our notes — it is one more annotation with creator = glm-5.3@date (H-51 applies to us too).
 ```
 

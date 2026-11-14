@@ -5,8 +5,8 @@ use parseltongue_core_row_types::{
     HldFolderEndpointBucket, HldFolderRollupRecord, HldGraphEdgeKey, HldMaterializationInputRecord,
     HldMaterializationOutputRecord, HldMaterializationValidationError, HldMaterializedEdgeRecord,
     HldNodeInputCategory, HldNodeInputRecord, HldOutputCompletenessKind, HldOutputEdgeStatus,
-    HldRelationKindValue, HldSelectedNodeRecord, HldUnitOriginKind, HldViaKindValue,
-    NameSymbolTargetKey, RunCancelFlagValue, SemanticOccurrenceKeyValue,
+    HldRelationKindValue, HldSelectedNodeRecord, HldTargetIdentityValue, HldUnitOriginKind,
+    HldViaKindValue, NameSymbolTargetKey, RunCancelFlagValue, SemanticOccurrenceKeyValue,
     validate_hld_materialization_input,
 };
 use parseltongue_table_store_traits::{
@@ -20,7 +20,12 @@ CREATE OR REPLACE TEMP TABLE "hld-analysis-node-records" AS
 SELECT
     input.*,
     CASE
-        WHEN endpoint_category_kind = 'crate_root' THEN TRUE
+        WHEN endpoint_category_kind IN ('crate_root', 'file_public_area') THEN TRUE
+        WHEN endpoint_category_kind = 'local_item'
+            AND item_kind_value = 'use_statement'
+            AND owner_kind_value IN ('crate_root', 'module', 'trait', 'impl')
+            AND function_body_ancestry_flag = FALSE
+            THEN TRUE
         WHEN endpoint_category_kind = 'local_item'
             AND item_kind_value IN (
                 'module', 'function', 'struct', 'enum', 'trait', 'type_alias',
@@ -85,6 +90,8 @@ WITH RECURSIVE path_walks (
         ON target.run_generation_key = edge.run_generation_key
         AND target.endpoint_identity_key = edge.target_identity_key
     WHERE edge.resolution_status_kind = 'extracted'
+        AND path.relation_kind_value NOT IN ('contains', 'imports')
+        AND edge.relation_kind_value NOT IN ('contains', 'imports')
         AND current.endpoint_category_kind = 'local_item'
         AND NOT current.node_selected_flag
         AND (
@@ -196,6 +203,17 @@ fn build_hld_rollup_buckets(
     node: &HldNodeInputRecord,
 ) -> Result<(HldEndpointRollupBucket, HldFolderEndpointBucket), HldAnalysisPortError> {
     match node.node_input_category {
+        HldNodeInputCategory::FilePublicArea => {
+            let unit = read_hld_target_unit(&node.node_target_reference).ok_or_else(|| {
+                invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory)
+            })?;
+            let path = node.node_source_relative_path.as_deref().ok_or_else(|| {
+                invalid_hld_rollup_input(
+                    HldMaterializationValidationError::InvalidSourceRelativePath,
+                )
+            })?;
+            source_hld_rollup_buckets(unit, path)
+        }
         HldNodeInputCategory::LocalItem => {
             let unit = read_hld_target_unit(&node.node_target_reference).ok_or_else(|| {
                 invalid_hld_rollup_input(HldMaterializationValidationError::InvalidNodeCategory)
@@ -220,7 +238,7 @@ fn build_hld_rollup_buckets(
             )),
         },
         HldNodeInputCategory::CrateRoot => match &node.node_target_reference {
-            NameSymbolTargetKey::CrateRoot(unit) => Ok((
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit)) => Ok((
                 HldEndpointRollupBucket::CrateRoot {
                     unit_compilation_identity_key: unit.clone(),
                 },
@@ -233,9 +251,9 @@ fn build_hld_rollup_buckets(
             )),
         },
         HldNodeInputCategory::Builtin => match &node.node_target_reference {
-            NameSymbolTargetKey::Builtin(_) => Ok(canonical_hld_rollup_buckets(
-                node.node_target_reference.clone(),
-            )),
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => Ok(
+                canonical_hld_rollup_buckets(node.node_target_reference.clone()),
+            ),
             _ => Err(invalid_hld_rollup_input(
                 HldMaterializationValidationError::InvalidNodeCategory,
             )),
@@ -262,7 +280,7 @@ fn source_hld_rollup_buckets(
 }
 
 fn canonical_hld_rollup_buckets(
-    target_reference: NameSymbolTargetKey,
+    target_reference: HldTargetIdentityValue,
 ) -> (HldEndpointRollupBucket, HldFolderEndpointBucket) {
     (
         HldEndpointRollupBucket::CanonicalExternalIdentity {
@@ -861,6 +879,7 @@ ORDER BY
     Ok(HldMaterializationOutputRecord {
         run_generation_digest_value: input_record.run_generation_digest_value,
         output_completeness_kind: HldOutputCompletenessKind::CompleteGraph,
+        source_coverage_kind: input_record.source_coverage_kind,
         selected_node_records,
         materialized_edge_records,
         evidence_path_records,
@@ -1018,7 +1037,7 @@ fn read_hld_folder_bucket(
 fn read_hld_identity_target(
     node_by_identity: &BTreeMap<String, &HldNodeInputRecord>,
     identity: &str,
-) -> Result<NameSymbolTargetKey, HldAnalysisPortError> {
+) -> Result<HldTargetIdentityValue, HldAnalysisPortError> {
     node_by_identity
         .get(identity)
         .map(|node| node.node_target_reference.clone())
@@ -1035,6 +1054,8 @@ fn read_hld_relation_kind(
     match relation_text {
         "calls" => Ok(HldRelationKindValue::Calls),
         "uses_type" => Ok(HldRelationKindValue::UsesType),
+        "imports" => Ok(HldRelationKindValue::Imports),
+        "reads" => Ok(HldRelationKindValue::Reads),
         "implements" => Ok(HldRelationKindValue::Implements),
         "reexports" => Ok(HldRelationKindValue::Reexports),
         "contains" => Ok(HldRelationKindValue::Contains),
@@ -1104,26 +1125,38 @@ fn encode_hld_occurrence_value(occurrence: &SemanticOccurrenceKeyValue) -> JsonV
     ])
 }
 
-fn encode_hld_target_value(target: &NameSymbolTargetKey) -> JsonValue {
+fn encode_hld_target_value(target: &HldTargetIdentityValue) -> JsonValue {
     match target {
-        NameSymbolTargetKey::Definition(occurrence) => {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence)) => {
             json!(["definition", encode_hld_occurrence_value(occurrence)])
         }
-        NameSymbolTargetKey::GenericParameter(occurrence, parameter_name) => {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::GenericParameter(
+            occurrence,
+            parameter_name,
+        )) => {
             json!([
                 "generic_parameter",
                 encode_hld_occurrence_value(occurrence),
                 parameter_name
             ])
         }
-        NameSymbolTargetKey::Builtin(name) => json!(["builtin", name]),
-        NameSymbolTargetKey::CrateRoot(unit_identity) => {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)) => {
+            json!(["builtin", name])
+        }
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
             json!(["crate_root", encode_hld_unit_value(unit_identity)])
         }
+        HldTargetIdentityValue::FilePublicArea(file_area) => json!([
+            "file_public_area",
+            encode_hld_unit_value(file_area.read_unit_identity_value()),
+            file_area.read_source_relative_path()
+        ]),
     }
 }
 
-fn encode_hld_target_identity(target: &NameSymbolTargetKey) -> Result<String, serde_json::Error> {
+pub(crate) fn encode_hld_target_identity(
+    target: &HldTargetIdentityValue,
+) -> Result<String, serde_json::Error> {
     serde_json::to_string(&encode_hld_target_value(target))
 }
 
@@ -1145,23 +1178,31 @@ fn encode_hld_hex_digest(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-fn read_hld_target_unit(target: &NameSymbolTargetKey) -> Option<CrateCompilationUnitKey> {
+fn read_hld_target_unit(target: &HldTargetIdentityValue) -> Option<CrateCompilationUnitKey> {
     match target {
-        NameSymbolTargetKey::Definition(occurrence)
-        | NameSymbolTargetKey::GenericParameter(occurrence, _) => Some(
-            occurrence
-                .read_semantic_occurrence_parts()
-                .unit_compilation_identity_key
-                .clone(),
-        ),
-        NameSymbolTargetKey::CrateRoot(unit_identity) => Some(unit_identity.clone()),
-        NameSymbolTargetKey::Builtin(_) => None,
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence))
+        | HldTargetIdentityValue::Symbol(NameSymbolTargetKey::GenericParameter(occurrence, _)) => {
+            Some(
+                occurrence
+                    .read_semantic_occurrence_parts()
+                    .unit_compilation_identity_key
+                    .clone(),
+            )
+        }
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
+            Some(unit_identity.clone())
+        }
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => None,
+        HldTargetIdentityValue::FilePublicArea(file_area) => {
+            Some(file_area.read_unit_identity_value().clone())
+        }
     }
 }
 
 fn encode_hld_node_category(category: HldNodeInputCategory) -> &'static str {
     match category {
         HldNodeInputCategory::LocalItem => "local_item",
+        HldNodeInputCategory::FilePublicArea => "file_public_area",
         HldNodeInputCategory::CrateRoot => "crate_root",
         HldNodeInputCategory::ExternalDefinition => "external_definition",
         HldNodeInputCategory::Builtin => "builtin",
@@ -1172,6 +1213,7 @@ fn encode_hld_item_kind(kind: parseltongue_core_row_types::HldItemKindValue) -> 
     use parseltongue_core_row_types::HldItemKindValue as Kind;
     match kind {
         Kind::Module => "module",
+        Kind::FilePublicArea => "file_public_area",
         Kind::Function => "function",
         Kind::Struct => "struct",
         Kind::Enum => "enum",
@@ -1189,6 +1231,12 @@ fn encode_hld_item_kind(kind: parseltongue_core_row_types::HldItemKindValue) -> 
         Kind::FunctionBodyItem => "function_body_item",
         Kind::GenericParameter => "generic_parameter",
         Kind::Unknown => "unknown",
+        Kind::Union => "union",
+        Kind::MacroDefinition => "macro_definition",
+        Kind::MacroInvocation => "macro_invocation",
+        Kind::ExternBlock => "extern_block",
+        Kind::ExternCrate => "extern_crate",
+        Kind::InlineAssembly => "inline_assembly",
     }
 }
 
@@ -1201,6 +1249,7 @@ fn encode_hld_owner_kind(kind: parseltongue_core_row_types::HldOwnerKindValue) -
         Kind::Impl => "impl",
         Kind::FunctionBody => "function_body",
         Kind::Other => "other",
+        Kind::ExternBlock => "extern_block",
     }
 }
 
@@ -1228,9 +1277,36 @@ fn encode_hld_relation_kind(kind: HldRelationKindValue) -> &'static str {
     match kind {
         HldRelationKindValue::Calls => "calls",
         HldRelationKindValue::UsesType => "uses_type",
+        HldRelationKindValue::Imports => "imports",
+        HldRelationKindValue::Reads => "reads",
         HldRelationKindValue::Implements => "implements",
         HldRelationKindValue::Reexports => "reexports",
         HldRelationKindValue::Contains => "contains",
         HldRelationKindValue::Derives => "derives",
+    }
+}
+
+#[cfg(test)]
+mod original_kind_codec_tests {
+    use super::*;
+
+    /// REQ-RUST-032.0, REQ-RUST-045.0
+    #[test]
+    fn test_encode_original_syntax_kinds() {
+        use parseltongue_core_row_types::HldItemKindValue as Kind;
+        for (kind, text) in [
+            (Kind::Union, "union"),
+            (Kind::MacroDefinition, "macro_definition"),
+            (Kind::MacroInvocation, "macro_invocation"),
+            (Kind::ExternBlock, "extern_block"),
+            (Kind::ExternCrate, "extern_crate"),
+            (Kind::InlineAssembly, "inline_assembly"),
+        ] {
+            assert_eq!(encode_hld_item_kind(kind), text);
+        }
+        assert_eq!(
+            encode_hld_owner_kind(parseltongue_core_row_types::HldOwnerKindValue::ExternBlock),
+            "extern_block"
+        );
     }
 }

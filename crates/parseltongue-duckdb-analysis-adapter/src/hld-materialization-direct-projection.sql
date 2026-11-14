@@ -26,7 +26,7 @@ CREATE TEMP TABLE "hld-analysis-node-inputs" (
     owner_kind_value VARCHAR,
     function_body_ancestry_flag BOOLEAN NOT NULL,
     effective_visibility_kind VARCHAR,
-    reachable_outside_crate_flag BOOLEAN NOT NULL,
+    reachable_outside_crate_flag BOOLEAN,
     source_relative_path VARCHAR,
     qualified_path_text VARCHAR NOT NULL,
     signature_text VARCHAR

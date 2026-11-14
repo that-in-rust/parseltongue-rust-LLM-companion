@@ -1,0 +1,260 @@
+{
+  "artifact_status": "PARTIAL_BLOCKED_EXPECTATION",
+  "rows": [
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "file_public_area",
+      "label": "area:src/lib.rs",
+      "source_evidence": {
+        "anchor_text": "//!",
+        "byte_range": [
+          0,
+          3
+        ],
+        "line": 1,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "module",
+      "label": "itoa",
+      "source_evidence": {
+        "anchor_text": "//!",
+        "byte_range": [
+          0,
+          3
+        ],
+        "line": 1,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "private",
+      "file": "src/lib.rs",
+      "item_kind": "use_statement",
+      "label": "use core::hint",
+      "source_evidence": {
+        "anchor_text": "use core::hint;",
+        "byte_range": [
+          1995,
+          2010
+        ],
+        "line": 56,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "private",
+      "file": "src/lib.rs",
+      "item_kind": "use_statement",
+      "label": "use core::mem::{self, MaybeUninit}",
+      "source_evidence": {
+        "anchor_text": "use core::mem::{self, MaybeUninit};",
+        "byte_range": [
+          2011,
+          2046
+        ],
+        "line": 57,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "private",
+      "file": "src/lib.rs",
+      "item_kind": "use_statement",
+      "label": "use core::str",
+      "source_evidence": {
+        "anchor_text": "use core::str;",
+        "byte_range": [
+          2047,
+          2061
+        ],
+        "line": 58,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "struct",
+      "label": "Buffer",
+      "source_evidence": {
+        "anchor_text": "pub struct Buffer",
+        "byte_range": [
+          2357,
+          2374
+        ],
+        "line": 72,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "associated_function",
+      "label": "Buffer::new",
+      "source_evidence": {
+        "anchor_text": "pub fn new()",
+        "byte_range": [
+          2881,
+          2893
+        ],
+        "line": 98,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "associated_function",
+      "label": "Buffer::format",
+      "source_evidence": {
+        "anchor_text": "pub fn format<I: Integer>",
+        "byte_range": [
+          3181,
+          3206
+        ],
+        "line": 106,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "trait",
+      "label": "Integer",
+      "source_evidence": {
+        "anchor_text": "pub trait Integer: private::Sealed",
+        "byte_range": [
+          3639,
+          3673
+        ],
+        "line": 119,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "associated_constant",
+      "label": "Integer::MAX_STR_LEN",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize;",
+        "byte_range": [
+          3809,
+          3834
+        ],
+        "line": 122,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "trait",
+      "label": "private::Sealed",
+      "source_evidence": {
+        "anchor_text": "pub trait Sealed: Copy",
+        "byte_range": [
+          3943,
+          3965
+        ],
+        "line": 128,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "associated_type",
+      "label": "private::Sealed::Buffer",
+      "source_evidence": {
+        "anchor_text": "type Buffer: 'static;",
+        "byte_range": [
+          3999,
+          4020
+        ],
+        "line": 130,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/lib.rs",
+      "item_kind": "associated_function",
+      "label": "private::Sealed::write",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str;",
+        "byte_range": [
+          4029,
+          4076
+        ],
+        "line": 131,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      }
+    },
+    {
+      "effective_visibility": "public",
+      "file": "src/u128_ext.rs",
+      "item_kind": "file_public_area",
+      "label": "area:src/u128_ext.rs",
+      "source_evidence": {
+        "anchor_text": "#[cfg",
+        "byte_range": [
+          0,
+          5
+        ],
+        "line": 1,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/u128_ext.rs",
+        "source_sha256": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+      }
+    },
+    {
+      "effective_visibility": "restricted_non_private",
+      "file": "src/u128_ext.rs",
+      "item_kind": "function",
+      "label": "u128_ext::mulhi",
+      "source_evidence": {
+        "anchor_text": "pub(crate) fn mulhi",
+        "byte_range": [
+          184,
+          203
+        ],
+        "line": 7,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/u128_ext.rs",
+        "source_sha256": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+      }
+    }
+  ]
+}

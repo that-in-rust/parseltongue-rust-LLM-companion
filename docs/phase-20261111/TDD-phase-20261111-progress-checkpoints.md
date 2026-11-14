@@ -4835,3 +4835,1803 @@ all-five S5 numbers and disagreement categories remain unstarted; no S5 rate exi
   formatter-only cleanup and the Clippy `manual_contains` correction,
   with the full affected gates recorded above.
 - Journal closure follows locally; no push or PR.
+
+## HLD-PUBLICATION-STUB — 2026-11-13
+
+- REQ-RUST-031.0: added the L2 HldGraphPublicationPort and typed
+  HldPublicationPortError; the Turso L3 implementation is a compiling stub.
+- STUB command (expected 30s, 60s ceiling): `cargo check -p
+  parseltongue-table-store-traits -p parseltongue-turso-store-adapter
+  --all-features --release --locked --offline`.
+- First check timed out while compiling dependencies at 60s (exit 124; peak
+  RSS 706,448 KiB) and exposed an unclosed delimiter. The next attempt
+  exposed a malformed import closure (exit 101; elapsed 19.56s; peak RSS
+  1,781,096 KiB). Both syntax errors were corrected before the passing
+  check; neither is counted as STUB evidence.
+- Passing output: `Finished release profile [optimized] target(s) in 0.39s`;
+  `elapsed_seconds=0.42 peak_rss_kib=215408`; exit 0. The known upstream
+  warning `unused manifest key lints.cargo` remains unchanged.
+- No behavior is implemented in the stub. RED covers snapshot gates,
+  cancellation, SQL rollback, empty snapshots, and typed round-trip fixtures.
+
+## HLD-PUBLICATION-RED — 2026-11-13
+
+- REQ-RUST-031.0 RED tests added: test_hld_missing_input_markers,
+  test_hld_generation_input_isolation, test_hld_cancel_preserves_publication,
+  test_hld_failed_write_rollback and test_hld_complete_empty_snapshot.
+- The first test compilation timed out at 120s while building warmed Rust
+  dependencies (exit 124; peak RSS 869,384 KiB), before test execution. One
+  test-only `.await` and unused import were corrected; no implementation was
+  changed to obtain RED.
+- Behavioral RED command (expected 10s, 20s ceiling): `cargo test -p
+  parseltongue-turso-store-adapter --lib hld_publication_contract_tests
+  --release --all-features --locked --offline -- --nocapture`.
+- Output: `running 5 tests`; `test result: FAILED. 0 passed; 5 failed; 8
+  filtered out`; `elapsed_seconds=5.75 peak_rss_kib=386100`; exit 101.
+  Each failed on the publication stub where its typed behavior was expected.
+- Cross-adapter round-trip RED is still pending; no implementation behavior
+  is claimed.
+
+## HLD-PUBLICATION-ROUND-TRIP-RED — 2026-11-13
+
+- Added REQ-RUST-031.0 DuckDB-to-Turso coverage:
+  test_hld_publication_round_trip. The five Turso behavioral RED tests remain
+  test_hld_missing_input_markers, test_hld_generation_input_isolation,
+  test_hld_cancel_preserves_publication, test_hld_failed_write_rollback and
+  test_hld_complete_empty_snapshot.
+- Exact warmed command (E=30s, 2x ceiling=60s):
+  `CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never python3
+  tools/process-tree-access-auditor.py sample --memory-sample-output-path
+  /home/ubuntu/hld-current-test-artifacts/20261113T070158Z-hld-publication/
+  roundtrip-red-memory.json -- cargo test
+  -p parseltongue-duckdb-analysis-adapter --lib --all-features --release
+  --locked --offline -- test_hld_publication_round_trip --nocapture`.
+- Behavioral RED output: `Finished release profile [optimized] target(s) in
+  21.67s`; `running 1 test`; `test_hld_publication_round_trip ... FAILED`;
+  panic at publication stub (`ValidateInputSnapshot`);
+  `test result: FAILED. 0 passed; 1 failed; 131 filtered out`; exit 101.
+  Process-tree elapsed 21.864s; peak RSS 903,602,176 bytes. DuckDB fixture
+  reported `memory_limit=25.0 GiB`, 8 threads, zero temporary-storage bytes.
+- The initial launch omitted the warmed `CARGO_TARGET_DIR`; after a new
+  `Compiling libduckdb-sys` marker appeared, that process was terminated before
+  native compilation. Fingerprint inspection found no compiled artifact in the
+  default worktree target; the prior release artifacts and exact target setting
+  are recorded in this journal. No cache deletion or toolchain change occurred.
+  Re-running with the documented target compiled the Rust adapters only and
+  showed no `Compiling libduckdb-sys` marker.
+- No implementation behavior is claimed. Next: implement atomic Turso
+  publication, then rerun the red set.
+
+## HLD-PUBLICATION-IMPLEMENTATION-VERIFICATION-BLOCKED — 2026-11-13
+
+- The L3 publication implementation and transaction-level workspace gate
+  factoring are present. A release type-check passed with the warmed target:
+  CARGO_TARGET_DIR=/home/ubuntu/repos/parseltongue-rust-LLM-companion/target
+  CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 CARGO_TERM_COLOR=never timeout -k 10s 60s
+  python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path
+  /home/ubuntu/hld-current-test-artifacts/20261113T070158Z-hld-publication/
+  stub-check-memory.json -- cargo check -p parseltongue-core-row-types -p
+  parseltongue-table-store-traits -p parseltongue-turso-store-adapter -p
+  parseltongue-duckdb-analysis-adapter --all-features --release --locked
+  --offline.
+  Output: Checking parseltongue-table-store-traits,
+  Checking parseltongue-duckdb-analysis-adapter,
+  Checking parseltongue-turso-store-adapter,
+  Finished release profile [optimized] target(s) in 1.18s;
+  exit 0. Process-tree elapsed 1.228s; peak RSS 505,618,432 bytes (114
+  samples). This is a check of the current implementation, not a new STUB
+  phase; the earlier passing STUB check remains recorded above.
+- The focused all-features Turso tests did not reach test execution after
+  three bounded attempts. Each used the same release/offline/locked command,
+  warmed CARGO_TARGET_DIR, and process-tree auditor:
+  cargo test -p parseltongue-turso-store-adapter --lib --all-features
+  --release --locked --offline -- hld_publication_contract_tests --nocapture.
+  Attempt 1 used E=20s / 40s ceiling and exited 124 while compiling
+  num-traits, tantivy, and turso_core. Attempt 2 used E=50s / 100s
+  ceiling and exited 124 while compiling tantivy, turso_core, and
+  turso_sqlite. Attempt 3 used E=40s / 80s ceiling and exited 124 while
+  compiling turso_core and turso_sqlite. No behavioral test output was
+  produced and the auditor did not write the Turso test RSS artifact.
+- No libduckdb-sys rebuild appeared. The repeated dependency-codegen timeout
+  is not evidence of a test failure or pass; stop further retries in this
+  increment rather than exceed the retry budget. cargo fmt --all -- --check
+  && git diff --check exited 0. Turso/core/traits full suites,
+  DuckDB-to-Turso round-trip GREEN, Clippy, release build, GREEN/REFACTOR
+  commits remain unverified/not completed.
+
+## 2026-11-13 — Phase 1 slice 0: unchanged pipeline on pinned itoa (measurement)
+
+- phase: measurement, no code change. REQ ids: none new (AD-1 evidence).
+- command: `parseltongue map-workspace-full-run --workspace-root-path-value <itoa copy>
+  --workspace-store-file-path <db> --worker-thread-count-value 4`, wrapped in
+  `timeout --signal=INT 2400` and `/usr/bin/time -v`. Declared E = 1200 s.
+- output: `Error: Resolution { source: StoreBackendFailureError { error_context_detail_text:
+  "NameResolutionCancelledError" } }`, `Command exited with non-zero status 124`,
+  `Elapsed (wall clock) time: 40:21.67`, `Maximum resident set size (kbytes): 8725256`.
+- observed: syntax stage 619 units / 359,053 records / 44.3 s (sysroot ingested); name
+  resolution not complete at the limit; nothing published.
+- report: `hld-current-test-runs/20261113T151000Z-itoa-unchanged-pipeline/hld-current-test-report.md`.
+- same day, documents: PRD, SPEC and ARCH rewritten as one clean set in `docs/phase-20261113/`;
+  REQ-RUST-033.0–037.0 added; SOP order note (skeleton slice before the first checkpoint);
+  itoa target dataset draft (73 nodes, 368 edges) in `docs/phase-20261113/itoa-target-dataset/`.
+- decision: AD-1 interim option B (no sysroot units for the first itoa pass), per the PRD's own
+  rule. Rejected for now: option A (does not finish), option C (invented sysroot identities).
+- commit: none yet. next: a pipeline switch to skip sysroot staging, test-first; then the
+  real-source harness (REQ-RUST-033.0). blockers: none.
+
+## 2026-11-13 — Phase 1 slice 1: real-source harness + sysroot scope switch — STUB and RED
+
+- phase: STUB then RED. REQ ids: REQ-RUST-033.0, REQ-RUST-038.0 (both added to the clean SPEC first).
+- stub: `SysrootSourceScopeKind`, `parse_sysroot_scope_flag`, CLI flag
+  `--sysroot-source-scope-kind`; `excluded` returns "not implemented".
+  `cargo check --release -p parseltongue-cli-dispatcher-binary --offline` → `Finished`.
+- test input: `crates/parseltongue-cli-dispatcher-binary/tests/pinned-itoa-source-tree/`,
+  byte-identical itoa files; the test checks their sha256 against `phase-one-benchmark-pin.json`.
+- tests: `test_itoa_pipeline_reads_published`, `test_sysroot_scope_excluded_units`
+  in `tests/itoa-source-acceptance-tests.rs`. Discovery: `-- --list` → `2 tests, 0 benchmarks`.
+- command: `CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests --offline` (release profile: reuses the built DuckDB).
+- output: `test test_sysroot_scope_excluded_units ... FAILED`, `test test_itoa_pipeline_reads_published
+  ... FAILED`, both `Error: "sysroot source scope excluded is not implemented"`;
+  `test result: FAILED. 0 passed; 2 failed`. Reached the intended behaviour: the pin digests
+  matched, the unknown-value usage error passed, and the failure is the stubbed switch.
+- commit: none. next: GREEN. blockers: none.
+
+## 2026-11-13 — Phase 1 slice 1: real-source harness + sysroot scope switch — GREEN
+
+- phase: GREEN. REQ ids: REQ-RUST-033.0, REQ-RUST-038.0.
+- code: `main.rs` passes `SysrootSourceScopeKind` to `prepare_sysroot_staging_scope` (skips the
+  sysroot scan and graph extension when `excluded`) and writes `workspace_sysroot_scope_kind` into
+  the workspace config row. `namespace-final-path-products.sql` adds `absent_sysroot_reason`;
+  `PathNamespaceProduct::finish` uses it only when the site is unresolved and has no other reason.
+- attempt 1: `test_itoa_pipeline_reads_published ... ok`, `test_sysroot_scope_excluded_units ... FAILED`
+  (`core::ops::Range` unresolved with `path_unresolved_reason_kind: null`).
+- attempt 2, same command as RED: `test test_sysroot_scope_excluded_units ... ok`,
+  `test test_itoa_pipeline_reads_published ... ok`, `test result: ok. 2 passed; 0 failed`, 11.02 s.
+- real-source run (release binary sha256 c8679fff…c9a6, 4 workers, `excluded`): exit 0, 11.55 s,
+  peak RSS 362,708 kB (parent process, `time -v`). Report:
+  `hld-current-test-runs/20261113T170000Z-itoa-sysroot-excluded/hld-current-test-report.md`.
+- decision: REQ-RUST-038.0 narrowed to paths that name a sysroot crate. Rejected: marking every
+  unresolved path in an `excluded` run as `external_source_missing` (would mislabel the 16
+  type-relative sites). 17 sysroot-through-import/prelude sites keep no reason; recorded in the SPEC.
+- commit: none. next: REFACTOR note, gates, then slice 2. blockers: none.
+
+## 2026-11-13 — Phase 1 slice 1 — REFACTOR
+
+- phase: REFACTOR. No structural refactor needed: the switch is one enum, one parser and one
+  early return. Clippy fixes only: `expect` in the new test helper replaced by `unwrap_or_else`;
+  one unused import removed from `hld-materialization-contract-tests.rs` (left by the earlier
+  uncommitted publication work).
+- gates: `cargo fmt --check` clean. `cargo clippy --release --all-targets --offline -- -D warnings`
+  → `Finished`. Workspace tests: see next entry.
+
+## 2026-11-13 — Phase 1 slice 1 — GATES (workspace tests)
+
+```text
+ phase      gates after REFACTOR · REQ-RUST-033.0, REQ-RUST-038.0
+ command    CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 /usr/bin/time -v cargo test --release --workspace --offline --no-fail-fast
+            (rust-analyzer SIGSTOP before, SIGCONT after; confirmed running again)
+ result     cargo_test_exit=101 · 313 passed; 3 failed; 4 ignored · wall 10:12.46 · cargo parent peak RSS 7,944,032 kB
+ new tests  test_itoa_pipeline_reads_published ... ok · test_sysroot_scope_excluded_units ... ok
+ failures   3, none in code changed by this slice:
+   test_lang_items_in_sysroot           sysroot-INCLUDED fixture (default scope). Still in name
+                                        resolution after 528 s, child RSS 2.6 GiB. I sent SIGTERM to
+                                        its parseltongue child so the suite could continue; the test
+                                        then failed on the non-zero exit. Same open regression as the
+                                        earlier journal entries that filtered this test (task
+                                        "Diagnose the native sysroot regression timeout"). Not fixed.
+   test_hld_configured_stage_gate       parseltongue-turso-store-adapter, HLD publication fixtures.
+   test_hld_missing_extra_required      Both failed before this slice (last recorded run: 9 passed,
+                                        2 failed, in fixture setup). Not touched here. Owed in the
+                                        slice that wires publication.
+ fmt        cargo fmt --check: clean
+ clippy     cargo clippy --release --all-targets --offline -- -D warnings: clean
+ log        ~/hld-current-test-artifacts/20261113T170000Z-itoa-sysroot-excluded/workspace-tests.log
+ commit     none (not authorised)
+ decision   slice 1 is closed as local-only progress. cargo test is NOT green for the workspace.
+ next       slice 2. Order changed after reading REQ-RUST-032.0 against the published rows:
+            a trait-impl member takes its trait's visibility, so node rows need the impl's trait
+            first. Sub-slices: 2a impl-header rows (REQ-RUST-035.0), 2b node rows, 2c contains and
+            imports edges, 2d assemble + build + publish.
+```
+
+## 2026-11-13 — Phase 1 slice 2a-pre — REQ + RED (names that reach an absent sysroot)
+
+```text
+ phase      REQ added, then RED · REQ-RUST-038.1 (new, SPEC section 3.4, replaces the "not yet covered" note)
+ test       test_sysroot_reached_names_reasoned (real-source, pinned itoa, `excluded`)
+ stub       none needed: the rule changes one SQL product, no new signature
+ discovery  cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests --offline -- --list
+            test_itoa_pipeline_reads_published: test
+            test_sysroot_reached_names_reasoned: test
+            test_sysroot_scope_excluded_units: test
+            3 tests, 0 benchmarks
+ RED        ... --offline -- test_sysroot_reached_names_reasoned
+            test test_sysroot_reached_names_reasoned ... FAILED
+            itoa-source-acceptance-tests.rs:261:5: assertion `left == right` failed  left: 0  right: 13
+            test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 10.97s
+ evidence   the pipeline ran to publication on pinned itoa and the test read published
+            path-resolution-site-records; it failed on the first behavioural assertion
+            (0 of 13 `MaybeUninit<u8>` sites carry external_source_missing). Not a setup failure.
+ decision   two mechanical cases only (import from an absent sysroot crate; one-segment name whose
+            lookup chain ends at the absent standard prelude). Rejected: labelling every unresolved
+            path under `excluded`, which would also relabel the 16 type-relative sites.
+ why now    node visibility (REQ-RUST-032.0) for a trait-impl member needs to know its trait leaves
+            the crate; `impl Default for Buffer` is the first checkpoint's impl.
+ commit     none (not authorised)
+next       GREEN: extend namespace-final-path-products.sql
+```
+
+## 2026-11-14 — Phase 1 reference rebuild — REQ-RUST-039.0 SPEC
+
+```text
+ phase      requirement/matrix and procedure update; no dataset code changed yet
+ req        REQ-RUST-039.0 (docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md)
+ test       not run; requirement and matrix are recorded before tooling tests
+ command    inline Python structural requirement check; git diff --check -- AGENTS.md
+            docs/phase-20261111/SOP-phase-20261111-hld-current-e2e-test.md
+ output     DOC_REQUIREMENT_VALIDATION=PASS checks=9
+            DOC_TRAILING_WHITESPACE=PASS files=5
+            DOC_DIFF_CHECK=PASS
+ decisions  complete candidate inventory remains separate from the eligible local-only subset;
+            blocked/proposed rows, five derived outputs and one table-contract manifest are required.
+            OD-2/OD-7/OD-8/OD-9 remain open. This work does not change production semantics.
+ commit     none (not authorised)
+ next       add offline behavioral tests before changing the reference generator
+ blockers   none
+```
+
+## 2026-11-14 — Phase 1 reference rebuild — REQ-RUST-039.0 RED
+
+```text
+ phase      RED, helper behavior reached by nonzero offline unittest discovery
+ req        REQ-RUST-039.0
+ tests      19 discovered; 15 assertion failures; 4 passed; no setup/runtime errors
+ command    python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+ output     Ran 19 tests in 0.001s
+            FAILED (failures=15)
+            BEHAVIORAL_RED_EXIT=1
+            Representative failures: direct/collapsed provenance merged; diamond evidence lost;
+            wrong-target same-count returned PASS; mixed generations/export errors/missing markers
+            returned PASS; pin mismatch was not rejected.
+ decision   the REQ matrix test suite runs against the helper stub and reaches behavioral assertions;
+            no parser, publisher, database or production pipeline was invoked.
+ commit     none (not authorised)
+ next       implement fail-closed reference classification and verification helpers
+ blockers   none
+```
+
+## 2026-11-14 — Phase 1 reference rebuild — REQ-RUST-039.0 helper GREEN
+
+```text
+ phase      GREEN for graph and validation helper behavior
+ req        REQ-RUST-039.0
+ tests      19 discovered; 19 passed; verified test methods reached assertions
+ command    python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+ output     Ran 19 tests in 0.001s
+            OK
+ decisions  exact identity only; unknown/canonical status blocks; direct/collapsed are keyed
+            separately; evidence sets retain diamond paths; all candidate rows remain in inventory.
+            No refactor needed before integrating helper into the generator.
+ commit     none (not authorised)
+ next       connect fail-closed helpers to itoa generator and baseline verifier
+ blockers   generator and report integration not yet complete
+```
+
+## 2026-11-14 — Phase 1 reference rebuild — REQ-RUST-039.0 artifact GREEN
+
+```text
+ phase      GREEN for reference artifact generation and read-only baseline verification
+ req        REQ-RUST-039.0
+ command    python3 docs/phase-20261113/itoa-target-dataset/itoa-target-dataset-builder.py
+ output     candidate_nodes=73; eligible_nodes=26; blocked_nodes=47
+            candidate_edges=368; eligible_edges=16; blocked_edges=352
+            expected_interface_nodes=15; expected_direct_edges=7; blocked_collapsed_edges=0
+            source commit af77385d0daf4d0e949e81f2588be2e44f69f086; both source digests matched pin
+ command    python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+ output     Ran 19 tests; OK. Includes two clean generation runs into separate temporary directories;
+            outputs byte-equal.
+ command    python3 docs/phase-20261113/itoa-target-dataset/itoa-backward-table-ladder.py
+ output     Status BLOCKED; 12 export files, 13 generation headers, 0 errors; generation
+            200527fb15e4e88d064c12943ffaaaa0accaa121bc08fffe76a89fab5cf6339a;
+            attempt 45b7540c4ea4fa3d8cb9f52cdb8f050796d3618620bb69c9f665c3f96ec50bf9/frozen/18.
+            Syntax checkpoint PRESENT [2506, 2519); semantic resolution row MISSING. Signature
+            lowering, call resolution and visibility/HLD are not yet implemented.
+ decision   outputs remain noncanonical source-review drafts. Direct local-only rows are eligible;
+            collapsed outputs stay blocked while OD-9 is open. Macro-invocation roll-ups are
+            blocked without assigning macro-generated items to a file. Baseline database untouched.
+ commit     none (not authorised)
+ next       package source/docs/tests and outputs for review; no production pipeline work
+ blockers   canonical keys, open OD decisions and unimplemented producer schemas remain blocked
+```
+
+## 2026-11-14 — Phase 1 reference rebuild — REQ-RUST-039.0 final output audit
+
+```text
+ phase      final generated bundle and fail-closed output audit
+ req        REQ-RUST-039.0
+ command    python3 docs/phase-20261113/itoa-target-dataset/itoa-target-dataset-builder.py
+ output     source commit and source digests match pin; source sizes: src/lib.rs 16904 bytes,
+            src/u128_ext.rs 695 bytes. Counts unchanged: 73/368 candidates; 26/16 eligible;
+            47/352 blocked; 15 interface nodes; 7 direct edges; 0 collapsed outputs eligible.
+ command    python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+ output     Ran 19 tests in 0.193s; OK (including deterministic two-directory regeneration).
+ command    python3 docs/phase-20261113/itoa-target-dataset/itoa-backward-table-ladder.py
+ output     BLOCKED; 12 exports, 13 headers, 0 errors; one generation and frozen attempt validated.
+            Syntax evidence PRESENT at [2506,2519); semantic path row MISSING; unimplemented HLD
+            stage markers remain a blocker. Baseline DB was not opened or written.
+ command    inline Python reference output/manifest validation
+ output     FINAL_REFERENCE_VALIDATION=PASS checks=14 contracts=31 matrix_tests=19
+ decision   full candidate inventory preserved; all canonical comparison and open-OD dependent
+            behavior remains blocked. Five expected outputs are distinct from inventory.
+ commit     none (not authorised)
+ next       package deliverables outside the repository for review
+ blockers   Phase 2 five-repository gate and production pipeline remain out of scope
+```
+
+## 2026-11-14 — Phase 1 reference rebuild — REQ-RUST-039.0 naming check
+
+```text
+ phase      verification-only test-name correction
+ req        REQ-RUST-039.0
+ change     renamed test_macro_file_rollup_stays_blocked (five words) to
+            test_macro_rollup_stays_blocked (four words); SPEC matrix updated to match
+ command    python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+ output     Ran 19 tests in 0.188s; OK
+ command    inline SPEC-matrix/name/whitespace validation
+ output     REFERENCE_STRUCTURE_VALIDATION=PASS checks=4 matrix_tests=19
+            REFERENCE_TRAILING_WHITESPACE=PASS files=28
+ decision   behavior is unchanged; keep the repository's four-word test naming rule
+ commit     none (not authorised)
+ next       final diff check and review bundle creation
+ blockers   none for reference artifacts; production gates remain out of scope
+```
+
+## 2026-11-14 — Focused reference correction — REQ-RUST-039.0
+
+```text
+ phase      RED/GREEN for registry-backed contracts, current collapse policy and fail-closed ladder
+ req        REQ-RUST-039.0
+ RED tests  test_payload_citations_are_exact; test_storage_keys_match_schema;
+            test_content_store_not_control; test_primitive_vocabulary_matches_source
+ RED output old manifest used OBSERVED_SERIALIZED_EXPORT_FIELDS instead of
+            OBSERVED_SOURCE_SERIALIZER_FIELDS; missing required_fields raised KeyError;
+            source-content relation was absent from its separate source-context layer;
+            f16 and f128 were absent from the source-matched builtin vocabulary.
+ GREEN command
+            python3 docs/phase-20261113/itoa-target-dataset/itoa-target-dataset-builder.py
+              --pin-file docs/phase-20261111/phase-one-benchmark-pin.json
+              --source-root /home/ubuntu/repos/rust-tools/itoa
+              --output-directory docs/phase-20261113/itoa-target-dataset
+ GREEN output candidate_nodes=73; eligible_nodes=26; blocked_nodes=47
+            candidate_edges=368; eligible_edges=29; blocked_edges=339
+            expected_interface_nodes=15; expected_direct_edges=11; expected_collapsed_edges=0
+            blocked_collapsible_candidate_edges=265; source commit and both source digests match pin
+ GREEN command
+            python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset
+              -p 'test_*.py' -v
+ GREEN output Ran 50 tests in 0.408s
+            OK
+ GREEN command
+            python3 docs/phase-20261113/itoa-target-dataset/itoa-backward-table-ladder.py
+              --export-directory /home/ubuntu/hld-current-test-artifacts/20261113T180000Z-itoa-slice-2/ladder-baseline/exported-table-rows
+              --source-root /home/ubuntu/repos/rust-tools/itoa
+              --pin-file docs/phase-20261111/phase-one-benchmark-pin.json
+              --output-directory docs/phase-20261113/itoa-target-dataset
+ GREEN output Status BLOCKED; source bytes match pin; generation-source link UNVERIFIED;
+            five HLD exports are EXPORTED_EMPTY with MISSING markers and BLOCKED comparisons;
+            missing upstream exports remain NOT_EXPORTED; full canonical HLD comparison absent.
+ decisions  all 34 registered contracts cite the live registry/DDL and schema provenance;
+            typed materializer remains a record; OD-9 is not a collapse filter.
+            The eligible source subset has zero collapsed rows, not because of OD-9 suppression;
+            fixture coverage exercises all six decided relation kinds.
+            Source-content storage is separate from publication controls. Verification does not
+            mutate the static manifest or baseline DB. No Rust gates, production writes, or
+            Phase 2 qualification were run.
+ commit     none (not authorised)
+ next       regenerate and inspect the review ZIP at its existing path
+ blockers   canonical mapping/full HLD comparison, open OD-2/OD-7/OD-8 decisions and
+            unbuilt producer schemas remain blocked
+```
+
+## 2026-11-14 — Reference provenance wording alignment
+
+```text
+ phase      documentation-only correction for candidate provenance and current verification status
+ req        REQ-RUST-039.0
+ change     AGENTS, PRD and ARCH now describe the itoa rows as source-reviewed symbolic candidates,
+            state that no LLM-generated rows are included, distinguish reference-builder behavior
+            from production pipeline status, and retain explicit source-coverage gaps.
+ command    git diff --check -- AGENTS.md docs/phase-20261113/PRD-phase-20261113-dependency-graph-hld.md
+              docs/phase-20261113/ARCH-phase-20261113-pipeline-graph-tables.md
+ output     exit 0; no whitespace diagnostics
+ tests      no rerun after documentation-only edits; implementation and test inputs were unchanged.
+            Earlier same-revision suite output: Ran 50 tests in 0.408s; OK.
+ commit     none (not authorised)
+ next       regenerate and validate the review ZIP at its existing path
+ blockers   none introduced; canonical comparison and open OD decisions remain blocked
+```
+
+## 2026-11-14 — Export payload error handling — REQ-RUST-039.0
+
+```text
+ phase      RED/GREEN for malformed JSONL row payload handling
+ req        REQ-RUST-039.0
+ test       test_invalid_export_payload_errors
+ RED command
+            python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset
+              -p 'test_*.py' -k invalid_export_payload_errors -v
+ RED output test_invalid_export_payload_errors ... FAIL
+            AssertionError: ValueError not raised
+            Ran 1 test in 0.002s
+            FAILED (failures=1)
+ GREEN change load_export now raises ValueError for invalid row-payload JSON; main records that
+            as an export error, keeping export integrity ERROR rather than silently dropping it.
+ GREEN command
+            python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset
+              -p 'test_*.py' -v
+ GREEN output Ran 51 tests in 0.358s
+            OK
+ GREEN command
+            python3 docs/phase-20261113/itoa-target-dataset/itoa-backward-table-ladder.py
+              --manifest-file docs/phase-20261113/itoa-target-dataset/itoa-table-contract-manifest.json
+              --export-directory /home/ubuntu/hld-current-test-artifacts/20261113T180000Z-itoa-slice-2/ladder-baseline/exported-table-rows
+              --source-root /home/ubuntu/repos/rust-tools/itoa
+              --pin-file docs/phase-20261111/phase-one-benchmark-pin.json
+              --output-directory docs/phase-20261113/itoa-target-dataset
+ GREEN output Status BLOCKED; malformed-payload fail-closed behavior did not alter valid exports;
+            source bytes PRESENT, generation link UNVERIFIED, canonical target comparison BLOCKED.
+ decisions  errors remain separate from missing exports; no production/database writes and no Rust
+            gates were run.
+ commit     none (not authorised)
+ next       regenerate and validate the existing review ZIP
+ blockers   canonical mapping/full HLD comparison and open OD decisions remain blocked
+```
+
+## 2026-11-14 — Export error propagation coverage
+
+```text
+ phase      GREEN extension to the malformed-payload regression
+ req        REQ-RUST-039.0
+ change     test_invalid_export_payload_errors now exercises both load_export's ValueError and
+            the CLI report's export_integrity=ERROR result while verification remains BLOCKED.
+ command    python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset
+              -p 'test_*.py' -v
+ output     Ran 51 tests in 0.454s
+            OK
+ decision   the original focused RED remains the evidence that malformed payloads were silently
+            discarded before the loader fix; the added assertion covers CLI error propagation.
+ commit     none (not authorised)
+ next       regenerate and validate the review ZIP at its existing path
+ blockers   none introduced
+
+## 2026-11-14 — Provenance metadata and graph endpoints
+
+```text
+ phase      append-only correction for the final Phase 1 review
+ req        REQ-RUST-039.0
+ RED        The focused candidate-row test reported:
+            test_candidate_inventory_rows_preserved ... FAIL
+            AssertionError: 'LLM_PARSED_DRAFT' != 'SOURCE_REVIEWED_CANDIDATE_DRAFT'
+            The focused metadata test reported:
+            test_candidate_provenance_metadata_explicit ... ERROR
+            KeyError: 'candidate_provenance'
+            Earlier focused endpoint tests reported missing direct external/builtin
+            terminals and admitted dangling node-kind endpoints; their exact command
+            lines are not retained in this correction.
+ GREEN      focused candidate-row and metadata tests both returned ok after the
+            builder regenerated LLM_PARSED_DRAFT provenance. The full suite also
+            reported test_forbidden_direct_external_targets ... ok and
+            test_dangling_node_endpoints_block ... ok.
+ command    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover
+              -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
+ output     Ran 54 tests in 0.367s
+            OK
+ matrix     REQ_039_MATRIX_VALIDATION=PASS matrix_tests=54 implemented_tests=54
+            missing=[] stale=[]
+ report     Status BLOCKED; source evidence PRESENT with generation link UNVERIFIED;
+            canonical target mapping and full HLD comparison are not implemented.
+ decision   Preserve public private::Sealed item selection; distinguish effective
+            interface visibility from outside-crate reachability. Keep forbidden
+            contains/imports only as direct terminal edges; block dangling node
+            endpoints. Candidate provenance is LLM_PARSED_DRAFT authored by Devin
+            from pinned source; no independent compiler/oracle verification has
+            frozen it.
+ commit     none (not authorised)
+ next       regenerate and validate the existing review ZIP
+blockers   canonical mapping/full HLD comparison remain blocked
+```
+
+## 2026-11-14 — scoped containment behavioral RED
+
+```text
+phase      RED — stop before GREEN; no containment or HLD producer added
+req        REQ-RUST-040.0
+test       test_itoa_top_level_containment
+discovery command
+           CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+             -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests -- --list
+discovery output
+           test_itoa_pipeline_reads_published: test
+           test_itoa_top_level_containment: test
+           test_sysroot_reached_names_reasoned: test
+           test_sysroot_scope_excluded_units: test
+           4 tests, 0 benchmarks
+           DISCOVERY_EXIT_CODE=0
+           DISCOVERY_WALL_SECONDS=6.319
+           DISCOVERY_PEAK_TREE_RSS_KIB=756160 (24 samples, 250 ms interval)
+probe      First test execution stopped at the fixture assertion that the persisted span began
+           with `pub struct Buffer`; the exact span includes preceding source text. This was not
+           counted as behavioral RED. The assertion now checks that the declaration is inside
+           the exact byte-verified span; persisted span text/digest and top-level ownership checks
+           passed before the intended RED.
+RED command
+           CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+             -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests
+             test_itoa_top_level_containment -- --exact --nocapture
+RED output running 1 test
+           thread 'test_itoa_top_level_containment' panicked at
+           crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs:282:5:
+           missing required scoped HLD interface nodes; fullgraph nodes=0, edges=0
+           test test_itoa_top_level_containment ... FAILED
+           test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out
+           RED_EXIT_CODE=101
+           RED_WALL_SECONDS=16.952 (expected 120 seconds)
+           RED_PEAK_TREE_RSS_KIB=484004 (64 samples, 250 ms interval)
+behavior    CLI invocation succeeded with sysroot source excluded and the new scope selected;
+           config scope, pinned file digest, exact Buffer source span, active cfg, empty expansion
+           provenance, and matching original-file top-level `item` ownership assertions passed.
+           Failure is at the first absent graph/HLD product rows, not CLI parsing, fixture setup,
+           or span evidence. The published input rows `item-effective-visibility-records` and
+           `edge-evidence-record-table` are also empty in this stub run.
+scope      Test-only output assertions use canonical unit/path and occurrence identities, then
+           the typed HLD input field names and existing HLD output payload identities; no expected
+           rows are supplied to production. Effective visibility/reachability are expected from
+           the future fullgraph row, not proven by syntactic `pub` source text.
+decision   Preserve strict full-semantic publication prerequisites; no GREEN implementation
+           until lead review.
+next       lead review of test contract and missing assembler/materializer/publication layer
+blockers   fullgraph source assembler, scoped HLD materialization, and scoped publication marker
+           are absent; effective Buffer visibility/reachability producer is not established
+```
+
+```text
+environment diagnostic
+           active toolchain: rustc 1.99.1, cargo 1.99.1, stable-x86_64-unknown-linux-gnu;
+           CARGO_HOME and CARGO_TARGET_DIR unset; repo environment blueprint has no Rust setup.
+           Cargo check, discovery, and RED each repeated this dependency-manifest warning:
+           warning: /home/ubuntu/repos/rust-tools/rust-analyzer/crates/parser/Cargo.toml:
+           unused manifest key `lints.cargo` (may be supported in a future version)
+           this Cargo does not support nightly features, but if you
+           switch to nightly channel you can pass
+           `-Zcargo-lints` to enable this feature.
+           The corresponding rust-analyzer syntax manifest emitted the same warning. No safe
+           fix was applied: changing the shared toolchain or dependency source is out of scope.
+           The commands completed; retain this repeated external-manifest environment warning.
+```
+
+## 2026-11-14 — unchanged final-stage default check
+
+```text
+phase      focused verification of the existing default route; no GREEN implementation
+req        REQ-RUST-040.0
+test       test_itoa_pipeline_reads_published
+command    CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+             -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests
+             test_itoa_pipeline_reads_published -- --exact --nocapture
+output     running 1 test
+           test test_itoa_pipeline_reads_published ... ok
+           test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out
+           DEFAULT_EXIT_CODE=0
+           DEFAULT_WALL_SECONDS=13.418 (expected 120 seconds)
+           DEFAULT_PEAK_TREE_RSS_KIB=475312 (51 samples, 250 ms interval)
+decision   the new final-stage selector leaves the existing name-resolution default working
+next       lead review; wait before GREEN implementation
+blocker    scoped fullgraph/HLD producers and publication remain absent
+```
+
+## 2026-11-14 — containment-slice requirement
+
+```text
+phase      REQUIREMENT — scoped source contract and matrix entry added before code
+req        REQ-RUST-040.0
+command    rg -n 'REQ-RUST-040\.0|test_itoa_top_level_containment' docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md
+output     824:#### REQ-RUST-040.0 — original-file top-level containment slice
+           1877:| REQ-RUST-040.0 | test_itoa_top_level_containment | pinned-itoa integration | ... | exact canonical identities and byte range |
+decision   explicit source-only final stage; file area is graph-only unit+normalized path identity;
+           source coverage stays separate from typed HLD completeness and full-semantic gates
+next       add minimal CLI stage stub, cargo check, then source-first RED
+blocker    none at requirement phase
+```
+
+## 2026-11-14 — containment-stage stub
+
+```text
+phase      STUB + CARGO CHECK — no source graph or HLD producer added
+req        REQ-RUST-040.0
+command    CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable check --release --locked --offline -p parseltongue-cli-dispatcher-binary
+output     Finished `release` profile [optimized] target(s) in 1.44s
+           CHECK_EXIT_CODE=0
+           CHECK_WALL_SECONDS=1.576
+           CHECK_PEAK_TREE_RSS_KIB=305016 (6 samples, 250 ms interval)
+           warnings: rust-analyzer parser/syntax manifests report unused `lints.cargo` keys
+stub       accepted --mapping-final-stage-kind original-top-level-containment; default remains
+           name-resolution; namespace still runs and generation config records the requested scope
+decision   no HLD rows, completion marker, or semantic completeness claim is produced by the stub
+next       add pinned-source acceptance contract and establish behavioral RED
+blocker    HLD source assembly/materialization/publication remains absent
+```
+
+## 2026-11-14 — Provenance requirement wording audit
+
+```text
+ phase      append-only SPEC wording correction after provenance audit
+ req        REQ-RUST-039.0
+ change     The requirement now specifies LLM_PARSED_DRAFT, Devin authorship from
+            pinned source, and the absence of independent compiler/oracle freeze.
+            No test implementation or behavior changed after the 54-test suite.
+ command    python3 -c 'import pathlib,re; spec=pathlib.Path("docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md").read_text(); test=pathlib.Path("docs/phase-20261113/itoa-target-dataset/test_itoa_reference_graph_rules.py").read_text(); rows=[line for line in spec.splitlines() if line.startswith("| REQ-RUST-039.0")]; listed=set(re.findall(r"\\btest_[a-z0-9_]+\\b", "\\n".join(rows))); defined=set(re.findall(r"^\\s*def (test_[a-z0-9_]+)\\s*\\(", test, re.M)); status="PASS" if listed == defined else "FAIL"; print("REQ_039_MATRIX_VALIDATION={} matrix_tests={} implemented_tests={} missing={} stale={}".format(status,len(listed),len(defined),sorted(listed-defined),sorted(defined-listed)))'
+ output     REQ_039_MATRIX_VALIDATION=PASS matrix_tests=54 implemented_tests=54
+            missing=[] stale=[]
+ report     status BLOCKED; export integrity BLOCKED with 0 errors; 42 ladder rows;
+            database_written=False.
+ commit     none (not authorised)
+ next       regenerate and validate the existing review ZIP
+ blockers   canonical mapping/full HLD comparison remain blocked
+
+## 2026-11-14 — REQ-RUST-040.0 GREEN contract revision and RED tests
+
+```text
+ phase       pinned-itoa roll-up contract correction and renamed-source fixture tests
+ requirement REQ-RUST-040.0
+ tests       test_itoa_top_level_containment; test_source_fixture_scope_rules;
+             test_source_mutation_identity_changes
+ discovery   cargo +stable test --release --locked --offline -p
+             parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests -- --list
+             test_itoa_pipeline_reads_published: test
+             test_itoa_top_level_containment: test
+             test_source_fixture_scope_rules: test
+             test_source_mutation_identity_changes: test
+             test_sysroot_reached_names_reasoned: test
+             test_sysroot_scope_excluded_units: test
+             6 tests, 0 benchmarks; exit=0; wall=1.828s; peak_tree_rss=376500 KiB
+ RED         cargo +stable test --release --locked --offline -p
+             parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests
+             test_itoa_top_level_containment -- --exact --nocapture
+             test_itoa_top_level_containment ... FAILED
+             missing required scoped HLD interface nodes; fullgraph nodes=0, edges=0
+             exit=101; wall=16.780s; peak_tree_rss=481708 KiB
+ RED         cargo +stable test --release --locked --offline -p
+             parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests
+             test_source -- --nocapture
+             test_source_mutation_identity_changes ... FAILED: source-derived node rows are missing
+             test_source_fixture_scope_rules ... FAILED: scoped source graph did not publish nodes
+             0 passed, 2 failed; exit=101; wall=1.583s; peak_tree_rss=326160 KiB
+ test-fix    Initial discovery failed because serde_json::Value is not Ord; use canonical JSON
+             identity strings in BTreeSet instead. Discovery then passed; no test was weakened.
+ change      Roll-up cardinality now compares the canonical direct Contains edge set matched by
+             unit/path/relation/via; it verifies Buffer is included and other edges share both
+             buckets. Added a renamed fixture with public/private/use/inline/nested/cfg-off,
+             empty reached-file and source-mutation identity assertions.
+ next        implement typed L1 identity/coverage and continue through DuckDB adapter; source graph
+             producer/frozen assembly/publication remain required for these RED tests.
+ blocker     structural producer has not been implemented; these tests are behavioral RED.
+```
+```
+```
+```
+
+## 2026-11-14 — Review bundle closeout
+
+```text
+ phase      append-only closeout; prior journal entries remain unchanged
+ req        REQ-RUST-039.0
+ command    Matrix check used single-backslash regex boundaries:
+            python3 -c 'import pathlib,re; spec=pathlib.Path("docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md").read_text(); test=pathlib.Path("docs/phase-20261113/itoa-target-dataset/test_itoa_reference_graph_rules.py").read_text(); rows=[line for line in spec.splitlines() if line.startswith("| REQ-RUST-039.0")]; listed=set(re.findall(r"\btest_[a-z0-9_]+\b", "\n".join(rows))); defined=set(re.findall(r"^\s*def (test_[a-z0-9_]+)\s*\(", test, re.M)); status="PASS" if listed == defined else "FAIL"; print("REQ_039_MATRIX_VALIDATION={} matrix_tests={} implemented_tests={} missing={} stale={}".format(status,len(listed),len(defined),sorted(listed-defined),sorted(defined-listed)))'
+ matrix     REQ_039_MATRIX_VALIDATION=PASS matrix_tests=54 implemented_tests=54
+            missing=[] stale=[]
+ report     REPORT_VALIDATION status=BLOCKED export_integrity=BLOCKED export_errors=0
+            report_errors=0 production_database_written=False ladder_rows=42
+            source_evidence=PRESENT generation_link=UNVERIFIED_UNLESS_FILE_SOURCE_EXPORT_MATCHES
+ ZIP        README zip -FS -r recipe regenerated
+            /home/ubuntu/hld-current-test-artifacts/itoa-reference-review-20261114.zip
+ output     No errors detected in compressed data of
+            /home/ubuntu/hld-current-test-artifacts/itoa-reference-review-20261114.zip.
+            ZIP_CONTENT_VALIDATION=PASS entries=38 bytes=371505 forbidden_entries=0
+            missing_entries=0 mismatched_current_files=0
+ blocker    canonical target mapping and complete HLD comparison remain unimplemented;
+            overall status remains BLOCKED.
+```
+
+## 2026-11-14 — Explicit roll-up exclusions
+
+```text
+ phase      bounded artifact correction; no bucket policy inferred
+ req        REQ-RUST-039.0
+ RED command
+            PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover
+              -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py'
+              -k rollup_edges_accounted_once -v
+ RED output test_rollup_edges_accounted_once ... FAIL
+            AssertionError: Element counts were not equal:
+            First has 1, Second has 0: ('source', 'calls', 'local', 'direct')
+            First has 1, Second has 0: ('source', 'uses_type', 'u32', 'direct')
+            Ran 1 test in 0.000s
+            FAILED (failures=1)
+ GREEN      test_rollup_edges_accounted_once ... ok
+            Ran 1 test in 0.000s
+            OK
+ suite      Ran 55 tests in 0.398s
+            OK
+ matrix     REQ_039_MATRIX_VALIDATION=PASS matrix_tests=55 implemented_tests=55
+            missing=[] stale=[]
+ artifacts  Four expected HLD edges are excluded pending source/target mapping;
+            builtin exclusions use BUILTIN_BUCKET_MAPPING_NOT_IMPLEMENTED. Both
+            roll-up outputs are BLOCKED and carry the same explicit exclusions.
+ decision   Do not invent builtin buckets; count known-mapped edges once or list
+            each excluded edge with its reason.
+ next       regenerate and validate the existing review ZIP
+ blockers   canonical mapping/full HLD comparison remain blocked
+```
+
+## 2026-11-13 — REQ-RUST-040.0 typed HLD contract correction
+
+```text
+phase       append omitted typed-foundation and evidence-validation journal notes; finish HLD
+            contract tests without source producers or CLI changes
+requirement REQ-RUST-040.0
+foundation  L1 file-area identity, HLD target identity, source-coverage scope, and optional
+            reachability were introduced in the preceding handoff. The journal entry was
+            omitted. No foundation RED command/output was preserved, so no RED phase is claimed
+            or reconstructed here. The prior in-memory clone/match identity test and adapter
+            test-only decoders were not accepted as codec proof; the decoder tests are removed.
+historical  The preceding HLD materialization report recorded 12/18 tests failing with
+            InvalidEvidenceIdentity when Symbol definition and evidence-site paths differed.
+            Its exact command transcript is not preserved in this append; it is recorded as
+            prior reported evidence, not as a new reproduction.
+change      Preserve unit-only evidence ownership for Symbol identities; require both unit and
+            exact file path for FilePublicArea evidence. Structural input now requires
+            FilePublicArea -> original, unexpanded Definition Contains edges, exact target
+            evidence, empty local expansion chains, no LocalItem/FilePublicArea kind, and no
+            area signature. FullSemantic local items still reject unknown reachability.
+            DuckDB selects use statements outside bodies independently of visibility. Direct
+            Contains/Imports remain available; recursive SQL rejects them at anchor and later
+            hops while Reads remains collapse-eligible. Full-semantic publication gates were
+            not changed.
+RED         No new RED is claimed: these tests were added after implementation of the reported
+            contract changes. The earlier test-only codecs are explicitly not counted as RED or
+            GREEN evidence. First compile of the new DuckDB test failed with E0507 because a
+            closure moved `item`; cloning the endpoint fixed the test-only compile error.
+discovery   cargo +stable test --release --locked --offline -p
+            parseltongue-duckdb-analysis-adapter -p parseltongue-turso-store-adapter hld -- --list
+            DuckDB: 27 tests, 0 benchmarks; Turso: 13 tests, 0 benchmarks; exit=0.
+GREEN       cargo +stable test --release --locked --offline -p parseltongue-core-row-types -p
+            parseltongue-duckdb-analysis-adapter -p parseltongue-turso-store-adapter hld
+            Core: 3 passed, 0 failed. DuckDB materialization: 27 passed, 0 failed. Turso
+            publication: 11 passed, 2 failed, 8 filtered out. Area input-to-materialization
+            output/bucket/evidence, private-use selection, structural counterexamples,
+            mixed first/intermediate Contains/Imports paths, Reads collapse, persisted area
+            identity, and symbol JSON compatibility all passed.
+remaining    test_hld_configured_stage_gate failed during required-stage setup with
+             `Turso store: StageInputMissingError: hld-current-materialization-stage`.
+             test_hld_missing_extra_required failed during required-stage setup with
+             `Turso store: unsupported required stage extra-required-stage`. Both failures
+             originate in the existing stage-config fixture/gate path, which this change did
+             not modify. They are not claimed pre-existing because no base-branch comparison
+             was run; full-semantic gates remain unchanged.
+format       cargo +stable fmt --all; exit=0, no output.
+format-check cargo +stable fmt --all -- --check; exit=0, no output.
+clippy       cargo +stable clippy --release --locked --offline -p parseltongue-core-row-types
+             -p parseltongue-duckdb-analysis-adapter -p parseltongue-turso-store-adapter
+             --all-targets -- -D warnings; Finished release profile in 39.07s.
+refactor     Removed test-only adapter decoders. DuckDB area behavior is verified through typed
+             input and materialization; Turso area identity is verified in a published
+             full-semantic fixture. No broader refactor.
+next         Keep source producer/frozen assembler/CLI work deferred. Resolve the two
+publication test-fixture setup failures only in a separately scoped change.
+commit       none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 frozen storage stub
+
+```text
+phase       STUB L2 HLD graph-input store port and Turso implementation seam
+requirement REQ-RUST-041.0
+changed     Added HldGraphInputStorePort with write_hld_graph_input and
+            assemble_hld_graph_input plus structured thiserror variants. Added a Turso
+            implementation returning NotImplemented so the boundary compiles before RED.
+check       CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable check --release --locked --offline
+            -p parseltongue-table-store-traits -p parseltongue-turso-store-adapter
+output      Checking parseltongue-core-row-types ...
+            Checking parseltongue-table-store-traits ...
+            Checking parseltongue-turso-store-adapter ...
+            Finished `release` profile [optimized] target(s) in 1.23s
+            exit=0
+next        Add persisted graph-table contract tests; verify nonzero discovery and behavioral RED
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-040.0 source-evidence validation stub
+
+```text
+phase       STUB / RED
+requirement REQ-RUST-040.0
+tests       test_source_file_digest_mismatch, test_source_span_range_rejected,
+            test_source_span_utf8_rejected, test_source_span_text_mismatch
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-duckdb-analysis-adapter test_source_file_digest_mismatch -- --nocapture
+output      running 1 test; 0 passed; 1 failed; assertion expected FileDigestMismatch, got Ok
+            exit=101; the test reached validate_original_source_evidence
+scope       The remaining negative contracts were added before implementation and will be run
+            together; this RED establishes the intended source-byte rejection behavior.
+commit      none (not authorized)
+```
+
+```text
+phase       RED · expanded source-evidence negative contracts
+requirement REQ-RUST-040.0
+tests       test_source_file_digest_mismatch, test_source_span_range_rejected,
+            test_source_span_utf8_rejected, test_source_span_text_mismatch
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-duckdb-analysis-adapter test_source_ -- --nocapture
+output      running 8 tests; 4 passed (existing tests), 4 failed (the four new evidence contracts)
+            test result: FAILED. 4 passed; 4 failed; exit=101
+trace       Each new test reached validate_original_source_evidence and failed because the stub
+            accepted bad full-file digest, invalid range, invalid UTF-8 and mismatched span text.
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 assembler cancellation checkpoints GREEN
+
+```text
+phase       GREEN/REFACTOR for cancellation observability during frozen assembly
+requirement REQ-RUST-041.0
+test        test_hld_assembly_cancel_checkpoints
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-turso-store-adapter test_hld_
+output      running 30 tests
+            test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out
+            finished in 0.11s
+implementation The production assembler now checks cancellation after every persisted read/decode
+               stage and after exact source revalidation. Its shared checkpoint seam deterministically
+               cancels immediately after node rows are read and after source revalidation; both calls
+               return HldGraphInputStoreError::Cancelled instead of an assembled value.
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable clippy --release --locked --offline
+            -p parseltongue-core-row-types -p parseltongue-table-store-traits
+            -p parseltongue-turso-store-adapter --all-targets -- -D warnings
+output      Finished `release` profile [optimized] target(s) in 19.00s
+command     cargo +stable fmt --all -- --check
+output      exit 0; no output
+red         No separate failing test run is claimed for this checkpoint addition.
+next        Source SQL production and CLI wiring remain deferred.
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 source-provenance guards GREEN
+
+```text
+phase       GREEN/REFACTOR after the marker-provenance test replan
+requirement REQ-RUST-041.0
+tests       test_hld_source_race_rejected, test_hld_source_marker_missing,
+            test_hld_source_marker_mismatch
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-turso-store-adapter test_hld_
+output      running 29 tests
+            test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out
+            finished in 0.09s
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable clippy --release --locked --offline
+            -p parseltongue-core-row-types -p parseltongue-table-store-traits
+            -p parseltongue-turso-store-adapter --all-targets -- -D warnings
+output      Finished `release` profile [optimized] target(s) in 1.05s
+command     cargo +stable fmt --all -- --check
+output      exit 0; no output
+trace       REQ_041_MATRIX_VALIDATION=PASS listed=16 missing=[]
+decision    The direct SQL corruption attempt was replaced after its changed revision was not
+            visible through the frozen read API. The publisher's shared source-marker pair
+            validator now has a typed mismatch/legacy-absence check; a real frozen structural
+            publication fixture confirms missing provenance is rejected. The deterministic race
+            fixture still inserts late source work before graph sealing and checks prior manifest
+            plus all five HLD output tables remain unchanged. A final cancellation check now runs
+            after the assembler's source revalidation.
+red         No new product RED is claimed for the replacement marker tests; the failed direct
+            corruption fixture is recorded above as a fixture failure, not product evidence.
+next        Source SQL production and CLI wiring remain deferred.
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 source-provenance test replan
+
+```text
+phase       REPLAN after a fixture-level corruption test did not mutate the frozen read view
+requirement REQ-RUST-041.0
+test        test_hld_source_marker_mismatch — unresolved fixture behavior; not product RED
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-turso-store-adapter test_hld_source_marker_mismatch
+output      assertion `left == right` failed; left: Number(1); right: 9
+            Earlier final publisher assertion output: Ok(StageRunScopeValue { ...,
+            stage_attempt_sequence_value: "source-marker-mismatch/frozen/3" })
+diagnosis   The direct UPDATE issued by this test was not visible through
+            read_stage_table_rows for the frozen graph snapshot. Its affected-row count was not
+            captured, so I cannot distinguish a non-matching update from a read-view behavior.
+            This is not evidence that production publication accepted mismatched markers: the
+            attempted corruption was not observed by the read path. I stopped this mutation path
+            after two behavioral attempts and will replace it with a missing-provenance storage
+            fixture plus a direct typed marker-pair mismatch check.
+blocker     The direct corruption mechanism remains unexplained; no production claim is based on it.
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 graph-storage RED
+
+```text
+phase       RED; selected discovery 20 HLD tests, 0 benchmarks
+tests       test_hld_graph_input_roundtrip; test_hld_unfrozen_source_scope;
+            test_hld_missing_graph_marker; test_hld_frozen_scope_mismatch;
+            test_hld_stale_graph_marker; test_hld_unknown_reachability_scope;
+            test_hld_structural_publication_rollback
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-turso-store-adapter test_hld_
+result      11 passed; 9 failed. The seven new tests failed at the intended unimplemented
+            graph-input port boundary (NotImplemented or expected typed error mismatch), so the
+            discovery was nonzero and reached behavior. Two existing fixtures also regressed:
+            test_hld_missing_input_markers has only three upstream markers, which cannot be sealed
+            by publish_analysis_input_snapshot; test_hld_sealed_any_marker assumed final-publication
+            side effects. Fix their fixture setup without weakening final publication gates.
+            The two previously reported configured-stage fixture tests now pass.
+output      test_hld_graph_input_roundtrip ... FAILED (NotImplemented)
+            test_hld_frozen_scope_mismatch ... FAILED (expected CoverageScopeMismatch)
+            test_hld_missing_graph_marker ... FAILED (expected MissingStageMarker)
+            test_hld_stale_graph_marker ... FAILED (expected StaleStageMarker)
+            test_hld_unfrozen_source_scope ... FAILED (expected UnfrozenSourceSnapshot)
+            test_hld_unknown_reachability_scope ... FAILED (NotImplemented)
+            test_hld_structural_publication_rollback ... FAILED (NotImplemented)
+            test result: FAILED. 11 passed; 9 failed; 0 ignored; 0 measured; 8 filtered out
+next        Implement persisted typed codecs, frozen assembly, scoped publication and rollback
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 frozen graph storage GREEN
+
+```text
+phase       GREEN; complete persisted graph input assembly and structural HLD publication
+requirement REQ-RUST-041.0
+tests       Final `test_hld_` selection discovered and ran 23 Turso tests, including
+            test_hld_graph_input_roundtrip, test_hld_valid_empty_graph_input,
+            test_hld_conflicting_graph_row_key, test_hld_unfrozen_source_scope,
+            test_hld_missing_graph_marker, test_hld_frozen_scope_mismatch,
+            test_hld_stale_graph_marker, test_hld_unknown_reachability_scope,
+            test_hld_structural_publication_rollback, and
+            test_hld_full_semantic_scope_marker.
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-turso-store-adapter test_hld_
+output      test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out;
+            finished in 0.07s
+coverage    Actual registered graph tables are written, frozen and read back to typed input;
+            root namespace scope provenance supplies canonical unit configuration digests.
+            Structural empty-vs-missing marker, frozen-scope/config mismatch, stale later
+            graph markers, structural unknown reachability, FullSemantic unknown rejection,
+            configured-stage denials, and cancellation/backend rollback all pass. The
+            structural rollback test preserves all five prior HLD output tables.
+            Explicit legacy-compatible FullSemantic marker scope also passes.
+core        Six selected core tests passed in the preceding verification; core sources were
+            unchanged in this storage/publication step, so that suite was not rerun.
+format      cargo +stable fmt --all -- --check; exit=0, no output.
+clippy      CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable clippy --release --locked --offline
+            -p parseltongue-core-row-types -p parseltongue-table-store-traits
+            -p parseltongue-turso-store-adapter --all-targets -- -D warnings
+            Finished `release` profile [optimized] target(s) in 1.15s; exit=0.
+whitespace  git diff --check; exit=0, no output.
+scope       No source SQL producer, CLI wiring, source acceptance test, commit, push or PR.
+next        Hand off the storage/publication seam; source graph production remains the next step.
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 frozen graph storage refactor
+
+```text
+phase       REFACTOR; preserve typed row identity and lint-clean publication context
+requirement REQ-RUST-041.0
+changes     Grouped completion-marker arguments in HldMarkerPublicationContext after focused
+            Clippy identified 8/7 arguments. Assembly now compares each persisted row key with
+            its canonical decoded node/edge identity and rejects conflicting keys. FullSemantic
+            graph markers preserve explicit `FullSemantic` config spelling while structural
+            marker spelling remains exact. The test helper uses the production graph-row encoder;
+            no test-only decoder was introduced.
+prior       The initial configured-stage fixture failures were fixed by using
+            publish_analysis_input_snapshot for complete input fixtures; intentionally
+            incomplete missing-marker coverage remains unmanifested. Publisher gates and
+            configured-stage denials were not weakened.
+RED         No separate RED is claimed for the final row-key integrity and explicit FullSemantic
+            marker cases; they were added during review and are included in the passing GREEN
+            selection above. The original stub/RED evidence remains in the preceding entries.
+blockers    Source SQL production, CLI wiring and real-source acceptance remain intentionally
+            deferred; this storage step does not make the overall HLD milestone DONE.
+commit      none (not authorized)
+```
+
+## 2026-11-14 — REQ-RUST-041.0 final storage review status
+
+```text
+phase       FINAL VERIFY; this EOF record is authoritative for the storage-review continuation
+requirement REQ-RUST-041.0
+tests       test_hld_source_race_rejected, test_hld_source_marker_missing,
+            test_hld_source_marker_mismatch, test_hld_assembly_cancel_checkpoints
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-turso-store-adapter test_hld_
+output      running 30 tests
+            test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out
+            finished in 0.11s
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable clippy --release --locked --offline
+            -p parseltongue-core-row-types -p parseltongue-table-store-traits
+            -p parseltongue-turso-store-adapter --all-targets -- -D warnings
+output      Finished `release` profile [optimized] target(s) in 19.00s
+command     cargo +stable fmt --all -- --check
+output      exit 0; no output
+trace       REQ_041_MATRIX_VALIDATION=PASS listed=17 missing=[]
+scope       Final source revision is checked inside publication; graph marker provenance is
+            checked as a pair; the stale-source race preserves the prior serving manifest and
+            five HLD tables; assembler cancellation after node-row read and source revalidation
+            returns Cancelled. Canonical unit digests use root namespace scope rows.
+replan      The direct SQL corruption attempt and its readback mismatch are recorded above; it
+            did not establish product behavior, so it was replaced by a real missing-provenance
+            publication fixture and the shared typed marker-pair check. No production conclusion
+            relies on that direct mutation attempt.
+ordering    Earlier 2026-11-14 continuation entries in this file were inserted before the older
+            REQ-RUST-041 entries because a patch matched a repeated commit line. No existing
+            journal content was edited; this EOF entry records the final outcome and corrects
+            the chronology for this continuation.
+scope       Source SQL production, CLI wiring, source acceptance tests, commit, push and PR
+            remain out of scope. This is not an overall HLD milestone PASS.
+commit      none (not authorized)
+```
+
+### 2026-11-14 — verification-first restart: contract and process review
+
+```text
+phase       SPEC / PLAN (no new STUB, RED or GREEN claim)
+requirements REQ-RUST-033.0–037.0, 040.0–042.0
+request     Read SOP/AGENTS and recent 100 messages before changing code; update PRD/SPEC/TDD first.
+review      Reviewed 100 recent message records (2026-11-13 08:51:03 UTC through
+            2026-11-14 03:45:48 UTC), current 364-line AGENTS and 841-line SOP.
+            Full fetched records are retained session-locally under .devin-files;
+            API-truncated message fragments are not treated as new source evidence.
+findings    Duplicate SOP R15, superseded memory limits and obsolete implementation status;
+            all-five wording obscures Phase 1 scope; planned tests conflict with test-existence
+            checks; mandatory todo stubs are unnecessary for existing-bug regression tests.
+            Repeated document/component progress did not close the source acceptance loop.
+decision    Proposed six focused SOP/AGENTS corrections to user; approval pending. No process
+            document, threshold, oracle authority, publication gate or pin changed here.
+contracts   Extended 040.0 for semantic visibility restrictions and child-module owner/path
+            identity. Added 042.0 for generic supertrait call resolution with typed unresolved
+            outcomes, shadowing/cycle/distractor/mutation checks and persisted evidence.
+            New test IDs live in an explicitly queued contract section, not passed evidence.
+prd         Removed obsolete inline implementation status in favor of STATUS/run reports;
+            added containment prerequisite and bounded generic-call acceptance.
+active      area:src/lib.rs --contains--> Buffer through production/persisted/published rows.
+queued      default -> Buffer::new, then format -> private::Sealed::write. One target active;
+            supporting work must close an observed gap in that target.
+architecture L1 typed facts/errors; L2 semantic/store ports; L3 Rust semantic producers,
+            DuckDB relational candidate joins/HLD derivation, Turso durability/publication.
+            No third database, global in-memory resolver or expected-data production input.
+index       codebase-memory-mcp cli index_repository
+              --repo-path /home/ubuntu/repos/parseltongue-integration --mode full
+            status=indexed; nodes=26125; edges=55167; parse_partial_count=6;
+            skipped_count=0; parse_unusable_count=0. Navigation evidence only.
+tests       Planned tests not implemented or run in this phase. Previous 27 DuckDB / 30 Turso
+            passes are component history, not acceptance of the latest source connection.
+next        Validate document links/contracts, trace current source projection with refreshed
+            index plus coverage/snippet checks, add discovered regression tests, reproduce RED.
+blockers    Generic HLD publication must not reuse structural scope for calls or weaken strict
+            semantic prerequisites. Scope/producer gaps remain explicit until proven.
+commit      none; dirty worktree from earlier work preserved; no commit/push/PR in this phase.
+```
+
+### 2026-11-14 — current containment baseline and source regressions
+
+```text
+phase       BASELINE / existing seam check / regression RED · REQ-RUST-040.0/041.0
+artifacts   ~/hld-current-test-artifacts/20261114T043000Z-structural-verification/
+environment CARGO_BUILD_JOBS=2 CXXFLAGS=-g0; release, stable, locked/offline; no memory cap.
+check       cargo +stable check --release --locked --offline -p parseltongue-cli-dispatcher-binary
+            Finished release profile in 2.17s; exit 0. Sampler: 2.223s; tree peak 531898368 bytes.
+build       cargo +stable test --release --locked --offline -p parseltongue-cli-dispatcher-binary
+              --test itoa-source-acceptance-tests --no-run
+            Existing build: 0.23s; exit 0. Budgets: check E=120s/stop240; build E=180s/stop360.
+discovery   target/release/deps/itoa_source_acceptance_tests-bc99e221687ffad4 --list
+            6 tests, 0 benchmarks before new regressions; 8 tests, 0 benchmarks afterward.
+baseline    same executable test_itoa_top_level_containment --exact --nocapture
+            test test_itoa_top_level_containment ... ok
+            test result: ok. 1 passed; 0 failed; 5 filtered out; finished in 14.26s
+            Full graph: 17 nodes/15 edges. HLD: 8 nodes/6 edges/6 evidence paths;
+            2 file roll-ups/1 folder roll-up. Whole test-tree sampled peak 403832832 bytes;
+            sampled elapsed 14.267s. Includes harness and provisioning, not mapper-only RSS.
+correction  The earlier status used a stale source-acceptance run. Current pre-existing wiring
+            already passes this exact relationship; no new production fix caused this pass.
+stub        Existing producer/store signatures reused; check above verifies the current seam.
+            Added two source fixtures through existing CLI acceptance helpers; no production
+            implementation changed. Fixture cargo check --offline --locked --lib succeeds
+            outside the mapper, so invalid Rust is not the source of either failure.
+red         same executable test_source_visibility_scope_equivalence --exact --nocapture
+            FAILED: original source row is malformed in span-reference-text-table:
+              unknown visibility pub /* comment */ (crate)
+            0 passed; 1 failed; 7 filtered out; finished in 1.19s.
+            This is a production projection failure for valid Rust, not a fixture setup RED;
+            later selection assertions have not yet executed.
+red         same executable test_source_module_owner_paths --exact --nocapture
+            FAILED: owner of src/left.rs; left String("CrateRoot"), right "Module"
+            0 passed; 1 failed; 7 filtered out; finished in 1.02s.
+budgets     Each direct fixture E=30s, stop60; both selected exactly one test.
+design      Reuse frozen namespace scope/visibility facts rather than interpreting a pub-prefix
+            or deriving module names from filenames. Retain canonical source evidence checks.
+next        Repair the observed producer boundary; rerun both regressions AND pinned containment.
+qualification Still structural and sysroot-excluded only; no Phase 1/SOP PASS claim.
+docs        PRD/SPEC fences balanced and new relative links exist. Journal's unmatched fence
+            predates this continuation; new appended entries each add a balanced pair.
+commit      none
+```
+
+
+### 2026-11-14 — containment producer GREEN and boundary repair
+
+```text
+phase       GREEN · REQ-RUST-040.0/041.0; same artifact directory as preceding entry
+change      Source projection now copies namespace item/import records and joins exact canonical
+            occurrences (use-tree sites bounded by their source use item). Owner and qualified path
+            use the frozen module scope; visibility compares resolved restrictions to that scope.
+            Missing/contradictory contexts fail closed. Source, range and digest checks are retained.
+            Namespace visibility extraction uses parsed AST variants, not visibility text. This
+            handles pub(self), pub(in self), comments and relative/absolute ancestor restrictions.
+check       green-check.log: release check passed in 1.30s; green-build.log: test build 22.56s.
+first run   Both new source regressions passed. Pinned containment then FAILED at use core::hint,
+            0 namespace contexts (0 passed, 1 failed, 7 filtered; 13.66s). This was a regression:
+            namespace copy projected away import_resolution_source_kind, so the new query could
+            not distinguish Use imports from bound imports. Preserved that source column rather
+            than weakening the source-kind filter. No fixture expectations entered production.
+command     cargo +stable test --release --locked --offline -p parseltongue-cli-dispatcher-binary
+              --test itoa-source-acceptance-tests --no-run
+discovery   rebuilt executable --list: 8 tests, 0 benchmarks.
+commands    rebuilt executable <name-below> --exact --nocapture, sampled separately; E=60s/stop120.
+green       test_itoa_top_level_containment ... ok; 1 passed/0 failed/7 filtered; 14.51s
+            sampler 14.524s; peak 410009600 bytes; 17 full nodes/15 full edges;
+            HLD 8 nodes/6 edges/6 paths/2 file roll-ups/1 folder roll-up.
+green       test_source_fixture_scope_rules ... ok; 1/0/7; 2.35s; peak 196067328 bytes
+green       test_source_mutation_identity_changes ... ok; 1/0/7; 3.67s; peak 206581760 bytes
+green       test_source_visibility_scope_equivalence ... ok; 1/0/7; 1.22s; peak 132665344 bytes
+green       test_source_module_owner_paths ... ok; 1/0/7; 1.10s; peak 125394944 bytes
+scope       All are structural/sysroot-excluded. Ordinary private-equivalent items retained in
+            full graph but not HLD; top-level uses retain their explicit interface exception.
+gates      fmt --all -- --check found only the new unformatted edits. Workspace release Clippy
+            --all-targets --all-features -- -D warnings found the new error enum too large (216
+            bytes); refactor will box the occurrence diagnostic without changing the public result.
+next        Negative namespace-input tests, refactor/format, rerun acceptance and full quality gates.
+tooling     Clarity was unavailable on the current shell PATH; no installation detour. Codebase-
+            memory coverage + direct source inspection used; refreshed index pending final edits.
+commit      none; no all-five/SOP milestone or whole-itoa claim
+```
+
+### 2026-11-14 — malformed namespace range RED and refactor
+
+```text
+phase       RED / REFACTOR · REQ-RUST-040.0
+test        hld_original_source_projection::tests::test_source_namespace_input_validation
+build       cargo +stable test --release --locked --offline -p parseltongue-duckdb-analysis-adapter
+              --lib --no-run; exit 0, 19.34s (negative-build.log); E=180s/stop360.
+discovery   adapter executable --list contains the exact test (150 total unit tests).
+red         adapter executable <test-above> --exact --nocapture; E=30s/stop60.
+            test result: FAILED. 0 passed; 1 failed; 149 filtered out; finished in 0.19s
+            inverted range must fail closed
+boundary    Prior cases exercised valid public/private/ancestor scopes plus absent/conflicting
+            contexts, unknown visibility kinds/scopes, malformed scope components, stale
+            generations and leaf ranges outside the item. The reversed leaf range was accepted;
+            added the missing strict start < end predicate (also excludes zero-width leaves).
+refactor    Boxed the occurrence only in InvalidNamespaceContext diagnostics, reducing the error
+            enum size without suppressing Clippy or changing canonical success values.
+next        Format, repeat the exact negative test, then workspace gates and fresh source acceptance.
+commit      none
+```
+
+### 2026-11-14 — quality gate stop-rule decomposition
+
+```text
+phase       REFACTOR / gate diagnosis · REQ-RUST-040.0/041.0
+attempts    Broad release Clippy has now failed three times, at different exposed lint layers:
+            (1) new 216-byte error diagnostic; boxed its occurrence;
+            (2) CLI pipeline's 9 arguments; grouped the three existing injectable store ports in
+                WorkspacePipelineStorePorts, preserving all three trait seams;
+            (3) two existing chunks_exact(2) calls in the source acceptance harness; this toolchain
+                now recommends as_chunks::<2>().0.iter(). No functional production error reported.
+stop        Stop repeated broad-gate attempts. Cut the gate into the exact CLI test target first,
+            fix only those mechanical array-chunk lints, then resume the broad gate once that
+            smaller target passes. Separate test compilation/execution from lint to avoid hiding
+            behavioral evidence behind unrelated harness lints. No lint allowance will be added.
+index       Refreshed codebase-memory: indexed, 26141 nodes/55262 edges, 6 partial parses,
+            0 unusable, 0 skipped. Main changed afterward; source inspection remains authoritative
+            until the final refresh. New namespace-context SQL has no recorded parse issue.
+commit      none
+```
+
+### 2026-11-14 — full gate results and source-text test correction
+
+```text
+phase       VERIFY / existing regression RED · REQ-RUST-038.1/040.0/041.0
+gates       cargo +stable fmt --all -- --check: PASS.
+            Scoped source-test Clippy PASS; repeated broad --release --locked --offline
+            --all-targets --all-features -- -D warnings: PASS, sampled 1.458s/550936576 bytes.
+build       cargo +stable test --release --locked --offline --all-targets --all-features --no-run:
+            PASS, 21 test executables; 71.896s, sampled tree peak 1289850880 bytes.
+discovery   same selection -- --list: recorded workspace-discovery.log.
+tests       same selection --no-fail-fast -- --test-threads=2: FAIL, 182.710s,
+            sampled tree peak 1007853568 bytes. New namespace boundary test passed;
+            adapter 150/0; source acceptance 7/1; two targets failed in total.
+failure 1   test_sysroot_reached_names_reasoned: left 3, right 13.
+failure 2   test_lang_items_in_sysroot: full sysroot reached 618 units/358595 syntax records;
+            Turso I/O error (pwrite): no storage space. This is environment failure, not
+            semantic RED. Full native retry remains outside this bounded Phase 1 loop.
+disk        Removed ONLY inactive rebuildable debug/build and debug/incremental caches under
+            parseltongue-rust-LLM-companion/target. Free space rose from 1.2 to 5.6 GiB.
+            No source, current release binaries, archives or run evidence deleted.
+diagnostic  Pinned vendored source copied to the artifact directory; current release CLI run with
+            worker=2/sysroot=excluded, E60/stop120; exported published raw namespace/path rows.
+observed    202 path rows: 164 resolved, 38 unresolved, 22 external_source_missing, 16 unreasoned
+            type-relative sites. All 13 MaybeUninit sites already have the right reason: 3 raw
+            spellings MaybeUninit<u8> and 10 expanded spellings MaybeUninit <u8 >. Expanded
+            Self paths also contain whitespace. Therefore the test matcher, NOT production
+            reason propagation, is wrong. Earlier status describing missing reasons is corrected.
+fix         Normalize whitespace only for these token-path assertions. Add byte-exact checks for
+            every path against published file bytes/ranges so generated text itself is not altered
+            or hidden by normalization. Keep all 202/164/38/22 and per-name counts unchanged.
+next        Run this exact test, then bounded workspace tests explicitly excluding the native
+            all-sysroot test; report that exclusion, never call the full workspace gate green.
+commit      none
+```
+
+### 2026-11-14 — current structural checkpoint verified; next graph-shape decision
+
+```text
+phase       GREEN / REFACTOR / VERIFY · REQ-RUST-038.1/040.0/041.0
+green       Exact test_sysroot_reached_names_reasoned: 1 passed, 7 filtered; 15.410s;
+            sampled process-tree peak 390660096 bytes. All 202 path texts equal their
+            persisted source bytes at the recorded ranges. No production reason logic changed.
+refactor    No further refactor needed: token-path comparison is local to this test;
+            exact raw text and source evidence remain unchanged.
+gates       Stable release, --locked --offline --all-targets --all-features.
+            test --no-fail-fast -- --test-threads=2 --skip test_lang_items_in_sysroot:
+            360 passed / 0 failed / 4 ignored / 1 filtered, 21 harness results;
+            77.805s, sampled tree peak 848207872 bytes.
+            fmt --all -- --check: PASS.
+            clippy ... -- -D warnings: PASS, 0.492s / 339062784 bytes.
+            build ...: PASS, 1.251s / 914939904 bytes.
+discovery   Exact selections checked against --list before running; files retained.
+acceptance  Current exact test_itoa_top_level_containment: 1 passed / 7 filtered;
+            17.364s / 422227968 bytes. 17 full nodes, 15 full edges; 8 HLD nodes,
+            6 HLD edges, 6 paths, 2 file roll-ups, 1 folder roll-up.
+negative    Current exact hld_original_source_projection::tests::test_source_namespace_input_validation:
+            1 passed / 149 filtered; 0.242s / 74842112 bytes.
+scope       Structural/sysroot-excluded only. DuckDB reports 25.0 GiB effective source-projection
+            limit; no interim correctness cap introduced. All-five/SOP and whole semantic itoa
+            are not PASS. Both semantic call checkpoints remain unimplemented.
+process     The earlier full workspace command should not have included the native test:
+            the prior native stop rule was still in force. Its disk failure is preserved,
+            not reinterpreted as semantic RED. No native retry occurred after that failure.
+index       Refreshed codebase-memory: 26147 nodes / 55279 edges, 6 partial SQL parses,
+            0 unusable / 0 skipped; relevant coverage rechecked; direct source authoritative.
+evidence    hld-current-test-runs/20261114T043000Z-structural-verification/hld-current-test-report.md
+            raw logs, byte-source exports and SHA-256 inventories in matching external artifact dir.
+next        SPEC section 8 explicitly forbids implementing an undecided containment choice.
+            Ask OD-7's impl-member source-container question before extending the skeleton;
+            recommendation is one lexical source container plus separate impl-owner metadata.
+            Existing contains/imports collapse prohibition remains unchanged.
+commit      none; six proposed SOP/AGENTS process corrections remain unapplied.
+```
+
+## 2026-11-14 — source-container decision recorded before implementation
+
+```text
+phase       SPEC · REQ-RUST-035.0/036.0/043.0
+decision    User selected "Use source containers; keep impl ownership separate (recommended)".
+contract    One lexical source container per original non-body item; impl members skip impl
+            blocks as graph containers. File-level members use file area; nested members use
+            enclosing inline module. Impl/self-type/trait ownership remains separate metadata.
+            No contains/imports collapse; no implicit type containment; body descendants stay
+            evidence. File-module/area relationship and generated-file attribution remain open.
+documents   PRD/SPEC/ARCH updated in place; matching decision recorded in SOP and AGENTS.
+            These synchronize the approved graph rule only, not the six proposed process edits.
+next        Real-source default -> Buffer::new test; identify earliest missing producer with
+            exact original impl/header/member evidence. Supporting tests do not replace it.
+verification No new runtime claim; structural checkpoint above remains the prior baseline.
+commit      none; source reference candidates are not automatically promoted by this decision.
+```
+
+## 2026-11-14 — impl-header source acceptance RED
+
+```text
+phase       RED · REQ-RUST-033.0/035.0/043.0 · test_impl_header_row_contents
+contract    Existing planned impl-header contract now has an executable pinned-source test.
+            Production CLI, sysroot excluded; no fixture facts supplied to the mapper.
+            No new production interface/stub introduced in this regression-first check.
+build       CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests --no-run
+            PASS; release dependency compilation separated from behavior execution.
+discovery   target/release/deps/itoa_source_acceptance_tests-bc99e221687ffad4
+            --list --exact test_impl_header_row_contents
+            test_impl_header_row_contents: test; 1 test, 0 benchmarks
+command     python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path
+            ~/hld-current-test-artifacts/20261114T110000Z-impl-header-verification/red-test-memory.json
+            -- timeout 120 target/release/deps/itoa_source_acceptance_tests-bc99e221687ffad4
+            --exact test_impl_header_row_contents --nocapture
+budget      Expected 60 seconds; stop 120 seconds; measured RSS, no memory cap.
+result      FAILED: one header per active source impl, including expansions
+            left: 0; right: 33
+            0 passed; 1 failed; 8 filtered out; finished in 12.57s
+meaning     Source parsing and publication succeeded; all 33 active impl spans exist.
+            First missing producer: impl-header-index-table (zero rows), not input/setup.
+next        Produce source-backed impl headers and direct member/source-container metadata;
+            retain external_source_missing for Default rather than invent core identity.
+commit      none; default -> Buffer::new remains the active semantic target, not yet proven.
+```
+
+## 2026-11-14 — impl-header producer interface STUB
+
+```text
+phase       STUB · REQ-RUST-035.0/043.0
+interface   persist_impl_header_rows behind existing StageTableStorePort; typed L3
+            ImplHeaderSourceError. No database/runtime dependency enters L1.
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable check --release --offline
+            -p parseltongue-syntax-span-extractor
+dependency  Reuse already locked thiserror 2 for typed L3 errors; update this crate's lock entry.
+verification cargo check is compile evidence only; behavioral RED is the preceding source run.
+next        Replace stub, preserve namespace identities and exact parser ranges; no full
+            signature-stage completion marker, no fabricated self/trait resolution.
+commit      none
+```
+
+## 2026-11-14 — impl-header frozen-input correction
+
+```text
+phase       GREEN attempt · REQ-RUST-035.0/043.0; not yet passing
+discovery   One selected test_impl_header_row_contents; release harness 97d580fb057373dc.
+result      FAILED: expected 33 headers, actual 5; source pipeline completed in 14.09s.
+diagnosis   The source scope aliases its first frozen revision after namespace processing.
+            Reading that scope returned only original inputs, omitting later macro facts.
+correction  Publish a fresh analysis-input snapshot after namespace convergence; read all
+            header inputs from that one snapshot, write headers to the active source attempt.
+rejected    Do not drop expanded impl expectations or read a mixture of snapshot revisions.
+next        Rerun the same pinned test; preserve partial signature-stage status.
+commit      none
+```
+
+## 2026-11-14 — cut header verification at target-identity boundary
+
+```text
+phase       Re-plan after three source-test failures (initial 0, stale-snapshot 5, now 33 headers).
+result      Frozen-input run: header counts/occurrences pass; self type is unresolved instead
+            of resolved. 1 failed / 8 filtered, 12.32s. No further whole-target tuning.
+diagnosis   Namespace path export adds target_namespace_kind_values; original binding metadata
+            does not carry this field. Whole-JSON string equality is not target identity.
+smaller-step Extract metadata key normalization and prove namespace export decoration does
+            not change identity; source range, unit, expansion evidence still distinguish targets.
+next        Focused RED/GREEN test_impl_target_namespace_metadata, then return to pinned source.
+commit      none
+```
+
+## 2026-11-14 — impl target export decoration RED/GREEN
+
+```text
+phase       RED -> GREEN · REQ-RUST-035.0
+discovery   impl_header_source_records::tests::test_impl_target_namespace_metadata:
+            1 test, 0 benchmarks in syntax-span-extractor release harness.
+RED         0 passed; 1 failed; 21 filtered. Equality failed solely on the exporter-added
+            target_namespace_kind_values decoration; raw range/unit metadata unchanged.
+GREEN       cargo +stable test --release --locked --offline -p parseltongue-syntax-span-extractor
+            --lib impl_header_source_records::tests::test_impl_target_namespace_metadata
+            -- --exact --nocapture
+            1 passed; 0 failed; 21 filtered. Different source range still gives a different key.
+decision    Strip only the export namespace decoration; preserve all target/unit/provenance
+            metadata. Do not join by spelling or drop canonical target discriminators.
+next        Resume pinned-source header acceptance after this smaller behavior is proven.
+commit      none
+```
+
+## 2026-11-14 — pinned impl-header producer GREEN, narrow scope
+
+```text
+phase       GREEN · REQ-RUST-033.0/035.0/043.0; header-paths-only, not complete signature lowering
+discovery   target/release/deps/itoa_source_acceptance_tests-97d580fb057373dc
+            --list --exact test_impl_header_row_contents: 1 test, 0 benchmarks
+command     python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path
+            ~/hld-current-test-artifacts/20261114T110000Z-impl-header-verification/identity-test-memory.json
+            -- timeout 120 target/release/deps/itoa_source_acceptance_tests-97d580fb057373dc
+            --exact test_impl_header_row_contents --nocapture
+result      test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out;
+            finished in 103.04s. Sampled elapsed 103.071636s, process-tree peak 434,118,656 bytes.
+proves      33 active original/expanded impl spans each have one header with matching occurrence
+            range, digest and expansion chain. Default's self type resolves to Buffer; its
+            missing external trait is reasoned unresolved; default member source bytes match.
+binary      f493d1e170f17e750ab876c1a6c229e217220ccf31d4d50fbc223810cf3a2ef5
+harness     c7d877da85e20ce1a607bf9a45a0a4a73b59c25d437aa03e521d4012989c995695
+not-proven  default -> new calls, all impl types resolved, node/member containment, complete
+            signature lowering, whole-itoa HLD, current workspace quality gates or any SOP milestone.
+next        REFACTOR/negative checks and fresh quality gates. No native sysroot retry.
+commit      none
+```
+
+## 2026-11-14 — evidence correction and formatting/Clippy boundary
+
+```text
+correction  The preceding GREEN entry transcribed the harness SHA-256 with an extra zero.
+            Exact observed SHA-256: c7d877da85e20ce1a607bf9a45a4a73b59c25d437aa03e521d4012989c995695.
+phase       REFACTOR · cargo +stable fmt --all completed.
+gate        CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable clippy --release --locked --offline
+            --all-targets --all-features -- -D warnings
+result      FAIL: clippy::items_after_test_module in impl-header-source-records.rs.
+next        Move tests after production items, without changing behavior or suppressing the lint.
+commit      none
+```
+
+## 2026-11-14 — syntax-only stage boundary RED
+
+```text
+phase       REFACTOR/RED · REQ-RUST-024.11/035.0
+prior       Test module moved after production items; fmt --check and release warnings-denied
+            Clippy all-target/all-feature PASS. Workspace release test compilation PASS.
+discovery   target/release/deps/workspace_cli_contract_tests-17b37d595d3f24e5
+            --list --exact test_syntax_publication_status_complete: 1 test, 0 benchmarks.
+RED         Same executable --exact test_syntax_publication_status_complete --nocapture:
+            0 passed; 1 failed; 29 filtered; 2.51s.
+failure     ImplHeader(Store(... StageInputMissingError: analysis source incomplete ...))
+diagnosis   Impl-header invocation runs even when syntax-spans is the requested final stage.
+contract    Header producer requires completed namespace inputs; syntax-only publication must
+            not run this downstream partial signature stage. Existing regression proves breakage.
+next        Gate invocation on a final stage that includes name resolution; repeat regression.
+commit      none
+```
+
+## 2026-11-14 — syntax-only boundary GREEN; bounded gate plan
+
+```text
+phase       GREEN · REQ-RUST-024.11/035.0
+command     CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release --locked --offline
+            -p parseltongue-cli-dispatcher-binary --all-features --test workspace-cli-contract-tests
+            test_syntax_publication_status_complete -- --exact --nocapture
+result      1 passed; 0 failed; 29 filtered. Syntax-only publication no longer invokes headers.
+refactor    Formatting applied; no signature-lowering complete marker is added.
+next        Fresh format/Clippy/build and bounded workspace tests, single test thread to bound
+            concurrent temporary DB disk use. Exclude only test_lang_items_in_sysroot, whose native
+            retry requires explicit re-planning. This cannot count as a full workspace gate PASS.
+budget      Expected bounded execution <=360s, timeout 720s (2x); compile separately. Measure
+            whole process-tree RSS; do not impose a memory cap or retry native scope.
+commit      none
+```
+
+## 2026-11-14 — bounded verification disk failure and cache-only recovery
+
+```text
+phase       VERIFY · same frozen production/source artifact; environmental failure
+command     python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path
+            ~/hld-current-test-artifacts/20261114T110000Z-impl-header-verification/final-workspace-memory.json
+            -- timeout 720 env CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable test --release
+            --locked --offline --workspace --all-targets --all-features
+            -- --skip test_lang_items_in_sysroot --test-threads=1
+result      Source harness: 8 passed; 1 failed; 55.32s. Mapper exit 101; sampled elapsed
+            55.568802s, peak 524,496,896 bytes. Later workspace harnesses were not reached.
+failure     test_itoa_top_level_containment: DuckDB WAL write, No space left on device.
+recovery    Paused IDE background compilers. Removed only the inactive research checkout's
+            target/debug rebuildable cache (4.3 GiB); source, release executables and evidence
+            preserved. Free disk increased from 936 MiB to 5.0 GiB. No native retry.
+next        Same command/same production hash; outputs use reclaimed-workspace-{test.log,memory.json}.
+commit      none
+```
+
+## 2026-11-14 — bounded header verification PASS after cache recovery
+
+```text
+phase       VERIFY · REQ-RUST-024.11/033.0/035.0/040.0/041.0/043.0
+command     Previous bounded workspace command, unchanged; output names reclaimed-workspace-*.
+result      21 harness results: 362 passed; 0 failed; 4 ignored; 1 filtered. Exit 0.
+source      9 source-acceptance tests passed; 0 failed; 59.73s. Includes 33-header acceptance
+            and original top-level containment publication. Syntax-only boundary also passes.
+metrics     Sampled elapsed 133.375446s; whole-process-tree peak 512,983,040 bytes.
+gates       cargo +stable fmt --all -- --check PASS;
+            CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo +stable clippy --release --locked --offline
+            --workspace --all-targets --all-features -- -D warnings PASS;
+            same Cargo flags build --release --locked --offline --workspace
+            --all-targets --all-features PASS.
+binary      18ac2591bc0e973c880936eef51ae834eb71ee2030abcef6f15734d55afe352e
+source      c2b4beb33718eb9e9eaa8245cb635b19bc1bf95cedae83e4a0772c751929cd12
+freeze      final-source-executable-manifest.json records 121 source files; all source and
+            executable hashes were checked unchanged after the recovered run.
+limits      test_lang_items_in_sysroot excluded; no full-workspace, whole-itoa, all-five SOP,
+            worker-determinism or final memory qualification. No calls are produced yet.
+cleanup     IDE processes resumed; free disk 5.0 GiB. Source/release/evidence preserved.
+next        Header negative/ownership checks and the member/body/type-relative producers needed
+            for default -> new; do not reinterpret header-paths-only as full signature lowering.
+commit      none
+```
+
+## 2026-11-14 18:03 IST — SPEC scope: detailed full map, abstractions deferred
+
+```text
+phase       SPEC / REVIEW only · REQ-RUST-032.0/043.0/044.0
+decision    User: prioritize the detailed mega map; abstractions are later queries; move
+            unrelated work/decisions into phase1-abstractions-decision-backlog.md.
+active      Canonical public/private nodes, direct facts, source/container and semantic
+            ownership, signatures/bodies/resolution/expansion evidence, full-map frozen
+            readback/reference comparison, unresolved inventories and generation safety.
+deferred    Interface selection, private-path collapse, HLD evidence-path projections,
+            file/folder roll-ups, consumer presentation copies and projection-only choices.
+contracts   REQ-RUST-044.0; three new planned full-map tests in the queued matrix. Existing
+            generic HLD roundtrip stays deferred; no queued test is executable evidence.
+verification Documentation validation only; runtime gates not rerun after Cargo cleanup.
+            Source digest/history/link/requirement checks are recorded in
+            ~/hld-current-test-artifacts/20261114T123100Z-full-map-scope/.
+limits      No STUB/RED/GREEN or production behavior claimed. Prior HLD contracts/safety
+            gates retained when invoked; no broad SOP process rewrite approved/applied.
+next        Original item/member nodes + source containers; then default -> Buffer::new
+            in the full map with exact evidence. No HLD projection required.
+commit      none
+```
+
+## 2026-11-14 19:39 IST — SOP relocation and full-map integration STUB
+
+REQ-RUST-045.0; documentation follow-up requested by user. Current SOP moved to
+`docs/phase-20261113/SOP-phase-20261113-full-item-dependency-graph.md`; historical path redirects.
+All four relative links resolve; content and historical qualification sections retained.
+
+Python runner path regression (existing runner, no Rust semantic claim):
+- STUB: `read_canonical_sop_path` raised `NotImplementedError`.
+- RED: `/home/ubuntu/.pyenv/versions/3.11.18/bin/python -B -m unittest discover -s tools
+  -p test_sop_qualification_runner.py -k test_canonical_sop_path_freezes -v` discovered 1 test,
+  reached the stub, and failed with `NotImplementedError: canonical SOP relocation`.
+- GREEN: same command, `Ran 1 test ... OK`; runner now freezes current SOP rather than redirect.
+- REFACTOR: no additional refactor needed for the path helper. Full runner regression:
+  `... -m unittest discover -s tools -p test_sop_qualification_runner.py` —
+  `Ran 146 tests in 2.789s / OK`.
+- Earlier Python 3.10 import failure (`tomllib`) and unqualified `python3.11` not on PATH were
+  setup failures, not RED. Re-planned by locating the existing pyenv 3.11.18 executable.
+
+Rust STUB in progress: new explicit `full-item-dependency-graph` final-stage dispatch and
+`publish_full_graph_checkpoint` signature with `todo!()`. Existing top-level mode unchanged.
+Build command: `CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0 CXXFLAGS=-g0
+python3 tools/process-tree-access-auditor.py sample --memory-sample-output-path <artifacts>/stub-check-memory.json
+-- cargo check --release --workspace --all-targets --all-features`.
+Expected cold compilation 10–15 minutes; execution tests are measured separately. IDE analyzer
+processes paused during native build; no interim DuckDB memory limit. Check not finished yet.
+
+Artifacts: `~/hld-current-test-artifacts/20261114T140300Z-full-map-implementation/`.
+Three independent child implementations own projection, Rust call resolution, and core/storage;
+parent owns real-source acceptance, CLI composition, shared docs and aggregate gates.
+No commits/pushes; documentation-only push permission requested solely to provide folder URL.
+
+## 2026-11-14 19:52 IST — Single-VM consolidation and acceptance tests authored
+
+The user prohibited separate-VM workers and requested all progress merged here, then archived.
+All three workers stopped; their 20 edited/new source files were applied with 3/3 forward-check
+and 3/3 reverse-check passes. 141 parent files outside worker ownership matched the backup
+byte-for-byte. Raw patches, SHA-256 values, partial gate evidence and incomplete handoffs are
+preserved in `~/hld-current-test-artifacts/20261114T140300Z-full-map-implementation/` alongside
+`single-vm-integration-manifest.json`. All three sessions are archived and suspended.
+
+STUB remains in progress, not PASS. The cold native check began before patch consolidation;
+its mixed-revision result is cache warm-up only and will be followed by a fresh integrated check.
+Projection's 16 authored tests and codec test came back with `todo!()` implementations. No
+projection behavioral RED/GREEN was observed in the worker. Core/storage and resolver evidence
+is explicitly partial and revision-specific in the recovered handoffs, not source acceptance.
+
+Parent added `test_original_member_graph_roundtrip` and `test_default_new_call_roundtrip`
+(REQ-RUST-032.0, 043.0, 045.0 and 029.0/042.0 respectively). These check original canonical
+members, exact source evidence, one lexical container, separate impl bridge, no body nodes,
+one resolved default->new call, frozen incomplete readback, strict HLD rejection and no HLD
+output. Both are authored but not yet discovered/executed. Continue STUB -> RED on this VM.
+
+No GitHub merge, commit or push. One-VM rule recorded in AGENTS; no more child sessions.
+
+## 2026-11-14 19:56 IST — Integrated STUB check PASS
+
+REQ-RUST-045.0. `CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0
+CXXFLAGS=-g0 cargo check --release --workspace --all-targets --all-features` completed:
+`Finished release profile [optimized] target(s) in 5.08s`, exit 0. Projection, codec and CLI
+stub APIs and authored tests compile together. No behavioral pass claimed.
+
+The preceding native warm-up ended with stale enum metadata errors after files were consolidated
+mid-build; it is not behavioral RED. Measured 1023.231s and 3,713,507,328 bytes peak tree RSS.
+The fresh integrated check rebuilt affected metadata and passed without source changes.
+
+Next RED build: same release/features/toolchain inputs, `cargo test --release --workspace
+--all-targets --all-features --no-run`, measured separately from test execution. Expected
+6–10 minutes cold Rust codegen; native DuckDB archive is now cached. Then run/discover the
+projection, codec and two real-itoa acceptance tests, recording intended stub failures.
+Evidence prefix: `integrated-stub-*` and `red-build-*` in the current artifact directory.
+
+## 2026-11-14 20:03 IST — Behavioral RED reached on pinned source and components
+
+REQ-RUST-032.0, 043.0, 045.0. Release test build PASS: `Finished release profile [optimized]
+target(s) in 7m 02s`. Discovery: 16 original projection tests, 1 new-kind codec test and 2
+`roundtrip` source tests. Commands (from repository root, measured with process-tree auditor):
+
+```text
+target/release/deps/parseltongue_duckdb_analysis_adapter-1a64f40abee19231 original_item_projection_tests --nocapture --test-threads=1
+test result: FAILED. 0 passed; 16 failed; 0 ignored; 0 measured; 151 filtered out; finished in 0.87s
+target/release/deps/parseltongue_duckdb_analysis_adapter-1a64f40abee19231 original_kind_codec_tests --nocapture
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.00s
+target/release/deps/itoa_source_acceptance_tests-1ae11faedf268e6c roundtrip --nocapture --test-threads=1
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 9 filtered out; finished in 27.50s
+```
+
+All component failures reach their `todo!()` bodies, not setup/compilation. Both real-source
+tests reach CLI `todo!("original full-map checkpoint")` after 33 impl headers are produced.
+No method/call readback assertions have passed yet. Evidence: `red-projection.log`,
+`red-codec.log`, `red-itoa.log`, matching memory JSON and the build log in the artifact directory.
+Next GREEN: SQL original-item inventory/ancestry + source-checked identities, then CLI composition
+through frozen full-map storage. Unknown visibility stays explicit; HLD contract stays strict.
+No commit or push (authorization absent).
+
+## 2026-11-14 20:11 IST — Projection GREEN, CLI composition awaiting source rerun
+
+REQ-RUST-032.0/043.0/045.0. SQL now inventories original spans, computes lexical ancestry,
+retains body/cfg/impl/deferred-member exclusion reasons, joins canonical impl bridges and
+selects nearest file/module/trait containment independently of ownership. Rust validates
+source bytes/digests and canonical identities; nodes retain Unknown/None visibility and no
+invented signature. Original top-level diagnostic SQL/semantics are unchanged.
+
+After correcting compile-time String/Value adapter mismatches, the same release build and
+discovered test commands reached GREEN (no test expectation changes):
+`test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 151 filtered out; finished in 2.38s`.
+New-kind codec: `1 passed; 0 failed; 166 filtered out; finished in 0.00s`.
+Evidence: `green-build-one.log` (compile failure), `green-build-two.log` (PASS),
+`green-projection-one.log`, matching memory JSON, `green-codec.log`.
+
+CLI composition now uses injected FullGraphInputStorePort, the caller's one frozen source
+scope for projection/resolution, explicit incomplete persistence, exact assembled equality,
+and no HLD publication. Build and the two source tests are next; source GREEN is not claimed.
+No commit/push. Refactor/quality gates remain outstanding.
+
+## 2026-11-14 20:08 IST — Pinned-source first call GREEN
+
+Timestamp correction: the preceding projection entry's manually written 20:11 timestamp was
+ahead of the VM clock. Source execution below finished at 14:38:44 UTC / 20:08:44 IST.
+
+REQ-RUST-032.0/034.0/035.0/043.0/045.0. First composed run failed at exact frozen bundle
+equality: storage enumerates rows by persisted key, while projection enumerates typed records.
+Canonical sorting of assembled nodes/edges before equality fixes ordering without changing,
+dropping or weakening any field, endpoint, evidence, provenance or completeness comparison.
+The same source tests then passed:
+
+```text
+target/release/deps/itoa_source_acceptance_tests-1ae11faedf268e6c roundtrip --nocapture --test-threads=1
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 26.80s
+stage=full-item-dependency-graph nodes=45 containment=43 calls=61 resolved_calls=2 completeness=incomplete
+stage=frozen-full-map-readback ... nodes=45 edges=104 completeness=incomplete
+```
+
+`test_default_new_call_roundtrip` independently verifies exactly one default->new edge, canonical
+source/target members, exact Buffer::new() bytes/digest, persisted body site and honest namespace
+type-prefix provenance. `test_original_member_graph_roundtrip` verifies every original item
+range/digest, no body-local nodes, one lexical container and distinct impl/header ownership;
+both reject HLD assembly and require absent HLD outputs. Five original impls stay records,
+five body descendants stay evidence, two inactive source items are excluded. Expanded items,
+fields/variants and complete semantics remain outside this bounded checkpoint.
+
+Parent reruns also pass: syntax 40 unit + 17 contract tests (including supplied-frozen-snapshot
+regression); Turso 45 passed / 3 ignored. No child results substituted for these executions.
+Evidence: `green-itoa-one.log` (ordering failure), `green-facade-two-build.log`,
+`green-itoa-two.log`, its measured-memory JSON and `integrated-{syntax,turso}-*.log`.
+Next REFACTOR: format combined changes, warnings-denied Clippy, all bounded workspace tests,
+release build and retained source snapshot/executable identity. No complete-map/SOP PASS.
+
+## 2026-11-14 20:10 IST — REFACTOR formatting and Clippy PASS
+
+Applied workspace formatting. Warnings-denied Clippy first found the recovered codec test module
+before production functions (`clippy::items_after_test_module`); moved that module after the
+functions, without suppressing lint. No algorithmic optimization/refactor needed for this slice.
+
+```text
+cargo fmt --all -- --check
+PASS (exit 0)
+CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0 CXXFLAGS=-g0
+cargo clippy --release --workspace --all-targets --all-features -- -D warnings
+Finished release profile [optimized] target(s) in 3.54s
+```
+
+Evidence: `refactor-fmt-{before,after}.log`, `refactor-clippy.log` (lint failure),
+`refactor-clippy-two.log` and measured-memory JSON. Release profile is kept stable throughout
+this TDD cycle; no debug-profile native rebuild. Parser manifest notices about nightly-only
+`lints.cargo` are Cargo metadata notices, not allowed Rust/Clippy lint warnings.
+
+VERIFY next: separate `cargo test --release --workspace --all-targets --all-features --no-run`
+from bounded test execution. Expected test execution 3–5 minutes, no interim memory cap.
+Run `cargo test --release --workspace --all-targets --all-features -- --skip
+test_lang_items_in_sysroot --test-threads=1`; native sysroot remains excluded under the existing
+three-attempt stop rule. The unrestricted all-tests/SOP gate is not claimed. Also run the
+all-target/all-feature release build and retain executable/source digests plus measured evidence.
+
+## 2026-11-14 — VERIFY regression and ownership hardening
+
+Bounded workspace run reached 10 passing source tests and one failure in
+`test_sysroot_reached_names_reasoned`: `left: 231, right: 202`. It still asserted the old
+total path population before body-call type prefixes existed. All earlier exact source slices
+and unresolved-reason assertions passed. Retain the original 202-path checks by partitioning
+the explicit new context; additionally assert 29 body-prefix rows and a resolved Buffer prefix.
+This updates expected scope, not semantic evidence or missing-core acceptance. `verify-workspace.log`
+is a failed run, not a workspace PASS. Python runner regression: 146 passed in 2.950s.
+
+Review also found file-level ownership defaulting to CrateRoot even in a reached child file.
+Canonical file containment stays correct, but owner metadata must distinguish the mapped Cargo
+target root from other reached module files. Existing projection API is the STUB seam. Add
+`test_child_file_owner_identity` and non-vacuous u128_ext.rs Function-owner assertions to the
+real member test before fixing it. Use persisted unit_source_root_path, not a lib.rs filename
+heuristic or fabricated module semantic path; labels remain explicitly source-qualified.
+The first source archive is now superseded by test changes; recapture only after final gates.
+
+## 2026-11-14 20:16 IST — Child-file ownership behavioral RED
+
+REQ-RUST-043.0/045.0. Release all-target/all-feature test compilation passed. Discovery/execution:
+
+```text
+.../parseltongue_duckdb_analysis_adapter-1a64f40abee19231 test_child_file_owner_identity --nocapture
+0 passed; 1 failed; 167 filtered out; finished in 0.21s
+.../itoa_source_acceptance_tests-1ae11faedf268e6c --exact test_original_member_graph_roundtrip --nocapture
+0 passed; 1 failed; 10 filtered out; finished in 13.02s
+Both: left: Some(CrateRoot), right: Some(Module)
+```
+
+The source test reached published/frozen graph rows; failure is actual owner metadata, not
+setup. Minimal correction uses the persisted target's exact unit_source_root_path and file
+request path; non-root original files use Module ownership, with unchanged file-area containment.
+Missing root metadata errors rather than guessing from lib.rs/main.rs. Existing API retained.
+Evidence: `owner-{component,source}-red.log`, source memory JSON and `owner-red-build.log`.
+
+## 2026-11-14 — Child-file ownership component GREEN; final verification running
+
+Same discovered projection suite: `17 passed; 0 failed; 151 filtered out; finished in 2.48s`.
+The new non-root-owner regression passes with persisted Cargo target-root evidence; impl and
+trait ownership/containment tests remain green. Production/test formatting applied; no further
+algorithmic refactor needed. Final bounded workspace rerun is active on the new source revision
+(`verify-final-workspace.log`); no aggregate PASS until it exits successfully.
+New test identifiers all have four words after test_, and all cited REQ-RUST IDs exist.
+
+## 2026-11-14 20:24 IST — Final bounded GREEN / REFACTOR / VERIFY
+
+REQ-RUST-032.0/043.0/045.0. No algorithmic refactor needed after the owner correction;
+formatting and warnings-denied Clippy are green. Same release/toolchain/features/lock inputs:
+
+```text
+cargo fmt --all -- --check
+PASS
+cargo clippy --release --workspace --all-targets --all-features -- -D warnings
+PASS: 2.597308s / 758,792,192 bytes process-tree peak
+cargo test --release --workspace --all-targets --all-features -- --skip test_lang_items_in_sysroot --test-threads=1
+PASS (bounded): 415 passed / 0 failed / 4 ignored / 1 filtered; 21 harness results
+154.884209s / 506,855,424 bytes process-tree peak
+itoa-source-acceptance-tests: 11 passed / 0 failed; 87.32s
+cargo build --release --workspace --all-targets --all-features
+PASS: 1.244002s / 911,904,768 bytes process-tree peak
+Python SOP runner: Ran 146 tests in 2.950s — OK
+```
+
+Cargo environment: CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0
+CXXFLAGS=-g0. rustc 1.99.1 / cargo 1.99.1. Existing parser/syntax manifest `lints.cargo`
+warnings remain outside Clippy code diagnostics. The native test was not retried;
+the unrestricted workspace gate and formal five-repository SOP are not PASS.
+
+Copied the unchanged final CLI to frozen-release-graph-executable and ran the retained
+pin-checked source workspace through map-workspace-full-run, 2 workers, sysroot excluded,
+mapping-final-stage-kind=full-item-dependency-graph, under the process-tree auditor:
+exit 0; 14.810602s / 410,705,920 bytes. Effective DuckDB limit 25.0 GiB; no interim cap.
+Final counts: 45 nodes / 43 containment / 61 calls / 2 resolved / 104 total edge-evidence rows.
+Frozen readback equal after deterministic ordering; completeness remains incomplete.
+This run retains its native Turso database and sidecars, not only transient test data.
+Python sqlite3 cannot inspect the native format; acceptance uses the actual Turso adapter.
+
+Executable SHA-256: ec9d24df192152263ed5bf6cec0db0c3cc20b64a2498886bcc4a1b63fb85fcde.
+Runtime source manifest: 1,401 inputs (147 integration + 1,254 clean pinned parser files);
+digest 114238fcdffe3d2b82d2459242f59954f94537a5015e54b45e3511edce073e49.
+The verified-runtime-source-* files supersede the earlier source-input-digest-manifest for
+this final executable, while earlier evidence remains retained. Post-run free disk:
+8,288,354,304 bytes. Report: hld-current-test-runs/20261114T140300Z-full-map-implementation/
+hld-current-test-report.md. Artifact root remains ~/hld-current-test-artifacts with that run ID.
+
+Commit/push/PR: none; deferred pending authorization. All three workers remain archived;
+only this VM was used after consolidation. Next: a new real-source RED for generic
+Buffer::format -> private::Sealed::write. Full-map, whole-itoa, native and all-five qualification
+remain outstanding; do not claim a percentage or promote this checkpoint into a milestone PASS.

@@ -1,0 +1,783 @@
+{
+  "artifact_status": "LLM_PARSED_DRAFT_NOT_PRODUCTION",
+  "candidate_provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NOT_FROZEN",
+    "status": "LLM_PARSED_DRAFT"
+  },
+  "rows": [
+    {
+      "end_line": 81,
+      "file": "src/lib.rs",
+      "generated_by": null,
+      "self_type": "Buffer",
+      "source_anchor": "impl Default for Buffer",
+      "source_evidence": {
+        "anchor_text": "impl Default for Buffer",
+        "byte_range": [
+          2429,
+          2452
+        ],
+        "line": 76,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 76,
+      "trait": "core::default::Default"
+    },
+    {
+      "end_line": 83,
+      "file": "src/lib.rs",
+      "generated_by": null,
+      "self_type": "Buffer",
+      "source_anchor": "impl Copy for Buffer {}",
+      "source_evidence": {
+        "anchor_text": "impl Copy for Buffer {}",
+        "byte_range": [
+          2529,
+          2552
+        ],
+        "line": 83,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 83,
+      "trait": "core::marker::Copy"
+    },
+    {
+      "end_line": 91,
+      "file": "src/lib.rs",
+      "generated_by": null,
+      "self_type": "Buffer",
+      "source_anchor": "impl Clone for Buffer",
+      "source_evidence": {
+        "anchor_text": "impl Clone for Buffer",
+        "byte_range": [
+          2597,
+          2618
+        ],
+        "line": 86,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 86,
+      "trait": "core::clone::Clone"
+    },
+    {
+      "end_line": 114,
+      "file": "src/lib.rs",
+      "generated_by": null,
+      "self_type": "Buffer",
+      "source_anchor": "impl Buffer {",
+      "source_evidence": {
+        "anchor_text": "impl Buffer {",
+        "byte_range": [
+          2696,
+          2709
+        ],
+        "line": 93,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 93,
+      "trait": null
+    },
+    {
+      "end_line": 404,
+      "file": "src/lib.rs",
+      "generated_by": null,
+      "self_type": "u128",
+      "source_anchor": "impl Unsigned for u128",
+      "source_evidence": {
+        "anchor_text": "impl Unsigned for u128",
+        "byte_range": [
+          11690,
+          11712
+        ],
+        "line": 334,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 334,
+      "trait": "Unsigned"
+    },
+    {
+      "end_line": 145,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u8",
+      "source_anchor": "impl Integer for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Unsigned",
+        "byte_range": [
+          4389,
+          4415
+        ],
+        "line": 143,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 143,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 157,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u8",
+      "source_anchor": "impl private::Sealed for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Unsigned",
+        "byte_range": [
+          4514,
+          4548
+        ],
+        "line": 147,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 147,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 161,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i8",
+      "source_anchor": "impl Integer for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Signed",
+        "byte_range": [
+          4995,
+          5019
+        ],
+        "line": 159,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 159,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 181,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i8",
+      "source_anchor": "impl private::Sealed for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Signed",
+        "byte_range": [
+          5116,
+          5148
+        ],
+        "line": 163,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 163,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 145,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u16",
+      "source_anchor": "impl Integer for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Unsigned",
+        "byte_range": [
+          4389,
+          4415
+        ],
+        "line": 143,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 143,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 157,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u16",
+      "source_anchor": "impl private::Sealed for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Unsigned",
+        "byte_range": [
+          4514,
+          4548
+        ],
+        "line": 147,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 147,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 161,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i16",
+      "source_anchor": "impl Integer for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Signed",
+        "byte_range": [
+          4995,
+          5019
+        ],
+        "line": 159,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 159,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 181,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i16",
+      "source_anchor": "impl private::Sealed for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Signed",
+        "byte_range": [
+          5116,
+          5148
+        ],
+        "line": 163,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 163,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 145,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u32",
+      "source_anchor": "impl Integer for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Unsigned",
+        "byte_range": [
+          4389,
+          4415
+        ],
+        "line": 143,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 143,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 157,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u32",
+      "source_anchor": "impl private::Sealed for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Unsigned",
+        "byte_range": [
+          4514,
+          4548
+        ],
+        "line": 147,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 147,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 161,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i32",
+      "source_anchor": "impl Integer for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Signed",
+        "byte_range": [
+          4995,
+          5019
+        ],
+        "line": 159,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 159,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 181,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i32",
+      "source_anchor": "impl private::Sealed for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Signed",
+        "byte_range": [
+          5116,
+          5148
+        ],
+        "line": 163,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 163,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 145,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u64",
+      "source_anchor": "impl Integer for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Unsigned",
+        "byte_range": [
+          4389,
+          4415
+        ],
+        "line": 143,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 143,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 157,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u64",
+      "source_anchor": "impl private::Sealed for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Unsigned",
+        "byte_range": [
+          4514,
+          4548
+        ],
+        "line": 147,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 147,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 161,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i64",
+      "source_anchor": "impl Integer for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Signed",
+        "byte_range": [
+          4995,
+          5019
+        ],
+        "line": 159,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 159,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 181,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i64",
+      "source_anchor": "impl private::Sealed for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Signed",
+        "byte_range": [
+          5116,
+          5148
+        ],
+        "line": 163,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 163,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 145,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u128",
+      "source_anchor": "impl Integer for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Unsigned",
+        "byte_range": [
+          4389,
+          4415
+        ],
+        "line": 143,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 143,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 157,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "self_type": "u128",
+      "source_anchor": "impl private::Sealed for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Unsigned",
+        "byte_range": [
+          4514,
+          4548
+        ],
+        "line": 147,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 147,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 161,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i128",
+      "source_anchor": "impl Integer for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $Signed",
+        "byte_range": [
+          4995,
+          5019
+        ],
+        "line": 159,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 159,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 181,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "self_type": "i128",
+      "source_anchor": "impl private::Sealed for $Signed",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $Signed",
+        "byte_range": [
+          5116,
+          5148
+        ],
+        "line": 163,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 163,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 196,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 215,
+        "macro": "impl_Integer_size"
+      },
+      "self_type": "isize",
+      "source_anchor": "impl Integer for $t",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $t",
+        "byte_range": [
+          6203,
+          6222
+        ],
+        "line": 194,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 194,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 207,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 215,
+        "macro": "impl_Integer_size"
+      },
+      "self_type": "isize",
+      "source_anchor": "impl private::Sealed for $t",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $t",
+        "byte_range": [
+          6367,
+          6394
+        ],
+        "line": 199,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 199,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 196,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 216,
+        "macro": "impl_Integer_size"
+      },
+      "self_type": "usize",
+      "source_anchor": "impl Integer for $t",
+      "source_evidence": {
+        "anchor_text": "impl Integer for $t",
+        "byte_range": [
+          6203,
+          6222
+        ],
+        "line": 194,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 194,
+      "trait": "Integer"
+    },
+    {
+      "end_line": 207,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 216,
+        "macro": "impl_Integer_size"
+      },
+      "self_type": "usize",
+      "source_anchor": "impl private::Sealed for $t",
+      "source_evidence": {
+        "anchor_text": "impl private::Sealed for $t",
+        "byte_range": [
+          6367,
+          6394
+        ],
+        "line": 199,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 199,
+      "trait": "private::Sealed"
+    },
+    {
+      "end_line": 325,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 329,
+        "macro": "impl_Unsigned"
+      },
+      "self_type": "u8",
+      "source_anchor": "impl Unsigned for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Unsigned for $Unsigned",
+        "byte_range": [
+          8777,
+          8804
+        ],
+        "line": 261,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 261,
+      "trait": "Unsigned"
+    },
+    {
+      "end_line": 325,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 330,
+        "macro": "impl_Unsigned"
+      },
+      "self_type": "u16",
+      "source_anchor": "impl Unsigned for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Unsigned for $Unsigned",
+        "byte_range": [
+          8777,
+          8804
+        ],
+        "line": 261,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 261,
+      "trait": "Unsigned"
+    },
+    {
+      "end_line": 325,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 331,
+        "macro": "impl_Unsigned"
+      },
+      "self_type": "u32",
+      "source_anchor": "impl Unsigned for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Unsigned for $Unsigned",
+        "byte_range": [
+          8777,
+          8804
+        ],
+        "line": 261,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 261,
+      "trait": "Unsigned"
+    },
+    {
+      "end_line": 325,
+      "file": "src/lib.rs",
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 332,
+        "macro": "impl_Unsigned"
+      },
+      "self_type": "u64",
+      "source_anchor": "impl Unsigned for $Unsigned",
+      "source_evidence": {
+        "anchor_text": "impl Unsigned for $Unsigned",
+        "byte_range": [
+          8777,
+          8804
+        ],
+        "line": 261,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 261,
+      "trait": "Unsigned"
+    }
+  ]
+}

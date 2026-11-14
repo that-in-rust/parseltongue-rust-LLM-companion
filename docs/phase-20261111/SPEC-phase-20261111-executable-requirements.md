@@ -1,5 +1,9 @@
 # Executable specs — phase-20261111: HLD for Rust code that compiles
 
+> History. Replaced on 2026-11-13 by `docs/phase-20261113/SPEC-phase-20261113-executable-requirements.md`,
+> which keeps every requirement id and test name and states only what is in force. Do not edit or
+> cite this file as current.
+
 Status: draft contracts; implementation not yet measured. Source: PRD decisions D1–D6, D-A–D-N.
 SPEC owns the executable contracts and M0–M8 ordering; PRD owns product intent; SOP executes the gates.
 These three phase-prefixed document basenames are an explicit naming exception. **M** denotes observations,
@@ -156,6 +160,10 @@ the last selected sub-step SHALL be ≥95% on each of the five repos. M7 may be 
 already meets that gate on all five; skipping it does not remove the M8 gate.
 
 ### REQ-RUST-019.1 — D6 nodes and reexports
+
+Superseded 2026-11-13 by REQ-RUST-019.2 (full graph first). Kept for history; its reexport and
+reachability sentences still apply; "Private uses are evidence only" and "No use statement becomes a
+node" do not.
 
 WHEN nodes are selected, THEN use effective item visibility (§2.4), not only explicit pub syntax:
 file-top-level, inline-module and top-level impl/trait associated items usable by another file qualify.
@@ -382,7 +390,7 @@ edge_source_signature_text: assembled source signature
 edge_target_signature_text: assembled target signature
 edge_source_qualified_path: source path in compilation context
 edge_target_qualified_path: canonical target path including package source/target
-edge_relation_kind_value: calls/uses_type/implements/reexports/contains/derives
+edge_relation_kind_value: calls/uses_type/implements/reexports/contains/derives/imports/reads (REQ-RUST-030.1)
 edge_collapse_via_kind: direct/collapsed
 edge_evidence_row_count: unique supporting evidence rows
 edge_dependency_origin_kind: same_crate/workspace_crate/std/external_crate
@@ -537,10 +545,11 @@ never linked into production. S1/S2 are external-tool preconditions/coverage che
 Development order (2026-11-13): Phase 1 is the single pinned itoa library in
 [SOP §1.1](SOP-phase-20261111-hld-current-e2e-test.md#11-phase-1--one-small-repeatedly-tested-hld-current-benchmark)
 and [phase-one-benchmark-pin.json](phase-one-benchmark-pin.json).
-Construct and independently verify its expected HLD from source before production
-comparison, then repeatedly test each available stage against that frozen reference.
+Construct and independently verify its expected full-item-dependency-graph, and the HLD
+derived from it, from source before production comparison, then repeatedly test each
+available stage against that frozen reference.
 The scoped expected node/edge sets, evidence and roll-ups require exact agreement;
-REQ-RUST-009.2/012.1/019.1/020.1 still apply. A future stage is NOT STARTED,
+REQ-RUST-009.2/012.1/019.2/020.1/032.0 apply (019.2 replaced 019.1 on 2026-11-13). A future stage is NOT STARTED,
 not a passing empty table. This revision specifies a benchmark procedure, not
 implemented runner support, a completed expected graph, or a passing run.
 
@@ -1545,6 +1554,7 @@ Effective visibility facts include item kind, owner, fn-body ancestry and
 outside-crate reachability; unknown visibility SHALL NOT silently mean private.
 Resolved relations use only calls/uses_type/implements/reexports/contains/derives.
 Generic/concrete dispatch is evidence metadata, not an additional relation kind.
+(Revised 2026-11-13 by REQ-RUST-030.1: imports and reads are added.)
 
 WHEN traversal reaches a selected or canonical external target, THEN it SHALL
 stop; otherwise it SHALL traverse only extracted relations through private
@@ -1665,6 +1675,54 @@ guessed local file or silent edge exclusion is permitted.
 
 ### Authoritative Phase 1 HLD verification matrix
 
+#### Durable Turso publication contract
+
+The L2 HldGraphPublicationPort accepts immutable source snapshot scope, mutable
+destination scope, typed HldMaterializationOutputRecord, and RunCancelFlagValue;
+it returns the new frozen scope or typed HldPublicationPortError. The L3
+TursoWorkspaceStoreAdapter uses the existing generic stage schema; L1 remains
+dependency-free.
+
+Register lowered-signature-type-table and impl-header-index-table under
+signature-type-lowering-stage; item-effective-visibility-records under
+item-effective-visibility-stage; edge-evidence-record-table under
+semantic-edge-evidence-stage. Keep legacy owners unchanged. The five semantic
+HLD tables remain hld-current-interface-nodes, hld-current-dependency-edges,
+hld-edge-evidence-paths, hld-file-level-rollup, hld-folder-level-rollup;
+owner: hld-current-materialization-stage. No input decoders/producers are
+added.
+
+Require source scope in frozen-stage-publication-records, resolve its base
+attempt/revision, match destination generation/base attempt and all output
+generation keys, require CompleteGraph and both Some roll-ups, and require
+markers visible at that exact revision for crate-graph, source-ingest,
+syntax-spans, syntax-namespace-input-records, name-resolution,
+signature-type-lowering-stage, item-effective-visibility-stage, and
+semantic-edge-evidence-stage. Later mutable-base markers cannot qualify an
+older snapshot. Preserve workspace_required_stage_names and the generic gate.
+
+One transaction writes all five tables under hld/current, writes unit/global
+completion markers, seals a snapshot and switches the workspace manifest.
+The global HLD completion marker payload records input snapshot alias, base
+attempt and revision as persistence metadata, separate from semantic payloads.
+Semantic keys/payloads use canonical JSON for full typed identities, enum
+variants, optional signatures and ordered proofs; no Debug strings, guessed
+fields, transient IDs or attempt IDs.
+
+Cancellation is checked throughout and before commit; failure rolls back rows,
+markers, snapshot metadata/sealing and manifest, preserving the previous view.
+Reject sealed HLD units; clear only unpublished HLD rows/markers in the
+destination scope. Retain bounded Busy retries without erasing typed errors.
+For each required input owner, reject publication with typed
+StaleInputSnapshot if any current-scope completion/work-unit marker is absent
+from the supplied frozen revision. This exact-closure check is HLD-specific;
+generic snapshot semantics remain unchanged. Generic writes owned by
+hld-current-materialization-stage are rejected after any of its markers is
+sealed, including global completion and work units other than hld/current.
+Before publishing, clear all unsealed HLD-owned rows and markers in the
+destination scope so stale work units cannot enter the new view.
+This checks snapshot compatibility, not producer or source-pipeline completion.
+
 | req_id | test_id | test_type | assertion | metric |
 | --- | --- | --- | --- | --- |
 | REQ-RUST-029.0 | test_itoa_reference_occurrence_inventory | reference contract | distinct generated owners, selected internal interfaces, explicit unfrozen gaps | exact inventory |
@@ -1679,16 +1737,167 @@ guessed local file or silent edge exclusion is permitted.
 | REQ-RUST-030.0 | test_hld_unresolved_path_stop | integration | unresolved, inferred and proposed hops stop while extracted branches remain | exact row/path set |
 | REQ-RUST-030.0 | test_hld_invalid_input_rejection | negative integration | malformed identity/missing endpoint fails | typed error |
 | REQ-RUST-030.0 | test_hld_duplicate_conflict_rejection | negative integration | conflicting duplicate is not overwritten | typed error |
-| REQ-RUST-030.0 / 031.0 | test_hld_generation_input_isolation | integration | incompatible generation cannot contaminate output | zero foreign rows |
-| REQ-RUST-030.0 / 031.0 | test_hld_missing_input_markers | negative integration | table presence is not stage completion | no publication |
-| REQ-RUST-031.0 | test_hld_cancel_preserves_publication | integration | cancellation leaves old generation readable | unchanged digest |
-| REQ-RUST-031.0 | test_hld_failed_write_rollback | integration | partial output unit never publishes | unchanged digest |
+| REQ-RUST-030.0 / 031.0 | test_hld_generation_input_isolation | integration | wrong generation/base attempt, partial graph, or unfrozen source cannot publish | typed rejection; zero foreign rows |
+| REQ-RUST-030.0 / 031.0 | test_hld_missing_input_markers | negative integration | missing frozen marker and marker added after older snapshot are rejected | no publication |
+| REQ-RUST-031.0 | test_hld_stale_input_snapshot | negative integration | a later semantic work-unit marker outside the frozen revision is rejected with typed error | no HLD rows or manifest switch |
+| REQ-RUST-031.0 | test_hld_sealed_any_marker | negative integration | global HLD completion and another HLD unit in a frozen view cannot be replaced | sealed view unchanged |
+| REQ-RUST-031.0 | test_hld_sealed_node_rewrite | negative integration | generic HLD owner writes through another unit or completion marker cannot mutate a sealed row | old payload unchanged |
+| REQ-RUST-031.0 | test_hld_unsealed_other_staging | integration | stale unsealed HLD rows/markers from other units are cleared before publication | new view excludes stale unit |
+| REQ-RUST-031.0 | test_hld_cancel_preserves_publication | integration | mid-transaction cancellation rolls back and preserves previous view | no partial rows; unchanged manifest/output |
+| REQ-RUST-031.0 | test_hld_failed_write_rollback | integration | later SQL insert failure rolls back all outputs, markers, snapshot and manifest | old view unchanged; no partial rows |
 | REQ-RUST-031.0 / 012.1 | test_hld_order_attempt_determinism | integration | reordered/duplicate inputs and attempt token preserve nodes, edges, paths and roll-ups; reused adapter clears on empty input | output equality including roll-ups; empty output |
 | REQ-RUST-031.0 / 009.2 | test_hld_rollup_edge_counts | integration | path/evidence multiplicity never inflates deduplicated file/folder groups; relation/via stay distinct and functions merge by folder | exact group counts; sums at both levels equal HLD row count |
 | REQ-RUST-031.0 / 009.2 | test_hld_rollup_bucket_context | integration | same relative path in distinct units, root file, CrateRoot, verified/missing external files and Builtin preserve typed buckets | exact typed bucket keys |
 | REQ-RUST-031.0 | test_hld_empty_input_rollups | integration | completed empty typed input yields CompleteGraph and present empty roll-ups | Some(empty) at both levels |
-| REQ-RUST-031.0 | test_hld_complete_empty_snapshot | integration | complete empty input differs from missing stage | explicit empty result |
+| REQ-RUST-031.0 | test_hld_complete_empty_snapshot | integration | complete empty output is durably published, distinct from missing stage | five empty tables and visible markers |
+| REQ-RUST-031.0 | test_hld_publication_round_trip | integration | DuckDB typed fixture is published/read through Turso; prior/new views remain isolated | exact five tables and snapshot metadata |
 
 These are required test contracts, not passing evidence. Record STUB/RED/GREEN/
 REFACTOR output and exact test implementation locations in the journal. The
 pinned source-to-HLD comparison remains a separate Phase 1 end-to-end gate.
+
+## Phase 1 revision — full graph first, levels derived (2026-11-13)
+
+User decisions of 2026-11-13, consolidated with examples in
+[Table-Specs-01](../phase-20261113/archive-folded-draft-files/Table-Specs-01.md). This revision changes
+which rows exist and how the HLD is derived. It does not change the Turso /
+DuckDB split, identities, generations or publication. Nothing below is
+implemented; no producer of the two full-graph tables exists yet.
+
+Supersession: REQ-RUST-019.2 replaces REQ-RUST-019.1, and REQ-RUST-030.1 revises
+the relation-kind sentence of REQ-RUST-030.0. REQ-RUST-009.2, §2.4 and
+REQ-RUST-031.0 stand, read with "selected" meaning REQ-RUST-019.2's filter.
+The sentence "No use statement becomes a node" in REQ-RUST-019.1 is withdrawn.
+Earlier text that cites REQ 019.1 for node selection (§2.1 metric 019, the §4
+crosswalk, REQ-RUST-029.0, REQ-RUST-030.0, SOP §1.1) reads as 019.2. Metric 019
+scores both the full-graph node set and the interface-level selection.
+PRD §5 and §3.1 say stages 6 and 7 write edge-evidence-record-table directly;
+the Turso registry in code gives each table one owner stage name
+(semantic-edge-evidence-stage for edges, item-effective-visibility-stage for
+nodes). The registry governs; which tool computes each fact is unchanged.
+
+Owned names added: `full-item-dependency-graph` (the two tables below taken
+together) and `file-public-area-node`. `file_public_area`, `imports` and `reads`
+are enum values. Levels keep their AGENTS.md names: `public-item-l2-interface`
+and `folder-file-l1-rollup`.
+
+### REQ-RUST-032.0 — full item dependency graph
+
+WHEN semantic facts are produced for a compilation unit, THEN the
+full-item-dependency-graph SHALL be stored in two existing tables and no new
+ones: item-effective-visibility-records holds one row per graph node and
+edge-evidence-record-table holds one row per edge fact.
+
+Nodes. Every module, function, struct, enum, trait, type alias, const, static,
+associated function, associated const and associated type owned by the crate
+root, a module, a trait or an impl SHALL be a node whatever its visibility,
+private items included. Nothing with fn-body ancestry is a node. Each node
+stores effective visibility under §2.4 and node_reachable_outside_crate as
+separate facts; unknown visibility is a typed error, never private.
+
+WHEN a source file belongs to the unit, THEN exactly one file-public-area-node
+SHALL exist for it, distinct from the file's module node, with item kind
+`file_public_area` and an identity made of the compilation unit and the file
+path. WHEN a `use` declaration is outside fn bodies and cfg-active, THEN it
+SHALL be a node with item kind `use_statement`, whatever its visibility. An
+inline module is an ordinary module node with its own scope; it does not see
+the imports of the file that contains it.
+
+Edges. Every relation proven from source SHALL be stored with extracted status,
+including relations between two private items. The full graph is never
+collapsed. An unresolved site is stored with its reason and is not an edge.
+Each file-public-area-node has one `contains` edge to each top-level node of
+its file. Each use node has one `imports` edge per resolved binding, aliases
+and globs included. A function that reads a const, static or associated const
+has one `reads` edge to it.
+
+An edge's source is a full-graph node. The one exception is an `implements`
+fact whose self type is not local (`impl Integer for u8`): its source is the
+builtin or external type, it is stored, and it never seeds an interface-level
+edge; no local node is invented for the primitive (REQ-RUST-029.0). Impl blocks
+are not nodes; an impl member's row names its impl block as owner evidence.
+
+WHEN a call, type use or read resolves a name through an import, THEN the edge
+SHALL target the resolved item, not the use node; the use node's occurrence is
+retained in that edge's evidence. A function SHALL have edges only to items it
+uses, never to every import visible in its scope.
+
+### REQ-RUST-019.2 — interface level is a filter (replaces 019.1)
+
+WHEN the public-item-l2-interface level is built, THEN it SHALL be derived from
+the full-item-dependency-graph by filtering nodes, collapsing paths and
+deduplicating, and SHALL add no fact that is absent from the full graph.
+
+A full-graph node is selected when it is the crate root, or a
+file-public-area-node, or a use node, or an item whose effective visibility is
+public or restricted-non-private. File-public-area-nodes are selected even when
+the file's module is private. Private items are not selected at this level;
+they remain full-graph nodes and appear as intermediates in evidence paths.
+Reexport edges, node_reachable_outside_crate and the collapse algorithm are
+unchanged from REQ-RUST-019.1, REQ-RUST-009.2 and §2.4.
+
+WHEN a collapsed path is built, THEN no hop of it SHALL be a `contains` or
+`imports` edge, neither the first hop nor a later one (user decision,
+2026-11-13). Collapse walks calls, uses_type, implements, reexports, derives
+and reads. A `contains` or `imports` edge appears at this level only as a
+direct edge whose target is selected or external; one whose target is an
+unselected private item yields no interface-level row and stays in the full
+graph. This changes REQ-RUST-009.2 as built: HLD_RECURSIVE_PATH_SQL walks every
+relation kind today.
+
+WHEN folder-file-l1-rollup rows are built, THEN they SHALL count interface-level
+edges only. A file-public-area-node is bucketed in its own file.
+
+### REQ-RUST-030.1 — relation kinds
+
+Resolved relations use only calls / uses_type / implements / reexports /
+contains / derives / imports / reads. Generic/concrete dispatch stays evidence
+metadata. The typed materializer input and output records, their validation and
+their canonical JSON SHALL accept the two added kinds and the
+`file_public_area` item kind.
+
+### Not decided in this revision
+
+Do not implement a choice for these; each needs a decision first.
+
+- Containment detail. Whether each node has exactly one container (its file's
+  file-public-area-node for top-level items and impl members; the inline
+  module or trait for nested ones), what relates a file's module node to its
+  area node, and whether a `contains`-only chain may collapse through a
+  dropped private module so that the area still contains `private::Sealed` at
+  the interface level.
+- Whether `reads` and `uses_type` may have a non-function source: a const
+  initializer, an associated type, a struct field type or an array length
+  (`const MAX_STR_LEN: usize = <u64 as Integer>::MAX_STR_LEN`).
+- Whether a `pub use` carries both an `imports` edge from its use node and the
+  module's `reexports` edge.
+- Enum variants and struct fields as full-graph nodes; REQ-RUST-030.0 still
+  rejects Field/EnumVariant ownership.
+- How an item generated by a declarative macro is assigned to a source file for
+  `contains` edges and roll-ups.
+- Whether the agent reads the two full-graph tables directly or a published
+  copy with path and signature text.
+- Whether private items visible to several files appear at the interface level.
+
+### Named RED contracts for this revision
+
+These are required test contracts, not passing evidence, and none is written.
+Component tests on typed fixtures do not replace the pinned-itoa real-source
+acceptance of SOP §1.1.
+
+| req_id | test_id | test_type | assertion | metric |
+| --- | --- | --- | --- | --- |
+| REQ-RUST-032.0 | test_graph_private_item_nodes | real-source integration | private items outside fn bodies are nodes; body items are not | exact node set |
+| REQ-RUST-032.0 | test_graph_private_edge_retention | real-source integration | private → private relations are stored uncollapsed | exact edge set |
+| REQ-RUST-032.0 | test_graph_file_area_containment | real-source integration | one area node per source file, distinct from the module node, containing its top-level nodes | exact nodes and edges |
+| REQ-RUST-032.0 | test_graph_use_statement_nodes | real-source integration | each cfg-active use outside fn bodies is a node; cfg-inactive ones are absent | exact node set |
+| REQ-RUST-032.0 | test_graph_import_binding_edges | real-source integration | one imports edge per resolved binding, aliases and globs included | exact edge set |
+| REQ-RUST-032.0 | test_graph_constant_read_edges | real-source integration | a const, static or associated-const read yields one reads edge | exact edge set |
+| REQ-RUST-032.0 | test_graph_real_item_targets | real-source integration | an edge resolved through an import targets the item and keeps the use node as evidence | exact target and evidence |
+| REQ-RUST-032.0 | test_graph_import_access_exclusion | real-source integration | a function has no edge to an import it does not use | zero such edges |
+| REQ-RUST-032.0 | test_graph_inline_module_scope | real-source integration | an inline module is a module node and does not resolve through its file's imports | exact resolution |
+| REQ-RUST-019.2 | test_level_filter_adds_nothing | integration | every interface-level node and evidence hop exists in the full graph | zero additions |
+| REQ-RUST-019.2 | test_level_area_use_selection | integration | area and use nodes are selected, including in a file whose module is private | exact node set |
+| REQ-RUST-019.2 | test_level_private_item_exclusion | integration | private items are unselected but named in collapsed evidence paths | exact rows and paths |
+| REQ-RUST-019.2 | test_level_collapse_kind_exclusion | integration | selected -contains-> private -calls-> X and use -imports-> private -calls-> X emit no collapsed edge; direct contains/imports rows to selected targets remain | exact rows |
+| REQ-RUST-030.1 | test_hld_added_relation_kinds | unit/integration | imports and reads round-trip through typed input, DuckDB and output | exact rows |

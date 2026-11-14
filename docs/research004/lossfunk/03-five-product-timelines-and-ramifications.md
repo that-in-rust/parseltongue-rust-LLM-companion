@@ -2,7 +2,7 @@
 
 **Decision:** Build the graph, not a PR reviewer. Each timeline below starts with the same artifact: a versioned, source-linked map of the externally reachable contracts in a Rust workspace and the dependencies needed to reason about them. Each tests a different reason a systems programmer would actually keep that map. The sequence is illustrative, not a delivery estimate or evidence of demand.
 
-The [README](../README.md) documents the starting point: an installed CLI can already create a graph from source and let agents query it. The [model experiment](01-small-model-interface-graph-research.md) asks whether a local, open-weight graph generator can produce a *better graph* on unseen Rust OSS. Launching a new viewer, replacing storage or attracting PR reviewers would not answer that question.
+The [README](../../../README.md) documents the starting point: an installed CLI can already create a graph from source and let agents query it. The [model experiment](01-small-model-interface-graph-research.md) asks whether a local, open-weight graph generator can produce a *better graph* on unseen Rust OSS. Launching a new viewer, replacing storage or attracting PR reviewers would not answer that question.
 
 ## Timeline A: The maintainer publishes the map
 
@@ -117,9 +117,9 @@ Local sources:
 
 - [Learned graph compiler thesis](02-learned-graph-compiler-thesis.md): primary technical hypothesis and representation.
 - [Earlier small-model research](01-small-model-interface-graph-research.md): model options, baselines, dataset and success criteria.
-- [Current-state PRD](../docs/research004/prd-v20260710.md): graph requirements and narrow HTTP capture scope.
-- [Current-state architecture proposal](../docs/research004/Arch-v202607210.md): proposed capture/accounting system, not an implemented rewrite.
-- [Visual trust and change evidence](../docs/research004/Sol-Insights-02.md): preceding product framing.
-- [Public-interface graphs and source accounting](../docs/research004/Sol-Insights-03.md): earlier projection/identity thesis.
+- [Current-state PRD](../prd-v20260710.md): graph requirements and narrow HTTP capture scope.
+- [Current-state architecture proposal](../Arch-v202607210.md): proposed capture/accounting system, not an implemented rewrite.
+- [Visual trust and change evidence](../Sol-Insights-02.md): preceding product framing.
+- [Public-interface graphs and source accounting](../Sol-Insights-03.md): earlier projection/identity thesis.
 - [Query extractor](../crates/parseltongue-core/src/query_extractor.rs): current entity/edge extraction evidence.
 - [Adjacency representation](../crates/parseltongue-core/src/graph_analysis/adjacency_list_graph_representation.rs): current native graph integration evidence.

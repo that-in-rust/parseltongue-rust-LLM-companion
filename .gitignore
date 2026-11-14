@@ -43,3 +43,5 @@ artifacts/
 
 # Archive folder (for cleanup - can be deleted later)
 git-ref-repo/ignore-this-folder-repos
+# Python bytecode caches
+__pycache__/

@@ -215,3 +215,7 @@ The turn that mattered most in this stretch was the user's "shouldn't L3 be acti
 **Added to what stands.** Fixed/moving separation in DI-07 §2–3; the 8 GB Air as the hard target; CPU tools that call tiny models as the unit of work; three HLD tables in one file with delta as a view; raw text in the span reference table only; L3 deferred and incremental with roll-ups on write; HLD = public-item graph sourced from L2 and L3; the four-word descriptive naming rule and AGENTS.md; `ext-llm-coding-agent` as the external agent's name; DI-08 as the new top-of-pyramid document with lines 1–2 and the end-to-end workflow.
 
 **Added to what is open.** Model call style, runtime and scheduler; agent interface and return shape; the precise grey rule; the L3 trigger policy beyond "edited files first"; the teacher/eval loop as a component; a retire marker and rows-vs-events for the future table; Turso vs SurrealDB on the same edge set; members-per-type density (the first thing to measure once the spanner exists); whether `agent-learned-notes-table` belongs inside the map file or in a Hindsight bank beside it; lines 3–10 of DI-08.
+
+## 2026-11-14 — documentation relocation
+
+The append-only research corpus moved from `devin-research/` to `docs/devin-research/`; all standalone Deep-Insight files and the `Deep-Insight-01.md` mirror remain together. Related Lossfunk research moved from `docs-lossfunk/` to `docs/research004/lossfunk/`, and the historical journey documents moved to `docs/research000/journey-of-parseltongue/`.

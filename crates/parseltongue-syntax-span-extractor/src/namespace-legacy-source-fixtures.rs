@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use super::*;
 use parseltongue_table_store_traits::{ItemMacroExpansionPort, ResolvedMacroLookupPort};
 
@@ -252,6 +252,81 @@ fn unit() -> Value {
         "unit_compilation_role_kind":"target","unit_target_cfg_values":[],"unit_enabled_feature_values":[],
         "unit_rust_edition_value":"2024","unit_source_root_path":"/fixture/src/lib.rs","unit_package_root_path":"/fixture",
         "unit_compilation_identity_key":"fixture-unit"})
+}
+
+/// REQ-RUST-034.0 / REQ-RUST-036.0
+#[test]
+fn test_request_original_body_prefix() {
+    let store = LegacyMacroFixtureStore {
+        source: "struct Buffer; fn caller() { Buffer::new(); }".into(),
+    };
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let paths = &projection
+        .projection_resolution_input_rows
+        .name_signature_path_rows;
+    let prefix = paths.iter().find(|path| projection.projection_path_metadata_rows[&path.path_site_occurrence_key]["site_path_context_kind"] == "body_call_type_prefix").expect("body prefix request");
+    assert_eq!(
+        prefix.path_requested_namespace_kind,
+        NameNamespaceFilterKind::Type
+    );
+    assert_eq!(
+        projection.projection_path_metadata_rows[&prefix.path_site_occurrence_key]["path_site_source_text"],
+        "Buffer"
+    );
+    assert_eq!(paths.len(), 1);
+}
+
+/// REQ-RUST-034.0
+#[test]
+fn test_preserve_body_lexical_scope() {
+    let store = LegacyMacroFixtureStore {
+        source: "struct Buffer; fn caller() { struct Buffer; Buffer::new(); }".into(),
+    };
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let prefix = projection.projection_resolution_input_rows.name_signature_path_rows.iter().find(|path| projection.projection_path_metadata_rows[&path.path_site_occurrence_key]["site_path_context_kind"] == "body_call_type_prefix").expect("body prefix request");
+    let locals = projection
+        .projection_resolution_input_rows
+        .name_symbol_binding_rows
+        .iter()
+        .filter(|row| {
+            row.binding_resolved_name_text == "Buffer"
+                && row.binding_namespace_kind_value == NamespaceBindingKindValue::Type
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(locals.len(), 2);
+    assert!(
+        locals
+            .iter()
+            .any(|row| row.binding_lexical_scope_key == prefix.path_lexical_scope_key)
+    );
 }
 
 struct NamespacePersistenceFixture {

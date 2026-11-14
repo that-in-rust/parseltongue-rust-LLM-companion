@@ -24,6 +24,9 @@ pub struct DuckdbAnalysisStoreAdapter {
 mod hld_materialization_contract_tests;
 #[path = "hld-materialization-duckdb-store.rs"]
 mod hld_materialization_duckdb_store;
+#[path = "hld-original-source-projection.rs"]
+mod hld_original_source_projection;
+pub use hld_original_source_projection::OriginalSourceProjectionError;
 
 #[path = "namespace-analysis-phase-diagnostics.rs"]
 mod namespace_analysis_phase_diagnostics;

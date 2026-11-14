@@ -1,82 +1,90 @@
-# current-milestone-status-board (phase-20261111)
+# Current milestone status board
 
-Rewritten in place after every run report. History lives in the TDD journal and run reports.
+Updated 2026-11-14 20:24 IST. **Bounded first-call checkpoint PASS; full map remains incomplete.**
+Expected relationship: `<Buffer as Default>::default -> Buffer::new` with exact evidence.
+Actual: exactly one extracted target edge is proven through the production CLI, published
+graph rows and frozen readback. Canonical endpoints, source ranges/digests, impl bridges,
+one lexical source container and exact `Buffer::new()` bytes are checked. Unknown visibility
+and absent reachability remain explicit; strict HLD validation rejects the incomplete graph.
+All three worker patches are consolidated locally and their sessions remain archived/suspended.
+Projection, call resolution and CLI/storage composition are implemented and verified here.
+Current evidence: [newest-first Phase 1 log](../phase1-log-p1.md) and
+[append-only TDD journal](TDD-phase-20261111-progress-checkpoints.md).
+The source/executable digests recorded there define the tested uncommitted snapshot.
+Any subsequent production change requires fresh evidence.
 
-Development-order revision (2026-11-13): Phase 1 is pinned itoa 1.0.18
-(`af77385d0daf4d0e949e81f2588be2e44f69f086`), 488 library-source lines in two
-files; see SOP §1.1 and `phase-one-benchmark-pin.json`. Source inventory/pin
-verified only. Reference graph, qualification and S1–S10 benchmark runs:
-NOT STARTED; lockfile NOT CAPTURED; configuration/reference NOT FROZEN.
-All implementation agents and the native diagnostic remain halted by user order.
-The following native/milestone entries are historical evidence, not itoa results.
-Phase 2 preserves all-five acceptance, starting with serde.
+## Current verified runtime snapshot — bounded, not whole-map qualification
 
-Last updated: 2026-11-13 · Latest full native runtime measurement remains the isolated M2 retry from integrated HEAD `825d760e8685d8d4d95ab8acd2267edf3687847b`: the supervisor enforced 2,400s, total command elapsed 2,410.252s including bounded descendant cleanup, exit 124, peak whole-tree RSS 9,234,448 KiB sampled every 0.2s; no assertion/result line. Live stderr reached completed copy/normalization and resolution rounds; its last marker was round 3 import-bindings started, with exact active query unknown. REQ-RUST-028.1 now adds operational refresh traces and a bounded generated-import fixture; its focused checks passed but do not change the native S3 status. The current source includes that instrumentation and remains unqualified. No all-five PASS, production qualification, or frozen release exists; the three-attempt stop rule bars another full native retry.
+- Pinned itoa, library, no features, Rust 2021, x86_64-unknown-linux-gnu, sysroot excluded.
+- **45 nodes**: 43 active original non-body items plus 2 file areas. **104 edge/evidence records**:
+  43 containment edges and 61 calls, only 2 resolved; 59 remain explicitly unresolved.
+  These counts are not complete semantic coverage. Header-only lowering remains incomplete.
+- All **11 source-acceptance tests** pass, including the two new full-map tests; **87.32s**.
+  Child-file function ownership is Module, not CrateRoot; file-area containment is unchanged.
+  Legacy 202 import/signature paths retain their original checks; 29 new body-prefix paths
+  are checked separately. Full-map publication does not emit HLD tables.
+- Formatting, warnings-denied release Clippy and all-target/all-feature release build: **PASS**.
+- Bounded workspace: **415 passed / 0 failed / 4 ignored / 1 filtered**, 21 harness results,
+  **154.884209s / 506,855,424 bytes** sampled process-tree peak (one test thread).
+  The filtered test is `test_lang_items_in_sysroot`; the full workspace gate is **not PASS**.
+- Python SOP runner: **146 passed / 2.950s**. No changes to that runner in this implementation.
+
+Current [bounded run report](../../hld-current-test-runs/20261114T140300Z-full-map-implementation/hld-current-test-report.md):
+**14.810602s / 410,705,920 bytes** for the retained single CLI run. Measured DuckDB limit:
+25.0 GiB, 2 threads; no interim cap. Executable SHA-256:
+`ec9d24df192152263ed5bf6cec0db0c3cc20b64a2498886bcc4a1b63fb85fcde`.
+Runtime source manifest: 1,401 files (147 integration, 1,254 pinned parser inputs), digest
+`114238fcdffe3d2b82d2459242f59954f94537a5015e54b45e3511edce073e49`.
+Retained native Turso database, pin-checked source workspace, executable, source archive,
+gate logs and process-tree samples are indexed in the report. The earlier structural report
+is historical, not evidence for this newer executable.
+
+## Formal SOP status
 
 ```text
- MILESTONE  STATE
- M0  core types, Turso store            code done; SOP S3 skeleton subset not re-run on current digest
- M1  ingest, crate graph, spans         code done; S1/S2/S3 historical PASS (old digest) → re-run pending
- M2  name resolution (DuckDB SQL)       mapper plus runner/comparator descendants integrated but unqualified; native M2 retry BLOCKED/incomplete at 2,400s; live stderr logged a 14-round fixed-point line and later copy/normalization plus repeated resolution progress, ending at round 3 import-bindings started; exact active query unknown. REQ-RUST-028.1 trace and bounded generated-import regression are GREEN, instrumentation-only; earlier forensic copy shows frozen revision 8, normalized source 221,822 rows, persisted unit-link/path/binding outputs, and no fixed-point manifest; all-five S5 not started
-       code   measured-only default, generation-backed publication receipts, and stage-status banner integrated
-       runner component code/tests integrated; full S3 intake is unimplemented; S4/S5 execution is not started
-       comparator R9 file-backed follow-up integrated; no production comparison or final freeze
-       done   non-monotone SQL resolution, preludes, extern aliases, textual macro scope, macro alternation
-       done   oracle path partition (module-scope scored at M2; type-relative deferred)
-       done   indexed frozen visibility + distinct namespace cleanup indexes (focused tests GREEN)
-       done   typed copy/normalization/resolution failures, memory telemetry, retained replay and rollback-safe EXPLAIN
-       open   choose the next bounded S3 acceptance action from the timeout diagnosis; no further full native retry is authorized by the three-attempt stop rule; full S3 intake and all-five serde-first qualification remain pending
- M3  proc-macro shapes                  not started
- M4–M6 signatures, impls, bodies, methods  not started
- M7  coverage + performance             not started
- M8  HLD builder, full S1–S10           not started
+S1      NOT STARTED — current-artifact formal corpus run
+S2      NOT STARTED
+S3      BLOCKED — full native path; bounded source/full-map checkpoint above passes
+S4      NOT STARTED
+S5      NOT STARTED
+S6–S10  NOT STARTED
 ```
 
-```text
- SOP STEP  LATEST RESULT ON CURRENT DIGEST
- S1  structural index        not-started (five pinned roots/locks checked read-only; no source qualification)
- S2  coverage inventory      not-started
- S3  fixture/production map  BLOCKED/incomplete: isolated native M2 retry reached the 2,400s deadline (exit 124; 2,410.252s including cleanup), not an assertion failure; full S3 intake is unimplemented
-                             Live stderr recorded a 14-round fixed-point line and later repeated copy/normalization/resolution work; last marker was round 3 import-bindings started. Exact active query remains unknown. Earlier forensic copy counts remain historical; see the separate retry report.
-                             REQ-RUST-028.1 structured refresh/digest/fixed-point/exhaustion trace and generated-import fixture: focused checks PASS; this does not establish native or corpus convergence.
- S4  oracle exports          NOT STARTED; no production/corpus exports or full S3 intake
- S5  per-site comparison     NOT STARTED; comparator R9 code is integrated, but no production corpus comparison or all-five qualification
- S6–S10                      NOT STARTED
-```
+Phase 1 remains itoa-only. Phase 2 retains all-five qualification, serde first.
+No whole-itoa equality, complete semantic coverage, worker-count determinism, or final 500 MB
+qualification is established.
 
-Stop rule: retained native capture plus two resolution replays completed without raising the cap.
-Copy PASS 35.398s / sampled tree peak 1323495424 bytes; normalization PASS 31.469s / 1936781312 bytes.
-Resolution fails at candidate INSERT in round 2 (32.273s / 1482792960 bytes) or round 3 on reused derived state.
-INSERT EXPLAIN ANALYZE independently OOMs at 4.884s. SELECT-only profile has 133 operator counts; no complete INSERT profile.
-Specific join/index root cause is unresolved; no speculative fix. Final 500 MB acceptance remains deferred.
+## Immediate next work and decisions
 
-Follow-up hypotheses: H1 already false; explicit SET false OOM 5.354s / 1412620288 bytes.
-H2 threads=1 OOM 9.034s / 1394860032 bytes. H3 unconstrained CTAS itself OOM
-6.610s / 1409286144 bytes before target INSERT. H4 UNION DISTINCT OOM 3.324s /
-1417895936 bytes; removing unused lookahead join OOM 4.807s / 1621385216 bytes.
-Allocator attribution is measured: normalization's peak has 802144141 bytes in
-C++ non-managed BaseAppender stacks, not Rust JSON/Turso buffering. Full adapter
-suite now GREEN (57 tests); invalid completion-marker handoff fixture repaired.
+1. **OD-7 source containment decided** (REQ-RUST-043.0): one lexical source container,
+   with separate impl/self-type/trait ownership metadata. No contains/imports collapse.
+   File-module/area relationship and generated source/container provenance remain open;
+   derived roll-up bucket attribution is deferred.
+2. The selected ten subparts toward `default -> Buffer::new` now have bounded integrated evidence.
+   No unresolved fact was filled by guessing and no HLD gate was weakened.
+3. Next semantic target: `Buffer::format -> private::Sealed::write` through generic/supertrait lookup;
+   start with a new real-source behavioral RED. It is not implemented by this checkpoint.
+4. Macro provenance, fields/variants and non-function dependency decisions still block affected
+   full-map reference rows. Frozen full-map readback must not depend on HLD output.
+5. Everything unrelated to building/preserving/verifying this graph is in the
+   [backlog](../phase1-abstractions-decision-backlog.md): abstractions are later queries over
+   retained facts, not separate semantic pipelines. The broader six SOP/AGENTS process
+   corrections still await approval (BF-05); only the requested scope correction is applied.
 
-Integrated-source checks and readiness (2026-11-12):
-- Python runner tests: 115/115 PASS in 0.766s; process-tree contract tests: 6/6 PASS in 0.317s.
-- `cargo fmt --all -- --check`: PASS. All-target/all-feature Clippy: PASS in 3.97s. Workspace release build: PASS in 11.47s; the warmed release DuckDB archive hash stayed unchanged.
-- Earlier all-target/all-feature debug-profile workspace tests did not reach a test harness: the 120s command timed out during compilation after Cargo printed `Compiling libduckdb-sys`. Only `test_lang_items_in_sysroot` was requested as an exclusion; that M2 path-resolution/lang-item test remained pending.
-- The separate warmed release-profile workspace suite with only `test_lang_items_in_sysroot` skipped completed: 270 passed, 0 failed, 3 ignored, 1 filtered. Those 270 do not include the native test. Its isolated release attempt then timed out at 2,400.11s (exit 124), peak RSS 8,786,596 KiB sampled every 0.2s, with no assertion/result and no memory cap. Exact harness/CLI digests and argv/environment are in the run report and external summary.
-- Earlier postmortem checkpoints record the reader-unavailable state and the source/lock finding that bundled DuckDB is 2.0.0. The later session-built reader resolved that prerequisite without a Python wheel or C++ rebuild; read-only inspection of an external copy returned measured manifest and table counts. Historical journal entries are preserved.
-- Latest forensic finding: original and copy DuckDB hashes match before/after, and no DuckDB WAL sidecar exists. Copy and normalization completed for frozen revision 8; unit-link outputs and path/binding rows persisted; fixed-point completion is not evidenced. The exact last SQL operation remains unknown. This query evidence is not original-run DuckDB memory/settings telemetry.
-- CLI contract helper regression: 27 passed, 0 failed, 1 ignored (`test_child_fixture_waits_release`), and 1 filtered (`test_lang_items_in_sysroot`) in 4.29s, exit 0, using the warmed locked/offline release target. The ignored fixture supplies live-stderr, exit/output, and output-read cases. No DuckDB C++ rebuild occurred; the native M2 test remains excluded.
-- Reviewed oracle branch `eecdf0d3700d33b7522709f01cfbf24fbdba9e90` is integrated. REQ-RUST-027.0 limits the advertised capability to mapped path exports; it does not establish full S4 support or qualification. The child's reviewed RED/34-test/fmt/Clippy/release gates were not repeated here; no corpus export or native M2 rerun occurred.
-- Separate native M2 rerun preflight `20261112T222609Z-native-m2-regression-preflight` is BLOCKED before launch: persistent `/dev/root` had 3,213,532 KiB available (98% used), less than the preserved prior 4.0G fixture footprint. No test or Cargo process ran; this is not a timeout or assertion result. The earlier timeout report remains historical and S3 remains BLOCKED/incomplete.
-- Diagnostic-only run report: `hld-current-test-runs/20261112T203325Z-native-m2-regression/hld-current-test-report.md`.
-- The all-target/all-feature debug build was not run because the timed-out test gate reached `libduckdb-sys`; further debug compilation could require a bundled native build, which was not authorized. No test result or completed debug native build is inferred.
-- Five pinned corpus roots and lock hashes match the read-only inventory; stable Rust 1.99.1 `rust-src` core/alloc/std sources are present. `strace`, Cargo, rustc, Python, and process tools are available. The external pinned Python provider `blake3==1.0.10` is provisioned and its vectors/provider selection were verified, but the qualification runner has not been invoked and no corpus run directory was created.
-- No memory cap was set, no corpus/native qualification was run, and no release artifact was frozen.
+PRD/SPEC/ARCH/SOP/AGENTS now separate active full-map requirements from retained deferred HLD
+contracts. REQ-RUST-044.0 and its queued tests are contracts, not executable acceptance evidence.
 
-REQ-RUST-028.1 instrumentation-only checks (2026-11-13): the generated-import CLI fixture passed (1 test, 0.96s); manifest digest tests passed (3 tests); the non-native CLI contract target passed (28 passed, 1 ignored child-fixture, 1 native M2 test filtered). `cargo fmt --all -- --check`, all-target/all-feature Clippy, and warmed release build passed. The test fixture proves only the trace contract and this bounded dependency-macro/import scenario; it is not native/corpus qualification. DuckDB archive hash and mtime stayed unchanged; no C++ rebuild marker appeared. Retained command logs and digests are in `/home/ubuntu/hld-current-test-artifacts/20261113T001017Z-macro-refresh-trace/`.
+## Operational guardrails
 
-Next actions:
-1. Keep full S3 intake, all corpus runs, S4–S10, and qualification not started until the timeout diagnosis and next bounded action are reviewed; do not infer a precise stalled query from the last marker.
-2. No further full native retry is authorized under the three-attempt stop rule.
-3. The external pinned Python BLAKE3 provider is ready, but keep the qualification runner unused until reviewed.
-4. Preserve the no-interim-memory-cap policy; no all-five PASS is claimed. The retry used no external memory cap; its live DuckDB logger reported the application's 25.0 GiB setting.
+- **No further full-native retry** under the prior three-attempt stop rule.
+  The unrestricted workspace run mistakenly included it and failed on disk exhaustion before
+  its semantic check; raw failure evidence is retained. The final bounded run excluded it.
+- Earlier disk failures are historical. Current retained-run disk measurement:
+  **8,288,354,304 bytes free**. No source, release executable or evidence was removed here.
+- Codebase-memory refreshed: 26,428 nodes / 57,341 edges; 6 partially parsed files, 0 unusable/skipped.
+  Use direct source inspection where flagged; the index is not a semantic oracle.
+- Earlier native/all-five diagnostics remain historical, not permission to resume them.
+  Details are in their retained reports and the append-only TDD journal.
+- No commit or push for this work.
+- Cargo targets were rebuilt after the requested cleanup. No native-sysroot retry was made.
+  Work, parallel processes, integration and tests use this VM only (AGENTS rule).
