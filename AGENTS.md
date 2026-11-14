@@ -108,8 +108,7 @@ TARGET   itoa-target-dataset/                           the expected itoa graph 
 LOG      LOG-itoa-full-item-graph-progress.md           the single progress record, newest first
 BACKLOG  BACKLOG-deferred-work-open-decisions.md        deferred work and open decisions
 MAP      MAP-parseltongue-crates-as-measured.md         crates, files, verbs, stages as measured
-SPEC     SPEC-wider-scope-requirements-not-current.md   written for the wider scope; to be
-                                                        rewritten after ARCH
+SPEC     SPEC-itoa-full-item-graph-requirements.md      the REQ-RUST ids in force, state and tests
 ```
 
 - These files state only what is in force. Edit in place; no revision sections. History goes
