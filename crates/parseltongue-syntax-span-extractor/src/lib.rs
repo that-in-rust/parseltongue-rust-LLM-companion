@@ -40,6 +40,7 @@ mod legacy_macro_scope_records;
 #[path = "signature-type-edge-records.rs"]
 mod signature_type_edge_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
+pub use signature_type_edge_records::{SignatureTypeEdgeError, resolve_signature_type_edges};
 #[path = "legacy-macro-source-events.rs"]
 mod legacy_macro_source_events;
 pub use legacy_macro_source_events::{LegacyMacroNodeEvents, read_legacy_node_events};

@@ -288,6 +288,23 @@ impl ImplHeaderSourceContext<'_> {
         Ok(self.paths.get(&key).map(Vec::as_slice).unwrap_or(&[]))
     }
 
+    /// The one graph identity a resolved path target row names, when the
+    /// namespace items hold exactly one for it.
+    pub(super) fn read_single_target_identity(
+        &self,
+        target: &Value,
+    ) -> Result<Option<Value>, ImplHeaderSourceError> {
+        match self
+            .targets
+            .get(&impl_target_lookup_key(target))
+            .map(|identities| identities.iter().collect::<Vec<_>>())
+            .as_deref()
+        {
+            Some([identity]) => Ok(Some(serde_json::from_str(identity)?)),
+            _ => Ok(None),
+        }
+    }
+
     pub(super) fn resolve_type(
         &self,
         span: &Value,
