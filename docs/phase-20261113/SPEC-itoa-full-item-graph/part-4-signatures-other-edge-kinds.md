@@ -1,11 +1,11 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a steps 1 to 5 of 7 BUILT (edges to items, `Self` and builtins). 4b to 4d are stubs.**
+**State: 4a steps 1 to 6 of 7 BUILT (items, `Self`, builtins, unresolved rows). 4b to 4d are stubs.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
-4a  uses_type from signatures   REQ-RUST-018.2   items, Self and builtins built; unresolved next
+4a  uses_type from signatures   REQ-RUST-018.2   all four target outcomes built; step 7 left
 4b  implements from impl headers                 stub
 4c  reads of consts and statics                  stub
 4d  imports from use nodes                       stub
@@ -44,8 +44,9 @@ is a graph node and was written in original source.
 - **R4.** WHEN the path resolves to a type parameter, or is `Self` inside a trait
   declaration, THEN no row SHALL be stored: it names no item.
 - **R5.** WHEN name resolution left the path unresolved, THEN one unresolved `uses_type` row
-  SHALL be stored with one reason: `ExternalSourceMissing` when resolution recorded missing
-  source, `AmbiguousTarget` for several targets, `TraitSolverNeeded` otherwise.
+  SHALL be stored with one reason: `ExternalSourceMissing` or `CfgInactive` when
+  resolution recorded that reason, `AmbiguousTarget` for several targets,
+  `MissingTarget` when the resolved target is not a graph node, `TraitSolverNeeded` otherwise.
 - **R6.** WHEN a path inside a signature row is an expression, not a type (an array length,
   a const generic argument), THEN it SHALL NOT produce a `uses_type` row.
 - **R7.** WHEN the same owner names the same type at two sites, THEN two edges SHALL be
@@ -83,12 +84,15 @@ L3  parseltongue-cli-dispatcher-binary   full-graph-checkpoint-facade adds the e
 | --- | --- | --- | --- | --- |
 | 018.2 R1 | test_new_return_type_edge | real source, CLI | `Buffer::new --uses_type--> Buffer`, site is `Buffer` on line 98, read back frozen | exactly 1 edge |
 | 018.2 R2 | test_clone_self_type_edge | real source, CLI | `<Buffer as Clone>::clone --uses_type--> Buffer`, site is `Self` on line 88 | exactly 1 edge |
-| 018.2 R3 | test_signature_builtin_type_edges | real source, CLI | `private::Sealed::write --uses_type--> str`; one `Builtin` node for `str` | 1 edge, 1 node |
+| 018.2 R3 | test_write_builtin_type_edge | real source, CLI | `private::Sealed::write --uses_type--> str`; one `Builtin` node for `str` | 1 edge, 1 node |
 | 018.2 R5 | test_signature_external_type_unresolved | real source, CLI, sysroot excluded | `MaybeUninit` in `enc_16lsd` is stored unresolved | `ExternalSourceMissing` |
 | 018.2 R1 R7 | test_signature_paths_listed_once | fixture | params, return, fields, bounds; nested generic arguments | one entry per type path |
 | 018.2 R6 | test_expression_paths_not_types | fixture | `[u8; N::LEN]` and `Foo<{ LEN }>` | no entry for the expression |
 | 018.2 R4 | test_type_parameter_no_edge | fixture | `fn f<T>(t: T)`; `Self` in a trait method | 0 rows |
 | 018.2 R2 | test_self_unresolved_header_reason | fixture | `Self` in an impl whose self type has no source | unresolved, header's reason |
+| 018.2 R5 | test_ambiguous_type_path_reason | fixture | a path with two targets; a path stored `cfg_inactive` | `AmbiguousTarget`; `CfgInactive` |
+| 018.2 R3 | test_builtin_target_one_node | fixture | `u8` used three times, `str` once, an array length | 4 edges, 2 nodes |
+| 018.2 R2 | test_impl_self_type_edge | fixture | `Self` in an impl, in a trait declaration, and under `Option<Self>` | 3 edges, 0, 1 unresolved |
 | 018.2 R7 | test_repeated_type_two_edges | fixture | `fn f(a: S, b: S)` | 2 edges, 2 sites |
 | 018.2 R8 | test_body_and_macro_rows_skipped | fixture | item inside a function body; row with an expansion chain | 0 rows |
 | 045.0 | test_original_member_graph_roundtrip | real source, CLI | existing test still passes | pass |
@@ -139,6 +143,25 @@ A `Self` whose impl header is unresolved stores nothing until step 6.
 - Gates pass: 454 tests passed, 0 failed, 4 ignored; the 16 real-source tests pass (151.3 s).
 - Known defect: the stage log line still prints `nodes=45`, because it is printed before
   the builtin nodes are added. The frozen readback line prints 51. Fixed in step 6.
+
+**After step 6**, measured on one run:
+
+- 51 nodes and 138 edges: 43 `contains`, 61 `calls`, 34 `uses_type`.
+- The 34 are 29 with a target and 5 unresolved. Every type path in an original signature
+  now has exactly one row.
+- The 5 unresolved, read from the stored rows:
+  - 4 `ExternalSourceMissing`: `MaybeUninit<u8>` three times (the `Buffer` field,
+    `enc_16lsd`, one more parameter) and `Copy` in `Sealed: Copy`.
+  - 1 `TraitSolverNeeded`: `Self::Buffer` in a parameter (Q4).
+- Correction: step 3 predicted 6 unresolved sites. The list it gave has 5, and 5 is measured.
+- `test_signature_external_type_unresolved` passes on pinned itoa.
+- Reason rule as built: no stored row or no stored reason gives `TraitSolverNeeded`;
+  several rows or several targets give `AmbiguousTarget`; a stored
+  `external_source_missing` or `cfg_inactive` is kept; a resolved target that is not a
+  graph node gives `MissingTarget`.
+- Gates pass: 457 tests passed, 0 failed, 4 ignored; the 17 real-source tests pass (165.9 s).
+- The stage log line now prints `nodes=51`.
+- Not done: step 7 (refactor pass and one run's cost over the whole process tree).
 
 ## 7 — Open questions
 

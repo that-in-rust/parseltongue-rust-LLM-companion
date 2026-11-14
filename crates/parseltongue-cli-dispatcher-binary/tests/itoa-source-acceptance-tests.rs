@@ -8,7 +8,7 @@ use parseltongue_core_row_types::{
     HldEdgeInputRecord, HldEdgeResolutionValue, HldEffectiveVisibilityKind,
     HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
     HldNodeInputCategory, HldNodeInputRecord, HldOwnerKindValue, HldRelationKindValue,
-    HldTargetIdentityValue, NameSymbolTargetKey, RunCancelFlagValue,
+    HldTargetIdentityValue, HldUnresolvedReasonKind, NameSymbolTargetKey, RunCancelFlagValue,
     validate_hld_materialization_input,
 };
 use parseltongue_table_store_traits::{
@@ -650,6 +650,32 @@ fn test_write_builtin_type_edge() {
         .collect::<Vec<_>>();
     assert_eq!(nodes.len(), 1, "one node stands for the builtin str");
     assert_eq!(nodes[0].node_input_category, HldNodeInputCategory::Builtin);
+}
+
+/// REQ-RUST-018.2
+#[test]
+fn test_signature_external_type_unresolved() {
+    let (_input, uses, _buffer, expected_site) = read_signature_type_uses(
+        "enc_16lsd",
+        "fn enc_16lsd<const OFFSET: usize>(buf: &mut [MaybeUninit<u8>], n: u64) {",
+        "MaybeUninit<u8>",
+    );
+    let at_site = uses
+        .iter()
+        .filter(|edge| read_edge_site_range(edge) == expected_site)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        at_site.len(),
+        1,
+        "the MaybeUninit path is stored once, though its source is not in this run"
+    );
+    assert_eq!(
+        at_site[0].edge_resolution_value,
+        HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::ExternalSourceMissing
+        },
+        "core is excluded from this run, so the reason is missing source"
+    );
 }
 
 /// REQ-RUST-018.2

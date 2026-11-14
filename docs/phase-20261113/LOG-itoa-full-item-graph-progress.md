@@ -6,15 +6,15 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 51 nodes and
-133 edges, with 3 of 61 calls resolved and 29 `uses_type` edges. Three dependencies are proven
+138 edges, with 3 of 61 calls resolved and 34 `uses_type` rows (29 with a target, 5 unresolved). Three dependencies are proven
 from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
 marked `incomplete`.**
 
-- **Next target:** part 4a step 6, unresolved `uses_type` rows with a reason (6 sites in
-  itoa). Steps 1 to 5 of 7 are built.
-- **Produced today:** `contains`, `calls`, and `uses_type` from signatures to items and
-  builtins. Not produced: unresolved `uses_type` rows, `reads`, `implements`, `imports`.
+- **Next target:** part 4a step 7 (refactor pass, one run's cost), then 4b `implements`.
+  Steps 1 to 6 of 7 are built.
+- **Produced today:** `contains`, `calls`, and `uses_type` from signatures (items,
+  builtins, unresolved with a reason). Not produced: `reads`, `implements`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
   ([itoa-target-dataset](itoa-target-dataset/)). Nothing can be accepted against it yet.
 
@@ -52,7 +52,7 @@ step                                   state         measured or missing
   single process. The whole process tree was last measured on 2026-11-14, before the macro
   commits were merged: 14.8 s, 411 MB, no memory cap.
 
-The counts above were re-read after part 4a step 5 (51 nodes, 133 edges, 61 calls, 3 resolved).
+The counts above were re-read after part 4a step 6 (51 nodes, 138 edges, 61 calls, 3 resolved).
 Not re-measured on the current commit: the whole-process-tree memory of one run.
 
 ## What is missing, in build order
@@ -90,6 +90,22 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 05:50 IST — Part 4a step 6: unresolved type paths are stored with a reason
+
+- Every type path in an original itoa signature now has one `uses_type` row: 34 rows,
+  29 with a target and 5 unresolved. One run stores 51 nodes and 138 edges.
+- The 5 unresolved: 4 `ExternalSourceMissing` (`MaybeUninit<u8>` three times, `Copy`
+  once) and 1 `TraitSolverNeeded` (`Self::Buffer` in a parameter).
+- `test_signature_external_type_unresolved` passes on pinned itoa.
+- RED first: three fixture tests and the real-source test failed on behaviour (0 rows
+  where 1 or more are expected) before the code changed.
+- Workspace gates: format, lint and release build pass; 457 tests passed, 0 failed,
+  4 ignored. The 17 real-source tests pass (165.9 s).
+- Corrections: 5 unresolved sites, not the 6 predicted. The stage log line now prints
+  `nodes=51`.
+- R5 in part 4 now names two more reasons the code uses: `CfgInactive` and `MissingTarget`.
+- Next: step 7, the refactor pass and one run's cost over the whole process tree.
 
 ### 2026-11-15 05:15 IST — Part 4a step 5: builtin types are targets, with one node each
 
