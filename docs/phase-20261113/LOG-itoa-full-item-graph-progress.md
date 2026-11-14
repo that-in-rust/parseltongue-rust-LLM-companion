@@ -1,9 +1,9 @@
 # LOG — progress on the itoa full item graph
 
-Updated 2026-11-14. Rewritten in place: the current state is on top, and what led here is
-compressed at the bottom. Add a dated line to "History" for each new checkpoint.
+Two parts. **Current state** is rewritten in place whenever it changes. **Entries** is
+newest first: add each new checkpoint at the top of that section and never edit older ones.
 
-## The answer
+## Current state (2026-11-14)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 45 nodes and
 104 edges, with 2 of 61 calls resolved. One dependency is proven from source:
@@ -81,21 +81,29 @@ core  run with the sysroot source, or accept unresolved     blocks 119 edges
 
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
-## History
+## Entries — newest first
 
-```text
-2026-11-13        Decision: the full graph is built first; anything higher is a later query.
-2026-11-14 15:45  All 33 impl headers produced from pinned source. Work split into four parts.
-2026-11-14 15:56  Bounded gates pass (362 tests). Disk ran out mid-run; build caches cleared.
-2026-11-14 18:03  Scope set to the detailed full graph; abstractions moved to the backlog.
-2026-11-14 19:43  One VM only. Three workers' changes consolidated here; workers archived.
-2026-11-14 20:24  First call proven: default -> Buffer::new. 45 nodes, 104 edges,
-                  415 bounded workspace tests pass, 4 ignored, 1 excluded (sysroot).
-2026-11-14 22:10  Three macro commits from 2026-11-13 merged onto this branch.
-2026-11-14 22:20  Scope narrowed: itoa only, full item graph only. Oracle harness deleted.
-                  Other repositories and higher-abstraction tables are out of this phase.
-2026-11-14 22:35  Target dataset cut to the full graph and renamed. 16 dataset tests pass.
-```
+Add new entries directly below this line. One entry per checkpoint: time, what changed, the
+test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
-The run reports those entries cited were removed from the tree on 2026-11-14; the last commit
-that has them is `a2e13a3bd`. Entry-by-entry detail is in git history of this file.
+### 2026-11-14 22:45 IST — Documents cut to the itoa full item graph
+
+- Scope fixed: itoa only, full item graph only. Other repositories, rust-analyzer export,
+  oracle comparison and higher-abstraction tables are out of this phase.
+- Oracle harness deleted. Target dataset cut to the full graph and renamed; its 16 tests pass.
+- Three macro commits from 2026-11-13 merged onto this branch.
+- Re-run at `15643ec4f`: `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests -- --test-threads=1`, 11 passed, 0 failed, 104 s.
+- No production code changed. Next target unchanged: `Buffer::format -> private::Sealed::write`.
+
+### 2026-11-14 20:24 IST — Baseline: everything before this log was compressed
+
+- First call proven from source: `<Buffer as Default>::default --calls--> Buffer::new`.
+- Graph stored and read back frozen: 45 nodes, 43 `contains`, 61 `calls` (2 resolved, 59
+  unresolved with a reason). All 33 impl headers produced.
+- Bounded workspace tests: 415 passed, 4 ignored, 1 excluded (`test_lang_items_in_sysroot`).
+- One run: 14.8 s, 411 MB peak for the whole process tree.
+- Decisions taken on the way: the full graph is built first and anything higher is a later
+  query (2026-11-13); one VM only, worker sessions archived (2026-11-14).
+- The run reports behind these numbers were removed from the tree; the last commit that has
+  them is `a2e13a3bd`. Earlier entry-by-entry detail is in this file's git history.
