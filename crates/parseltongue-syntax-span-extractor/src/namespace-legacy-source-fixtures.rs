@@ -290,6 +290,102 @@ fn test_request_original_body_prefix() {
     assert_eq!(paths.len(), 1);
 }
 
+/// REQ-RUST-048.0
+#[test]
+fn test_request_body_value_path() {
+    let store = LegacyMacroFixtureStore {
+        source: "static S: u8 = 1; fn caller(p: u8) -> u8 { p + S }".into(),
+    };
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let metadata = &projection.projection_path_metadata_rows;
+    let requests = projection
+        .projection_resolution_input_rows
+        .name_signature_path_rows
+        .iter()
+        .filter(|path| {
+            metadata[&path.path_site_occurrence_key]["site_path_context_kind"] == "body_value_path"
+        })
+        .map(|path| {
+            let row = &metadata[&path.path_site_occurrence_key];
+            (
+                row["path_site_source_text"].as_str().unwrap(),
+                row["site_source_range_start"].as_u64().unwrap(),
+                path.path_requested_namespace_kind,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        requests,
+        [("S", 47, NameNamespaceFilterKind::Value)],
+        "the static is requested as a value at its own range; the parameter is not requested"
+    );
+}
+
+/// REQ-RUST-048.0
+#[test]
+fn test_value_path_block_scope() {
+    let store = LegacyMacroFixtureStore {
+        source: "static S: u8 = 1; fn caller() -> u8 { const S: u8 = 2; S }".into(),
+    };
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let metadata = &projection.projection_path_metadata_rows;
+    let request = projection
+        .projection_resolution_input_rows
+        .name_signature_path_rows
+        .iter()
+        .find(|path| {
+            metadata[&path.path_site_occurrence_key]["site_path_context_kind"] == "body_value_path"
+        })
+        .unwrap();
+    let scopes = projection
+        .projection_resolution_input_rows
+        .name_symbol_binding_rows
+        .iter()
+        .filter(|row| {
+            row.binding_resolved_name_text == "S"
+                && row.binding_namespace_kind_value == NamespaceBindingKindValue::Value
+        })
+        .map(|row| &row.binding_lexical_scope_key)
+        .collect::<Vec<_>>();
+    assert_eq!(scopes.len(), 2, "the module static and the block const");
+    assert_eq!(
+        scopes
+            .iter()
+            .filter(|scope| **scope == &request.path_lexical_scope_key)
+            .count(),
+        1,
+        "the request is made in the block scope, where only the block const is bound"
+    );
+}
+
 /// REQ-RUST-034.0
 #[test]
 fn test_preserve_body_lexical_scope() {
