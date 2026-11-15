@@ -5,16 +5,18 @@ newest first: add each new checkpoint at the top of that section and never edit 
 
 ## Current state (2026-11-15)
 
-**The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 51 nodes and
-138 edges, with 3 of 61 calls resolved and 34 `uses_type` rows (29 with a target, 5 unresolved). Three dependencies are proven
+**The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 58 nodes and
+170 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved)
+and 32 `implements` rows (29 with a target, 3 unresolved). Four dependencies are proven
 from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
-`Buffer::format --calls--> private::Sealed::write` and `Buffer::new --uses_type--> Buffer`. No SOP step has passed and the graph is
-marked `incomplete`.**
+`Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer` and
+`u128 --implements--> Unsigned`. No SOP step has passed and the graph is marked
+`incomplete`.**
 
-- **Next target:** part 4b, `implements` edges from impl headers (REQ-RUST-047.0). It is
-  specified, not built: 32 rows expected on itoa. Part 4a is built.
-- **Produced today:** `contains`, `calls`, and `uses_type` from signatures (items,
-  builtins, unresolved with a reason). Not produced: `reads`, `implements`, `imports`.
+- **Next target:** part 4c, `reads` of consts and statics. It is a stub: its part must be
+  written with the executable-spec skill before any code. Parts 4a and 4b are built.
+- **Produced today:** `contains`, `calls`, `uses_type` from signatures, and `implements`
+  from impl headers, original and macro-generated. Not produced: `reads`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
   ([itoa-target-dataset](itoa-target-dataset/)). Nothing can be accepted against it yet.
 
@@ -25,7 +27,7 @@ step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
-4  remaining edge kinds                NEXT          uses_type, reads, implements, imports
+4  remaining edge kinds                IN PROGRESS   uses_type and implements built; reads, imports not
 5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
@@ -89,6 +91,28 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 10:20 IST — Part 4b built: 32 `implements` rows on pinned itoa
+
+- All 7 steps of part 4b are done (REQ-RUST-047.0). One run stores 58 nodes and 170 edges:
+  43 `contains`, 61 `calls` (3 resolved), 34 `uses_type`, 32 `implements`.
+- The 32 rows: 12 to `Integer`, 12 to `private::Sealed`, 5 to `Unsigned`, 3 from `Buffer`
+  unresolved with `ExternalSourceMissing`. `implements_without_source` is 0.
+- 28 rows come from macro-generated headers. Their site is the trait path in expanded text
+  with the expansion chain; the frozen store accepts it, so they did not move to part 5.
+- The validator accepts a builtin as an edge source for `implements` only.
+- Gates at `7e2a2ef87`: format, lint and release build pass; 470 tests pass, 0 fail,
+  4 ignored; `test_lang_items_in_sysroot` skipped. The 22 real-source itoa tests pass
+  (`cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests -- --test-threads=1`, 232.7 s).
+- Cost of one run (3 runs, sysroot excluded, 2 workers, executable sha256
+  `5be64c7b…41d825f3`): 13.0 to 13.7 s, 369 to 371 MB peak over the whole process tree
+  (sampled about every 18 ms, not the SOP's 10 ms), 9.5 MB store.
+- Found: a row's identity includes the workspace's absolute path, so runs in two
+  directories do not give equal rows (Q6 of the part).
+- Commits: `7c15ddbec`, `e1c144ce8`, `6025dc9a5`, `9b1d33825`, `60d1cc40f`, `802ca8a72`,
+  `7e2a2ef87`.
+- Next: write part 4c (`reads`) with the executable-spec skill.
 
 ### 2026-11-15 06:40 IST — Part 4b specified: `implements` from impl headers
 
