@@ -1,6 +1,10 @@
 use super::*;
 
+#[path = "macro-call-expands-projection-tests.rs"]
+mod macro_call_expands_projection_tests;
+
 const CALL_TEXT: &str = "make!();";
+const DEFINITION_TEXT: &str = "macro_rules! make { () => {} }";
 
 fn build_fixture_digest_text(text: &str) -> String {
     blake3::hash(text.as_bytes()).to_hex().to_string()
@@ -27,7 +31,7 @@ impl OriginalGraphFixtureStore {
         let digest = build_fixture_digest_text(text);
         self.expanded
             .insert(digest.clone(), text.as_bytes().to_vec());
-        self.insert_source_fixture_row("macro-expanded-item-table", json!({"macro_resolution_state_kind":"expanded", "macro_virtual_source_path":path, "macro_invocation_provenance_chain":chain, "macro_invocation_identity_record":{"span_source_file_path":call.0, "span_byte_range_value":[call.1, call.2]}}));
+        self.insert_source_fixture_row("macro-expanded-item-table", json!({"macro_resolution_state_kind":"expanded", "macro_virtual_source_path":path, "macro_invocation_provenance_chain":chain, "macro_matched_arm_index":0, "macro_invocation_identity_record":{"unit_compilation_identity_key":build_original_fixture_unit(), "span_source_file_path":call.0, "span_byte_range_value":[call.1, call.2], "span_expansion_provenance_chain":chain[..chain.len() - 1]}}));
         self.insert_source_fixture_row(
             "file-source-text-table",
             json!({"file_source_absolute_path":path, "file_content_digest_full":digest}),
@@ -45,7 +49,24 @@ impl OriginalGraphFixtureStore {
     }
 }
 
-/// The base fixture with `make!();` written at the end of `src/lib.rs` and expanded to
+impl OriginalGraphFixtureStore {
+    /// Stores the textual-scope lookup of the macro path of `call` at one scope revision:
+    /// the definition in scope, or none.
+    fn insert_fixture_scope_lookup(
+        &mut self,
+        call: &Value,
+        definition: Option<&Value>,
+        revision: u64,
+    ) {
+        let start = call["span_byte_start_offset"].as_u64().unwrap();
+        let site = json!({"unit_compilation_identity_key":build_original_fixture_unit(), "span_source_file_path":"src/lib.rs", "span_byte_range_value":[start, start + 4], "span_content_digest_full":build_fixture_digest_text("make"), "span_expansion_provenance_chain":[]});
+        let target = definition.map(|span| json!({"target_identity_variant_kind":"definition", "target_semantic_occurrence_key":encode_fixture_occurrence_value(span)}));
+        self.insert_source_fixture_row("legacy-macro-scope-records", json!({"legacy_lookup_identity_key":"lookup-make", "legacy_source_site_key":site, "legacy_macro_name_text":"make", "legacy_target_identity_key":target, "legacy_scope_revision_value":revision, "legacy_source_order_parts":[start, 3, 0]}));
+    }
+}
+
+/// The base fixture with `macro_rules! make` and `make!();` written at the end of
+/// `src/lib.rs`, the call's path looked up to that definition, and the call expanded to
 /// `text`. Returns the store, the chain of the expansion and the generated spans by text.
 fn build_generated_fixture_store(
     text: &str,
@@ -56,17 +77,24 @@ fn build_generated_fixture_store(
     BTreeMap<String, Value>,
 ) {
     let mut source = build_original_fixture_store();
-    source.bytes.extend_from_slice(CALL_TEXT.as_bytes());
-    source.bytes.extend_from_slice(b"\r\n");
+    for text in [DEFINITION_TEXT, CALL_TEXT] {
+        source.bytes.extend_from_slice(text.as_bytes());
+        source.bytes.extend_from_slice(b"\r\n");
+    }
     let file_digest = blake3::hash(&source.bytes).to_hex().to_string();
     source.rows.remove("file-source-text-table");
     source.insert_source_fixture_row("file-source-text-table", json!({"file_source_absolute_path":"/fixture/src/lib.rs", "file_content_digest_full":file_digest}));
+    let definition =
+        source.insert_fixture_span_record(DEFINITION_TEXT, "MACRO_RULES", "make", true);
     let call = source.insert_fixture_span_record(CALL_TEXT, "MACRO_CALL", "", true);
+    for span in [&definition, &call] {
+        source.insert_source_fixture_row("span-byte-ownership-ranges", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":span["span_byte_start_offset"], "span_byte_end_offset":span["span_byte_end_offset"], "span_gap_classification_kind":"item", "span_expansion_provenance_chain":[]}));
+    }
+    source.insert_fixture_scope_lookup(&call, Some(&definition), 0);
     let (start, end) = (
         call["span_byte_start_offset"].as_u64().unwrap() as usize,
         call["span_byte_end_offset"].as_u64().unwrap() as usize,
     );
-    source.insert_source_fixture_row("span-byte-ownership-ranges", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":start, "span_byte_end_offset":end, "span_gap_classification_kind":"item", "span_expansion_provenance_chain":[]}));
     let chain = vec!["33".repeat(32)];
     let spans =
         source.insert_fixture_macro_expansion(&chain, ("src/lib.rs", start, end), text, items);

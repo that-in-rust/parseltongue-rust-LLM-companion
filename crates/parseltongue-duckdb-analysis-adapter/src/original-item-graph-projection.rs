@@ -6,6 +6,8 @@ mod original_item_projection_tests;
 
 #[path = "generated-item-graph-projection.rs"]
 mod generated_item_graph_projection;
+#[path = "macro-call-expands-projection.rs"]
+mod macro_call_expands_projection;
 
 #[path = "item-node-label-text.rs"]
 mod item_node_label_text;
@@ -31,7 +33,11 @@ impl DuckdbAnalysisStoreAdapter {
         let tables = ORIGINAL_SOURCE_PROJECTION_TABLE_NAMES
             .iter()
             .copied()
-            .chain(["impl-header-index-table", "macro-expanded-item-table"])
+            .chain([
+                "impl-header-index-table",
+                "macro-expanded-item-table",
+                "legacy-macro-scope-records",
+            ])
             .collect::<Vec<_>>();
         self.copy_published_stage_rows(source, source_scope, &tables, cancel)?;
         let connection = self
@@ -168,6 +174,14 @@ impl DuckdbAnalysisStoreAdapter {
             )?;
         nodes.extend(generated_nodes);
         edges.extend(generated_edges);
+        edges.extend(macro_call_expands_projection::build_macro_expands_records(
+            &connection,
+            source,
+            source_scope,
+            workspace_root,
+            generation,
+            cancel,
+        )?);
         let inventory = read_projection_rows::<2>(
             &connection,
             "SELECT projection_state, count(*)::VARCHAR FROM \"original-item-source-inventory\" WHERE generation_key=? AND attempt_key=? GROUP BY projection_state ORDER BY projection_state",

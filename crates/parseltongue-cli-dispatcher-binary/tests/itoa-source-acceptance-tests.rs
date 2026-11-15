@@ -2738,7 +2738,95 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 285);
+    assert_eq!(input.input_edge_records.len(), 300);
+}
+
+/// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
+/// row to the `macro_rules!` definition its path names, sited at the call, with the arm
+/// the expansion matched.
+#[test]
+fn test_expands_edge_row_counts() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let find_node_record = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| node.node_target_reference == *reference)
+            .unwrap()
+    };
+    let rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Expands)
+        .collect::<Vec<_>>();
+    assert_eq!(rows.len(), 15);
+    let mut rows_per_definition = std::collections::BTreeMap::new();
+    for edge in &rows {
+        let source = find_node_record(&edge.edge_source_reference);
+        assert_eq!(
+            source.node_item_kind_value,
+            Some(HldItemKindValue::MacroInvocation)
+        );
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call_key)) =
+            &edge.edge_source_reference
+        else {
+            panic!("call identity expected");
+        };
+        assert_eq!(
+            edge.edge_evidence_row_key.evidence_site_occurrence_key,
+            *call_key
+        );
+        let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
+            panic!("{} has no target", source.node_qualified_path_text);
+        };
+        let definition = find_node_record(target);
+        assert_eq!(
+            definition.node_item_kind_value,
+            Some(HldItemKindValue::MacroDefinition)
+        );
+        let name = definition
+            .node_qualified_path_text
+            .rsplit("::")
+            .next()
+            .unwrap();
+        // The call's own text starts with the name of the definition it expands.
+        assert!(
+            source
+                .node_qualified_path_text
+                .contains(&format!("::{name}!(")),
+            "{} -> {}",
+            source.node_qualified_path_text,
+            definition.node_qualified_path_text
+        );
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        assert_eq!(
+            metadata,
+            json!({"macro_name_text": name, "macro_matched_arm_index": 0})
+        );
+        *rows_per_definition
+            .entry(definition.node_qualified_path_text.as_str())
+            .or_insert(0_usize) += 1;
+    }
+    assert_eq!(
+        rows_per_definition.into_iter().collect::<Vec<_>>(),
+        [
+            ("itoa::src/lib.rs::impl_Integer", 5),
+            ("itoa::src/lib.rs::impl_Integer_size", 6),
+            ("itoa::src/lib.rs::impl_Unsigned", 4),
+        ]
+    );
+    let calls = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_item_kind_value == Some(HldItemKindValue::MacroInvocation))
+        .count();
+    assert_eq!(calls, 15);
+    let sources = rows
+        .iter()
+        .map(|edge| &edge.edge_source_reference)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(sources.len(), 15);
 }
 
 /// REQ-RUST-046.0 R11: a second read of the store gives the same 45 generated nodes, each
