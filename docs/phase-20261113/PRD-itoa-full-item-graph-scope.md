@@ -261,6 +261,13 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     generated items do not repeat the call text; they have the node field and `generates`.
   - Chosen by the design rule above. On itoa all 103 labels are now distinct (was 45).
 
+- **Non-function sources (2026-11-16, built in part 5d step 10a for `reads`).** `reads` and
+  `uses_type` start at any item a path is written in: a const or static (its initializer),
+  a type alias or struct (an array length), not only a function. Chosen by the design rule:
+  an agent changing `MAX_STR_LEN` must see that `Buffer`'s size reads it. A row whose
+  target is not proven keeps the lookup record and the sources not read, and is never
+  marked as external unless that is proven.
+
 ### Open
 
 - **Targets in `core`, not built.** 119 of the 368 draft edges point into `core`. Resolving them needs
@@ -273,8 +280,6 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   already holds the 45 items as spans (measured 2026-11-15).
 - **Enum variants and struct fields:** nodes, or evidence only.
 - **File module and file area:** how a file's module node relates to its file-area node.
-- **Non-function sources:** may `reads` and `uses_type` start at a non-function item? itoa
-  needs it for `const MAX_STR_LEN` and the array length in `Buffer`. Lean: yes.
 - **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for
   sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
   are compared (A4).

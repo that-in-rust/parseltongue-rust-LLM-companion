@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 8 BUILT (section 10); generated consts and type aliases as sources (G7) not built.
+5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15); G7 `uses_type` (10c), the impl member for `<T as Trait>::NAME` (10b) and arguments of builtin macros (`assert!`) are not built.
 5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
@@ -505,8 +505,10 @@ G5  A member reached through a type (Self::NAME, u8::NAME) that name lookup left
 G6  A calls row carries the callee's source text. Its dispatch kind does not say "original"
     for a call written by a macro. The reason for a missing target is the stored one, not a
     catch-all.
-G7  Generated consts and type aliases are sources too: the type in the declaration and the
-    paths and calls in an initializer.
+G7  Consts, statics, type aliases and structs are sources too, written by a macro or not:
+    the type in the declaration and the paths and calls in an initializer or in an
+    expression of a type (an array length). An item written in a function sees none of
+    the function's parameters or locals.
 G8  The stage line's reads_in_expanded_bodies is the number of stored reads rows sited in
     expanded text.
 G9  A call whose callee is a path gets its target from the stored name lookup of the whole
@@ -572,8 +574,11 @@ step  what                                         rules    predicted           
       the method's own self                                                         member; 41 of 197 unchanged
 9     the impl member when the receiver is a cast  G13      43 of 197 with a target 43 of 197 calls with a target
       to a stored type
--     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
-                                                            34 uses_type
+10a   consts, statics and types as reads sources    G7       reads 55 -> 78          78 reads (22 original, 56 in
+                                                                                    expanded text); 525 edges
+10b   the impl member for <T as Trait>::NAME       G14      2 rows change target    not built
+10c   declared and aliased types as uses_type      G7       34 generated, 3 orig    not built
+11    arguments of builtin macros (assert!)        -        20 reads sites          not built
 ```
 
 Step 2 was planned after step 4; the second opinion moved it forward so steps 3 and 4 land
@@ -1186,3 +1191,79 @@ instead of a function as the nearest item) passed until a case was added
   `as_mut_ptr`, `unsigned_abs`) are in `core`: the receiver type can be recorded now,
   the target waits on part 6. Not provable without `core`: `try_into`, `expect`,
   `unwrap`, `ilog10`, `cast`, `rev`.
+
+### 10.15 Step 10a: consts, statics and types as `reads` sources (measured)
+
+Rule G7, `reads` half. Built at `ed55f4a63`.
+
+**Cause found (measured on the step 9 store).** The stored site table already held every
+path expression owned by a generated const or type alias. No `reads` row came out because
+the value-path request was only made for a path inside a function body
+(`check_body_value_path`). The `reads` producer has no filter on the owner's kind.
+
+**Rule as built.**
+
+```text
+A path expression is a value-path request when it is written in any item: a function body,
+the initializer of a const or static, or an expression of a type (array length, enum
+discriminant). Unchanged: not a call's callee, and its single name is not a local binding.
+Local bindings are looked for in the nearest item the path is written in. A const, static
+or struct written in a function does not see the function's parameters or locals; a let in
+a const's own block still binds.
+A path in an attribute of the file is in no item and is not requested.
+```
+
+**Measured on pinned itoa (3 release runs, executable `576bb091…ced1e`).**
+
+```text
+nodes=103 edges=525 (was 502) reads=78 (was 55) reads_in_expanded_bodies=56 (was 34)
+calls=197 resolved_calls=43 type_uses=66 implements=32 imports=4   completeness=incomplete
+wall 17.0 to 19.4 s, peak 371 to 391 MB, store 17,358,848 bytes
+
+new rows  source                               read                           target
+10        <T as Integer>::MAX_STR_LEN (gen.)   uN::MAX / iN::MAX              none: no stored impl of the
+                                                                              builtin declares MAX; inherent
+                                                                              items in core were not read
+10        <T as private::Sealed>::Buffer (gen.) Self::MAX_STR_LEN (array len) <T as Integer>::MAX_STR_LEN (G5)
+2         <usize|isize as Integer>::MAX_STR_LEN <u64|i64 as Integer>::MAX_STR_LEN
+                                                                              Integer::MAX_STR_LEN, the
+                                                                              trait's declaration
+1         struct Buffer (original)             i128::MAX_STR_LEN (array len)  <i128 as Integer>::MAX_STR_LEN
+```
+
+- The 10 rows without a target keep the reason `TraitSolverNeeded` and carry the G5
+  lookup record (`no_stored_impl_member`, and the two unread sources). They are not
+  marked "external source missing": a blanket impl or a trait default in read source is
+  not enumerated by the lookup, so "it is in `core`" is not proven. Part 6 names them.
+- The 2 qualified-path rows are true but less exact than the expected graph, which has
+  the impl member `<u64 as Integer>::MAX_STR_LEN`. Name lookup drops the type anchor.
+  Choosing the member needs name requests for the anchor type and the trait path, which
+  are not stored today. That is step 10b (rule G14).
+- **Side effect, checked.** The 11 array-length paths were requested before as
+  `signature` paths (type-or-value namespace, unresolved, no reason). They are
+  `body_value_path` requests now. `signature` path rows on itoa go from 204 to 193;
+  11 more one-name type prefixes are requested (`u8` … `i128`). `uses_type` is
+  unchanged at 66.
+
+**Tests.** `test_item_initializer_read_rows` (itoa, all 23 rows by source, text and
+target; failed first with 0 rows), `test_item_initializer_paths_listed` (fixture; failed
+first on a struct in a function seeing the function's parameter). 12 pins in 7 older
+itoa tests and 2 fixture tests were changed to the measured values, each after reading
+the assertion. 45 of 45 itoa tests pass (136 s), 119 + 17 syntax crate tests, format,
+lint on the two touched crates.
+
+**Deliberate breaks.** Four, each fails a test: value paths only in functions; bindings
+looked for in the nearest function; bindings in the nearest function, const or static;
+no item check at all (this one survived until the file-attribute case was added).
+
+**Not done.** No `todo!()` stub: the change is to two existing predicates, no new
+signature. No second opinion yet for this step; it is taken with 10b and 10c.
+
+- **Q38.** A path in an attribute of an item (`#[a = B] fn f() {}`) is requested as a
+  value path of that item. Not valid Rust after expansion; no test.
+- **Q39.** The 20 expected `reads` of `core` consts in `const _` blocks
+  (`assert!($Signed::MIN < 0, ..)`) need the arguments of a builtin macro parsed. Step 11.
+- **Q40.** Calls in a const initializer (`uN::MAX.ilog10()`) are stored sites; whether
+  the `calls` producer emits them was not measured in this step (`calls` stayed 197,
+  which already includes them or not). Measure in 10c.
+

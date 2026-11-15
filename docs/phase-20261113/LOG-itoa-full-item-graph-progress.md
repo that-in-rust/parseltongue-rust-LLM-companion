@@ -6,17 +6,20 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
-32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (all 55 with a
-target; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
+(45 written by macro expansions) and 525 edges (88 `contains`, 45 `generates`, 15 `expands`), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+32 `implements` rows (29 with a target, 3 unresolved), 78 `reads` rows (68 with a
+target; 56 of the 78 are sited in macro-expanded text; consts, statics, type aliases and structs are sources since part 5d step 10a) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
 are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** method calls, whose receiver type is not determined (104 generated,
-  more original), starting with a receiver that is a cast (part 5 Q34).
+- **Next target:** part 5d step 10b (the impl member for `<T as Trait>::NAME`, 2 rows),
+  10c (`uses_type` from the declared type of a const or static and the aliased type of a
+  type alias: 34 generated and 3 original expected rows), step 11 (arguments of `assert!`:
+  20 expected `reads`), then the 5d workspace gates and part 6.
+  Part 5d step 9 is built: the two cast-receiver calls have a target (part 5 Q34 closed).
   Part 5d step 8 is built: the five `Unsigned ::fmt(self, buf)` calls target
   `<uN as Unsigned>::fmt`, the member of the impl for the calling method's type, and keep
   the trait's declaration and the candidate list on the row (part 5 Q27 closed).
@@ -119,6 +122,50 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 00:05 IST — Part 5d step 10a: consts, statics and types as `reads` sources (REQ-RUST-052.0 G7)
+
+- **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.
+- **Built at** `ed55f4a63`. Spec: part 5 section 10.15.
+- **Cause, measured first:** the stored site table already held the paths owned by
+  generated consts and type aliases; the value-path request was only made inside a
+  function body. One predicate changed, and the scope of local bindings with it.
+- **Measured (3 release runs, executable `576bb0918faed1f1fa9daa14f6ff744de480cf025d7f6ca45cdb87c489cced1e`):**
+
+```text
+nodes=103 containment=88 generates=45 expands=15 calls=197 resolved_calls=43 type_uses=66
+implements=32 reads=78 reads_in_expanded_bodies=56 imports=4 edges=525 completeness=incomplete
+run1 wall=19.44s maxrss=385908kB
+run2 wall=17.03s maxrss=391440kB
+run3 wall=17.18s maxrss=371312kB
+store_bytes=17358848
+```
+
+- **New rows (23):** 10 `uN::MAX` without a target, 10 `Self::MAX_STR_LEN` in generated
+  `Buffer` aliases with the impl member as target, 2 `<u64|i64 as Integer>::MAX_STR_LEN`
+  on the trait's declaration, 1 `i128::MAX_STR_LEN` in the array length of struct `Buffer`.
+- **RED:** `test_item_initializer_read_rows` failed with 0 rows against 23;
+  `test_item_initializer_paths_listed` failed on a struct in a function seeing the
+  function's parameter. **GREEN:** 45 of 45 itoa tests (135.71 s), 119 + 17 syntax crate
+  tests, format, lint on the two touched crates.
+- **Prediction off:** I expected the 2 qualified-path rows to need a new rule before they
+  had any target. Name lookup already gives the trait's declaration. I first wrote the
+  test for the impl member (G14), then pinned the measured, less exact target and moved
+  G14 to step 10b: it needs name requests that are not stored.
+- **Pins changed, each after reading the assertion:** 12 in 7 older itoa tests, 2 in
+  fixture tests. One was not a number to raise: an older test asserted that no generated
+  `reads` row is left with `TraitSolverNeeded`. Ten are now (`uN::MAX`). I kept the
+  reason and pinned the ten by text and lookup record, instead of renaming the reason
+  to "external source missing", which is not proven.
+- **Side effect:** 11 array-length paths left the `signature` request kind (204 to 193
+  rows) and are value-path requests now.
+- **Deliberate breaks:** 4, all fail a test; one survived until a file-attribute case
+  was added to the fixture.
+- **Slips:** no `todo!()` stub (no new signature). No codebase-memory trace result
+  before the change: the first trace command failed on my parsing, and I did not rerun
+  it. No second opinion yet; it is taken with 10b and 10c.
+- **Workspace gates:** not run; they run at the end of part 5d.
+- **Next:** 10c, then 10b, then step 11.
 
 ### 2026-11-15 23:20 IST — Part 5d step 9: the impl member when the receiver is a cast (REQ-RUST-052.0 G13)
 
