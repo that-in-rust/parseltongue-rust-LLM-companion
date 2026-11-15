@@ -2613,3 +2613,75 @@ fn test_generated_item_node_counts() {
         88
     );
 }
+
+/// REQ-RUST-046.0 R5: a generated node names the macro call that wrote it, and that call
+/// is a node; a source-written node names no call.
+#[test]
+fn test_generated_node_names_call() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let source = fs::read(root.join("src/lib.rs")).unwrap();
+    let call_ranges = read_published_stage_rows(&database, "macro-expanded-item-table")
+        .iter()
+        .filter(|row| row["macro_resolution_state_kind"] == "expanded")
+        .map(|row| {
+            let range = &row["macro_invocation_identity_record"]["span_byte_range_value"];
+            (
+                row["macro_invocation_provenance_chain"][0]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+                (range[0].as_u64().unwrap(), range[1].as_u64().unwrap()),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut named = 0;
+    let mut first_call_text = Vec::new();
+    for node in &input.input_node_records {
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
+            &node.node_target_reference
+        else {
+            assert_eq!(node.node_generating_call_reference, None);
+            continue;
+        };
+        let parts = key.read_semantic_occurrence_parts();
+        let Some(digest) = parts.span_expansion_provenance_chain.first() else {
+            assert_eq!(
+                node.node_generating_call_reference, None,
+                "source-written node names no call: {}",
+                node.node_qualified_path_text
+            );
+            continue;
+        };
+        let digest = digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let call = node
+            .node_generating_call_reference
+            .as_ref()
+            .unwrap_or_else(|| panic!("no call named: {}", node.node_qualified_path_text));
+        let call_node = input
+            .input_node_records
+            .iter()
+            .find(|other| other.node_target_reference == *call)
+            .unwrap_or_else(|| panic!("the named call is not a node"));
+        assert_eq!(
+            call_node.node_item_kind_value,
+            Some(HldItemKindValue::MacroInvocation)
+        );
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call_key)) = call else {
+            panic!("call identity expected");
+        };
+        let call_parts = call_key.read_semantic_occurrence_parts();
+        let range = call_parts.span_byte_range_value.read_source_range_pair();
+        assert_eq!(call_parts.span_source_file_path, "src/lib.rs");
+        assert!(call_parts.span_expansion_provenance_chain.is_empty());
+        assert_eq!(range, call_ranges[&digest], "the call of the node's chain");
+        if node.node_qualified_path_text.ends_with("::_") && first_call_text.is_empty() {
+            first_call_text = source[range.0 as usize..range.1 as usize].to_vec();
+        }
+        named += 1;
+    }
+    assert_eq!(named, 45);
+    assert!(first_call_text.starts_with(b"impl_Integer!("));
+}
