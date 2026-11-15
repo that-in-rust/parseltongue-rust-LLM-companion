@@ -197,10 +197,19 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     "callee path never looked up" without reading the resolver. The typed reason is kept
     as it was (decided and built 2026-11-16, part 5d step 4, under the maximum-information
     rule).
-  - A member reached through a type (`Self::NAME`, `u8::NAME`) gets a trait member as
-    target only when a trait of the crate declares the name and a stored impl header proves
-    the type implements it; the row records that the type's inherent items were not read
-    (decided 2026-11-16, part 5d; not built).
+  - A member reached through a type (`Self::NAME`, `u8::NAME`) that name lookup left
+    without a target gets the impl member as target (`<u8 as Integer>::MAX_STR_LEN`, not
+    the trait's declaration) only when the stored impl headers prove it: exactly one stored
+    impl of that type, or of a type with no stored target, declares the name, and that one
+    is a trait impl of the type with a stored trait, no generic parameter and no negation.
+    The type is read from stored rows (the owner's impl header for `Self`, a Type lookup
+    for any other prefix), never matched by text. Whether the trait is in scope is not
+    checked. The row carries the lookup record with or without a target: every candidate
+    impl, the outcome, and what was not read (for a builtin type its inherent items and
+    trait impls in crates not read; for a type of the crate, blanket trait impls in crates
+    not read), so an agent sees why a row has no target and what the target rests on
+    (decided 2026-11-16 under the maximum-information rule; built in part 5d step 5 for
+    `reads` and `uses_type`, not yet for `calls`).
   - Built (part 5a): identity, container, and the generating call in both forms, for a
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.

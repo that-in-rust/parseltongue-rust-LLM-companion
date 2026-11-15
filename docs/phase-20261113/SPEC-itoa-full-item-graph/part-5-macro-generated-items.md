@@ -493,11 +493,15 @@ G3  A row sited in expanded text carries, in its metadata, where its first token
     stored apart, never merged into one range. This is where an agent edits.
 G4  Targets follow the existing rules. A path that name resolution left without a target is
     one row with a reason and its source text.
-G5  A member reached through a type (Self::NAME, u8::NAME): the target is a trait member only
-    when a trait of this crate declares NAME and a stored impl header proves the type
-    implements that trait, directly or through a stored supertrait row. The row records what
-    was not read (the inherent items of the type). No trait of this crate declaring NAME
-    (MIN, MAX, BITS, ilog10): the rule does not fire.
+G5  A member reached through a type (Self::NAME, u8::NAME) that name lookup left without a
+    target. The type: for Self, the stored self type of the impl that lists the site's owner;
+    for any other one-name prefix, its own stored Type lookup at the site. The candidates:
+    members named NAME in stored impls of that type, and in stored impls whose self type has
+    no stored target. The target is the impl member only when there is exactly one candidate,
+    it is in a trait impl of the type with a stored trait, no generic parameter and no
+    negation, it has the kind asked for, and it is a graph node. The row carries the lookup
+    record either way: candidates, outcome, and what was not read. Section 10.10.
+
 G6  A calls row carries the callee's source text. Its dispatch kind does not say "original"
     for a call written by a macro. The reason for a missing target is the stored one, not a
     catch-all.
@@ -520,7 +524,7 @@ step  what                                         rules    predicted           
                                                                                     target, 4 without), 366 edges
 4     calls from generated bodies                  G1-G4,   197 calls, 502 edges    197 calls (3 with a target,
                                                    G6                               194 without), 502 edges
-5     trait members through a type                 G5       16 reads and 4 uses_type not built
+5     trait members through a type                 G5       built: 16 reads and 5 uses_type gained a target
                                                             gain a target
 6     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
                                                             34 uses_type
@@ -751,3 +755,75 @@ format (workspace), lint       pass (2 touched crates)
 graph                          103 nodes, 502 edges (was 366); still incomplete
 workspace gates, run cost      not run for this step; they run at the end of part 5d
 ```
+
+### 10.10 Step 5: a member reached through a type (measured)
+
+Rule G5 as built. It replaces the earlier wording ("a trait of this crate declares NAME ...
+through a stored supertrait row"), which the build showed to be narrower than needed: the
+lookup goes by type and name over the stored impl headers, and walks no supertrait.
+
+```text
+what                     how it is proven
+the type, for Self       the stored self type of the impl header whose member list holds the
+                         site's owner. A function nested in a method is in no member list, so
+                         it has no Self; the lookup does not walk up.
+the type, other prefix   a new Type request for the one-name qualifier of a two-segment body
+                         value path (context body_value_type_prefix), in the site's scope.
+                         No builtin name is matched by text.
+candidates               members named NAME in stored impls of the type, plus stored impls
+                         whose self type has no stored target (generic and blanket impls)
+target                   exactly one candidate; trait impl of the type; stored trait; no
+                         generic parameter; not negative; kind CONST (reads) or TYPE_ALIAS
+                         (uses_type); the member is a graph node
+not checked              whether the trait is in scope at the site
+```
+
+The target is the impl member (`<u8 as Integer>::MAX_STR_LEN`), not the trait's declaration.
+
+Every row the lookup ran for carries `type_relative_member_evidence`:
+
+```text
+self_type_source_text, self_type_builtin_name, self_type_identity
+member_lookup_outcome_kind   single_trait_impl_member | no_stored_impl_member |
+                             single_member_unproven | several_stored_impl_members
+member_candidate_impl_rows   per candidate: impl header, trait text, flags, member kind
+impl_trait_source_text, impl_header_occurrence   (only with a target)
+sources_not_read             builtin type: its inherent items, and trait impls for it in crates
+                             not read. Type of this crate: blanket trait impls in crates not read.
+```
+
+Measured on pinned itoa at `705efeae5` (release, 3 runs: 15.7 to 20.4 s, 344 to 360 MB peak,
+16 MB store). Totals unchanged: 103 nodes, 502 edges.
+
+```text
+rows  relation   site                  written in  target
+5     reads      Self ::MAX_STR_LEN    expansion   <iN as Integer>::MAX_STR_LEN
+5     reads      uN ::MAX_STR_LEN      expansion   <uN as Integer>::MAX_STR_LEN
+5     reads      u128::MAX_STR_LEN     source      <u128 as Integer>::MAX_STR_LEN
+1     reads      i128::MAX_STR_LEN     source      <i128 as Integer>::MAX_STR_LEN
+4     uses_type  Self ::Buffer         expansion   <uN as private::Sealed>::Buffer
+1     uses_type  Self::Buffer          source      <u128 as private::Sealed>::Buffer
+```
+
+- `reads`: 55 of 55 have a target (was 39). `uses_type`: 62 of 66 (was 57); the other 4 are
+  `MaybeUninit`, in `core`.
+- Path rows: 12 new prefix requests (11 builtins, 1 type parameter `I`), counted apart from
+  the 202 signature and import paths.
+- Predicted 4 `uses_type` rows; measured 5. The fifth is in the source-written `fmt` for u128.
+- `uses_type` runs the lookup only for the prefix `Self`; `reads` for any one-name prefix.
+  itoa has no `u8::Alias` in a signature.
+
+Tests: `test_type_relative_member_targets` (real source; failed first on
+`u128::MAX_STR_LEN has no target`), 8 tests in `type-relative-member-tests.rs` and
+`test_value_prefix_path_listed`. The 9 fixture tests passed on first run; four mutations of
+the code (unknown self type not a candidate, kind not checked, inherent impl accepted, prefix
+of any path requested) each made at least one fail.
+
+Open:
+
+- **Q23.** No pipeline-level fixture for: an impl inside a function body (the member is not a
+  node), `Self` in a closure against `Self` in a nested function, and a prefix that is a
+  `use` alias. Each is covered only by reading the code.
+- **Q18, still open.** The rule cannot see an inherent item or a trait impl in `core`. The row
+  says so; the target stands on itoa compiling.
+- The generated `Unsigned ::fmt(..)` calls are not in this step (Q21).

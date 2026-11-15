@@ -7,19 +7,23 @@ newest first: add each new checkpoint at the top of that section and never edit 
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
 (45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 197 calls resolved (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
-32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (39 with a
-target, 16 unresolved; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
+32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (all 55 with a
+target; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
 are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 5: a member reached through a type (`Self::NAME`,
-  `uN::NAME`) gets its trait member as target. Steps 1 to 4 are built: `reads` and `calls`
-  from generated function bodies and `uses_type` from generated function signatures, each
-  row naming where its first and last token were copied from in the source file. Every
-  `calls` row now carries the call's text, the callee's text, its shape, and what stopped
+- **Next target:** `calls` to this crate's own functions: the callee path of a call is
+  never sent to name lookup (26 bare-name calls, 1 `u128_ext::mulhi`), and the 10 generated
+  `Unsigned ::fmt(..)` calls need the member lookup of step 5 with a trait as prefix.
+  Part 5d steps 1 to 5 are built: `reads` and `calls` from generated function bodies,
+  `uses_type` from generated function signatures, each row naming where its first and
+  last token were copied from in the source file, and a member reached through a type
+  (`Self::NAME`, `uN::NAME`) has the member of the one stored trait impl as target
+  (16 `reads` and 5 `uses_type` rows; `uses_type` now has 62 of 66 with a target).
+  Every `calls` row carries the call's text, the callee's text, its shape, and what stopped
   the lookup when it has no target.
   Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
   by a `generates` row), 5b (readable labels: all 103 distinct, each impl member names
@@ -107,6 +111,50 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 02:30 IST — Part 5d step 5: a member reached through a type (REQ-RUST-052.0 G5)
+
+- **Built.** `Self::NAME` and `uN::NAME` in function bodies (`reads`) and `Self::NAME` in
+  member signatures (`uses_type`) that name lookup left without a target are looked up in
+  the stored impl headers. The target is the impl member, when exactly one stored impl of
+  the type (or of a type with no stored target) declares the name and it is a trait impl
+  with a stored trait, no generic parameter and no negation. New file
+  `type-relative-member-records.rs`; one new Type request per qualifier of a two-segment
+  body value path (context `body_value_type_prefix`).
+- **RED** (real source, before the code): `test_type_relative_member_targets` failed with
+  `u128::MAX_STR_LEN has no target`. Command:
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests test_type_relative_member_targets`.
+- **GREEN**, same command: `1 passed; 0 failed; 40 filtered out`. Whole file:
+  `test result: ok. 41 passed; 0 failed` (97.6 s). Syntax crate: `102 passed` and `17 passed`.
+- **Measured on pinned itoa at `705efeae5`** (release, 3 runs): 15.7 to 20.4 s, 344 to
+  360 MB peak, 16 MB store. 103 nodes, 502 edges, both unchanged. `reads` 55 of 55 with a
+  target (was 39). `uses_type` 62 of 66 (was 57). `calls` 3 of 197, unchanged. 21 rows
+  carry `type_relative_member_evidence`, all with outcome `single_trait_impl_member`.
+  Path rows: 12 new prefix requests (u128 6; i128, u8, u16, u32, u64, `I` 1 each).
+- **Prediction off by one:** 4 `uses_type` rows predicted, 5 measured (the source-written
+  `fmt` for u128 also has `Self::Buffer`).
+- **Four older assertions changed** to the new measured values: generated reads without a
+  target 10 to 0; the 6 source-written `u128::`/`i128::MAX_STR_LEN` reads now have targets;
+  generated `fmt -> Self::Buffer` has a target; path totals count the prefix requests apart.
+- **Second opinion** (GLM-5.3, pi, max reasoning, read-only), recorded in
+  `docs/devin-research/1794776377-second-opinion-glm-5-3-max-type-relative-member-step-five.md`.
+  Adopted: unread trait impls for builtins in the record; candidates kept on rows without a
+  target; rule G5 reworded to the code. Disagreed: it says a type of this crate has nothing
+  unread; a blanket impl in an unread crate applies to it, and the row says so.
+- **Refactor:** the lookup returns one value (target or not, plus the record) so both
+  producers keep the record on a row without a target; `ReadTargetLookupScope` groups four
+  borrowed indexes (clippy `too_many_arguments`).
+- **Weak evidence:** the 9 fixture tests passed on first run. Four mutations of the code
+  each made at least one fail (unknown self type dropped from the candidates, member kind
+  not checked, inherent impl accepted, prefix requested for any qualified path).
+- **Not built:** pipeline-level fixtures for an impl inside a function body, `Self` in a
+  closure against a nested function, and a `use` alias as prefix (Q23). No itoa row has an
+  outcome other than `single_trait_impl_member`, so the three other outcomes are shown only
+  by fixtures.
+- **Rule 4:** `detect_changes` run before the commit. Workspace gates not run; they run at
+  the end of 5d.
+- **Next:** send the callee path of a call to name lookup (26 calls to own free functions,
+  1 `u128_ext::mulhi`), then `Unsigned ::fmt(..)`.
 
 ### 2026-11-16 04:10 IST — Part 5d step 4b: correction to step 4, and the stored reason on 5 calls (REQ-RUST-052.0 G6)
 
