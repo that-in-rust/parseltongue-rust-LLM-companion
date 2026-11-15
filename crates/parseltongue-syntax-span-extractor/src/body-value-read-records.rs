@@ -40,8 +40,8 @@ pub enum BodyReadEdgeError {
     InvalidScope,
 }
 
-/// The `reads` edges of one graph, and how many value paths were left out
-/// because they sit in a macro-generated body.
+/// The `reads` edges of one graph, and how many of them are sited in the
+/// expanded text of a macro-generated body.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BodyReadEdgeSet {
     pub read_edge_input_records: Vec<HldEdgeInputRecord>,
@@ -94,12 +94,7 @@ pub fn resolve_body_read_edges(
         let Some(request) = read_value_path_request(&site, &context)? else {
             continue;
         };
-        if !site["span_expansion_provenance_chain"]
-            .as_array()
-            .is_some_and(Vec::is_empty)
-        {
-            edges.read_expanded_site_count += 1;
-        } else if let Some(edge) = build_body_read_edge(
+        if let Some(edge) = build_body_read_edge(
             &site,
             request,
             &context,
@@ -107,6 +102,10 @@ pub fn resolve_body_read_edges(
             &endpoints,
             input.run_generation_digest_value,
         )? {
+            let expanded = !site["span_expansion_provenance_chain"]
+                .as_array()
+                .is_some_and(Vec::is_empty);
+            edges.read_expanded_site_count += usize::from(expanded);
             edges.read_edge_input_records.push(edge);
         }
     }
@@ -274,6 +273,18 @@ fn build_body_read_edge(
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, BodyReadEdgeError> {
     let owner = context.span(read_site_text_field(site, "site_owner_occurrence_key")?)?;
+    // A site and its owner are in the same text: both original, or both in one expansion.
+    if [
+        "span_expansion_provenance_chain",
+        "file_source_absolute_path",
+    ]
+    .iter()
+    .any(|field| site[field] != owner[field])
+    {
+        return Err(BodyReadEdgeError::InvalidEvidence {
+            field: "span_expansion_provenance_chain",
+        });
+    }
     if owner["span_configuration_active_flag"] != true {
         return Ok(None);
     }

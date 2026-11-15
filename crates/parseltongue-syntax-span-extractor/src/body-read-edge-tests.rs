@@ -244,9 +244,10 @@ fn test_function_value_no_read() {
     );
 }
 
-/// REQ-RUST-048.0 R7
+/// REQ-RUST-052.0 G2: a site in expanded text belongs to an owner in the same expanded
+/// text. A site whose expansion chain differs from its owner's is rejected, never a row.
 #[test]
-fn test_expanded_body_read_counted() {
+fn test_expanded_site_owner_mismatch() {
     let source = "struct Buffer; static TABLE: u8 = 1; fn pick() -> u8 { TABLE }";
     let (store, input) = make_read_fixture_graph(source, &[("TABLE", 1, "TABLE", "Static")]);
     store.rows.lock().unwrap().iter_mut().for_each(|row| {
@@ -259,18 +260,17 @@ fn test_expanded_body_read_counted() {
         value[chain] = json!(["ab".repeat(32)]);
         row.stage_row_payload_text = value.to_string();
     });
-    let edges = resolve_body_read_edges(
-        &store,
-        &make_call_fixture_scope(),
-        &input,
-        &RunCancelFlagValue::default(),
-    )
-    .unwrap();
-    assert_eq!(edges.read_edge_input_records, vec![]);
-    assert_eq!(
-        edges.read_expanded_site_count, 1,
-        "a value path in a macro-generated body is counted and left to part 5"
-    );
+    assert!(matches!(
+        resolve_body_read_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        ),
+        Err(BodyReadEdgeError::InvalidEvidence {
+            field: "span_expansion_provenance_chain"
+        })
+    ));
 }
 
 /// REQ-RUST-048.0

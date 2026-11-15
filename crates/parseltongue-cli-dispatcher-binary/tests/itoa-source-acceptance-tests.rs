@@ -2261,7 +2261,15 @@ fn test_itoa_reads_row_counts() {
     let rows = input
         .input_edge_records
         .iter()
-        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+        .filter(|edge| {
+            edge.edge_relation_kind_value == HldRelationKindValue::Reads
+                && edge
+                    .edge_evidence_row_key
+                    .evidence_site_occurrence_key
+                    .read_semantic_occurrence_parts()
+                    .span_expansion_provenance_chain
+                    .is_empty()
+        })
         .map(|edge| {
             let (start, end) = read_edge_site_range(edge);
             (edge, &source[start as usize..end as usize])
@@ -2279,7 +2287,11 @@ fn test_itoa_reads_row_counts() {
             })
             .count()
     };
-    assert_eq!(rows.len(), 21, "15 reads with a target and 6 without");
+    assert_eq!(
+        rows.len(),
+        21,
+        "sited in original text: 15 reads with a target and 6 without"
+    );
     assert_eq!(
         (count("DECIMAL_PAIRS", true), count("I::MAX_STR_LEN", true)),
         (14, 1)
@@ -2402,7 +2414,7 @@ fn check_relation_rows_twice(relation: HldRelationKindValue, expected: usize) {
 /// REQ-RUST-048.0 R8
 #[test]
 fn test_reads_rows_read_twice() {
-    check_relation_rows_twice(HldRelationKindValue::Reads, 21);
+    check_relation_rows_twice(HldRelationKindValue::Reads, 55);
 }
 
 /// REQ-RUST-049.0 R12
@@ -2738,7 +2750,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 300);
+    assert_eq!(input.input_edge_records.len(), 334);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -2956,4 +2968,116 @@ fn test_impl_member_label_segment() {
             format!("itoa::src/lib.rs::const _ #{segment}")
         );
     }
+}
+
+/// REQ-RUST-052.0 G1, G2: a function written by a macro expansion is a source of `reads`
+/// rows. Each of the four generated `<uN as Unsigned>::fmt` reads the static
+/// `DECIMAL_PAIRS` six times; every row is sited in the expanded text of its own node.
+#[test]
+fn test_generated_fmt_static_reads() {
+    let (_directory, _root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let target = locate_original_kind_node(&input, &spans, "DECIMAL_PAIRS", "STATIC");
+    let writers = input
+        .input_node_records
+        .iter()
+        .filter(|node| {
+            node.node_generating_call_reference.is_some()
+                && node
+                    .node_qualified_path_text
+                    .ends_with(" as Unsigned>::fmt")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        writers.len(),
+        4,
+        "u8, u16, u32 and u64; the one for u128 is source-written"
+    );
+    for node in writers {
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
+            &node.node_target_reference
+        else {
+            panic!("definition identity expected");
+        };
+        let owner = key.read_semantic_occurrence_parts();
+        let (owner_start, owner_end) = owner.span_byte_range_value.read_source_range_pair();
+        assert_eq!(owner.span_expansion_provenance_chain.len(), 1);
+        let text = spans
+            .iter()
+            .find(|span| {
+                span["span_declared_name_value"] == "fmt"
+                    && span["span_byte_start_offset"] == owner_start
+                    && span["span_byte_end_offset"] == owner_end
+                    && span["file_source_absolute_path"]
+                        .as_str()
+                        .is_some_and(|path| path.ends_with(owner.span_source_file_path))
+            })
+            .and_then(|span| span["span_source_code_text"].as_str())
+            .unwrap();
+        let rows = input
+            .input_edge_records
+            .iter()
+            .filter(|edge| {
+                edge.edge_relation_kind_value == HldRelationKindValue::Reads
+                    && edge.edge_source_reference == node.node_target_reference
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(rows.len(), 6, "{}", node.node_qualified_path_text);
+        for edge in rows {
+            assert_eq!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Extracted {
+                    target: target.node_target_reference.clone()
+                }
+            );
+            let site = edge
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key
+                .read_semantic_occurrence_parts();
+            let (start, end) = site.span_byte_range_value.read_source_range_pair();
+            assert_eq!(site.span_source_file_path, owner.span_source_file_path);
+            assert_eq!(
+                site.span_expansion_provenance_chain,
+                owner.span_expansion_provenance_chain
+            );
+            assert!(owner_start <= start && end <= owner_end);
+            assert_eq!(
+                &text[(start - owner_start) as usize..(end - owner_start) as usize],
+                "DECIMAL_PAIRS"
+            );
+        }
+    }
+    let stored = |relation| {
+        input
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == relation)
+            .count()
+    };
+    assert_eq!(
+        stored(HldRelationKindValue::Reads),
+        55,
+        "21 original and 34 generated"
+    );
+    // The other 10 generated rows are `Self::MAX_STR_LEN` and `uN::MAX_STR_LEN` in generated
+    // `write` bodies. Name lookup alone does not find a trait const through a builtin type,
+    // so each keeps one row without a target until G5 is built.
+    let pending = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_relation_kind_value == HldRelationKindValue::Reads
+                && !edge
+                    .edge_evidence_row_key
+                    .evidence_site_occurrence_key
+                    .read_semantic_occurrence_parts()
+                    .span_expansion_provenance_chain
+                    .is_empty()
+                && edge.edge_resolution_value
+                    == HldEdgeResolutionValue::Unresolved {
+                        reason: HldUnresolvedReasonKind::TraitSolverNeeded,
+                    }
+        })
+        .count();
+    assert_eq!(pending, 10);
 }
