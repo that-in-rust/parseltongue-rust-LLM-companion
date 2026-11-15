@@ -6,16 +6,16 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 58 nodes and
-185 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
-32 `implements` rows (29 with a target, 3 unresolved) and 15 `reads` rows. Five dependencies
+191 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+32 `implements` rows (29 with a target, 3 unresolved) and 21 `reads` rows (15 with a
+target, 6 unresolved). Five dependencies
 are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 4c step 5, the "proven, gap" record on `Buffer::format --reads-->
-  Integer::MAX_STR_LEN`, then step 6, unresolved rows. Steps 1 to 4 are pushed. Parts 4a and
-  4b are built.
+- **Next target:** part 4c step 7 (refactor note, workspace gates, one run's cost). Steps
+  1 to 6 are pushed. Parts 4a and 4b are built. After 4c: part 4d, `imports`.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -31,7 +31,7 @@ step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
-4  remaining edge kinds                IN PROGRESS   uses_type, implements built; reads 15 rows; imports not
+4  remaining edge kinds                IN PROGRESS   uses_type, implements built; reads 21 rows; imports not
 5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
@@ -95,6 +95,79 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 12:40 IST — Part 4c steps 5 and 6: the bound record, and unresolved reads
+
+**Every value path in an original itoa function body that could be a read now has one
+`reads` row: 15 with a target and 6 unresolved with a reason. The row for
+`I::MAX_STR_LEN` names the bounds walked and that `Copy` was not read.**
+
+- **Commits:** step 5 `c06d960b2` (shared bound walk), `00cda7db9` (real-source test);
+  step 6 `443123077` (unresolved rows), `083b6c63a` (fixture test), `fc0ebe4e0`
+  (real-source count and read-twice tests).
+- **Step 5, what changed:** the part-3 bound and supertrait walk was inside
+  `resolve_bound_method_target`. It is now `walk_parameter_bound_traits`, called by the
+  method-call resolver and by the reads resolver, so the two cannot drift. A reads row
+  whose path starts at a bounded type parameter of its own function carries
+  `bound_read_evidence`: `{"bound_chain":["I","Integer","private::Sealed"],
+  "missing_source_traits":["Copy"]}`.
+- **Step 6, what changed:** a value path stored unresolved or ambiguous gives one row
+  without a target (`resolve_read_path_target`). The reason follows the part-4a rule: a
+  stored `external_source_missing` or `cfg_inactive` is kept, several targets give
+  `AmbiguousTarget`, no stored reason gives `TraitSolverNeeded`. A path to a function, a
+  const generic parameter or a const declared in a body still gives no row.
+- **Test first:**
+  - `test_generic_const_bound_read` failed on `left: Null` where the bound record was
+    expected (89 s), then passed.
+  - `test_unresolved_read_keeps_reason` failed with only the `TABLE` row where 4 rows
+    were expected, then passed.
+  - `test_itoa_reads_row_counts` and `test_reads_rows_read_twice` both failed on
+    `left: 15, right: 21` (86 s), then passed.
+- **Tests:** `cargo test -p parseltongue-syntax-span-extractor`: 85 + 17 passed, 0 failed.
+  `cargo test -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  26 passed, 0 failed, 0 ignored (296 s, debug build). Format and lint clean on the two
+  touched crates. Workspace gates run at step 7.
+- **Measured** by `test_itoa_reads_row_counts` on pinned itoa: 21 `reads` rows.
+
+```text
+rows  site text            state        reason or target
+14    DECIMAL_PAIRS        extracted    the static
+1     I::MAX_STR_LEN       extracted    Integer::MAX_STR_LEN, gap: Copy not read
+5     u128::MAX_STR_LEN    unresolved   TraitSolverNeeded
+1     i128::MAX_STR_LEN    unresolved   TraitSolverNeeded (source: Buffer::new)
+```
+
+- **Edge total:** 191 by addition (170 before part 4c, plus 21). Not yet read from a run's
+  stage line; step 7 measures it.
+- **Against the expected graph:** still 3 of 62 grouped `reads` rows matched by source and
+  target. The 6 unresolved rows have the expected source and no target, so they do not
+  count as matched until part 5 makes the macro-generated consts nodes.
+- **Weak point, recorded as Q8 in part 4c:** the reason `TraitSolverNeeded` on the 6 rows
+  is what the rule gives when name resolution stored no reason. The real cause is that the
+  target const is inside a macro-generated impl. A reader of the row cannot tell that today.
+- **Rule 4 slip:** before the step-6 change to `build_body_read_edge` I did not run
+  `trace_path` on it in both directions; I ran the inbound traces after the commit. Each
+  changed function has one caller, and `walk_parameter_bound_traits` has the two intended.
+- **Codebase-memory queries:**
+  - `trace_path --function-name build_bound_method_index --direction both --depth 1` and
+    `trace_path --function-name resolve_body_read_edges --direction both --depth 1`
+    (before step 5).
+  - `search_graph --label Function --name-pattern
+    '.*(type_param|generic_bound|bound_member|assoc|type_relative).*'` (before adding the
+    walk: found `resolve_bound_method_target`, which was split instead of copied).
+  - `search_graph --label Function --name-pattern
+    '.*(unresolved_reason|reason_kind|read_unresolved|map_.*reason).*'` (before step 6:
+    found `read_stored_reason_kind`, reused).
+  - `trace_path --function-name run_original_graph_fixture --direction inbound --depth 1`
+    (returned no test callers; the index does not hold integration-test calls to it, so
+    the helpers were found by reading the test file).
+  - `detect_changes` before the step-5 commit (useless here: it diffs against
+    `origin/main` and listed 739 files).
+  - `trace_path --direction inbound --depth 1` on `resolve_read_path_target`,
+    `build_body_read_edge`, `walk_parameter_bound_traits`, `resolve_bound_method_target`
+    (after the step-6 commits).
+  - `index_repository` after each of the two code pushes.
+- **Next:** step 7: refactor note, workspace gates, one run's counts and cost.
 
 ### 2026-11-15 — part 4c steps 3 and 4: `reads` rows stored from original bodies
 

@@ -4,7 +4,7 @@ Written 2026-11-15 with `rust-executable-specs-01`, before any code.
 
 ## The answer
 
-**State: IN PROGRESS, steps 1 to 4 of 7 pushed; 15 `reads` rows are stored. One `reads` row per value path in an original function body
+**State: IN PROGRESS, steps 1 to 6 of 7 pushed; 21 `reads` rows are stored (15 with a target, 6 unresolved). One `reads` row per value path in an original function body
 that names a `static`, a `const` or an associated const which is a graph node. The first
 target is `enc_16lsd --reads--> DECIMAL_PAIRS`.**
 
@@ -105,8 +105,12 @@ Each step is one commit of about 200 changed lines, test first.
    value-path resolution, and the node set. A target that is not a node gives no row.
 4. L3 facade: rows in the full graph; step 1 goes GREEN. DONE (`de4c64b03`).
 5. Generic `T::NAME` (R4). The target is already found: name resolution treats a type
-   parameter's bounds as glob imports. What is left is the "proven, gap" record.
+   parameter's bounds as glob imports. What was left is the "proven, gap" record.
+   DONE (`c06d960b2`, `00cda7db9`). The part-3 walk is now one function,
+   `walk_parameter_bound_traits`, used by calls and reads. The target is kept only if it
+   is a member of a trait the walk reached; otherwise the row is unresolved.
 6. Unresolved rows and the counts (R5, R7, R8); `test_itoa_reads_row_counts`.
+   DONE (`443123077`, `083b6c63a`, `fc0ebe4e0`).
 7. Refactor pass, workspace gates, one run's counts and cost.
 
 ## 6 — Quality gate results
@@ -140,7 +144,28 @@ rows  source           target                 expected graph (grouped rows)
 3 of the expected graph's 62 grouped `reads` rows are matched by source and target. Syntax
 crate 84 + 17 tests pass; the 23 real-source itoa tests pass, none ignored.
 
+Steps 5 and 6, measured 2026-11-15 on pinned itoa by `test_itoa_reads_row_counts` (debug
+build, sysroot excluded): 21 `reads` rows.
+
+```text
+rows  site text            state        reason or target
+14    DECIMAL_PAIRS        extracted    the static
+1     I::MAX_STR_LEN       extracted    Integer::MAX_STR_LEN; bound_chain I, Integer,
+                                        private::Sealed; missing source: Copy
+5     u128::MAX_STR_LEN    unresolved   TraitSolverNeeded
+1     i128::MAX_STR_LEN    unresolved   TraitSolverNeeded
+```
+
+Still 3 of 62 expected grouped rows matched: an unresolved row has no target to match.
+Syntax crate 85 + 17 tests pass; the 26 real-source itoa tests pass, none ignored (296 s).
+
 ## 7 — Open questions
+
+- **Q8. The reason on the 6 unresolved rows says too little.** Name resolution stores no
+  reason for `u128::MAX_STR_LEN`, so the part-4a rule gives `TraitSolverNeeded`. The real
+  cause is that the const belongs to a macro-generated impl, which is not a node until
+  part 5. Part 5 should turn these into rows with a target; if any remain, name resolution
+  should store why.
 
 - **Q7. Site of a read through a field.** The expected graph anchors the 14
   `DECIMAL_PAIRS` sites on `DECIMAL_PAIRS.0`; R6 and production use the path
@@ -156,7 +181,7 @@ crate 84 + 17 tests pass; the 23 real-source itoa tests pass, none ignored.
   have no row. If the graph later gains body-local items, they get rows then.
 - **Q5. `I::MAX_STR_LEN` already resolves.** Checked in step 4: it names the trait const
   `Integer::MAX_STR_LEN` (bytes 3680 to 3834), found because name resolution imports a type
-  parameter's bounds by glob. The row does not yet say that `Copy` was not read (R4).
+  parameter's bounds by glob. Since step 5 the row says that `Copy` was not read (R4).
 - **Q6. Two older scope checks.** `check_call_lexical_shadowing` and
   `check_receiver_name_rebound` are separate from the new pattern-scope check. The first
   treats any `use` in a block as shadowing every name. Merging them is step 7 work.
