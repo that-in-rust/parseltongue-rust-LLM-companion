@@ -326,8 +326,8 @@ was written. Record: `docs/devin-research/1794768300-second-opinion-glm-5-3-max-
 
 ## 9 — Part 5c: `expands`, macro call to macro definition (REQ-RUST-051.0)
 
-**State: SPECIFIED.** Numbers marked *measured* come from the stored tables of one release
-run at `47d4d05e0`; the edge total is predicted.
+**State: BUILT** at `b0733521f` (section 9.6). Numbers in 9.1 are measured on the stored
+tables of one release run at `47d4d05e0`; 9.3 states the prediction and the measured result.
 
 ### 9.1 What is stored today (measured)
 
@@ -354,7 +354,10 @@ E1  A tenth relation kind, expands: macro call node -> macro definition node. It
 E2  Every macro call node that is written in a source file has exactly one expands row.
 E3  Site: the whole macro call, the same site as its generates rows.
 E4  Target: the definition that the stored textual-scope lookup for the call's macro path
-    names. All stored lookups for one call must name the same definition, else a typed error.
+    names. A call has one stored lookup per scope revision; the row with the highest
+    revision is the one in force, as in the existing name resolver. Two lookups at that
+    revision naming different definitions are a typed error. (Revised when built: the first
+    wording required all revisions to agree.)
 E5  Cross-check: every output token the expansion row says was copied from a definition
     must lie inside the target definition's byte range, in the same file. A mismatch is a
     typed error, never a row.
@@ -372,11 +375,15 @@ E10 The stage line prints expands=N.
 
 A call written by a macro (nested expansion) is not a node (section 2, R4), so it has no row.
 
-### 9.3 Predicted on itoa
+### 9.3 Predicted on itoa, and measured
 
 15 `expands` rows, all with a target, split 5 / 6 / 4; arm index 0 on all 15; 300 edges
 (285 + 15); nodes unchanged at 103. The expected graph has no macro nodes, so these 15 rows
 match nothing in it until part 7 repairs it.
+
+Measured at `b0733521f`, read back from the stored edge table: 15 `expands` rows, all with a
+target, 5 to `impl_Integer`, 6 to `impl_Integer_size`, 4 to `impl_Unsigned`; arm index 0 on
+all 15; 103 nodes; 300 edges. The prediction held.
 
 ### 9.4 Tests
 
@@ -386,14 +393,51 @@ test_expands_edge_row_counts        real source  E1-E5, E8: 15 rows, 5/6/4, site
 test_expands_row_endpoint_kinds     fixture      E9: wrong source kind, wrong target kind, wrong site
 test_expands_unresolved_call_row    fixture      E2, E6: a call with no definition gets one unresolved row
 test_expands_token_origin_mismatch  fixture      E5: a copied token outside the definition stops the run
+test_expands_call_definition_row    fixture      E2-E4, E8: one call, one definition, one row with arm index
+test_expands_latest_scope_revision  fixture      E4: the lookup at the highest scope revision names the target
+test_expands_pathless_expansion_rejected  fixture  E7: an expanded call with no stored lookup stops the run
 ```
+
+The last three were added when the part was built.
 
 ### 9.5 Open questions (5c)
 
 - **Q12.** E7: macros called by path. Needs the resolved binding stored per call.
 - **Q13.** A builtin or `include!` call at item position: unresolved by E6; no fixture yet.
-- **Q14.** Several stored lookups per call (one per scope revision) are required to agree
-  (E4). A macro defined by a macro that shadows an earlier one would fail this; untested.
+- **Q14.** Closed when built: the lookup at the highest scope revision is used (E4), so a
+  later definition that shadows an earlier one is followed, not rejected.
+- **Q15.** The validator checks one row at a time (E9). It does not check that every macro
+  call node has exactly one `expands` row, or the shape of the metadata; the real-source
+  test pins both on itoa only.
+- **Q16.** E5 is checked in the producer, not in the validator, so a graph written by
+  another producer is not covered by it.
 
 Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only:
 [record](../../devin-research/1794770900-second-opinion-glm-5-3-max-part-5c-expands-edge.md).
+
+### 9.6 Quality gate results (5c, measured at `b0733521f`)
+
+```text
+expands rows read back from the stored table  15, all with a target: 5 / 6 / 4 by definition;
+                                              arm index 0 on all 15; site = the macro call
+fixture tests, new (validator)                1 passed (5 cases); failed on the stub first
+fixture tests, new (adapter)                  5 passed on first run. Checked by mutation: with
+                                              the revision filter and the token check disabled,
+                                              test_expands_latest_scope_revision and
+                                              test_expands_token_origin_mismatch fail. The other
+                                              three were not seen failing.
+real-source test, new                         test_expands_edge_row_counts passed; failed first on
+                                              `not yet implemented: REQ-RUST-051.0`
+core tests                                    22 passed
+adapter tests                                 184 passed, 0 failed
+Turso adapter tests                           71 passed, 0 failed, 3 ignored
+real-source itoa tests                        36 passed, 0 failed, 80 s, release, default threads
+format (workspace), lint (4 touched crates)   pass
+one run, 3 times                              14.9 to 15.8 s, 343 to 361 MB peak, 13.1 MB store
+graph                                         103 nodes, 300 edges (was 285); still incomplete
+workspace gates                               not run for 5c; they run at the end of part 5
+```
+
+One defect found on the way: the first SQL read the call's compilation unit from a JSON
+field that is empty in the stored lookup rows, so no call joined to its lookup and the run
+stopped with the E7 typed error. The unit is now read from the lookup's site key.

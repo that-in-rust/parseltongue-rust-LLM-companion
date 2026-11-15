@@ -44,8 +44,9 @@ Graph rules:
 3. Each `use` outside a function body is a node, with one `imports` edge per resolved binding.
 4. An inline module is an ordinary module node with its own scope.
 5. Every extracted edge is stored uncollapsed, private to private included. The edge type has
-   eight kinds: `calls`, `uses_type`, `implements`, `reexports`, `contains`, `derives`,
-   `imports`, `reads`. itoa needs six of them; it has no `derives` or `reexports`.
+   ten kinds: `calls`, `uses_type`, `implements`, `reexports`, `contains`, `derives`,
+   `imports`, `reads`, and the two structural kinds for macros, `generates` and `expands`.
+   itoa needs eight of them; it has no `derives` or `reexports`.
 6. A call, type use or read targets the real item. The `use` line is evidence, never the target.
 7. The graph is the two tables above. No table is added.
 
@@ -178,10 +179,15 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   - Generating call: named twice, as a field on the node and as a `generates` edge from
     the call node to the item (itoa: 45 rows). `generates` is a new relation kind.
   - A macro call points to the definition it expands by an `expands` edge (itoa: 15 rows).
+    The target is the definition the stored textual-scope lookup names at the highest scope
+    revision. The row is sited at the whole call and carries the macro name and the index
+    of the arm that matched, so a reader knows which arm to edit. `expands` is a new
+    relation kind (decided and built 2026-11-16, part 5c).
   - Built (part 5a): identity, container, and the generating call in both forms, for a
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.
-  - Not built: `expands`.
+  - Not built: `expands` for a macro called by a path (`crate::m!`); a run that meets one
+    stops with a typed error. itoa has none.
 - **Node labels (2026-11-15, built in part 5b).** The label is display text copied from
   source; it is not the identity.
   - It starts with the crate target name and the file path (`itoa::src/lib.rs::`), not the

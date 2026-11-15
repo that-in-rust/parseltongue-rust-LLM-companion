@@ -35,7 +35,8 @@ Unresolved calls are kept as rows with a reason.
 
 ## Which edge kinds have a producer
 
-The edge type `HldRelationKindValue` has eight kinds. Outside tests and store codecs:
+The edge type `HldRelationKindValue` has ten kinds (2026-11-16; the list below is the
+earlier measurement and predates the producers built in parts 4 and 5). Outside tests and store codecs:
 
 ```text
 contains   original-item-graph-projection.rs        this phase's stage

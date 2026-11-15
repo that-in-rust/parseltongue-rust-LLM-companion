@@ -3,10 +3,10 @@
 Two parts. **Current state** is rewritten in place whenever it changes. **Entries** is
 newest first: add each new checkpoint at the top of that section and never edit older ones.
 
-## Current state (2026-11-15)
+## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 285 edges (88 `contains`, 45 `generates`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 300 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 21 `reads` rows (15 with a
 target, 6 unresolved) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,10 +15,11 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5c, `expands`: macro call to macro definition (15 rows predicted).
+- **Next target:** part 5d, generated bodies and signatures as edge sources.
   Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
-  by a `generates` row) and 5b (readable labels: all 103 distinct, each impl member names
-  its impl header) are built. Parts 4a to 4d are built.
+  by a `generates` row), 5b (readable labels: all 103 distinct, each impl member names
+  its impl header) and 5c (`expands`: each of the 15 macro calls points to its definition,
+  with the matched arm index) are built. Parts 4a to 4d are built.
 - **Not built in 5a:** a generated item whose macro call is itself written by a macro
   (nested expansion). The run stops with a typed error; itoa has none.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
@@ -38,7 +39,7 @@ step                                   state         measured or missing
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21, imports 4
-5  macro-generated items and bodies    5a BUILT      45 generated nodes, 45 generates; bodies are not edge sources yet
+5  macro-generated items and bodies    5a-5c BUILT   45 generated nodes, 45 generates, 15 expands; bodies are not edge sources yet
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -53,12 +54,12 @@ step                                   state         measured or missing
   expansions, one file area per source file (2), and 13 builtin types that an edge starts
   or ends at. Each generated node names its macro call.
   Visibility and reachability are stored as unknown, not guessed.
-- **Edges.** 285: 88 `contains`, 45 `generates`, 61 `calls`, 34 `uses_type`, 32 `implements`, 21 `reads` and 4 `imports`. 3 calls are resolved; 58 are stored unresolved
+- **Edges.** 300: 88 `contains`, 45 `generates`, 15 `expands`, 61 `calls`, 34 `uses_type`, 32 `implements`, 21 `reads` and 4 `imports`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
   inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 35 real-source itoa tests pass at commit `47d4d05e0` (448 s, release build, one
-  thread).
+- **Tests.** 36 real-source itoa tests pass at commit `b0733521f` (80 s, release build,
+  default threads).
 - **Workspace gates** after part 5a: format, lint and release build pass; 514 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
 - **Cost of one run** (2026-11-16, after part 5a, sysroot excluded, 2 workers): 13.7 to
@@ -101,6 +102,54 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 01:10 IST — Part 5c: `expands`, macro call to macro definition (REQ-RUST-051.0)
+
+- **Result.** Pinned itoa stores 15 `expands` rows, one per macro call written in a source
+  file, each to the `macro_rules!` definition it expands: 5 to `impl_Integer`, 6 to
+  `impl_Integer_size`, 4 to `impl_Unsigned`. Each row is sited at the whole call and carries
+  `{"macro_matched_arm_index":0,"macro_name_text":".."}`. 103 nodes, 300 edges (was 285),
+  read back from the stored edge table. Predicted 15 and 300; measured 15 and 300.
+- **Against the expected graph:** no row gained or lost. It has no macro nodes; part 7
+  repairs it.
+- **STUB.** `check_expands_edge_record` with `todo!("REQ-RUST-051.0 E9")`; the new relation
+  kind in the three store codecs; `expands=N` on the stage line.
+- **RED.** `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests expands_edge_row`: 0 passed, 1 failed on
+  `not yet implemented: REQ-RUST-051.0`. Validator fixture `test_expands_row_endpoint_kinds`
+  failed on the same stub.
+- **GREEN.** Producer `build_macro_expands_records` (SQL plus one Rust file), called after
+  the generated items. Same command: 1 passed, 18.97 s.
+- **Defect on the way.** First GREEN attempt stopped with "expanded macro call has no
+  definition node in textual scope". Cause: the SQL read the compilation unit from
+  `legacy_source_unit_key`, which is empty in the stored rows; it now reads it from
+  `legacy_source_site_key.unit_compilation_identity_key`.
+- **Spec revised when built (E4).** The first wording required every stored lookup of a
+  call to name the same definition. The stored table has one lookup per scope revision, and
+  the existing name resolver uses the highest revision; the producer now does the same.
+- **Fixture tests (adapter).** 5 new, all passed on first run, so I disabled the revision
+  filter and the token check and re-ran: `test_expands_latest_scope_revision` and
+  `test_expands_token_origin_mismatch` failed, 3 passed. The other three were never seen
+  failing. Code restored before the gates.
+- **REFACTOR.** None. Producer is 156 lines, SQL 75, tests 201.
+- **Gates.** `cargo fmt --all -- --check`: pass. `cargo clippy --release` on the four touched
+  crates, `--all-targets -D warnings`: pass. Core 22 passed; adapter 184 passed; Turso
+  adapter 71 passed, 3 ignored. `cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests`: 36 passed, 0 failed, 79.92 s (default threads).
+  Workspace gates not run; they run at the end of part 5.
+- **Cost, 3 runs (binary `117b3ba5…ee1f`):** 14.91, 15.14, 15.75 s; 360, 343, 361 MB peak;
+  13.1 MB store.
+- **Not built.** A macro called by a path (`crate::m!`): typed error, itoa has none. The
+  validator checks one row at a time; "every macro call has exactly one row" is pinned by
+  the real-source test only (part file Q15, Q16).
+- **Second opinion.** GLM-5.3, pi, max reasoning, before the spec:
+  `docs/devin-research/1794770900-second-opinion-glm-5-3-max-part-5c-expands-edge.md`.
+- **codebase-memory.** `search_graph` for `build_generated_item_records` and
+  `derive_original_graph_input` (the call site of the new producer); `detect_changes`
+  before the commit. Not run before each test, which Rule 4 asks for.
+- **Commits.** `3232b76cb` (spec), `e9c5bfd59` (kind, validator, codecs), `b0733521f`
+  (producer and tests).
+- **Next.** Part 5d, generated bodies and signatures as edge sources.
 
 ### 2026-11-16 00:40 IST — Part 5b: readable node labels (REQ-RUST-050.0)
 

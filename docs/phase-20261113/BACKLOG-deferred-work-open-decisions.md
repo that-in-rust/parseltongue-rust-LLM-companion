@@ -40,8 +40,8 @@ that reads the graph":
   `core`) stays unresolved, with the method name and a reason. No sysroot run in this phase.
 - **Macro nodes:** each `macro_rules!` definition and each macro call at item position is a
   node (itoa: 3 and 15). A macro-generated item records the call that generated it. A call
-  points to the definition it expands; the relation kind `expands` is proposed for this and is
-  not built.
+  points to the definition it expands by an `expands` row (decided and built 2026-11-16,
+  part 5c; itoa: 15 rows).
 
 - **Macro-generated items (OD-2, decided 2026-11-15):** identity is the macro call plus the
   item's place in its expansion. The file area or module where the call is written contains
