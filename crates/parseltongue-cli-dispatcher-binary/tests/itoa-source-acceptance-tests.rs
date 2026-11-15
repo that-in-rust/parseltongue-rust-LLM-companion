@@ -698,6 +698,51 @@ fn test_clone_self_type_edge() {
     assert_eq!(read_edge_site_range(&uses[0]), expected_site);
 }
 
+/// REQ-RUST-048.0
+#[test]
+#[ignore = "RED until part 4c step 4 stores reads rows in the full graph"]
+fn test_decimal_pairs_static_read() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let owner = locate_original_member_node(&input, &spans, "enc_16lsd");
+    let target = locate_original_kind_node(&input, &spans, "DECIMAL_PAIRS", "STATIC");
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let body = source.find("fn enc_16lsd").unwrap()..source.find("fn div_rem_1e16").unwrap();
+    let name = "DECIMAL_PAIRS";
+    let expected = source[body.clone()]
+        .match_indices(name)
+        .map(|(offset, _)| {
+            let start = (body.start + offset) as u64;
+            (start, start + name.len() as u64)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(expected.len(), 8, "the pin reads the static 8 times here");
+    let reads = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_source_reference == owner.node_target_reference
+                && edge.edge_relation_kind_value == HldRelationKindValue::Reads
+        })
+        .collect::<Vec<_>>();
+    let mut sites = reads
+        .iter()
+        .map(|edge| read_edge_site_range(edge))
+        .collect::<Vec<_>>();
+    sites.sort_unstable();
+    assert_eq!(
+        sites, expected,
+        "one reads row per path expression, sited at the path itself"
+    );
+    assert!(
+        reads.iter().all(|edge| edge.edge_resolution_value
+            == HldEdgeResolutionValue::Extracted {
+                target: target.node_target_reference.clone()
+            }),
+        "every row targets the static DECIMAL_PAIRS"
+    );
+}
+
 /// REQ-RUST-047.0
 #[test]
 fn test_buffer_clone_trait_unresolved() {
