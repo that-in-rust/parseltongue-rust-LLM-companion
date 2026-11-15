@@ -3423,7 +3423,9 @@ fn test_generated_body_call_rows() {
                     [
                         "generic_bound_trait_method",
                         "type_path_associated_function",
-                        "callee_path_function"
+                        "callee_path_function",
+                        "trait_path_method",
+                        "tuple_struct_constructor"
                     ]
                     .contains(&kind)
                 );
@@ -3461,10 +3463,8 @@ fn test_generated_body_call_rows() {
                 "method_call method call receiver_type_not_determined".to_owned(),
                 104
             ),
-            (
-                "qualified_path_call fmt type_prefix_is_trait".to_owned(),
-                10
-            ),
+            // Rule G10: the trait's method declaration, named through the trait.
+            ("qualified_path_call fmt -".to_owned(), 10),
             (
                 "qualified_path_call size_of type_prefix_unresolved".to_owned(),
                 4
@@ -3605,6 +3605,80 @@ fn test_type_relative_member_targets() {
     );
 }
 
+/// REQ-RUST-052.0 G10, G11: a trait's method called through the trait
+/// (`Unsigned::fmt(x, ..)`) has the trait's method declaration as target and lists the
+/// stored impl members that could run; a tuple struct called as a function
+/// (`DecimalPairs(..)`) has the struct as target.
+#[test]
+fn test_trait_path_call_targets() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+    };
+    let mut found = std::collections::BTreeMap::<String, usize>::new();
+    for edge in input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+    {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let callee = metadata["callee_source_text"]
+            .as_str()
+            .unwrap()
+            .replace(' ', "");
+        if !["Unsigned::fmt", "DecimalPairs"].contains(&callee.as_str()) {
+            continue;
+        }
+        let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
+            panic!(
+                "{} calls {callee} without a target: {metadata}",
+                label(&edge.edge_source_reference)
+            );
+        };
+        assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
+        let candidates = metadata["trait_method_lookup_evidence"]["trait_member_candidate_rows"]
+            .as_array()
+            .map(|rows| {
+                rows.iter()
+                    .map(|row| row["impl_self_type_source_text"].as_str().unwrap())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+        *found
+            .entry(format!(
+                "{callee} -> {} {} [{candidates}]",
+                label(target),
+                metadata["dispatch_kind"].as_str().unwrap()
+            ))
+            .or_default() += 1;
+    }
+    assert_eq!(
+        found,
+        std::collections::BTreeMap::from([
+            (
+                "DecimalPairs -> itoa::src/lib.rs::DecimalPairs tuple_struct_constructor []"
+                    .to_owned(),
+                1
+            ),
+            (
+                "Unsigned::fmt -> itoa::src/lib.rs::Unsigned::fmt trait_path_method \
+                 [u128,u16,u32,u64,u8]"
+                    .to_owned(),
+                10
+            ),
+        ])
+    );
+}
+
 /// REQ-RUST-052.0 G9: a call whose callee is a path that name lookup resolves to one
 /// function of this crate has that function as its target: a bare name
 /// (`divmod100(..)`), a bare name with generic arguments (`enc_16lsd::<..>(..)`), and
@@ -3654,12 +3728,12 @@ fn test_callee_path_function_targets() {
                 2
             ),
             (
-                "DecimalPairs callee_is_not_function [\"Struct\"] null".to_owned(),
+                "DecimalPairs single_struct_node [\"Struct\"] null".to_owned(),
                 1
             ),
             ("MaybeUninit callee_path_unresolved [] null".to_owned(), 1),
             (
-                "Unsigned::fmt callee_qualifier_not_module [\"Function\"] \"Trait\"".to_owned(),
+                "Unsigned::fmt single_trait_method [\"Function\"] \"Trait\"".to_owned(),
                 10
             ),
             (

@@ -518,6 +518,15 @@ G9  A call whose callee is a path gets its target from the stored name lookup of
     qualifier stored as a builtin type whose whole path has a stored reason takes that
     reason. No request is made for a callee with a `<T as Trait>` anchor, a single name
     bound by a parameter or pattern of the function, or a parenthesised callee.
+G10 A callee whose qualifier is stored as a trait and whose whole path stores exactly one
+    Function that is a graph node (`Trait::method(x, ..)`) has that function, the trait's
+    declaration, as target. The row lists as evidence every function of that name in a
+    stored impl of that trait: the impl, the type it is for, and the member. No impl member
+    is the target: the receiver's type is not stored.
+G11 A callee that is one name, or is qualified by a module, and whose path stores exactly
+    one Struct that is a graph node (`S(..)`) is a tuple struct's constructor: the struct
+    is the target, with its own dispatch kind. A struct found through a trait or a type is
+    not a target.
 ```
 
 ### 10.3 Steps, predicted and measured on itoa
@@ -909,3 +918,65 @@ added for each.
 - A local binding named like the qualifier (`fn caller(m: u8) { m::f() }`) blocks the lookup,
   although Rust would still resolve `m` as a module. Conservative; loses a target only.
 
+### 10.12 Step 7: a trait's method through the trait, and a tuple struct's constructor (measured)
+
+Rules G10 and G11. Built at the commit that adds this section. Both were decided in step 6
+(Q21, Q26) under the maximum-information rule.
+
+```text
+ callee            rows  target                     dispatch_kind             row's outcome
+ Unsigned ::fmt      10  Unsigned::fmt (the trait's trait_path_method         single_trait_method
+                         declaration)
+ DecimalPairs         1  DecimalPairs (the struct)  tuple_struct_constructor  single_struct_node
+```
+
+**Measured (three release runs on pinned itoa).** 103 nodes and 502 edges, both unchanged.
+`resolved_calls` 41 of 197 (was 30). Wall 18.4 to 22.7 s, peak 354 to 369 MB, store 16 MB.
+The graph is still marked incomplete.
+
+**Row metadata (G10).** Each of the 10 rows carries `trait_method_lookup_evidence`:
+`trait_member_outcome_kind: trait_method_declaration`, `receiver_type_stored_flag: false`,
+`sources_not_read` (impls of the trait in crates whose source was not read), and
+`trait_member_candidate_rows`. On itoa each row lists the same five candidates: `fmt` in
+the impls of `Unsigned` for `u8`, `u16`, `u32`, `u64` (generated) and `u128` (original).
+Each candidate row has the impl header's occurrence key, the impl's self type text, whether
+that self type is stored as resolved, whether the impl has generic parameters, and the
+member's occurrence key.
+
+**What the 10 calls are.** Six are `Unsigned::fmt(self, buf)` in the `write` of an unsigned
+type; four are `Unsigned::fmt(self.unsigned_abs(), ..)` in the `write` of a signed type.
+
+**Not built: the impl member as target.** For the six `Unsigned::fmt(self, buf)` calls the
+first argument is the `self` parameter of a method in an impl for a stored type, so the
+impl member that runs is provable from source without type inference. No rule reads the
+first argument yet, so these rows also stop at the declaration (Q27). The other four need
+the return type of `unsigned_abs`, which is in `core`.
+
+**Tests.** Real source: `test_trait_path_call_targets` (failed first: "`<u8 as
+private::Sealed>::write` calls Unsigned::fmt without a target"; then passed) pins the 11
+targets, their dispatch kinds and the five candidate types. Changed to measured values:
+`test_callee_path_function_targets` (two outcomes), `test_generated_body_call_rows` (the
+10 `fmt` rows have a target; two more dispatch kinds). Fixtures:
+`test_trait_method_candidate_rows` (only functions of that name in resolved impls of that
+trait), `test_tuple_struct_callee_target` (a struct that is, and is not, a graph node),
+`test_qualified_callee_needs_module` (a function through a trait is a target; a struct or
+a const through a trait is not; a function through a struct goes to the member lookup; a
+struct through a module is a target), `test_bare_callee_untargeted_reasons` (a const is
+not a call target). The fixture tests were written after the code. Six deliberate breaks of
+the code each made a fixture test fail at once
+(a struct through a trait accepted; any non-module qualifier treated as a trait; candidates
+ignoring the trait, the member kind, or the trait's stored state; the graph-node filter
+removed).
+
+**Open questions.**
+
+- **Q27.** `Trait::method(self, ..)` where `self` is the method's own `self` parameter in an
+  impl for a stored type: the impl member is provable. Not built.
+- **Q28.** A tuple enum variant called as a function (`E::V(..)`) and a unit struct or
+  variant used as a value are not covered. itoa has none.
+- **Q29.** A struct found in the Value namespace is taken as a tuple struct. A struct with
+  named fields has no Value binding in Rust; whether name lookup ever stores one for it is
+  not checked by a test.
+- **Q30.** The candidate list is not narrowed by the impl's generic parameters or by
+  negative impls; each candidate row carries the generic-parameter flag instead. itoa has
+  neither on `Unsigned`.

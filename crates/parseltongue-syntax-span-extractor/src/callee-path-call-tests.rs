@@ -50,6 +50,17 @@ fn make_callee_fixture_graph(
         let (targets, reason) = match (*state, *kind) {
             ("resolved", "Function") => (json!([function]), Value::Null),
             ("resolved", "Function+Function") => (json!([function, function]), Value::Null),
+            // A struct bound in the Value namespace, standing where `helper` is.
+            ("resolved", "Struct") => {
+                let mut constructor = function.clone();
+                constructor["target_symbol_kind_value"] = json!("Struct");
+                extra.push(make_call_fixture_row(
+                    "syntax-namespace-input-items",
+                    json!({"binding_target_identity_key":encode_symbol_target_value(&target),
+                        "binding_target_metadata_value":constructor}),
+                ));
+                (json!([constructor]), Value::Null)
+            }
             ("resolved", "Builtin") => (
                 json!([{"target_symbol_kind_value":"Builtin", "target_builtin_name_value":"str"}]),
                 Value::Null,
@@ -171,7 +182,7 @@ fn test_bare_callee_untargeted_reasons() {
         // No stored lookup for the callee: the row is as it was before rule G9.
         (vec![], "TraitSolverNeeded", "callee_path_not_requested -"),
         (
-            vec![("helper", CALLEE, "resolved", "Struct")],
+            vec![("helper", CALLEE, "resolved", "Const")],
             "TraitSolverNeeded",
             "callee_is_not_function callee_is_not_function",
         ),
@@ -220,9 +231,9 @@ fn test_bare_callee_untargeted_reasons() {
     );
 }
 
-/// REQ-RUST-052.0 G9: a qualified callee is decided by its whole path only when its
-/// qualifier is stored as a module; otherwise the row keeps the record of the whole
-/// path and goes to the type-prefix lookup.
+/// REQ-RUST-052.0 G9, G10, G11: a qualified callee is decided by its whole path only
+/// when its qualifier is stored as a module or a trait; otherwise the row keeps the
+/// record of the whole path and goes to the type-prefix lookup.
 #[test]
 fn test_qualified_callee_needs_module() {
     let source = "struct Buffer; fn helper() {} fn caller() { m::helper(); }";
@@ -249,9 +260,33 @@ fn test_qualified_callee_needs_module() {
         (
             ("resolved", "Trait"),
             ("resolved", "Function"),
+            "helper",
+            "trait_path_method",
+            "- single_trait_method",
+        ),
+        // Through a trait, only a function is a target.
+        (
+            ("resolved", "Trait"),
+            ("resolved", "Struct"),
             "unresolved:TraitSolverNeeded",
             NONE,
             "type_prefix_is_trait callee_qualifier_not_module",
+        ),
+        (
+            ("resolved", "Trait"),
+            ("resolved", "Const"),
+            "unresolved:TraitSolverNeeded",
+            NONE,
+            "type_prefix_is_trait callee_is_not_function",
+        ),
+        // A function named through a type is a member: the path does not decide it,
+        // the member lookup of the type does.
+        (
+            ("resolved", "Struct"),
+            ("resolved", "Function"),
+            "unresolved:MissingTarget",
+            NONE,
+            "member_lookup_unproven callee_qualifier_not_module",
         ),
         // A module qualifier whose whole path has no target: the older outcome stands.
         (
@@ -264,6 +299,13 @@ fn test_qualified_callee_needs_module() {
         (
             ("resolved", "Module"),
             ("resolved", "Struct"),
+            "helper",
+            "tuple_struct_constructor",
+            "- single_struct_node",
+        ),
+        (
+            ("resolved", "Module"),
+            ("resolved", "Const"),
             "unresolved:TraitSolverNeeded",
             NONE,
             "type_prefix_is_module callee_is_not_function",
@@ -352,4 +394,78 @@ fn test_shadowed_qualifier_blocks_callee() {
         (kind.as_str(), detail.as_str()),
         (NONE, "callee_prefix_lexically_shadowed -")
     );
+}
+
+/// REQ-RUST-052.0 G11: a struct found for a bare callee is a tuple struct's
+/// constructor and is the call's target.
+#[test]
+fn test_tuple_struct_callee_target() {
+    let (store, input) =
+        make_callee_fixture_graph(BARE, &[("helper", CALLEE, "resolved", "Struct")]);
+    assert_eq!(
+        read_callee_fixture_row(&store, &input),
+        row("helper", "tuple_struct_constructor", "- single_struct_node")
+    );
+    let (store, mut input) =
+        make_callee_fixture_graph(BARE, &[("helper", CALLEE, "resolved", "Struct")]);
+    input
+        .input_node_records
+        .retain(|node| node.node_qualified_path_text != "helper");
+    assert_eq!(
+        read_callee_fixture_row(&store, &input),
+        row(
+            "unresolved:MissingTarget",
+            NONE,
+            "callee_target_not_node callee_target_not_node"
+        )
+    );
+}
+
+/// REQ-RUST-052.0 G10: the candidates of a trait's method named through the trait are
+/// the functions of that name in the stored impls of that trait, and nothing else.
+#[test]
+fn test_trait_method_candidate_rows() {
+    let header = |trait_target: Value, self_text: &str, members: Value| {
+        json!({"impl_semantic_occurrence_key":format!("impl for {self_text}"),
+            "impl_trait_type_resolution":trait_target,
+            "impl_self_type_resolution":{"resolution_state_kind":"resolved",
+                "type_source_evidence":{"type_source_text":self_text}},
+            "impl_generic_parameters_flag":false,
+            "impl_member_occurrence_rows":members})
+    };
+    let of =
+        |identity: &str| json!({"resolution_state_kind":"resolved", "target_identity":identity});
+    let member = |name: &str, kind: &str| {
+        json!({"member_declared_name_value":name, "member_syntax_kind_value":kind,
+            "member_semantic_occurrence_key":format!("{kind} {name}")})
+    };
+    let headers = [
+        header(
+            of("T"),
+            "u8",
+            json!([member("other", "FN"), member("fmt", "FN")]),
+        ),
+        header(of("T"), "u16", json!([member("fmt", "CONST")])),
+        header(of("T"), "u32", json!([member("other", "FN")])),
+        header(of("Other"), "u64", json!([member("fmt", "FN")])),
+        header(Value::Null, "u128", json!([member("fmt", "FN")])),
+        header(
+            json!({"resolution_state_kind":"unresolved", "target_identity":"T"}),
+            "i8",
+            json!([member("fmt", "FN")]),
+        ),
+    ];
+    let evidence = list_trait_method_candidates(&headers, &json!("T"), &json!("fmt"));
+    assert_eq!(
+        evidence["trait_member_candidate_rows"],
+        json!([{"impl_header_occurrence":"impl for u8", "impl_self_type_source_text":"u8",
+            "impl_self_type_stored_flag":true, "impl_generic_parameters_flag":false,
+            "member_semantic_occurrence_key":"FN fmt"}])
+    );
+    assert_eq!(
+        evidence["trait_member_outcome_kind"],
+        "trait_method_declaration"
+    );
+    assert_eq!(evidence["receiver_type_stored_flag"], false);
+    assert_eq!(evidence["sources_not_read"].as_array().unwrap().len(), 1);
 }

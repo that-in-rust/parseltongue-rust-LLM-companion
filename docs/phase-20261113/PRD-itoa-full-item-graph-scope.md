@@ -220,8 +220,10 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     method declaration, which the path proves; the impl members that could run are listed
     as evidence, and one becomes the target only when the receiver's type is stored. A
     tuple struct called as a function (`DecimalPairs(..)`) targets the struct node with its
-    own dispatch kind (both decided 2026-11-16 under the maximum-information rule; not
-    built).
+    own dispatch kind (both decided 2026-11-16 under the maximum-information rule; built
+    2026-11-16, part 5d step 7). Each trait-method row lists the candidate impl members
+    with the type each impl is for, and says that impls in unread crates were not read.
+    Choosing the impl member from a `self` first argument is not built.
   - Built (part 5a): identity, container, and the generating call in both forms, for a
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.

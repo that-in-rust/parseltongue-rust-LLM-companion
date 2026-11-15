@@ -190,7 +190,7 @@ fn build_original_call_edge(
         )?)
     };
     let callee = if receiver_evidence.is_null() {
-        resolve_callee_path_target(&evidence, syntax, context, endpoints)?
+        resolve_callee_path_target(&evidence, syntax, context, endpoints, headers)?
     } else {
         CalleePathLookupValue::default()
     };
@@ -309,7 +309,9 @@ fn build_original_call_edge(
     let mut dispatch = json!({
         "dispatch_kind":match (&target, &bound_evidence) {
             (None, _) => "undetermined",
-            (Some(_), _) if callee.callee_path_row_decision.is_some() => "callee_path_function",
+            (Some(_), _) if callee.callee_path_row_decision.is_some() => {
+                callee.callee_path_dispatch_kind
+            }
             (Some(_), Some(_)) => "generic_bound_trait_method",
             (Some(_), None) => "type_path_associated_function",
         },
@@ -334,6 +336,9 @@ fn build_original_call_edge(
     }
     if let Some(evidence) = callee.callee_path_lookup_evidence {
         dispatch["callee_path_lookup_evidence"] = evidence;
+    }
+    if let Some(evidence) = callee.trait_method_lookup_evidence {
+        dispatch["trait_method_lookup_evidence"] = evidence;
     }
     let origin = origins.build_site_origin_value(&evidence, context)?;
     if !origin.is_null() {
@@ -363,15 +368,61 @@ struct CalleePathLookupValue {
     callee_path_row_decision: Option<(HldEdgeResolutionValue, &'static str)>,
     /// What was stored for the callee path; kept on the row either way.
     callee_path_lookup_evidence: Option<Value>,
+    /// How a target was chosen, when the callee path gave one.
+    callee_path_dispatch_kind: &'static str,
+    /// For a trait's method named through the trait: the stored impl members
+    /// that could run.
+    trait_method_lookup_evidence: Option<Value>,
+}
+
+/// The stored impls of `trait_identity` that declare a function `name`: what a
+/// call of the trait's method through the trait can run (REQ-RUST-052.0 G10).
+fn list_trait_method_candidates(headers: &[Value], trait_identity: &Value, name: &Value) -> Value {
+    let rows = headers
+        .iter()
+        .filter(|header| {
+            header["impl_trait_type_resolution"]["resolution_state_kind"] == "resolved"
+                && header["impl_trait_type_resolution"]["target_identity"] == *trait_identity
+        })
+        .flat_map(|header| {
+            header["impl_member_occurrence_rows"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|member| {
+                    member["member_declared_name_value"] == *name
+                        && member["member_syntax_kind_value"] == "FN"
+                })
+                .map(move |member| {
+                    let self_type = &header["impl_self_type_resolution"];
+                    json!({
+                        "impl_header_occurrence":header["impl_semantic_occurrence_key"],
+                        "impl_self_type_source_text":self_type["type_source_evidence"]["type_source_text"],
+                        "impl_self_type_stored_flag":self_type["resolution_state_kind"] == "resolved",
+                        "impl_generic_parameters_flag":header["impl_generic_parameters_flag"],
+                        "member_semantic_occurrence_key":member["member_semantic_occurrence_key"]
+                    })
+                })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "trait_member_outcome_kind":"trait_method_declaration",
+        "trait_member_candidate_rows":rows,
+        "receiver_type_stored_flag":false,
+        "sources_not_read":["impls of the trait in crates whose source was not read"]
+    })
 }
 
 /// Reads the stored name lookup of a call's whole callee path. The call gets a
 /// target only when the path names one function that is a graph node.
 ///
 /// A qualified callee is decided here only when its qualifier is stored as a
-/// module. A qualifier that is a trait or a type names a member, whose target
+/// module or a trait. A trait's function named through the trait has the
+/// trait's declaration as target, with the stored impl members that could run
+/// as evidence (G10). A qualifier that is a type names a member, whose target
 /// depends on more than the path; such a row keeps the record and goes to the
-/// type-prefix lookup. One exception: a qualifier stored as a builtin type whose
+/// type-prefix lookup. A struct found in the Value namespace is a tuple
+/// struct's constructor and is the target of the call (G11). One exception: a qualifier stored as a builtin type whose
 /// whole path has a stored reason. `str::from_utf8_unchecked` under
 /// `use core::str` is in a module that was not read, whatever the Type lookup
 /// of `str` says.
@@ -380,6 +431,7 @@ fn resolve_callee_path_target(
     syntax: &Value,
     context: &ImplHeaderSourceContext<'_>,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
+    headers: &[Value],
 ) -> Result<CalleePathLookupValue, OriginalCallResolutionError> {
     let source = &syntax["callee_path_evidence"];
     if source.is_null() || syntax["call_lexical_shadowing_flag"] == true {
@@ -397,23 +449,28 @@ fn resolve_callee_path_target(
         .iter()
         .map(|target| target["target_symbol_kind_value"].clone())
         .collect::<Vec<_>>();
-    let prefix_kind = if qualified {
+    let prefix_symbol = if qualified {
         match context.read_type_path_records(site, &syntax["type_source_evidence"])? {
             [prefix] => match prefix["path_target_symbol_rows"]
                 .as_array()
                 .map(Vec::as_slice)
             {
-                Some([target]) => target["target_symbol_kind_value"].clone(),
-                _ => Value::Null,
+                Some([target]) => Some(target),
+                _ => None,
             },
-            _ => Value::Null,
+            _ => None,
         }
     } else {
-        Value::Null
+        None
     };
+    let prefix_kind = prefix_symbol
+        .map(|symbol| symbol["target_symbol_kind_value"].clone())
+        .unwrap_or(Value::Null);
     let finish = |decision: Option<(HldEdgeResolutionValue, &'static str)>, outcome: &str| {
         CalleePathLookupValue {
             callee_path_row_decision: decision,
+            callee_path_dispatch_kind: "",
+            trait_method_lookup_evidence: None,
             callee_path_lookup_evidence: Some(json!({
                 "callee_path_state_kind":path["path_resolution_state_kind"],
                 "callee_path_unresolved_reason":path["path_unresolved_reason_kind"],
@@ -447,32 +504,58 @@ fn resolve_callee_path_target(
             ));
         }
     };
-    if symbol["target_symbol_kind_value"] != "Function" {
-        return Ok(stop(
-            HldUnresolvedReasonKind::TraitSolverNeeded,
-            "callee_is_not_function",
-            !qualified,
-        ));
-    }
-    if qualified && prefix_kind != "Module" {
-        return Ok(finish(None, "callee_qualifier_not_module"));
-    }
+    let kind = symbol["target_symbol_kind_value"].as_str();
+    let through_trait = qualified && prefix_kind == "Trait";
+    // (dispatch kind, outcome with a target): how this path names what it calls.
+    let (dispatch, outcome) = match kind {
+        Some("Function") if through_trait => ("trait_path_method", "single_trait_method"),
+        Some("Function") if !qualified || prefix_kind == "Module" => {
+            ("callee_path_function", "single_function_node")
+        }
+        Some("Struct") if !qualified || prefix_kind == "Module" => {
+            ("tuple_struct_constructor", "single_struct_node")
+        }
+        Some("Function" | "Struct") => return Ok(finish(None, "callee_qualifier_not_module")),
+        _ => {
+            return Ok(stop(
+                HldUnresolvedReasonKind::TraitSolverNeeded,
+                "callee_is_not_function",
+                !qualified,
+            ));
+        }
+    };
     let target = context
         .read_single_target_identity(symbol)?
         .map(|identity| decode_symbol_target_value(&identity))
         .transpose()?
         .map(HldTargetIdentityValue::from)
         .filter(|target| endpoints.contains(target));
-    Ok(match target {
-        Some(target) => finish(
-            Some((HldEdgeResolutionValue::Extracted { target }, "")),
-            "single_function_node",
-        ),
-        None => stop(
+    let Some(target) = target else {
+        return Ok(stop(
             HldUnresolvedReasonKind::MissingTarget,
             "callee_target_not_node",
             true,
-        ),
+        ));
+    };
+    let candidates = match prefix_symbol.filter(|_| through_trait) {
+        Some(prefix) => context
+            .read_single_target_identity(prefix)?
+            .map(|identity| {
+                list_trait_method_candidates(
+                    headers,
+                    &identity,
+                    &syntax["member_declared_name_value"],
+                )
+            }),
+        None => None,
+    };
+    Ok(CalleePathLookupValue {
+        callee_path_dispatch_kind: dispatch,
+        trait_method_lookup_evidence: candidates,
+        ..finish(
+            Some((HldEdgeResolutionValue::Extracted { target }, "")),
+            outcome,
+        )
     })
 }
 

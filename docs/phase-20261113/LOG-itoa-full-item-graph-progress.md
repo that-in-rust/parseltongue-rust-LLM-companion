@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 30 of 197 calls resolved (27 by the callee path, part 5d step 6; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 41 of 197 calls resolved (27 by the callee path, part 5d step 6; 10 `Unsigned ::fmt` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (all 55 with a
 target; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,9 +15,11 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** the 10 generated `Unsigned ::fmt(..)` calls (target: the trait's method
-  declaration, candidates as evidence) and the `DecimalPairs(..)` constructor call; then
-  method calls, whose receiver type is not determined (104 generated, more original).
+- **Next target:** method calls, whose receiver type is not determined (104 generated,
+  more original); and the impl member for `Unsigned::fmt(self, buf)` (part 5 Q27).
+  Part 5d step 7 is built: the 10 generated `Unsigned ::fmt(..)` calls target the trait's
+  method declaration and list the five impl members that could run; `DecimalPairs(..)`
+  targets the struct.
   Part 5d step 6 is built: the whole callee path of a call is sent to name lookup, and the
   27 calls to this crate's own free functions (`divmod100`, `slice_buffer_to_str`,
   `div_rem_1e16`, `enc_16lsd`, `u128_ext::mulhi`) have a target.
@@ -114,6 +116,41 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 06:00 IST — Part 5d step 7: a trait's method through the trait; a tuple struct's constructor (REQ-RUST-052.0 G10, G11)
+
+- **Built.** A callee qualified by a trait whose whole path stores one Function that is a
+  graph node has the trait's declaration as target (`dispatch_kind: trait_path_method`),
+  with `trait_method_lookup_evidence` listing every function of that name in a stored impl
+  of that trait. A bare or module-qualified callee whose path stores one Struct that is a
+  graph node has the struct as target (`tuple_struct_constructor`).
+- **Measured on pinned itoa, three release runs:** 103 nodes, 502 edges (unchanged),
+  `resolved_calls` 41 of 197 (was 30), 18.4 to 22.7 s, 354 to 369 MB peak, 16 MB store.
+  The 10 `Unsigned ::fmt` rows each list 5 candidates (`u8`, `u16`, `u32`, `u64`, `u128`).
+- **RED.** `test_trait_path_call_targets`: "`<u8 as private::Sealed>::write` calls
+  Unsigned::fmt without a target", 0 passed 1 failed. **GREEN:** 1 passed, after I replaced
+  a placeholder candidate list with the measured one.
+- **Stale assertions changed to measured values:** `test_callee_path_function_targets`,
+  `test_generated_body_call_rows`, and two fixture cases that pinned "no target" for a
+  struct callee and a trait-qualified function.
+- **Wrong expectation of mine:** a function through a struct qualifier stops at
+  `member_lookup_unproven`, not `type_prefix_unresolved`.
+- **Mutations.** Six deliberate breaks; each failed a fixture test at once
+  (`/home/ubuntu/phase5d-work/s7-mutations.txt`).
+- **Gates.** Format; lint on the two touched crates; syntax crate 111 + 17 tests; all 43
+  real-source itoa tests (131 s); release build. Workspace gates not run; they run at the
+  end of part 5d.
+- **Second opinion.** None new: both designs were reviewed by GLM-5.3 in step 6 and are
+  built as decided there.
+- **codebase-memory.** Slip against Rule 4: re-index and `trace_path
+  resolve_callee_path_target` (19 callees, among them `list_trait_method_candidates`,
+  `read_single_target_identity`, `read_type_path_records`) were run after the code change,
+  before the commit, not before the change.
+- **No refactor.** `resolve_callee_path_target` grew one match and one helper; splitting
+  it is left for the end of part 5d.
+- **Not built:** the impl member as target for `Unsigned::fmt(self, buf)` (Q27); tuple enum
+  variants as callees (Q28).
+- **Next.** Q27, then method calls.
 
 ### 2026-11-16 04:30 IST — Part 5d step 6: a call whose callee path names one function (REQ-RUST-052.0 G9)
 
