@@ -230,6 +230,20 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     it (decided under the maximum-information rule; built 2026-11-16, part 5d step 8). A
     second stored impl that may be of the same trait for the same type leaves the row on
     the trait's declaration.
+  - **Method call on a cast receiver (decided and built 2026-11-16, part 5d step 9).**
+    `(x as T).name(..)` targets the one stored impl member `name` for `T`
+    (`dispatch_kind: cast_receiver_impl_method`) when `T` is a stored struct, enum, union
+    or builtin, and the member's trait is the trait of the impl the call is written in,
+    which is what puts that trait in scope. Decided under the maximum-information rule:
+    - The target is given although `core` is not read. For a builtin, an inherent method
+      of that name in `core`, or another trait's impl in an unread crate, would change the
+      answer; the row says so under `sources_not_read` instead of withholding a target
+      that the read source proves.
+    - The row carries the cast's type, every candidate impl, the chosen member, and the
+      trait and type of the impl the call is in, so an agent can judge it from the row.
+    - A row that fails one condition has no target and names the condition
+      (`cast_type_not_stored`, `cast_member_unproven`, `cast_member_not_method`,
+      `cast_trait_scope_unproven`, `cast_member_not_node`).
   - Built (part 5a): identity, container, and the generating call in both forms, for a
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.

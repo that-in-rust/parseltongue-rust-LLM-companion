@@ -537,6 +537,17 @@ G12 A G10 call whose first argument is the path `self`, written in a method that
     takes `self` by value; and it is a graph node. The row keeps the G10 candidate list
     and adds the trait's declaration, the member, the impl H and its type. Otherwise the
     G10 row stands.
+G13 A method call whose receiver, through any parentheses, is a cast (`(x as T).name(..)`)
+    has an impl member as target when all of this is stored: T is one path without generic
+    arguments or a type anchor, and its name lookup at the call stores exactly one struct,
+    enum, union or builtin; among the stored impls for that type, and those whose type is
+    not stored, exactly one has a member `name`; that member is a function taking `self`,
+    `&self` or `&mut self`, in a trait impl whose trait is stored, without generic
+    parameters, not negative; that trait is the trait of the impl the call is written in,
+    that impl is not inside a function body, and the call's nearest item is a function
+    with no block above it; and the member is a graph node. The row records the cast's
+    type, the candidates, the member, the impl the call is in, and what was not read.
+    Otherwise the row has no target and names the condition that stopped it.
 ```
 
 ### 10.3 Steps, predicted and measured on itoa
@@ -559,6 +570,8 @@ step  what                                         rules    predicted           
       struct's constructor                         G11
 8     the impl member when the first argument is   G12      5 rows change target    5 rows: target is the impl
       the method's own self                                                         member; 41 of 197 unchanged
+9     the impl member when the receiver is a cast  G13      43 of 197 with a target 43 of 197 calls with a target
+      to a stored type
 -     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
                                                             34 uses_type
 ```
@@ -1069,5 +1082,107 @@ deliberate breaks of the code each made one of these fail
 - **Q33.** The five `Unsigned::fmt(self.unsigned_abs(), ..)` rows need the return type of
   `unsigned_abs`, which is in `core`. They stay on the trait's declaration until part 6.
 - **Q34.** Next rule proposed by the review: a method call whose receiver is a cast
-  (`(self as $primitive).write(buf)`) has the cast's written type as receiver type. Not
-  built; not yet checked in the stored rows.
+  (`(self as $primitive).write(buf)`) has the cast's written type as receiver type.
+  Closed: built in step 9 (10.14, G13).
+
+### 10.14 Step 9: the impl member when the receiver is a cast to a stored type (measured)
+
+Rule G13 (closes Q34). Built at `6e78660c0` and `a9e8cdbf1`.
+
+```text
+ call                         written in                      target                           dispatch_kind
+ (self as u64 ) .write (buf ) <usize as private::Sealed>::write <u64 as private::Sealed>::write cast_receiver_impl_method
+ (self as i64 ) .write (buf ) <isize as private::Sealed>::write <i64 as private::Sealed>::write cast_receiver_impl_method
+```
+
+**Measured (three release runs on pinned itoa).** 103 nodes and 502 edges, unchanged;
+`resolved_calls` 43 of 197 (was 41). Wall 19.2 to 21.4 s, peak 350 to 359 MB, store
+16.8 MB. The exported edge table holds 2 rows with `cast_receiver_impl_method`. The graph
+is still marked incomplete.
+
+**Method calls, counted in the stored rows before this step.** Of 141 method calls, three
+have a target inside itoa: `i.write(..)` (already resolved by the generic bound) and these
+two. The other 138 call a method of `core` and wait on part 6.
+
+**Why the member is proven, not inferred.**
+
+- The receiver's type is written in the source: a cast expression has the type it casts
+  to. No inference is used. The cast's path is sent to name lookup at the call, so a local
+  item that shadows `u64` is found there, as the compiler would find it.
+- The trait is in scope. A method of a trait can be called only where the trait is in
+  scope. `private::Sealed` is not imported in `src/lib.rs`; the call compiles because the
+  trait of an impl is in scope in the bodies of that impl's members. So the rule requires
+  the chosen member's trait to be the trait of the impl the call is written in.
+- A call written in a function or a const nested in the body is left out: such an item has
+  the module's scope, not the impl's.
+- One candidate only. Every stored impl for the type, and every stored impl whose type is
+  not stored (a generic, a reference, a blanket impl), counts. Two members with the name
+  give no target.
+
+**What is not read, and is said on the row.** For a builtin such as `u64`, an inherent
+method `write` in `core`, or an impl for `u64` of another trait in an unread crate, would
+change the answer. `core` is not read in this phase. The row gives the target and lists
+both under `sources_not_read` (the same rule as `u8::MAX_STR_LEN`, G5). Decided under the
+maximum-information rule; the second opinion agreed (`u64` has no inherent `write`, and
+withholding the target would remove a true edge).
+
+**What is stored where.**
+
+- Method receiver evidence (`method_receiver_evidence`), on every method call:
+  `receiver_shape_kind: cast_expression`; `receiver_cast_type_evidence` (the type's byte
+  range in its file, its text, and `type_simple_path_flag`), null for other receivers;
+  `receiver_member_body_flag`, true when the call's nearest item is a function with no
+  block above it.
+- Name lookup: one more request per cast receiver with a simple path, context
+  `body_cast_receiver_type`, type namespace. Stored path rows on itoa: 204 (was 202), 166
+  resolved (was 164).
+- The row's `cast_receiver_lookup_evidence`: `self_type_source_text` and
+  `self_type_identity` (the cast's type), `member_candidate_impl_rows`,
+  `member_lookup_outcome_kind`, `impl_header_occurrence` and `impl_trait_source_text` of
+  the chosen member's impl, `selected_member_occurrence_key`,
+  `member_self_parameter_kind`, `enclosing_impl_header_occurrence`,
+  `enclosing_impl_trait_identity`, `enclosing_impl_trait_source_text`,
+  `enclosing_impl_self_type_identity`, `enclosing_impl_self_type_source_text` (`usize`),
+  `call_member_body_flag`, `trait_scope_proof_kind` (`enclosing_impl_trait`, or null),
+  and `sources_not_read`.
+- A row without a target has `dispatch_kind: undetermined` and `unresolved_detail_kind`,
+  one of `cast_type_not_stored`, `cast_member_unproven`, `cast_member_not_method`,
+  `cast_trait_scope_unproven`, `cast_member_not_node`. It keeps the same evidence.
+
+**Second opinion** (record:
+`docs/devin-research/1794784173-second-opinion-glm-5-3-max-part-5d-step-nine-cast-receiver.md`).
+It found no compiling program within read source for which the rule gives a wrong member.
+Adopted: three missing fixture cases (the member is not a graph node; the one candidate is
+a negative impl; the call names the method as `r#name`), and the enclosing impl's trait
+and type written on the row. Its example for a nested `fn` (the trait is not in scope
+there) was not compiled here; the rule excludes that position either way.
+
+**Tests.** Real source: `test_cast_receiver_call_targets` (failed first: no row had a cast
+receiver, 0 passed 1 failed; then passed) pins both rows, their dispatch kind, the cast's
+type, the outcome, the trait and two unread sources. Changed to measured values:
+`test_generated_body_call_rows` (one more dispatch kind; 102 method calls without a
+target, 2 with), `test_sysroot_reached_names_reasoned` (204 path rows, 166 resolved),
+`test_capture_generic_receiver_evidence` (two more fields). Fixtures, in
+`cast-receiver-member-tests.rs`, written after the code and passing on first run:
+`test_cast_receiver_syntax_evidence` (10 receiver shapes), `test_cast_receiver_path_request`
+(which paths are sent to name lookup), `test_cast_receiver_member_rules` (header rows:
+each condition of G13 removed one at a time), `test_cast_receiver_call_member` (two runs of
+the call producer on source text: member chosen; member not a graph node). Sixteen
+deliberate breaks of the code; fifteen failed a fixture test at once, one (any item
+instead of a function as the nearest item) passed until a case was added
+(`/home/ubuntu/phase5d-work/s9-mutations.txt`).
+
+**Open questions.**
+
+- **Q35.** A call written in an associated const of the impl (`const C: u8 = (1 as
+  u8).m();`) gets no target, though the trait is in scope there. A miss, not a wrong
+  target. itoa has none.
+- **Q36.** The trait-in-scope proof covers only the enclosing impl's trait. A trait in
+  scope by `use`, by the prelude, or by being declared in the module is not yet used as
+  proof; such a call keeps `cast_trait_scope_unproven`.
+- **Q37.** Receivers whose type can be read from itoa's own source, by the review's count:
+  `buf[offset]`, `DECIMAL_PAIRS.0`, `self.bytes`, `string`, and `self` in a method of an
+  impl for a stored type. Their methods (`MaybeUninit::write`, `get_unchecked`, `len`,
+  `as_mut_ptr`, `unsigned_abs`) are in `core`: the receiver type can be recorded now,
+  the target waits on part 6. Not provable without `core`: `try_into`, `expect`,
+  `unwrap`, `ilog10`, `cast`, `rev`.

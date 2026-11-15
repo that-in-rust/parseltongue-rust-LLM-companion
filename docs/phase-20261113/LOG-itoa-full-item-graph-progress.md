@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 41 of 197 calls resolved (27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (all 55 with a
 target; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -119,6 +119,62 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-15 23:20 IST — Part 5d step 9: the impl member when the receiver is a cast (REQ-RUST-052.0 G13)
+
+Clock note: `date` on the machine reads 2026-11-15 23:20 IST. The entries below carry
+stamps that run about five hours ahead of it; their order is right, their times are not.
+
+- **Built.** `(x as T).name(..)` has the one stored impl member `name` for `T` as target
+  (`dispatch_kind: cast_receiver_impl_method`) when `T` is a stored struct, enum, union or
+  builtin and the member's trait is the trait of the impl the call is written in. The row
+  keeps `cast_receiver_lookup_evidence`: the cast's type, the candidates, the member, the
+  impl the call is in with its trait and type, and what was not read. New stored fields on
+  every method call: `receiver_cast_type_evidence`, `receiver_member_body_flag`. New name
+  lookup context: `body_cast_receiver_type`.
+- **Measured on pinned itoa, three release runs:** 103 nodes, 502 edges (unchanged),
+  `resolved_calls` 43 of 197 (was 41). 19.2 to 21.4 s, 350 to 359 MB peak, 16.8 MB store.
+  The two rows: `<usize as private::Sealed>::write` to `<u64 as private::Sealed>::write`,
+  and the `isize` to `i64` one. Still marked incomplete.
+- **Counted first.** Of 141 stored method calls, 3 have a target in itoa (these two and
+  `i.write(..)`, already resolved). The other 138 call into `core`.
+- **RED.** `test_cast_receiver_call_targets`: no row had a cast receiver, 0 passed 1
+  failed. **GREEN:** after one compile fix (a missing import) the two rows were right but
+  the test still failed on text: expanded source reads `private ::Sealed`. The test now
+  strips spaces; 1 passed.
+- **No STUB phase.** The drafted code went in after RED without a `todo!()` signature
+  step. A slip against the loop.
+- **Caught by the full real-source run:** `test_generated_body_call_rows` (dispatch kinds;
+  104 untargeted method calls are now 102 plus 2) and `test_sysroot_reached_names_reasoned`
+  (202 path rows are 204, 164 resolved are 166). Both changed to measured values. One
+  fixture pin, `test_capture_generic_receiver_evidence`, gained the two new fields.
+- **Fixture tests, written after the code, all passed on first run**
+  (`cast-receiver-member-tests.rs`): `test_cast_receiver_syntax_evidence`,
+  `test_cast_receiver_path_request`, `test_cast_receiver_member_rules`,
+  `test_cast_receiver_call_member`.
+- **Mutations.** 16 deliberate breaks. 15 failed a fixture test at once. One passed
+  ("any item" instead of "a function" as the call's nearest item); a top-level `const`
+  case was added and it now fails (`/home/ubuntu/phase5d-work/s9-mutations.txt`).
+- **Second opinion (GLM-5.3, built code, 324 s).** No wrong-target case found within read
+  source. Adopted: fixture cases for a member that is not a graph node, a negative impl,
+  and a call written `r#name`; the enclosing impl's trait and type on the row. Agreed with
+  giving the target for a builtin with the unread `core` sources named on the row.
+  Record: `docs/devin-research/1794784173-second-opinion-glm-5-3-max-part-5d-step-nine-cast-receiver.md`.
+- **Gates.** Format; lint on the two touched crates; syntax crate 118 + 17 tests; all 44
+  real-source itoa tests (127 s); release build. Workspace gates not run; they run at the
+  end of part 5d.
+- **codebase-memory.** `trace_path` on `extract_method_receiver_syntax`,
+  `find_type_member_target` and `check_body_call_prefix` before the change; re-index
+  after the push.
+- **Refactor.** The first draft did lookup, proof and endpoint check in one function. It is
+  split: `find_cast_receiver_member` (pure, on stored rows) and
+  `resolve_cast_receiver_target` (type lookup and the graph-node check).
+  `original-call-resolution-records.rs` is still far over the 200-line guide; the split is
+  left for the end of part 5d.
+- **Not built:** Q35 (a call in an associated const), Q36 (a trait in scope by `use` or
+  prelude), Q37 (receiver types readable from itoa's source whose methods are in `core`).
+- **Next.** Generated consts and type aliases as edge sources (G7), then the part 5d
+  workspace gates, then part 6.
 
 ### 2026-11-16 04:10 IST — Part 5d step 8: the impl member when the first argument is the method's own `self` (REQ-RUST-052.0 G12)
 
