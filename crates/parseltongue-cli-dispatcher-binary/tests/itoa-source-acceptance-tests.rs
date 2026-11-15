@@ -2161,6 +2161,40 @@ fn test_sysroot_reached_names_reasoned() {
             .any(|row| row["path_site_source_text"] == "Buffer"
                 && row["path_resolution_state_kind"] == "resolved")
     );
+    // REQ-RUST-052.0 G5: the one-name qualifier of a two-segment body value path
+    // (`u128::MAX_STR_LEN`, `I::MAX_STR_LEN`) is its own Type request; `Self` is not requested.
+    let (value_prefixes, paths): (Vec<_>, Vec<_>) = paths
+        .into_iter()
+        .partition(|row| row["site_path_context_kind"] == "body_value_type_prefix");
+    let mut prefix_kinds = std::collections::BTreeMap::<(String, String), usize>::new();
+    for row in &value_prefixes {
+        assert_eq!(row["path_resolution_state_kind"], "resolved");
+        let targets = row["path_target_symbol_rows"].as_array().unwrap();
+        assert_eq!(targets.len(), 1);
+        *prefix_kinds
+            .entry((
+                row["path_site_source_text"].as_str().unwrap().to_owned(),
+                targets[0]["target_symbol_kind_value"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            ))
+            .or_default() += 1;
+    }
+    let kind = |text: &str, kind: &str, rows| ((text.to_owned(), kind.to_owned()), rows);
+    assert_eq!(
+        prefix_kinds,
+        std::collections::BTreeMap::from([
+            kind("I", "TypeParam", 1),
+            kind("i128", "Builtin", 1),
+            // 5 in the source-written `fmt` for u128, 1 in the generated `write` for i128
+            kind("u128", "Builtin", 6),
+            kind("u16", "Builtin", 1),
+            kind("u32", "Builtin", 1),
+            kind("u64", "Builtin", 1),
+            kind("u8", "Builtin", 1),
+        ])
+    );
     // REQ-RUST-048.0: value paths in bodies are their own request kind, kept out of the
     // signature and import totals below.
     let (body_values, paths): (Vec<_>, Vec<_>) = paths
@@ -2291,23 +2325,20 @@ fn test_itoa_reads_row_counts() {
             })
             .count()
     };
-    assert_eq!(
-        rows.len(),
-        21,
-        "sited in original text: 15 reads with a target and 6 without"
-    );
+    assert_eq!(rows.len(), 21, "sited in original text");
     assert_eq!(
         (count("DECIMAL_PAIRS", true), count("I::MAX_STR_LEN", true)),
         (14, 1)
     );
     assert_eq!(
         (
-            count("u128::MAX_STR_LEN", false),
-            count("i128::MAX_STR_LEN", false)
+            count("u128::MAX_STR_LEN", true),
+            count("i128::MAX_STR_LEN", true)
         ),
         (5, 1),
-        "consts of macro-generated impls are not nodes until part 5"
+        "REQ-RUST-052.0 G5: the const of the one stored trait impl of the builtin type"
     );
+    assert_eq!(rows.len(), 20 + 1, "all 21 have a target");
     for (edge, site) in &rows {
         if let HldEdgeResolutionValue::Unresolved { reason } = &edge.edge_resolution_value {
             assert_eq!(
@@ -3064,8 +3095,8 @@ fn test_generated_fmt_static_reads() {
         "21 original and 34 generated"
     );
     // The other 10 generated rows are `Self::MAX_STR_LEN` and `uN::MAX_STR_LEN` in generated
-    // `write` bodies. Name lookup alone does not find a trait const through a builtin type,
-    // so each keeps one row without a target until G5 is built.
+    // `write` bodies. Name lookup alone does not find a trait const through a builtin type;
+    // G5 gives each its target (`test_type_relative_member_targets`), so none is left.
     let pending = input
         .input_edge_records
         .iter()
@@ -3083,7 +3114,7 @@ fn test_generated_fmt_static_reads() {
                     }
         })
         .count();
-    assert_eq!(pending, 10);
+    assert_eq!(pending, 0);
 }
 
 /// REQ-RUST-052.0 G3: a `reads` row sited in expanded text names where its first and its
@@ -3236,7 +3267,17 @@ fn test_generated_signature_type_uses() {
                 .node_qualified_path_text
                 .strip_suffix("write")
                 .is_some_and(|header| target == format!("{header}Buffer"));
-            let target = if own { "own Buffer".to_owned() } else { target };
+            let sibling = node
+                .node_qualified_path_text
+                .strip_suffix(" as Unsigned>::fmt")
+                .is_some_and(|header| target == format!("{header} as private::Sealed>::Buffer"));
+            let target = if own {
+                "own Buffer".to_owned()
+            } else if sibling {
+                "Buffer of the type's Sealed impl".to_owned()
+            } else {
+                target
+            };
             *shapes
                 .entry((member, text.replace(' ', ""), target))
                 .or_default() += 1;
@@ -3254,7 +3295,7 @@ fn test_generated_signature_type_uses() {
     assert_eq!(
         shapes,
         std::collections::BTreeMap::from([
-            shape("fmt", "Self::Buffer", "TraitSolverNeeded"),
+            shape("fmt", "Self::Buffer", "Buffer of the type's Sealed impl"),
             shape("fmt", "usize", "builtin usize"),
             shape("write", "Self::Buffer", "own Buffer"),
             shape("write", "str", "builtin str"),
@@ -3380,4 +3421,135 @@ fn test_generated_body_call_rows() {
         ])
     );
     assert_eq!(calls.len(), 197, "61 in original bodies, 136 in generated");
+}
+
+/// REQ-RUST-052.0 G5: a member reached through a type (`Self::NAME`, `u8::NAME`) has the
+/// member of the one stored trait impl of that type as its target, and the row says which
+/// impl proved it and what was not read.
+#[test]
+fn test_type_relative_member_targets() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+    };
+    // The type a member impl is for, read from its label `..::<T as Trait>::name`.
+    let self_type = |text: &str| {
+        text.rsplit_once("::<")
+            .and_then(|(_, rest)| rest.split_once(" as "))
+            .map(|(name, _)| name.to_owned())
+            .unwrap()
+    };
+    let check = |relation, text_field: &str, member: &str, trait_text: &str, owner: &str| {
+        input
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == relation)
+            .filter_map(|edge| {
+                let metadata: Value =
+                    serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref()?).ok()?;
+                let text = metadata[text_field].as_str()?.replace(' ', "");
+                let (prefix, name) = text.split_once("::")?;
+                (name == member && prefix != "I")
+                    .then(|| (edge, metadata.clone(), prefix.to_owned()))
+            })
+            .map(|(edge, metadata, prefix)| {
+                (label(&edge.edge_source_reference), edge, metadata, prefix)
+            })
+            .filter(|(source, ..)| source.contains(owner))
+            .map(|(source, edge, metadata, prefix)| {
+                let named = if prefix == "Self" {
+                    self_type(&source)
+                } else {
+                    prefix.clone()
+                };
+                let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value
+                else {
+                    panic!(
+                        "{source} {prefix}::{member} has no target: {:?}",
+                        edge.edge_resolution_value
+                    );
+                };
+                assert_eq!(
+                    label(target),
+                    format!("itoa::src/lib.rs::<{named} as {trait_text}>::{member}"),
+                    "{source}"
+                );
+                let proof = &metadata["type_relative_member_evidence"];
+                assert_eq!(proof["self_type_source_text"], prefix.as_str(), "{source}");
+                assert_eq!(
+                    proof["member_lookup_outcome_kind"], "single_trait_impl_member",
+                    "{source}"
+                );
+                assert_eq!(
+                    proof["member_candidate_impl_rows"].as_array().map(Vec::len),
+                    Some(1),
+                    "{source}"
+                );
+                assert_eq!(proof["self_type_builtin_name"], named.as_str(), "{source}");
+                assert_eq!(
+                    proof["impl_trait_source_text"]
+                        .as_str()
+                        .map(|text| text.replace(' ', ""))
+                        .as_deref(),
+                    Some(trait_text),
+                    "{source}"
+                );
+                assert_eq!(
+                    proof["sources_not_read"],
+                    json!([
+                        format!("inherent items of builtin type {named}"),
+                        format!("trait impls for {named} in crates whose source was not read")
+                    ]),
+                    "{source}"
+                );
+                (
+                    prefix == "Self",
+                    source.contains('#')
+                        || !edge
+                            .edge_evidence_row_key
+                            .evidence_site_occurrence_key
+                            .read_semantic_occurrence_parts()
+                            .span_expansion_provenance_chain
+                            .is_empty(),
+                )
+            })
+            .fold(
+                std::collections::BTreeMap::<(bool, bool), usize>::new(),
+                |mut counts, key| {
+                    *counts.entry(key).or_default() += 1;
+                    counts
+                },
+            )
+    };
+    // (through Self, sited in expanded text) -> rows
+    assert_eq!(
+        check(
+            HldRelationKindValue::Reads,
+            "read_source_text",
+            "MAX_STR_LEN",
+            "Integer",
+            ""
+        ),
+        std::collections::BTreeMap::from([
+            ((true, true), 5),
+            ((false, true), 5),
+            ((false, false), 6)
+        ])
+    );
+    // `Self::Buffer` in `impl Unsigned for uN`: the alias is a member of another impl of uN.
+    assert_eq!(
+        check(
+            HldRelationKindValue::UsesType,
+            "type_source_text",
+            "Buffer",
+            "private::Sealed",
+            " as Unsigned>::fmt"
+        ),
+        std::collections::BTreeMap::from([((true, true), 4), ((true, false), 1)])
+    );
 }

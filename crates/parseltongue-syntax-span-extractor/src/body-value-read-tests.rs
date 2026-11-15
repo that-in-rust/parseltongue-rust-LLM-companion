@@ -70,3 +70,27 @@ fn test_callee_path_not_listed() {
          a function named as a value is listed for resolution to drop"
     );
 }
+
+/// REQ-RUST-052.0 G5: the one-name qualifier of a two-segment body value path
+/// is requested as a type; `Self`, a longer path and a callee's prefix are not.
+#[test]
+fn test_value_prefix_path_listed() {
+    let source = "trait A { const N: u8; fn g() -> u8; } \
+                  impl A for u8 { const N: u8 = 1; fn g() -> u8 { 1 } } \
+                  mod m { pub mod n { pub const C: u8 = 2; } } \
+                  impl A for u16 { const N: u8 = u8::N; \
+                  fn g() -> u8 { let a = u8::N + Self::N + m::n::C; a + u8::g() } }";
+    let prefixes = SourceFile::parse(source, Edition::Edition2021)
+        .tree()
+        .syntax()
+        .descendants()
+        .filter_map(ast::Path::cast)
+        .filter(check_body_value_prefix)
+        .map(|path| path.syntax().text().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        prefixes,
+        ["u8"],
+        "once, for `u8::N` in the body of g; the const initializer is not a function body"
+    );
+}

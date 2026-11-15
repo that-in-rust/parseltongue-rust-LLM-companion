@@ -6,6 +6,9 @@ use crate::impl_header_source_records::{
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
+use crate::type_relative_member_records::{
+    ImplMemberLookupIndex, read_impl_member_index, read_type_relative_parts,
+};
 use crate::{SyntaxFileInputData, check_syntax_item_node, restore_source_byte_offset};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
@@ -128,6 +131,7 @@ pub fn resolve_signature_type_edges(
         context: &context,
         endpoints: &endpoints,
         self_types: &read_member_self_types(store, source_scope)?,
+        members: &read_impl_member_index(store, source_scope)?,
         origins: &read_expanded_token_origins(store, source_scope)?,
         generation: input.run_generation_digest_value,
     };
@@ -189,6 +193,8 @@ struct SignatureEdgeGraphScope<'a> {
     endpoints: &'a BTreeSet<&'a HldTargetIdentityValue>,
     /// Impl member identity to the stored resolution of its impl's self type.
     self_types: &'a BTreeMap<HldTargetIdentityValue, Value>,
+    /// The stored impl headers, for a member reached through `Self`.
+    members: &'a ImplMemberLookupIndex,
     /// Where each token of each expanded text was copied from.
     origins: &'a ExpandedTokenOriginIndex,
     generation: RunGenerationDigestValue,
@@ -290,6 +296,41 @@ fn build_type_path_edge(
     let Some(resolution) = resolve_type_path_target(path, &evidence, graph, source)? else {
         return Ok(None);
     };
+    // `Self::NAME` that name lookup left without a target: the type alias member of the one
+    // stored trait impl of the owner's self type (REQ-RUST-052.0 G5).
+    let proven = (resolution
+        == HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::TraitSolverNeeded,
+        })
+    .then(|| read_type_relative_parts(text))
+    .flatten()
+    .filter(|(prefix, _)| *prefix == "Self")
+    .and_then(|(prefix, name)| {
+        graph.members.find_type_member_target(
+            prefix,
+            graph.self_types.get(source)?,
+            name,
+            "TYPE_ALIAS",
+        )
+    })
+    .map(|found| {
+        Ok::<_, SignatureTypeEdgeError>((
+            found
+                .member_target_occurrence
+                .map(decode_occurrence_identity_value)
+                .transpose()?
+                .map(|key| HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(key)))
+                .filter(|target| graph.endpoints.contains(target)),
+            found.member_lookup_evidence,
+        ))
+    })
+    .transpose()?;
+    // The member lookup's record stays on the row whether or not it proved a target.
+    let (resolution, proof) = match proven {
+        Some((Some(target), proof)) => (HldEdgeResolutionValue::Extracted { target }, proof),
+        Some((None, proof)) => (resolution, proof),
+        None => (resolution, Value::Null),
+    };
     let target = match &resolution {
         HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
         _ => None,
@@ -300,6 +341,9 @@ fn build_type_path_edge(
         "type_source_text":text,
         "type_path_self_flag":path["type_path_self_flag"]
     });
+    if !proof.is_null() {
+        metadata["type_relative_member_evidence"] = proof;
+    }
     let origin = graph.origins.build_site_origin_value(&evidence, context)?;
     if !origin.is_null() {
         metadata["expansion_source_origin"] = origin;

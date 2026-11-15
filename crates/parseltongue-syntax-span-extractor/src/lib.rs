@@ -31,6 +31,8 @@ pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
 mod body_value_read_records;
 #[path = "expanded-site-origin-records.rs"]
 mod expanded_site_origin_records;
+#[path = "type-relative-member-records.rs"]
+mod type_relative_member_records;
 pub use body_value_read_records::{BodyReadEdgeError, BodyReadEdgeSet, resolve_body_read_edges};
 #[path = "impl-header-source-records.rs"]
 mod impl_header_source_records;

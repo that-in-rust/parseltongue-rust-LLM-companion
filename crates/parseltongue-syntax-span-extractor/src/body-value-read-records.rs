@@ -11,6 +11,9 @@ use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
+use crate::type_relative_member_records::{
+    ImplMemberLookupIndex, read_impl_member_index, read_type_relative_parts,
+};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
 use ra_ap_syntax::{AstNode, SyntaxKind, SyntaxNode, ast, ast::HasLoopBody};
@@ -79,6 +82,7 @@ pub fn resolve_body_read_edges(
     let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
     let lookup = build_bound_method_index(store, source_scope, &context, input)?;
     let origins = read_expanded_token_origins(store, source_scope)?;
+    let members = read_impl_member_index(store, source_scope)?;
     let endpoints = input
         .input_node_records
         .iter()
@@ -100,9 +104,12 @@ pub fn resolve_body_read_edges(
             &site,
             request,
             &context,
-            &lookup,
-            &origins,
-            &endpoints,
+            &ReadTargetLookupScope {
+                lookup: &lookup,
+                members: &members,
+                origins: &origins,
+                endpoints: &endpoints,
+            },
             input.run_generation_digest_value,
         )? {
             let expanded = !site["span_expansion_provenance_chain"]
@@ -161,14 +168,51 @@ fn read_value_path_request<'a>(
 /// The first segment of a two-segment path such as `T::NAME`, when it is one
 /// plain identifier.
 fn read_type_relative_prefix(text: &str) -> Option<&str> {
-    let (prefix, member) = text.split_once("::")?;
-    let prefix = prefix.trim();
-    (!prefix.is_empty()
-        && !member.contains("::")
-        && prefix
-            .chars()
-            .all(|letter| letter.is_alphanumeric() || letter == '_'))
-    .then_some(prefix)
+    read_type_relative_parts(text).map(|(prefix, _)| prefix)
+}
+
+/// `Self::NAME` or `u8::NAME` that name lookup left without a target: the
+/// `const` member of the one stored trait impl of that type, with the record
+/// of what proved it (REQ-RUST-052.0 G5). `Self` is the stored self type of the
+/// owner's impl; any other prefix is read from its stored type lookup.
+fn find_type_relative_const(
+    site: &Value,
+    text: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+) -> Result<Option<(Option<HldTargetIdentityValue>, Value)>, BodyReadEdgeError> {
+    let Some((prefix, name)) = read_type_relative_parts(text) else {
+        return Ok(None);
+    };
+    let looked_up;
+    let self_type = if prefix == "Self" {
+        members.read_owner_self_type(read_site_text_field(site, "site_owner_occurrence_key")?)
+    } else {
+        let evidence = build_site_evidence_value(site)?;
+        let start = evidence["span_byte_start_offset"].as_u64().ok_or(
+            BodyReadEdgeError::InvalidEvidence {
+                field: "span_byte_start_offset",
+            },
+        )?;
+        let source = json!({
+            "span_byte_start_offset":start,
+            "span_byte_end_offset":start + prefix.len() as u64,
+            "type_simple_path_flag":true
+        });
+        looked_up = context.resolve_type(&evidence, &source, false)?;
+        Some(&looked_up)
+    };
+    self_type
+        .and_then(|self_type| members.find_type_member_target(prefix, self_type, name, "CONST"))
+        .map(|found| {
+            let target = found
+                .member_target_occurrence
+                .map(decode_occurrence_identity_value)
+                .transpose()?
+                .map(|key| NameSymbolTargetKey::Definition(key).into());
+            Ok((target, found.member_lookup_evidence))
+        })
+        .transpose()
 }
 
 /// How one stored value-path resolution becomes a `reads` edge: the edge's
@@ -185,6 +229,7 @@ fn resolve_read_path_target(
     request: &Value,
     context: &ImplHeaderSourceContext<'_>,
     lookup: &BoundMethodLookupIndex,
+    members: &ImplMemberLookupIndex,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
 ) -> Result<Option<(HldEdgeResolutionValue, Value)>, BodyReadEdgeError> {
     let text = read_site_text_field(site, "site_syntax_source_text")?;
@@ -212,9 +257,25 @@ fn resolve_read_path_target(
             return unresolved(HldUnresolvedReasonKind::AmbiguousTarget);
         }
         _ => {
-            return unresolved(read_stored_reason_kind(
-                &request["path_unresolved_reason_kind"],
-            ));
+            let reason = read_stored_reason_kind(&request["path_unresolved_reason_kind"]);
+            if reason != HldUnresolvedReasonKind::TraitSolverNeeded {
+                return unresolved(reason);
+            }
+            // The member lookup's record stays on the row whether or not it proved a target.
+            let Some((target, proof)) = find_type_relative_const(site, text, context, members)?
+            else {
+                return unresolved(reason);
+            };
+            let target = target.filter(|target| endpoints.contains(target));
+            let mut metadata = describe(target.as_ref().map(|_| "Const"), Value::Null);
+            metadata["type_relative_member_evidence"] = proof;
+            return Ok(Some((
+                match target {
+                    Some(target) => HldEdgeResolutionValue::Extracted { target },
+                    None => HldEdgeResolutionValue::Unresolved { reason },
+                },
+                metadata,
+            )));
         }
     };
     let kind = symbol["target_symbol_kind_value"].as_str();
@@ -265,6 +326,15 @@ fn resolve_read_path_target(
     )))
 }
 
+/// The stored rows a read's target and origin are looked up in.
+#[derive(Clone, Copy)]
+struct ReadTargetLookupScope<'a> {
+    lookup: &'a BoundMethodLookupIndex,
+    members: &'a ImplMemberLookupIndex,
+    origins: &'a ExpandedTokenOriginIndex,
+    endpoints: &'a BTreeSet<&'a HldTargetIdentityValue>,
+}
+
 /// The `reads` edge of one path expression whose owner is a graph node, with
 /// or without a target. A row sited in expanded text also names where its
 /// first and its last token were copied from.
@@ -272,11 +342,15 @@ fn build_body_read_edge(
     site: &Value,
     request: &Value,
     context: &ImplHeaderSourceContext<'_>,
-    lookup: &BoundMethodLookupIndex,
-    origins: &ExpandedTokenOriginIndex,
-    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+    scope: &ReadTargetLookupScope<'_>,
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, BodyReadEdgeError> {
+    let ReadTargetLookupScope {
+        lookup,
+        members,
+        origins,
+        endpoints,
+    } = *scope;
     let owner = context.span(read_site_text_field(site, "site_owner_occurrence_key")?)?;
     // A site and its owner are in the same text: both original, or both in one expansion.
     if [
@@ -301,7 +375,7 @@ fn build_body_read_edge(
         return Ok(None);
     }
     let Some((resolution, mut metadata)) =
-        resolve_read_path_target(site, request, context, lookup, endpoints)?
+        resolve_read_path_target(site, request, context, lookup, members, endpoints)?
     else {
         return Ok(None);
     };
@@ -350,6 +424,24 @@ pub(super) fn check_body_value_path(path: &ast::Path) -> bool {
         .and_then(|call| call.expr())
         .is_some_and(|callee| callee.syntax() == site);
     in_body && !callee && !check_local_value_binding(path)
+}
+
+/// Whether `path` is the one-name qualifier of a two-segment body value path
+/// such as `u8::NAME`. It is submitted to the namespace engine as a Type
+/// request, in the actual lexical scope. `Self` is not: it is read from the
+/// impl header.
+pub(super) fn check_body_value_prefix(path: &ast::Path) -> bool {
+    path.qualifier().is_none()
+        && path.segment().is_some_and(|segment| {
+            segment.name_ref().is_some() && segment.self_type_token().is_none()
+        })
+        && path
+            .syntax()
+            .parent()
+            .and_then(ast::Path::cast)
+            .is_some_and(|outer| {
+                outer.qualifier().as_ref() == Some(path) && check_body_value_path(&outer)
+            })
 }
 
 /// Whether the single name of `path` is `self` or is bound by a pattern whose
