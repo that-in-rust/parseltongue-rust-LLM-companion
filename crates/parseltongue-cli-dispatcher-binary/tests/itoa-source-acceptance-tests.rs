@@ -2685,3 +2685,54 @@ fn test_generated_node_names_call() {
     assert_eq!(named, 45);
     assert!(first_call_text.starts_with(b"impl_Integer!("));
 }
+
+/// REQ-RUST-046.0 R5: each generated node has exactly one `generates` row, from the macro
+/// call it names and sited at that call; itoa has 45.
+#[test]
+fn test_generates_edge_row_counts() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Generates)
+        .collect::<Vec<_>>();
+    assert_eq!(rows.len(), 45);
+    let mut rows_per_call = std::collections::BTreeMap::new();
+    for node in &input.input_node_records {
+        let Some(call) = &node.node_generating_call_reference else {
+            continue;
+        };
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call_key)) = call else {
+            panic!("call identity expected");
+        };
+        let matching = rows
+            .iter()
+            .filter(|edge| {
+                edge.edge_resolution_value
+                    == HldEdgeResolutionValue::Extracted {
+                        target: node.node_target_reference.clone(),
+                    }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "{}", node.node_qualified_path_text);
+        assert_eq!(matching[0].edge_source_reference, *call);
+        assert_eq!(
+            matching[0]
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key,
+            *call_key
+        );
+        let range = call_key
+            .read_semantic_occurrence_parts()
+            .span_byte_range_value
+            .read_source_range_pair();
+        *rows_per_call.entry(range).or_insert(0_usize) += 1;
+    }
+    // 11 of the 15 calls write an active item: five `impl_Integer!` (7 each), the two
+    // `impl_Integer_size!` for 64-bit pointers (3 each) and four `impl_Unsigned!` (1 each).
+    // The other four `impl_Integer_size!` calls write only items whose `#[cfg]` is off.
+    let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
+    counts.sort_unstable();
+    assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
+    assert_eq!(input.input_edge_records.len(), 285);
+}
