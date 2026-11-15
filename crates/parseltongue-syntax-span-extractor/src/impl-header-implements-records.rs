@@ -81,16 +81,16 @@ pub fn resolve_impl_header_edges(
 
 /// What one impl header contributes to the graph.
 enum ImplHeaderRowOutcome {
-    /// Inherent, negative, inside a function body, or macro-expanded.
+    /// Inherent, negative, or inside a function body.
     NoTraitImplemented,
     /// A trait impl whose self type is not a node of the graph.
     SourceNotNode,
     Edge(Box<HldEdgeInputRecord>),
 }
 
-/// The row of one original, positive trait impl header outside any function
-/// body: from its self type to its trait, or unresolved with one reason when
-/// the trait is not a node of the graph.
+/// The row of one positive trait impl header outside any function body, in
+/// original or macro-expanded text: from its self type to its trait, or
+/// unresolved with one reason when the trait is not a node of the graph.
 fn build_impl_header_edge(
     header: &Value,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
@@ -105,7 +105,6 @@ fn build_impl_header_edge(
     if trait_type.is_null()
         || header["impl_negative_implementation_flag"] == true
         || header["impl_function_body_ancestry_flag"] == true
-        || !header_parts.span_expansion_provenance_chain.is_empty()
     {
         return Ok(ImplHeaderRowOutcome::NoTraitImplemented);
     }

@@ -749,6 +749,12 @@ fn test_unsigned_impl_builtin_source() {
         .filter(|edge| {
             edge.edge_relation_kind_value == HldRelationKindValue::Implements
                 && edge.edge_source_reference == source
+                && edge
+                    .edge_evidence_row_key
+                    .evidence_site_occurrence_key
+                    .read_semantic_occurrence_parts()
+                    .span_expansion_provenance_chain
+                    .is_empty()
         })
         .collect::<Vec<_>>();
     assert_eq!(

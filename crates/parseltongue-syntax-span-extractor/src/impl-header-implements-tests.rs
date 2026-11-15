@@ -4,7 +4,9 @@ use crate::original_call_resolution_records::original_call_resolution_tests::{
     OriginalCallFixtureStore, make_call_fixture_graph, make_call_fixture_row,
     make_call_fixture_scope, make_call_fixture_unit,
 };
-use crate::syntax_namespace_record_codec::encode_symbol_target_value;
+use crate::syntax_namespace_record_codec::{
+    encode_occurrence_identity_value, encode_symbol_target_value,
+};
 use serde_json::{Value, json};
 
 const BUILTIN_NAMES: [&str; 2] = ["u8", "u16"];
@@ -273,4 +275,47 @@ fn test_unresolved_self_counted_only() {
         "a trait impl whose self type is not a node has no row and is counted; \
          an inherent impl is not counted"
     );
+}
+
+/// REQ-RUST-047.0
+#[test]
+fn test_expanded_header_keeps_chain() {
+    let source = "struct Buffer; trait Make {} impl Make for Buffer {}";
+    let path = ".parseltongue/macro-source/09/expanded.rs";
+    let chain = [[9; 32]];
+    let (store, input) = make_header_fixture(source, |header| {
+        let key =
+            decode_occurrence_identity_value(&header["impl_semantic_occurrence_key"]).unwrap();
+        let parts = key.read_semantic_occurrence_parts();
+        let expanded = SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+            parts.unit_compilation_identity_key,
+            path,
+            *parts.span_byte_range_value,
+            *parts.span_content_digest_full,
+            &chain,
+        )
+        .unwrap();
+        header["impl_semantic_occurrence_key"] = encode_occurrence_identity_value(&expanded);
+    });
+    let (edges, without_source) = read_header_fixture_edges(source, &store, &input);
+    let site = format!("{}:Make", source.rfind("Make").unwrap());
+    assert_eq!(
+        edges,
+        vec![("Buffer".to_owned(), read_make_node_target(&input), site)],
+        "a header in expanded text has the same row as an original one"
+    );
+    assert_eq!(without_source, 0);
+    let set = resolve_impl_header_edges(
+        &store,
+        &make_call_fixture_scope(),
+        &input,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    let parts = set.implements_edge_records[0]
+        .edge_evidence_row_key
+        .evidence_site_occurrence_key
+        .read_semantic_occurrence_parts();
+    assert_eq!(parts.span_source_file_path, path);
+    assert_eq!(parts.span_expansion_provenance_chain, chain);
 }
