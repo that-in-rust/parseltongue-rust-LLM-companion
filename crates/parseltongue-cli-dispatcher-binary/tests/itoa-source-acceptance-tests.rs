@@ -2195,6 +2195,61 @@ fn test_sysroot_reached_names_reasoned() {
             kind("u8", "Builtin", 1),
         ])
     );
+    // REQ-RUST-052.0 G9: the whole callee path of a call is its own request kind.
+    let (callee_paths, paths): (Vec<_>, Vec<_>) = paths
+        .into_iter()
+        .partition(|row| row["site_path_context_kind"] == "body_call_callee_path");
+    let mut callee_kinds = std::collections::BTreeMap::<(String, String), usize>::new();
+    for row in &callee_paths {
+        let text = row["path_site_source_text"].as_str().unwrap();
+        let text = text.split("::<").next().unwrap().replace(' ', "");
+        let targets = row["path_target_symbol_rows"].as_array().unwrap();
+        let outcome = match row["path_resolution_state_kind"].as_str().unwrap() {
+            "resolved" => {
+                assert_eq!(targets.len(), 1, "{row}");
+                targets[0]["target_symbol_kind_value"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            }
+            state => format!(
+                "{state}:{}",
+                row["path_unresolved_reason_kind"].as_str().unwrap_or("-")
+            ),
+        };
+        *callee_kinds.entry((text, outcome)).or_default() += 1;
+    }
+    assert_eq!(
+        callee_kinds,
+        std::collections::BTreeMap::from([
+            // A member reached through a type: name lookup stores no target and no reason.
+            kind("Buffer::new", "unresolved:-", 2),
+            kind("u128::from", "unresolved:-", 9),
+            // A tuple struct's constructor.
+            kind("DecimalPairs", "Struct", 1),
+            // A trait's method, named through the trait.
+            kind("Unsigned::fmt", "Function", 10),
+            kind("div_rem_1e16", "Function", 2),
+            kind("divmod100", "Function", 12),
+            kind("enc_16lsd", "Function", 2),
+            kind("slice_buffer_to_str", "Function", 10),
+            kind("u128_ext::mulhi", "Function", 1),
+            // In `core`, which is not read. `str` is the module imported by `use core::str`.
+            kind("MaybeUninit", "unresolved:external_source_missing", 1),
+            kind(
+                "hint::unreachable_unchecked",
+                "unresolved:external_source_missing",
+                1
+            ),
+            kind("mem::size_of", "unresolved:external_source_missing", 4),
+            kind(
+                "str::from_utf8_unchecked",
+                "unresolved:external_source_missing",
+                1
+            ),
+        ]),
+        "56 callee paths: (path, what name lookup stored for it)"
+    );
     // REQ-RUST-048.0: value paths in bodies are their own request kind, kept out of the
     // signature and import totals below.
     let (body_values, paths): (Vec<_>, Vec<_>) = paths
@@ -3367,7 +3422,8 @@ fn test_generated_body_call_rows() {
                 assert!(
                     [
                         "generic_bound_trait_method",
-                        "type_path_associated_function"
+                        "type_path_associated_function",
+                        "callee_path_function"
                     ]
                     .contains(&kind)
                 );
@@ -3398,14 +3454,9 @@ fn test_generated_body_call_rows() {
     assert_eq!(
         shapes,
         std::collections::BTreeMap::from([
-            (
-                "bare_name_call divmod100 callee_path_not_requested".to_owned(),
-                8
-            ),
-            (
-                "bare_name_call slice_buffer_to_str callee_path_not_requested".to_owned(),
-                10
-            ),
+            // Rule G9: the callee path names one function of this crate.
+            ("bare_name_call divmod100 -".to_owned(), 8),
+            ("bare_name_call slice_buffer_to_str -".to_owned(), 10),
             (
                 "method_call method call receiver_type_not_determined".to_owned(),
                 104
@@ -3551,5 +3602,161 @@ fn test_type_relative_member_targets() {
             " as Unsigned>::fmt"
         ),
         std::collections::BTreeMap::from([((true, true), 4), ((true, false), 1)])
+    );
+}
+
+/// REQ-RUST-052.0 G9: a call whose callee is a path that name lookup resolves to one
+/// function of this crate has that function as its target: a bare name
+/// (`divmod100(..)`), a bare name with generic arguments (`enc_16lsd::<..>(..)`), and
+/// a module path (`u128_ext::mulhi(..)`), in original and in generated bodies alike.
+#[test]
+fn test_callee_path_function_targets() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+    };
+    // Every call whose callee path was looked up keeps the record of that lookup, with
+    // or without a target: (callee, outcome, symbol kinds found, qualifier's kind).
+    let mut records = std::collections::BTreeMap::<String, usize>::new();
+    for edge in input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+    {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let record = &metadata["callee_path_lookup_evidence"];
+        if record.is_null() {
+            assert_eq!(metadata["call_shape_kind"], "method_call", "{metadata}");
+            continue;
+        }
+        let callee = metadata["callee_source_text"].as_str().unwrap();
+        *records
+            .entry(format!(
+                "{} {} {} {}",
+                callee.split("::<").next().unwrap().replace(' ', ""),
+                record["callee_path_outcome_kind"].as_str().unwrap(),
+                record["callee_target_symbol_kinds"],
+                record["callee_qualifier_symbol_kind"]
+            ))
+            .or_default() += 1;
+    }
+    assert_eq!(
+        records,
+        std::collections::BTreeMap::from([
+            (
+                "Buffer::new callee_path_unresolved [] \"Struct\"".to_owned(),
+                2
+            ),
+            (
+                "DecimalPairs callee_is_not_function [\"Struct\"] null".to_owned(),
+                1
+            ),
+            ("MaybeUninit callee_path_unresolved [] null".to_owned(), 1),
+            (
+                "Unsigned::fmt callee_qualifier_not_module [\"Function\"] \"Trait\"".to_owned(),
+                10
+            ),
+            (
+                "div_rem_1e16 single_function_node [\"Function\"] null".to_owned(),
+                2
+            ),
+            (
+                "divmod100 single_function_node [\"Function\"] null".to_owned(),
+                12
+            ),
+            (
+                "enc_16lsd single_function_node [\"Function\"] null".to_owned(),
+                2
+            ),
+            (
+                "hint::unreachable_unchecked callee_path_unresolved [] null".to_owned(),
+                1
+            ),
+            ("mem::size_of callee_path_unresolved [] null".to_owned(), 4),
+            (
+                "slice_buffer_to_str single_function_node [\"Function\"] null".to_owned(),
+                10
+            ),
+            (
+                "str::from_utf8_unchecked callee_path_unresolved [] \"Builtin\"".to_owned(),
+                1
+            ),
+            (
+                "u128::from callee_path_unresolved [] \"Builtin\"".to_owned(),
+                9
+            ),
+            (
+                "u128_ext::mulhi single_function_node [\"Function\"] \"Module\"".to_owned(),
+                1
+            ),
+        ]),
+        "56 calls with a looked-up callee path"
+    );
+    let mut found = std::collections::BTreeMap::<(String, String, bool), usize>::new();
+    for edge in input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+    {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let callee = metadata["callee_source_text"].as_str().unwrap();
+        let name = callee.split("::<").next().unwrap().replace(' ', "");
+        if ![
+            "divmod100",
+            "slice_buffer_to_str",
+            "div_rem_1e16",
+            "enc_16lsd",
+            "u128_ext::mulhi",
+        ]
+        .contains(&name.as_str())
+        {
+            continue;
+        }
+        let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
+            panic!(
+                "{} calls {callee} without a target: {metadata}",
+                label(&edge.edge_source_reference)
+            );
+        };
+        assert_eq!(
+            metadata["dispatch_kind"], "callee_path_function",
+            "{metadata}"
+        );
+        assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
+        let expanded = metadata["expansion_source_origin"].is_object();
+        *found.entry((name, label(target), expanded)).or_default() += 1;
+    }
+    let row = |name: &str, target: &str, expanded| (name.to_owned(), target.to_owned(), expanded);
+    assert_eq!(
+        found,
+        std::collections::BTreeMap::from([
+            (
+                row("div_rem_1e16", "itoa::src/lib.rs::div_rem_1e16", false),
+                2
+            ),
+            (row("divmod100", "itoa::src/lib.rs::divmod100", false), 4),
+            (row("divmod100", "itoa::src/lib.rs::divmod100", true), 8),
+            (row("enc_16lsd", "itoa::src/lib.rs::enc_16lsd", false), 2),
+            (
+                row(
+                    "slice_buffer_to_str",
+                    "itoa::src/lib.rs::slice_buffer_to_str",
+                    true
+                ),
+                10
+            ),
+            (
+                row("u128_ext::mulhi", "itoa::src/u128_ext.rs::mulhi", false),
+                1
+            ),
+        ]),
+        "27 calls: (callee, target, written in an expansion)"
     );
 }

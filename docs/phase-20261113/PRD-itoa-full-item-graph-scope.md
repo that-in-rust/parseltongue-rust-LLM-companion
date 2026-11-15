@@ -210,6 +210,18 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     not read), so an agent sees why a row has no target and what the target rests on
     (decided 2026-11-16 under the maximum-information rule; built in part 5d step 5 for
     `reads` and `uses_type`, not yet for `calls`).
+  - A call whose callee is a path (`f(..)`, `m::f(..)`) gets its target from the stored
+    name lookup of the whole callee path, and only when that lookup names exactly one
+    function that is a graph node and the path is one name or is qualified by a module.
+    Every call whose callee path was looked up carries the record of that lookup (state,
+    reason, kinds of the symbols found, the qualifier's kind, the outcome), with or without
+    a target (decided and built 2026-11-16, part 5d step 6).
+  - A trait's method called through the trait (`Unsigned::fmt(x, ..)`) targets the trait's
+    method declaration, which the path proves; the impl members that could run are listed
+    as evidence, and one becomes the target only when the receiver's type is stored. A
+    tuple struct called as a function (`DecimalPairs(..)`) targets the struct node with its
+    own dispatch kind (both decided 2026-11-16 under the maximum-information rule; not
+    built).
   - Built (part 5a): identity, container, and the generating call in both forms, for a
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.

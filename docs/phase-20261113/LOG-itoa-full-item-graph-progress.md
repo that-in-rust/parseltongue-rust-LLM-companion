@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 197 calls resolved (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 30 of 197 calls resolved (27 by the callee path, part 5d step 6; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (all 55 with a
 target; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,9 +15,12 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** `calls` to this crate's own functions: the callee path of a call is
-  never sent to name lookup (26 bare-name calls, 1 `u128_ext::mulhi`), and the 10 generated
-  `Unsigned ::fmt(..)` calls need the member lookup of step 5 with a trait as prefix.
+- **Next target:** the 10 generated `Unsigned ::fmt(..)` calls (target: the trait's method
+  declaration, candidates as evidence) and the `DecimalPairs(..)` constructor call; then
+  method calls, whose receiver type is not determined (104 generated, more original).
+  Part 5d step 6 is built: the whole callee path of a call is sent to name lookup, and the
+  27 calls to this crate's own free functions (`divmod100`, `slice_buffer_to_str`,
+  `div_rem_1e16`, `enc_16lsd`, `u128_ext::mulhi`) have a target.
   Part 5d steps 1 to 5 are built: `reads` and `calls` from generated function bodies,
   `uses_type` from generated function signatures, each row naming where its first and
   last token were copied from in the source file, and a member reached through a type
@@ -111,6 +114,44 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 04:30 IST — Part 5d step 6: a call whose callee path names one function (REQ-RUST-052.0 G9)
+
+- **Built.** The whole callee path of each call is one more stored path request
+  (`body_call_callee_path`, Value namespace, the call's own scope). A call gets the function
+  as target when that lookup stores exactly one Function that is a graph node and the path
+  is one name or is qualified by a module.
+- **Measured on pinned itoa, three release runs:** 103 nodes, 502 edges (unchanged),
+  `resolved_calls` 30 of 197 (was 3), 16.8 to 19.1 s, 357 to 376 MB peak, 16 MB store.
+  Path table 258 rows (was 202): the 56 callee paths.
+- **RED.** `test_callee_path_function_targets`: "`<i8 as private::Sealed>::write` calls
+  slice_buffer_to_str without a target", 0 passed 1 failed. **GREEN:** 1 passed.
+- **Stale assertions changed to measured values:** `test_generated_body_call_rows` (the 18
+  generated `divmod100` / `slice_buffer_to_str` rows now have a target; a third dispatch
+  kind), `test_sysroot_reached_names_reasoned` (callee paths split out of the path total),
+  `test_request_original_body_prefix` (2 requests for `Buffer::new()`, was 1).
+- **Two wrong expectations of mine in fixtures:** an anchored callee `<u8 as T>::x()` already
+  has a Type request for its anchor; a trait qualifier's row keeps reason
+  `TraitSolverNeeded`, and a builtin qualifier's `MissingTarget`. Tests pin the measured
+  behaviour.
+- **Finding.** `str::from_utf8_unchecked`: the qualifier's Type lookup says builtin `str`
+  though `use core::str` makes it a module. The whole path's lookup is right (external
+  source missing) and the row takes it. The qualifier lookup is not fixed (part 5 Q24).
+- **GLM-5.3 review** (pi, max reasoning, read-only), recorded in
+  `docs/devin-research/1794779312-second-opinion-glm-5-3-max-callee-path-step-six.md`.
+  Adopted: keep the lookup record on qualified rows that go to the type-prefix lookup;
+  narrow the exception to a builtin qualifier, so a struct qualifier's member lookup is
+  never displaced; tests for two stored targets, the block scope of the request, a module
+  qualifier without a target. Its answers on `Unsigned::fmt` and `DecimalPairs(..)` are
+  recorded as decisions for the next step in the PRD.
+- **Mutations.** Nine deliberate breaks; seven failed a test at once; two (ignore the
+  shadowing flag; an ambiguous qualified path decides) did not, and each got a test.
+- **Gates.** Format; lint on the two touched crates; syntax crate 109 + 17 tests; all 42
+  real-source itoa tests (110.6 s; 667 s single-threaded). Workspace gates not run; they
+  run at the end of part 5d.
+- **Not covered:** `crate::f`, `self::f`, `super::f` callees and generic arguments on a
+  non-final segment (Q25). itoa has none.
+- **Next.** `Unsigned ::fmt(..)` and `DecimalPairs(..)`, then method calls.
 
 ### 2026-11-16 02:30 IST — Part 5d step 5: a member reached through a type (REQ-RUST-052.0 G5)
 

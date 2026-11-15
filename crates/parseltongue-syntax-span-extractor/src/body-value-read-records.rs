@@ -446,7 +446,7 @@ pub(super) fn check_body_value_prefix(path: &ast::Path) -> bool {
 
 /// Whether the single name of `path` is `self` or is bound by a pattern whose
 /// scope covers the path. A pattern of another function never covers it.
-fn check_local_value_binding(path: &ast::Path) -> bool {
+pub(super) fn check_local_value_binding(path: &ast::Path) -> bool {
     let name = match (path.qualifier(), path.segment()) {
         (None, Some(segment)) => segment.syntax().text().to_string(),
         _ => return false,

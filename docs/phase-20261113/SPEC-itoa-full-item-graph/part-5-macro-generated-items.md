@@ -509,6 +509,15 @@ G7  Generated consts and type aliases are sources too: the type in the declarati
     paths and calls in an initializer.
 G8  The stage line's reads_in_expanded_bodies is the number of stored reads rows sited in
     expanded text.
+G9  A call whose callee is a path gets its target from the stored name lookup of the whole
+    callee path, asked as a Value request in the call's own scope. The target is given only
+    when that lookup stores exactly one symbol, of kind Function, that is a graph node, and
+    the callee is one name (`f(..)`, `f::<T>(..)`) or its qualifier is stored as a module
+    (`m::f(..)`). A qualifier that is a trait or a type names a member: the row keeps the
+    record of the whole-path lookup and goes to the type-prefix lookup. Exception: a
+    qualifier stored as a builtin type whose whole path has a stored reason takes that
+    reason. No request is made for a callee with a `<T as Trait>` anchor, a single name
+    bound by a parameter or pattern of the function, or a parenthesised callee.
 ```
 
 ### 10.3 Steps, predicted and measured on itoa
@@ -827,3 +836,76 @@ Open:
 - **Q18, still open.** The rule cannot see an inherent item or a trait impl in `core`. The row
   says so; the target stands on itoa compiling.
 - The generated `Unsigned ::fmt(..)` calls are not in this step (Q21).
+
+### 10.11 Step 6: a call whose callee path names one function (measured)
+
+Rule G9. Built at the commit that adds this section.
+
+**Cause removed.** The callee path of a call was never sent to name lookup; only its type
+prefix was. Now each call's whole callee path is one more stored path request, context kind
+`body_call_callee_path`, Value namespace. Pinned itoa stores 56 of them (path table: 258 rows,
+was 202).
+
+```text
+ what name lookup stores for the 56 callee paths            rows  row's outcome
+ divmod100                Function                            12  target (8 generated, 4 original)
+ slice_buffer_to_str      Function                            10  target (generated)
+ div_rem_1e16             Function                             2  target
+ enc_16lsd::<..>          Function                             2  target
+ u128_ext::mulhi          Function, qualifier Module           1  target
+ Unsigned ::fmt           Function, qualifier Trait           10  no target: qualifier is a trait (Q21)
+ DecimalPairs             Struct                               1  no target: callee_is_not_function (Q26)
+ Buffer::new              no target, no reason; Struct         2  target by the member lookup of part 3
+ u128::from               no target, no reason; Builtin        9  no target: member lookup unproven
+ str::from_utf8_unchecked external source missing; Builtin     1  no target: external source missing
+ mem ::size_of, hint::unreachable_unchecked, MaybeUninit::<u8>::uninit
+                          external source missing              6  no target: qualifier unresolved
+```
+
+**Measured (three release runs on pinned itoa).** 103 nodes and 502 edges, both unchanged.
+`resolved_calls` 30 of 197 (was 3). Wall 16.8 to 19.1 s, peak 357 to 376 MB, store 16 MB.
+The graph is still marked incomplete.
+
+**Row metadata.** A targeted row has `dispatch_kind: callee_path_function`. Every call whose
+callee path has a stored lookup carries `callee_path_lookup_evidence`: the stored state and
+reason, the kinds of the symbols found, the qualifier's kind, and the outcome
+(`single_function_node`, `callee_qualifier_not_module`, `callee_is_not_function`,
+`callee_path_unresolved`, `callee_path_ambiguous`, `callee_target_not_node`). So the 10
+`Unsigned ::fmt` rows already say that the path names one function through a trait.
+
+**Finding (Q24).** itoa has `use core::str;`, so `str` in `str::from_utf8_unchecked` is the
+module `core::str`. The stored Type lookup of the qualifier `str` says builtin type. The
+Value lookup of the whole path says external source missing, which is right. The row takes
+the whole path's reason (the exception in G9). The qualifier lookup itself is not fixed: an
+import whose source was not read does not shadow a builtin type name in the name lookup.
+
+**Tests.** Real source: `test_callee_path_function_targets` (failed first: `slice_buffer_to_str`
+without a target; then passed) pins the 27 targets by caller kind and the lookup record of
+all 56 calls; `test_sysroot_reached_names_reasoned` pins what name lookup stores for the 56
+paths. Fixtures: `test_request_call_callee_path`, `test_callee_path_block_scope` (the request
+is made in the block's scope, where a block-local `fn` is the binding),
+`test_bare_callee_names_function`, `test_bare_callee_untargeted_reasons`,
+`test_qualified_callee_needs_module`, `test_struct_qualifier_keeps_member`,
+`test_shadowed_qualifier_blocks_callee`. The fixture tests were written after the code and
+passed or failed only on wrong expectations of mine, so they are weak as first-run evidence.
+Nine deliberate breaks of the code were tried; seven made a test fail at once, two did not
+(ignoring the shadowing flag; letting an ambiguous qualified path decide) and a test was
+added for each.
+
+**Open questions.**
+
+- **Q24.** The Type lookup of a qualifier named like a builtin (`str`) ignores an import of
+  that name whose source was not read. Fix belongs in name lookup. No wrong target on itoa.
+- **Q25.** `crate::f(..)`, `self::f(..)`, `super::f(..)` and generic arguments on a
+  non-final segment are not covered by a test, and whether their qualifier is stored as a
+  module is not checked. itoa has none; such a call can only lose a target, not gain a
+  wrong one.
+- **Q26.** `DecimalPairs(..)` is a tuple struct's constructor. Name lookup stores the struct.
+  Decided for the next step under the maximum-information rule: the row targets the struct
+  node with its own dispatch kind.
+- **Q21, decided for the next step.** `Unsigned ::fmt(..)`: the path alone proves the trait's
+  method declaration. That is the target; the impl members that could run are evidence, and
+  one of them becomes the target only when the receiver's type is stored.
+- A local binding named like the qualifier (`fn caller(m: u8) { m::f() }`) blocks the lookup,
+  although Rust would still resolve `m` as a module. Conservative; loses a target only.
+

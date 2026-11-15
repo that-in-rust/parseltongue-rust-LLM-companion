@@ -287,7 +287,154 @@ fn test_request_original_body_prefix() {
         projection.projection_path_metadata_rows[&prefix.path_site_occurrence_key]["path_site_source_text"],
         "Buffer"
     );
-    assert_eq!(paths.len(), 1);
+    assert_eq!(paths.len(), 2, "the prefix and the whole callee path");
+}
+
+/// REQ-RUST-052.0 G9: the whole callee path of a call is one Value request, unless its
+/// single name is bound in the function or it has a `<T as Trait>` anchor.
+#[test]
+fn test_request_call_callee_path() {
+    let store = LegacyMacroFixtureStore {
+        source: "mod m { pub fn h() {} } trait T { fn x(); } fn h() {} \
+            fn caller(g: fn()) { g(); h(); m::h(); h::<u8>(); <u8 as T>::x(); (h)(); }"
+            .into(),
+    };
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let mut requests = projection
+        .projection_resolution_input_rows
+        .name_signature_path_rows
+        .iter()
+        .map(|path| {
+            let metadata =
+                &projection.projection_path_metadata_rows[&path.path_site_occurrence_key];
+            (
+                metadata["site_path_context_kind"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+                metadata["path_site_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+                path.path_requested_namespace_kind,
+                path.path_source_segment_rows.len(),
+            )
+        })
+        .filter(|(context, ..)| context.starts_with("body_call_"))
+        .collect::<Vec<_>>();
+    requests.sort_by(|left, right| (&left.0, &left.1).cmp(&(&right.0, &right.1)));
+    let row = |context: &str, text: &str, namespace, segments| {
+        (context.to_owned(), text.to_owned(), namespace, segments)
+    };
+    assert_eq!(
+        requests,
+        vec![
+            row(
+                "body_call_callee_path",
+                "h",
+                NameNamespaceFilterKind::Value,
+                1
+            ),
+            row(
+                "body_call_callee_path",
+                "h::<u8>",
+                NameNamespaceFilterKind::Value,
+                1
+            ),
+            row(
+                "body_call_callee_path",
+                "m::h",
+                NameNamespaceFilterKind::Value,
+                2
+            ),
+            // The anchor is the callee's qualifier: a Type request since part 3.
+            row(
+                "body_call_type_prefix",
+                "<u8 as T>",
+                NameNamespaceFilterKind::Type,
+                1
+            ),
+            row(
+                "body_call_type_prefix",
+                "m",
+                NameNamespaceFilterKind::Type,
+                1
+            ),
+        ],
+        "no callee request for g (a parameter), the anchored path, the parenthesised callee"
+    );
+}
+
+/// REQ-RUST-052.0 G9: the callee request is made in the block's own scope, where a
+/// function declared in the block is the binding found, not the module's function.
+#[test]
+fn test_callee_path_block_scope() {
+    let store = LegacyMacroFixtureStore {
+        source: "fn h() {} fn caller() { fn h() {} h(); }".into(),
+    };
+    let scope = StageRunScopeValue {
+        run_generation_digest_value: "generation".into(),
+        stage_attempt_sequence_value: "attempt".into(),
+    };
+    let cancel = RunCancelFlagValue::default();
+    let workspace = json!({"workspace_source_root_path":"/fixture"});
+    let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+    )
+    .unwrap();
+    projection.project_unit_source_root().unwrap();
+    let metadata = &projection.projection_path_metadata_rows;
+    let request = projection
+        .projection_resolution_input_rows
+        .name_signature_path_rows
+        .iter()
+        .find(|path| {
+            metadata[&path.path_site_occurrence_key]["site_path_context_kind"]
+                == "body_call_callee_path"
+        })
+        .unwrap();
+    let scopes = projection
+        .projection_resolution_input_rows
+        .name_symbol_binding_rows
+        .iter()
+        .filter(|row| {
+            row.binding_resolved_name_text == "h"
+                && row.binding_namespace_kind_value == NamespaceBindingKindValue::Value
+        })
+        .map(|row| &row.binding_lexical_scope_key)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        scopes.len(),
+        2,
+        "the module function and the block function"
+    );
+    assert_eq!(
+        scopes
+            .iter()
+            .filter(|scope| **scope == &request.path_lexical_scope_key)
+            .count(),
+        1,
+        "exactly one of the two is bound in the request's own scope"
+    );
+    assert_ne!(scopes[0], scopes[1]);
 }
 
 /// REQ-RUST-048.0

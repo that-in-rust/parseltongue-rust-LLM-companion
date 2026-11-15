@@ -3,6 +3,7 @@ use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
 };
+use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
@@ -19,6 +20,9 @@ use std::{
     path::Path,
 };
 
+#[cfg(test)]
+#[path = "callee-path-call-tests.rs"]
+mod callee_path_call_tests;
 #[cfg(test)]
 #[path = "original-call-resolution-tests.rs"]
 pub(crate) mod original_call_resolution_tests;
@@ -185,8 +189,15 @@ fn build_original_call_edge(
             endpoints,
         )?)
     };
+    let callee = if receiver_evidence.is_null() {
+        resolve_callee_path_target(&evidence, syntax, context, endpoints)?
+    } else {
+        CalleePathLookupValue::default()
+    };
     // The second value says what stopped the lookup of a row without a target.
-    let (resolution, stopped) = if let Some((found, _)) = &bound {
+    let (resolution, stopped) = if let Some((found, stopped)) = &callee.callee_path_row_decision {
+        (found.clone(), *stopped)
+    } else if let Some((found, _)) = &bound {
         let stopped = match found {
             HldEdgeResolutionValue::Unresolved { reason } => match reason {
                 HldUnresolvedReasonKind::AmbiguousTarget => "bound_method_ambiguous",
@@ -298,6 +309,7 @@ fn build_original_call_edge(
     let mut dispatch = json!({
         "dispatch_kind":match (&target, &bound_evidence) {
             (None, _) => "undetermined",
+            (Some(_), _) if callee.callee_path_row_decision.is_some() => "callee_path_function",
             (Some(_), Some(_)) => "generic_bound_trait_method",
             (Some(_), None) => "type_path_associated_function",
         },
@@ -320,6 +332,9 @@ fn build_original_call_edge(
     if let Some(evidence) = bound_evidence {
         dispatch["bound_dispatch_evidence"] = evidence;
     }
+    if let Some(evidence) = callee.callee_path_lookup_evidence {
+        dispatch["callee_path_lookup_evidence"] = evidence;
+    }
     let origin = origins.build_site_origin_value(&evidence, context)?;
     if !origin.is_null() {
         dispatch["expansion_source_origin"] = origin;
@@ -337,6 +352,128 @@ fn build_original_call_edge(
         },
         edge_dispatch_metadata_text: Some(dispatch.to_string()),
     }))
+}
+
+/// What the stored name lookup of a call's whole callee path says.
+#[derive(Debug, Default)]
+struct CalleePathLookupValue {
+    /// The row's resolution and what stopped the lookup (empty with a target),
+    /// when the callee path decides the row. `None` leaves the row to the
+    /// type-prefix lookup.
+    callee_path_row_decision: Option<(HldEdgeResolutionValue, &'static str)>,
+    /// What was stored for the callee path; kept on the row either way.
+    callee_path_lookup_evidence: Option<Value>,
+}
+
+/// Reads the stored name lookup of a call's whole callee path. The call gets a
+/// target only when the path names one function that is a graph node.
+///
+/// A qualified callee is decided here only when its qualifier is stored as a
+/// module. A qualifier that is a trait or a type names a member, whose target
+/// depends on more than the path; such a row keeps the record and goes to the
+/// type-prefix lookup. One exception: a qualifier stored as a builtin type whose
+/// whole path has a stored reason. `str::from_utf8_unchecked` under
+/// `use core::str` is in a module that was not read, whatever the Type lookup
+/// of `str` says.
+fn resolve_callee_path_target(
+    site: &Value,
+    syntax: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+) -> Result<CalleePathLookupValue, OriginalCallResolutionError> {
+    let source = &syntax["callee_path_evidence"];
+    if source.is_null() || syntax["call_lexical_shadowing_flag"] == true {
+        return Ok(CalleePathLookupValue::default());
+    }
+    let [path] = context.read_type_path_records(site, source)? else {
+        return Ok(CalleePathLookupValue::default());
+    };
+    let qualified = !syntax["type_source_evidence"].is_null();
+    let targets = path["path_target_symbol_rows"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let kinds = targets
+        .iter()
+        .map(|target| target["target_symbol_kind_value"].clone())
+        .collect::<Vec<_>>();
+    let prefix_kind = if qualified {
+        match context.read_type_path_records(site, &syntax["type_source_evidence"])? {
+            [prefix] => match prefix["path_target_symbol_rows"]
+                .as_array()
+                .map(Vec::as_slice)
+            {
+                Some([target]) => target["target_symbol_kind_value"].clone(),
+                _ => Value::Null,
+            },
+            _ => Value::Null,
+        }
+    } else {
+        Value::Null
+    };
+    let finish = |decision: Option<(HldEdgeResolutionValue, &'static str)>, outcome: &str| {
+        CalleePathLookupValue {
+            callee_path_row_decision: decision,
+            callee_path_lookup_evidence: Some(json!({
+                "callee_path_state_kind":path["path_resolution_state_kind"],
+                "callee_path_unresolved_reason":path["path_unresolved_reason_kind"],
+                "callee_target_symbol_kinds":kinds,
+                "callee_qualifier_symbol_kind":prefix_kind,
+                "callee_path_outcome_kind":outcome
+            })),
+        }
+    };
+    let stop = |reason, stopped: &'static str, decides: bool| {
+        finish(
+            decides.then(|| (unresolved_call_target_value(reason), stopped)),
+            stopped,
+        )
+    };
+    let symbol = match (path["path_resolution_state_kind"].as_str(), targets) {
+        (Some("resolved"), [symbol]) => symbol,
+        (Some("ambiguous"), _) | (_, [_, _, ..]) => {
+            return Ok(stop(
+                HldUnresolvedReasonKind::AmbiguousTarget,
+                "callee_path_ambiguous",
+                !qualified,
+            ));
+        }
+        _ => {
+            let stored = &path["path_unresolved_reason_kind"];
+            return Ok(stop(
+                read_stored_reason_kind(stored),
+                "callee_path_unresolved",
+                !qualified || (!stored.is_null() && prefix_kind == "Builtin"),
+            ));
+        }
+    };
+    if symbol["target_symbol_kind_value"] != "Function" {
+        return Ok(stop(
+            HldUnresolvedReasonKind::TraitSolverNeeded,
+            "callee_is_not_function",
+            !qualified,
+        ));
+    }
+    if qualified && prefix_kind != "Module" {
+        return Ok(finish(None, "callee_qualifier_not_module"));
+    }
+    let target = context
+        .read_single_target_identity(symbol)?
+        .map(|identity| decode_symbol_target_value(&identity))
+        .transpose()?
+        .map(HldTargetIdentityValue::from)
+        .filter(|target| endpoints.contains(target));
+    Ok(match target {
+        Some(target) => finish(
+            Some((HldEdgeResolutionValue::Extracted { target }, "")),
+            "single_function_node",
+        ),
+        None => stop(
+            HldUnresolvedReasonKind::MissingTarget,
+            "callee_target_not_node",
+            true,
+        ),
+    })
 }
 
 /// Bound rows by owner item, traits that declare supertraits, methods with a
@@ -649,6 +786,29 @@ pub(super) fn check_body_call_prefix(path: &ast::Path) -> bool {
         })
 }
 
+/// Whether `path` is the whole callee of a call expression and may name a
+/// function: it has no `<T as Trait>` anchor and its single name is not bound
+/// by a parameter or pattern in scope. It is submitted to the namespace engine
+/// as a Value request, in the actual lexical scope.
+pub(super) fn check_body_call_callee(path: &ast::Path) -> bool {
+    path.syntax()
+        .parent()
+        .and_then(ast::PathExpr::cast)
+        .is_some_and(|expression| {
+            expression
+                .syntax()
+                .parent()
+                .and_then(ast::CallExpr::cast)
+                .and_then(|call| call.expr())
+                .is_some_and(|callee| callee.syntax() == expression.syntax())
+        })
+        && !path
+            .syntax()
+            .descendants()
+            .any(|child| child.kind() == SyntaxKind::TYPE_ANCHOR)
+        && !super::body_value_read_records::check_local_value_binding(path)
+}
+
 pub(super) fn extract_original_call_syntax(
     input: &SyntaxFileInputData,
     node: &SyntaxNode,
@@ -697,7 +857,17 @@ pub(super) fn extract_original_call_syntax(
             let end = restore_source_byte_offset(range.end(), removed);
             std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()
         });
-    json!({"callee_source_text":callee,"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"method_receiver_evidence":receiver})
+    let callee_path = path
+        .as_ref()
+        .filter(|path| check_body_call_callee(path))
+        .and_then(|path| {
+            let range = path.syntax().text_range();
+            let start = restore_source_byte_offset(range.start(), removed);
+            let end = restore_source_byte_offset(range.end(), removed);
+            let text = std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()?;
+            Some(json!({"span_byte_start_offset":start,"span_byte_end_offset":end,"type_source_text":text}))
+        });
+    json!({"callee_source_text":callee,"callee_path_evidence":callee_path,"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"method_receiver_evidence":receiver})
 }
 
 /// Syntax-only evidence for `receiver.method(..)`. Nothing is resolved here:
