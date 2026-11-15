@@ -9,7 +9,8 @@ full item dependency graph only.
 bounded graph. Part 3 is built for one receiver shape: the generic call
 `Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is built: `uses_type` rows from original signatures. Part 4b is built: 32
 `implements` rows from impl headers, including the 28 macro-generated ones. Part 4c
-(`reads`) is next and specified: first `enc_16lsd --reads--> DECIMAL_PAIRS`.**
+is built: 21 `reads` rows from original function bodies, 15 with a target. Part 4d
+(`imports`) is next; its part is a stub.**
 
 ```text
 part  file                                       requirements                   state
