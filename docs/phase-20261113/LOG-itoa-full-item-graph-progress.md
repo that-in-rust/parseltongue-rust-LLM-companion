@@ -6,19 +6,21 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 58 nodes and
-170 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved)
-and 32 `implements` rows (29 with a target, 3 unresolved). Four dependencies are proven
-from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
-`Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer` and
-`u128 --implements--> Unsigned`. No SOP step has passed and the graph is marked
+185 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+32 `implements` rows (29 with a target, 3 unresolved) and 15 `reads` rows. Five dependencies
+are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
+`Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
+`u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 4c step 3, the resolver that turns value-path requests into `reads`
-  rows. Steps 1 and 2 are pushed; no `reads` row is stored yet. Parts 4a and 4b are built.
+- **Next target:** part 4c step 5, the "proven, gap" record on `Buffer::format --reads-->
+  Integer::MAX_STR_LEN`, then step 6, unresolved rows. Steps 1 to 4 are pushed. Parts 4a and
+  4b are built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
-- **Produced today:** `contains`, `calls`, `uses_type` from signatures, and `implements`
-  from impl headers, original and macro-generated. Not produced: `reads`, `imports`.
+- **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
+  from impl headers, original and macro-generated, and `reads` from original function
+  bodies. Not produced: `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
   ([itoa-target-dataset](itoa-target-dataset/)). Nothing can be accepted against it yet.
 
@@ -29,7 +31,7 @@ step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
-4  remaining edge kinds                IN PROGRESS   uses_type and implements built; reads, imports not
+4  remaining edge kinds                IN PROGRESS   uses_type, implements built; reads 15 rows; imports not
 5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
@@ -93,6 +95,55 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 — part 4c steps 3 and 4: `reads` rows stored from original bodies
+
+**`enc_16lsd --reads--> DECIMAL_PAIRS` is stored from pinned itoa, 8 rows, one per site.
+One run now stores 15 `reads` rows and counts 34 value paths in macro-generated bodies.**
+
+- **Commits:** `674173fd6` (resolver `resolve_body_read_edges`), `fcc930c47` (fixture
+  tests), `de4c64b03` (facade, `test_decimal_pairs_static_read` no longer ignored).
+- **Test first:** the five fixture tests were written against a stub that returned no rows.
+  4 failed on behaviour (`[]` where rows were expected, count 0 where 1, `Ok` where a
+  typed error); `test_local_binding_no_read` passed on the stub and proves nothing alone.
+- **Tests:** `cargo test -p parseltongue-syntax-span-extractor`: 84 + 17 passed, 0 failed.
+  `cargo test -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  23 passed, 0 failed, 0 ignored (304 s, debug build). Format and lint clean on the two
+  touched crates. Workspace gates run at step 7.
+- **Measured** (debug build, sysroot excluded, 2 workers; stage line and exported rows):
+  58 nodes, 185 edges, `reads=15 reads_in_expanded_bodies=34`.
+
+```text
+rows  source           target                 expected graph (grouped rows)
+8     enc_16lsd        DECIMAL_PAIRS          matched: source, target, 8 site starts
+6     fmt for u128     DECIMAL_PAIRS          matched: source, target, 6 site starts
+1     Buffer::format   Integer::MAX_STR_LEN   matched: source, target, exact range
+```
+
+- **Against the expected graph:** 3 of its 62 grouped `reads` rows are matched by source
+  and target. The other 59: 56 start in macro-generated bodies (part 5), 2 target the
+  macro-generated `<i128 as Integer>::MAX_STR_LEN` or `<u128 ...>` const from an original
+  function (stored as requests, unresolved, no row yet: step 6), 1 starts at the struct
+  `Buffer` (OD-8).
+- **Disagreement found, not settled:** for the 14 `DECIMAL_PAIRS` sites the expected graph
+  anchors the site on `DECIMAL_PAIRS.0` (15 bytes); production sites the path
+  `DECIMAL_PAIRS` (13 bytes), as R6 says. Starts agree, ends differ by 2. Part 7 rules on it.
+- **Finding for step 5:** `I::MAX_STR_LEN` needed no new lookup. Name resolution already
+  treats a type parameter's bounds as glob imports into the parameter's scope
+  (`syntax-namespace-input-extraction.rs`, the `TYPE_PARAM | TRAIT` bound-list branch), so
+  the stored row resolves to the trait const at bytes 3680 to 3834. What the row lacks is
+  the part-3 record that `Copy` (supertrait of `Sealed`) was not read.
+- **Not done:** unresolved rows (R5), the read-twice real-source test (R8; the fixture
+  helper does compare two reads), SOP-grade cost of one run.
+- **Codebase-memory queries:**
+  `search_graph --label Function --name-pattern '.*(read_edge|body_read|value_read|body_site_row|read_body).*'`
+  (no existing resolver for reads; 2 test helpers);
+  `trace_path --function-name make_call_fixture_occurrence --direction inbound` (4 callers, all in the call tests);
+  `trace_path --function-name publish_full_graph_checkpoint --direction both`;
+  `trace_path --function-name read_type_path_records --direction inbound` (call and signature resolvers);
+  `trace_path --function-name read_single_target_identity --direction inbound` (signature resolver);
+  `search_graph --label Function --name-pattern '.*(type_param|generic_bound|bound_member|assoc|type_relative).*'`;
+  `index_repository` after the three commits.
 
 ### 2026-11-15 11:55 IST — Part 4c step 2: value paths in bodies are requested
 

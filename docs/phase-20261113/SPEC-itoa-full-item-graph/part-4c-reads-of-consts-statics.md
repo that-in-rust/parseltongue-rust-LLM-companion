@@ -4,7 +4,7 @@ Written 2026-11-15 with `rust-executable-specs-01`, before any code.
 
 ## The answer
 
-**State: IN PROGRESS, steps 1 and 2 of 7 pushed; no `reads` row is stored yet. One `reads` row per value path in an original function body
+**State: IN PROGRESS, steps 1 to 4 of 7 pushed; 15 `reads` rows are stored. One `reads` row per value path in an original function body
 that names a `static`, a `const` or an associated const which is a graph node. The first
 target is `enc_16lsd --reads--> DECIMAL_PAIRS`.**
 
@@ -101,8 +101,11 @@ Each step is one commit of about 200 changed lines, test first.
    request, and there is no flag. Items declared in a block and generic parameters are
    requested and left to name resolution, which resolves them in the block scope.
 3. L2 resolver: single-segment and module paths to value nodes (R1, R2, R3, R6).
-4. L3 facade: rows in the full graph; step 1 goes GREEN.
-5. Generic `T::NAME` through the bound lookup (R4).
+   DONE (`674173fd6`, `fcc930c47`). It joins stored rows only: a body site, its stored
+   value-path resolution, and the node set. A target that is not a node gives no row.
+4. L3 facade: rows in the full graph; step 1 goes GREEN. DONE (`de4c64b03`).
+5. Generic `T::NAME` (R4). The target is already found: name resolution treats a type
+   parameter's bounds as glob imports. What is left is the "proven, gap" record.
 6. Unresolved rows and the counts (R5, R7, R8); `test_itoa_reads_row_counts`.
 7. Refactor pass, workspace gates, one run's counts and cost.
 
@@ -124,7 +127,24 @@ Syntax crate 79 + 17 tests pass; the 22 real-source itoa tests pass with
 `test_decimal_pairs_static_read` still ignored; format and lint clean on the two touched
 crates. Workspace gates run at step 7.
 
+Steps 3 and 4, measured 2026-11-15 on pinned itoa (debug build, sysroot excluded): 58
+nodes, 185 edges, `reads=15 reads_in_expanded_bodies=34`.
+
+```text
+rows  source           target                 expected graph (grouped rows)
+8     enc_16lsd        DECIMAL_PAIRS          matched: source, target, 8 site starts
+6     fmt for u128     DECIMAL_PAIRS          matched: source, target, 6 site starts
+1     Buffer::format   Integer::MAX_STR_LEN   matched: source, target, exact range
+```
+
+3 of the expected graph's 62 grouped `reads` rows are matched by source and target. Syntax
+crate 84 + 17 tests pass; the 23 real-source itoa tests pass, none ignored.
+
 ## 7 — Open questions
+
+- **Q7. Site of a read through a field.** The expected graph anchors the 14
+  `DECIMAL_PAIRS` sites on `DECIMAL_PAIRS.0`; R6 and production use the path
+  `DECIMAL_PAIRS`. Starts agree, ends differ by 2 bytes. Part 7 rules on it.
 
 - **Q1. Concrete type-relative consts.** `i128::MAX_STR_LEN` targets the const of the
   macro-generated `impl Integer for i128`. Until part 5 makes it a node, 4c stores the 6
@@ -134,9 +154,9 @@ crates. Workspace gates run at step 7.
   const from a struct. 4c covers function bodies only; OD-8 decides the rest.
 - **Q3. Consts inside function bodies** (`EXP`, `D`, ...) are not nodes, so reads of them
   have no row. If the graph later gains body-local items, they get rows then.
-- **Q5. `I::MAX_STR_LEN` already resolves.** Name resolution stores it as resolved to a
-  `Const` without the part-3 bound lookup. Step 5 must check which const it names and
-  whether the "proven, gap on `Copy`" record is still needed (R4).
+- **Q5. `I::MAX_STR_LEN` already resolves.** Checked in step 4: it names the trait const
+  `Integer::MAX_STR_LEN` (bytes 3680 to 3834), found because name resolution imports a type
+  parameter's bounds by glob. The row does not yet say that `Copy` was not read (R4).
 - **Q6. Two older scope checks.** `check_call_lexical_shadowing` and
   `check_receiver_name_rebound` are separate from the new pattern-scope check. The first
   treats any `use` in a block as shadowing every name. Merging them is step 7 work.
