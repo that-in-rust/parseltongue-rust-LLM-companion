@@ -2298,8 +2298,18 @@ fn test_itoa_reads_row_counts() {
 /// REQ-RUST-049.0 R6 R7 R11
 #[test]
 fn test_itoa_imports_row_counts() {
-    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let (_directory, root, database, input) = run_original_graph_fixture();
     let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let outcomes = read_published_stage_rows(&database, "import-resolution-site-records");
+    assert_eq!(
+        outcomes.len(),
+        4,
+        "R1: one stored outcome per use import; the 4 bound imports get none"
+    );
+    assert!(outcomes.iter().all(|row| {
+        row["import_resolution_state_kind"] == "unresolved"
+            && row["import_unresolved_reason_kind"] == "external_source_missing"
+    }));
     let use_nodes = input
         .input_node_records
         .iter()
