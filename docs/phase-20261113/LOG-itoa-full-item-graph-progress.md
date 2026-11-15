@@ -14,8 +14,8 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 4c step 7 (refactor note, workspace gates, one run's cost). Steps
-  1 to 6 are pushed. Parts 4a and 4b are built. After 4c: part 4d, `imports`.
+- **Next target:** part 4d, `imports` from `use` items (4 expected rows). Parts 4a, 4b
+  and 4c are built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -31,7 +31,7 @@ step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
-4  remaining edge kinds                IN PROGRESS   uses_type, implements built; reads 21 rows; imports not
+4  remaining edge kinds                IN PROGRESS   uses_type, implements, reads (21 rows) built; imports not
 5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
@@ -46,19 +46,19 @@ step                                   state         measured or missing
 - **Nodes.** 58: 43 original items outside function bodies, one file area per source file,
   and 13 builtin types that an edge starts or ends at.
   Visibility and reachability are stored as unknown, not guessed.
-- **Edges.** 170: 43 `contains`, 61 `calls`, 34 `uses_type` and 32 `implements`. 3 calls are resolved; 58 are stored unresolved
+- **Edges.** 191: 43 `contains`, 61 `calls`, 34 `uses_type`, 32 `implements` and 21 `reads`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
   inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 22 real-source itoa tests pass at commit `7e2a2ef87` (232.7 s, release build, one
+- **Tests.** 26 real-source itoa tests pass at commit `fc0ebe4e0` (312 s, release build, one
   thread).
-- **Workspace gates** after part 4b: format, lint and release build pass; 470 tests pass,
+- **Workspace gates** after part 4c: format, lint and release build pass; 486 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
-- **Cost of one run** (2026-11-15, after part 4b, sysroot excluded, 2 workers): 13.0 to
-  13.7 s, 369 to 371 MB peak over the whole process tree (sampled about every 18 ms, not the
-  SOP's 10 ms), 9.5 MB store, no memory cap.
+- **Cost of one run** (2026-11-15, after part 4c, sysroot excluded, 2 workers): 13.0 to
+  14.4 s, 358 to 368 MB peak over the whole process tree (sampled about every 17 ms, not the
+  SOP's 10 ms), 11.4 MB store, no memory cap.
 
-All counts above were read at commit `7e2a2ef87`.
+All counts above were read at commit `fc0ebe4e0`.
 
 ## What is missing, in build order
 
@@ -95,6 +95,48 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 13:40 IST — Part 4c step 7: gates and one run's cost; 4c is built
+
+**Part 4c is built. One run on pinned itoa stores 58 nodes and 191 edges, 21 of them
+`reads`, in 13.0 to 14.4 s and 358 to 368 MB.**
+
+- **Code under test:** `fc0ebe4e0` (the later commit `d2a6197dd` changes documents only).
+- **Workspace gates,** run from `/home/ubuntu/zcode-runs/4c-step7-gates.sh`:
+  - `cargo fmt --all -- --check`: exit 0.
+  - `cargo clippy --release --workspace --all-targets --all-features -- -D warnings`: exit 0.
+  - `cargo test --release --workspace --all-targets --all-features -- --skip
+    test_lang_items_in_sysroot --test-threads=1`: 486 passed, 0 failed, 4 ignored, 1
+    skipped by the filter. The 26 real-source itoa tests took 312 s.
+  - `cargo build --release --workspace --all-targets --all-features`: exit 0.
+  - The skipped test is the open sysroot defect, so the workspace gate is not a full PASS.
+- **Cost of one run** (3 runs, binary sha256 `72163607…dd6f2e89`, sysroot excluded, 2
+  workers, no memory cap): 13.03 to 14.41 s; 357.8 to 367.5 MB peak, resident memory
+  summed over the process tree (at most 2 processes); 11.4 MB store. Sampled about every
+  17 ms (757 to 803 samples), not the SOP's 10 ms.
+- **Counts from the stage lines,** identical in the 3 runs: `nodes=58 containment=43
+  calls=61 resolved_calls=3 type_uses=34 implements=32 reads=21`, read back frozen as
+  `nodes=58 edges=191 completeness=incomplete`. The 191 written in the last entry by
+  addition is now measured.
+- **Store grew** from 9.5 MB after part 4b to 11.4 MB. Not broken down; the new rows are
+  the 70 value-path requests and their resolutions, and 21 edges.
+- **Refactor:** done in step 5, none added here. Functions in the two files touched, by
+  complexity (codebase-memory `query_graph`):
+  - `build_original_call_edge`, 143 lines, 18: not split. It is call code this part did
+    not change; it should be split when the four unhandled call shapes are built.
+  - `walk_parameter_bound_traits`, 57 lines, 10: new in step 5, split out of
+    `resolve_bound_method_target`, which went from 100 lines to 61.
+  - `resolve_read_path_target`, 84 lines, 10: new in step 6, one match per rule; not split.
+  - `build_bound_method_index`, 57 lines, 10: unchanged.
+- **Not done, on purpose:** merging `check_call_lexical_shadowing` and
+  `check_receiver_name_rebound` with the pattern-scope check (part 4c, Q6). It would change
+  which calls are resolved, so it belongs with the call work, test first.
+- **Codebase-memory queries:** `query_graph` `MATCH (f:Function) WHERE f.file_path ENDS
+  WITH 'body-value-read-records.rs' OR f.file_path ENDS WITH
+  'original-call-resolution-records.rs' RETURN f.name, f.start_line, f.end_line,
+  f.complexity ORDER BY f.complexity DESC LIMIT 12`.
+- **Next:** part 4d, `imports` from `use` items (4 expected rows). Its part file is a
+  stub and is written first.
 
 ### 2026-11-15 12:40 IST — Part 4c steps 5 and 6: the bound record, and unresolved reads
 

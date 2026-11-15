@@ -4,7 +4,9 @@ Written 2026-11-15 with `rust-executable-specs-01`, before any code.
 
 ## The answer
 
-**State: IN PROGRESS, steps 1 to 6 of 7 pushed; 21 `reads` rows are stored (15 with a target, 6 unresolved). One `reads` row per value path in an original function body
+**State: BUILT (all 7 steps, 2026-11-15). Pinned itoa stores 21 `reads` rows: 15 with a
+target and 6 unresolved. 3 of the expected graph's 62 grouped `reads` rows are matched;
+56 of the rest wait on part 5. One `reads` row per value path in an original function body
 that names a `static`, a `const` or an associated const which is a graph node. The first
 target is `enc_16lsd --reads--> DECIMAL_PAIRS`.**
 
@@ -111,7 +113,7 @@ Each step is one commit of about 200 changed lines, test first.
    is a member of a trait the walk reached; otherwise the row is unresolved.
 6. Unresolved rows and the counts (R5, R7, R8); `test_itoa_reads_row_counts`.
    DONE (`443123077`, `083b6c63a`, `fc0ebe4e0`).
-7. Refactor pass, workspace gates, one run's counts and cost.
+7. Refactor pass, workspace gates, one run's counts and cost. DONE at `fc0ebe4e0`.
 
 ## 6 — Quality gate results
 
@@ -158,6 +160,15 @@ rows  site text            state        reason or target
 
 Still 3 of 62 expected grouped rows matched: an unresolved row has no target to match.
 Syntax crate 85 + 17 tests pass; the 26 real-source itoa tests pass, none ignored (296 s).
+
+Step 7, measured 2026-11-15 at `fc0ebe4e0` (release build, sysroot excluded, 2 workers):
+
+- Workspace gates: format, lint and release build exit 0; 486 tests passed, 0 failed, 4
+  ignored, `test_lang_items_in_sysroot` skipped (so not a full PASS).
+- One run, 3 times: 13.0 to 14.4 s; 358 to 368 MB peak over the process tree (sampled about
+  every 17 ms, not the SOP's 10 ms); 11.4 MB store.
+- Stage lines: 58 nodes, 191 edges, `reads=21`, `completeness=incomplete`.
+- Refactor: the bound walk was split out in step 5; nothing further. Q6 is left open.
 
 ## 7 — Open questions
 
