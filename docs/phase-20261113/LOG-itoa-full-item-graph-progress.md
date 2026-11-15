@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 334 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 366 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (39 with a
 target, 16 unresolved; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,9 +15,10 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 3: `uses_type` from generated function signatures. Steps 1
-  and 2 are built: `reads` from generated function bodies, each naming where its first and
-  last token were copied from in the source file.
+- **Next target:** part 5d step 4: `calls` from generated bodies. Steps 1 to 3 are built:
+  `reads` from generated function bodies and `uses_type` from generated function signatures
+  (66 rows, was 34), each row naming where its first and last token were copied from in the
+  source file.
   Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
   by a `generates` row), 5b (readable labels: all 103 distinct, each impl member names
   its impl header) and 5c (`expands`: each of the 15 macro calls points to its definition,
@@ -41,7 +42,7 @@ step                                   state         measured or missing
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21 (+34 in part 5d), imports 4
-5  macro-generated items and bodies    5a-5c BUILT, 5d 2 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads
+5  macro-generated items and bodies    5a-5c BUILT, 5d 3 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -104,6 +105,39 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 03:00 IST — Part 5d step 3 built: `uses_type` from generated function signatures (REQ-RUST-052.0 G1-G4)
+
+- **Result.** Pinned itoa stores 66 `uses_type` rows (was 34) and 366 edges (was 334), read
+  back from the stored table. Predicted 66 and 366; measured 66 and 366. The 32 new rows:
+  12 `write -> Buffer` (the type alias of the same impl), 12 `write -> str`, 4 `fmt -> usize`,
+  4 `fmt -> Self::Buffer` without a target (`TraitSolverNeeded`, step 5). All 32 carry
+  `expansion_source_origin`, both tokens from a macro definition.
+- **STUB.** None: no new signature; the change lifts a filter and reuses step 2's helper.
+- **RED.** `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests test_generated_signature_type_uses`: 0 passed, 1 failed,
+  `left: {} right: {("fmt", "Self::Buffer", "TraitSolverNeeded"): 4, ("fmt", "usize",
+  "builtin usize"): 4, ("write", "Self::Buffer", "own Buffer"): 12, ("write", "str",
+  "builtin str"): 12}`.
+- **GREEN.** `build_signature_row_edges` no longer drops rows in expanded text and rejects a
+  row whose file or chain differs from its owner's; `build_type_path_edge` adds the origin
+  key. Test passes.
+- **Tests changed.** `test_body_and_macro_rows_skipped` is now `test_body_owner_rows_skipped`
+  and expects a typed error for an expanded row under an original owner (weak: not run
+  against the old code). `test_generates_edge_row_counts` 334 -> 366 (it failed on
+  `left: 366 right: 334` first). `read_edge_site_range` in the real-source tests returns
+  nothing for a site in expanded text (closes Q19).
+- **REFACTOR.** None needed.
+- **Gates.** `cargo fmt --all -- --check`: pass. `cargo clippy --release -p
+  parseltongue-syntax-span-extractor -p parseltongue-cli-dispatcher-binary --all-targets
+  --all-features -- -D warnings`: pass. Syntax crate: 92 + 17 passed. `cargo test --release
+  -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`: 39 passed,
+  0 failed, 80.91 s.
+- **codebase-memory.** `trace_path` both directions on `resolve_signature_type_edges` (3
+  callers: the full-graph publisher and two fixtures) before the change.
+- **Next.** Step 4: `calls` from generated bodies (predicted 197 calls, 502 edges), with the
+  callee's source text, a dispatch kind that does not say "original", the stored reason, and
+  the origin key.
 
 ### 2026-11-16 02:20 IST — Part 5d step 2 built: where a generated site was copied from (REQ-RUST-052.0 G3)
 
