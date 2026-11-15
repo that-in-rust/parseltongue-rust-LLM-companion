@@ -6,16 +6,18 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 300 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
-32 `implements` rows (29 with a target, 3 unresolved), 21 `reads` rows (15 with a
-target, 6 unresolved) and 4 `imports` rows (all unresolved: their targets are in `core`).
+(45 written by macro expansions) and 334 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (39 with a
+target, 16 unresolved; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
 are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d, generated bodies and signatures as edge sources.
+- **Next target:** part 5d step 2: each row sited in expanded text names where its first and
+  last token were copied from in the source file. Step 1 (`reads` from generated function
+  bodies) is built.
   Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
   by a `generates` row), 5b (readable labels: all 103 distinct, each impl member names
   its impl header) and 5c (`expands`: each of the 15 macro calls points to its definition,
@@ -38,8 +40,8 @@ step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
-4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21, imports 4
-5  macro-generated items and bodies    5a-5c BUILT   45 generated nodes, 45 generates, 15 expands; bodies are not edge sources yet
+4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21 (+34 in part 5d), imports 4
+5  macro-generated items and bodies    5a-5c BUILT, 5d 1 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -102,6 +104,51 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 01:35 IST — Part 5d specified; step 1 built: `reads` from generated function bodies (REQ-RUST-052.0)
+
+- **Result.** A function written by a macro expansion is now a source of `reads` rows.
+  Pinned itoa stores 55 `reads` rows (was 21) and 334 edges (was 300), read back from the
+  stored table. Predicted 55 and 334 from a hand-lifted filter; measured 55 and 334.
+  - 24 new rows with a target: `<uN as Unsigned>::fmt --reads--> DECIMAL_PAIRS`, 6 in each of
+    the 4 generated `fmt`.
+  - 10 new rows without a target (`TraitSolverNeeded`): `Self::MAX_STR_LEN` and
+    `uN::MAX_STR_LEN` in generated `write` bodies. Step 5 (rule G5) gives them targets.
+- **Against the expected graph:** 4 more grouped `reads` rows now match by source and target
+  (the four `fmt -> DECIMAL_PAIRS`); 7 of 62 in all. Sites differ by design: the stored site
+  is in expanded text, the expected one in `src/lib.rs`; step 2 adds the source origin.
+- **Measured before the spec.** Lifting the expansion filter in the three producers by hand
+  (then restoring): reads +34, uses_type +32, calls +136 (all unresolved), 502 edges.
+- **STUB.** None needed: no new signature. The change removes a filter.
+- **RED.** `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests test_generated_fmt_static_reads`: 0 passed, 1 failed,
+  `itoa::src/lib.rs::<u8 as Unsigned>::fmt left: 0 right: 6`. (First run failed on my own
+  test: 5 nodes end in `as Unsigned>::fmt`; the one for `u128` is source-written.)
+  `cargo test --release -p parseltongue-syntax-span-extractor
+  test_expanded_site_owner_mismatch`: 0 passed, 1 failed (no typed error returned).
+- **GREEN.** `resolve_body_read_edges` builds a row for every site; `build_body_read_edge`
+  rejects a site whose file or chain differs from its owner's. Both tests pass.
+- **Tests changed.** `test_expanded_body_read_counted` removed (REQ-RUST-048.0 R7 is
+  superseded by G1). `test_itoa_reads_row_counts` counts rows sited in original text (21).
+  `test_reads_rows_read_twice` 21 -> 55. Edge total 300 -> 334.
+- **REFACTOR.** None; the change is 20 lines.
+- **Gates.** `cargo fmt --all -- --check`: pass. `cargo clippy --release -p
+  parseltongue-syntax-span-extractor -p parseltongue-cli-dispatcher-binary --all-targets
+  --all-features -- -D warnings`: pass. Syntax crate: 90 + 17 passed. `cargo test --release
+  -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`: 37 passed,
+  0 failed, 82.61 s. Workspace gates and run cost not measured for this step.
+- **Decisions.** Site stays in expanded text; the source origin goes in metadata, first and
+  last token apart (G2, G3). Rejected: siting the row in `src/lib.rs` (no range there holds
+  the text of `u8::MAX_STR_LEN`), and one merged origin range.
+- **Second opinion.** GLM-5.3, pi, max reasoning:
+  `docs/devin-research/1794772360-second-opinion-glm-5-3-max-part-5d-generated-edge-sources.md`.
+  It moved the origin step ahead of `uses_type` and `calls`.
+- **codebase-memory.** `index_status`; `trace_path` inbound and outbound on
+  `resolve_body_read_edges`, `resolve_signature_type_edges`, `resolve_original_call_edges`
+  before the experiment; `trace_path` inbound on `resolve_body_read_edges` and
+  `build_body_read_edge` before the commit (3 callers each, one of them the removed test).
+- **Next.** Step 2: the origin of a site's first and last token, from
+  `macro-expanded-item-table`, on the 34 generated `reads` rows.
 
 ### 2026-11-16 01:10 IST — Part 5c: `expands`, macro call to macro definition (REQ-RUST-051.0)
 
