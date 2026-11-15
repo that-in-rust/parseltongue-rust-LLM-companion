@@ -148,6 +148,9 @@ Edges:
 - **F13** One lexical container per item. File-level items and impl members belong to the file
   area; nested items belong to their inline module or trait. Impl identity, self type and trait
   are metadata, never a second parent.
+- **F14** One edge row per source site. Two sites with the same source, relation and target are
+  two rows, each with its own range. The expected graph lists one row per source, relation and
+  target with its sites; stored rows are grouped the same way before comparison.
 
 Identity:
 

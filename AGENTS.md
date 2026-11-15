@@ -28,9 +28,17 @@ code itself. Current numbers and the next target are the top entry of
   expected edge.
 - Never guess. Unknown visibility, unresolved calls, inactive `cfg` items and unsupported forms
   are stored explicitly with a typed reason.
+- Source is often missing or broken, so every edge is in one of three states. **Proven:** every
+  candidate was visible in source. **Proven, gap:** one target was found, and the edge names the
+  source that was missing. **Unresolved:** zero or several targets were found, with one typed
+  reason. Acceptance still needs zero gap edges, or an explicit accepted list.
 - Any production change after a run invalidates that run.
 - Status is given per SOP step (PASS / FAIL / BLOCKED / NOT STARTED) with measured numbers.
   No bare percentages, no "complete" for a bounded result.
+- Progress on a part is expected rows matched, per relation kind: N of M. Until a row-by-row
+  comparison exists, say that a count is stored rows, not matches, and never set a count of
+  stored sites against a count of expected rows.
+- A number in a part file or the log is measured, with its command, or marked predicted.
 - `codebase-memory-mcp` and `clarity` show structure. They are navigation aids, not evidence.
 - `docs/phase-20261113/itoa-target-dataset/` is the expected graph. Today it is an unreviewed
   draft; it becomes the reference only after review against source and a freeze (SOP S1).
@@ -43,6 +51,9 @@ Graph rules in force:
 - Each source file has one file-area node. Each `use` is a node.
 - Edges are stored uncollapsed. Relation kinds: `contains`, `calls`, `imports`, `uses_type`,
   `reads`, `implements`, `reexports`, `derives`.
+- One edge row per source site. Two sites with the same source, relation and target are two
+  rows, each with its own range. The expected graph lists one row per source, relation and
+  target with its sites, so group stored rows the same way before comparing.
 - An edge targets the real item, never the `use` line.
 - Impl blocks are records, not nodes. Body-local items are evidence, not nodes.
 - An impl member has one lexical container: its file area or enclosing inline module. Impl,
@@ -63,6 +74,8 @@ Scope:
 - Anything not needed for the itoa full graph goes in
   [the backlog](docs/phase-20261113/BACKLOG-deferred-work-open-decisions.md). Do not implement an
   undecided choice; ask, or backlog it.
+- If most of a part's expected rows wait on an open decision, ask for that decision before
+  starting the part.
 - `--sysroot-source-scope-kind excluded` is how runs work today. How edges into `core` are
   judged is an open decision in the PRD; until decided, such a run cannot pass.
 
@@ -80,7 +93,17 @@ Scope:
   index in the same commit. Parts not yet picked stay stubs.
 - **Test first.** Write a failing real-source test on pinned itoa, make it pass with the smallest general change, refactor. A RED or GREEN
   claim needs a nonzero selected-test count and a test that reached the intended behaviour.
-- **Gates before every push of code:**
+- **Gates before every push of code**, on each crate the commit touches, plus the real-source
+  itoa tests:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --release -p <crate> --all-targets --all-features -- -D warnings
+cargo test  --release -p <crate> --all-targets --all-features
+cargo test  --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests -- --test-threads=1
+```
+
+- **Workspace gates once per step of a part**, before its log entry:
 
 ```bash
 cargo fmt --all -- --check
@@ -175,7 +198,7 @@ parseltongue map-workspace-full-run \
   --worker-thread-count-value 2 \
   --mapping-final-stage-kind full-item-dependency-graph
 
-# read it back
+# read it back; use this to study stored rows, not a temporary test
 parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \
   --stage-owned-table-name item-effective-visibility-records     # nodes
 parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \
