@@ -2196,3 +2196,46 @@ fn test_sysroot_reached_names_reasoned() {
         .count();
     assert_eq!(reasoned, 22);
 }
+
+/// REQ-RUST-048.0 R4
+#[test]
+fn test_generic_const_bound_read() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let format = locate_original_member_node(&input, &spans, "format");
+    let target = locate_original_kind_node(&input, &spans, "MAX_STR_LEN", "CONST");
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let start = source.find("I::MAX_STR_LEN").unwrap() as u64;
+    let reads = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_source_reference == format.node_target_reference
+                && edge.edge_relation_kind_value == HldRelationKindValue::Reads
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(reads.len(), 1, "Buffer::format reads one const, once");
+    let read = reads[0];
+    assert_eq!(
+        read_edge_site_range(read),
+        (start, start + "I::MAX_STR_LEN".len() as u64)
+    );
+    assert_eq!(
+        read.edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: target.node_target_reference.clone()
+        },
+        "the type parameter path targets the trait const Integer::MAX_STR_LEN"
+    );
+    let metadata: Value = serde_json::from_str(
+        read.edge_dispatch_metadata_text
+            .as_deref()
+            .unwrap_or("null"),
+    )
+    .unwrap();
+    assert_eq!(
+        metadata["bound_read_evidence"],
+        json!({"bound_chain":["I", "Integer", "private::Sealed"],"missing_source_traits":["Copy"]}),
+        "the row names the bounds walked and the trait whose source was not read"
+    );
+}
