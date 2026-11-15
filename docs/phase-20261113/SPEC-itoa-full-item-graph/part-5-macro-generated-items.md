@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c to 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
+5b BUILT (section 8). 5c SPECIFIED (section 9). 5d and 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
 ## The answer
@@ -323,3 +323,77 @@ Three older tests named a node by its old label and were changed to the new form
 
 Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only, before this section
 was written. Record: `docs/devin-research/1794768300-second-opinion-glm-5-3-max-part-5b-node-labels.md`.
+
+## 9 — Part 5c: `expands`, macro call to macro definition (REQ-RUST-051.0)
+
+**State: SPECIFIED.** Numbers marked *measured* come from the stored tables of one release
+run at `47d4d05e0`; the edge total is predicted.
+
+### 9.1 What is stored today (measured)
+
+```text
+MacroInvocation nodes                           15, all written in src/lib.rs
+MacroDefinition nodes                           3: impl_Integer, impl_Integer_size, impl_Unsigned
+legacy-macro-scope-records (published)          94 rows; one row is one lookup of a macro name
+                                                in textual scope: the site, the name, and the
+                                                definition in scope there, or null
+  rows whose site is the path of one of the     15 distinct, each with exactly one definition,
+  15 calls                                      and that definition is one of the 3 nodes
+  calls per definition                          impl_Integer 5, impl_Integer_size 6, impl_Unsigned 4
+macro-expanded-item-table, state expanded       15 rows, each with the arm matched (all 0) and,
+                                                per output token, where it was copied from
+```
+
+So no new producer is needed: the graph step joins two stored tables.
+
+### 9.2 Rules
+
+```text
+E1  A tenth relation kind, expands: macro call node -> macro definition node. It is a
+    structural relation like generates; it is not a dependency and is never collapsed.
+E2  Every macro call node that is written in a source file has exactly one expands row.
+E3  Site: the whole macro call, the same site as its generates rows.
+E4  Target: the definition that the stored textual-scope lookup for the call's macro path
+    names. All stored lookups for one call must name the same definition, else a typed error.
+E5  Cross-check: every output token the expansion row says was copied from a definition
+    must lie inside the target definition's byte range, in the same file. A mismatch is a
+    typed error, never a row.
+E6  A call with no definition in scope and no expansion gets one unresolved row. The reason
+    is the one stored on its expansion row (ExternalSourceMissing for a macro in core), or
+    MissingTarget when no row exists.
+E7  A call that was expanded but has no stored lookup naming a definition (a macro called
+    by a path such as crate::m!) stops the run with a typed error. Not built; itoa has none.
+E8  The row's metadata is JSON: {"macro_name_text": .., "macro_matched_arm_index": N}; the
+    index is present only when the call was expanded. It tells a reader which arm to edit.
+E9  The validator rejects an expands row whose source is not a macro call node, whose
+    target is not a macro definition node, or whose site is not the source call.
+E10 The stage line prints expands=N.
+```
+
+A call written by a macro (nested expansion) is not a node (section 2, R4), so it has no row.
+
+### 9.3 Predicted on itoa
+
+15 `expands` rows, all with a target, split 5 / 6 / 4; arm index 0 on all 15; 300 edges
+(285 + 15); nodes unchanged at 103. The expected graph has no macro nodes, so these 15 rows
+match nothing in it until part 7 repairs it.
+
+### 9.4 Tests
+
+```text
+test                                kind         proves
+test_expands_edge_row_counts        real source  E1-E5, E8: 15 rows, 5/6/4, site, arm 0, 300 edges
+test_expands_row_endpoint_kinds     fixture      E9: wrong source kind, wrong target kind, wrong site
+test_expands_unresolved_call_row    fixture      E2, E6: a call with no definition gets one unresolved row
+test_expands_token_origin_mismatch  fixture      E5: a copied token outside the definition stops the run
+```
+
+### 9.5 Open questions (5c)
+
+- **Q12.** E7: macros called by path. Needs the resolved binding stored per call.
+- **Q13.** A builtin or `include!` call at item position: unresolved by E6; no fixture yet.
+- **Q14.** Several stored lookups per call (one per scope revision) are required to agree
+  (E4). A macro defined by a macro that shadows an earlier one would fail this; untested.
+
+Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only:
+[record](../../devin-research/1794770900-second-opinion-glm-5-3-max-part-5c-expands-edge.md).
