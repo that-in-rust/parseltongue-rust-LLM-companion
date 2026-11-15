@@ -3081,3 +3081,76 @@ fn test_generated_fmt_static_reads() {
         .count();
     assert_eq!(pending, 10);
 }
+
+/// REQ-RUST-052.0 G3: a `reads` row sited in expanded text names where its first and its
+/// last token were copied from in `src/lib.rs`, apart: the macro definition, or the call.
+/// A row sited in original text has no such record.
+#[test]
+fn test_generated_read_source_origins() {
+    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let mut shapes = std::collections::BTreeMap::<(String, String), usize>::new();
+    for edge in input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+    {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let expanded = !edge
+            .edge_evidence_row_key
+            .evidence_site_occurrence_key
+            .read_semantic_occurrence_parts()
+            .span_expansion_provenance_chain
+            .is_empty();
+        let origin = &metadata["expansion_source_origin"];
+        if !expanded {
+            assert!(origin.is_null(), "{metadata}");
+            continue;
+        }
+        let read = |token: &Value| {
+            assert_eq!(token["token_source_relative_path"], "src/lib.rs");
+            let range = &token["token_source_byte_range"];
+            (
+                token["token_source_origin_kind"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+                source[range[0].as_u64().unwrap() as usize..range[1].as_u64().unwrap() as usize]
+                    .to_owned(),
+            )
+        };
+        let first = read(&origin["site_first_token_origin"]);
+        let last = read(&origin["site_last_token_origin"]);
+        let text = metadata["read_source_text"].as_str().unwrap();
+        assert!(
+            text.starts_with(&first.1) && text.ends_with(&last.1),
+            "{text}"
+        );
+        assert_eq!(last.0, "definition", "{text}");
+        *shapes
+            .entry((format!("{} {}", first.0, first.1), last.1))
+            .or_default() += 1;
+    }
+    let count = |first: &str, last: &str| {
+        shapes
+            .iter()
+            .filter(|((start, end), _)| start == first && end == last)
+            .map(|(_, count)| *count)
+            .sum::<usize>()
+    };
+    assert_eq!(count("definition DECIMAL_PAIRS", "DECIMAL_PAIRS"), 24);
+    assert_eq!(shapes.values().sum::<usize>(), 34);
+    // `Self::MAX_STR_LEN` is written in the macro definition; in `$Unsigned::MAX_STR_LEN` the
+    // type name is copied from the call and the const name from the definition.
+    let from_call = shapes
+        .iter()
+        .filter(|((first, last), _)| first.starts_with("invocation u") && last == "MAX_STR_LEN")
+        .map(|(_, count)| *count)
+        .sum::<usize>();
+    assert_eq!(
+        (count("definition Self", "MAX_STR_LEN"), from_call),
+        (10 - from_call, from_call)
+    );
+    assert!(from_call > 0, "{shapes:?}");
+}

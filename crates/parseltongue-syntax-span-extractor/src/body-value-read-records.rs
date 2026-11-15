@@ -1,3 +1,4 @@
+use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -77,6 +78,7 @@ pub fn resolve_body_read_edges(
         .unwrap_or("");
     let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
     let lookup = build_bound_method_index(store, source_scope, &context, input)?;
+    let origins = read_expanded_token_origins(store, source_scope)?;
     let endpoints = input
         .input_node_records
         .iter()
@@ -99,6 +101,7 @@ pub fn resolve_body_read_edges(
             request,
             &context,
             &lookup,
+            &origins,
             &endpoints,
             input.run_generation_digest_value,
         )? {
@@ -262,13 +265,15 @@ fn resolve_read_path_target(
     )))
 }
 
-/// The `reads` edge of one original path expression whose owner is a graph
-/// node, with or without a target.
+/// The `reads` edge of one path expression whose owner is a graph node, with
+/// or without a target. A row sited in expanded text also names where its
+/// first and its last token were copied from.
 fn build_body_read_edge(
     site: &Value,
     request: &Value,
     context: &ImplHeaderSourceContext<'_>,
     lookup: &BoundMethodLookupIndex,
+    origins: &ExpandedTokenOriginIndex,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, BodyReadEdgeError> {
@@ -295,11 +300,15 @@ fn build_body_read_edge(
     if !endpoints.contains(&source) {
         return Ok(None);
     }
-    let Some((resolution, metadata)) =
+    let Some((resolution, mut metadata)) =
         resolve_read_path_target(site, request, context, lookup, endpoints)?
     else {
         return Ok(None);
     };
+    let origin = origins.build_site_origin_value(site, context)?;
+    if !origin.is_null() {
+        metadata["expansion_source_origin"] = origin;
+    }
     let evidence = build_site_evidence_value(site)?;
     let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
     let target = match &resolution {

@@ -203,18 +203,18 @@ impl ImplHeaderSourceContext<'_> {
             .ok_or_else(|| ImplHeaderSourceError::InvalidReference { key: key.into() })
     }
 
-    pub(super) fn occurrence(&self, span: &Value) -> Result<Value, ImplHeaderSourceError> {
-        let raw = required_impl_source_string(span, "unit_compilation_identity_key")?;
-        let unit = self
-            .roots
-            .get(raw)
-            .ok_or_else(|| ImplHeaderSourceError::InvalidReference { key: raw.into() })?;
+    /// The path of a source file as occurrence identities name it: relative to
+    /// the package root of its unit, else to the workspace.
+    pub(super) fn relate_unit_source_path(
+        &self,
+        unit: &str,
+        absolute: &str,
+    ) -> Result<String, ImplHeaderSourceError> {
         let package = self
             .units
-            .get(raw)
-            .ok_or_else(|| ImplHeaderSourceError::InvalidReference { key: raw.into() })?;
-        let absolute = required_impl_source_string(span, "file_source_absolute_path")?;
-        let relative = Path::new(absolute)
+            .get(unit)
+            .ok_or_else(|| ImplHeaderSourceError::InvalidReference { key: unit.into() })?;
+        Ok(Path::new(absolute)
             .strip_prefix(required_impl_source_string(
                 package,
                 "unit_package_root_path",
@@ -226,7 +226,17 @@ impl ImplHeaderSourceContext<'_> {
                     "external-source/{}/source.rs",
                     blake3::hash(absolute.as_bytes()).to_hex()
                 )
-            });
+            }))
+    }
+
+    pub(super) fn occurrence(&self, span: &Value) -> Result<Value, ImplHeaderSourceError> {
+        let raw = required_impl_source_string(span, "unit_compilation_identity_key")?;
+        let unit = self
+            .roots
+            .get(raw)
+            .ok_or_else(|| ImplHeaderSourceError::InvalidReference { key: raw.into() })?;
+        let absolute = required_impl_source_string(span, "file_source_absolute_path")?;
+        let relative = self.relate_unit_source_path(raw, absolute)?;
         let start = required_impl_source_offset(span, "span_byte_start_offset")?;
         let end = required_impl_source_offset(span, "span_byte_end_offset")?;
         let text = required_impl_source_string(span, "span_source_code_text")?;
