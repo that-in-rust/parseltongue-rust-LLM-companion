@@ -97,3 +97,50 @@ curl -s -G -H "Authorization: Bearer $ZAI_API_KEY" --data-urlencode "startTime=$
    smoke      echo 'Reply with exactly the word pong.' | ~/bin/zcode -p --output-format text --model glm-5.3-flash   → pong (~5 s)
    quota      curl -s -H "Authorization: Bearer $ZAI_CODING_PLAN_API_KEY" https://api.z.ai/api/monitor/usage/quota/limit
 ```
+
+## 7. Maximum-capability settings and the pi harness (added 2026-11-15)
+
+Read from docs.z.ai that day (devpack/tool/claude, devpack/latest-model, devpack/tool/pi, devpack/tool/others,
+guides/llm/glm-5.3) and checked on this VM. Sections 2 and 4 above show the older launcher; this section is in force.
+
+```text
+   model            glm-5.3: 1M context, 128K max output, text only. Reasoning is always on; effort low | high | max,
+                    default max, and max is what Z.ai recommends for coding.
+   supported tools  Claude Code and Pi are official coding tools. Hermes Agent is a "general-purpose agent" served
+                    best-effort and rate-limited under load, so it is not used here.
+   quota            Max plan; 0 % of the 5-hour token budget used before the 2026-11-15 runs.
+```
+
+Pi (default harness):
+```text
+   install     npm install -g --ignore-scripts @earendil-works/pi-coding-agent      (1.5.2 tested, Node 22)
+   key         ZAI_API_KEY in the process env = the Coding Plan key (a pay-as-you-go key fails with 1113)
+   model       pi --list-models glm-5.3   →  zai glm-5.3, context 1M, max-out 131.1K, thinking yes
+   MCP         pi mcp add codebase-memory -- ~/.local/bin/codebase-memory-mcp      (written to ~/.pi/agent/mcp.json)
+   launcher    ~/bin/zpi = pi -p --provider zai --model glm-5.3 --thinking max --no-session --no-approve
+                           --tools read,grep,find,ls --exclude-tools '*delete_project*,*index_repository*,*manage_adr*,*ingest_traces*'
+   run         ~/bin/zpi @zcode-runs/<name>-prompt.txt > zcode-runs/<name>-pi.md 2> zcode-runs/<name>-pi.err
+```
+
+Claude Code (second voice):
+```text
+   launcher    ~/bin/zcode now sets the three model slots to glm-5.3[1m] / glm-5.3-flash[1m],
+               CLAUDE_CODE_AUTO_COMPACT_WINDOW=1000000, CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000, DISABLE_TELEMETRY=1
+   run         ~/bin/zcode -p --effort max --output-format text --allowedTools "Read,Glob,Grep,LS,mcp__codebase-memory-mcp"
+                   < zcode-runs/<name>-prompt.txt > zcode-runs/<name>-claude.md 2> zcode-runs/<name>-claude.err
+   checked     the JSON result reports contextWindow 1000000 for glm-5.3[1m]; maxOutputTokens stayed 32000
+   before      the old launcher named plain glm-5.3, so earlier runs had a 200K window
+```
+
+Not measured: whether effort max reasons more deeply than low (the usage report shows no thinking-token count),
+and the token cost of a run. Both harnesses print nothing until they finish; wait on a marker file written
+after the command, not on pgrep.
+
+Not yet in the VM blueprint: the pi install, ~/bin/zpi, ~/.pi/agent/mcp.json and the updated ~/bin/zcode.
+
+Run log, continued:
+```text
+   2026-11-15  glm-5.3 thinking max, pi 1.5.2           nine open questions on the itoa full graph   850 s    25.7 KB answer
+   2026-11-15  glm-5.3[1m] effort max, Claude Code 2.1.319   same prompt                              1113 s   24.3 KB answer
+   recorded in docs/devin-research/1794719045-second-opinion-glm-5-3-max-two-harness-review-of-itoa-open-questions.md
+```

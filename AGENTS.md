@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Rules for any agent working in this repository. Read top to bottom: the answer first,
-then the four rules that follow from it, then reference facts.
+then the five rules that follow from it, then reference facts.
 
 ## The answer
 
@@ -89,7 +89,7 @@ Scope:
   message that says what changed and why. Push after each. Do not hold work back for a full
   rewrite. Only a delete-only commit may be larger.
 - **Spec first.** Before code for a new target, write its part file in the SPEC folder with
-  the skill `rust-executable-specs-spec-first-architecture` (seven sections), and update the
+  the skill `rust-executable-specs-01` (seven sections), and update the
   index in the same commit. Parts not yet picked stay stubs.
 - **Test first.** Write a failing real-source test on pinned itoa, make it pass with the smallest general change, refactor. A RED or GREEN
   claim needs a nonzero selected-test count and a test that reached the intended behaviour.
@@ -155,6 +155,43 @@ Two limits:
 - **Confirm in source.** Its call edges are matched by name and some are wrong. Check every
   claim taken from it against the source lines before writing it down or acting on it
   (Rule 1: navigation, not evidence).
+
+## Rule 5 — Get a second opinion before a design decision
+
+GLM-5.3 on the Z.ai Coding Plan is a second reader with no stake in the current plan. Use it
+at its maximum setting, read-only, and treat what it says as claims to check.
+
+- **When.** Before writing a part file that fixes a design choice; before asking the user to
+  decide an open decision; when a step has failed twice; and whenever the user asks for a
+  review of the work.
+- **How.** Write the prompt to `~/zcode-runs/<date>-<topic>-prompt.txt`: the goal, the measured
+  state, each open question with the current lean, and "tell me what I did not ask". Tell it
+  to read the repository itself and to cite `path:line`. Then run:
+
+  ```bash
+  ~/bin/zpi @~/zcode-runs/<name>-prompt.txt > ~/zcode-runs/<name>-pi.md 2> ~/zcode-runs/<name>-pi.err
+  ```
+
+  `zpi` is the pi coding agent with `--provider zai --model glm-5.3 --thinking max`, tools
+  `read,grep,find,ls` and the codebase-memory read tools. For a decision that blocks more than
+  one part, also run the same prompt through Claude Code and compare the two:
+
+  ```bash
+  ~/bin/zcode -p --effort max --output-format text --allowedTools "Read,Glob,Grep,LS,mcp__codebase-memory-mcp" \
+      < ~/zcode-runs/<name>-prompt.txt > ~/zcode-runs/<name>-claude.md 2> ~/zcode-runs/<name>-claude.err
+  ```
+
+  A run takes 10 to 20 minutes. Never give either one write, edit or shell tools for a review.
+- **Check.** Confirm each claim you intend to use against the source lines (Rule 1). The
+  reviewer cannot run the pipeline, so its counts are arithmetic, not measurements.
+- **Record.** Put the prompt and each output verbatim in a new file under
+  `docs/devin-research/`, with the claims confirmed, the claims not checked, and where we
+  disagree. Its advice changes a decision only through the SPEC, ARCH or backlog, never by
+  being copied into them unchecked.
+- **Report.** Tell the user where it disagreed with the plan, including advice not taken.
+
+Setup, quota and settings: [second-opinion SOP](docs/devin-research/sop/SOP-zai-glm-coding-plan-second-opinion.md).
+Latest review: [2026-11-15](docs/devin-research/1794719045-second-opinion-glm-5-3-max-two-harness-review-of-itoa-open-questions.md).
 
 ## Reference
 

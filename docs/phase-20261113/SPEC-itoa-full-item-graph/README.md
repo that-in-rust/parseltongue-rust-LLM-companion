@@ -34,7 +34,7 @@ every higher-abstraction table (interface level, HLD, file and folder roll-ups).
 ## How a part is written
 
 1. **One part per target, written before its code.** When a target is picked, write its part
-   with the skill `rust-executable-specs-spec-first-architecture`, in that skill's seven
+   with the skill `rust-executable-specs-01`, in that skill's seven
    sections: work mode, executable requirements, design by layer, verification matrix,
    implementation plan, quality gate results, open questions.
 2. **Until a part is picked it is a stub**: the requirement in a few lines and what blocks it.

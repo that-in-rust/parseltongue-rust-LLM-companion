@@ -1,6 +1,6 @@
 # Part 4b — `implements` edges from impl headers
 
-Written 2026-11-15 with `rust-executable-specs-spec-first-architecture`, before any code.
+Written 2026-11-15 with `rust-executable-specs-01`, before any code.
 
 ## The answer
 
