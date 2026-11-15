@@ -571,10 +571,12 @@ removed: R7 is superseded by G1.
   byte range without its text. It now returns nothing for a site in expanded text, so a test
   cannot slice `src/lib.rs` with a range of an expansion.
 - **Q21.** The 136 generated calls have no target. 18 are bare names of this crate's own
-  functions (`divmod100`, `slice_buffer_to_str`) and 10 are `Self::fmt` / `uN::fmt`. The
-  namespace stage does not request the callee path of a call (only its type prefix), so no
-  stored lookup exists for them. Requesting callee paths is the next change to `calls`
-  (step 5 for the `fmt` rows, part 5e for bare names).
+  functions (`divmod100`, `slice_buffer_to_str`); 8 more are in original bodies. The
+  namespace stage does not request the callee path of a call (only its prefix), so no
+  stored lookup exists for a bare name. 10 are `Unsigned ::fmt(..)`: the prefix is stored
+  as the trait, and the lookup does not take a trait as prefix. The expected graph targets
+  the impl member (`<uN as Unsigned>::fmt`), which needs the type of the first argument;
+  the trait method `Unsigned::fmt` is provable from the path alone. Both are part 5e.
 - **Q22.** G6 asks for "the stored reason". For a callee that was never requested there is
   no stored reason. The typed reason stays `TraitSolverNeeded` (the existing rule for a
   call shape the resolver does not handle) and the row's `unresolved_detail_kind` says what
@@ -690,44 +692,61 @@ expansion_source_origin   only on a row sited in expanded text (G3)
 `dispatch_kind` no longer has the value `original_associated_function`; a target chosen
 through a type path is `type_path_associated_function` wherever the call is written.
 
-The 197 rows on pinned itoa, read from the exported edge table:
+The 197 rows on pinned itoa, read from the exported edge table (run after step 4b):
 
 ```text
-rows  written in  call_shape_kind      dispatch_kind                  unresolved_detail_kind
-104   expansion   method_call          undetermined                   receiver_type_not_determined
-18    expansion   bare_name_call       undetermined                   callee_path_not_requested
-10    expansion   qualified_path_call  undetermined                   type_prefix_unresolved
-4     expansion   qualified_path_call  undetermined                   callee_path_not_requested
-36    source      method_call          undetermined                   receiver_type_not_determined
-10    source      qualified_path_call  undetermined                   member_lookup_unproven
-9     source      bare_name_call       undetermined                   callee_path_not_requested
-2     source      qualified_path_call  undetermined                   type_prefix_unresolved
-1     source      qualified_path_call  undetermined                   callee_path_not_requested
-2     source      qualified_path_call  type_path_associated_function  -
-1     source      method_call          generic_bound_trait_method     -
+rows  written in  call_shape_kind      dispatch_kind                  unresolved_detail_kind        typed reason
+104   expansion   method_call          undetermined                   receiver_type_not_determined  TraitSolverNeeded
+18    expansion   bare_name_call       undetermined                   callee_path_not_requested     TraitSolverNeeded
+10    expansion   qualified_path_call  undetermined                   type_prefix_is_trait          TraitSolverNeeded
+4     expansion   qualified_path_call  undetermined                   type_prefix_unresolved        ExternalSourceMissing
+36    source      method_call          undetermined                   receiver_type_not_determined  TraitSolverNeeded
+10    source      qualified_path_call  undetermined                   member_lookup_unproven        MissingTarget
+9     source      bare_name_call       undetermined                   callee_path_not_requested     TraitSolverNeeded
+2     source      qualified_path_call  undetermined                   type_prefix_unresolved        ExternalSourceMissing
+1     source      qualified_path_call  undetermined                   type_prefix_is_module         TraitSolverNeeded
+2     source      qualified_path_call  type_path_associated_function  -                             -
+1     source      method_call          generic_bound_trait_method     -                             -
 ```
 
-- The 136 generated rows by callee: 104 method calls, 10 `slice_buffer_to_str`, 8
-  `divmod100`, 10 `fmt` (`Self::fmt` / `uN::fmt`), 4 `size_of`.
+- The 136 generated rows by callee text: 104 method calls, 10 `slice_buffer_to_str`, 8
+  `divmod100`, 10 `Unsigned ::fmt` (a call through the trait's path), 4
+  `mem ::size_of ::<Self >`.
+- The 9 bare names in original bodies: 4 `divmod100`, 2 `div_rem_1e16`, 2 `enc_16lsd::<..>`,
+  1 `DecimalPairs` (a tuple struct used as a constructor).
 - All 136 are sited inside the expanded text of their own node and carry
   `expansion_source_origin`. A call whose chain differs from its owner's stops the run with
   a typed error (G2).
-- **Prediction that was wrong:** I expected the 10 generated `fmt` rows to stop at member
-  lookup. Measured: their type prefix (`Self`, `uN`) has no stored target, so they stop one
-  step earlier, `type_prefix_unresolved`. The test pins the measured value.
 - **No new target.** Resolved calls stay at 3. See Q21.
 - **Against the expected graph:** it has 102 grouped `calls` rows (its summary file). A
   row without a target cannot match one, so the matched count is unchanged by this step.
 
+**Step 4b (same day): two things step 4 got wrong, corrected.**
+
+- I wrote that the 10 generated `fmt` calls are `Self::fmt` / `uN::fmt` and that their prefix
+  has no stored target. Read from the stored path rows: the callee is `Unsigned ::fmt`, and
+  its prefix `Unsigned` is stored as resolved, to the trait. The lookup stops because it
+  accepts only a struct, enum, union or builtin as prefix. The detail is now
+  `type_prefix_is_trait`; the one `u128_ext::mulhi` call is `type_prefix_is_module`.
+- G6, "the stored reason": 5 calls whose shape the lookup does not handle
+  (4 `mem ::size_of ::<Self >`, 1 `MaybeUninit::<u8>::uninit`) have a prefix that was looked
+  up and is stored as `external_source_missing`. Their typed reason was the catch-all
+  `TraitSolverNeeded`; it is now `ExternalSourceMissing`, with detail
+  `type_prefix_unresolved`.
+- Calls by typed reason after 4b: 178 `TraitSolverNeeded`, 10 `MissingTarget`,
+  6 `ExternalSourceMissing`, 3 with a target.
+
 ```text
 real-source test, new          test_generated_body_call_rows failed first on a missing
-                               call_source_text, then on the fmt detail (see above), then passed
+                               call_source_text, then passed; for 4b it failed on
+                               fmt type_prefix_unresolved / size_of callee_path_not_requested
+                               against the corrected expectation, then passed
 fixture test, new              test_call_metadata_site_mismatch: metadata of a resolved and an
                                unsupported call; a site in another text than its owner is a
                                typed error. Passed on first run (written after the code)
 real-source test, changed      test_generates_edge_row_counts: 366 -> 502 edges
 syntax crate tests             93 + 17 passed
-real-source itoa tests         40 passed, 0 failed, 82 s, release, default threads
+real-source itoa tests         40 passed, 0 failed, 88 s after 4b, release, default threads
 format (workspace), lint       pass (2 touched crates)
 graph                          103 nodes, 502 edges (was 366); still incomplete
 workspace gates, run cost      not run for this step; they run at the end of part 5d

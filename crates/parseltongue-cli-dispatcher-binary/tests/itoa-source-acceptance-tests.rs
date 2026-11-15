@@ -3370,11 +3370,11 @@ fn test_generated_body_call_rows() {
                 104
             ),
             (
-                "qualified_path_call fmt type_prefix_unresolved".to_owned(),
+                "qualified_path_call fmt type_prefix_is_trait".to_owned(),
                 10
             ),
             (
-                "qualified_path_call size_of callee_path_not_requested".to_owned(),
+                "qualified_path_call size_of type_prefix_unresolved".to_owned(),
                 4
             ),
         ])

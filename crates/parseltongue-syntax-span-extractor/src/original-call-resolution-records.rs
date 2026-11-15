@@ -200,16 +200,40 @@ fn build_original_call_edge(
     } else if syntax["call_supported_path_flag"] != true
         || syntax["call_lexical_shadowing_flag"] != false
     {
-        (
-            unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded),
-            if syntax["call_lexical_shadowing_flag"] == true {
-                "callee_prefix_lexically_shadowed"
-            } else if syntax["member_declared_name_value"].is_null() {
-                "callee_expression_not_path"
-            } else {
-                "callee_path_not_requested"
-            },
-        )
+        // A callee shape the lookup does not handle. When its prefix was looked up and has
+        // a stored reason for having no target, that reason is the row's reason.
+        let stored = (syntax["call_lexical_shadowing_flag"] == false
+            && !syntax["type_source_evidence"].is_null())
+        .then(|| context.read_type_path_records(&evidence, &syntax["type_source_evidence"]))
+        .transpose()?
+        .and_then(|paths| match paths {
+            [path] if path["path_resolution_state_kind"] == "unresolved" => {
+                match path["path_unresolved_reason_kind"].as_str() {
+                    Some("cfg_inactive") => Some(HldUnresolvedReasonKind::CfgInactive),
+                    Some("external_source_missing") => {
+                        Some(HldUnresolvedReasonKind::ExternalSourceMissing)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        });
+        match stored {
+            Some(reason) => (
+                unresolved_call_target_value(reason),
+                "type_prefix_unresolved",
+            ),
+            None => (
+                unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded),
+                if syntax["call_lexical_shadowing_flag"] == true {
+                    "callee_prefix_lexically_shadowed"
+                } else if syntax["member_declared_name_value"].is_null() {
+                    "callee_expression_not_path"
+                } else {
+                    "callee_path_not_requested"
+                },
+            ),
+        }
     } else {
         let paths = context.read_type_path_records(&evidence, &syntax["type_source_evidence"])?;
         let receiver = context.resolve_type(&evidence, &syntax["type_source_evidence"], false)?;
@@ -235,7 +259,21 @@ fn build_original_call_edge(
                     Some("trait_solver_needed") => HldUnresolvedReasonKind::TraitSolverNeeded,
                     _ => HldUnresolvedReasonKind::MissingTarget,
                 }),
-                "type_prefix_unresolved",
+                // The prefix may have a target that is not a type: a trait or a module.
+                match paths {
+                    [path] => match path["path_target_symbol_rows"]
+                        .as_array()
+                        .map(Vec::as_slice)
+                    {
+                        Some([target]) => match target["target_symbol_kind_value"].as_str() {
+                            Some("Trait") => "type_prefix_is_trait",
+                            Some("Module") => "type_prefix_is_module",
+                            _ => "type_prefix_unresolved",
+                        },
+                        _ => "type_prefix_unresolved",
+                    },
+                    _ => "type_prefix_unresolved",
+                },
             )
         } else {
             (

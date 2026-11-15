@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 197 calls resolved (136 of the 197 start in macro-generated function bodies), 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 197 calls resolved (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (39 with a
 target, 16 unresolved; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -107,6 +107,35 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 04:10 IST — Part 5d step 4b: correction to step 4, and the stored reason on 5 calls (REQ-RUST-052.0 G6)
+
+- **Correction to the entry below.** It says the 10 generated `fmt` calls are `Self::fmt` /
+  `uN::fmt` with a prefix that has no stored target, and counts 27 calls to this crate's
+  own free functions. Both were written without reading the rows. Read from the stored
+  path table of the step-4 run: the callee is `Unsigned ::fmt`; its prefix is stored as
+  resolved, to the trait `Unsigned`. The bare names are 26 calls to own free functions
+  (18 generated, 8 original) and 1 `DecimalPairs(..)` constructor.
+- **Stored prefix rows of call sites** (table `path-resolution-site-records`, context
+  `body_call_type_prefix`): 10 `Unsigned` resolved Trait; 1 `u128_ext` resolved Module;
+  9 `u128`, 1 `str` Builtin; 2 `Buffer` Struct; 4 `mem`, 1 `hint`, 1 `MaybeUninit::<u8>`
+  unresolved `external_source_missing`.
+- **RED.** `test_generated_body_call_rows` with the corrected expectation: 0 passed, 1
+  failed, `left: {.. "qualified_path_call fmt type_prefix_unresolved": 10,
+  "qualified_path_call size_of callee_path_not_requested": 4} right: {.. "qualified_path_call
+  fmt type_prefix_is_trait": 10, "qualified_path_call size_of type_prefix_unresolved": 4}`.
+- **GREEN.** A prefix stored as a trait or a module gives `type_prefix_is_trait` /
+  `type_prefix_is_module`. A call shape the lookup does not handle, whose prefix is stored
+  unresolved with `cfg_inactive` or `external_source_missing`, takes that stored reason
+  instead of `TraitSolverNeeded` (5 rows on itoa: 4 `mem ::size_of ::<Self >`, 1
+  `MaybeUninit::<u8>::uninit`).
+- **Measured after.** 197 calls, 502 edges, 3 resolved. By typed reason: 178
+  `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`.
+- **Gates.** `cargo fmt --all -- --check`: pass. Lint on the syntax crate: pass. Syntax
+  crate: 93 + 17 passed. Real-source itoa tests: 40 passed, 0 failed, 88.42 s.
+- **Weak evidence.** No fixture test pins the two new detail values or the stored-reason
+  branch; only the itoa test does.
+- **Next.** Step 5 (G5), unchanged.
 
 ### 2026-11-16 03:40 IST — Part 5d step 4 built: `calls` from generated bodies (REQ-RUST-052.0 G1-G3, G6)
 
