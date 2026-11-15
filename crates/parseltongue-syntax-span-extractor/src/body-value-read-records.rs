@@ -404,10 +404,12 @@ fn build_body_read_edge(
     }))
 }
 
-/// Whether `path` is a whole path expression in a function body that may name
-/// a `static` or `const`: it is not a call's callee and its single name is not
-/// bound by a parameter or pattern in scope. Items and generic parameters are
-/// left to name resolution, which knows the block scopes.
+/// Whether `path` is a whole path expression that may name a `static` or
+/// `const`: it is not a call's callee and its single name is not bound by a
+/// parameter or pattern in scope. It is written in a function body, in the
+/// initializer of a `const` or `static`, or in an expression of a type, such as
+/// an array length (REQ-RUST-052.0 G7). Items and generic parameters are left
+/// to name resolution, which knows the block scopes.
 pub(super) fn check_body_value_path(path: &ast::Path) -> bool {
     let Some(expression) = path.syntax().parent().and_then(ast::PathExpr::cast) else {
         return false;
@@ -415,9 +417,8 @@ pub(super) fn check_body_value_path(path: &ast::Path) -> bool {
     let site = expression.syntax();
     let in_body = site
         .ancestors()
-        .find_map(ast::Fn::cast)
-        .and_then(|function| function.body())
-        .is_some_and(|body| body.syntax().text_range().contains_range(site.text_range()));
+        .skip(1)
+        .any(|node| ast::Item::can_cast(node.kind()));
     let callee = site
         .parent()
         .and_then(ast::CallExpr::cast)
@@ -445,7 +446,8 @@ pub(super) fn check_body_value_prefix(path: &ast::Path) -> bool {
 }
 
 /// Whether the single name of `path` is `self` or is bound by a pattern whose
-/// scope covers the path. A pattern of another function never covers it.
+/// scope covers the path. A pattern outside the nearest item the path is
+/// written in, such as one of another function, never covers it.
 pub(super) fn check_local_value_binding(path: &ast::Path) -> bool {
     let name = match (path.qualifier(), path.segment()) {
         (None, Some(segment)) => segment.syntax().text().to_string(),
@@ -453,7 +455,10 @@ pub(super) fn check_local_value_binding(path: &ast::Path) -> bool {
     };
     let name = name.trim_start_matches("r#");
     let site = path.syntax();
-    let function = site.ancestors().find(|node| node.kind() == SyntaxKind::FN);
+    // An item written in a function sees none of the function's locals.
+    let function = site
+        .ancestors()
+        .find(|node| ast::Item::can_cast(node.kind()));
     name == "self"
         || function.iter().any(|function| {
             function

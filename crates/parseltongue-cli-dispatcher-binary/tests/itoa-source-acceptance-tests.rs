@@ -2186,13 +2186,19 @@ fn test_sysroot_reached_names_reasoned() {
         prefix_kinds,
         std::collections::BTreeMap::from([
             kind("I", "TypeParam", 1),
-            kind("i128", "Builtin", 1),
+            // G7: one `uN::MAX` or `iN::MAX` in each generated `MAX_STR_LEN` initializer,
+            // and `i128::MAX_STR_LEN` in the array length of `Buffer`'s field.
+            kind("i128", "Builtin", 3),
+            kind("i16", "Builtin", 1),
+            kind("i32", "Builtin", 1),
+            kind("i64", "Builtin", 1),
+            kind("i8", "Builtin", 1),
             // 5 in the source-written `fmt` for u128, 1 in the generated `write` for i128
-            kind("u128", "Builtin", 6),
-            kind("u16", "Builtin", 1),
-            kind("u32", "Builtin", 1),
-            kind("u64", "Builtin", 1),
-            kind("u8", "Builtin", 1),
+            kind("u128", "Builtin", 7),
+            kind("u16", "Builtin", 2),
+            kind("u32", "Builtin", 2),
+            kind("u64", "Builtin", 2),
+            kind("u8", "Builtin", 2),
         ])
     );
     // REQ-RUST-052.0 G9: the whole callee path of a call is its own request kind.
@@ -2282,16 +2288,38 @@ fn test_sysroot_reached_names_reasoned() {
     assert_eq!(count_sites("Copy", missing()), 2);
     assert_eq!(count_sites("Default", missing()), 1);
     assert_eq!(count_sites("Clone", missing()), 1);
-    assert_eq!(count_sites("Self::MAX_STR_LEN", Value::Null), 10);
+    // G7: `Self::MAX_STR_LEN` in the array length of a generated `Buffer` alias is a value
+    // path now, as `i128::MAX_STR_LEN` in the array length of `Buffer`'s field is.
+    assert_eq!(count_sites("Self::MAX_STR_LEN", Value::Null), 0);
+    let count_values = |text: &str| {
+        body_values
+            .iter()
+            .filter(|row| {
+                row["path_site_source_text"]
+                    .as_str()
+                    .is_some_and(|source| source.split_whitespace().collect::<String>() == text)
+            })
+            .count()
+    };
+    assert_eq!(
+        (
+            count_values("Self::MAX_STR_LEN"),
+            count_values("i128::MAX_STR_LEN")
+        ),
+        // 5 in generated `write` bodies and 10 in generated `Buffer` aliases; one in the
+        // generated `write` for i128 and one in `Buffer`'s field
+        (15, 2)
+    );
     assert_eq!(count_sites("Self::Buffer", Value::Null), 5);
-    assert_eq!(count_sites("i128::MAX_STR_LEN", Value::Null), 1);
+    assert_eq!(count_sites("i128::MAX_STR_LEN", Value::Null), 0);
     let count_state = |state: &str| {
         paths
             .iter()
             .filter(|row| row["path_resolution_state_kind"] == state)
             .count()
     };
-    assert_eq!(paths.len(), 204);
+    // G7: 11 fewer than before; the array-length paths above are value paths now.
+    assert_eq!(paths.len(), 193);
     assert_eq!(count_state("resolved"), 166);
     assert_eq!(count_state("ambiguous"), 0);
     let reasoned = paths
@@ -2380,7 +2408,7 @@ fn test_itoa_reads_row_counts() {
             })
             .count()
     };
-    assert_eq!(rows.len(), 21, "sited in original text");
+    assert_eq!(rows.len(), 22, "sited in original text");
     assert_eq!(
         (count("DECIMAL_PAIRS", true), count("I::MAX_STR_LEN", true)),
         (14, 1)
@@ -2390,10 +2418,11 @@ fn test_itoa_reads_row_counts() {
             count("u128::MAX_STR_LEN", true),
             count("i128::MAX_STR_LEN", true)
         ),
-        (5, 1),
-        "REQ-RUST-052.0 G5: the const of the one stored trait impl of the builtin type"
+        (5, 2),
+        "REQ-RUST-052.0 G5: the const of the one stored trait impl of the builtin type; \
+         G7: `i128::MAX_STR_LEN` is also the array length of `Buffer`'s field"
     );
-    assert_eq!(rows.len(), 20 + 1, "all 21 have a target");
+    assert_eq!(rows.len(), 20 + 2, "all 22 have a target");
     for (edge, site) in &rows {
         if let HldEdgeResolutionValue::Unresolved { reason } = &edge.edge_resolution_value {
             assert_eq!(
@@ -2402,10 +2431,19 @@ fn test_itoa_reads_row_counts() {
                 "no reason was stored for {site}"
             );
         }
-        if *site == "i128::MAX_STR_LEN" {
-            assert_eq!(edge.edge_source_reference, new.node_target_reference);
-        }
     }
+    // G7: `i128::MAX_STR_LEN` is read by `Buffer::new` and, as the array length of its field,
+    // by the struct `Buffer`.
+    let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT");
+    let mut sources = rows
+        .iter()
+        .filter(|(_, site)| *site == "i128::MAX_STR_LEN")
+        .map(|(edge, _)| &edge.edge_source_reference)
+        .collect::<Vec<_>>();
+    sources.sort();
+    let mut expected = [&new.node_target_reference, &buffer.node_target_reference];
+    expected.sort();
+    assert_eq!(sources, expected);
 }
 
 /// REQ-RUST-049.0 R6 R7 R11
@@ -2504,7 +2542,7 @@ fn check_relation_rows_twice(relation: HldRelationKindValue, expected: usize) {
 /// REQ-RUST-048.0 R8
 #[test]
 fn test_reads_rows_read_twice() {
-    check_relation_rows_twice(HldRelationKindValue::Reads, 55);
+    check_relation_rows_twice(HldRelationKindValue::Reads, 78);
 }
 
 /// REQ-RUST-049.0 R12
@@ -2840,7 +2878,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 502);
+    assert_eq!(input.input_edge_records.len(), 525);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3146,12 +3184,14 @@ fn test_generated_fmt_static_reads() {
     };
     assert_eq!(
         stored(HldRelationKindValue::Reads),
-        55,
-        "21 original and 34 generated"
+        78,
+        "22 original and 56 generated"
     );
     // The other 10 generated rows are `Self::MAX_STR_LEN` and `uN::MAX_STR_LEN` in generated
     // `write` bodies. Name lookup alone does not find a trait const through a builtin type;
-    // G5 gives each its target (`test_type_relative_member_targets`), so none is left.
+    // G5 gives each its target (`test_type_relative_member_targets`). G7: the 10 left are
+    // `uN::MAX` and `iN::MAX` in generated `MAX_STR_LEN` initializers: no stored impl of the
+    // builtin type declares `MAX`, and its inherent items in `core` were not read.
     let pending = input
         .input_edge_records
         .iter()
@@ -3168,8 +3208,33 @@ fn test_generated_fmt_static_reads() {
                         reason: HldUnresolvedReasonKind::TraitSolverNeeded,
                     }
         })
-        .count();
-    assert_eq!(pending, 0);
+        .map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            let proof = &metadata["type_relative_member_evidence"];
+            assert_eq!(proof["member_lookup_outcome_kind"], "no_stored_impl_member");
+            assert_eq!(
+                proof["sources_not_read"][0],
+                format!(
+                    "inherent items of builtin type {}",
+                    proof["self_type_builtin_name"].as_str().unwrap()
+                )
+            );
+            metadata["read_source_text"]
+                .as_str()
+                .unwrap()
+                .replace(' ', "")
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        pending,
+        [
+            "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128"
+        ]
+        .iter()
+        .map(|name| format!("{name}::MAX"))
+        .collect()
+    );
 }
 
 /// REQ-RUST-052.0 G3: a `reads` row sited in expanded text names where its first and its
@@ -3230,7 +3295,7 @@ fn test_generated_read_source_origins() {
             .sum::<usize>()
     };
     assert_eq!(count("definition DECIMAL_PAIRS", "DECIMAL_PAIRS"), 24);
-    assert_eq!(shapes.values().sum::<usize>(), 34);
+    assert_eq!(shapes.values().sum::<usize>(), 56);
     // `Self::MAX_STR_LEN` is written in the macro definition; in `$Unsigned::MAX_STR_LEN` the
     // type name is copied from the call and the const name from the definition.
     let from_call = shapes
@@ -3240,7 +3305,9 @@ fn test_generated_read_source_origins() {
         .sum::<usize>();
     assert_eq!(
         (count("definition Self", "MAX_STR_LEN"), from_call),
-        (10 - from_call, from_call)
+        // 10 in generated `write` bodies less those from the call, and (G7) one in the
+        // array length of each of the 10 generated `Buffer` aliases.
+        (20 - from_call, from_call)
     );
     assert!(from_call > 0, "{shapes:?}");
 }
@@ -3508,7 +3575,8 @@ fn test_type_relative_member_targets() {
                 let metadata: Value =
                     serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref()?).ok()?;
                 let text = metadata[text_field].as_str()?.replace(' ', "");
-                let (prefix, name) = text.split_once("::")?;
+                // `<T as Trait>::NAME` is not this rule's: its row is on the trait's declaration.
+                let (prefix, name) = text.split_once("::").filter(|_| !text.starts_with('<'))?;
                 (name == member && prefix != "I")
                     .then(|| (edge, metadata.clone(), prefix.to_owned()))
             })
@@ -3591,9 +3659,11 @@ fn test_type_relative_member_targets() {
             ""
         ),
         std::collections::BTreeMap::from([
-            ((true, true), 5),
+            // G7: 10 more in the array lengths of the generated `Buffer` aliases
+            ((true, true), 15),
             ((false, true), 5),
-            ((false, false), 6)
+            // G7: one more in the array length of `Buffer`'s field
+            ((false, false), 7)
         ])
     );
     // `Self::Buffer` in `impl Unsigned for uN`: the alias is a member of another impl of uN.
@@ -3707,6 +3777,87 @@ fn test_trait_path_call_targets() {
 /// REQ-RUST-052.0 G13: a method call whose receiver is a cast to a stored type
 /// (`(self as u64).write(buf)`) has the one stored impl member of that type as target,
 /// when it is a member of the trait whose impl holds the call. The row keeps the cast's
+/// REQ-RUST-052.0 G7: a const, a type alias and a struct are `reads` sources too. A path
+/// expression in a const's initializer or in an array length of a type is one row, from the
+/// item it is written in. `<T as Trait>::NAME` has the trait's declaration of `NAME` as
+/// target: the impl member for `T` is not chosen yet. `uN::MAX` is in `core` and has none.
+#[test]
+fn test_item_initializer_read_rows() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| {
+                node.node_qualified_path_text
+                    .trim_start_matches("itoa::src/lib.rs::")
+                    .to_owned()
+            })
+            .unwrap()
+    };
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+        .map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            (
+                label(&edge.edge_source_reference),
+                metadata["read_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .replace(' ', ""),
+                match &edge.edge_resolution_value {
+                    HldEdgeResolutionValue::Extracted { target } => label(target),
+                    _ => "-".to_owned(),
+                },
+            )
+        })
+        .filter(|(source, ..)| source.ends_with("MAX_STR_LEN") || source.ends_with("Buffer"))
+        .collect::<Vec<_>>();
+    rows.sort();
+    let row = |source: String, text: String, target: String| (source, text, target);
+    let mut expected = [
+        "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128",
+    ]
+    .iter()
+    .flat_map(|name| {
+        [
+            row(
+                format!("<{name} as Integer>::MAX_STR_LEN"),
+                format!("{name}::MAX"),
+                "-".to_owned(),
+            ),
+            row(
+                format!("<{name} as private::Sealed>::Buffer"),
+                "Self::MAX_STR_LEN".to_owned(),
+                format!("<{name} as Integer>::MAX_STR_LEN"),
+            ),
+        ]
+    })
+    .chain(
+        [("usize", "u64"), ("isize", "i64")]
+            .iter()
+            .map(|(size, fixed)| {
+                row(
+                    format!("<{size} as Integer>::MAX_STR_LEN"),
+                    format!("<{fixed}asInteger>::MAX_STR_LEN"),
+                    "Integer::MAX_STR_LEN".to_owned(),
+                )
+            }),
+    )
+    .chain([row(
+        "Buffer".to_owned(),
+        "i128::MAX_STR_LEN".to_owned(),
+        "<i128 as Integer>::MAX_STR_LEN".to_owned(),
+    )])
+    .collect::<Vec<_>>();
+    expected.sort();
+    assert_eq!(rows, expected);
+}
+
 /// type, the candidates and what was not read.
 #[test]
 fn test_cast_receiver_call_targets() {

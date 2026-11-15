@@ -65,9 +65,28 @@ fn test_callee_path_not_listed() {
             "static S: u8 = T::N; struct T; impl T { const N: u8 = 1; fn new() -> T { T } } \
              fn g(a: [u8; S as usize]) { g([0; T::N as usize]); T::new(); let _ = g; }"
         ),
-        ["T", "T::N", "g"],
-        "no callee, no call prefix, no signature or initializer path; \
-         a function named as a value is listed for resolution to drop"
+        ["T::N", "T", "S", "T::N", "g"],
+        "no callee and no call prefix; a static's initializer and an array length \
+         in a signature are listed (REQ-RUST-052.0 G7); a function named as a value \
+         is listed for resolution to drop"
+    );
+}
+
+/// REQ-RUST-052.0 G7: a path expression in the initializer of a `const` or `static`, or in
+/// an expression of a type (an array length, an enum discriminant), is listed. An item
+/// written in a function sees none of the function's parameters or locals; a `let` in a
+/// const's own block still binds. A path in an attribute of the file is in no item.
+#[test]
+fn test_item_initializer_paths_listed() {
+    assert_eq!(
+        read_body_value_paths(
+            "#![z = Z] const A: u8 = B; static S: [u8; A as usize] = [C; D as usize]; \
+             type T = [u8; E]; struct U([u8; F]); enum V { W = G } \
+             trait X { const Y: u8 = H; } impl X for u8 { const Y: u8 = I; } \
+             fn f(p: u8) { let a = 1; const J: u8 = a + p; \
+             const K: u8 = { let b = 2; b }; struct L([u8; p]); }"
+        ),
+        ["B", "A", "C", "D", "E", "F", "G", "H", "I", "a", "p", "p"],
     );
 }
 
@@ -90,7 +109,7 @@ fn test_value_prefix_path_listed() {
         .collect::<Vec<_>>();
     assert_eq!(
         prefixes,
-        ["u8"],
-        "once, for `u8::N` in the body of g; the const initializer is not a function body"
+        ["u8", "u8"],
+        "for `u8::N` in the const initializer (REQ-RUST-052.0 G7) and in the body of g"
     );
 }
