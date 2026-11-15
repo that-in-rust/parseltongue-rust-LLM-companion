@@ -13,6 +13,10 @@ const HLD_BUILTIN_TYPE_NAMES: [&str; 19] = [
 #[path = "full-graph-validation-tests.rs"]
 mod full_graph_validation_tests;
 
+#[cfg(test)]
+#[path = "generated-node-validation-tests.rs"]
+mod generated_node_validation_tests;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldInputCompletenessKind {
     CompleteTypedInput,
@@ -727,16 +731,17 @@ fn validate_graph_input_records(
         if !unit_origins.contains_key(site_unit_identity) {
             return Err(HldMaterializationValidationError::MissingUnitProvenance);
         }
-        let site_path = edge_record
+        let site_parts = edge_record
             .edge_evidence_row_key
             .evidence_site_occurrence_key
-            .read_semantic_occurrence_parts()
-            .span_source_file_path;
+            .read_semantic_occurrence_parts();
+        // A file area holds sites in its own file, and items its macro calls expand to.
         if matches!(
             edge_record.edge_source_reference,
             HldTargetIdentityValue::FilePublicArea(_)
-        ) && read_hld_target_path(&edge_record.edge_source_reference)
-            .is_some_and(|source_path| source_path != site_path)
+        ) && site_parts.span_expansion_provenance_chain.is_empty()
+            && read_hld_target_path(&edge_record.edge_source_reference)
+                .is_some_and(|source_path| source_path != site_parts.span_source_file_path)
         {
             return Err(HldMaterializationValidationError::InvalidEvidenceIdentity);
         }
@@ -767,12 +772,14 @@ fn validate_hld_node_input(
             HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence_key)),
         ) => {
             validate_hld_occurrence_identity(occurrence_key)?;
-            if node_record.node_source_relative_path.as_deref()
-                != Some(
-                    occurrence_key
-                        .read_semantic_occurrence_parts()
-                        .span_source_file_path,
-                )
+            let occurrence_parts = occurrence_key.read_semantic_occurrence_parts();
+            // An item written by a macro expansion names the file of its macro call; its own
+            // text is in the expanded source named by its identity.
+            let source_path_valid = match node_record.node_source_relative_path.as_deref() {
+                Some(_) if !occurrence_parts.span_expansion_provenance_chain.is_empty() => true,
+                source_path => source_path == Some(occurrence_parts.span_source_file_path),
+            };
+            if !source_path_valid
                 || node_record.node_item_kind_value.is_none()
                 || node_record.node_item_kind_value == Some(HldItemKindValue::Unknown)
                 || node_record.node_owner_kind_value.is_none()
