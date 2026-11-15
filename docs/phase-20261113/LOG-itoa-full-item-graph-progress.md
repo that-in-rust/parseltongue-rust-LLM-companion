@@ -16,8 +16,8 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `incomplete`.**
 
 - **Next target:** part 5a step 1, the failing real-source test for one generated
-  `const _`. Part 5a is specified and waits for the user to confirm three rules (identity,
-  container, how a node names its generating call). Parts 4a to 4d are built.
+  `const _`. Part 5a is specified and its three open rules are decided. Parts 4a to 4d are
+  built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -85,7 +85,8 @@ All counts above were read at commit `5dabc3279`.
 ## Decisions that block freezing the expected graph
 
 ```text
-OD-2  macro-generated items: identity and container        working decision, unconfirmed
+OD-2  DECIDED 2026-11-15: call + place in expansion;       45 generates rows to add
+      lexical container; generates edge and node field
 OD-8  may reads and uses_type start at a non-function item  working decision: yes
 OD-7  how a file's module node relates to its file area     blocks 2 edges
 OD-4  enum variants and struct fields: nodes or evidence
@@ -131,8 +132,9 @@ all 45 generated items the expected graph has; one SQL filter keeps them out of 
   `build_original_item_identity`, `validate_original_graph_inventory`); `search_graph` for
   `HldNodeInputRecord|build_original_item_identity|read_semantic_occurrence_parts`
   (`HldNodeInputRecord` has 26 inbound references, which is the cost of adding a field).
-- **Blocked on the user:** rules R2 (identity), R3 (container), R5 (edge or field for the
-  generating call).
+- **Decided by the user the same day:** R2, R3, and for R5 both a `generates` edge and a
+  node field, under the rule "provide maximum information which helps the coding agent code
+  better". That rule is now AGENTS.md Rule 6 and is in the PRD.
 
 ### 2026-11-15 16:50 IST — Part 4d built: `imports` from `use` items
 

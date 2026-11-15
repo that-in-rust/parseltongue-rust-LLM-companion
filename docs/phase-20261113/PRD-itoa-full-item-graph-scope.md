@@ -163,8 +163,22 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   itoa's source proves it, the crate, and a flag that the target's source was not read. The
   sysroot source stays out of the run. Chosen because it is the most explicit form for an
   agent reading the graph.
-- **Macro definitions and calls (2026-11-15).** Both are nodes, and a generated item records
-  the call that generated it, for the same reason.
+- **Macro definitions and calls (2026-11-15).** Both are nodes, for the same reason.
+- **Design rule (user, 2026-11-15).** "Our intention should be to provide maximum
+  information which helps the coding agent code better." When a graph design choice is
+  open, the form that tells a coding agent the most is chosen and recorded here as decided.
+- **One edge row per source site (2026-11-15).** Repeated sites with the same source,
+  relation and target stay separate rows, each with its own range. Rows are grouped only
+  when they are compared to the expected graph.
+- **Macro-generated items (2026-11-15).**
+  - Identity: the macro call plus the item's place in that call's expanded text. Two calls
+    of one macro give two nodes.
+  - Container: the file area or module where the call is written (one `contains` row), as
+    for original impl members.
+  - Generating call: named twice, as a field on the node and as a `generates` edge from
+    the call node to the item (itoa: 45 rows). `generates` is a new relation kind.
+  - A macro call points to the definition it expands by an `expands` edge (itoa: 15 rows).
+  - None of this is built yet; it is part 5.
 
 ### Open
 
@@ -173,8 +187,9 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   resolution in 2,400 s (the run report is deleted). Runs today use
   `--sysroot-source-scope-kind excluded` and store those edges unresolved; the named external
   target is not built yet.
-- **Macro-generated items.** Their identity and container. 45 of the 73 draft nodes come from
-  `impl_Integer`, `impl_Integer_size` and `impl_Unsigned` invocations.
+- **Macro-generated items, not built.** 45 of the 73 draft nodes come from `impl_Integer`,
+  `impl_Integer_size` and `impl_Unsigned` calls. The rules are decided (above); the store
+  already holds the 45 items as spans (measured 2026-11-15).
 - **Enum variants and struct fields:** nodes, or evidence only.
 - **File module and file area:** how a file's module node relates to its file-area node.
 - **Non-function sources:** may `reads` and `uses_type` start at a non-function item? itoa
@@ -183,7 +198,8 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
   are compared (A4).
 
-The four middle points block the affected expected rows from being frozen.
+The enum-variant, file-module and non-function-source points block the affected expected
+rows from being frozen.
 
 ### Out of scope
 

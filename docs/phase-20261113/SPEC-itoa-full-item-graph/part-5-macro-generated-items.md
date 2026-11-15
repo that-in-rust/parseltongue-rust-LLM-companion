@@ -1,6 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
-**State: SPECIFIED for 5a, no code. Waiting for the user to confirm rules R2, R3 and R5.**
+**State: SPECIFIED for 5a, no code. Rules R2, R3 and R5 decided by the user on 2026-11-15
+("most explicit for an agent reading our artifact").**
 
 ## The answer
 
@@ -19,8 +20,8 @@ of the graph. Part 5 lets them in, in five sub-parts, starting with nodes and co
     `.parseltongue/macro-source/<call digest>/expanded.rs`, its byte range in the expanded
     text, its kind, and the chain of call digests.
   - The filter is `original-item-graph-projection.sql` line 11 (chain length = 0).
-- **Predicted, not measured:** after 5a, 103 nodes (58 + 45) and 88 `contains` rows
-  (43 + 45).
+- **Predicted, not measured:** after 5a, 103 nodes (58 + 45), 88 `contains` rows
+  (43 + 45) and 45 `generates` rows; 285 edges in all (195 + 90).
 - **What the expected graph has for these items:** 45 `contains` rows, and 202 edges that
   start at a generated item (80 `calls`, 66 `uses_type`, 56 `reads`). 4 more end at one.
 
@@ -52,17 +53,20 @@ resolvers of parts 2 to 4 are not touched in 5a.
   active, its kind is one the graph has for original items, and it is not inside a function
   body or an initializer, THEN the graph SHALL hold one node for it. Impl blocks stay
   records.
-- **R2 (identity; to confirm).** The node identity SHALL be the stored occurrence key: unit,
+- **R2 (identity; decided).** The node identity SHALL be the stored occurrence key: unit,
   expansion path relative to the package root, byte range in the expanded text, kind, chain.
   Two calls of one macro give two nodes.
-- **R3 (container; to confirm).** WHEN a generated item is at the top of an expansion or is
+- **R3 (container; decided).** WHEN a generated item is at the top of an expansion or is
   a member of a generated impl, THEN one `contains` row SHALL go from the file area or
   inline module that holds the outermost macro call to the item. The macro call node is not
   its container. (Same rule as original impl members, REQ-RUST-043.0.)
 - **R4 (nested expansion).** WHEN the chain has more than one call, THEN the container SHALL
   come from the first call of the chain, the one written in a source file.
-- **R5 (generating call; to confirm).** Each generated node SHALL name the macro call node
-  that produced it (the last call of its chain). Form: see Q1.
+- **R5 (generating call; decided: both forms).** Each generated node SHALL name the macro
+  call node that produced it (the last call of its chain) in two ways: a field on the node
+  row, and one `generates` row from the call node to the item, sited at the call.
+  `generates` is a new relation kind; it is never collapsed and never counted as a
+  dependency between items.
 - **R6 (evidence).** The node's source text SHALL equal the stored expanded text at its
   range, checked by digest; a mismatch SHALL be a typed error, not a skipped row.
 - **R7 (inactive).** WHEN the span's `#[cfg]` is off, THEN no node and no row.
@@ -101,6 +105,7 @@ R1 R2    test_generated_const_node_contained      real source   itoa-source-acce
 R3       test_generated_const_node_contained      real source   itoa-source-acceptance-tests
 R1 R7    test_generated_item_node_counts          real source   itoa-source-acceptance-tests
 R5       test_generated_node_names_call           real source   itoa-source-acceptance-tests
+R5       test_generates_edge_row_counts           real source   itoa-source-acceptance-tests
 R10      test_generated_item_node_counts          real source   itoa-source-acceptance-tests
 R11      test_generated_nodes_read_twice          real source   itoa-source-acceptance-tests
 R1 R8    test_expanded_item_projected_node        fixture       original-item-projection-tests
@@ -120,7 +125,8 @@ R9       test_generated_item_node_counts          real source   itoa-source-acce
 3. GREEN: the SQL view and the identity for generated items; step 1 passes.
 4. GREEN: all 45; `test_generated_item_node_counts` (45 nodes by kind, 20 inactive, 58 old
    nodes unchanged).
-5. R5 in the form the user picks.
+5. R5: the node field, then the `generates` relation kind and its 45 rows. Each is its
+   own RED and GREEN.
 6. REFACTOR, workspace gates, cost of one run, this file and the log.
 
 Tests that pin today's behaviour and will change in 5a or 5d (named by the second review,
@@ -134,15 +140,8 @@ None yet.
 
 ## 7 — Open questions
 
-- **Q1 (for the user). How does a generated node name its call?**
-  - *Edge* `generates`, call -> item: 45 more rows. The route "definition, call, item" can
-    be walked as edges. The expected graph gets the same 45 rows.
-  - *Field* on the node: no new rows. Changes the node record, the DuckDB table, the
-    publication step and the export.
-  - *Neither*: a reader takes the call digest out of the node identity and looks it up in
-    `macro-expanded-item-table`. Cheapest, least explicit.
-  - By the user's rule of 2026-11-15 (most explicit for an agent reading the graph) the
-    edge wins. Lean: the edge, together with `expands` in 5c.
+- **Q1 (closed). How does a generated node name its call?** Both: a `generates` edge and a
+  node field (R5). The expected graph gains the same 45 rows when it is repaired.
 - **Q2. Where is the range in the macro definition stored?** The expected graph sites a
   generated node in the definition body, so five nodes share one range. Production sites
   it in the expanded text. `macro_token_origin_rows` maps one to the other. Part 7 cannot

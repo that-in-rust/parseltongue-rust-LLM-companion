@@ -20,8 +20,6 @@ Counts are rows of the draft expected graph that stay blocked until the decision
 
 ```text
 id     decision                                                   blocks
-OD-2   Macro-generated items: their identity, and which file      279 edges, 45 nodes
-       and container own them.
 core   Targets in core: run with the sysroot source, or accept    119 edges
        these edges as unresolved. The sysroot run did not
        finish name resolution in 2,400 s (measured 2026-11-13).
@@ -45,12 +43,14 @@ that reads the graph":
   points to the definition it expands; the relation kind `expands` is proposed for this and is
   not built.
 
+- **Macro-generated items (OD-2, decided 2026-11-15):** identity is the macro call plus the
+  item's place in its expansion. The file area or module where the call is written contains
+  the item. The generating call is named twice: a field on the node, and a `generates` edge
+  from the call to the item (itoa: 45 rows). Part 5a, REQ-RUST-046.0 R2, R3, R5.
+
 Working decisions (2026-11-15). The user delegated these to best judgement; they are not yet
 confirmed. Each is used so work can continue and is reversed if the user rules otherwise.
 
-- **OD-2:** a macro-generated item is identified by its macro call site plus its place in the
-  expansion; its container is the module and file area where the macro is called. Confirm in
-  part 5's part file before any code depends on it.
 - **OD-8:** yes, `reads` and `uses_type` may start at a non-function item.
 - **Disagreement with the expected graph:** show the source lines, the user rules, and the
   wrong side is fixed.
