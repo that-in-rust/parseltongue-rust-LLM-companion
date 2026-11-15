@@ -106,7 +106,11 @@ pub(crate) fn make_call_fixture_scope() -> StageRunScopeValue {
         stage_attempt_sequence_value: "attempt".into(),
     }
 }
-fn make_call_fixture_occurrence(start: u64, end: u64, text: &str) -> SemanticOccurrenceKeyValue {
+pub(crate) fn make_call_fixture_occurrence(
+    start: u64,
+    end: u64,
+    text: &str,
+) -> SemanticOccurrenceKeyValue {
     SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
         &make_call_fixture_unit(),
         "src/lib.rs",

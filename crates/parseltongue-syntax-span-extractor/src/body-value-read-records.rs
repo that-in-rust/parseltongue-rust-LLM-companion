@@ -15,6 +15,10 @@ use std::{collections::BTreeSet, path::Path};
 #[path = "body-value-read-tests.rs"]
 mod body_value_read_tests;
 
+#[cfg(test)]
+#[path = "body-read-edge-tests.rs"]
+mod body_read_edge_tests;
+
 #[derive(Debug, thiserror::Error)]
 pub enum BodyReadEdgeError {
     #[error("body read edge resolution cancelled")]
