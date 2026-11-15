@@ -47,10 +47,13 @@ pub use impl_header_implements_records::{
 };
 #[path = "signature-type-edge-records.rs"]
 mod signature_type_edge_records;
+#[path = "use-import-edge-records.rs"]
+mod use_import_edge_records;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
 pub use signature_type_edge_records::{
     SignatureTypeEdgeError, collect_builtin_endpoint_nodes, resolve_signature_type_edges,
 };
+pub use use_import_edge_records::{UseImportEdgeError, UseImportEdgeSet, resolve_use_import_edges};
 #[path = "legacy-macro-source-events.rs"]
 mod legacy_macro_source_events;
 pub use legacy_macro_source_events::{LegacyMacroNodeEvents, read_legacy_node_events};
