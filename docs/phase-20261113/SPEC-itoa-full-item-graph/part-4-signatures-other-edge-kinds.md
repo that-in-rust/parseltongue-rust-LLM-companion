@@ -1,14 +1,14 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a BUILT for original signatures (all 7 steps). 4b BUILT in its own file. 4c BUILT in its own file. 4d specified in its own file.**
+**State: 4a BUILT for original signatures (all 7 steps). 4b BUILT in its own file. 4c BUILT in its own file. 4d BUILT in its own file.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
 4a  uses_type from signatures   REQ-RUST-018.2   BUILT; Q3 and Q4 stay open
 4b  implements from impl headers  REQ-RUST-047.0  BUILT (part-4b file)
-4c  reads of consts and statics  REQ-RUST-048.0  SPECIFIED (part-4c file)
-4d  imports from use nodes                       specified, own file
+4c  reads of consts and statics  REQ-RUST-048.0  BUILT (part-4c file)
+4d  imports from use nodes       REQ-RUST-049.0  BUILT (part-4d file)
 ```
 
 **4a target:** `Buffer::new --uses_type--> Buffer`, from this source:
@@ -200,7 +200,8 @@ A `Self` whose impl header is unresolved stores nothing until step 6.
   [part-4c-reads-of-consts-statics.md](part-4c-reads-of-consts-statics.md) (REQ-RUST-048.0).
 - **4d `imports`.** Specified in
   [part-4d-imports-from-use-items.md](part-4d-imports-from-use-items.md) (REQ-RUST-049.0).
-  All four in itoa point into `core` (part 6).
+  Built: 4 rows on pinned itoa. All four point into `core` and are stored unresolved with
+  their path text until part 6.
 
 REQ-RUST-032.0 (two tables, every item a node, every proven dependency one uncollapsed
 edge) is met only when 4a to 4d and parts 5 to 7 are.

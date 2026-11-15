@@ -6,21 +6,23 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 58 nodes and
-191 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
-32 `implements` rows (29 with a target, 3 unresolved) and 21 `reads` rows (15 with a
-target, 6 unresolved). Five dependencies
+195 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+32 `implements` rows (29 with a target, 3 unresolved), 21 `reads` rows (15 with a
+target, 6 unresolved) and 4 `imports` rows (all unresolved: their targets are in `core`).
+Five dependencies
 are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 4d step 1 (failing real-source test). 4d is specified: `imports`
-  from `use` items, 4 expected rows. Parts 4a, 4b and 4c are built.
+- **Next target:** part 5, macro-generated items as nodes, starting with one call,
+  `impl_Unsigned!(u8)`. Its part file is not written. Parts 4a to 4d are built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
-  from impl headers, original and macro-generated, and `reads` from original function
-  bodies. Not produced: `imports`.
+  from impl headers, original and macro-generated, `reads` from original function
+  bodies, and `imports` from original `use` items. Every edge kind the expected graph
+  uses now has a producer.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
   ([itoa-target-dataset](itoa-target-dataset/)). Nothing can be accepted against it yet.
 
@@ -31,7 +33,7 @@ step                                   state         measured or missing
 1  item nodes and containment          BOUNDED       43 original items + 2 file areas, 43 contains
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
-4  remaining edge kinds                IN PROGRESS   uses_type, implements, reads (21 rows) built; imports not
+4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21, imports 4
 5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
@@ -46,19 +48,19 @@ step                                   state         measured or missing
 - **Nodes.** 58: 43 original items outside function bodies, one file area per source file,
   and 13 builtin types that an edge starts or ends at.
   Visibility and reachability are stored as unknown, not guessed.
-- **Edges.** 191: 43 `contains`, 61 `calls`, 34 `uses_type`, 32 `implements` and 21 `reads`. 3 calls are resolved; 58 are stored unresolved
+- **Edges.** 195: 43 `contains`, 61 `calls`, 34 `uses_type`, 32 `implements`, 21 `reads` and 4 `imports`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
   inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 26 real-source itoa tests pass at commit `fc0ebe4e0` (312 s, release build, one
+- **Tests.** 28 real-source itoa tests pass at commit `5dabc3279` (331 s, release build, one
   thread).
-- **Workspace gates** after part 4c: format, lint and release build pass; 486 tests pass,
+- **Workspace gates** after part 4d: format, lint and release build pass; 494 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
-- **Cost of one run** (2026-11-15, after part 4c, sysroot excluded, 2 workers): 13.0 to
-  14.4 s, 358 to 368 MB peak over the whole process tree (sampled about every 17 ms, not the
-  SOP's 10 ms), 11.4 MB store, no memory cap.
+- **Cost of one run** (2026-11-15, after part 4d, sysroot excluded, 2 workers): 13.5 to
+  14.1 s, 334 to 345 MB peak over the whole process tree (sampled about every 17 ms, not the
+  SOP's 10 ms), 11.5 MB store, no memory cap.
 
-All counts above were read at commit `fc0ebe4e0`.
+All counts above were read at commit `5dabc3279`.
 
 ## What is missing, in build order
 
@@ -95,6 +97,65 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 16:50 IST — Part 4d built: `imports` from `use` items
+
+**Part 4d is built. One run on pinned itoa stores 58 nodes and 195 edges, 4 of them
+`imports`, all unresolved with reason `ExternalSourceMissing`. 0 of the 4 expected rows
+match by target until part 6; 4 of 4 match by source node, 2 of 4 by exact site range.**
+
+- **Predicted and measured:** 4 rows and 195 edges predicted, 4 and 195 measured.
+- **What was built.**
+  - Name resolution writes `import-resolution-site-records`: one row per `use` import with
+    its state, targets and unresolved reason. "External source missing" comes from the
+    SQL rule path requests already use.
+  - `resolve_use_import_edges` joins those rows to the import requests and the `use`
+    nodes. It looks no name up.
+  - The full graph adds the rows; the stage line prints `imports=4` and three skip counts
+    (all 0 on itoa).
+- **Defect 1, found by the real-source tests.** The first SQL moved the 6 import rows out
+  of `path-resolution-site-records` (301 rows became 295), and `i.write(..)` in
+  `Buffer::format` lost its target (3 resolved calls became 2). Fixed: the path table is
+  unchanged (301 rows, no row differs from `fc0ebe4e0`) and the import row is extra.
+- **Defect 2, found by the second review (Rule 5, GLM-5.3 through pi, on the built code).**
+  The table held 8 rows on itoa, 4 of them for trait-bound requests of kind `Signature`.
+  Fixed: `namespace-import-request-records` stores `request_kind`, and only kind `import`
+  gets a row. Measured after the fix: 4 rows.
+- **Also from that review:** a stored `trait_solver_needed` reason is kept; the skip test
+  uses two globs so swapped counters fail; an absent outcome row is a tested typed error.
+  Not done, recorded as Q5 to Q8 in the part file: a site with two targets, path text for
+  `::a` and `$crate::a`, a counted skip for an unmapped unit, `ambiguous` at the SQL step.
+  Record: `docs/devin-research/1794740417-second-opinion-glm-5-3-max-part-4d-diff-review.md`.
+- **Test first.**
+  - Step 2b: `test_import_outcome_rows_written` failed with an extra row for the bound
+    request (`bf4be6dd4`), then passed (`fc6019e03`).
+  - Step 3: 4 of 5 resolver tests failed on the stub (`3420dc73c`), then passed (`06aca66b6`).
+  - Step 3b: `test_unresolved_import_keeps_reason` failed with `Other` where
+    `TraitSolverNeeded` is expected (`0990f9a68`), then passed (`4f42d9c87`).
+  - Passed on first run, so they describe existing behaviour: the two-glob count and the
+    absent-outcome error.
+- **Refactor:** `build_import_edge_record` taken out of `resolve_use_import_edges`
+  (`5dabc3279`). Two files stay over the 200-line guide: the resolver (289) and its test
+  file (420).
+- **Gates at `5dabc3279`**, release, executable sha256 `22fd0e31...dd88a84`:
+  - `cargo fmt --all -- --check`: pass.
+  - `cargo clippy --release --workspace --all-targets --all-features -- -D warnings`: pass.
+  - `cargo test --release --workspace --all-targets --all-features -- --skip
+    test_lang_items_in_sysroot --test-threads=1`: 494 passed, 0 failed, 4 ignored.
+    `test_lang_items_in_sysroot` is skipped, so this is not a full PASS.
+  - Real-source itoa tests inside that run: 28 passed, 0 failed, 0 ignored, 331 s.
+  - `cargo build --release --workspace --all-targets --all-features`: pass.
+- **Cost of one run, 3 times:** 13.5 to 14.1 s, 334 to 345 MB peak for the whole process
+  tree, 11.5 MB store.
+- **Codebase-memory queries:** `detect_changes` (before the last test commit; its base is
+  `origin/main`, so it lists 744 files and is of little use here); `search_graph` for
+  `resolve_use_import_edges|resolve_import_outcome_targets|read_import_path_text`, which
+  showed `resolve_use_import_edges` at 104 lines and led to the refactor; `index_repository`
+  after the last commit.
+- **Slips against the rules:** steps 4 and 5 are one commit; the resolver commit is over
+  200 lines; no codebase-memory trace was run before the step 2b and 3b edits.
+- **Next:** part 5, macro-generated items as nodes. Its part file comes first, with the
+  identity and container rule put to the user before code depends on it.
 
 ### 2026-11-15 14:05 IST — Part 4d specified: `imports` from `use` items
 
