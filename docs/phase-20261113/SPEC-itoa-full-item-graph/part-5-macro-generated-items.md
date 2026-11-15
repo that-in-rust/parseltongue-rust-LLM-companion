@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b to 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
+5b SPECIFIED (section 8). 5c to 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
 ## The answer
@@ -36,7 +36,7 @@ of the graph. Part 5 lets them in, in five sub-parts, starting with nodes and co
 part  target                                              rows on itoa (predicted)   state
 5a    generated items as nodes, contained, with their     45 nodes, 45 contains,     BUILT (measured)
       generating call                                     45 generates
-5b    labels: impl header and macro call text in the      58 + 45 labels             not specified
+5b    labels: impl header and macro call text in the      103 labels, all distinct   SPECIFIED (section 8)
       node's path text
 5c    `expands`: macro call -> macro definition          15 rows                    not specified
 5d    generated bodies and signatures as edge sources:    up to 202 rows             not specified
@@ -200,3 +200,99 @@ Tests that passed on first run and so were not seen failing: `test_generated_ite
 Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only, on this design
 before it was written. Record:
 `docs/devin-research/1794745800-second-opinion-glm-5-3-max-part-5-macro-items-design.md`.
+
+## 8 — Part 5b: readable node labels (REQ-RUST-050.0)
+
+**State: SPECIFIED.** Numbers marked *measured* come from one release run at `4ea998560`
+(store `/home/ubuntu/phase5b-work/store.db`); everything else is a rule.
+
+### 8.1 The problem (measured)
+
+`node_qualified_path_text` is the one text a reader sees for a node. Today it is
+`<cargo package id>::<file>::<module and trait names>::<declared name, or the syntax kind>`.
+On itoa only 45 of the 103 labels are distinct:
+
+```text
+nodes  label today                      what they are
+15     ...::src/lib.rs::MACRO_CALL      the 15 macro calls
+3      ...::src/lib.rs::USE             the 3 use items
+5      ...::src/lib.rs::_               5 generated `const _`
+12     ...::src/lib.rs::MAX_STR_LEN     12 generated impl consts
+12     ...::src/lib.rs::Buffer          12 generated impl types
+12     ...::src/lib.rs::write           12 generated impl functions
+5      ...::src/lib.rs::fmt             1 original and 4 generated impl functions
+4      ...::new, format, default, clone original impl members, no impl named
+```
+
+The prefix is `path+file:///<checkout>/itoa#1.0.18`, which changes with the checkout.
+An impl block is not a node, so the label is the only place a reader sees which impl a
+member belongs to.
+
+### 8.2 Rules
+
+The label is display text. It is not the identity, is never parsed by production code, and
+need not be unique. Every part of it is copied from stored source text; nothing is guessed.
+
+```text
+L1  Prefix: <crate target name>::<file path>, then the names of enclosing modules and
+    traits, as today. The crate target name (`itoa`) replaces the package id; the package
+    id stays in the node identity. A file area reads <crate>::<file>::<file-area>.
+L2  Impl member, original or generated: one segment from its impl header before the name.
+    Trait impl: <SelfText as TraitText>. Inherent impl: SelfText. Both are the header's
+    own source text (`type_source_text`), normalized by L6.
+    A header with no readable self text gives the segment IMPL (the syntax kind).
+L3  Macro call: the last segment is the call's own source text, normalized by L6.
+L4  Use item: the last segment is its own source text, normalized by L6.
+L5  A const with no name: `const _`. If a macro call wrote it: `const _ #` followed by
+    that call's L3 segment. Other generated items do not repeat the call text; they carry
+    the call as a node field and a `generates` row.
+L6  Text normalization, in order: drop leading lines that start with `//`; turn every
+    whitespace run into one space; drop spaces next to `::`; drop one trailing `;`;
+    if the result is longer than 160 characters keep the first 160 and add ` …`.
+L7  Any other item: its declared name with a leading `r#` removed, or the syntax kind if
+    it has none (unchanged).
+```
+
+Examples on itoa (predicted until the test passes):
+
+```text
+itoa::src/lib.rs::<u8 as private::Sealed>::write
+itoa::src/lib.rs::<Buffer as Default>::default
+itoa::src/lib.rs::Buffer::new
+itoa::src/lib.rs::impl_Integer!(i8, u8)
+itoa::src/lib.rs::use core::mem::{self, MaybeUninit}
+itoa::src/lib.rs::const _ #impl_Integer!(i8, u8)
+```
+
+### 8.3 Verification matrix (5b)
+
+```text
+test                               level        pins
+test_node_labels_all_distinct      real itoa    103 labels pairwise distinct; none contains file:///;
+                                                macro call and use labels equal the file's own bytes
+test_impl_member_label_segment     real itoa    exact labels of original and generated impl members;
+                                                `const _` labels end with their call's segment
+test_impl_header_label_segment     fixture      L2: trait impl, inherent impl, expander spacing, no self text
+test_source_text_label_rule        fixture      L6: comments, whitespace, `::`, `;`, the 160 cut
+test_unnamed_const_label_text      fixture      L5 and L7: `const _`, `const _ #call`, `r#`, kind fallback
+```
+
+### 8.4 Plan
+
+1. Stub `item-node-label-text.rs` in the DuckDB adapter; failing fixture tests.
+2. Failing real-source tests.
+3. Code; both projections call the one helper.
+4. The two 5a tests that find `const _` by the suffix `::_` find it by kind.
+5. Gates, three measured runs, log, PRD.
+
+### 8.5 Open questions (5b)
+
+- **Q7. Expected-graph labels differ in form.** They carry no crate and file prefix
+  (`u128_ext::mulhi`), and write `const _ #impl_Integer(i8,u8)`. Part 7 decides how labels
+  are compared; the expected graph is repaired to the stored form there.
+- **Q8. No typed link from an impl member to its impl header.** The label segment is the
+  only one. A node field naming the header (`node_impl_header_reference`) is in the backlog.
+- **Q9. Q2 (range in the macro definition) moves to 5d**, where generated bodies need it.
+
+Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only, before this section
+was written. Record: `docs/devin-research/1794768300-second-opinion-glm-5-3-max-part-5b-node-labels.md`.
