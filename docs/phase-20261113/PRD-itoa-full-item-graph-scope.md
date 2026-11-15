@@ -183,6 +183,16 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     revision. The row is sited at the whole call and carries the macro name and the index
     of the arm that matched, so a reader knows which arm to edit. `expands` is a new
     relation kind (decided and built 2026-11-16, part 5c).
+  - A generated item is an edge source like any other item. A row that starts in expanded
+    text is sited at its occurrence in that expanded text, because that is the text the
+    edge read. Its metadata names where its first and last token were copied from in the
+    source file (definition or call), stored apart, so an agent knows where to edit
+    (decided 2026-11-16, part 5d; `reads` from generated function bodies built, the
+    origin metadata not yet).
+  - A member reached through a type (`Self::NAME`, `u8::NAME`) gets a trait member as
+    target only when a trait of the crate declares the name and a stored impl header proves
+    the type implements it; the row records that the type's inherent items were not read
+    (decided 2026-11-16, part 5d; not built).
   - Built (part 5a): identity, container, and the generating call in both forms, for a
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.

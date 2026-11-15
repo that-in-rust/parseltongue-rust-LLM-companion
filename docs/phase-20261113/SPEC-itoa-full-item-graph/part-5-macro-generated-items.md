@@ -1,7 +1,8 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c SPECIFIED (section 9). 5d and 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
+5b BUILT (section 8). 5c BUILT (section 9). 5d SPECIFIED, step 1 of 6 BUILT (section 10).
+5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
 ## The answer
@@ -38,8 +39,8 @@ part  target                                              rows on itoa (predicte
       generating call                                     45 generates
 5b    labels: impl header and macro call text in the      103 labels, all distinct   BUILT (measured)
       node's path text
-5c    `expands`: macro call -> macro definition          15 rows                    not specified
-5d    generated bodies and signatures as edge sources:    up to 202 rows             not specified
+5c    `expands`: macro call -> macro definition          15 rows                    BUILT (measured)
+5d    generated bodies and signatures as edge sources:    up to 202 rows             step 1 of 6 BUILT
       reads, then uses_type, then calls
 5e    first chain: <u128 as Sealed>::write ->             3 call rows                not specified
       <u128 as Unsigned>::fmt -> div_rem_1e16 -> mulhi
@@ -441,3 +442,130 @@ workspace gates                               not run for 5c; they run at the en
 One defect found on the way: the first SQL read the call's compilation unit from a JSON
 field that is empty in the stored lookup rows, so no call joined to its lookup and the run
 stopped with the E7 typed error. The unit is now read from the lookup's site key.
+
+## 10 — Part 5d: generated items as edge sources (REQ-RUST-052.0)
+
+**State: SPECIFIED; step 1 BUILT** (section 10.6). Section 10.1 is measured on stored tables of
+runs at `255163ea0` with the filters named there lifted by hand and then restored.
+
+### 10.1 What is stored today (measured)
+
+```text
+producer        filter that drops rows from expanded text                         rows with it lifted
+reads           body-value-read-records.rs, the expansion-chain test on a site    +34: 24 with a target,
+                                                                                  10 without
+uses_type       signature-type-edge-records.rs, the same test on a signature row  +32: 28 with a target,
+                                                                                  4 without
+calls           original-call-resolution-records.rs, the same test on a call site +136, all without a
+                                                                                  target
+all three lifted                                                                  502 edges (300 + 202)
+```
+
+- The stored tables already hold the sites: `body-site-reference-table` and
+  `field-signature-detail-table` have rows for expanded text, each with its owner, its range
+  in the expanded text and the chain of call digests. Name resolution has run on them.
+- The 24 reads with a target are `DECIMAL_PAIRS`, 6 in each generated `<uN as Unsigned>::fmt`.
+  The 10 without are `Self::MAX_STR_LEN` and `uN::MAX_STR_LEN` in generated `write` bodies.
+- The 4 signature rows without a target are `Self::Buffer` in `impl Unsigned for uN`:
+  `Buffer` is declared by `private::Sealed`, a supertrait.
+- All 136 calls fall into one catch-all that gives `TraitSolverNeeded`; their metadata has no
+  callee text and says `original_associated_function`.
+- `macro-expanded-item-table` stores, per output token of an expansion, the byte range it was
+  copied from in the source file and whether that is the macro definition or the call.
+- The expected graph has 202 rows from generated sources: 76 `reads` sites (56 grouped),
+  66 `uses_type`, 136 `calls` sites (80 grouped). The three producers give 34, 32 and 136
+  of them with the filters lifted (the call producer already reads const initializers); the
+  other 42 `reads` sites and 34 `uses_type` rows start at generated consts and type aliases.
+
+### 10.2 Rules
+
+```text
+G1  A node written by a macro expansion is an edge source on the same terms as a node written
+    in a source file: reads and calls from its body, uses_type from its signature.
+G2  Site: the occurrence in the expanded text (the virtual path, the range there, the digest
+    of the site's text, the chain of call digests). A site and its owner are in the same
+    text; a site whose file or chain differs from its owner's is a typed error, never a row.
+    The site is not moved to the source file: the digest is of the text the edge read, and
+    no range of the source file has to hold that text (u8::MAX_STR_LEN is one token from
+    the call and two from the definition).
+G3  A row sited in expanded text carries, in its metadata, where its first token and its
+    last token were copied from: file, byte range, and definition or call. The two are
+    stored apart, never merged into one range. This is where an agent edits.
+G4  Targets follow the existing rules. A path that name resolution left without a target is
+    one row with a reason and its source text.
+G5  A member reached through a type (Self::NAME, u8::NAME): the target is a trait member only
+    when a trait of this crate declares NAME and a stored impl header proves the type
+    implements that trait, directly or through a stored supertrait row. The row records what
+    was not read (the inherent items of the type). No trait of this crate declaring NAME
+    (MIN, MAX, BITS, ilog10): the rule does not fire.
+G6  A calls row carries the callee's source text. Its dispatch kind does not say "original"
+    for a call written by a macro. The reason for a missing target is the stored one, not a
+    catch-all.
+G7  Generated consts and type aliases are sources too: the type in the declaration and the
+    paths and calls in an initializer.
+G8  The stage line's reads_in_expanded_bodies is the number of stored reads rows sited in
+    expanded text.
+```
+
+### 10.3 Steps, predicted and measured on itoa
+
+```text
+step  what                                         rules    predicted               measured
+1     reads from generated function bodies         G1, G2,  55 reads, 334 edges     55 reads (39 with a target,
+                                                   G4, G8                           16 without), 334 edges
+2     origin of first and last token, on reads     G3       34 rows gain metadata   not built
+3     uses_type from generated signatures          G1-G4    66 uses_type, 366 edges not built
+4     calls from generated bodies                  G1-G4,   197 calls, 502 edges    not built
+                                                   G6
+5     trait members through a type                 G5       16 reads and 4 uses_type not built
+                                                            gain a target
+6     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
+                                                            34 uses_type
+```
+
+Step 2 was planned after step 4; the second opinion moved it forward so steps 3 and 4 land
+with it.
+
+### 10.4 Tests
+
+```text
+test                                kind         proves
+test_generated_fmt_static_reads     real source  G1, G2, G4: each of the 4 generated fmt has 6 reads of
+                                                 DECIMAL_PAIRS sited inside its own expanded text; 55
+                                                 reads; 10 generated rows without a target
+test_expanded_site_owner_mismatch   fixture      G2: a site whose chain differs from its owner's stops
+                                                 the run
+test_itoa_reads_row_counts          real source  changed: counts the 21 rows sited in original text
+test_reads_rows_read_twice          real source  changed: 55 rows, read twice, none twice
+```
+
+`test_expanded_body_read_counted` (REQ-RUST-048.0 R7, "counted and left to part 5") is
+removed: R7 is superseded by G1.
+
+### 10.5 Open questions (5d)
+
+- **Q17.** Step 6: do the stored tables hold value-path and call sites for const initializers
+  and type aliases? If not, step 6 changes the namespace stage, not only a producer.
+- **Q18.** G5 rests on the rule that an inherent item shadows a trait item. `core` is not
+  read, so "u8 has no inherent MAX_STR_LEN" is not proven; the row says so. Not checked
+  against rustc here.
+- **Q19.** The real-source test helper `read_edge_site_range` returns a byte range without
+  its file. One test compares ranges alone; steps 3 and 4 must make it compare the file too.
+- **Q20.** Expanded text prints `Self ::MAX_STR_LEN` with a space. The row's source text keeps
+  the expanded form; no fixture pins it yet.
+
+Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only:
+[record](../../devin-research/1794772360-second-opinion-glm-5-3-max-part-5d-generated-edge-sources.md).
+
+### 10.6 Quality gate results (5d step 1)
+
+```text
+real-source test, new          test_generated_fmt_static_reads failed first on
+                               `<u8 as Unsigned>::fmt left: 0 right: 6`, then passed
+fixture test, new              test_expanded_site_owner_mismatch failed first, then passed
+syntax crate tests             90 + 17 passed
+real-source itoa tests         37 passed, 0 failed, 83 s, release, default threads
+format (workspace), lint       pass (2 touched crates)
+graph                          103 nodes, 334 edges (was 300); still incomplete
+workspace gates, run cost      not run for this step; they run at the end of part 5d
+```
