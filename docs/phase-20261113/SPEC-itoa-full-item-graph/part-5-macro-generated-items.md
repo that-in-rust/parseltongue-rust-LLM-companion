@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b SPECIFIED (section 8). 5c to 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
+5b BUILT (section 8). 5c to 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
 ## The answer
@@ -36,7 +36,7 @@ of the graph. Part 5 lets them in, in five sub-parts, starting with nodes and co
 part  target                                              rows on itoa (predicted)   state
 5a    generated items as nodes, contained, with their     45 nodes, 45 contains,     BUILT (measured)
       generating call                                     45 generates
-5b    labels: impl header and macro call text in the      103 labels, all distinct   SPECIFIED (section 8)
+5b    labels: impl header and macro call text in the      103 labels, all distinct   BUILT (measured)
       node's path text
 5c    `expands`: macro call -> macro definition          15 rows                    not specified
 5d    generated bodies and signatures as edge sources:    up to 202 rows             not specified
@@ -203,8 +203,8 @@ before it was written. Record:
 
 ## 8 — Part 5b: readable node labels (REQ-RUST-050.0)
 
-**State: SPECIFIED.** Numbers marked *measured* come from one release run at `4ea998560`
-(store `/home/ubuntu/phase5b-work/store.db`); everything else is a rule.
+**State: BUILT at `47d4d05e0`.** The numbers in 8.1 are measured on one release run at
+`4ea998560`, before the change; the numbers in 8.6 are measured after it.
 
 ### 8.1 The problem (measured)
 
@@ -251,9 +251,10 @@ L6  Text normalization, in order: drop leading lines that start with `//`; turn 
     if the result is longer than 160 characters keep the first 160 and add ` …`.
 L7  Any other item: its declared name with a leading `r#` removed, or the syntax kind if
     it has none (unchanged).
+L8  A builtin type node (`u8`, `str`) keeps its bare name (unchanged; it has no file).
 ```
 
-Examples on itoa (predicted until the test passes):
+Examples on itoa (measured, read back from the stored table):
 
 ```text
 itoa::src/lib.rs::<u8 as private::Sealed>::write
@@ -274,7 +275,8 @@ test_impl_member_label_segment     real itoa    exact labels of original and gen
                                                 `const _` labels end with their call's segment
 test_impl_header_label_segment     fixture      L2: trait impl, inherent impl, expander spacing, no self text
 test_source_text_label_rule        fixture      L6: comments, whitespace, `::`, `;`, the 160 cut
-test_unnamed_const_label_text      fixture      L5 and L7: `const _`, `const _ #call`, `r#`, kind fallback
+test_unnamed_const_label_text      fixture      L3, L4, L5, L7: call, use, `const _`, `const _ #call`, `r#`, kind fallback
+test_label_crate_name_prefix       fixture      L1: crate target name first, the package id nowhere
 ```
 
 ### 8.4 Plan
@@ -287,12 +289,37 @@ test_unnamed_const_label_text      fixture      L5 and L7: `const _`, `const _ #
 
 ### 8.5 Open questions (5b)
 
+- **Q10. L2 on a negative impl or an impl whose trait text is unreadable gives `IMPL`.**
+  Only the no-self-text case has a test. itoa has neither.
+- **Q11. The 160 cut can make two long labels equal.** Labels need not be unique (8.2), and
+  itoa's longest label is 88 characters, so the cut is tested on a fixture only.
+
 - **Q7. Expected-graph labels differ in form.** They carry no crate and file prefix
   (`u128_ext::mulhi`), and write `const _ #impl_Integer(i8,u8)`. Part 7 decides how labels
   are compared; the expected graph is repaired to the stored form there.
 - **Q8. No typed link from an impl member to its impl header.** The label segment is the
   only one. A node field naming the header (`node_impl_header_reference`) is in the backlog.
 - **Q9. Q2 (range in the macro definition) moves to 5d**, where generated bodies need it.
+
+### 8.6 Quality gate results (5b, measured at `47d4d05e0`)
+
+```text
+labels read back from the stored table      103, 103 distinct, 0 containing file:///
+                                            (90 item and file-area labels, 13 builtin types)
+fixture tests, new                          4 passed; all 4 failed on the stub first
+real-source tests, new                      2 passed; both failed first (45 distinct of 103;
+                                            no `itoa::src/lib.rs::<file-area>` label)
+adapter tests                               179 passed, 0 failed
+real-source itoa tests                      35 passed, 0 failed, 448 s, release, one thread
+format, lint (adapter and CLI crates)       pass
+one run, 3 times                            13.9 to 18.8 s, 336 to 353 MB peak, 12.9 MB store
+graph                                       103 nodes, 285 edges, unchanged; still incomplete
+workspace gates                             not run for 5b; they run at the end of part 5
+```
+
+Three older tests named a node by its old label and were changed to the new form:
+`test_generated_item_node_counts` and `test_generated_node_names_call` (real source), and
+`test_preserve_known_syntax_kinds` (fixture; its macro call no longer has an invented name).
 
 Second opinion (Rule 5): GLM-5.3 through pi, max reasoning, read-only, before this section
 was written. Record: `docs/devin-research/1794768300-second-opinion-glm-5-3-max-part-5b-node-labels.md`.

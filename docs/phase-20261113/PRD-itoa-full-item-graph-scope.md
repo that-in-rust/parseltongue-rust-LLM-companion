@@ -182,6 +182,17 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     macro call written in a source file. A macro call written by another macro is not a
     node yet; a run that meets one stops with a typed error and guesses nothing.
   - Not built: `expands`.
+- **Node labels (2026-11-15, built in part 5b).** The label is display text copied from
+  source; it is not the identity.
+  - It starts with the crate target name and the file path (`itoa::src/lib.rs::`), not the
+    cargo package id, which changes with the checkout. The package id stays in the identity.
+  - An impl member names its impl header: `<u8 as private::Sealed>::write`, `Buffer::new`.
+    An impl block is not a node, so this is the only place a reader sees the impl.
+  - A macro call and a use item read as their own source text: `impl_Integer!(i8, u8)`,
+    `use core::mem::{self, MaybeUninit}`.
+  - A generated `const _` names its call: `const _ #impl_Integer!(i8, u8)`. Other
+    generated items do not repeat the call text; they have the node field and `generates`.
+  - Chosen by the design rule above. On itoa all 103 labels are now distinct (was 45).
 
 ### Open
 

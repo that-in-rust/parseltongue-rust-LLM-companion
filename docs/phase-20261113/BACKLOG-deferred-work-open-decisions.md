@@ -89,6 +89,8 @@ BF-02   Proc-macro, async and dynamic-dispatch shapes that
 BF-03   Performance tuning, incremental remapping, new CLI
         verbs
 BF-06   Any rust-analyzer export or oracle comparison
+BL-09   A node field naming the impl header of an impl     today only the label names it
+        member (`node_impl_header_reference`)               (part 5, section 8, Q8)
 ```
 
 Ids are kept from the earlier backlog so old references still resolve. BL-05, BD-01 to BD-04,

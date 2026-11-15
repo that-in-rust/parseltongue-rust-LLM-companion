@@ -15,9 +15,10 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5b, readable labels for generated items and macro calls. Part 5a
-  (generated items as nodes, contained, each naming its macro call as a field and by a
-  `generates` row) is built. Parts 4a to 4d are built.
+- **Next target:** part 5c, `expands`: macro call to macro definition (15 rows predicted).
+  Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
+  by a `generates` row) and 5b (readable labels: all 103 distinct, each impl member names
+  its impl header) are built. Parts 4a to 4d are built.
 - **Not built in 5a:** a generated item whose macro call is itself written by a macro
   (nested expansion). The run stops with a typed error; itoa has none.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
@@ -56,7 +57,7 @@ step                                   state         measured or missing
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
   inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 33 real-source itoa tests pass at commit `bbdb98524` (461 s, release build, one
+- **Tests.** 35 real-source itoa tests pass at commit `47d4d05e0` (448 s, release build, one
   thread).
 - **Workspace gates** after part 5a: format, lint and release build pass; 514 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
@@ -100,6 +101,43 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 00:40 IST — Part 5b: readable node labels (REQ-RUST-050.0)
+
+- **Result.** All 103 node labels on pinned itoa are distinct (was 45), read back from the
+  stored table. Labels start `itoa::src/lib.rs::`; none carries the checkout path.
+  An impl member names its impl header (`<u8 as private::Sealed>::write`, `Buffer::new`);
+  a macro call and a use item read as their source text; a generated `const _` names its
+  call (`const _ #impl_Integer!(i8, u8)`). Nodes and edges unchanged: 103 and 285.
+- **Against the expected graph:** no row gained or lost. Its labels have no crate and file
+  prefix and write `const _ #impl_Integer(i8,u8)`; part 7 repairs it to the stored form.
+- **STUB.** `item-node-label-text.rs` with four `todo!()` functions.
+- **RED (fixture).** `cargo test --release -p parseltongue-duckdb-analysis-adapter
+  item_node_label`: 0 passed, 4 failed, each on `not yet implemented: REQ-RUST-050.0`.
+- **RED (real source).** `test_node_labels_all_distinct`: `left: 45 right: 103`.
+  `test_impl_member_label_segment`: `itoa::src/lib.rs::<file-area>`, `left: 0 right: 1`.
+- **GREEN.** One helper, called by both projections. Adapter: 179 passed. Real source:
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests -- --test-threads=1`: 35 passed, 0 failed, 448.34 s.
+- **Two failures on the way, both tests that named a node by its old label:**
+  `test_generated_item_node_counts` (`[0, 12, 12, 12, 4]` for `[5, 12, 12, 12, 4]`) and the
+  fixture `test_preserve_known_syntax_kinds`, whose macro call carried an invented name.
+  Both now use the new form. `test_generated_node_names_call` finds `const _` by kind.
+- **REFACTOR.** None needed: the two copies of the label code became one function.
+- **Gates.** Format and lint pass on the adapter and CLI crates. Workspace gates not run;
+  they run at the end of part 5.
+- **Cost, 3 runs (binary `bcc71b7f…d8a1`):** 13.89, 14.36, 18.78 s; 340, 336, 353 MB peak;
+  12.89 MB store.
+- **Decisions.** One label string, no typed impl-header field (backlog BL-09). Call text only
+  on a generated item with no name. Crate target name, not package id. Cut at 160
+  characters, not at the first newline as the review proposed.
+- **Second opinion.** GLM-5.3, pi, max reasoning, before the spec:
+  `docs/devin-research/1794768300-second-opinion-glm-5-3-max-part-5b-node-labels.md`.
+- **codebase-memory.** `index_status`; `search_graph` for the four projection functions;
+  `trace_path build_generated_item_pair` both ways, depth 2; `detect_changes` before the
+  commit. Not run before each test, which Rule 4 asks for.
+- **Commits.** `f8a95c80b` (spec), `47d4d05e0` (code and tests).
+- **Next.** Part 5c, `expands`.
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
