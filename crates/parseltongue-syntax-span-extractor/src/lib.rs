@@ -29,6 +29,7 @@ pub use persisted_macro_expansion_adapter::prepare_macro_expansion_port;
 pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
 #[path = "body-value-read-records.rs"]
 mod body_value_read_records;
+pub use body_value_read_records::{BodyReadEdgeError, BodyReadEdgeSet, resolve_body_read_edges};
 #[path = "impl-header-source-records.rs"]
 mod impl_header_source_records;
 pub use impl_header_source_records::{ImplHeaderSourceError, persist_impl_header_rows};

@@ -1,8 +1,210 @@
+use crate::impl_header_source_records::{
+    ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
+    read_impl_stage_values,
+};
+use crate::syntax_namespace_record_codec::{
+    decode_occurrence_identity_value, decode_symbol_target_value,
+};
+use parseltongue_core_row_types::*;
+use parseltongue_table_store_traits::StageTableStorePort;
 use ra_ap_syntax::{AstNode, SyntaxKind, SyntaxNode, ast, ast::HasLoopBody};
+use serde_json::{Value, json};
+use std::{collections::BTreeSet, path::Path};
 
 #[cfg(test)]
 #[path = "body-value-read-tests.rs"]
 mod body_value_read_tests;
+
+#[derive(Debug, thiserror::Error)]
+pub enum BodyReadEdgeError {
+    #[error("body read edge resolution cancelled")]
+    Cancelled,
+    #[error("body read edge store: {0}")]
+    Store(#[from] StoreBackendFailureError),
+    #[error("body read edge identity: {0}")]
+    Identity(#[from] ImplHeaderSourceError),
+    #[error("body read edge evidence field is invalid: {field}")]
+    InvalidEvidence { field: &'static str },
+    #[error("body read edge input scope does not match its graph")]
+    InvalidScope,
+}
+
+/// The `reads` edges of one graph, and how many value paths were left out
+/// because they sit in a macro-generated body.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BodyReadEdgeSet {
+    pub read_edge_input_records: Vec<HldEdgeInputRecord>,
+    pub read_expanded_site_count: usize,
+}
+
+/// One `reads` edge per value path in an original function body that names a
+/// `static` or `const` graph node. It joins rows that earlier stages stored
+/// and never looks a name up itself. The caller supplies the frozen source
+/// scope of `input`.
+pub fn resolve_body_read_edges(
+    store: &dyn StageTableStorePort,
+    source_scope: &StageRunScopeValue,
+    input: &HldMaterializationInputRecord,
+    cancel: &RunCancelFlagValue,
+) -> Result<BodyReadEdgeSet, BodyReadEdgeError> {
+    if cancel.check_stage_work_cancelled() {
+        return Err(BodyReadEdgeError::Cancelled);
+    }
+    if source_scope.run_generation_digest_value
+        != blake3::Hash::from(input.run_generation_digest_value.0)
+            .to_hex()
+            .as_str()
+        || input.source_coverage_kind != HldSourceCoverageKind::FullSemantic
+    {
+        return Err(BodyReadEdgeError::InvalidScope);
+    }
+    let workspace = read_impl_stage_values(store, source_scope, "workspace-config-state-records")?;
+    let workspace = workspace
+        .first()
+        .and_then(|row| row["workspace_source_root_path"].as_str())
+        .unwrap_or("");
+    let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
+    let endpoints = input
+        .input_node_records
+        .iter()
+        .filter(|node| {
+            !node.node_function_body_ancestry_flag
+                && node.node_input_category == HldNodeInputCategory::LocalItem
+        })
+        .map(|node| &node.node_target_reference)
+        .collect::<BTreeSet<_>>();
+    let mut edges = BodyReadEdgeSet::default();
+    for site in read_impl_stage_values(store, source_scope, "body-site-reference-table")? {
+        if cancel.check_stage_work_cancelled() {
+            return Err(BodyReadEdgeError::Cancelled);
+        }
+        let Some(request) = read_value_path_request(&site, &context)? else {
+            continue;
+        };
+        if !site["span_expansion_provenance_chain"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+        {
+            edges.read_expanded_site_count += 1;
+        } else if let Some(edge) = build_body_read_edge(
+            &site,
+            request,
+            &context,
+            &endpoints,
+            input.run_generation_digest_value,
+        )? {
+            edges.read_edge_input_records.push(edge);
+        }
+    }
+    edges.read_edge_input_records.sort();
+    edges.read_edge_input_records.dedup();
+    Ok(edges)
+}
+
+/// A stored field of a body site row that must be text.
+fn read_site_text_field<'a>(
+    site: &'a Value,
+    field: &'static str,
+) -> Result<&'a str, BodyReadEdgeError> {
+    site[field]
+        .as_str()
+        .ok_or(BodyReadEdgeError::InvalidEvidence { field })
+}
+
+/// The source evidence of a body site, in the shape a span row has.
+fn build_site_evidence_value(site: &Value) -> Result<Value, BodyReadEdgeError> {
+    let text = read_site_text_field(site, "site_syntax_source_text")?;
+    Ok(json!({
+        "unit_compilation_identity_key":site["unit_compilation_identity_key"],
+        "file_source_absolute_path":site["file_source_absolute_path"],
+        "span_byte_start_offset":site["span_byte_start_offset"],
+        "span_byte_end_offset":site["span_byte_end_offset"],
+        "span_source_code_text":text,
+        "span_content_digest_full":blake3::hash(text.as_bytes()).to_hex().to_string(),
+        "span_expansion_provenance_chain":site["span_expansion_provenance_chain"]
+    }))
+}
+
+/// The stored value-path resolution of a path expression site. `None` when
+/// the site is not a path expression or no value-path request was made for
+/// it: the name is bound locally, or the path is a call's callee.
+fn read_value_path_request<'a>(
+    site: &Value,
+    context: &'a ImplHeaderSourceContext<'_>,
+) -> Result<Option<&'a Value>, BodyReadEdgeError> {
+    if site["site_syntax_kind_value"] != "PATH_EXPR" {
+        return Ok(None);
+    }
+    let evidence = build_site_evidence_value(site)?;
+    Ok(context
+        .read_type_path_records(&evidence, &evidence)?
+        .iter()
+        .find(|record| record["site_path_context_kind"] == "body_value_path"))
+}
+
+/// The `reads` edge of one original path expression, when its owner is a
+/// graph node and `request` resolved to one `static` or `const` graph node.
+/// A const declared in a function body is not a node, so it gives no edge.
+fn build_body_read_edge(
+    site: &Value,
+    request: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+    generation: RunGenerationDigestValue,
+) -> Result<Option<HldEdgeInputRecord>, BodyReadEdgeError> {
+    let owner = context.span(read_site_text_field(site, "site_owner_occurrence_key")?)?;
+    if owner["span_configuration_active_flag"] != true {
+        return Ok(None);
+    }
+    let source: HldTargetIdentityValue = NameSymbolTargetKey::Definition(
+        decode_occurrence_identity_value(&context.occurrence(owner)?)?,
+    )
+    .into();
+    let symbol = match (
+        request["path_resolution_state_kind"].as_str(),
+        request["path_target_symbol_rows"]
+            .as_array()
+            .map(Vec::as_slice),
+    ) {
+        (Some("resolved"), Some([symbol])) => symbol,
+        _ => return Ok(None),
+    };
+    let kind = symbol["target_symbol_kind_value"].as_str();
+    if !endpoints.contains(&source) || !matches!(kind, Some("Static" | "Const")) {
+        return Ok(None);
+    }
+    let Some(target) = context
+        .read_single_target_identity(symbol)?
+        .map(|identity| decode_symbol_target_value(&identity))
+        .transpose()?
+        .map(HldTargetIdentityValue::from)
+        .filter(|target| endpoints.contains(target))
+    else {
+        return Ok(None);
+    };
+    let evidence = build_site_evidence_value(site)?;
+    let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
+    let metadata = json!({
+        "read_kind":"body_value_path",
+        "read_source_text":site["site_syntax_source_text"],
+        "read_target_symbol_kind":kind
+    });
+    Ok(Some(HldEdgeInputRecord {
+        run_generation_digest_value: generation,
+        edge_source_reference: source.clone(),
+        edge_relation_kind_value: HldRelationKindValue::Reads,
+        edge_resolution_value: HldEdgeResolutionValue::Extracted {
+            target: target.clone(),
+        },
+        edge_evidence_row_key: HldEvidenceRowKey {
+            evidence_site_occurrence_key: occurrence,
+            evidence_source_occurrence_key: source,
+            evidence_relation_kind_value: HldRelationKindValue::Reads,
+            evidence_target_reference_value: Some(target),
+        },
+        edge_dispatch_metadata_text: Some(metadata.to_string()),
+    }))
+}
 
 /// Whether `path` is a whole path expression in a function body that may name
 /// a `static` or `const`: it is not a call's callee and its single name is not
