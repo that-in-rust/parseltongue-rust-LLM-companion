@@ -14,8 +14,8 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 4d, `imports` from `use` items (4 expected rows). Parts 4a, 4b
-  and 4c are built.
+- **Next target:** part 4d step 1 (failing real-source test). 4d is specified: `imports`
+  from `use` items, 4 expected rows. Parts 4a, 4b and 4c are built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -95,6 +95,28 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 14:05 IST — Part 4d specified: `imports` from `use` items
+
+**Part 4d is written, no code: REQ-RUST-049.0, 4 `imports` rows on pinned itoa, all into
+`core` and so stored unresolved until part 6.**
+
+- **Part file:** `SPEC-itoa-full-item-graph/part-4d-imports-from-use-items.md`.
+- **Measured** from the exported store of one run (`export-published-stage-rows`, no
+  temporary test): 3 `UseStatement` nodes; 8 import request rows, 4 of kind `Import`; no
+  stored row says what an import resolved to.
+- **Second opinion (Rule 5):** GLM-5.3 through pi, about 5 minutes. It changed one choice:
+  my draft re-derived "external source missing" in Rust; the analysis stage already
+  computes it in SQL, so the stage will write one outcome row per import and the resolver
+  will read it. Record:
+  `docs/devin-research/1794730674-second-opinion-glm-5-3-max-part-4d-imports-design.md`.
+  One claim of the review was wrong (it counted `resolve_use_import_edges` as three words).
+- **Codebase-memory queries:** `index_status`; `search_graph Function
+  '.*(import|use_tree|use_item|reexport).*'`; `trace_path resolve_import_endpoint_rounds
+  both 1`; `trace_path resolve_impl_header_edges both 1`; `trace_path
+  read_header_fixture_edges both 1`; `search_graph Function
+  '.*(final_output|namespace_output|binding_output|scope_binding).*'`.
+- **Next:** step 1, the failing real-source test `test_itoa_imports_row_counts`.
 
 ### 2026-11-15 13:40 IST — Part 4c step 7: gates and one run's cost; 4c is built
 
