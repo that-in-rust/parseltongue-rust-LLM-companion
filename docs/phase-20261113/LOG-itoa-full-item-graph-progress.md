@@ -39,22 +39,22 @@ step                                   state         measured or missing
 
 - **Run.** `parseltongue map-workspace-full-run --mapping-final-stage-kind
   full-item-dependency-graph` on the pinned source writes and reads back a frozen graph.
-- **Nodes.** 45: 43 original items outside function bodies, plus one file area per source file.
+- **Nodes.** 58: 43 original items outside function bodies, one file area per source file,
+  and 13 builtin types that an edge starts or ends at.
   Visibility and reachability are stored as unknown, not guessed.
-- **Edges.** 104: 43 `contains` and 61 `calls`. 3 calls are resolved; 58 are stored unresolved
+- **Edges.** 170: 43 `contains`, 61 `calls`, 34 `uses_type` and 32 `implements`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
   inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 13 real-source itoa tests pass at commit `b1115a5f4` (114.56 s, release build, one
-  thread). Three cover the full graph: `test_original_member_graph_roundtrip`,
-  `test_default_new_call_roundtrip` and `test_format_sealed_write_call`.
-- **Workspace gates** after part 4a: format, lint and release build pass; 457 tests pass,
+- **Tests.** 22 real-source itoa tests pass at commit `7e2a2ef87` (232.7 s, release build, one
+  thread).
+- **Workspace gates** after part 4b: format, lint and release build pass; 470 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
-- **Cost of one run** (2026-11-15, after part 4a, sysroot excluded, 2 workers): 14.1 s,
-  360 MB peak over the whole process tree, 9.3 MB store, no memory cap.
+- **Cost of one run** (2026-11-15, after part 4b, sysroot excluded, 2 workers): 13.0 to
+  13.7 s, 369 to 371 MB peak over the whole process tree (sampled about every 18 ms, not the
+  SOP's 10 ms), 9.5 MB store, no memory cap.
 
-The counts above were re-read after part 4a step 6 (51 nodes, 138 edges, 61 calls, 3 resolved).
-Not re-measured on the current commit: the whole-process-tree memory of one run.
+All counts above were read at commit `7e2a2ef87`.
 
 ## What is missing, in build order
 
@@ -92,7 +92,7 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
 
-### 2026-11-15 10:20 IST — Part 4b built: 32 `implements` rows on pinned itoa
+### 2026-11-15 09:40 IST — Part 4b built: 32 `implements` rows on pinned itoa
 
 - All 7 steps of part 4b are done (REQ-RUST-047.0). One run stores 58 nodes and 170 edges:
   43 `contains`, 61 `calls` (3 resolved), 34 `uses_type`, 32 `implements`.
