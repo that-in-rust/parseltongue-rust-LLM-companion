@@ -5,9 +5,14 @@ use parseltongue_core_row_types::{StageTableRowRecord, StageUnitWriteRequest};
 use serde_json::json;
 use std::collections::BTreeMap;
 
+#[path = "generated-item-projection-tests.rs"]
+mod generated_item_projection_tests;
+
 struct OriginalGraphFixtureStore {
     rows: BTreeMap<String, Vec<StageTableRowRecord>>,
     bytes: Vec<u8>,
+    /// Expanded macro texts by digest; any other digest reads the one source file.
+    expanded: BTreeMap<String, Vec<u8>>,
 }
 
 impl StageTableStorePort for OriginalGraphFixtureStore {
@@ -36,8 +41,8 @@ impl StageTableStorePort for OriginalGraphFixtureStore {
     ) -> Result<bool, StoreBackendFailureError> {
         unreachable!()
     }
-    fn read_file_content_bytes(&self, _: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
-        Ok(self.bytes.clone())
+    fn read_file_content_bytes(&self, digest: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
+        Ok(self.expanded.get(digest).unwrap_or(&self.bytes).clone())
     }
     fn publish_workspace_generation_manifest(
         &self,
@@ -111,6 +116,7 @@ fn build_original_fixture_store() -> OriginalGraphFixtureStore {
     let mut source = OriginalGraphFixtureStore {
         rows: BTreeMap::new(),
         bytes: text.as_bytes().to_vec(),
+        expanded: BTreeMap::new(),
     };
     source.insert_source_fixture_row("crate-dependency-graph-table", json!({"unit_compilation_identity_key":"raw-unit", "unit_package_root_path":"/fixture", "unit_source_root_path":"/fixture/src/lib.rs", "unit_mapped_target_flag":true}));
     source.insert_source_fixture_row("syntax-namespace-input-scopes", json!({"scope_cargo_unit_key":"raw-unit", "scope_module_identity_key":{"scope_compilation_unit_key":build_original_fixture_unit(), "scope_semantic_path_parts":[]}}));
