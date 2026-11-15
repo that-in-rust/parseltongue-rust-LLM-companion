@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 525 edges (88 `contains`, 45 `generates`, 15 `expands`), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 565 edges (88 `contains`, 45 `generates`, 15 `expands`, 106 `uses_type`: the declared type of a const or static and the aliased type of a type alias are sites since part 5d step 10c), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 78 `reads` rows (68 with a
 target; 56 of the 78 are sited in macro-expanded text; consts, statics, type aliases and structs are sources since part 5d step 10a) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,10 +15,9 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 10b (the impl member for `<T as Trait>::NAME`, 2 rows),
-  10c (`uses_type` from the declared type of a const or static and the aliased type of a
-  type alias: 34 generated and 3 original expected rows), step 11 (arguments of `assert!`:
-  20 expected `reads`), then the 5d workspace gates and part 6.
+- **Next target:** part 5d step 10b (the impl member for `<T as Trait>::NAME`: 2 `reads`
+  and 2 `uses_type` rows), step 11 (arguments of `assert!`: 20 expected `reads`), then
+  the 5d workspace gates and part 6. Step 10c is built (40 new `uses_type` rows).
   Part 5d step 9 is built: the two cast-receiver calls have a target (part 5 Q34 closed).
   Part 5d step 8 is built: the five `Unsigned ::fmt(self, buf)` calls target
   `<uN as Unsigned>::fmt`, the member of the impl for the calling method's type, and keep
@@ -122,6 +121,50 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 01:10 IST — Part 5d step 10c: declared and aliased types as `uses_type` sites (REQ-RUST-052.0 G7)
+
+- **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.
+- **Built at** `84c4e6372`. Spec: part 5 section 10.16.
+- **Cause, measured first:** name lookup was already asked for these type paths; the
+  field table had no row for the declared type of a const or static or the aliased type of
+  a type alias, so the `uses_type` producer never saw them.
+- **STUB:** `read_declared_type_owner` with `todo!()`; `cargo check -p
+  parseltongue-syntax-span-extractor` finished with one warning (`function
+  read_declared_type_owner is never used`).
+- **RED:** `test_declared_type_paths_listed` failed: left had 3 rows (`T: H`, `H`, `Q`),
+  right 8. `test_declared_type_use_rows` failed: left `[]`, right 40 rows.
+- **GREEN:** 46 of 46 itoa tests (144.55 s), 120 + 17 syntax crate tests, format, lint on
+  the two touched crates.
+- **Measured (3 release runs, executable `3532463e6eea5354921a8331ce0b2a1d8c916f5f22e20dcd577a39b86c9f4143`):**
+
+```text
+nodes=103 containment=88 generates=45 expands=15 calls=197 resolved_calls=43 type_uses=106
+implements=32 reads=78 reads_in_expanded_bodies=56 imports=4 edges=565 completeness=incomplete
+run1 wall=23.82s maxrss=385968kB
+run2 wall=17.95s maxrss=356420kB
+run3 wall=25.20s maxrss=374080kB
+store_bytes=17985536
+```
+
+- **Prediction held:** 106 `uses_type` and 565 edges were written down before the code.
+- **New rows (40):** 12 `MAX_STR_LEN -> usize`, 10 `Buffer -> MaybeUninit<u8>` (no
+  target, in `core`), 10 `Buffer -> u8`, 6 from the two qualified aliases (the whole path
+  on the trait's declaration, `u64`/`i64`, `private::Sealed`), `DECIMAL_PAIRS ->
+  DecimalPairs`, `Integer::MAX_STR_LEN -> usize`.
+- **Pins changed, each after reading the assertion:** edges 525 to 565, `uses_type` 66
+  to 106, and the generated-signature test now skips declared-type rows (it asserts
+  "copied from the definition", and `u64` is copied from the call; the new test pins the
+  origin of all 40).
+- **Deliberate breaks:** 7, all fail a test; one (a static labelled as a const) survived
+  until the fixture also checked the item-kind field.
+- **Defect of mine repaired:** the step 10a insert had split the doc comment of
+  `test_cast_receiver_call_targets` in two. Put back in one piece.
+- **Q40 closed:** the 10 `.ilog10()` calls in const initializers are already `calls` rows.
+- **Slips:** no codebase-memory trace before the change. No second opinion yet; taken
+  with 10b.
+- **Workspace gates:** not run; they run at the end of part 5d.
+- **Next:** 10b (2 `reads` and 2 `uses_type` qualified paths), then step 11.
 
 ### 2026-11-16 00:05 IST — Part 5d step 10a: consts, statics and types as `reads` sources (REQ-RUST-052.0 G7)
 

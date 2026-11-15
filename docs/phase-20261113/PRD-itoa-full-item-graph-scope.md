@@ -261,7 +261,11 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     generated items do not repeat the call text; they have the node field and `generates`.
   - Chosen by the design rule above. On itoa all 103 labels are now distinct (was 45).
 
-- **Non-function sources (2026-11-16, built in part 5d step 10a for `reads`).** `reads` and
+- **Non-function sources (2026-11-16, built in part 5d step 10a for `reads` and step 10c
+  for `uses_type`).** A `uses_type` row from a const, static or type alias names the kind
+  of that item (`declared_type_owner_kind`); a qualified path (`<u64 as Sealed>::Buffer`)
+  is one row and each type inside it is one more, so an agent sees every type the item
+  depends on. `reads` and
   `uses_type` start at any item a path is written in: a const or static (its initializer),
   a type alias or struct (an array length), not only a function. Chosen by the design rule:
   an agent changing `MAX_STR_LEN` must see that `Buffer`'s size reads it. A row whose

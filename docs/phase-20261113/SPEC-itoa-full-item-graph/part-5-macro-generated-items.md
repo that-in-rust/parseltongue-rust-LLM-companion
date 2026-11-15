@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15); G7 `uses_type` (10c), the impl member for `<T as Trait>::NAME` (10b) and arguments of builtin macros (`assert!`) are not built.
+5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15) and step 10c BUILT (`uses_type` from declared and aliased types, section 10.16); the impl member for `<T as Trait>::NAME` (10b) and arguments of builtin macros (`assert!`) are not built.
 5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
@@ -1267,3 +1267,84 @@ signature. No second opinion yet for this step; it is taken with 10b and 10c.
   the `calls` producer emits them was not measured in this step (`calls` stayed 197,
   which already includes them or not). Measure in 10c.
 
+
+### 10.16 Step 10c: declared and aliased types as `uses_type` sites (measured)
+
+Rule G7, `uses_type` half. Built at `84c4e6372`.
+
+**Cause found (measured on the step 10a store).** Name lookup was already asked for every
+type path in the declared type of a const or static and in the aliased type of a type
+alias. No `uses_type` row came out because `field-signature-detail-table` had no row for
+those types: its rows were fields, parameters, return types, generic parameters and bounds.
+
+**Rule as built.**
+
+```text
+The type node written after the colon of a const or static, or after the "=" of a type
+alias, is one field-signature-detail row. Its kind is the kind of the type (PATH_TYPE,
+ARRAY_TYPE, TUPLE_TYPE, ..). The row names the kind of its item in
+declared_type_owner_kind: CONST, STATIC or TYPE_ALIAS.
+Its type paths are listed as on any signature row: a path under an expression (an array
+length) is not listed; a bound of an associated type stays on its own bound row.
+Each listed path is one uses_type row from the item, and carries declared_type_owner_kind.
+A qualified path (<u64 as private::Sealed>::Buffer) is one row, and so is each type path
+inside it (u64, private::Sealed).
+A let type in a body is not a row.
+```
+
+**Measured on pinned itoa (3 release runs, executable `3532463e…f4143`).**
+
+```text
+nodes=103 edges=565 (was 525) type_uses=106 (was 66) reads=78 calls=197 resolved_calls=43
+implements=32 imports=4   completeness=incomplete
+wall 18.0 to 25.2 s, peak 356 to 386 MB, store 17,985,536 bytes
+
+new rows  source                                 type written              target
+12        <T as Integer>::MAX_STR_LEN (gen.)     usize                     builtin usize
+10        <T as private::Sealed>::Buffer (gen.)  MaybeUninit<u8>           none: MaybeUninit is in core
+10        same                                   u8                        builtin u8
+2         <usize|isize as private::Sealed>::Buffer
+                                                 <u64|i64 as private::Sealed>::Buffer
+                                                                           private::Sealed::Buffer, the
+                                                                           trait's declaration
+2         same                                   u64 | i64                 builtin u64 | i64
+2         same                                   private::Sealed           the trait private::Sealed
+1         DECIMAL_PAIRS (original)               DecimalPairs              the struct DecimalPairs
+1         Integer::MAX_STR_LEN (original)        usize                     builtin usize
+```
+
+- Prediction (written before the code): 106 `uses_type`, 565 edges. Measured the same.
+- Each of the 38 generated rows names where its first and last token were copied from. The
+  `u64` / `i64` rows are copied from the macro call; all others from the definition.
+- Against the expected graph: the 12 + 20 + 1 rows to `usize`, `MaybeUninit`, `u8` and
+  `DecimalPairs` are in it. It has the impl member `<u64 as private::Sealed>::Buffer` for
+  the 2 qualified rows; ours is the trait's declaration until step 10b. It has no row for
+  `u64`, `private::Sealed` inside the qualified path, nor for `Integer::MAX_STR_LEN ->
+  usize`. All five are true and stay (one row per site); the expected graph gains them
+  in part 7.
+- **Q40 closed.** The 10 `uN::MAX.ilog10()` calls in const initializers are already
+  `calls` rows (counted in the 197), each without a target.
+
+**Tests.** `test_declared_type_use_rows` (itoa, all 40 rows by source, item kind, token
+origin, text and target; failed first with 0 rows), `test_declared_type_paths_listed`
+(fixture; failed first with only the bound rows). Stub first:
+`read_declared_type_owner` with `todo!()`, `cargo check` passed with one dead-code
+warning. 3 pins in 2 older itoa tests changed to the measured values (edges 565,
+`uses_type` 106; the generated-signature test skips declared-type rows, which have their
+own test). 46 of 46 itoa tests pass (145 s), 120 + 17 syntax crate tests, format, lint on
+the two touched crates.
+
+**Deliberate breaks.** Seven, each fails a test: no row for a type alias; for a static;
+for a const; no check that the node is a type; a declared path type not its own nearest
+row; row holders found by kind only; a static labelled as a const (this one survived
+until the fixture also checked `declared_type_owner_kind`).
+
+**Not done.** No second opinion yet; it is taken with 10b. Workspace gates run at the
+end of 5d.
+
+- **Q41.** A declared type that is an `impl Trait` or `dyn Trait` lists its bound paths
+  on the bound row, which has no `declared_type_owner_kind`. The `uses_type` row exists;
+  only the item-kind field is missing. No fixture.
+- **Q42.** A const or static written inside a function body has a declared-type row
+  (fixture: `const S: U`), owned by that const's own span. Whether the graph has a node
+  for such an item is the rule of part 1; itoa has none.
