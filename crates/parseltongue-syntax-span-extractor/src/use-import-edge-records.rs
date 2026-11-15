@@ -125,29 +125,41 @@ pub fn resolve_use_import_edges(
             resolve_import_outcome_targets(outcome, &context, &endpoints)?
                 .into_iter()
                 .map(|resolution| {
-                    let target = match &resolution {
-                        HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
-                        _ => None,
-                    };
-                    HldEdgeInputRecord {
-                        run_generation_digest_value: input.run_generation_digest_value,
-                        edge_source_reference: source.clone(),
-                        edge_relation_kind_value: HldRelationKindValue::Imports,
-                        edge_resolution_value: resolution,
-                        edge_evidence_row_key: HldEvidenceRowKey {
-                            evidence_site_occurrence_key: site.clone(),
-                            evidence_source_occurrence_key: source.clone(),
-                            evidence_relation_kind_value: HldRelationKindValue::Imports,
-                            evidence_target_reference_value: target,
-                        },
-                        edge_dispatch_metadata_text: Some(metadata.clone()),
-                    }
+                    build_import_edge_record(input, source, &site, resolution, &metadata)
                 }),
         );
     }
     set.import_edge_input_records.sort();
     set.import_edge_input_records.dedup();
     Ok(set)
+}
+
+/// One `imports` row: from the `use` node `source`, sited at the import
+/// request's own range, to `resolution`.
+fn build_import_edge_record(
+    input: &HldMaterializationInputRecord,
+    source: &HldTargetIdentityValue,
+    site: &SemanticOccurrenceKeyValue,
+    resolution: HldEdgeResolutionValue,
+    metadata: &str,
+) -> HldEdgeInputRecord {
+    let target = match &resolution {
+        HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
+        _ => None,
+    };
+    HldEdgeInputRecord {
+        run_generation_digest_value: input.run_generation_digest_value,
+        edge_source_reference: source.clone(),
+        edge_relation_kind_value: HldRelationKindValue::Imports,
+        edge_resolution_value: resolution,
+        edge_evidence_row_key: HldEvidenceRowKey {
+            evidence_site_occurrence_key: site.clone(),
+            evidence_source_occurrence_key: source.clone(),
+            evidence_relation_kind_value: HldRelationKindValue::Imports,
+            evidence_target_reference_value: target,
+        },
+        edge_dispatch_metadata_text: Some(metadata.to_owned()),
+    }
 }
 
 /// The `use` nodes of a graph that sit in original text outside any function
