@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c BUILT (section 9). 5d SPECIFIED, steps 1 to 3 of 6 BUILT (section 10).
+5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 8 BUILT (section 10); generated consts and type aliases as sources (G7) not built.
 5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
@@ -521,12 +521,22 @@ G9  A call whose callee is a path gets its target from the stored name lookup of
 G10 A callee whose qualifier is stored as a trait and whose whole path stores exactly one
     Function that is a graph node (`Trait::method(x, ..)`) has that function, the trait's
     declaration, as target. The row lists as evidence every function of that name in a
-    stored impl of that trait: the impl, the type it is for, and the member. No impl member
-    is the target: the receiver's type is not stored.
+    stored impl of that trait: the impl, the type it is for, and the member. An impl member
+    is the target only under G12.
 G11 A callee that is one name, or is qualified by a module, and whose path stores exactly
     one Struct that is a graph node (`S(..)`) is a tuple struct's constructor: the struct
     is the target, with its own dispatch kind. A struct found through a trait or a type is
     not a target.
+G12 A G10 call whose first argument is the path `self`, written in a method that declares
+    `self` by value without a type and is not inside a block, has an impl member as target
+    when all of this is stored: the calling method is a member of an impl H for a type
+    written as a plain path with a stored target, without generic parameters, not negative,
+    not inside a function body; among all stored trait impls that are not shown to be of
+    another trait or for another type, exactly one function has the callee's name; that
+    function's impl is as plain as H, is of the trait the callee names, and the function
+    takes `self` by value; and it is a graph node. The row keeps the G10 candidate list
+    and adds the trait's declaration, the member, the impl H and its type. Otherwise the
+    G10 row stands.
 ```
 
 ### 10.3 Steps, predicted and measured on itoa
@@ -544,7 +554,12 @@ step  what                                         rules    predicted           
                                                    G6                               194 without), 502 edges
 5     trait members through a type                 G5       built: 16 reads and 5 uses_type gained a target
                                                             gain a target
-6     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
+6     a call whose callee path names one function  G9       -                       30 of 197 calls with a target
+7     a trait's method through the trait; a tuple  G10,     -                       41 of 197 calls with a target
+      struct's constructor                         G11
+8     the impl member when the first argument is   G12      5 rows change target    5 rows: target is the impl
+      the method's own self                                                         member; 41 of 197 unchanged
+-     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
                                                             34 uses_type
 ```
 
@@ -972,7 +987,7 @@ removed).
 **Open questions.**
 
 - **Q27.** `Trait::method(self, ..)` where `self` is the method's own `self` parameter in an
-  impl for a stored type: the impl member is provable. Not built.
+  impl for a stored type: the impl member is provable. Built in step 8 (10.13, G12).
 - **Q28.** A tuple enum variant called as a function (`E::V(..)`) and a unit struct or
   variant used as a value are not covered. itoa has none.
 - **Q29.** A struct found in the Value namespace is taken as a tuple struct. A struct with
@@ -981,3 +996,78 @@ removed).
 - **Q30.** The candidate list is not narrowed by the impl's generic parameters or by
   negative impls; each candidate row carries the generic-parameter flag instead. itoa has
   neither on `Unsigned`.
+
+### 10.13 Step 8: the impl member when the first argument is the method's own `self` (measured)
+
+Rule G12 (closes Q27). Built at the commit that adds this section.
+
+```text
+ callee                               rows  target                     dispatch_kind           row's outcome
+ Unsigned ::fmt (self , buf )            5  <uN as Unsigned>::fmt      trait_path_impl_method  single_impl_member_by_self
+                                            (uN = u8 u16 u32 u64 u128)
+ Unsigned ::fmt (self .unsigned_abs ()   5  Unsigned::fmt (the trait's trait_path_method       trait_method_declaration
+   , ..)                                    declaration), unchanged
+```
+
+**Measured (three release runs on pinned itoa).** 103 nodes, 502 edges and `resolved_calls`
+41 of 197, all unchanged: the five rows had a target before and have a more exact one now.
+Wall 14.8 to 18.1 s, peak 339 to 365 MB, store 16 MB. The exported edge table holds 5 rows
+with `trait_path_impl_method` and 5 with `receiver_impl_header_occurrence`. The graph is
+still marked incomplete.
+
+**Why the member is proven, not inferred.** The call is written in `fn write(self, ..)` of
+`impl private::Sealed for uN`. `self` there has the type the impl is for. That impl's type
+is stored with a target. `Trait::name(self, ..)` takes `self` by value, so no reference or
+deref step changes the type. So the function that runs is `name` in the impl of the trait
+for that same stored type, when there is exactly one.
+
+**What is stored where.**
+
+- Call syntax (`call_syntax_evidence`): `call_first_argument_self_flag`, true only for the
+  bare path `self` as first argument where the nearest `fn` declares `self` or `mut self`
+  and has no block above it.
+- Impl header member rows: `member_self_parameter_kind`, one of `value`, `reference`,
+  `typed`, or null when the function has no `self`. `member_self_parameter_flag` stays.
+- The row's `trait_method_lookup_evidence`, when a member is chosen:
+  `trait_member_outcome_kind: single_impl_member_by_self`, `trait_member_candidate_rows`
+  (the G10 list, unchanged), `selected_member_occurrence_key`,
+  `trait_method_declaration_identity`, `receiver_type_stored_flag: true`,
+  `receiver_self_type_identity`, `receiver_self_type_source_text` (`u8`),
+  `receiver_impl_header_occurrence` (the impl that holds the calling method), and
+  `sources_not_read`.
+
+**Changed after the second opinion** (record:
+`docs/devin-research/1794782315-second-opinion-glm-5-3-max-part-5d-step-eight-self-argument-member.md`).
+The first build counted only impls whose trait was stored with a plain path. With
+`trait T<A = u8>`, `impl T<u16> for u8` and `impl T for u8`, the first impl's trait is not
+stored (it has generic arguments), so one candidate was left and `T::<u16>::f(self)` would
+have been given the wrong member. Now every stored trait impl counts unless its trait or its
+type is stored as another one, and two candidates give no member. This case is pinned on
+header rows in a fixture, not on real source. Also from the review: the row names the impl
+that holds the calling method and the chosen member; a member written `r#name` matches.
+
+**Tests.** Real source: `test_trait_path_call_targets` (failed first: all ten rows were
+`trait_path_method trait_method_declaration false`; then passed) pins the five impl
+members, the five declaration rows and the type text of each chosen row. Changed to the
+measured value: `test_generated_body_call_rows` (one more dispatch kind; it failed on the
+first full run). Fixtures, in `self-argument-member-tests.rs`, written after the code:
+`test_own_self_argument_flag` (14 call shapes), `test_self_argument_member_rules` (header
+rows: each condition of G12 removed one at a time, on the calling method's impl and on the
+candidate's), `test_trait_call_self_member` (three runs of the call producer on real
+source text: member chosen; another first argument; member not a graph node). Eighteen
+deliberate breaks of the code each made one of these fail
+(`/home/ubuntu/phase5d-work/s8-mutations.txt`).
+
+**Open questions.**
+
+- **Q31.** A callee whose trait qualifier has generic arguments (`T::<u16>::f(self)`) is not
+  rejected by G12 itself; the rule relies on "exactly one candidate among all impls that may
+  be of this trait for this type". The reviewer asked for an explicit guard. Not added: with
+  one such impl, generic arguments cannot select another. Not tested on real source.
+- **Q32.** An impl written inside a `const _: () = { .. }` block at module level gets no
+  member (the block rule); it keeps the G10 row. itoa's five `const _` blocks hold no impl.
+- **Q33.** The five `Unsigned::fmt(self.unsigned_abs(), ..)` rows need the return type of
+  `unsigned_abs`, which is in `core`. They stay on the trait's declaration until part 6.
+- **Q34.** Next rule proposed by the review: a method call whose receiver is a cast
+  (`(self as $primitive).write(buf)`) has the cast's written type as receiver type. Not
+  built; not yet checked in the stored rows.

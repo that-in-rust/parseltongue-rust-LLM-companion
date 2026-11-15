@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 41 of 197 calls resolved (27 by the callee path, part 5d step 6; 10 `Unsigned ::fmt` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 41 of 197 calls resolved (27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (all 55 with a
 target; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -16,7 +16,10 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `incomplete`.**
 
 - **Next target:** method calls, whose receiver type is not determined (104 generated,
-  more original); and the impl member for `Unsigned::fmt(self, buf)` (part 5 Q27).
+  more original), starting with a receiver that is a cast (part 5 Q34).
+  Part 5d step 8 is built: the five `Unsigned ::fmt(self, buf)` calls target
+  `<uN as Unsigned>::fmt`, the member of the impl for the calling method's type, and keep
+  the trait's declaration and the candidate list on the row (part 5 Q27 closed).
   Part 5d step 7 is built: the 10 generated `Unsigned ::fmt(..)` calls target the trait's
   method declaration and list the five impl members that could run; `DecimalPairs(..)`
   targets the struct.
@@ -116,6 +119,53 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 04:10 IST — Part 5d step 8: the impl member when the first argument is the method's own `self` (REQ-RUST-052.0 G12)
+
+Clock note: this time is read from the machine. The two entries below are stamped about
+two and a half hours ahead of their commits (`79357012e` was committed at 03:38 IST).
+
+- **Built.** `Trait::name(self, ..)` written in a method that takes `self` by value, in an
+  impl for a stored type, has the one impl member of that trait for that type as target
+  (`dispatch_kind: trait_path_impl_method`, outcome `single_impl_member_by_self`). The row
+  keeps the trait's declaration, the candidate list, the chosen member, and the impl and
+  type that proved it. New stored fields: `call_first_argument_self_flag` on call syntax,
+  `member_self_parameter_kind` on impl member rows.
+- **Measured on pinned itoa, three release runs:** 103 nodes, 502 edges, `resolved_calls`
+  41 of 197, all unchanged; 5 rows moved from the trait's declaration to
+  `<uN as Unsigned>::fmt` (u8, u16, u32, u64, u128). 14.8 to 18.1 s, 339 to 365 MB peak,
+  16 MB store.
+- **RED.** `test_trait_path_call_targets`: all ten rows read
+  `trait_path_method trait_method_declaration false`, 0 passed 1 failed. **GREEN:** 1 passed
+  (23 s), after one compile fix (`ast::HasArgList::arg_list(&call)`).
+- **Caught by the full real-source run:** `test_generated_body_call_rows` pinned the set of
+  dispatch kinds and failed (42 passed, 1 failed). The new kind is added; 43 pass.
+- **Fixture tests, written after the code** (`self-argument-member-tests.rs`):
+  `test_own_self_argument_flag`, `test_self_argument_member_rules`,
+  `test_trait_call_self_member`. All three passed on first run.
+- **Mutations.** 18 deliberate breaks (13 before the review changes, 5 after); each failed a
+  fixture test (`/home/ubuntu/phase5d-work/s8-mutations.txt`).
+- **Second opinion (GLM-5.3, built code).** Found one case that would have given a wrong
+  member: `impl T<u16> for u8` beside `impl T for u8` left one candidate, because an impl
+  whose trait has generic arguments is not stored as resolved. Fixed: every stored trait
+  impl counts unless its trait or type is stored as another one. Pinned on header rows,
+  not on real source. Also adopted: the row names the impl and the chosen member; `r#name`
+  matches. Not adopted: an explicit guard on generic arguments in the callee (Q31).
+  Record: `docs/devin-research/1794782315-second-opinion-glm-5-3-max-part-5d-step-eight-self-argument-member.md`.
+- **Gates.** Format; lint on the two touched crates; syntax crate 114 + 17 tests; all 43
+  real-source itoa tests (94 s); release build. Workspace gates not run; they run at the
+  end of part 5d.
+- **codebase-memory.** `search_graph` and `trace_path` on `resolve_callee_path_target`
+  and `find_type_member_target` before the change; re-index and `trace_path
+  find_self_argument_member` after it.
+- **No refactor.** `original-call-resolution-records.rs` is 1,342 lines, far over the
+  200-line guide; splitting it is left for the end of part 5d. `find_self_argument_member`
+  and `check_own_self_argument` are three-word names after the verb; kept, since both are
+  private and read as what they do.
+- **Not built:** the five `Unsigned::fmt(self.unsigned_abs(), ..)` rows (Q33, needs
+  `core`); cast receivers (Q34).
+- **Next.** Method calls: read the stored rows of the 104 generated method calls by
+  receiver shape, then the smallest rule that is provable from source.
 
 ### 2026-11-16 06:20 IST — Correction to the step 7 entry below: 5 and 5, not 6 and 4
 
