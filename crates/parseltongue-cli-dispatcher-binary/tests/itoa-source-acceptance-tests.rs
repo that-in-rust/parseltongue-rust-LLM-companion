@@ -2878,7 +2878,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 525);
+    assert_eq!(input.input_edge_records.len(), 565);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3359,6 +3359,10 @@ fn test_generated_signature_type_uses() {
             assert!(owner_start <= start && end <= owner_end);
             let metadata: Value =
                 serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            // The declared type of a generated const or type alias has its own test (G7).
+            if !metadata["declared_type_owner_kind"].is_null() {
+                continue;
+            }
             let text = metadata["type_source_text"].as_str().unwrap();
             let origin = &metadata["expansion_source_origin"];
             let copied = |token: &Value| {
@@ -3429,8 +3433,8 @@ fn test_generated_signature_type_uses() {
             .iter()
             .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::UsesType)
             .count(),
-        66,
-        "34 from original signatures and 32 from generated ones"
+        106,
+        "34 from original signatures, 32 from generated ones and (G7) 40 from declared types"
     );
 }
 
@@ -3774,9 +3778,6 @@ fn test_trait_path_call_targets() {
     );
 }
 
-/// REQ-RUST-052.0 G13: a method call whose receiver is a cast to a stored type
-/// (`(self as u64).write(buf)`) has the one stored impl member of that type as target,
-/// when it is a member of the trait whose impl holds the call. The row keeps the cast's
 /// REQ-RUST-052.0 G7: a const, a type alias and a struct are `reads` sources too. A path
 /// expression in a const's initializer or in an array length of a type is one row, from the
 /// item it is written in. `<T as Trait>::NAME` has the trait's declaration of `NAME` as
@@ -3858,6 +3859,144 @@ fn test_item_initializer_read_rows() {
     assert_eq!(rows, expected);
 }
 
+/// REQ-RUST-052.0 G7: the declared type of a const or static and the aliased type of a
+/// type alias are `uses_type` sites of that item, written by a macro or not. A qualified
+/// path (`<u64 as private::Sealed>::Buffer`) is one row, and so is each type inside it.
+#[test]
+fn test_declared_type_use_rows() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| {
+                node.node_qualified_path_text
+                    .trim_start_matches("itoa::src/lib.rs::")
+                    .to_owned()
+            })
+            .unwrap()
+    };
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::UsesType)
+        .filter_map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            let owner = metadata["declared_type_owner_kind"].as_str()?.to_owned();
+            // Where the first token of a site in expanded text was copied from.
+            let origin = metadata["expansion_source_origin"]["site_first_token_origin"]
+                ["token_source_origin_kind"]
+                .as_str()
+                .unwrap_or("-")
+                .to_owned();
+            Some((
+                label(&edge.edge_source_reference),
+                owner,
+                origin,
+                metadata["type_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .replace(' ', ""),
+                match &edge.edge_resolution_value {
+                    HldEdgeResolutionValue::Extracted { target } => label(target),
+                    _ => "-".to_owned(),
+                },
+            ))
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let row = |source: String, owner: &str, origin: &str, text: &str, target: &str| {
+        (
+            source,
+            owner.to_owned(),
+            origin.to_owned(),
+            text.to_owned(),
+            target.to_owned(),
+        )
+    };
+    let mut expected = [
+        "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128",
+    ]
+    .iter()
+    .flat_map(|name| {
+        let alias = format!("<{name} as private::Sealed>::Buffer");
+        [
+            row(
+                format!("<{name} as Integer>::MAX_STR_LEN"),
+                "CONST",
+                "definition",
+                "usize",
+                "usize",
+            ),
+            row(
+                alias.clone(),
+                "TYPE_ALIAS",
+                "definition",
+                "MaybeUninit<u8>",
+                "-",
+            ),
+            row(alias, "TYPE_ALIAS", "definition", "u8", "u8"),
+        ]
+    })
+    .chain(
+        [("usize", "u64"), ("isize", "i64")]
+            .iter()
+            .flat_map(|(size, fixed)| {
+                let alias = format!("<{size} as private::Sealed>::Buffer");
+                [
+                    row(
+                        format!("<{size} as Integer>::MAX_STR_LEN"),
+                        "CONST",
+                        "definition",
+                        "usize",
+                        "usize",
+                    ),
+                    row(
+                        alias.clone(),
+                        "TYPE_ALIAS",
+                        "definition",
+                        &format!("<{fixed}asprivate::Sealed>::Buffer"),
+                        "private::Sealed::Buffer",
+                    ),
+                    // The type name is copied from the macro call.
+                    row(alias.clone(), "TYPE_ALIAS", "invocation", fixed, fixed),
+                    row(
+                        alias,
+                        "TYPE_ALIAS",
+                        "definition",
+                        "private::Sealed",
+                        "private::Sealed",
+                    ),
+                ]
+            }),
+    )
+    .chain([
+        row(
+            "DECIMAL_PAIRS".to_owned(),
+            "STATIC",
+            "-",
+            "DecimalPairs",
+            "DecimalPairs",
+        ),
+        row(
+            "Integer::MAX_STR_LEN".to_owned(),
+            "CONST",
+            "-",
+            "usize",
+            "usize",
+        ),
+    ])
+    .collect::<Vec<_>>();
+    expected.sort();
+    assert_eq!(rows, expected);
+    assert_eq!(expected.len(), 40);
+}
+
+/// REQ-RUST-052.0 G13: a method call whose receiver is a cast to a stored type
+/// (`(self as u64).write(buf)`) has the one stored impl member of that type as target,
+/// when it is a member of the trait whose impl holds the call. The row keeps the cast's
 /// type, the candidates and what was not read.
 #[test]
 fn test_cast_receiver_call_targets() {

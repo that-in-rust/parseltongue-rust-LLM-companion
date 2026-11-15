@@ -38,10 +38,29 @@ fn check_signature_row_kind(kind: SyntaxKind) -> bool {
     )
 }
 
+/// Whether `node` is the declared type of a `const` or `static`, or the aliased type of a
+/// type alias: `Some` with the item's syntax kind (REQ-RUST-052.0 G7).
+pub(super) fn read_declared_type_owner(node: &SyntaxNode) -> Option<&'static str> {
+    let owner = node.parent().filter(|_| ast::Type::can_cast(node.kind()))?;
+    match owner.kind() {
+        SyntaxKind::CONST => Some("CONST"),
+        SyntaxKind::STATIC => Some("STATIC"),
+        SyntaxKind::TYPE_ALIAS => Some("TYPE_ALIAS"),
+        _ => None,
+    }
+}
+
+/// Whether `node` is a signature row: one of the row kinds, or a declared type.
+fn check_signature_row_node(node: &SyntaxNode) -> bool {
+    check_signature_row_kind(node.kind()) || read_declared_type_owner(node).is_some()
+}
+
 /// The type paths one signature row names, each with its own source range.
 /// A path is listed on the nearest signature row that holds it, so a bound's
 /// path is on the bound row and not also on its type parameter. Paths under an
-/// expression (an array length, a const argument) are not listed.
+/// expression (an array length, a const argument) are not listed. The declared
+/// type of a `const` or `static` and the aliased type of a type alias are rows
+/// too (REQ-RUST-052.0 G7).
 /// `Value::Null` when the row is not in signature position: it sits under an
 /// expression of its owning item, such as a closure parameter.
 pub(super) fn extract_signature_type_paths(
@@ -49,7 +68,7 @@ pub(super) fn extract_signature_type_paths(
     node: &SyntaxNode,
     removed: &[usize],
 ) -> Value {
-    if !check_signature_row_kind(node.kind())
+    if !check_signature_row_node(node)
         || node
             .ancestors()
             .skip(1)
@@ -61,10 +80,13 @@ pub(super) fn extract_signature_type_paths(
     node.descendants()
         .filter(|path| path.kind() == SyntaxKind::PATH_TYPE)
         .filter(|path| {
-            let mut holders = path.ancestors().skip(1);
-            let nearest = holders.by_ref().find(|holder| {
-                check_signature_row_kind(holder.kind()) || ast::Expr::can_cast(holder.kind())
-            });
+            // A declared type that is itself a path is its own nearest row.
+            let nearest = path
+                .ancestors()
+                .skip(usize::from(path != node))
+                .find(|holder| {
+                    check_signature_row_node(holder) || ast::Expr::can_cast(holder.kind())
+                });
             nearest.as_ref() == Some(node)
         })
         .map(|path| {
@@ -341,6 +363,9 @@ fn build_type_path_edge(
         "type_source_text":text,
         "type_path_self_flag":path["type_path_self_flag"]
     });
+    if !row["declared_type_owner_kind"].is_null() {
+        metadata["declared_type_owner_kind"] = row["declared_type_owner_kind"].clone();
+    }
     if !proof.is_null() {
         metadata["type_relative_member_evidence"] = proof;
     }

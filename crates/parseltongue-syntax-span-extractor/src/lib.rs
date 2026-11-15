@@ -616,6 +616,7 @@ fn extract_macro_context_syntax(
             continue;
         }
         let kind = format!("{:?}", node.kind());
+        let declared_type = signature_type_edge_records::read_declared_type_owner(&node);
         let field = matches!(
             kind.as_str(),
             "RECORD_FIELD"
@@ -629,7 +630,7 @@ fn extract_macro_context_syntax(
                 | "WHERE_PRED"
                 | "TYPE_BOUND"
                 | "ATTR"
-        );
+        ) || declared_type.is_some();
         let body = matches!(
             kind.as_str(),
             "CALL_EXPR"
@@ -677,6 +678,9 @@ fn extract_macro_context_syntax(
             signature_type_edge_records::extract_signature_type_paths(input, &node, &removed);
         if !type_paths.is_null() {
             payload["type_path_source_rows"] = type_paths;
+        }
+        if let Some(owner) = declared_type {
+            payload["declared_type_owner_kind"] = json!(owner);
         }
         if matches!(kind.as_str(), "CALL_EXPR" | "METHOD_CALL_EXPR") {
             payload["call_syntax_evidence"] =

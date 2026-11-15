@@ -85,6 +85,58 @@ fn test_signature_paths_listed_once() {
     );
 }
 
+/// REQ-RUST-052.0 G7: the declared type of a const or static and the aliased type of a
+/// type alias are signature rows. Their kind is the kind of the type; an array length is
+/// an expression and is not listed. A `let` type is not a row.
+#[test]
+fn test_declared_type_paths_listed() {
+    let source = "const A: m::B<C> = 1;\nstatic D: [E; F] = [];\n\
+        type G<T: H> = (I, <J as K>::L);\ntrait M { const N: O; type P: Q; }\n\
+        fn f() { let x: R = 1; const S: U = 1; }\n";
+    assert_eq!(
+        read_signature_path_lists(source),
+        vec![
+            row("PATH_TYPE", "m::B<C>", &["m::B<C>", "C"]),
+            row("ARRAY_TYPE", "[E; F]", &["E"]),
+            row("TYPE_PARAM", "T: H", &[]),
+            row("TYPE_BOUND", "H", &["H"]),
+            row(
+                "TUPLE_TYPE",
+                "(I, <J as K>::L)",
+                &["I", "<J as K>::L", "J", "K"]
+            ),
+            row("PATH_TYPE", "O", &["O"]),
+            row("TYPE_BOUND", "Q", &["Q"]),
+            row("PATH_TYPE", "U", &["U"]),
+        ]
+    );
+    // Each declared-type row names the kind of the item it belongs to; no other row does.
+    let owners = extract_file_syntax_rows(&make_call_syntax_input(source))
+        .unwrap()
+        .stage_unit_output_rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "field-signature-detail-table")
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .filter_map(|row| {
+            Some((
+                row["site_syntax_source_text"].as_str()?.to_owned(),
+                row["declared_type_owner_kind"].as_str()?.to_owned(),
+            ))
+        })
+        .collect::<Vec<_>>();
+    let owner = |text: &str, kind: &str| (text.to_owned(), kind.to_owned());
+    assert_eq!(
+        owners,
+        [
+            owner("m::B<C>", "CONST"),
+            owner("[E; F]", "STATIC"),
+            owner("(I, <J as K>::L)", "TYPE_ALIAS"),
+            owner("O", "CONST"),
+            owner("U", "CONST"),
+        ]
+    );
+}
+
 /// REQ-RUST-018.2
 #[test]
 fn test_expression_paths_not_types() {
