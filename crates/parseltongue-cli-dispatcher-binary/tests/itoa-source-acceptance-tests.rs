@@ -700,7 +700,6 @@ fn test_clone_self_type_edge() {
 
 /// REQ-RUST-048.0
 #[test]
-#[ignore = "RED until part 4c step 4 stores reads rows in the full graph"]
 fn test_decimal_pairs_static_read() {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");
