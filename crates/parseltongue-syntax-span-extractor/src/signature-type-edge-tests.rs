@@ -223,7 +223,7 @@ fn test_type_parameter_no_edge() {
 
 /// REQ-RUST-018.2
 #[test]
-fn test_body_and_macro_rows_skipped() {
+fn test_body_owner_rows_skipped() {
     let source = "struct Buffer; fn outer() { fn inner(a: Buffer) {} }";
     let (store, mut input) = make_call_fixture_graph(source);
     assert_eq!(read_type_fixture_edges(source, &store, &input).len(), 1);
@@ -248,10 +248,19 @@ fn test_body_and_macro_rows_skipped() {
             row.stage_row_payload_text = value.to_string();
         }
     });
-    assert_eq!(
-        read_type_fixture_edges(source, &store, &input),
-        vec![],
-        "a row from a macro expansion is left to part 5"
+    assert!(
+        matches!(
+            resolve_signature_type_edges(
+                &store,
+                &make_call_fixture_scope(),
+                &input,
+                &RunCancelFlagValue::default(),
+            ),
+            Err(SignatureTypeEdgeError::InvalidEvidence {
+                field: "span_expansion_provenance_chain"
+            })
+        ),
+        "REQ-RUST-052.0 G2: a row in expanded text whose owner is in original text is rejected"
     );
 }
 

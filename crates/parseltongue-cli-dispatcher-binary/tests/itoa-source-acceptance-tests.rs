@@ -598,12 +598,16 @@ fn read_signature_type_uses(
     )
 }
 
-fn read_edge_site_range(edge: &HldEdgeInputRecord) -> (u64, u64) {
-    edge.edge_evidence_row_key
+/// The byte range of an edge's site in its source file. `None` for a site in expanded
+/// text: its range is a range of that expanded text, not of any source file.
+fn read_edge_site_range(edge: &HldEdgeInputRecord) -> Option<(u64, u64)> {
+    let site = edge
+        .edge_evidence_row_key
         .evidence_site_occurrence_key
-        .read_semantic_occurrence_parts()
-        .span_byte_range_value
-        .read_source_range_pair()
+        .read_semantic_occurrence_parts();
+    site.span_expansion_provenance_chain
+        .is_empty()
+        .then(|| site.span_byte_range_value.read_source_range_pair())
 }
 
 /// REQ-RUST-018.2
@@ -625,7 +629,7 @@ fn test_new_return_type_edge() {
     );
     assert_eq!(
         read_edge_site_range(&uses[0]),
-        expected_site,
+        Some(expected_site),
         "the site is the type path itself, not the whole signature"
     );
 }
@@ -653,7 +657,7 @@ fn test_write_builtin_type_edge() {
         1,
         "Sealed::write names str once in its signature: its return type"
     );
-    assert_eq!(read_edge_site_range(to_str[0]), expected_site);
+    assert_eq!(read_edge_site_range(to_str[0]), Some(expected_site));
     let nodes = input
         .input_node_records
         .iter()
@@ -673,7 +677,7 @@ fn test_signature_external_type_unresolved() {
     );
     let at_site = uses
         .iter()
-        .filter(|edge| read_edge_site_range(edge) == expected_site)
+        .filter(|edge| read_edge_site_range(edge) == Some(expected_site))
         .collect::<Vec<_>>();
     assert_eq!(
         at_site.len(),
@@ -706,7 +710,7 @@ fn test_clone_self_type_edge() {
         },
         "Self is the impl's self type, the struct Buffer"
     );
-    assert_eq!(read_edge_site_range(&uses[0]), expected_site);
+    assert_eq!(read_edge_site_range(&uses[0]), Some(expected_site));
 }
 
 /// REQ-RUST-048.0
@@ -737,7 +741,7 @@ fn test_decimal_pairs_static_read() {
         .collect::<Vec<_>>();
     let mut sites = reads
         .iter()
-        .map(|edge| read_edge_site_range(edge))
+        .map(|edge| read_edge_site_range(edge).unwrap())
         .collect::<Vec<_>>();
     sites.sort_unstable();
     assert_eq!(
@@ -768,7 +772,7 @@ fn test_buffer_clone_trait_unresolved() {
                 && edge.edge_source_reference == buffer.node_target_reference
         })
         .map(|edge| {
-            let (start, end) = read_edge_site_range(edge);
+            let (start, end) = read_edge_site_range(edge).unwrap();
             (
                 text[start as usize..end as usize].to_owned(),
                 text[..start as usize].ends_with("impl "),
@@ -992,7 +996,7 @@ fn test_unsigned_impl_builtin_source() {
     );
     assert_eq!(
         read_edge_site_range(rows[0]),
-        (start, start + "Unsigned".len() as u64)
+        Some((start, start + "Unsigned".len() as u64))
     );
     let nodes = input
         .input_node_records
@@ -2229,7 +2233,7 @@ fn test_generic_const_bound_read() {
     let read = reads[0];
     assert_eq!(
         read_edge_site_range(read),
-        (start, start + "I::MAX_STR_LEN".len() as u64)
+        Some((start, start + "I::MAX_STR_LEN".len() as u64))
     );
     assert_eq!(
         read.edge_resolution_value,
@@ -2271,7 +2275,7 @@ fn test_itoa_reads_row_counts() {
                     .is_empty()
         })
         .map(|edge| {
-            let (start, end) = read_edge_site_range(edge);
+            let (start, end) = read_edge_site_range(edge).unwrap();
             (edge, &source[start as usize..end as usize])
         })
         .collect::<Vec<_>>();
@@ -2349,7 +2353,7 @@ fn test_itoa_imports_row_counts() {
         .iter()
         .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Imports)
         .map(|edge| {
-            let (start, end) = read_edge_site_range(edge);
+            let (start, end) = read_edge_site_range(edge).unwrap();
             let metadata = edge
                 .edge_dispatch_metadata_text
                 .as_deref()
@@ -2750,7 +2754,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 334);
+    assert_eq!(input.input_edge_records.len(), 366);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3153,4 +3157,116 @@ fn test_generated_read_source_origins() {
         (10 - from_call, from_call)
     );
     assert!(from_call > 0, "{shapes:?}");
+}
+
+/// REQ-RUST-052.0 G1, G2, G3: the signature of a function written by a macro expansion is a
+/// source of `uses_type` rows, sited in the expanded text of its own node and naming where
+/// the site was copied from. Each of the 12 generated `write` names its impl's own `Buffer`
+/// and `str`; each of the 4 generated `fmt` names `usize` and, without a target until G5,
+/// `Self::Buffer` of the supertrait.
+#[test]
+fn test_generated_signature_type_uses() {
+    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+    };
+    let mut shapes = std::collections::BTreeMap::<(String, String, String), usize>::new();
+    for node in input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_generating_call_reference.is_some())
+    {
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
+            &node.node_target_reference
+        else {
+            panic!("definition identity expected");
+        };
+        let owner = key.read_semantic_occurrence_parts();
+        let (owner_start, owner_end) = owner.span_byte_range_value.read_source_range_pair();
+        for edge in input.input_edge_records.iter().filter(|edge| {
+            edge.edge_relation_kind_value == HldRelationKindValue::UsesType
+                && edge.edge_source_reference == node.node_target_reference
+        }) {
+            let site = edge
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key
+                .read_semantic_occurrence_parts();
+            let (start, end) = site.span_byte_range_value.read_source_range_pair();
+            assert_eq!(site.span_source_file_path, owner.span_source_file_path);
+            assert_eq!(
+                site.span_expansion_provenance_chain,
+                owner.span_expansion_provenance_chain
+            );
+            assert!(owner_start <= start && end <= owner_end);
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            let text = metadata["type_source_text"].as_str().unwrap();
+            let origin = &metadata["expansion_source_origin"];
+            let copied = |token: &Value| {
+                assert_eq!(token["token_source_relative_path"], "src/lib.rs");
+                assert_eq!(token["token_source_origin_kind"], "definition");
+                let range = &token["token_source_byte_range"];
+                &source[range[0].as_u64().unwrap() as usize..range[1].as_u64().unwrap() as usize]
+            };
+            assert!(text.starts_with(copied(&origin["site_first_token_origin"])));
+            assert!(text.ends_with(copied(&origin["site_last_token_origin"])));
+            let target = match &edge.edge_resolution_value {
+                HldEdgeResolutionValue::Extracted { target } => match target {
+                    HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)) => {
+                        format!("builtin {name}")
+                    }
+                    target => label(target),
+                },
+                HldEdgeResolutionValue::Unresolved { reason } => format!("{reason:?}"),
+                other => panic!("{other:?}"),
+            };
+            let member = node
+                .node_qualified_path_text
+                .rsplit("::")
+                .next()
+                .unwrap()
+                .to_owned();
+            let own = node
+                .node_qualified_path_text
+                .strip_suffix("write")
+                .is_some_and(|header| target == format!("{header}Buffer"));
+            let target = if own { "own Buffer".to_owned() } else { target };
+            *shapes
+                .entry((member, text.replace(' ', ""), target))
+                .or_default() += 1;
+        }
+    }
+    let shape = |member: &str, text: &str, target: &str| {
+        (
+            (member.to_owned(), text.to_owned(), target.to_owned()),
+            match member {
+                "write" => 12,
+                _ => 4,
+            },
+        )
+    };
+    assert_eq!(
+        shapes,
+        std::collections::BTreeMap::from([
+            shape("fmt", "Self::Buffer", "TraitSolverNeeded"),
+            shape("fmt", "usize", "builtin usize"),
+            shape("write", "Self::Buffer", "own Buffer"),
+            shape("write", "str", "builtin str"),
+        ])
+    );
+    assert_eq!(
+        input
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::UsesType)
+            .count(),
+        66,
+        "34 from original signatures and 32 from generated ones"
+    );
 }

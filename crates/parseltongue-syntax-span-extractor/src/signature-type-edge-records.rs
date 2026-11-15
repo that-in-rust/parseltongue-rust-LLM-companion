@@ -1,3 +1,4 @@
+use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -88,8 +89,8 @@ pub enum SignatureTypeEdgeError {
     InvalidScope,
 }
 
-/// One `uses_type` edge per type path in an original signature row whose owner
-/// is a graph node. It joins rows that earlier stages stored and never looks a
+/// One `uses_type` edge per type path in a signature row whose owner is a
+/// graph node, written in a source file or by a macro expansion. It joins rows that earlier stages stored and never looks a
 /// name up itself. The caller supplies the frozen source scope of `input`.
 pub fn resolve_signature_type_edges(
     store: &dyn StageTableStorePort,
@@ -127,6 +128,7 @@ pub fn resolve_signature_type_edges(
         context: &context,
         endpoints: &endpoints,
         self_types: &read_member_self_types(store, source_scope)?,
+        origins: &read_expanded_token_origins(store, source_scope)?,
         generation: input.run_generation_digest_value,
     };
     let mut edges = Vec::new();
@@ -187,6 +189,8 @@ struct SignatureEdgeGraphScope<'a> {
     endpoints: &'a BTreeSet<&'a HldTargetIdentityValue>,
     /// Impl member identity to the stored resolution of its impl's self type.
     self_types: &'a BTreeMap<HldTargetIdentityValue, Value>,
+    /// Where each token of each expanded text was copied from.
+    origins: &'a ExpandedTokenOriginIndex,
     generation: RunGenerationDigestValue,
 }
 
@@ -214,8 +218,9 @@ fn read_member_self_types(
     Ok(self_types)
 }
 
-/// The edges of one signature row: none unless the row is original source,
-/// lists its type paths, and is owned by an active item that is a graph node.
+/// The edges of one signature row: none unless the row lists its type paths
+/// and is owned by an active item that is a graph node. A row and its owner
+/// are in the same text: both original, or both in one expansion.
 fn build_signature_row_edges(
     row: &Value,
     graph: &SignatureEdgeGraphScope<'_>,
@@ -227,14 +232,24 @@ fn build_signature_row_edges(
     ) else {
         return Ok(Vec::new());
     };
-    let Some(source_span) = context.span(owner).ok().filter(|span| {
-        span["span_configuration_active_flag"] == true
-            && row["span_expansion_provenance_chain"]
-                .as_array()
-                .is_some_and(Vec::is_empty)
-    }) else {
+    let Some(source_span) = context
+        .span(owner)
+        .ok()
+        .filter(|span| span["span_configuration_active_flag"] == true)
+    else {
         return Ok(Vec::new());
     };
+    if [
+        "span_expansion_provenance_chain",
+        "file_source_absolute_path",
+    ]
+    .iter()
+    .any(|field| row[field] != source_span[field])
+    {
+        return Err(SignatureTypeEdgeError::InvalidEvidence {
+            field: "span_expansion_provenance_chain",
+        });
+    }
     let source: HldTargetIdentityValue = NameSymbolTargetKey::Definition(
         decode_occurrence_identity_value(&context.occurrence(source_span)?)?,
     )
@@ -279,12 +294,16 @@ fn build_type_path_edge(
         HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
         _ => None,
     };
-    let metadata = json!({
+    let mut metadata = json!({
         "type_use_kind":"signature",
         "signature_row_kind":row["site_syntax_kind_value"],
         "type_source_text":text,
         "type_path_self_flag":path["type_path_self_flag"]
     });
+    let origin = graph.origins.build_site_origin_value(&evidence, context)?;
+    if !origin.is_null() {
+        metadata["expansion_source_origin"] = origin;
+    }
     Ok(Some(HldEdgeInputRecord {
         run_generation_digest_value: graph.generation,
         edge_source_reference: source.clone(),

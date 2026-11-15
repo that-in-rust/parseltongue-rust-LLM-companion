@@ -187,8 +187,9 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     text is sited at its occurrence in that expanded text, because that is the text the
     edge read. Its metadata names where its first and last token were copied from in the
     source file (definition or call), stored apart, so an agent knows where to edit
-    (decided 2026-11-16, part 5d; built for `reads` from generated function bodies, metadata
-    key `expansion_source_origin`; `uses_type` and `calls` not yet).
+    (decided 2026-11-16, part 5d; built for `reads` from generated function bodies and
+    `uses_type` from generated function signatures, metadata key
+    `expansion_source_origin`; `calls` not yet).
   - A member reached through a type (`Self::NAME`, `u8::NAME`) gets a trait member as
     target only when a trait of the crate declares the name and a stored impl header proves
     the type implements it; the row records that the type's inherent items were not read

@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c BUILT (section 9). 5d SPECIFIED, steps 1 and 2 of 6 BUILT (section 10).
+5b BUILT (section 8). 5c BUILT (section 9). 5d SPECIFIED, steps 1 to 3 of 6 BUILT (section 10).
 5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
@@ -516,7 +516,8 @@ step  what                                         rules    predicted           
 2     origin of first and last token, on reads     G3       34 rows gain metadata   34 rows: 29 definition to
                                                                                     definition, 5 call to
                                                                                     definition; 334 edges
-3     uses_type from generated signatures          G1-G4    66 uses_type, 366 edges not built
+3     uses_type from generated signatures          G1-G4    66 uses_type, 366 edges 66 uses_type (28 new with a
+                                                                                    target, 4 without), 366 edges
 4     calls from generated bodies                  G1-G4,   197 calls, 502 edges    not built
                                                    G6
 5     trait members through a type                 G5       16 reads and 4 uses_type not built
@@ -566,8 +567,9 @@ removed: R7 is superseded by G1.
 - **Q18.** G5 rests on the rule that an inherent item shadows a trait item. `core` is not
   read, so "u8 has no inherent MAX_STR_LEN" is not proven; the row says so. Not checked
   against rustc here.
-- **Q19.** The real-source test helper `read_edge_site_range` returns a byte range without
-  its file. One test compares ranges alone; steps 3 and 4 must make it compare the file too.
+- **Q19 (closed in step 3).** The real-source test helper `read_edge_site_range` returned a
+  byte range without its text. It now returns nothing for a site in expanded text, so a test
+  cannot slice `src/lib.rs` with a range of an expansion.
 - **Q20.** Expanded text prints `Self ::MAX_STR_LEN` with a space. The row's source text keeps
   the expanded form; no fixture pins it yet.
 
@@ -626,5 +628,36 @@ syntax crate tests             92 + 17 passed
 real-source itoa tests         38 passed, 0 failed, 91 s, release, default threads
 format (workspace), lint       pass (2 touched crates)
 graph                          103 nodes, 334 edges (unchanged); still incomplete
+workspace gates, run cost      not run for this step; they run at the end of part 5d
+```
+
+### 10.8 Step 3: `uses_type` from generated function signatures (measured)
+
+```text
+rows  source (generated)             site text       target
+12    <T as private::Sealed>::write  Self ::Buffer   the Buffer type alias of the same impl
+12    <T as private::Sealed>::write  str             builtin str
+4     <uN as Unsigned>::fmt          usize           builtin usize
+4     <uN as Unsigned>::fmt          Self ::Buffer   none, TraitSolverNeeded (step 5, rule G5)
+```
+
+- All 32 rows are sited inside the expanded text of their own node and carry
+  `expansion_source_origin`; both tokens of all 32 come from a macro definition.
+- A signature row whose file or chain differs from its owner's stops the run with a typed
+  error (G2), as for `reads`.
+- **Against the expected graph:** it has 100 `uses_type` rows; 66 are stored. The other 34
+  start at generated consts and type aliases (step 6).
+
+```text
+real-source test, new          test_generated_signature_type_uses failed first on
+                               `left: {} right: {4 shapes}`, then passed
+fixture test, changed          test_body_owner_rows_skipped (was test_body_and_macro_rows_skipped):
+                               an expanded row under an original owner is now a typed error;
+                               not seen failing on the old code
+real-source test, changed      test_generates_edge_row_counts: 334 -> 366 edges
+syntax crate tests             92 + 17 passed
+real-source itoa tests         39 passed, 0 failed, 81 s, release, default threads
+format (workspace), lint       pass (2 touched crates)
+graph                          103 nodes, 366 edges (was 334); still incomplete
 workspace gates, run cost      not run for this step; they run at the end of part 5d
 ```
