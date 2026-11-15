@@ -95,24 +95,40 @@ cargo build --release --workspace --all-targets --all-features
   cap in this phase.
 - **Stop.** Kill a run that exceeds 2× its expected wall time. After 3 failed attempts at one
   step, stop, log what was tried, and cut the step smaller.
-- **Log.** After each GREEN or REFACTOR commit, add a newest-first entry to the log: test names, exact command, pass/fail counts, commit, next target.
+- **Log.** After each GREEN or REFACTOR commit, add a newest-first entry to the log: test names, exact command, pass/fail counts, commit, next target, and the codebase-memory queries run (Rule 4).
 
 ## Rule 4 — Query codebase-memory at every step
 
 Use the skill `codebase-memory` (CLI `codebase-memory-mcp`, commands under Navigation aids)
-constantly, not once per part. grep and sed are for reading the lines the graph points to,
-and for text it does not hold: string literals, table names, JSON keys.
+as the first tool for every question about the code, not once per part. grep and sed are for
+reading the lines the graph points to, and for text it does not hold: string literals, table
+names, JSON keys.
+
+Query it at each of these points:
 
 - **Session start, and after any context reset:** `index_status`. Re-index if `indexed_at`
   is older than the last code commit.
+- **Before answering "where are we" or reviewing work:** re-index, then query the functions
+  the answer is about.
+- **Before writing a part file:** `trace_path` from the stage entry point to the code the
+  target needs. The design section names the callers and callees found.
+- **Before writing a test:** `search_graph` for the fixtures and helpers that already exist,
+  and `trace_path` inbound on the function under test to see which tests cover it.
 - **Before changing a function:** `trace_path` on it in both directions, and read its
   callers before changing what it returns.
 - **Before adding a function, type or module:** `search_graph` for one that already does
   the job. Extend it instead of writing a parallel copy.
+- **Before each commit:** `trace_path` inbound on every function the diff changed, and run
+  the tests it names.
 - **After each code commit:** `index_repository`. The CLI index is not watched and never
   refreshes itself.
-- **In each part file:** the design section names the callers and callees found and the
-  query that found them.
+- **In the refactor step:** list the longest and most complex functions in the files touched
+  (`query_graph` on `complexity`) and say for each whether it was split.
+
+Two limits:
+
+- **Record the queries.** Each log entry lists the codebase-memory queries run for that step.
+  A step whose entry lists none did not follow this rule.
 - **Confirm in source.** Its call edges are matched by name and some are wrong. Check every
   claim taken from it against the source lines before writing it down or acting on it
   (Rule 1: navigation, not evidence).
