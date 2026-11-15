@@ -159,13 +159,20 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   gap edges, or an explicit accepted list.
 - **Memory:** measured and reported on every run; no cap in this phase.
 
+- **Targets in `core` (2026-11-15).** Stored with a named external target: the name as far as
+  itoa's source proves it, the crate, and a flag that the target's source was not read. The
+  sysroot source stays out of the run. Chosen because it is the most explicit form for an
+  agent reading the graph.
+- **Macro definitions and calls (2026-11-15).** Both are nodes, and a generated item records
+  the call that generated it, for the same reason.
+
 ### Open
 
-- **Targets in `core`.** 119 of the 368 draft edges point into `core`. Resolving them needs
+- **Targets in `core`, not built.** 119 of the 368 draft edges point into `core`. Resolving them needs
   the sysroot source in the run; measured on 2026-11-13, that run did not finish name
   resolution in 2,400 s (the run report is deleted). Runs today use
-  `--sysroot-source-scope-kind excluded` and store those edges unresolved. Until decided, such
-  a run cannot pass.
+  `--sysroot-source-scope-kind excluded` and store those edges unresolved; the named external
+  target is not built yet.
 - **Macro-generated items.** Their identity and container. 45 of the 73 draft nodes come from
   `impl_Integer`, `impl_Integer_size` and `impl_Unsigned` invocations.
 - **Enum variants and struct fields:** nodes, or evidence only.

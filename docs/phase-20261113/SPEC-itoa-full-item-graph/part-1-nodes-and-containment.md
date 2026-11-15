@@ -11,7 +11,9 @@ Macro-generated items are not nodes yet; that is [part 5](part-5-macro-generated
   required stage did not run.
 - **REQ-RUST-038.0 — sysroot switch.** With `--sysroot-source-scope-kind excluded`, no sysroot
   unit is loaded, the scope is recorded in the generation, and no sysroot identity is
-  invented. The default is `included`. An excluded run cannot be an SOP PASS.
+  invented. The default is `included`. An excluded run can be an SOP PASS when every edge into the
+  sysroot is stored with a named external target (ARCH F3) or as an unresolved site with a
+  reason (decided 2026-11-15).
 - **REQ-RUST-038.1 — absent sysroot names.** In an excluded run, a path that reaches `core`
   through an import, or a prelude name such as `Default`, is stored unresolved with
   `external_source_missing`. A resolved or ambiguous path is never changed by this rule.

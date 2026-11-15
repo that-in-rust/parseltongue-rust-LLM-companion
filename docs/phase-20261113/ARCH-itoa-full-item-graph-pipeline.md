@@ -119,7 +119,9 @@ Columns the two graph tables carry:
 Nodes:
 
 - **G1** Every item is a node whatever its visibility: module, function, struct, enum, trait,
-  type alias, const, static, associated function, const and type.
+  type alias, const, static, associated function, const and type. A `macro_rules!` definition
+  and a macro call at item position are nodes too; a macro-generated item records the call
+  that generated it.
 - **G2** Nothing inside a function body is a node. Body contents are evidence.
 - **G3** The crate root is a node.
 - **G4** Each node stores effective visibility: public, restricted, or private. Trait members and
@@ -135,7 +137,9 @@ Nodes:
 Edges:
 
 - **F2** Only facts proven from source are edges. An unresolved site is stored with a reason.
-- **F3** A target is a graph node, a canonical external item, or a builtin primitive type.
+- **F3** A target is a graph node, a named external item, or a builtin primitive type. A named
+  external item carries its name as far as the read source proves it, its crate, and a flag
+  that its own source was not read. itoa's targets in `core` are stored this way.
 - **F4** A generic or trait call targets the trait method once, with the bound chain in dispatch
   metadata. It never fans out to implementations.
 - **F5** `pub use` gives one `reexports` edge per resolved binding. itoa has none.
@@ -148,7 +152,7 @@ Edges:
 - **F13** One lexical container per item. File-level items and impl members belong to the file
   area; nested items belong to their inline module or trait. Impl identity, self type and trait
   are metadata, never a second parent.
-- **F14** One edge row per source site. Two sites with the same source, relation and target are
+- **F15** One edge row per source site. Two sites with the same source, relation and target are
   two rows, each with its own range. The expected graph lists one row per source, relation and
   target with its sites; stored rows are grouped the same way before comparison.
 

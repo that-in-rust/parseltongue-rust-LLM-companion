@@ -33,14 +33,24 @@ OD-4   Enum variants and struct fields: nodes, or evidence only.  not counted; i
                                                                   private fields only
 ```
 
+Decided by the user (2026-11-15), on the rule "choose what is most explicit for a coding agent
+that reads the graph":
+
+- **core:** an edge into `core` is stored with a named external target: the name as far as
+  itoa's source proves it, the crate, and a flag that the target's source was not read. A site
+  whose target name cannot be proven without `core` (a method on a value whose type comes from
+  `core`) stays unresolved, with the method name and a reason. No sysroot run in this phase.
+- **Macro nodes:** each `macro_rules!` definition and each macro call at item position is a
+  node (itoa: 3 and 15). A macro-generated item records the call that generated it. A call
+  points to the definition it expands; the relation kind `expands` is proposed for this and is
+  not built.
+
 Working decisions (2026-11-15). The user delegated these to best judgement; they are not yet
 confirmed. Each is used so work can continue and is reversed if the user rules otherwise.
 
 - **OD-2:** a macro-generated item is identified by its macro call site plus its place in the
   expansion; its container is the module and file area where the macro is called. Confirm in
   part 5's part file before any code depends on it.
-- **core:** edges into `core` are stored unresolved with reason "source missing" and listed
-  explicitly; no sysroot run in this phase.
 - **OD-8:** yes, `reads` and `uses_type` may start at a non-function item.
 - **Disagreement with the expected graph:** show the source lines, the user rules, and the
   wrong side is fixed.

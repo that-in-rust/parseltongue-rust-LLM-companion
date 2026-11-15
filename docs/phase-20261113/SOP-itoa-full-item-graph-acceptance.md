@@ -125,7 +125,7 @@ Pass:
 - Time and memory come only from the untraced run.
 
 `--sysroot-source-scope-kind excluded` is how the code runs today. Targets in `core` are then
-stored unresolved with a reason. See the open decision below.
+stored unresolved with a reason; the decided form is a named external target (below), not built.
 
 ### S3 — Exact comparison
 
@@ -168,10 +168,12 @@ Each run writes one entry at the top of [the log](LOG-itoa-full-item-graph-progr
 digests; each step PASS / FAIL / BLOCKED / NOT STARTED with row counts; the first differing
 row; time and peak memory. A step with no entry was not observed.
 
-### Open decision
+### Targets outside itoa (decided 2026-11-15)
 
 **Targets outside itoa.** 119 of the 368 draft edges point at items in `core`, and 55 at
 builtin types. Resolving a `core` target to an item needs the sysroot source in the run; on
-2026-11-13 that run did not finish name resolution in 2,400 s. Until decided, an edge into
-`core` counts as matched only when production resolves it, so a sysroot-excluded run cannot
-pass.
+2026-11-13 that run did not finish name resolution in 2,400 s. Decided: the sysroot stays out of
+the run. An edge into `core` matches when production stores the same named external target
+as the expected row: the name as far as itoa's source proves it, the crate, and the flag that
+the target's source was not read. A site whose target name source cannot prove matches an
+expected unresolved row with the same reason.
