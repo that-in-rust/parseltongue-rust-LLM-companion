@@ -1,0 +1,121 @@
+# Part 4c — `reads` edges from value paths in bodies
+
+Written 2026-11-15 with `rust-executable-specs-spec-first-architecture`, before any code.
+
+## The answer
+
+**State: SPECIFIED, not built. One `reads` row per value path in an original function body
+that names a `static`, a `const` or an associated const which is a graph node. The first
+target is `enc_16lsd --reads--> DECIMAL_PAIRS`.**
+
+- **What is missing is resolution, not syntax.** The body table already stores every path
+  expression as a site (175 in original bodies), but no path-resolution request is made
+  for a value path. Requests exist only for signature, import and call-prefix paths.
+- **Measured on pinned itoa** (probe dump of the stored tables, sysroot excluded):
+
+```text
+original value-path sites   what they name                             4c row
+14  DECIMAL_PAIRS           static in itoa: fmt for u128 6, enc_16lsd 8  target
+1   I::MAX_STR_LEN          trait const through a bound (Buffer::format) target, gap on Copy
+6   i128/u128::MAX_STR_LEN  const of a macro-generated impl              unresolved, part 5
+1   i128::MAX_STR_LEN       same const, in a struct field type          none (Q2)
+7   EXP SIG D M_HIGH SH_POST consts declared inside a function body      none (not nodes)
+8   OFFSET                  const generic parameter                    none
+114 buf, offset, n, ...     locals and parameters                      none
+24  callee position         already a call site                        none
+```
+
+- **Expected graph:** 62 `reads` rows, 56 from macro-generated bodies (part 5). Of the 6
+  from original source, 3 have an original target: the two `DECIMAL_PAIRS` rows and
+  `Buffer::format -> Integer::MAX_STR_LEN`. The other 3 target macro-generated consts.
+- **Row grain:** one row per site, as for `calls` and `uses_type`. The expected graph
+  groups sites per pair; part 7 reconciles the two.
+
+## 1 — Work mode
+
+Spec mode and delivery mode. Component: L2 syntax extractor and resolver, L3 the CLI facade.
+The main risk is a local name being stored as an unresolved read, which would flood the
+graph with false rows. The second is a read whose target is wrong because a local item
+shadows a module item.
+
+## 2 — Executable requirements
+
+**REQ-RUST-048.0 — `reads` edges from value paths in original bodies.**
+
+- **R1.** WHEN a path expression in an original function body is not in callee position
+  and resolves to a `static`, `const` or associated const that is a graph node, THEN one
+  `reads` row SHALL be stored from the body's owning item to that node, `Extracted`.
+- **R2.** WHEN the path's first segment is bound by an enclosing parameter, `let`, pattern,
+  closure parameter, generic parameter or item declared in an enclosing block, THEN no row
+  SHALL be stored.
+- **R3.** WHEN the path resolves to a function, type, module or other non-value item, THEN no
+  `reads` row SHALL be stored.
+- **R4.** WHEN a type-relative path `T::NAME` has a type parameter `T` of the same function,
+  THEN the target SHALL be found by the part-3 bound and supertrait lookup, with the same
+  "proven, gap" record for traits whose source is missing.
+- **R5.** WHEN the path is not bound locally and does not resolve to one value node, THEN
+  one unresolved row SHALL be stored with one reason, by the part-4a reason rule.
+- **R6.** The evidence site SHALL be the path expression's own byte range.
+- **R7.** Paths in macro-generated bodies are out of scope; their owners are not nodes until
+  part 5. The stage line SHALL count them as `reads_in_expanded_bodies`.
+- **R8.** Two reads of the same store SHALL return identical rows in identical order.
+
+## 3 — Design by layer
+
+- **L2 syntax** (`syntax-namespace-input-extraction.rs`): a path-resolution request for each
+  path expression in a function body that is not a call's callee, with context
+  `body_value_path` and namespace `Value`. Its metadata carries a local-binding flag
+  computed by generalising `check_call_lexical_shadowing` to `let`, patterns and block
+  items.
+- **L2 resolver:** new module `body-value-read-records.rs` with
+  `resolve_body_read_edges(store, scope, input, cancel) -> Result<BodyReadEdgeSet, BodyReadEdgeError>`.
+  It reuses `read_stored_reason_kind` and the part-3 bound index. `BodyReadEdgeError` is a
+  `thiserror` enum with no free-text variant. Cancellation is checked per row.
+- **L3 facade:** adds the rows to the full graph and prints `reads=N
+  reads_in_expanded_bodies=N` on the stage line.
+- **L1:** no change expected. The validator already accepts `reads` between item nodes.
+
+## 4 — Verification matrix
+
+```text
+req    test                                   type          assertion
+R1 R6  test_decimal_pairs_static_read         real source   enc_16lsd --reads--> DECIMAL_PAIRS, 8 rows, ranges
+R1     test_static_read_row_edge              fixture       fn body reads a static: one row
+R2     test_local_binding_no_read             fixture       param, let, pattern, block const: zero rows
+R3     test_function_value_no_read            fixture       path to a fn or unit struct: zero rows
+R4     test_generic_const_bound_read          real source   Buffer::format --reads--> Integer::MAX_STR_LEN, gap Copy
+R5     test_unresolved_read_keeps_reason      fixture       missing and ambiguous names keep a reason
+R7     test_itoa_reads_row_counts             real source   14 + 1 extracted, 6 unresolved, 0 from locals
+R8     test_reads_rows_read_twice             real source   two reads equal, no duplicate
+```
+
+Metric for every row: exact equality of source, target or reason, relation and site range.
+
+## 5 — Implementation plan
+
+Each step is one commit of about 200 changed lines, test first.
+
+1. RED: `test_decimal_pairs_static_read` on pinned itoa (0 `reads` rows today).
+2. L2 syntax: value-path requests and the local-binding flag; syntax fixture tests.
+3. L2 resolver: single-segment and module paths to value nodes (R1, R2, R3, R6).
+4. L3 facade: rows in the full graph; step 1 goes GREEN.
+5. Generic `T::NAME` through the bound lookup (R4).
+6. Unresolved rows and the counts (R5, R7, R8); `test_itoa_reads_row_counts`.
+7. Refactor pass, workspace gates, one run's counts and cost.
+
+## 6 — Quality gate results
+
+Not run. Nothing is built.
+
+## 7 — Open questions
+
+- **Q1. Concrete type-relative consts.** `i128::MAX_STR_LEN` targets the const of the
+  macro-generated `impl Integer for i128`. Until part 5 makes it a node, 4c stores the 6
+  sites unresolved. Pointing them at the trait's `Integer::MAX_STR_LEN` would be a wrong
+  target, so it is not done.
+- **Q2. Non-function sources (OD-8).** `Buffer`'s field type `[_; i128::MAX_STR_LEN]` reads a
+  const from a struct. 4c covers function bodies only; OD-8 decides the rest.
+- **Q3. Consts inside function bodies** (`EXP`, `D`, ...) are not nodes, so reads of them
+  have no row. If the graph later gains body-local items, they get rows then.
+- **Q4. Field access.** `DECIMAL_PAIRS.0` reads the static; the field `.0` is not a node
+  (OD-4), so the row targets the static.

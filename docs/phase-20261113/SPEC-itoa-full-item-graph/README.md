@@ -9,7 +9,7 @@ full item dependency graph only.
 bounded graph. Part 3 is built for one receiver shape: the generic call
 `Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is built: `uses_type` rows from original signatures. Part 4b is built: 32
 `implements` rows from impl headers, including the 28 macro-generated ones. Part 4c
-(`reads`) is next and not yet specified.**
+(`reads`) is next and specified: first `enc_16lsd --reads--> DECIMAL_PAIRS`.**
 
 ```text
 part  file                                       requirements                   state
@@ -17,8 +17,9 @@ part  file                                       requirements                   
                                                  043.0 045.0
 2     part-2-first-call-default-new.md           034.0 036.0                    PARTLY
 3     part-3-generic-call-format-write.md        042.0                          BUILT (one shape)
-4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a BUILT; 4c 4d stubs
+4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a BUILT; 4d stub    
 4b    part-4b-implements-from-impl-headers.md    047.0                          BUILT
+4c    part-4c-reads-of-consts-statics.md         048.0                          SPECIFIED
 5     part-5-macro-generated-items.md            046.0                          NOT STARTED
 6     part-6-targets-in-core.md                  (decision first)               BLOCKED
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED
