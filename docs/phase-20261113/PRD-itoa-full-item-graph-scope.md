@@ -187,9 +187,16 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     text is sited at its occurrence in that expanded text, because that is the text the
     edge read. Its metadata names where its first and last token were copied from in the
     source file (definition or call), stored apart, so an agent knows where to edit
-    (decided 2026-11-16, part 5d; built for `reads` from generated function bodies and
-    `uses_type` from generated function signatures, metadata key
-    `expansion_source_origin`; `calls` not yet).
+    (decided 2026-11-16, part 5d; built for `reads` and `calls` from generated function
+    bodies and `uses_type` from generated function signatures, metadata key
+    `expansion_source_origin`).
+  - Every `calls` row carries the call's text, the callee's text, the call's shape
+    (`call_shape_kind`) and how its target was chosen (`dispatch_kind`). A row without a
+    target has `dispatch_kind` `undetermined` and says what stopped the lookup
+    (`unresolved_detail_kind`), so an agent can tell "receiver type not determined" from
+    "callee path never looked up" without reading the resolver. The typed reason is kept
+    as it was (decided and built 2026-11-16, part 5d step 4, under the maximum-information
+    rule).
   - A member reached through a type (`Self::NAME`, `u8::NAME`) gets a trait member as
     target only when a trait of the crate declares the name and a stored impl header proves
     the type implements it; the row records that the type's inherent items were not read

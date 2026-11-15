@@ -2754,7 +2754,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 366);
+    assert_eq!(input.input_edge_records.len(), 502);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3269,4 +3269,115 @@ fn test_generated_signature_type_uses() {
         66,
         "34 from original signatures and 32 from generated ones"
     );
+}
+
+/// REQ-RUST-052.0 G1, G2, G3, G6: the body of an item written by a macro expansion is a
+/// source of `calls` rows. Every `calls` row, original or generated, carries the call's
+/// text, the callee's text, the call's shape and how its target was chosen; a row without a
+/// target says what stopped the lookup. A generated row is sited in the expanded text of
+/// its own node and names where its first and last token were copied from.
+#[test]
+fn test_generated_body_call_rows() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let generated_nodes = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_generating_call_reference.is_some())
+        .map(|node| &node.node_target_reference)
+        .collect::<std::collections::BTreeSet<_>>();
+    let calls = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+        .collect::<Vec<_>>();
+    let mut shapes = std::collections::BTreeMap::<String, usize>::new();
+    for edge in &calls {
+        let site = edge
+            .edge_evidence_row_key
+            .evidence_site_occurrence_key
+            .read_semantic_occurrence_parts();
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(owner)) =
+            &edge.edge_source_reference
+        else {
+            panic!("definition identity expected");
+        };
+        let owner = owner.read_semantic_occurrence_parts();
+        assert_eq!(site.span_source_file_path, owner.span_source_file_path);
+        assert_eq!(
+            site.span_expansion_provenance_chain,
+            owner.span_expansion_provenance_chain
+        );
+        let expanded = !site.span_expansion_provenance_chain.is_empty();
+        assert_eq!(
+            expanded,
+            generated_nodes.contains(&edge.edge_source_reference)
+        );
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let text = metadata["call_source_text"].as_str().unwrap();
+        let callee = metadata["callee_source_text"].as_str().unwrap();
+        assert!(!callee.is_empty() && text.contains(callee), "{metadata}");
+        let shape = metadata["call_shape_kind"].as_str().unwrap();
+        let kind = metadata["dispatch_kind"].as_str().unwrap();
+        let detail = metadata["unresolved_detail_kind"].as_str();
+        match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted { .. } => {
+                assert!(detail.is_none(), "{metadata}");
+                assert!(
+                    [
+                        "generic_bound_trait_method",
+                        "type_path_associated_function"
+                    ]
+                    .contains(&kind)
+                );
+            }
+            _ => {
+                assert_eq!(kind, "undetermined", "{metadata}");
+                assert!(detail.is_some(), "{metadata}");
+            }
+        }
+        assert_eq!(
+            metadata["expansion_source_origin"].is_object(),
+            expanded,
+            "{metadata}"
+        );
+        if expanded {
+            let name = match shape {
+                "method_call" => "method call".to_owned(),
+                _ => metadata["call_syntax_evidence"]["member_declared_name_value"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            };
+            *shapes
+                .entry(format!("{shape} {name} {}", detail.unwrap_or("-")))
+                .or_default() += 1;
+        }
+    }
+    assert_eq!(
+        shapes,
+        std::collections::BTreeMap::from([
+            (
+                "bare_name_call divmod100 callee_path_not_requested".to_owned(),
+                8
+            ),
+            (
+                "bare_name_call slice_buffer_to_str callee_path_not_requested".to_owned(),
+                10
+            ),
+            (
+                "method_call method call receiver_type_not_determined".to_owned(),
+                104
+            ),
+            (
+                "qualified_path_call fmt type_prefix_unresolved".to_owned(),
+                10
+            ),
+            (
+                "qualified_path_call size_of callee_path_not_requested".to_owned(),
+                4
+            ),
+        ])
+    );
+    assert_eq!(calls.len(), 197, "61 in original bodies, 136 in generated");
 }

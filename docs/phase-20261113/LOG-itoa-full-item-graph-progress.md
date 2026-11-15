@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 366 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 502 edges (88 `contains`, 45 `generates`, 15 `expands`), with 3 of 197 calls resolved (136 of the 197 start in macro-generated function bodies), 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 55 `reads` rows (39 with a
 target, 16 unresolved; 34 of the 55 start in macro-generated function bodies) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,10 +15,12 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 4: `calls` from generated bodies. Steps 1 to 3 are built:
-  `reads` from generated function bodies and `uses_type` from generated function signatures
-  (66 rows, was 34), each row naming where its first and last token were copied from in the
-  source file.
+- **Next target:** part 5d step 5: a member reached through a type (`Self::NAME`,
+  `uN::NAME`) gets its trait member as target. Steps 1 to 4 are built: `reads` and `calls`
+  from generated function bodies and `uses_type` from generated function signatures, each
+  row naming where its first and last token were copied from in the source file. Every
+  `calls` row now carries the call's text, the callee's text, its shape, and what stopped
+  the lookup when it has no target.
   Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
   by a `generates` row), 5b (readable labels: all 103 distinct, each impl member names
   its impl header) and 5c (`expands`: each of the 15 macro calls points to its definition,
@@ -42,7 +44,7 @@ step                                   state         measured or missing
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21 (+34 in part 5d), imports 4
-5  macro-generated items and bodies    5a-5c BUILT, 5d 3 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads
+5  macro-generated items and bodies    5a-5c BUILT, 5d 4 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads, 136 calls
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -105,6 +107,54 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 03:40 IST — Part 5d step 4 built: `calls` from generated bodies (REQ-RUST-052.0 G1-G3, G6)
+
+- **Result.** Pinned itoa stores 197 `calls` rows (was 61) and 502 edges (was 366), read
+  back from the stored table. Predicted 197 and 502; measured 197 and 502. Resolved calls
+  stay at 3: all 136 new rows are without a target.
+- **What each `calls` row now carries** (original and generated): `call_source_text`,
+  `callee_source_text`, `call_shape_kind`, `dispatch_kind`, and, without a target,
+  `unresolved_detail_kind`. Generated rows add `expansion_source_origin`.
+- **The 136 generated rows:** 104 method calls (`receiver_type_not_determined`), 18 bare
+  names `divmod100` / `slice_buffer_to_str` (`callee_path_not_requested`), 10 `fmt`
+  through `Self` or `uN` (`type_prefix_unresolved`), 4 `size_of`
+  (`callee_path_not_requested`).
+- **STUB.** None: no new signature; one parameter added to `build_original_call_edge`.
+- **RED.** `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests test_generated_body_call_rows`: 0 passed, 1 failed, 39
+  filtered out, `called Option::unwrap() on a None value` at the read of
+  `call_source_text`.
+- **GREEN.** `build_original_call_edge` no longer drops sites in expanded text, rejects a
+  site whose chain differs from its owner's, and writes the new metadata;
+  `extract_original_call_syntax` stores the callee's text.
+- **My prediction was wrong once.** I asserted `member_lookup_unproven` for the 10
+  generated `fmt` calls. Measured `type_prefix_unresolved`: the prefix `Self` / `uN` has
+  no stored target, so the lookup stops before members are read. The test pins the measured
+  value.
+- **Tests.** New real-source `test_generated_body_call_rows`. New fixture
+  `test_call_metadata_site_mismatch` (weak: written after the code, passed on first run).
+  `test_generates_edge_row_counts` 366 -> 502 (it failed on `left: 502 right: 366` first).
+- **Decisions (Rule 6, in the PRD).** `dispatch_kind` says how the target was chosen, so a
+  row without a target is `undetermined`; `original_associated_function` is renamed
+  `type_path_associated_function`. Rejected: a separate value for generated calls (where
+  the call is written is already in the site and the origin key). Rejected for now: new
+  typed reason kinds in the core row types; the typed reason is unchanged and the detail
+  key carries the cause (part file Q22).
+- **Not done.** The callee path of a call is never requested from name resolution, so the
+  27 calls to this crate's own free functions (18 generated, 9 original) cannot get a
+  target yet (part file Q21).
+- **REFACTOR.** None. `build_original_call_edge` is long; splitting it is left for the step
+  that adds callee-path targets.
+- **Gates.** `cargo fmt --all -- --check`: pass. `cargo clippy --release -p
+  parseltongue-syntax-span-extractor -p parseltongue-cli-dispatcher-binary --all-targets
+  --all-features -- -D warnings`: pass. Syntax crate: 93 + 17 passed. `cargo test --release
+  -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`: 40 passed,
+  0 failed, 81.93 s. Workspace gates not run; they run at the end of 5d.
+- **codebase-memory.** `trace_path` inbound on `build_original_call_edge` before the change
+  (one caller, `resolve_original_call_edges`; fixtures reach it through that).
+- **Next.** Step 5: trait members through a type (G5), which gives 16 `reads` and 4
+  `uses_type` rows a target and unblocks the 10 `fmt` calls.
 
 ### 2026-11-16 03:00 IST — Part 5d step 3 built: `uses_type` from generated function signatures (REQ-RUST-052.0 G1-G4)
 

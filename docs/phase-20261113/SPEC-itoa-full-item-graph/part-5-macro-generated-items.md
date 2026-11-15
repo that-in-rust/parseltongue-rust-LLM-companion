@@ -518,8 +518,8 @@ step  what                                         rules    predicted           
                                                                                     definition; 334 edges
 3     uses_type from generated signatures          G1-G4    66 uses_type, 366 edges 66 uses_type (28 new with a
                                                                                     target, 4 without), 366 edges
-4     calls from generated bodies                  G1-G4,   197 calls, 502 edges    not built
-                                                   G6
+4     calls from generated bodies                  G1-G4,   197 calls, 502 edges    197 calls (3 with a target,
+                                                   G6                               194 without), 502 edges
 5     trait members through a type                 G5       16 reads and 4 uses_type not built
                                                             gain a target
 6     generated consts and type aliases as sources G7       up to 42 reads sites,   not built
@@ -570,6 +570,15 @@ removed: R7 is superseded by G1.
 - **Q19 (closed in step 3).** The real-source test helper `read_edge_site_range` returned a
   byte range without its text. It now returns nothing for a site in expanded text, so a test
   cannot slice `src/lib.rs` with a range of an expansion.
+- **Q21.** The 136 generated calls have no target. 18 are bare names of this crate's own
+  functions (`divmod100`, `slice_buffer_to_str`) and 10 are `Self::fmt` / `uN::fmt`. The
+  namespace stage does not request the callee path of a call (only its type prefix), so no
+  stored lookup exists for them. Requesting callee paths is the next change to `calls`
+  (step 5 for the `fmt` rows, part 5e for bare names).
+- **Q22.** G6 asks for "the stored reason". For a callee that was never requested there is
+  no stored reason. The typed reason stays `TraitSolverNeeded` (the existing rule for a
+  call shape the resolver does not handle) and the row's `unresolved_detail_kind` says what
+  stopped the lookup. A reason kind of its own would change the core row types; not done.
 - **Q20.** Expanded text prints `Self ::MAX_STR_LEN` with a space. The row's source text keeps
   the expanded form; no fixture pins it yet.
 
@@ -659,5 +668,67 @@ syntax crate tests             92 + 17 passed
 real-source itoa tests         39 passed, 0 failed, 81 s, release, default threads
 format (workspace), lint       pass (2 touched crates)
 graph                          103 nodes, 366 edges (was 334); still incomplete
+workspace gates, run cost      not run for this step; they run at the end of part 5d
+```
+
+### 10.9 Step 4: `calls` from generated bodies (measured)
+
+Every `calls` row, original or generated, now carries in its metadata:
+
+```text
+key                       value
+call_source_text          the whole call as written at the site
+callee_source_text        what is called: the callee expression, or the method's name
+call_shape_kind           method_call | qualified_path_call | bare_name_call |
+                          other_callee_expression
+dispatch_kind             how the target was chosen: generic_bound_trait_method |
+                          type_path_associated_function | undetermined (no target)
+unresolved_detail_kind    only on a row without a target: what stopped the lookup
+expansion_source_origin   only on a row sited in expanded text (G3)
+```
+
+`dispatch_kind` no longer has the value `original_associated_function`; a target chosen
+through a type path is `type_path_associated_function` wherever the call is written.
+
+The 197 rows on pinned itoa, read from the exported edge table:
+
+```text
+rows  written in  call_shape_kind      dispatch_kind                  unresolved_detail_kind
+104   expansion   method_call          undetermined                   receiver_type_not_determined
+18    expansion   bare_name_call       undetermined                   callee_path_not_requested
+10    expansion   qualified_path_call  undetermined                   type_prefix_unresolved
+4     expansion   qualified_path_call  undetermined                   callee_path_not_requested
+36    source      method_call          undetermined                   receiver_type_not_determined
+10    source      qualified_path_call  undetermined                   member_lookup_unproven
+9     source      bare_name_call       undetermined                   callee_path_not_requested
+2     source      qualified_path_call  undetermined                   type_prefix_unresolved
+1     source      qualified_path_call  undetermined                   callee_path_not_requested
+2     source      qualified_path_call  type_path_associated_function  -
+1     source      method_call          generic_bound_trait_method     -
+```
+
+- The 136 generated rows by callee: 104 method calls, 10 `slice_buffer_to_str`, 8
+  `divmod100`, 10 `fmt` (`Self::fmt` / `uN::fmt`), 4 `size_of`.
+- All 136 are sited inside the expanded text of their own node and carry
+  `expansion_source_origin`. A call whose chain differs from its owner's stops the run with
+  a typed error (G2).
+- **Prediction that was wrong:** I expected the 10 generated `fmt` rows to stop at member
+  lookup. Measured: their type prefix (`Self`, `uN`) has no stored target, so they stop one
+  step earlier, `type_prefix_unresolved`. The test pins the measured value.
+- **No new target.** Resolved calls stay at 3. See Q21.
+- **Against the expected graph:** it has 102 grouped `calls` rows (its summary file). A
+  row without a target cannot match one, so the matched count is unchanged by this step.
+
+```text
+real-source test, new          test_generated_body_call_rows failed first on a missing
+                               call_source_text, then on the fmt detail (see above), then passed
+fixture test, new              test_call_metadata_site_mismatch: metadata of a resolved and an
+                               unsupported call; a site in another text than its owner is a
+                               typed error. Passed on first run (written after the code)
+real-source test, changed      test_generates_edge_row_counts: 366 -> 502 edges
+syntax crate tests             93 + 17 passed
+real-source itoa tests         40 passed, 0 failed, 82 s, release, default threads
+format (workspace), lint       pass (2 touched crates)
+graph                          103 nodes, 502 edges (was 366); still incomplete
 workspace gates, run cost      not run for this step; they run at the end of part 5d
 ```

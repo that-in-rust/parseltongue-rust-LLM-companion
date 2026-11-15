@@ -1,3 +1,4 @@
+use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -74,6 +75,7 @@ pub fn resolve_original_call_edges(
         .map(|node| &node.node_target_reference)
         .collect::<BTreeSet<_>>();
     let lookup = build_bound_method_index(store, source_scope, &context, input)?;
+    let origins = read_expanded_token_origins(store, source_scope)?;
     let mut edges = Vec::new();
     for site in read_impl_stage_values(store, source_scope, "body-site-reference-table")? {
         if cancel.check_stage_work_cancelled() {
@@ -85,6 +87,7 @@ pub fn resolve_original_call_edges(
             &headers,
             &endpoints,
             &lookup,
+            &origins,
             input.run_generation_digest_value,
         )? {
             edges.push(edge);
@@ -101,15 +104,13 @@ fn build_original_call_edge(
     headers: &[Value],
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
     lookup: &BoundMethodLookupIndex,
+    origins: &ExpandedTokenOriginIndex,
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, OriginalCallResolutionError> {
     if !matches!(
         site["site_syntax_kind_value"].as_str(),
         Some("CALL_EXPR" | "METHOD_CALL_EXPR")
-    ) || !site["span_expansion_provenance_chain"]
-        .as_array()
-        .is_some_and(Vec::is_empty)
-    {
+    ) {
         return Ok(None);
     }
     let owner = site["site_owner_occurrence_key"].as_str().ok_or(
@@ -152,6 +153,12 @@ fn build_original_call_edge(
     let offset = start
         .checked_sub(owner_start)
         .and_then(|n| usize::try_from(n).ok());
+    // A site and its owner are in the same text: both original, or both in one expansion.
+    if site["span_expansion_provenance_chain"] != source_span["span_expansion_provenance_chain"] {
+        return Err(OriginalCallResolutionError::InvalidEvidence {
+            field: "span_expansion_provenance_chain",
+        });
+    }
     if site["file_source_absolute_path"] != source_span["file_source_absolute_path"]
         || site["unit_compilation_identity_key"] != source_span["unit_compilation_identity_key"]
         || offset.and_then(|offset| {
@@ -178,12 +185,31 @@ fn build_original_call_edge(
             endpoints,
         )?)
     };
-    let resolution = if let Some((found, _)) = &bound {
-        found.clone()
+    // The second value says what stopped the lookup of a row without a target.
+    let (resolution, stopped) = if let Some((found, _)) = &bound {
+        let stopped = match found {
+            HldEdgeResolutionValue::Unresolved { reason } => match reason {
+                HldUnresolvedReasonKind::AmbiguousTarget => "bound_method_ambiguous",
+                HldUnresolvedReasonKind::ExternalSourceMissing => "bound_trait_source_missing",
+                HldUnresolvedReasonKind::MissingTarget => "bound_method_not_found",
+                _ => "receiver_type_not_determined",
+            },
+            _ => "",
+        };
+        (found.clone(), stopped)
     } else if syntax["call_supported_path_flag"] != true
         || syntax["call_lexical_shadowing_flag"] != false
     {
-        unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded)
+        (
+            unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded),
+            if syntax["call_lexical_shadowing_flag"] == true {
+                "callee_prefix_lexically_shadowed"
+            } else if syntax["member_declared_name_value"].is_null() {
+                "callee_expression_not_path"
+            } else {
+                "callee_path_not_requested"
+            },
+        )
     } else {
         let paths = context.read_type_path_records(&evidence, &syntax["type_source_evidence"])?;
         let receiver = context.resolve_type(&evidence, &syntax["type_source_evidence"], false)?;
@@ -195,35 +221,71 @@ fn build_original_call_edge(
                         .is_some_and(|targets| targets.len() > 1)
             })
         {
-            unresolved_call_target_value(HldUnresolvedReasonKind::AmbiguousTarget)
+            (
+                unresolved_call_target_value(HldUnresolvedReasonKind::AmbiguousTarget),
+                "type_prefix_ambiguous",
+            )
         } else if receiver["resolution_state_kind"] != "resolved" {
-            unresolved_call_target_value(match receiver["unresolved_reason_kind"].as_str() {
-                Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,
-                Some("external_source_missing") => HldUnresolvedReasonKind::ExternalSourceMissing,
-                Some("trait_solver_needed") => HldUnresolvedReasonKind::TraitSolverNeeded,
-                _ => HldUnresolvedReasonKind::MissingTarget,
-            })
+            (
+                unresolved_call_target_value(match receiver["unresolved_reason_kind"].as_str() {
+                    Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,
+                    Some("external_source_missing") => {
+                        HldUnresolvedReasonKind::ExternalSourceMissing
+                    }
+                    Some("trait_solver_needed") => HldUnresolvedReasonKind::TraitSolverNeeded,
+                    _ => HldUnresolvedReasonKind::MissingTarget,
+                }),
+                "type_prefix_unresolved",
+            )
         } else {
-            resolve_inherent_member_target(
-                headers,
-                &receiver["target_identity"],
-                syntax,
-                endpoints,
-            )?
+            (
+                resolve_inherent_member_target(
+                    headers,
+                    &receiver["target_identity"],
+                    syntax,
+                    endpoints,
+                )?,
+                "member_lookup_unproven",
+            )
         }
     };
-    let mut dispatch = json!({
-        "dispatch_kind":"original_associated_function",
-        "call_syntax_evidence":syntax
-    });
-    if let Some((_, evidence)) = bound.filter(|(_, evidence)| !evidence.is_null()) {
-        dispatch["dispatch_kind"] = json!("generic_bound_trait_method");
-        dispatch["bound_dispatch_evidence"] = evidence;
-    }
     let target = match &resolution {
         HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
         _ => None,
     };
+    let bound_evidence = bound
+        .map(|(_, evidence)| evidence)
+        .filter(|evidence| !evidence.is_null());
+    // `dispatch_kind` says how the target was chosen; a row without one chose nothing.
+    let mut dispatch = json!({
+        "dispatch_kind":match (&target, &bound_evidence) {
+            (None, _) => "undetermined",
+            (Some(_), Some(_)) => "generic_bound_trait_method",
+            (Some(_), None) => "type_path_associated_function",
+        },
+        "call_shape_kind":if !receiver_evidence.is_null() {
+            "method_call"
+        } else if !syntax["type_source_evidence"].is_null() {
+            "qualified_path_call"
+        } else if !syntax["member_declared_name_value"].is_null() {
+            "bare_name_call"
+        } else {
+            "other_callee_expression"
+        },
+        "call_source_text":text,
+        "callee_source_text":syntax["callee_source_text"],
+        "call_syntax_evidence":syntax
+    });
+    if target.is_none() {
+        dispatch["unresolved_detail_kind"] = json!(stopped);
+    }
+    if let Some(evidence) = bound_evidence {
+        dispatch["bound_dispatch_evidence"] = evidence;
+    }
+    let origin = origins.build_site_origin_value(&evidence, context)?;
+    if !origin.is_null() {
+        dispatch["expansion_source_origin"] = origin;
+    }
     Ok(Some(HldEdgeInputRecord {
         run_generation_digest_value: generation,
         edge_source_reference: source.clone(),
@@ -583,7 +645,21 @@ pub(super) fn extract_original_call_syntax(
         .is_some_and(|prefix| check_call_lexical_shadowing(prefix, node));
     let receiver =
         ast::MethodCallExpr::cast(node.clone()).map(|call| extract_method_receiver_syntax(&call));
-    json!({"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"method_receiver_evidence":receiver})
+    // What is called, as written: the callee expression, or the method's name.
+    let callee = ast::CallExpr::cast(node.clone())
+        .and_then(|call| call.expr())
+        .map(|expr| expr.syntax().text_range())
+        .or_else(|| {
+            ast::MethodCallExpr::cast(node.clone())
+                .and_then(|call| call.name_ref())
+                .map(|name| name.syntax().text_range())
+        })
+        .and_then(|range| {
+            let start = restore_source_byte_offset(range.start(), removed);
+            let end = restore_source_byte_offset(range.end(), removed);
+            std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()
+        });
+    json!({"callee_source_text":callee,"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"method_receiver_evidence":receiver})
 }
 
 /// Syntax-only evidence for `receiver.method(..)`. Nothing is resolved here:

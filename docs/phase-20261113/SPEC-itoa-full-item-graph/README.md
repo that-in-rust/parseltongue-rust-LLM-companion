@@ -23,7 +23,7 @@ part  file                                       requirements                   
 4b    part-4b-implements-from-impl-headers.md    047.0                          BUILT
 4c    part-4c-reads-of-consts-statics.md         048.0                          BUILT (original bodies)
 4d    part-4d-imports-from-use-items.md          049.0                          BUILT
-5     part-5-macro-generated-items.md            046.0                          5a-5c BUILT; 5d steps 1-3 of 6 BUILT
+5     part-5-macro-generated-items.md            046.0                          5a-5c BUILT; 5d steps 1-4 of 6 BUILT
 6     part-6-targets-in-core.md                  (decision first)               DECIDED, not built
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED
 ```

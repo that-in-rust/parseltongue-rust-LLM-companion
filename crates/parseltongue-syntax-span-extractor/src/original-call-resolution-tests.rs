@@ -405,6 +405,69 @@ fn test_preserve_unsupported_call_reason() {
         }
     );
 }
+/// REQ-RUST-052.0 G2, G6: a call row carries its text, its callee's text, its shape and how
+/// its target was chosen; a call site in another text than its owner is a typed error.
+#[test]
+fn test_call_metadata_site_mismatch() {
+    let read = |source: &str| -> Value {
+        let (store, input) = make_call_fixture_graph(source);
+        let edges = read_call_fixture_edges(&store, &input);
+        serde_json::from_str(edges[0].edge_dispatch_metadata_text.as_deref().unwrap()).unwrap()
+    };
+    let found = read(SOURCE);
+    assert_eq!(
+        (
+            &found["call_source_text"],
+            &found["callee_source_text"],
+            &found["call_shape_kind"],
+            &found["dispatch_kind"],
+            &found["unresolved_detail_kind"],
+            &found["expansion_source_origin"],
+        ),
+        (
+            &json!("Buffer::new()"),
+            &json!("Buffer::new"),
+            &json!("qualified_path_call"),
+            &json!("type_path_associated_function"),
+            &Value::Null,
+            &Value::Null,
+        )
+    );
+    let unsupported = read(&SOURCE.replace("Buffer::new()", "<Buffer as Factory>::new()"));
+    assert_eq!(
+        (
+            &unsupported["callee_source_text"],
+            &unsupported["dispatch_kind"],
+            &unsupported["unresolved_detail_kind"],
+        ),
+        (
+            &json!("<Buffer as Factory>::new"),
+            &json!("undetermined"),
+            &json!("callee_path_not_requested"),
+        )
+    );
+
+    let (store, input) = make_call_fixture_graph(SOURCE);
+    store.rows.lock().unwrap().iter_mut().for_each(|row| {
+        if row.stage_owned_table_name == "body-site-reference-table" {
+            let mut value: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            value["span_expansion_provenance_chain"] = json!(["ab".repeat(32)]);
+            row.stage_row_payload_text = value.to_string();
+        }
+    });
+    assert!(matches!(
+        resolve_original_call_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        ),
+        Err(OriginalCallResolutionError::InvalidEvidence {
+            field: "span_expansion_provenance_chain"
+        })
+    ));
+}
+
 /// REQ-RUST-045.0
 #[test]
 fn test_stop_cancelled_call_resolution() {
