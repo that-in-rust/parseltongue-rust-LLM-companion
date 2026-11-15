@@ -220,6 +220,7 @@ pub(crate) fn make_call_fixture_graph(
             node_source_relative_path: Some("src/lib.rs".into()),
             node_qualified_path_text: span["span_declared_name_value"].as_str().unwrap().into(),
             node_signature_text: None,
+            node_generating_call_reference: None,
         })
         .collect();
     (
@@ -762,6 +763,7 @@ fn make_bound_fixture_graph(
             node_source_relative_path: Some("src/lib.rs".into()),
             node_qualified_path_text: span["span_declared_name_value"].as_str().unwrap().into(),
             node_signature_text: None,
+            node_generating_call_reference: None,
         })
         .collect();
     let edges = traits

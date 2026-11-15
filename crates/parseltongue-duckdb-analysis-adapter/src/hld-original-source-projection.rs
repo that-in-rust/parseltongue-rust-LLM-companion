@@ -261,6 +261,7 @@ impl DuckdbAnalysisStoreAdapter {
                     unit.unit_cargo_package_identifier
                 ),
                 node_signature_text: None,
+                node_generating_call_reference: None,
             });
             let _ = absolute_path;
         }
@@ -358,6 +359,7 @@ impl DuckdbAnalysisStoreAdapter {
                 node_source_relative_path: Some(path),
                 node_qualified_path_text: label,
                 node_signature_text: None,
+                node_generating_call_reference: None,
             });
             edges.insert(HldEdgeInputRecord {
                 run_generation_digest_value: generation,

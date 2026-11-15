@@ -763,7 +763,8 @@ pub(super) fn encode_graph_node_rows(
                 "node_reachable_outside_crate_flag":node.node_reachable_outside_crate_flag,
                 "node_source_relative_path":node.node_source_relative_path,
                 "node_qualified_path_text":node.node_qualified_path_text,
-                "node_signature_text":node.node_signature_text
+                "node_signature_text":node.node_signature_text,
+                "node_generating_call_identity":node.node_generating_call_reference.as_ref().map(super::hld_graph_publication_turso::encode_target_identity_json)
             });
             graph_table_row("item-effective-visibility-records", key, payload)
         })
@@ -936,6 +937,10 @@ fn decode_graph_node_rows(
                         )
                     },
                 )?,
+                node_generating_call_reference: Some(&payload["node_generating_call_identity"])
+                    .filter(|call| !call.is_null())
+                    .map(|call| decode_target_identity_value(call, row))
+                    .transpose()?,
             };
             let canonical_key = serde_json::to_string(
                 &super::hld_graph_publication_turso::encode_target_identity_json(

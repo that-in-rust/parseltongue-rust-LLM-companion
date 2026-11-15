@@ -41,6 +41,7 @@ fn build_full_graph_fixture() -> HldMaterializationInputRecord {
             node_source_relative_path: Some("src/lib.rs".into()),
             node_qualified_path_text: "fixture::function".into(),
             node_signature_text: None,
+            node_generating_call_reference: None,
         }],
         input_edge_records: vec![HldEdgeInputRecord {
             run_generation_digest_value: RunGenerationDigestValue([0; 32]),
@@ -212,6 +213,7 @@ fn build_builtin_source_fixture(relation: HldRelationKindValue) -> HldMaterializ
         node_source_relative_path: None,
         node_qualified_path_text: "u8".into(),
         node_signature_text: None,
+        node_generating_call_reference: None,
     });
     let edge = &mut input.input_edge_records[0];
     edge.edge_source_reference = builtin.clone();

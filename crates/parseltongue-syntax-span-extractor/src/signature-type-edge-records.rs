@@ -176,6 +176,7 @@ pub fn collect_builtin_endpoint_nodes(edges: &[HldEdgeInputRecord]) -> Vec<HldNo
             node_source_relative_path: None,
             node_qualified_path_text: name.clone(),
             node_signature_text: None,
+            node_generating_call_reference: None,
         })
         .collect()
 }

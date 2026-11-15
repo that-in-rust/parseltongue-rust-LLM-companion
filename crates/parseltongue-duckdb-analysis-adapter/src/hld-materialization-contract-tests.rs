@@ -74,6 +74,7 @@ fn build_hld_fixture_node(
         node_source_relative_path: source_path.map(str::to_owned),
         node_qualified_path_text: qualified_path.to_owned(),
         node_signature_text: None,
+        node_generating_call_reference: None,
     }
 }
 
@@ -401,6 +402,7 @@ fn build_hld_area_input(
         node_source_relative_path: Some(path.into()),
         node_qualified_path_text: "file:src/lib.rs".into(),
         node_signature_text: None,
+        node_generating_call_reference: None,
     };
     let mut item_node = build_hld_fixture_node(
         generation,

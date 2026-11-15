@@ -212,6 +212,8 @@ pub struct HldNodeInputRecord {
     pub node_source_relative_path: Option<String>,
     pub node_qualified_path_text: String,
     pub node_signature_text: Option<String>,
+    /// The macro call whose expansion wrote this item; `None` for source-written items.
+    pub node_generating_call_reference: Option<HldTargetIdentityValue>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -424,6 +426,7 @@ pub enum HldMaterializationValidationError {
     InvalidEvidenceIdentity,
     StructuralScopeAllowsContainsOnly,
     UnknownReachability,
+    InvalidGeneratingCall,
 }
 
 impl std::fmt::Display for HldMaterializationValidationError {
@@ -446,6 +449,9 @@ impl std::fmt::Display for HldMaterializationValidationError {
             Self::MissingUnitProvenance => "compilation unit provenance is missing",
             Self::ConflictingUnitProvenance => "compilation unit provenance conflicts",
             Self::InvalidEvidenceIdentity => "evidence-row identity does not match its relation",
+            Self::InvalidGeneratingCall => {
+                "a generated node must name a macro call node; a source-written node names none"
+            }
             Self::StructuralScopeAllowsContainsOnly => {
                 "original top-level scope allows only extracted contains edges"
             }
@@ -631,6 +637,29 @@ fn validate_graph_input_records(
         {
             return Err(HldMaterializationValidationError::ConflictingNodeRecord);
         }
+    }
+
+    // A node written by a macro expansion names its macro call, and that call is a node.
+    if node_records.values().any(|node_record| {
+        let generated = matches!(
+            &node_record.node_target_reference,
+            HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key))
+                if !key
+                    .read_semantic_occurrence_parts()
+                    .span_expansion_provenance_chain
+                    .is_empty()
+        );
+        match &node_record.node_generating_call_reference {
+            Some(call) => {
+                !generated
+                    || node_records.get(call).is_none_or(|call_record| {
+                        call_record.node_item_kind_value != Some(HldItemKindValue::MacroInvocation)
+                    })
+            }
+            None => generated,
+        }
+    }) {
+        return Err(HldMaterializationValidationError::InvalidGeneratingCall);
     }
 
     let mut evidence_records = BTreeMap::new();

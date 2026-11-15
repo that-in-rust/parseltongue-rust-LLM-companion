@@ -15,9 +15,9 @@ pub(super) fn build_generated_item_records(
     connection
         .execute_batch(include_str!("generated-item-graph-projection.sql"))
         .map_err(|error| projection_backend_error(error.to_string()))?;
-    let rows = read_projection_rows::<13>(
+    let rows = read_projection_rows::<14>(
         connection,
-        "SELECT unit_payload,root_scope_payload,request_payload,file_payload,span_payload,owner_payload,container_payload,lexical_names,impl_bridges,expanded_file_payload,call_payload,call_container_payload,call_lexical_names FROM \"generated-item-graph-candidates\" WHERE generation_key=? AND attempt_key=? ORDER BY unit_payload,request_payload,span_payload",
+        "SELECT unit_payload,root_scope_payload,request_payload,file_payload,span_payload,owner_payload,container_payload,lexical_names,impl_bridges,expanded_file_payload,call_payload,call_container_payload,call_lexical_names,call_span_payload FROM \"generated-item-graph-candidates\" WHERE generation_key=? AND attempt_key=? ORDER BY unit_payload,request_payload,span_payload",
         source_scope,
     )?;
     let inventory = read_projection_rows::<2>(
@@ -47,7 +47,7 @@ pub(super) fn build_generated_item_records(
 
 fn build_generated_item_pair(
     source: &dyn StageTableStorePort,
-    row: &[String; 13],
+    row: &[String; 14],
     workspace_root: &Path,
     generation: RunGenerationDigestValue,
 ) -> Result<(HldNodeInputRecord, HldEdgeInputRecord), OriginalSourceProjectionError> {
@@ -56,6 +56,16 @@ fn build_generated_item_pair(
     let owner: Value = decode_json(&row[5], SPAN_TABLE)?;
     let container: Value = decode_json(&row[6], SPAN_TABLE)?;
     let call_container: Value = decode_json(&row[11], SPAN_TABLE)?;
+    let call_span: Value = decode_json(&row[13], SPAN_TABLE)?;
+    if call_span.is_null() {
+        return Err(invalid_source_row(
+            "macro-expanded-item-table",
+            "generating macro call is not a source-written macro call span".into(),
+        ));
+    }
+    let call = HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(
+        build_original_item_identity(&area, &call_span)?,
+    ));
     let names = decode_lexical_name_list(&row[12])?
         .into_iter()
         .chain(decode_lexical_name_list(&row[7])?)
@@ -114,6 +124,7 @@ fn build_generated_item_pair(
         node_source_relative_path: Some(area.path),
         node_qualified_path_text: label,
         node_signature_text: None,
+        node_generating_call_reference: Some(call),
     };
     let edge = HldEdgeInputRecord {
         run_generation_digest_value: generation,

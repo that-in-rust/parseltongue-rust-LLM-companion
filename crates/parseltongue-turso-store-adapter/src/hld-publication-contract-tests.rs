@@ -343,6 +343,7 @@ fn build_structural_hld_input(scope: &StageRunScopeValue) -> HldMaterializationI
                 node_source_relative_path: Some("src/lib.rs".into()),
                 node_qualified_path_text: "file:src/lib.rs".into(),
                 node_signature_text: None,
+                node_generating_call_reference: None,
             },
             HldNodeInputRecord {
                 run_generation_digest_value: generation,
@@ -356,6 +357,7 @@ fn build_structural_hld_input(scope: &StageRunScopeValue) -> HldMaterializationI
                 node_source_relative_path: Some("src/lib.rs".into()),
                 node_qualified_path_text: "Buffer".into(),
                 node_signature_text: None,
+                node_generating_call_reference: None,
             },
         ],
         input_edge_records: vec![HldEdgeInputRecord {

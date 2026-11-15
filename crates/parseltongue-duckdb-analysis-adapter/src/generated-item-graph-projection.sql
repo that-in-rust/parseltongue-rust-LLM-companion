@@ -74,7 +74,8 @@ SELECT area.*, span.payload AS span_payload,
             AND o.unit_key = span.unit_key
             AND o.file_path = json_extract_string(area.request_payload, '$.file_source_absolute_path')
             AND o.syntax_kind IN ('MODULE', 'TRAIT')
-            AND o.start_byte < outer_call.call_start AND o.end_byte > outer_call.call_end), '[]') AS call_lexical_names
+            AND o.start_byte < outer_call.call_start AND o.end_byte > outer_call.call_end), '[]') AS call_lexical_names,
+    coalesce(call_span.payload, 'null') AS call_span_payload
 FROM "generated-item-source-inventory" span
 JOIN "generated-item-macro-calls" last_call
     ON last_call.generation_key = span.generation_key AND last_call.attempt_key = span.attempt_key
@@ -112,4 +113,14 @@ LEFT JOIN LATERAL (
         AND o.start_byte < outer_call.call_start AND o.end_byte > outer_call.call_end
     ORDER BY o.end_byte - o.start_byte LIMIT 1
 ) call_container ON true
+-- The node of the call that wrote the item; only a source-written call is a node today.
+LEFT JOIN LATERAL (
+    SELECT o.payload FROM "original-item-source-spans" o
+    WHERE o.generation_key = span.generation_key AND o.attempt_key = span.attempt_key
+        AND o.unit_key = span.unit_key
+        AND o.file_path = json_extract_string(area.request_payload, '$.file_source_absolute_path')
+        AND o.syntax_kind = 'MACRO_CALL' AND len(last_call.chain) = 1
+        AND o.start_byte = last_call.call_start AND o.end_byte = last_call.call_end
+    LIMIT 1
+) call_span ON true
 WHERE span.projection_state = 'included';

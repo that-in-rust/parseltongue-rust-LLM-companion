@@ -22,6 +22,16 @@ fn build_generated_node_fixture() -> HldMaterializationInputRecord {
     )
     .unwrap();
     let item = HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence.clone()));
+    let call_occurrence = SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+        &unit,
+        "src/lib.rs",
+        SpanByteRangeValue::try_from((10, 16)).unwrap(),
+        SpanDigestIdValue::from([7; 32]),
+        &[],
+    )
+    .unwrap();
+    let call =
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call_occurrence.clone()));
     let area = HldTargetIdentityValue::FilePublicArea(
         FileAreaIdentityKey::build_file_area_identity(&unit, "src/lib.rs").unwrap(),
     );
@@ -48,6 +58,7 @@ fn build_generated_node_fixture() -> HldMaterializationInputRecord {
                 node_source_relative_path: Some("src/lib.rs".into()),
                 node_qualified_path_text: "fixture::src/lib.rs".into(),
                 node_signature_text: None,
+                node_generating_call_reference: None,
             },
             HldNodeInputRecord {
                 run_generation_digest_value: generation,
@@ -61,6 +72,21 @@ fn build_generated_node_fixture() -> HldMaterializationInputRecord {
                 node_source_relative_path: Some("src/lib.rs".into()),
                 node_qualified_path_text: "fixture::src/lib.rs::_".into(),
                 node_signature_text: None,
+                node_generating_call_reference: Some(call.clone()),
+            },
+            HldNodeInputRecord {
+                run_generation_digest_value: generation,
+                node_target_reference: call.clone(),
+                node_input_category: HldNodeInputCategory::LocalItem,
+                node_item_kind_value: Some(HldItemKindValue::MacroInvocation),
+                node_owner_kind_value: Some(HldOwnerKindValue::CrateRoot),
+                node_function_body_ancestry_flag: false,
+                node_effective_visibility_kind: Some(HldEffectiveVisibilityKind::Unknown),
+                node_reachable_outside_crate_flag: None,
+                node_source_relative_path: Some("src/lib.rs".into()),
+                node_qualified_path_text: "fixture::src/lib.rs::MACRO_CALL".into(),
+                node_signature_text: None,
+                node_generating_call_reference: None,
             },
         ],
         input_edge_records: vec![HldEdgeInputRecord {
@@ -123,6 +149,7 @@ fn test_original_node_path_exact() {
     .unwrap();
     let item = HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(original.clone()));
     input.input_node_records[1].node_target_reference = item.clone();
+    input.input_node_records[1].node_generating_call_reference = None;
     let edge = &mut input.input_edge_records[0];
     edge.edge_resolution_value = HldEdgeResolutionValue::Extracted {
         target: item.clone(),
@@ -137,5 +164,40 @@ fn test_original_node_path_exact() {
     assert_eq!(
         validate_full_graph_input(&input),
         Err(HldMaterializationValidationError::InvalidEvidenceIdentity)
+    );
+}
+
+/// REQ-RUST-046.0 R5: a generated node without its macro call is rejected.
+#[test]
+fn test_generated_node_call_required() {
+    let mut input = build_generated_node_fixture();
+    input.input_node_records[1].node_generating_call_reference = None;
+    assert_eq!(
+        validate_full_graph_input(&input),
+        Err(HldMaterializationValidationError::InvalidGeneratingCall)
+    );
+}
+
+/// REQ-RUST-046.0 R5: the named call must be a macro call node in the same graph.
+#[test]
+fn test_generating_call_node_kind() {
+    let mut input = build_generated_node_fixture();
+    input.input_node_records[1].node_generating_call_reference =
+        Some(input.input_node_records[0].node_target_reference.clone());
+    assert_eq!(
+        validate_full_graph_input(&input),
+        Err(HldMaterializationValidationError::InvalidGeneratingCall)
+    );
+}
+
+/// REQ-RUST-046.0 R5: a source-written node names no generating call.
+#[test]
+fn test_original_node_call_rejected() {
+    let mut input = build_generated_node_fixture();
+    input.input_node_records[2].node_generating_call_reference =
+        Some(input.input_node_records[2].node_target_reference.clone());
+    assert_eq!(
+        validate_full_graph_input(&input),
+        Err(HldMaterializationValidationError::InvalidGeneratingCall)
     );
 }
