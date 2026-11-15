@@ -276,12 +276,23 @@ fn test_original_member_graph_roundtrip() {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");
     let headers = read_published_stage_rows(&database, "impl-header-index-table");
+    // Items written by a macro expansion are covered by test_generated_item_node_counts.
     let local = input
         .input_node_records
         .iter()
-        .filter(|node| node.node_input_category == HldNodeInputCategory::LocalItem)
+        .filter(|node| {
+            matches!(
+                &node.node_target_reference,
+                HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key))
+                    if node.node_input_category == HldNodeInputCategory::LocalItem
+                        && key
+                            .read_semantic_occurrence_parts()
+                            .span_expansion_provenance_chain
+                            .is_empty()
+            )
+        })
         .collect::<Vec<_>>();
-    assert!(!local.is_empty());
+    assert_eq!(local.len(), 43, "original items, impl members included");
     assert!(
         local
             .iter()
@@ -2398,4 +2409,207 @@ fn test_reads_rows_read_twice() {
 #[test]
 fn test_imports_rows_read_twice() {
     check_relation_rows_twice(HldRelationKindValue::Imports, 4);
+}
+
+/// REQ-RUST-046.0 R1, R2, R3: the `const _` written by `impl_Integer!(i8, u8)` is a node,
+/// identified by its call and its place in the expanded text, held by the file of the call.
+#[test]
+fn test_generated_const_node_contained() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let source = fs::read(root.join("src/lib.rs")).unwrap();
+    let macros = read_published_stage_rows(&database, "macro-expanded-item-table");
+    let calls = macros
+        .iter()
+        .filter(|row| {
+            let call = &row["macro_invocation_identity_record"];
+            let range = &call["span_byte_range_value"];
+            call["span_source_file_path"] == "src/lib.rs"
+                && source
+                    .get(range[0].as_u64().unwrap() as usize..range[1].as_u64().unwrap() as usize)
+                    == Some(b"impl_Integer!(i8, u8);".as_slice())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(calls.len(), 1, "pin has one impl_Integer!(i8, u8) call");
+    let chain = &calls[0]["macro_invocation_provenance_chain"];
+    assert_eq!(
+        chain.as_array().unwrap().len(),
+        1,
+        "the call is source-written"
+    );
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let consts = spans
+        .iter()
+        .filter(|span| {
+            span["span_expansion_provenance_chain"] == *chain
+                && span["span_syntax_kind_value"] == "CONST"
+                && span["span_declared_name_value"].is_null()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(consts.len(), 1, "the call expands to one const _");
+    assert_eq!(consts[0]["span_configuration_active_flag"], true);
+    let range = (
+        consts[0]["span_byte_start_offset"].as_u64().unwrap(),
+        consts[0]["span_byte_end_offset"].as_u64().unwrap(),
+    );
+    let expanded_path = format!(
+        ".parseltongue/macro-source/{}/expanded.rs",
+        chain[0].as_str().unwrap()
+    );
+    let nodes = input
+        .input_node_records
+        .iter()
+        .filter(|node| {
+            let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
+                &node.node_target_reference
+            else {
+                return false;
+            };
+            let parts = key.read_semantic_occurrence_parts();
+            let digests = parts
+                .span_expansion_provenance_chain
+                .iter()
+                .map(|digest| digest.iter().map(|byte| format!("{byte:02x}")).collect())
+                .collect::<Vec<String>>();
+            json!(digests) == *chain
+                && parts.span_source_file_path == expanded_path
+                && parts.span_byte_range_value.read_source_range_pair() == range
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(nodes.len(), 1, "the generated const _ is one node");
+    let node = nodes[0];
+    assert_eq!(node.node_input_category, HldNodeInputCategory::LocalItem);
+    assert_eq!(node.node_item_kind_value, Some(HldItemKindValue::Constant));
+    assert_eq!(
+        node.node_owner_kind_value,
+        Some(HldOwnerKindValue::CrateRoot),
+        "the call is written at the top of the crate root file"
+    );
+    assert_eq!(
+        node.node_source_relative_path.as_deref(),
+        Some("src/lib.rs"),
+        "a generated node names the file of its macro call"
+    );
+    assert!(
+        node.node_qualified_path_text.ends_with("::_"),
+        "{}",
+        node.node_qualified_path_text
+    );
+    let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
+        &node.node_target_reference
+    else {
+        unreachable!()
+    };
+    assert_eq!(
+        blake3::Hash::from(
+            *key.read_semantic_occurrence_parts()
+                .span_content_digest_full
+                .read_full_digest_bytes()
+        )
+        .to_hex()
+        .to_string(),
+        consts[0]["span_content_digest_full"].as_str().unwrap()
+    );
+    let parents = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_relation_kind_value == HldRelationKindValue::Contains
+                && edge.edge_resolution_value
+                    == HldEdgeResolutionValue::Extracted {
+                        target: node.node_target_reference.clone(),
+                    }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(parents.len(), 1, "one lexical container");
+    let area = input
+        .input_node_records
+        .iter()
+        .find(|area| {
+            area.node_input_category == HldNodeInputCategory::FilePublicArea
+                && area.node_source_relative_path.as_deref() == Some("src/lib.rs")
+        })
+        .unwrap();
+    assert_eq!(
+        parents[0].edge_source_reference, area.node_target_reference,
+        "the file area of the call holds the item; the macro call node does not"
+    );
+}
+
+/// REQ-RUST-046.0 R1, R3, R4, R7: every active item written by a macro expansion is one
+/// node with one container; inactive generated spans and impl blocks are not nodes.
+#[test]
+fn test_generated_item_node_counts() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let generated = input
+        .input_node_records
+        .iter()
+        .filter(|node| {
+            matches!(
+                &node.node_target_reference,
+                HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key))
+                    if !key
+                        .read_semantic_occurrence_parts()
+                        .span_expansion_provenance_chain
+                        .is_empty()
+            )
+        })
+        .collect::<Vec<_>>();
+    let count = |kind: HldItemKindValue, name: &str| {
+        generated
+            .iter()
+            .filter(|node| {
+                node.node_item_kind_value == Some(kind)
+                    && node
+                        .node_qualified_path_text
+                        .ends_with(&format!("::{name}"))
+            })
+            .count()
+    };
+    assert_eq!(
+        [
+            count(HldItemKindValue::Constant, "_"),
+            count(HldItemKindValue::AssociatedConstant, "MAX_STR_LEN"),
+            count(HldItemKindValue::AssociatedType, "Buffer"),
+            count(HldItemKindValue::AssociatedFunction, "write"),
+            count(HldItemKindValue::AssociatedFunction, "fmt"),
+        ],
+        [5, 12, 12, 12, 4]
+    );
+    assert_eq!(generated.len(), 45);
+    assert_eq!(input.input_node_records.len(), 103);
+    let area = input
+        .input_node_records
+        .iter()
+        .find(|area| {
+            area.node_input_category == HldNodeInputCategory::FilePublicArea
+                && area.node_source_relative_path.as_deref() == Some("src/lib.rs")
+        })
+        .unwrap();
+    generated.iter().for_each(|node| {
+        assert_eq!(
+            node.node_source_relative_path.as_deref(),
+            Some("src/lib.rs")
+        );
+        let parents = input
+            .input_edge_records
+            .iter()
+            .filter(|edge| {
+                edge.edge_relation_kind_value == HldRelationKindValue::Contains
+                    && edge.edge_resolution_value
+                        == HldEdgeResolutionValue::Extracted {
+                            target: node.node_target_reference.clone(),
+                        }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(parents.len(), 1, "{}", node.node_qualified_path_text);
+        assert_eq!(parents[0].edge_source_reference, area.node_target_reference);
+    });
+    assert_eq!(
+        input
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Contains)
+            .count(),
+        88
+    );
 }
