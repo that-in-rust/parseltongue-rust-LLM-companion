@@ -15,9 +15,9 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 2: each row sited in expanded text names where its first and
-  last token were copied from in the source file. Step 1 (`reads` from generated function
-  bodies) is built.
+- **Next target:** part 5d step 3: `uses_type` from generated function signatures. Steps 1
+  and 2 are built: `reads` from generated function bodies, each naming where its first and
+  last token were copied from in the source file.
   Parts 5a (generated items as nodes, contained, each naming its macro call as a field and
   by a `generates` row), 5b (readable labels: all 103 distinct, each impl member names
   its impl header) and 5c (`expands`: each of the 15 macro calls points to its definition,
@@ -41,7 +41,7 @@ step                                   state         measured or missing
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21 (+34 in part 5d), imports 4
-5  macro-generated items and bodies    5a-5c BUILT, 5d 1 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads
+5  macro-generated items and bodies    5a-5c BUILT, 5d 2 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -104,6 +104,46 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 02:20 IST — Part 5d step 2 built: where a generated site was copied from (REQ-RUST-052.0 G3)
+
+- **Result.** Each of the 34 `reads` rows sited in expanded text now carries
+  `expansion_source_origin` in its metadata: the source file, byte range and kind
+  (definition or call) of its first token and of its last token, stored apart. Read back
+  from the stored edge table (measured): 24 `DECIMAL_PAIRS` rows, both tokens from the
+  `impl_Unsigned` definition; 5 `Self ::MAX_STR_LEN`, both from the `impl_Integer`
+  definition; 5 `uN ::MAX_STR_LEN`, first token from the call (`u8` .. `u128`), last from the
+  definition. The 21 rows sited in original text carry no such key. Graph size unchanged:
+  103 nodes, 334 edges.
+- **STUB.** `expanded-site-origin-records.rs`: `read_expanded_token_origins`,
+  `locate_site_token_pair`, `build_site_origin_value`, all `todo!()`.
+- **RED.** `cargo test --release -p parseltongue-syntax-span-extractor expanded_site_origin`:
+  0 passed, 2 failed, `not yet implemented: REQ-RUST-052.0 G3`
+  (`test_site_token_origin_pair`, `test_site_origin_missing_rejected`).
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests test_generated_read_source_origins`: 0 passed, 1 failed,
+  `left: Null right: "src/lib.rs"`.
+- **GREEN.** The three functions read `macro-expanded-item-table` and pick the stored tokens
+  inside a site; `build_body_read_edge` adds the key for a site in expanded text. Unit: 2
+  passed. Real source: 1 passed, 15.03 s.
+- **REFACTOR.** `ImplHeaderSourceContext::relate_unit_source_path` taken out of
+  `occurrence`, so the origin path and the occurrence path are made relative by one rule.
+- **Gates.** `cargo fmt --all -- --check`: pass. `cargo clippy --release -p
+  parseltongue-syntax-span-extractor -p parseltongue-cli-dispatcher-binary --all-targets
+  --all-features -- -D warnings`: pass (first run failed on `unwrap` in the new test file;
+  it now carries the same allow line as the other test files). Syntax crate: 92 + 17 passed.
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests`: 38 passed, 0 failed, 90.95 s.
+- **Decisions.** A site whose edge cuts a stored token is a typed error, not a nearest-token
+  guess. Rejected: storing the origin of every token of the site (a call site can hold a
+  whole argument list; first and last bound it and stay small).
+- **Not built.** The key on `uses_type` and `calls` rows (steps 3 and 4).
+- **codebase-memory.** `search_graph --name_pattern '.*origin.*' --label Function` (no
+  existing reader of token origins outside the adapter); `trace_path` inbound on
+  `build_body_read_edge` (1 caller) and `occurrence` (8 callers, all still served by the
+  unchanged signature).
+- **Next.** Step 3: `uses_type` from generated function signatures (predicted 66 rows, 366
+  edges), with the same origin key.
 
 ### 2026-11-16 01:35 IST — Part 5d specified; step 1 built: `reads` from generated function bodies (REQ-RUST-052.0)
 
