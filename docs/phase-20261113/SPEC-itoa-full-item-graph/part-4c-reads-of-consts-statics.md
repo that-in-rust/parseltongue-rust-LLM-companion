@@ -4,7 +4,7 @@ Written 2026-11-15 with `rust-executable-specs-01`, before any code.
 
 ## The answer
 
-**State: SPECIFIED, not built. One `reads` row per value path in an original function body
+**State: IN PROGRESS, steps 1 and 2 of 7 pushed; no `reads` row is stored yet. One `reads` row per value path in an original function body
 that names a `static`, a `const` or an associated const which is a graph node. The first
 target is `enc_16lsd --reads--> DECIMAL_PAIRS`.**
 
@@ -96,7 +96,10 @@ Metric for every row: exact equality of source, target or reason, relation and s
 Each step is one commit of about 200 changed lines, test first.
 
 1. RED: `test_decimal_pairs_static_read` on pinned itoa (0 `reads` rows today).
-2. L2 syntax: value-path requests and the local-binding flag; syntax fixture tests.
+2. L2 syntax: value-path requests; syntax fixture tests. DONE (`9b88de807`, `35d163f8c`).
+   Built differently from section 3: a name bound by a parameter or pattern in scope gets no
+   request, and there is no flag. Items declared in a block and generic parameters are
+   requested and left to name resolution, which resolves them in the block scope.
 3. L2 resolver: single-segment and module paths to value nodes (R1, R2, R3, R6).
 4. L3 facade: rows in the full graph; step 1 goes GREEN.
 5. Generic `T::NAME` through the bound lookup (R4).
@@ -105,7 +108,21 @@ Each step is one commit of about 200 changed lines, test first.
 
 ## 6 — Quality gate results
 
-Not run. Nothing is built.
+Step 2, measured 2026-11-15 on pinned itoa (sysroot excluded): 70 `body_value_path`
+requests, 36 in original bodies and 34 in macro-generated bodies.
+
+```text
+original, 36                        state       names
+14  DECIMAL_PAIRS                   resolved    Static
+1   I::MAX_STR_LEN                  resolved    Const
+7   D EXP M_HIGH SH_POST SIG        resolved    Const declared in the function body
+8   OFFSET                          resolved    ConstParam
+6   i128:: 1, u128::MAX_STR_LEN 5   unresolved  no reason stored
+```
+
+Syntax crate 79 + 17 tests pass; the 22 real-source itoa tests pass with
+`test_decimal_pairs_static_read` still ignored; format and lint clean on the two touched
+crates. Workspace gates run at step 7.
 
 ## 7 — Open questions
 
@@ -117,5 +134,11 @@ Not run. Nothing is built.
   const from a struct. 4c covers function bodies only; OD-8 decides the rest.
 - **Q3. Consts inside function bodies** (`EXP`, `D`, ...) are not nodes, so reads of them
   have no row. If the graph later gains body-local items, they get rows then.
+- **Q5. `I::MAX_STR_LEN` already resolves.** Name resolution stores it as resolved to a
+  `Const` without the part-3 bound lookup. Step 5 must check which const it names and
+  whether the "proven, gap on `Copy`" record is still needed (R4).
+- **Q6. Two older scope checks.** `check_call_lexical_shadowing` and
+  `check_receiver_name_rebound` are separate from the new pattern-scope check. The first
+  treats any `use` in a block as shadowing every name. Merging them is step 7 work.
 - **Q4. Field access.** `DECIMAL_PAIRS.0` reads the static; the field `.0` is not a node
   (OD-4), so the row targets the static.

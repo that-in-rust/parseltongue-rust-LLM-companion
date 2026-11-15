@@ -13,8 +13,10 @@ from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `u128 --implements--> Unsigned`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 4c, `reads` of consts and statics. It is a stub: its part must be
-  written with the executable-spec skill before any code. Parts 4a and 4b are built.
+- **Next target:** part 4c step 3, the resolver that turns value-path requests into `reads`
+  rows. Steps 1 and 2 are pushed; no `reads` row is stored yet. Parts 4a and 4b are built.
+- **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
+  macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, and `implements`
   from impl headers, original and macro-generated. Not produced: `reads`, `imports`.
 - **Expected graph:** an unreviewed draft of 73 nodes and 368 edges
@@ -78,11 +80,11 @@ All counts above were read at commit `7e2a2ef87`.
 ## Decisions that block freezing the expected graph
 
 ```text
-OD-2  macro-generated items: identity and container        blocks 279 edges, 45 nodes
-OD-8  may reads and uses_type start at a non-function item  blocks 56 edges
+OD-2  macro-generated items: identity and container        working decision, unconfirmed
+OD-8  may reads and uses_type start at a non-function item  working decision: yes
 OD-7  how a file's module node relates to its file area     blocks 2 edges
 OD-4  enum variants and struct fields: nodes or evidence
-core  run with the sysroot source, or accept unresolved     blocks 119 edges
+core  DECIDED 2026-11-15: named external target             119 expected rows to re-cut
 ```
 
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
@@ -91,6 +93,71 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 11:55 IST — Part 4c step 2: value paths in bodies are requested
+
+- REQ-RUST-048.0. A path expression in a function body that is not a callee and is not
+  bound by a parameter or pattern in scope is now a name-resolution request in the value
+  namespace, context `body_value_path`. No `reads` row is stored yet; the graph is
+  unchanged at 58 nodes and 170 edges.
+- Measured on pinned itoa (release build, sysroot excluded, 2 workers, 14.0 s, read with
+  `export-published-stage-rows --stage-owned-table-name path-resolution-site-records`):
+  301 path rows, 70 of them `body_value_path`.
+
+```text
+original bodies, 36                       state       names
+14  DECIMAL_PAIRS                         resolved    Static
+1   I::MAX_STR_LEN                        resolved    Const
+7   D EXP M_HIGH SH_POST SIG              resolved    Const declared in the function body
+8   OFFSET                                resolved    ConstParam
+6   i128::MAX_STR_LEN 1, u128:: 5         unresolved  no reason stored
+macro-generated bodies, 34
+24  DECIMAL_PAIRS                         resolved    Static
+10  Self:: 5, u8 u16 u32 u64 u128:: 1 each  unresolved  no reason stored
+```
+
+- Differs from the part as written: the part planned a local-binding flag on every path. Built
+  instead: a locally bound name gets no request at all, and items declared in a block and
+  generic parameters are left to name resolution, which already has block scopes
+  (`test_value_path_block_scope`: for `static S; fn f() { const S: u8 = 2; S }` the request
+  is made in the block scope, where only the block const is bound). This test passed on
+  first run, so it describes existing behaviour and was not a RED.
+- Correction: the 2026-11-15 second-opinion review said this check "can produce a wrong
+  edge" for a block-local const. The request-level test above does not support that. The
+  end-to-end proof (no `reads` row for such a path) belongs to step 3.
+- `test_sysroot_reached_names_reasoned` pinned total path rows; it now counts
+  `body_value_path` rows separately and asserts 38 resolved `DECIMAL_PAIRS` requests.
+- Tests: `cargo test -p parseltongue-syntax-span-extractor` 79 + 17 passed, 0 failed.
+  `cargo test -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`
+  22 passed, 0 failed, 1 ignored (`test_decimal_pairs_static_read`, RED until step 4),
+  279.0 s. `cargo fmt --all -- --check` and `cargo clippy -p
+  parseltongue-syntax-span-extractor -p parseltongue-cli-dispatcher-binary --all-targets --
+  -D warnings` clean. Workspace gates not run; they run at step 7.
+- codebase-memory queries: `index_status`; `trace_path check_call_lexical_shadowing both 1`;
+  `trace_path check_receiver_name_rebound both 1`; `search_graph Function
+  '.*(shadow|binding|scope_covers).*'`; `trace_path check_body_call_prefix inbound 1`
+  (one caller, the extraction file); `index_repository` after the commits.
+- Not done: the two older call-site checks (`check_call_lexical_shadowing`,
+  `check_receiver_name_rebound`) are not merged with the new one. The older one still
+  treats any `use` in a block as shadowing every name.
+- Commits: `9b88de807` (201 lines), `35d163f8c`.
+- Next: step 3, `resolve_body_read_edges` on fixtures.
+
+### 2026-11-15 11:00 IST — Process rules and two graph decisions
+
+- `AGENTS.md` Rule 4 (codebase-memory at every step, queries listed in each entry) and
+  Rule 5 (GLM-5.3 second opinion at max reasoning): `953b16a3f`, `20fdc9afe`,
+  `09e19e8e6`, `eacbfe0f2`. The first review is recorded verbatim in
+  `docs/devin-research/1794719045-second-opinion-glm-5-3-max-two-harness-review-of-itoa-open-questions.md`.
+- Decided by the user's rule "the more explicit thing for a future coding agent"
+  (`c22a3fe32`): a target in `core` is a named external target, as far as itoa's source
+  proves the name, with the crate and a source-not-read flag; macro definitions and macro
+  calls at item position are nodes. A relation `expands` (call to definition) is proposed,
+  not decided. Nothing is built.
+- Found by the review and confirmed in source, not yet repaired: the expected graph lists 4
+  of 9 `u128::from` sites in `mulhi`; all 70 expected `contains` rows have an empty site;
+  9 unresolved calls in original bodies target itoa's own functions and fail on callee
+  shape (bare name, module prefix, generic arguments), not on type inference.
 
 ### 2026-11-15 09:40 IST — Part 4b built: 32 `implements` rows on pinned itoa
 
