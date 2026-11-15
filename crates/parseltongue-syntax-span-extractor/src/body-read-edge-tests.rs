@@ -12,8 +12,10 @@ use serde_json::{Value, json};
 /// A call fixture graph of `source` (which must declare `struct Buffer`) with a
 /// node for each `static` and `const`, and one stored value-path resolution per
 /// entry of `paths`: (path text, which occurrence of that text, declared name
-/// it resolves to, symbol kind). Name resolution outcomes are supplied here, at
-/// the stage seam; the resolver under test only joins them.
+/// it resolves to, symbol kind). An empty name is a path left unresolved, and
+/// its kind is then the stored reason, `ambiguous`, or empty for no reason.
+/// Name resolution outcomes are supplied here, at the stage seam; the resolver
+/// under test only joins them.
 fn make_read_fixture_graph(
     source: &str,
     paths: &[(&str, usize, &str, &str)],
@@ -93,7 +95,16 @@ fn make_read_fixture_graph(
                 "site_expansion_provenance_chain":[],
                 "site_path_context_kind":"body_value_path",
                 "path_site_source_text":text,
-                "path_resolution_state_kind":if name.is_empty() { "unresolved" } else { "resolved" },
+                "path_resolution_state_kind":match (name.is_empty(), *kind) {
+                    (false, _) => "resolved",
+                    (true, "ambiguous") => "ambiguous",
+                    (true, _) => "unresolved",
+                },
+                "path_unresolved_reason_kind":if name.is_empty() && !kind.is_empty() {
+                    json!(kind)
+                } else {
+                    Value::Null
+                },
                 "path_target_symbol_rows":targets}),
         ));
     }
@@ -102,7 +113,7 @@ fn make_read_fixture_graph(
 }
 
 /// `reads` edges of a fixture as (source name, target name, "start:site text"),
-/// in source order.
+/// in source order. An unresolved edge has `unresolved:<reason>` as its target.
 fn read_body_fixture_edges(
     source: &str,
     store: &OriginalCallFixtureStore,
@@ -133,8 +144,10 @@ fn read_body_fixture_edges(
         .iter()
         .map(|edge| {
             assert_eq!(edge.edge_relation_kind_value, HldRelationKindValue::Reads);
-            let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
-                panic!("not extracted: {edge:?}");
+            let target = match &edge.edge_resolution_value {
+                HldEdgeResolutionValue::Extracted { target } => name(target),
+                HldEdgeResolutionValue::Unresolved { reason } => format!("unresolved:{reason:?}"),
+                other => panic!("neither extracted nor unresolved: {other:?}"),
             };
             let (start, end) = edge
                 .edge_evidence_row_key
@@ -146,7 +159,7 @@ fn read_body_fixture_edges(
                 start,
                 (
                     name(&edge.edge_source_reference),
-                    name(target),
+                    target,
                     format!("{start}:{}", &source[start as usize..end as usize]),
                 ),
             )
@@ -281,4 +294,31 @@ fn test_reject_read_edge_scope() {
         ),
         Err(BodyReadEdgeError::InvalidScope)
     ));
+}
+
+/// REQ-RUST-048.0 R5
+#[test]
+fn test_unresolved_read_keeps_reason() {
+    let source = "struct Buffer; static TABLE: u8 = 1; \
+        fn pick() -> u8 { MISSING + OUTSIDE + TWICE + TABLE }";
+    let (store, input) = make_read_fixture_graph(
+        source,
+        &[
+            ("MISSING", 0, "", ""),
+            ("OUTSIDE", 0, "", "external_source_missing"),
+            ("TWICE", 0, "", "ambiguous"),
+            ("TABLE", 1, "TABLE", "Static"),
+        ],
+    );
+    let site = |name: &str| format!("{}:{name}", source.rfind(name).unwrap());
+    assert_eq!(
+        read_body_fixture_edges(source, &store, &input),
+        vec![
+            edge("pick", "unresolved:TraitSolverNeeded", &site("MISSING")),
+            edge("pick", "unresolved:ExternalSourceMissing", &site("OUTSIDE")),
+            edge("pick", "unresolved:AmbiguousTarget", &site("TWICE")),
+            edge("pick", "TABLE", &site("TABLE")),
+        ],
+        "a path that names no one value keeps one row and one reason"
+    );
 }
