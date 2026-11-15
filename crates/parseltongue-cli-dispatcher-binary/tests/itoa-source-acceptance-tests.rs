@@ -734,6 +734,173 @@ fn test_buffer_clone_trait_unresolved() {
     );
 }
 
+/// The `implements` rows of one itoa run as (builtin source name if any,
+/// target node name if extracted, whether the site is in expanded text).
+fn read_itoa_implements_rows(
+    input: &HldMaterializationInputRecord,
+) -> Vec<(Option<String>, Option<String>, bool)> {
+    input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Implements)
+        .map(|edge| {
+            let source = match &edge.edge_source_reference {
+                HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)) => {
+                    Some(name.clone())
+                }
+                _ => None,
+            };
+            let target = match &edge.edge_resolution_value {
+                HldEdgeResolutionValue::Extracted { target } => input
+                    .input_node_records
+                    .iter()
+                    .find(|node| &node.node_target_reference == target)
+                    .map(|node| node.node_qualified_path_text.clone()),
+                _ => None,
+            };
+            let expanded = !edge
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key
+                .read_semantic_occurrence_parts()
+                .span_expansion_provenance_chain
+                .is_empty();
+            (source, target, expanded)
+        })
+        .collect()
+}
+
+/// REQ-RUST-047.0
+#[test]
+fn test_itoa_implements_row_counts() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let rows = read_itoa_implements_rows(&input);
+    let count = |name: &str| {
+        rows.iter()
+            .filter(|(_, target, _)| target.as_deref().is_some_and(|path| path.ends_with(name)))
+            .count()
+    };
+    assert_eq!(rows.len(), 32, "32 of itoa's 33 impl headers name a trait");
+    assert_eq!(
+        (count("Integer"), count("Sealed"), count("Unsigned")),
+        (12, 12, 5)
+    );
+    assert_eq!(
+        rows.iter()
+            .filter(|(_, target, _)| target.is_none())
+            .count(),
+        3,
+        "Buffer's three core traits"
+    );
+    let sources = rows
+        .iter()
+        .filter_map(|(source, _, _)| source.as_deref())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(sources.len(), 12, "the twelve builtin integer types");
+    for name in sources {
+        let nodes = input
+            .input_node_records
+            .iter()
+            .filter(|node| {
+                node.node_input_category == HldNodeInputCategory::Builtin
+                    && node.node_qualified_path_text == name
+            })
+            .count();
+        assert_eq!(nodes, 1, "{name}");
+    }
+}
+
+/// REQ-RUST-047.0
+#[test]
+fn test_implements_rows_read_twice() {
+    let (_directory, _root, database, input) = run_original_graph_fixture();
+    let read = |graph: &HldMaterializationInputRecord| {
+        graph
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Implements)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let again = store
+        .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
+        .unwrap();
+    let rows = read(&input);
+    assert_eq!(rows.len(), 32);
+    assert_eq!(rows, read(&again), "same rows in the same order");
+    assert_eq!(
+        rows.iter().collect::<std::collections::BTreeSet<_>>().len(),
+        32,
+        "no row is stored twice"
+    );
+}
+
+/// REQ-RUST-047.0
+#[test]
+fn test_macro_header_edge_provenance() {
+    let (_directory, _root, database, input) = run_original_graph_fixture();
+    let rows = read_itoa_implements_rows(&input);
+    let expanded = rows.iter().filter(|row| row.2).collect::<Vec<_>>();
+    assert_eq!(
+        expanded.len(),
+        28,
+        "28 impl headers come from macro expansion"
+    );
+    assert!(
+        expanded
+            .iter()
+            .all(|(source, target, _)| source.is_some() && target.is_some()),
+        "each joins a builtin to a trait of this crate"
+    );
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let mut sites = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Implements)
+        .filter_map(|edge| {
+            let site = edge
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key
+                .read_semantic_occurrence_parts();
+            let (start, end) = site.span_byte_range_value.read_source_range_pair();
+            let chain = site
+                .span_expansion_provenance_chain
+                .iter()
+                .map(|digest| digest.iter().map(|byte| format!("{byte:02x}")).collect())
+                .collect::<Vec<String>>();
+            (!chain.is_empty()).then(|| {
+                let headers = spans
+                    .iter()
+                    .filter(|span| {
+                        span["span_syntax_kind_value"] == "IMPL"
+                            && span["span_expansion_provenance_chain"] == json!(chain)
+                            && span["span_byte_start_offset"].as_u64().unwrap() <= start
+                            && end <= span["span_byte_end_offset"].as_u64().unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(headers.len(), 1, "one expanded impl holds the site");
+                let offset = headers[0]["span_byte_start_offset"].as_u64().unwrap();
+                let text = headers[0]["span_source_code_text"].as_str().unwrap();
+                assert!(text[..(start - offset) as usize].ends_with("impl "));
+                assert!(
+                    site.span_source_file_path
+                        .ends_with(&format!("macro-source/{}/expanded.rs", chain[0]))
+                );
+                text[(start - offset) as usize..(end - offset) as usize].replace(' ', "")
+            })
+        })
+        .collect::<Vec<_>>();
+    sites.sort();
+    sites.dedup_by(|left, right| left == right);
+    assert_eq!(
+        sites,
+        ["Integer", "Unsigned", "private::Sealed"],
+        "each site is the trait path in the expanded impl header"
+    );
+}
+
 /// REQ-RUST-047.0
 #[test]
 fn test_unsigned_impl_builtin_source() {
