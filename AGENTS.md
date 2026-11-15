@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Rules for any agent working in this repository. Read top to bottom: the answer first,
-then the three rules that follow from it, then reference facts.
+then the four rules that follow from it, then reference facts.
 
 ## The answer
 
@@ -96,6 +96,26 @@ cargo build --release --workspace --all-targets --all-features
 - **Stop.** Kill a run that exceeds 2× its expected wall time. After 3 failed attempts at one
   step, stop, log what was tried, and cut the step smaller.
 - **Log.** After each GREEN or REFACTOR commit, add a newest-first entry to the log: test names, exact command, pass/fail counts, commit, next target.
+
+## Rule 4 — Query codebase-memory at every step
+
+Use the skill `codebase-memory` (CLI `codebase-memory-mcp`, commands under Navigation aids)
+constantly, not once per part. grep and sed are for reading the lines the graph points to,
+and for text it does not hold: string literals, table names, JSON keys.
+
+- **Session start, and after any context reset:** `index_status`. Re-index if `indexed_at`
+  is older than the last code commit.
+- **Before changing a function:** `trace_path` on it in both directions, and read its
+  callers before changing what it returns.
+- **Before adding a function, type or module:** `search_graph` for one that already does
+  the job. Extend it instead of writing a parallel copy.
+- **After each code commit:** `index_repository`. The CLI index is not watched and never
+  refreshes itself.
+- **In each part file:** the design section names the callers and callees found and the
+  query that found them.
+- **Confirm in source.** Its call edges are matched by name and some are wrong. Check every
+  claim taken from it against the source lines before writing it down or acting on it
+  (Rule 1: navigation, not evidence).
 
 ## Reference
 
@@ -195,11 +215,12 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
 ```bash
 codebase-memory-mcp cli index_repository --repo_path /home/ubuntu/repos/parseltongue-rust-LLM-companion
 codebase-memory-mcp cli index_status   --project home-ubuntu-repos-parseltongue-rust-LLM-companion
-codebase-memory-mcp cli trace_path     --project home-ubuntu-repos-parseltongue-rust-LLM-companion --function-name <fn>
+codebase-memory-mcp cli trace_path     --project home-ubuntu-repos-parseltongue-rust-LLM-companion --function-name <fn> --direction both --depth 1
+codebase-memory-mcp cli search_graph   --project home-ubuntu-repos-parseltongue-rust-LLM-companion --label Function --name-pattern '.*<word>.*'
 codebase-memory-mcp cli query_graph    --project home-ubuntu-repos-parseltongue-rust-LLM-companion --query "<cypher>"
 clarity show crates --collapse
 clarity show <file> --reach both --depth 2
 ```
 
-Re-index after large changes. `search_graph --name_pattern` rejects inline regex flags such
-as `(?i)`.
+When to run them is Rule 4. Output is a tree by default; add `--format json` before parsing
+it. `search_graph --name-pattern` rejects inline regex flags such as `(?i)`.
