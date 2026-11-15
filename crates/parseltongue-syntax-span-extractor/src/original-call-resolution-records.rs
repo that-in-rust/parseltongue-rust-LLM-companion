@@ -499,6 +499,35 @@ fn find_cast_receiver_member<'a>(
     evidence["enclosing_impl_header_occurrence"] = enclosing
         .map(|header| header["impl_semantic_occurrence_key"].clone())
         .unwrap_or(Value::Null);
+    // Inline, so a reader need not open the impl header table to judge the row.
+    for (field, source) in [
+        (
+            "enclosing_impl_trait_identity",
+            "impl_trait_type_resolution",
+        ),
+        (
+            "enclosing_impl_self_type_identity",
+            "impl_self_type_resolution",
+        ),
+    ] {
+        evidence[field] = enclosing
+            .map(|header| header[source]["target_identity"].clone())
+            .unwrap_or(Value::Null);
+    }
+    for (field, source) in [
+        (
+            "enclosing_impl_trait_source_text",
+            "impl_trait_type_resolution",
+        ),
+        (
+            "enclosing_impl_self_type_source_text",
+            "impl_self_type_resolution",
+        ),
+    ] {
+        evidence[field] = enclosing
+            .map(|header| header[source]["type_source_evidence"]["type_source_text"].clone())
+            .unwrap_or(Value::Null);
+    }
     evidence["call_member_body_flag"] = receiver["receiver_member_body_flag"].clone();
     evidence["trait_scope_proof_kind"] = Value::Null;
     let Some((header, member)) = chosen else {

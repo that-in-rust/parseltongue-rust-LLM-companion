@@ -1,6 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-use super::original_call_resolution_tests::read_method_receiver_evidence;
+use super::original_call_resolution_tests::{
+    make_call_fixture_graph, make_call_fixture_occurrence, make_call_fixture_scope,
+    read_method_receiver_evidence,
+};
 use super::*;
+use crate::syntax_namespace_record_codec::encode_symbol_target_value;
 use ra_ap_syntax::{Edition, SourceFile};
 use serde_json::{Value, json};
 
@@ -145,6 +149,23 @@ fn test_cast_receiver_member_rules() {
             "{evidence}"
         );
         assert_eq!(member.is_some(), stopped.is_empty(), "{evidence}");
+        let held = site["site_owner_occurrence_key"] == "source isize write";
+        for field in [
+            "enclosing_impl_header_occurrence",
+            "enclosing_impl_self_type_identity",
+            "enclosing_impl_self_type_source_text",
+        ] {
+            assert_eq!(
+                evidence[field].is_null(),
+                !held || stopped == "cast_type_not_stored",
+                "{field} {evidence}"
+            );
+        }
+        if member.is_some() {
+            assert_eq!(evidence["enclosing_impl_trait_identity"], "T", "{evidence}");
+            assert_eq!(evidence["enclosing_impl_trait_source_text"], "T");
+            assert_eq!(evidence["enclosing_impl_self_type_source_text"], "isize");
+        }
         (
             member.map(|member| member["member_semantic_occurrence_key"].clone()),
             stopped,
@@ -217,11 +238,24 @@ fn test_cast_receiver_member_rules() {
         plain(vec![enclosing(), inherent]),
         stopped("cast_member_unproven", "single_member_unproven")
     );
-    let mut generic = target();
-    generic["impl_generic_parameters_flag"] = json!(true);
+    for flag in [
+        "impl_generic_parameters_flag",
+        "impl_negative_implementation_flag",
+    ] {
+        let mut other = target();
+        other[flag] = json!(true);
+        assert_eq!(
+            plain(vec![enclosing(), other]),
+            stopped("cast_member_unproven", "single_member_unproven"),
+            "{flag}"
+        );
+    }
+    // The call names the method as a raw identifier.
+    let mut raw_call = receiver.clone();
+    raw_call["method_declared_name_value"] = json!("r#write");
     assert_eq!(
-        plain(vec![enclosing(), generic]),
-        stopped("cast_member_unproven", "single_member_unproven")
+        found(vec![enclosing(), target()], &site, &raw_call, of("i64")),
+        chosen(single)
     );
     // The trait is not proven to be in scope at the call.
     let scope = |headers: Vec<Value>, site: &Value, receiver: &Value| {
@@ -244,4 +278,92 @@ fn test_cast_receiver_member_rules() {
     let mut nested = receiver.clone();
     nested["receiver_member_body_flag"] = json!(false);
     scope(vec![enclosing(), target()], &site, &nested);
+}
+
+const BY_CAST: &str = "struct Buffer; trait T { fn helper(self); fn caller(self); } \
+    impl T for Buffer { fn helper(self) {} fn caller(self) { (self as Buffer).helper(); } }";
+
+/// REQ-RUST-052.0 G13: the call producer, run on source text, gives
+/// `(self as Buffer).helper()` the `helper` of `impl T for Buffer` as target. When
+/// that member is not a graph node the row has no target and says so.
+#[test]
+fn test_cast_receiver_call_member() {
+    let run = |keep_member: bool| {
+        let (store, mut input) = make_call_fixture_graph(BY_CAST);
+        let occurrence = |text: &str| {
+            let start = BY_CAST.find(text).unwrap();
+            NameSymbolTargetKey::Definition(make_call_fixture_occurrence(
+                start as u64,
+                (start + text.len()) as u64,
+                text,
+            ))
+        };
+        let trait_target = occurrence("trait T { fn helper(self); fn caller(self); }");
+        let member = HldTargetIdentityValue::from(occurrence("fn helper(self) {}"));
+        // The impl header stage ran before the trait's lookup was stored: store its outcome.
+        let mut stored = 0;
+        for row in store
+            .rows
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .filter(|row| row.stage_owned_table_name == "impl-header-index-table")
+        {
+            let mut header: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            let resolution = &mut header["impl_trait_type_resolution"];
+            resolution["resolution_state_kind"] = json!("resolved");
+            resolution["target_identity"] = json!(encode_symbol_target_value(&trait_target));
+            row.stage_row_payload_text = header.to_string();
+            stored += 1;
+        }
+        assert_eq!(stored, 1, "one impl in the fixture");
+        assert!(
+            input
+                .input_node_records
+                .iter()
+                .any(|node| node.node_target_reference == member)
+        );
+        if !keep_member {
+            input
+                .input_node_records
+                .retain(|node| node.node_target_reference != member);
+        }
+        let edges = resolve_original_call_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+        let [edge] = edges.as_slice() else {
+            panic!("one call expected, found {}", edges.len());
+        };
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let record = &metadata["cast_receiver_lookup_evidence"];
+        assert_eq!(
+            record["member_lookup_outcome_kind"], "single_trait_impl_member",
+            "{metadata}"
+        );
+        assert_eq!(record["trait_scope_proof_kind"], "enclosing_impl_trait");
+        assert_eq!(record["enclosing_impl_self_type_source_text"], "Buffer");
+        (
+            matches!(&edge.edge_resolution_value,
+                HldEdgeResolutionValue::Extracted { target } if *target == member),
+            metadata["dispatch_kind"].as_str().unwrap().to_owned(),
+            metadata["unresolved_detail_kind"].clone(),
+        )
+    };
+    assert_eq!(
+        run(true),
+        (true, "cast_receiver_impl_method".to_owned(), Value::Null)
+    );
+    assert_eq!(
+        run(false),
+        (
+            false,
+            "undetermined".to_owned(),
+            json!("cast_member_not_node")
+        )
+    );
 }
