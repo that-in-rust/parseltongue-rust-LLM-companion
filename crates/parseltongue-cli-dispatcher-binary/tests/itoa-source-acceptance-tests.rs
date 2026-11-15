@@ -2291,8 +2291,8 @@ fn test_sysroot_reached_names_reasoned() {
             .filter(|row| row["path_resolution_state_kind"] == state)
             .count()
     };
-    assert_eq!(paths.len(), 202);
-    assert_eq!(count_state("resolved"), 164);
+    assert_eq!(paths.len(), 204);
+    assert_eq!(count_state("resolved"), 166);
     assert_eq!(count_state("ambiguous"), 0);
     let reasoned = paths
         .iter()
@@ -3426,6 +3426,7 @@ fn test_generated_body_call_rows() {
                         "callee_path_function",
                         "trait_path_method",
                         "trait_path_impl_method",
+                        "cast_receiver_impl_method",
                         "tuple_struct_constructor"
                     ]
                     .contains(&kind)
@@ -3460,9 +3461,11 @@ fn test_generated_body_call_rows() {
             // Rule G9: the callee path names one function of this crate.
             ("bare_name_call divmod100 -".to_owned(), 8),
             ("bare_name_call slice_buffer_to_str -".to_owned(), 10),
+            // Rule G13: the receiver is a cast to a stored type.
+            ("method_call method call -".to_owned(), 2),
             (
                 "method_call method call receiver_type_not_determined".to_owned(),
-                104
+                102
             ),
             // Rule G10: the trait's method declaration, named through the trait.
             ("qualified_path_call fmt -".to_owned(), 10),
@@ -3697,6 +3700,76 @@ fn test_trait_path_call_targets() {
                     .map(by_trait)
             )
             .chain(["DECIMAL_PAIRS | DecimalPairs | tuple_struct_constructor - null -".to_owned()])
+            .collect::<std::collections::BTreeSet<_>>()
+    );
+}
+
+/// REQ-RUST-052.0 G13: a method call whose receiver is a cast to a stored type
+/// (`(self as u64).write(buf)`) has the one stored impl member of that type as target,
+/// when it is a member of the trait whose impl holds the call. The row keeps the cast's
+/// type, the candidates and what was not read.
+#[test]
+fn test_cast_receiver_call_targets() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+            .replace("itoa::src/lib.rs::", "")
+    };
+    let mut found = std::collections::BTreeSet::<String>::new();
+    for edge in input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+    {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let receiver = &metadata["call_syntax_evidence"]["method_receiver_evidence"];
+        if receiver["receiver_shape_kind"] != "cast_expression" {
+            continue;
+        }
+        let caller = label(&edge.edge_source_reference);
+        let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
+            panic!("{caller} has a cast receiver call without a target: {metadata}");
+        };
+        let record = &metadata["cast_receiver_lookup_evidence"];
+        assert_eq!(
+            record["sources_not_read"].as_array().map(Vec::len),
+            Some(2),
+            "{metadata}"
+        );
+        assert!(
+            found.insert(format!(
+                "{caller} | {} | {} {} {} {}",
+                label(target),
+                metadata["dispatch_kind"].as_str().unwrap(),
+                receiver["receiver_cast_type_evidence"]["type_source_text"]
+                    .as_str()
+                    .unwrap(),
+                record["member_lookup_outcome_kind"].as_str().unwrap(),
+                // Expanded text is written with a space before `::`.
+                record["impl_trait_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .replace(' ', "")
+            )),
+            "{metadata}"
+        );
+    }
+    let row = |from: &str, to: &str| {
+        format!(
+            "<{from} as private::Sealed>::write | <{to} as private::Sealed>::write | \
+             cast_receiver_impl_method {to} single_trait_impl_member private::Sealed"
+        )
+    };
+    assert_eq!(
+        found,
+        [row("isize", "i64"), row("usize", "u64")]
+            .into_iter()
             .collect::<std::collections::BTreeSet<_>>()
     );
 }

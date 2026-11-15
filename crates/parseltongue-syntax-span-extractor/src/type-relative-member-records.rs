@@ -50,7 +50,12 @@ fn find_named_impl_member<'a>(header: &'a Value, name: &str) -> Option<&'a Value
     header["impl_member_occurrence_rows"]
         .as_array()?
         .iter()
-        .find(|member| member["member_declared_name_value"] == name)
+        .find(|member| {
+            member["member_declared_name_value"]
+                .as_str()
+                .map(|declared| declared.trim_start_matches("r#"))
+                == Some(name.trim_start_matches("r#"))
+        })
 }
 
 impl ImplMemberLookupIndex {

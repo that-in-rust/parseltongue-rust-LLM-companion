@@ -7,6 +7,7 @@ use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
+use crate::type_relative_member_records::ImplMemberLookupIndex;
 use crate::{SyntaxFileInputData, restore_source_byte_offset};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
@@ -23,6 +24,9 @@ use std::{
 #[cfg(test)]
 #[path = "callee-path-call-tests.rs"]
 mod callee_path_call_tests;
+#[cfg(test)]
+#[path = "cast-receiver-member-tests.rs"]
+mod cast_receiver_member_tests;
 #[cfg(test)]
 #[path = "original-call-resolution-tests.rs"]
 pub(crate) mod original_call_resolution_tests;
@@ -71,7 +75,13 @@ pub fn resolve_original_call_edges(
         .and_then(|row| row["workspace_source_root_path"].as_str())
         .unwrap_or("");
     let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
-    let headers = read_impl_stage_values(store, source_scope, "impl-header-index-table")?;
+    let members = ImplMemberLookupIndex {
+        impl_header_value_rows: read_impl_stage_values(
+            store,
+            source_scope,
+            "impl-header-index-table",
+        )?,
+    };
     let endpoints = input
         .input_node_records
         .iter()
@@ -91,7 +101,7 @@ pub fn resolve_original_call_edges(
         if let Some(edge) = build_original_call_edge(
             &site,
             &context,
-            &headers,
+            &members,
             &endpoints,
             &lookup,
             &origins,
@@ -108,7 +118,7 @@ pub fn resolve_original_call_edges(
 fn build_original_call_edge(
     site: &Value,
     context: &ImplHeaderSourceContext<'_>,
-    headers: &[Value],
+    members: &ImplMemberLookupIndex,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
     lookup: &BoundMethodLookupIndex,
     origins: &ExpandedTokenOriginIndex,
@@ -178,8 +188,21 @@ fn build_original_call_edge(
             field: "site_syntax_source_text",
         });
     }
+    let headers = members.impl_header_value_rows.as_slice();
     let syntax = &site["call_syntax_evidence"];
     let receiver_evidence = &syntax["method_receiver_evidence"];
+    let cast = (receiver_evidence["receiver_shape_kind"] == "cast_expression")
+        .then(|| {
+            resolve_cast_receiver_target(
+                site,
+                &evidence,
+                receiver_evidence,
+                context,
+                members,
+                endpoints,
+            )
+        })
+        .transpose()?;
     let bound = if receiver_evidence.is_null() {
         None
     } else {
@@ -200,6 +223,8 @@ fn build_original_call_edge(
     // The second value says what stopped the lookup of a row without a target.
     let (resolution, stopped) = if let Some((found, stopped)) = &callee.callee_path_row_decision {
         (found.clone(), *stopped)
+    } else if let Some(cast) = &cast {
+        cast.cast_receiver_row_decision.clone()
     } else if let Some((found, _)) = &bound {
         let stopped = match found {
             HldEdgeResolutionValue::Unresolved { reason } => match reason {
@@ -315,6 +340,7 @@ fn build_original_call_edge(
             (Some(_), _) if callee.callee_path_row_decision.is_some() => {
                 callee.callee_path_dispatch_kind
             }
+            (Some(_), _) if cast.is_some() => "cast_receiver_impl_method",
             (Some(_), Some(_)) => "generic_bound_trait_method",
             (Some(_), None) => "type_path_associated_function",
         },
@@ -336,6 +362,9 @@ fn build_original_call_edge(
     }
     if let Some(evidence) = bound_evidence {
         dispatch["bound_dispatch_evidence"] = evidence;
+    }
+    if let Some(cast) = cast {
+        dispatch["cast_receiver_lookup_evidence"] = cast.cast_receiver_lookup_evidence;
     }
     if let Some(evidence) = callee.callee_path_lookup_evidence {
         dispatch["callee_path_lookup_evidence"] = evidence;
@@ -360,6 +389,139 @@ fn build_original_call_edge(
         },
         edge_dispatch_metadata_text: Some(dispatch.to_string()),
     }))
+}
+
+/// What the stored rows say about `(x as T).method(..)`: the row's resolution, what
+/// stopped the lookup (empty with a target), and the record of what was looked at.
+#[derive(Debug)]
+struct CastReceiverLookupValue {
+    cast_receiver_row_decision: (HldEdgeResolutionValue, &'static str),
+    cast_receiver_lookup_evidence: Value,
+}
+
+/// REQ-RUST-052.0 G13: the target of a method call whose receiver is a cast to a
+/// stored type. The receiver's type is the cast's type, so no inference is needed.
+fn resolve_cast_receiver_target(
+    site: &Value,
+    span: &Value,
+    receiver: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+) -> Result<CastReceiverLookupValue, OriginalCallResolutionError> {
+    let cast_type = context.resolve_type(span, &receiver["receiver_cast_type_evidence"], false)?;
+    let (member, stopped, evidence) =
+        find_cast_receiver_member(site, receiver, &cast_type, members);
+    let stop = |reason, stopped, evidence| CastReceiverLookupValue {
+        cast_receiver_row_decision: (unresolved_call_target_value(reason), stopped),
+        cast_receiver_lookup_evidence: evidence,
+    };
+    let Some(member) = member else {
+        let reason = match cast_type["unresolved_reason_kind"].as_str() {
+            Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,
+            Some("external_source_missing") => HldUnresolvedReasonKind::ExternalSourceMissing,
+            _ => HldUnresolvedReasonKind::TraitSolverNeeded,
+        };
+        return Ok(stop(reason, stopped, evidence));
+    };
+    let target = HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(
+        decode_occurrence_identity_value(&member["member_semantic_occurrence_key"])?,
+    ));
+    Ok(if endpoints.contains(&target) {
+        CastReceiverLookupValue {
+            cast_receiver_row_decision: (HldEdgeResolutionValue::Extracted { target }, ""),
+            cast_receiver_lookup_evidence: evidence,
+        }
+    } else {
+        stop(
+            HldUnresolvedReasonKind::MissingTarget,
+            "cast_member_not_node",
+            evidence,
+        )
+    })
+}
+
+/// The impl member `(x as T).method(..)` runs, when the stored impl headers prove
+/// one; otherwise what stopped the lookup. The record of what was looked at is
+/// returned either way. `cast_type` is the stored resolution of `T`.
+///
+/// The member is the one stored impl member with that name among the impls of the
+/// type (and the impls whose type is not stored), when it takes `self` or `&self`
+/// in a trait impl, and that trait is the trait of the impl the call is written in.
+/// The last condition proves the trait is in scope: a trait is in scope inside its
+/// own impls. The call must be written directly in the member's body.
+fn find_cast_receiver_member<'a>(
+    site: &Value,
+    receiver: &Value,
+    cast_type: &Value,
+    members: &'a ImplMemberLookupIndex,
+) -> (Option<&'a Value>, &'static str, Value) {
+    let source = &receiver["receiver_cast_type_evidence"];
+    let lookup = source["type_source_text"]
+        .as_str()
+        .zip(receiver["method_declared_name_value"].as_str())
+        .and_then(|(text, method)| members.find_type_member_target(text, cast_type, method, "FN"));
+    let Some(lookup) = lookup else {
+        return (
+            None,
+            "cast_type_not_stored",
+            json!({"self_type_source_text":source["type_source_text"],
+                "member_lookup_outcome_kind":"cast_type_not_stored",
+                "cast_type_unresolved_reason":cast_type["unresolved_reason_kind"]}),
+        );
+    };
+    let headers = members.impl_header_value_rows.as_slice();
+    let holds = |header: &'a Value, field: &str, key: &Value| {
+        header["impl_member_occurrence_rows"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|member| member[field] == *key)
+    };
+    let trait_of = |header: &'a Value| {
+        let stored = &header["impl_trait_type_resolution"];
+        (stored["resolution_state_kind"] == "resolved").then_some(&stored["target_identity"])
+    };
+    let enclosing = headers.iter().find(|header| {
+        holds(
+            header,
+            "member_source_occurrence_key",
+            &site["site_owner_occurrence_key"],
+        )
+        .is_some()
+    });
+    let chosen = lookup.member_target_occurrence.and_then(|key| {
+        headers.iter().find_map(|header| {
+            holds(header, "member_semantic_occurrence_key", key).map(|member| (header, member))
+        })
+    });
+    let mut evidence = lookup.member_lookup_evidence;
+    evidence["enclosing_impl_header_occurrence"] = enclosing
+        .map(|header| header["impl_semantic_occurrence_key"].clone())
+        .unwrap_or(Value::Null);
+    evidence["call_member_body_flag"] = receiver["receiver_member_body_flag"].clone();
+    evidence["trait_scope_proof_kind"] = Value::Null;
+    let Some((header, member)) = chosen else {
+        return (None, "cast_member_unproven", evidence);
+    };
+    evidence["selected_member_occurrence_key"] = member["member_semantic_occurrence_key"].clone();
+    evidence["member_self_parameter_kind"] = member["member_self_parameter_kind"].clone();
+    if !matches!(
+        member["member_self_parameter_kind"].as_str(),
+        Some("value" | "reference")
+    ) {
+        return (None, "cast_member_not_method", evidence);
+    }
+    let in_scope = receiver["receiver_member_body_flag"] == true
+        && enclosing.is_some_and(|enclosing| {
+            enclosing["impl_function_body_ancestry_flag"] == false
+                && trait_of(enclosing).is_some_and(|named| Some(named) == trait_of(header))
+        });
+    if !in_scope {
+        return (None, "cast_trait_scope_unproven", evidence);
+    }
+    evidence["trait_scope_proof_kind"] = json!("enclosing_impl_trait");
+    (Some(member), "", evidence)
 }
 
 /// What the stored name lookup of a call's whole callee path says.
@@ -959,6 +1121,44 @@ fn resolve_inherent_member_target(
     })
 }
 
+/// The type a method call's receiver is cast to (`(x as T).m()`, through any
+/// parentheses), when the receiver is a cast.
+fn read_cast_receiver_type(call: &ast::MethodCallExpr) -> Option<ast::Type> {
+    let mut receiver = call.receiver()?;
+    while let ast::Expr::ParenExpr(inner) = &receiver {
+        receiver = inner.expr()?;
+    }
+    match receiver {
+        ast::Expr::CastExpr(cast) => cast.ty(),
+        _ => None,
+    }
+}
+
+/// The path of a type that is one path without generic arguments or a type anchor.
+fn read_simple_type_path(ty: &ast::Type) -> Option<ast::Path> {
+    ast::PathType::cast(ty.syntax().clone())
+        .and_then(|ty| ty.path())
+        .filter(|path| {
+            !path.syntax().descendants().any(|child| {
+                matches!(
+                    child.kind(),
+                    SyntaxKind::GENERIC_ARG_LIST | SyntaxKind::TYPE_ANCHOR
+                )
+            })
+        })
+}
+
+/// The whole path of the type a method call's receiver is cast to
+/// (REQ-RUST-052.0 G13) is submitted to the namespace engine as a Type request.
+pub(super) fn check_cast_receiver_type(path: &ast::Path) -> bool {
+    path.syntax()
+        .ancestors()
+        .find_map(ast::MethodCallExpr::cast)
+        .and_then(|call| read_cast_receiver_type(&call))
+        .and_then(|ty| read_simple_type_path(&ty))
+        .is_some_and(|whole| whole.syntax() == path.syntax())
+}
+
 /// The immediate qualifier of a path-expression callee is submitted to the
 /// existing namespace engine as a Type request, in the actual lexical scope.
 pub(super) fn check_body_call_prefix(path: &ast::Path) -> bool {
@@ -1063,8 +1263,8 @@ pub(super) fn extract_original_call_syntax(
     let shadowed = prefix
         .as_ref()
         .is_some_and(|prefix| check_call_lexical_shadowing(prefix, node));
-    let receiver =
-        ast::MethodCallExpr::cast(node.clone()).map(|call| extract_method_receiver_syntax(&call));
+    let receiver = ast::MethodCallExpr::cast(node.clone())
+        .map(|call| extract_method_receiver_syntax(&call, input, removed));
     let own_self = ast::CallExpr::cast(node.clone())
         .and_then(|call| ast::HasArgList::arg_list(&call))
         .and_then(|list| list.args().next())
@@ -1099,7 +1299,34 @@ pub(super) fn extract_original_call_syntax(
 /// Syntax-only evidence for `receiver.method(..)`. Nothing is resolved here:
 /// the record says whether the receiver is a plain parameter name, what type
 /// that parameter declares, and whether that type is a type parameter.
-fn extract_method_receiver_syntax(call: &ast::MethodCallExpr) -> Value {
+fn extract_method_receiver_syntax(
+    call: &ast::MethodCallExpr,
+    input: &SyntaxFileInputData,
+    removed: &[usize],
+) -> Value {
+    let cast_type = read_cast_receiver_type(call).map(|ty| {
+        let range = ty.syntax().text_range();
+        let start = restore_source_byte_offset(range.start(), removed);
+        let end = restore_source_byte_offset(range.end(), removed);
+        json!({"span_byte_start_offset":start, "span_byte_end_offset":end,
+            "type_source_text":input.file_source_content_bytes.get(start..end)
+                .and_then(|bytes| std::str::from_utf8(bytes).ok()),
+            "type_simple_path_flag":read_simple_type_path(&ty).is_some()})
+    });
+    // The call is written directly in the body of an impl member or a free function:
+    // its nearest item is a function that is not inside any block.
+    let member_body = call
+        .syntax()
+        .ancestors()
+        .find_map(ast::Item::cast)
+        .is_some_and(|item| {
+            matches!(item, ast::Item::Fn(_))
+                && !item
+                    .syntax()
+                    .ancestors()
+                    .skip(1)
+                    .any(|node| node.kind() == SyntaxKind::BLOCK_EXPR)
+        });
     let function = call.syntax().ancestors().find_map(ast::Fn::cast);
     let receiver = call
         .receiver()
@@ -1118,7 +1345,15 @@ fn extract_method_receiver_syntax(call: &ast::MethodCallExpr) -> Value {
         .zip(function.as_ref())
         .is_some_and(|(name, function)| check_receiver_name_rebound(function, call, name));
     json!({
-        "receiver_shape_kind":if parameter.is_some() {"parameter_identifier"} else {"other"},
+        "receiver_shape_kind":if parameter.is_some() {
+            "parameter_identifier"
+        } else if cast_type.is_some() {
+            "cast_expression"
+        } else {
+            "other"
+        },
+        "receiver_cast_type_evidence":cast_type,
+        "receiver_member_body_flag":member_body,
         "receiver_declared_name_value":receiver,
         "method_declared_name_value":call.name_ref().map(|name| name.text().trim_start_matches("r#").to_owned()),
         "method_generic_arguments_flag":call.generic_arg_list().is_some(),

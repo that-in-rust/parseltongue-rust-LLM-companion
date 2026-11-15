@@ -575,7 +575,7 @@ fn test_preserve_supplied_frozen_snapshot() {
     ));
 }
 
-fn read_method_receiver_evidence(source: &str, text: &str) -> Value {
+pub(super) fn read_method_receiver_evidence(source: &str, text: &str) -> Value {
     extract_file_syntax_rows(&make_call_syntax_input(source))
         .unwrap()
         .stage_unit_output_rows
@@ -607,6 +607,8 @@ fn test_capture_generic_receiver_evidence() {
             "receiver_parameter_type_text":"I",
             "receiver_generic_owner_kind":"function",
             "receiver_rebinding_flag":false,
+            "receiver_cast_type_evidence":null,
+            "receiver_member_body_flag":true,
         })
     );
 }
