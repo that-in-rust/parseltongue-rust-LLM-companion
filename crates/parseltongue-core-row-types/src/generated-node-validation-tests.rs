@@ -284,3 +284,75 @@ fn test_generates_edge_source_checked() {
         Err(HldMaterializationValidationError::InvalidGeneratingCall)
     );
 }
+
+/// An `expands` row from node `source` to node `target` of `input`, sited at node `site`.
+fn build_expands_edge_fixture(
+    input: &HldMaterializationInputRecord,
+    source: usize,
+    target: usize,
+    site: usize,
+) -> HldEdgeInputRecord {
+    let mut edge = build_generates_edge_fixture(input, source, site);
+    let target = input.input_node_records[target]
+        .node_target_reference
+        .clone();
+    edge.edge_relation_kind_value = HldRelationKindValue::Expands;
+    edge.edge_resolution_value = HldEdgeResolutionValue::Extracted {
+        target: target.clone(),
+    };
+    edge.edge_evidence_row_key.evidence_relation_kind_value = HldRelationKindValue::Expands;
+    edge.edge_evidence_row_key.evidence_target_reference_value = Some(target);
+    edge
+}
+
+/// The generated-node fixture plus one macro definition node (index 3) in `src/lib.rs`.
+fn build_macro_definition_fixture() -> HldMaterializationInputRecord {
+    let mut input = build_generated_node_fixture();
+    let mut definition = input.input_node_records[2].clone();
+    let unit = input.input_unit_provenance_records[0]
+        .unit_compilation_identity_key
+        .clone();
+    definition.node_target_reference =
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(
+            SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+                &unit,
+                "src/lib.rs",
+                SpanByteRangeValue::try_from((0, 9)).unwrap(),
+                SpanDigestIdValue::from([8; 32]),
+                &[],
+            )
+            .unwrap(),
+        ));
+    definition.node_item_kind_value = Some(HldItemKindValue::MacroDefinition);
+    definition.node_qualified_path_text = "fixture::src/lib.rs::m".into();
+    input.input_node_records.push(definition);
+    input
+}
+
+/// REQ-RUST-051.0 E9: call to definition, sited at the call, is accepted; a wrong source
+/// kind, a wrong target kind or a site that is not the call is rejected.
+#[test]
+fn test_expands_row_endpoint_kinds() {
+    let input = build_macro_definition_fixture();
+    let check = |edge: HldEdgeInputRecord| {
+        let mut input = input.clone();
+        input.input_edge_records.push(edge);
+        validate_full_graph_input(&input)
+    };
+    assert_eq!(check(build_expands_edge_fixture(&input, 2, 3, 2)), Ok(()));
+    for (source, target, site) in [(3, 3, 3), (2, 1, 2), (2, 2, 2), (2, 3, 3)] {
+        assert_eq!(
+            check(build_expands_edge_fixture(&input, source, target, site)),
+            Err(HldMaterializationValidationError::InvalidExpandsEdge),
+            "source {source}, target {target}, site {site}"
+        );
+    }
+    let mut unresolved = build_expands_edge_fixture(&input, 2, 3, 2);
+    unresolved.edge_resolution_value = HldEdgeResolutionValue::Unresolved {
+        reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+    };
+    unresolved
+        .edge_evidence_row_key
+        .evidence_target_reference_value = None;
+    assert_eq!(check(unresolved), Ok(()));
+}

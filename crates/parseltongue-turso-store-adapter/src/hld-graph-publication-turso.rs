@@ -581,6 +581,7 @@ fn encode_relation_kind_json(relation: HldRelationKindValue) -> &'static str {
         HldRelationKindValue::Contains => "Contains",
         HldRelationKindValue::Derives => "Derives",
         HldRelationKindValue::Generates => "Generates",
+        HldRelationKindValue::Expands => "Expands",
     }
 }
 

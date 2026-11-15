@@ -1465,6 +1465,7 @@ fn encode_relation_value(value: HldRelationKindValue) -> &'static str {
         HldRelationKindValue::Contains => "Contains",
         HldRelationKindValue::Derives => "Derives",
         HldRelationKindValue::Generates => "Generates",
+        HldRelationKindValue::Expands => "Expands",
     }
 }
 
@@ -1482,6 +1483,7 @@ fn decode_relation_value(value: &Value) -> Result<HldRelationKindValue, String> 
         "Contains" => Ok(HldRelationKindValue::Contains),
         "Derives" => Ok(HldRelationKindValue::Derives),
         "Generates" => Ok(HldRelationKindValue::Generates),
+        "Expands" => Ok(HldRelationKindValue::Expands),
         _ => Err("unknown HLD relation".into()),
     }
 }

@@ -1061,6 +1061,7 @@ fn read_hld_relation_kind(
         "contains" => Ok(HldRelationKindValue::Contains),
         "derives" => Ok(HldRelationKindValue::Derives),
         "generates" => Ok(HldRelationKindValue::Generates),
+        "expands" => Ok(HldRelationKindValue::Expands),
         _ => Err(read_hld_output_error("unknown relation kind")),
     }
 }
@@ -1285,6 +1286,7 @@ fn encode_hld_relation_kind(kind: HldRelationKindValue) -> &'static str {
         HldRelationKindValue::Contains => "contains",
         HldRelationKindValue::Derives => "derives",
         HldRelationKindValue::Generates => "generates",
+        HldRelationKindValue::Expands => "expands",
     }
 }
 

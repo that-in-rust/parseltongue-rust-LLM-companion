@@ -228,6 +228,9 @@ pub enum HldRelationKindValue {
     Derives,
     /// A macro call wrote this item: macro call node to generated item, sited at the call.
     Generates,
+    /// A macro call expands this definition: macro call node to macro definition node,
+    /// sited at the call.
+    Expands,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -429,6 +432,7 @@ pub enum HldMaterializationValidationError {
     StructuralScopeAllowsContainsOnly,
     UnknownReachability,
     InvalidGeneratingCall,
+    InvalidExpandsEdge,
 }
 
 impl std::fmt::Display for HldMaterializationValidationError {
@@ -453,6 +457,9 @@ impl std::fmt::Display for HldMaterializationValidationError {
             Self::InvalidEvidenceIdentity => "evidence-row identity does not match its relation",
             Self::InvalidGeneratingCall => {
                 "a generated node must name a macro call node; a source-written node names none"
+            }
+            Self::InvalidExpandsEdge => {
+                "an expands row goes from a macro call node to a macro definition node and is sited at the call"
             }
             Self::StructuralScopeAllowsContainsOnly => {
                 "original top-level scope allows only extracted contains edges"
@@ -713,6 +720,11 @@ fn validate_graph_input_records(
             ))
         {
             return Err(HldMaterializationValidationError::InvalidGeneratingCall);
+        }
+        if edge_record.edge_relation_kind_value == HldRelationKindValue::Expands
+            && !check_expands_edge_record(edge_record, source_record, &node_records)
+        {
+            return Err(HldMaterializationValidationError::InvalidExpandsEdge);
         }
         if input_record.source_coverage_kind == HldSourceCoverageKind::OriginalTopLevelContainment {
             let source_area = match &edge_record.edge_source_reference {
@@ -1083,4 +1095,30 @@ fn read_hld_target_path(target_reference: &HldTargetIdentityValue) -> Option<&st
             Some(file_area_identity.read_source_relative_path())
         }
     }
+}
+
+/// REQ-RUST-051.0 E9: an `expands` row starts at a macro call node, is sited at that call,
+/// and a target, when it has one, is a macro definition node.
+fn check_expands_edge_record(
+    edge_record: &HldEdgeInputRecord,
+    source_record: &HldNodeInputRecord,
+    node_records: &BTreeMap<HldTargetIdentityValue, &HldNodeInputRecord>,
+) -> bool {
+    let source_is_call =
+        source_record.node_item_kind_value == Some(HldItemKindValue::MacroInvocation);
+    let sited_at_call = matches!(
+        &edge_record.edge_source_reference,
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call))
+            if *call == edge_record.edge_evidence_row_key.evidence_site_occurrence_key
+    );
+    let target_is_definition = match &edge_record.edge_resolution_value {
+        HldEdgeResolutionValue::Extracted { target } => {
+            node_records.get(target).is_some_and(|target_record| {
+                target_record.node_item_kind_value == Some(HldItemKindValue::MacroDefinition)
+            })
+        }
+        HldEdgeResolutionValue::Unresolved { .. } => true,
+        HldEdgeResolutionValue::Inferred { .. } | HldEdgeResolutionValue::Proposed { .. } => false,
+    };
+    source_is_call && sited_at_call && target_is_definition
 }

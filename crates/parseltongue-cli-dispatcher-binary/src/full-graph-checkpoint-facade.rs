@@ -90,12 +90,13 @@ pub(crate) fn publish_full_graph_checkpoint(
             .count()
     };
     eprintln!(
-        "stage=full-item-dependency-graph nodes={} containment={} generates={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} reads={} reads_in_expanded_bodies={} imports={} imports_glob_skipped={} imports_in_expanded_items={} imports_without_source={} completeness=incomplete",
+        "stage=full-item-dependency-graph nodes={} containment={} generates={} expands={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} reads={} reads_in_expanded_bodies={} imports={} imports_glob_skipped={} imports_in_expanded_items={} imports_without_source={} completeness=incomplete",
         input.input_node_records.len(),
         count_structural_relation_rows(parseltongue_core_row_types::HldRelationKindValue::Contains),
         count_structural_relation_rows(
             parseltongue_core_row_types::HldRelationKindValue::Generates
         ),
+        count_structural_relation_rows(parseltongue_core_row_types::HldRelationKindValue::Expands),
         calls.len(),
         resolved,
         type_use_count,
