@@ -1482,8 +1482,10 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         }
         if let Some(path) = ast::Path::cast(node.clone())
             && (check_exported_signature_path(&path)
-                || super::original_call_resolution_records::check_body_call_prefix(&path))
+                || super::original_call_resolution_records::check_body_call_prefix(&path)
+                || super::body_value_read_records::check_body_value_path(&path))
         {
+            let body_value = super::body_value_read_records::check_body_value_path(&path);
             let body_prefix =
                 super::original_call_resolution_records::check_body_call_prefix(&path);
             let occurrence = self.build_source_occurrence_key(file, node)?;
@@ -1495,7 +1497,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     "site_source_range_start":restore_source_byte_offset(range.start(),&file.source_crlf_removed_offsets),
                     "site_source_range_end":restore_source_byte_offset(range.end(),&file.source_crlf_removed_offsets),
                     "path_site_source_text":read_original_node_source(node,file),
-                    "site_path_context_kind":if body_prefix {"body_call_type_prefix"} else if in_use {"import"} else {"signature"},
+                    "site_path_context_kind":if body_prefix {"body_call_type_prefix"} else if body_value {"body_value_path"} else if in_use {"import"} else {"signature"},
                     "site_expansion_provenance_chain":file.source_expansion_provenance_rows.iter().map(encode_digest_hex_value).collect::<Vec<_>>(),
                     "site_compilation_scope_record":self.build_compilation_scope_record(scope),
                 }));
@@ -1511,6 +1513,8 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     },
                     path_requested_namespace_kind: if body_prefix {
                         NameNamespaceFilterKind::Type
+                    } else if body_value {
+                        NameNamespaceFilterKind::Value
                     } else if in_use {
                         NameNamespaceFilterKind::Any
                     } else {

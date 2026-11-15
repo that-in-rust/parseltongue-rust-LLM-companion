@@ -2147,6 +2147,21 @@ fn test_sysroot_reached_names_reasoned() {
             .any(|row| row["path_site_source_text"] == "Buffer"
                 && row["path_resolution_state_kind"] == "resolved")
     );
+    // REQ-RUST-048.0: value paths in bodies are their own request kind, kept out of the
+    // signature and import totals below.
+    let (body_values, paths): (Vec<_>, Vec<_>) = paths
+        .into_iter()
+        .partition(|row| row["site_path_context_kind"] == "body_value_path");
+    let statics = body_values
+        .iter()
+        .filter(|row| row["path_site_source_text"] == "DECIMAL_PAIRS")
+        .collect::<Vec<_>>();
+    assert_eq!(statics.len(), 38, "14 in original bodies, 24 in expansions");
+    assert!(
+        statics
+            .iter()
+            .all(|row| row["path_resolution_state_kind"] == "resolved")
+    );
     let count_sites = |text: &str, reason: Value| {
         paths
             .iter()
