@@ -13,7 +13,8 @@ use serde_json::{Value, json};
 /// it. `site` is the text of the request's byte range, taken at its first
 /// occurrence after `after`. `state` is `resolved` (the target is
 /// `struct Buffer`), `resolved-elsewhere` (a target that is not a node),
-/// `ambiguous`, `unresolved`, or a stored reason.
+/// `ambiguous`, `unresolved`, `no-outcome` (no outcome row is stored), or a
+/// stored reason.
 struct ImportFixtureRequest {
     after: &'static str,
     site: &'static str,
@@ -112,6 +113,9 @@ fn make_import_fixture_graph(
             "unresolved" => ("unresolved", Value::Null, json!([])),
             reason => ("unresolved", json!(reason), json!([])),
         };
+        if request.state == "no-outcome" {
+            continue;
+        }
         extra.push(make_call_fixture_row(
             "import-resolution-site-records",
             json!({"import_site_occurrence_key":site,
@@ -290,13 +294,13 @@ fn test_grouped_import_two_rows() {
 /// has no node target.
 #[test]
 fn test_unresolved_import_keeps_reason() {
-    let source =
-        "struct Buffer; use a::One; use b::Two; use c::Three; use d::Four; fn caller() { loop {} }";
+    let source = "struct Buffer; use a::One; use b::Two; use c::Three; use d::Four; use e::Five; fn caller() { loop {} }";
     let states = [
         ("a::One", "resolved-elsewhere", "MissingTarget"),
         ("b::Two", "ambiguous", "AmbiguousTarget"),
         ("c::Three", "unresolved", "MissingTarget"),
         ("d::Four", "cfg_inactive", "CfgInactive"),
+        ("e::Five", "trait_solver_needed", "TraitSolverNeeded"),
     ];
     let requests = states.map(|(site, state, _)| ImportFixtureRequest {
         site,
@@ -304,7 +308,8 @@ fn test_unresolved_import_keeps_reason() {
             "a::One" => &["a", "One"],
             "b::Two" => &["b", "Two"],
             "c::Three" => &["c", "Three"],
-            _ => &["d", "Four"],
+            "d::Four" => &["d", "Four"],
+            _ => &["e", "Five"],
         },
         state,
         ..PLAIN
@@ -326,9 +331,10 @@ fn test_unresolved_import_keeps_reason() {
 
 /// REQ-RUST-049.0 R8 R9 R10: a signature request, a glob, a site in expanded
 /// text and a `use` in a function body give no row; the last three are counted.
+/// Two globs, so the glob count cannot be mistaken for another count.
 #[test]
 fn test_skipped_import_sites_counted() {
-    let source = "struct Buffer; use crate::Buffer; use core::mem::*; fn caller() { use crate::Buffer as Local; loop {} }";
+    let source = "struct Buffer; use crate::Buffer; use core::mem::*; use core::ptr::*; fn caller() { use crate::Buffer as Local; loop {} }";
     let (store, input) = make_import_fixture_graph(
         source,
         &[
@@ -342,6 +348,13 @@ fn test_skipped_import_sites_counted() {
             ImportFixtureRequest {
                 site: "core::mem::*",
                 segments: &["core", "mem"],
+                glob: true,
+                state: "external_source_missing",
+                ..PLAIN
+            },
+            ImportFixtureRequest {
+                site: "core::ptr::*",
+                segments: &["core", "ptr"],
                 glob: true,
                 state: "external_source_missing",
                 ..PLAIN
@@ -363,10 +376,11 @@ fn test_skipped_import_sites_counted() {
     );
     let (edges, skipped) = read_import_fixture_edges(source, &store, &input);
     assert_eq!(edges, []);
-    assert_eq!(skipped, [1, 1, 1]);
+    assert_eq!(skipped, [2, 1, 1]);
 }
 
-/// REQ-RUST-049.0: cancellation and a foreign scope are typed errors.
+/// REQ-RUST-049.0: cancellation, a foreign scope and an import whose outcome
+/// row is absent are typed errors.
 #[test]
 fn test_import_scope_cancel_errors() {
     let source = "struct Buffer; use crate::Buffer; fn caller() { loop {} }";
@@ -382,5 +396,25 @@ fn test_import_scope_cancel_errors() {
     assert!(matches!(
         resolve_use_import_edges(&store, &scope, &input, &RunCancelFlagValue::default()),
         Err(UseImportEdgeError::InvalidScope)
+    ));
+    let (store, input) = make_import_fixture_graph(
+        source,
+        &[ImportFixtureRequest {
+            site: "crate::Buffer",
+            segments: &["crate", "Buffer"],
+            state: "no-outcome",
+            ..PLAIN
+        }],
+    );
+    assert!(matches!(
+        resolve_use_import_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default()
+        ),
+        Err(UseImportEdgeError::InvalidEvidence {
+            field: "import_site_occurrence_key"
+        })
     ));
 }
