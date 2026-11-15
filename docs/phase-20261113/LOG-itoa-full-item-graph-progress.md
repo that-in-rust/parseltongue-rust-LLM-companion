@@ -15,8 +15,9 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5, macro-generated items as nodes, starting with one call,
-  `impl_Unsigned!(u8)`. Its part file is not written. Parts 4a to 4d are built.
+- **Next target:** part 5a step 1, the failing real-source test for one generated
+  `const _`. Part 5a is specified and waits for the user to confirm three rules (identity,
+  container, how a node names its generating call). Parts 4a to 4d are built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -34,7 +35,7 @@ step                                   state         measured or missing
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21, imports 4
-5  macro-generated items and bodies    NOT STARTED   45 of 73 expected nodes come from macros
+5  macro-generated items and bodies    5a SPECIFIED  45 of 73 expected nodes come from macros
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -97,6 +98,41 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 17:40 IST — Part 5a specified: macro-generated items as nodes
+
+**Part 5 is cut into five sub-parts and 5a is specified, no code. The store already holds
+all 45 generated items the expected graph has; one SQL filter keeps them out of the graph.**
+
+- **Measured** from the exported store of one release run at `499e04559`:
+  - `span-reference-text-table`: 148 rows, 93 from expanded text.
+  - Of the 93: 45 active non-impl items (17 `CONST`, 16 `FN`, 12 `TYPE_ALIAS`), 28 active
+    impl blocks, 20 spans under `#[cfg]` that is off.
+  - `macro-expanded-item-table`: 15 item-position calls expanded, 16 calls of `core`
+    macros unresolved (`external_source_missing`).
+  - Sites already stored in expanded text: 497 of 765 body sites, 108 of 168 signature
+    rows, 28 of 33 impl headers.
+- **Predicted, not measured:** 103 nodes and 88 `contains` rows after 5a.
+- **Sub-parts:** 5a nodes and containment; 5b labels; 5c `expands`; 5d generated bodies as
+  edge sources (reads, uses_type, calls); 5e the chain `write -> fmt -> div_rem_1e16 ->
+  mulhi`.
+- **Found while measuring, not fixed:** node path text does not tell nodes apart. All 15
+  macro calls read `itoa::src/lib.rs::MACRO_CALL`, and `Buffer::new` reads
+  `itoa::src/lib.rs::new`. Ten generated `write` functions would share one text. This is 5b.
+- **Second opinion (Rule 5):** GLM-5.3 through pi, max reasoning, read-only. Used: container
+  from the call site, smallest first slice, the cost of a `generates` edge against the
+  expected graph, the need for the definition range in part 7. Three of its claims were
+  wrong when checked (the `const _` wrapper, path-free unit key, relative stored path).
+  Record: `docs/devin-research/1794745800-second-opinion-glm-5-3-max-part-5-macro-items-design.md`.
+- **Codebase-memory queries:** `index_repository` (26,105 nodes); `search_graph` for
+  `.*(expanded_item|macro_item|generated_item|expansion_item|macro_expan).*` (13 functions,
+  none projects a generated item into the graph); `search_graph` for
+  `.*(original_item|item_node|node_input|inventory).*` (found
+  `build_original_item_identity`, `validate_original_graph_inventory`); `search_graph` for
+  `HldNodeInputRecord|build_original_item_identity|read_semantic_occurrence_parts`
+  (`HldNodeInputRecord` has 26 inbound references, which is the cost of adding a field).
+- **Blocked on the user:** rules R2 (identity), R3 (container), R5 (edge or field for the
+  generating call).
 
 ### 2026-11-15 16:50 IST — Part 4d built: `imports` from `use` items
 
