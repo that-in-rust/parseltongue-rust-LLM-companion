@@ -6,6 +6,7 @@ use crate::original_call_resolution_records::{
     BoundMethodLookupIndex, OriginalCallResolutionError, build_bound_method_index,
     walk_parameter_bound_traits,
 };
+use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
@@ -48,7 +49,8 @@ pub struct BodyReadEdgeSet {
 }
 
 /// One `reads` edge per value path in an original function body that names a
-/// `static` or `const` graph node. It joins rows that earlier stages stored
+/// `static` or `const` graph node, or that name resolution left without one
+/// target. It joins rows that earlier stages stored
 /// and never looks a name up itself. The caller supplies the frozen source
 /// scope of `input`.
 pub fn resolve_body_read_edges(
@@ -167,12 +169,102 @@ fn read_type_relative_prefix(text: &str) -> Option<&str> {
     .then_some(prefix)
 }
 
-/// The `reads` edge of one original path expression, when its owner is a
-/// graph node and `request` resolved to one `static` or `const` graph node.
-/// A const declared in a function body is not a node, so it gives no edge.
-/// A path through a type parameter of the owner gives an edge only when the
-/// target is a member of a trait the parameter is bound by; the edge then
-/// names the bounds walked and each bound trait whose source was not read.
+/// How one stored value-path resolution becomes a `reads` edge: the edge's
+/// resolution and its metadata. `None` when the path names something that is
+/// not a `static` or `const` graph node, such as a function, a const generic
+/// parameter or a const declared in a function body.
+///
+/// A path left unresolved or ambiguous keeps one reason. A path through a type
+/// parameter of the owner has a target only when the target is a member of a
+/// trait the parameter is bound by; the metadata then names the bounds walked
+/// and each bound trait whose source was not read.
+fn resolve_read_path_target(
+    site: &Value,
+    request: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    lookup: &BoundMethodLookupIndex,
+    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+) -> Result<Option<(HldEdgeResolutionValue, Value)>, BodyReadEdgeError> {
+    let text = read_site_text_field(site, "site_syntax_source_text")?;
+    let describe = |kind: Option<&str>, bound: Value| {
+        json!({
+            "read_kind":"body_value_path",
+            "read_source_text":text,
+            "read_target_symbol_kind":kind,
+            "bound_read_evidence":bound
+        })
+    };
+    let unresolved = |reason| {
+        Ok(Some((
+            HldEdgeResolutionValue::Unresolved { reason },
+            describe(None, Value::Null),
+        )))
+    };
+    let targets = request["path_target_symbol_rows"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let symbol = match (request["path_resolution_state_kind"].as_str(), targets) {
+        (Some("resolved"), [symbol]) => symbol,
+        (Some("ambiguous"), _) | (_, [_, _, ..]) => {
+            return unresolved(HldUnresolvedReasonKind::AmbiguousTarget);
+        }
+        _ => {
+            return unresolved(read_stored_reason_kind(
+                &request["path_unresolved_reason_kind"],
+            ));
+        }
+    };
+    let kind = symbol["target_symbol_kind_value"].as_str();
+    if !matches!(kind, Some("Static" | "Const")) {
+        return Ok(None);
+    }
+    let Some(target) = context
+        .read_single_target_identity(symbol)?
+        .map(|identity| decode_symbol_target_value(&identity))
+        .transpose()?
+        .map(HldTargetIdentityValue::from)
+        .filter(|target| endpoints.contains(target))
+    else {
+        return Ok(None);
+    };
+    let walk = read_type_relative_prefix(text)
+        .map(|prefix| {
+            walk_parameter_bound_traits(
+                read_site_text_field(site, "site_owner_occurrence_key")?,
+                prefix,
+                context,
+                lookup,
+            )
+            .map_err(BodyReadEdgeError::from)
+        })
+        .transpose()?;
+    let bound = match walk {
+        // A bound in a form the walk cannot prove.
+        Some(None) => return unresolved(HldUnresolvedReasonKind::TraitSolverNeeded),
+        Some(Some(walk))
+            if !walk.bound_trait_targets.is_empty() || !walk.missing_source_traits.is_empty() =>
+        {
+            let member = walk.bound_trait_targets.iter().any(|found| {
+                lookup
+                    .contained_item_pairs
+                    .contains(&(found.clone(), target.clone()))
+            });
+            if !member {
+                return unresolved(HldUnresolvedReasonKind::TraitSolverNeeded);
+            }
+            walk.build_walk_evidence_value()
+        }
+        _ => Value::Null,
+    };
+    Ok(Some((
+        HldEdgeResolutionValue::Extracted { target },
+        describe(kind, bound),
+    )))
+}
+
+/// The `reads` edge of one original path expression whose owner is a graph
+/// node, with or without a target.
 fn build_body_read_edge(
     site: &Value,
     request: &Value,
@@ -189,77 +281,30 @@ fn build_body_read_edge(
         decode_occurrence_identity_value(&context.occurrence(owner)?)?,
     )
     .into();
-    let symbol = match (
-        request["path_resolution_state_kind"].as_str(),
-        request["path_target_symbol_rows"]
-            .as_array()
-            .map(Vec::as_slice),
-    ) {
-        (Some("resolved"), Some([symbol])) => symbol,
-        _ => return Ok(None),
-    };
-    let kind = symbol["target_symbol_kind_value"].as_str();
-    if !endpoints.contains(&source) || !matches!(kind, Some("Static" | "Const")) {
+    if !endpoints.contains(&source) {
         return Ok(None);
     }
-    let Some(target) = context
-        .read_single_target_identity(symbol)?
-        .map(|identity| decode_symbol_target_value(&identity))
-        .transpose()?
-        .map(HldTargetIdentityValue::from)
-        .filter(|target| endpoints.contains(target))
+    let Some((resolution, metadata)) =
+        resolve_read_path_target(site, request, context, lookup, endpoints)?
     else {
         return Ok(None);
     };
-    let walk = read_type_relative_prefix(read_site_text_field(site, "site_syntax_source_text")?)
-        .map(|prefix| {
-            walk_parameter_bound_traits(
-                read_site_text_field(site, "site_owner_occurrence_key")?,
-                prefix,
-                context,
-                lookup,
-            )
-            .map_err(BodyReadEdgeError::from)
-        })
-        .transpose()?;
-    let bound = match walk {
-        // A bound in a form the walk cannot prove: no edge.
-        Some(None) => return Ok(None),
-        Some(Some(walk))
-            if !walk.bound_trait_targets.is_empty() || !walk.missing_source_traits.is_empty() =>
-        {
-            let member = walk.bound_trait_targets.iter().any(|found| {
-                lookup
-                    .contained_item_pairs
-                    .contains(&(found.clone(), target.clone()))
-            });
-            if !member {
-                return Ok(None);
-            }
-            walk.build_walk_evidence_value()
-        }
-        _ => Value::Null,
-    };
     let evidence = build_site_evidence_value(site)?;
     let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
-    let metadata = json!({
-        "read_kind":"body_value_path",
-        "read_source_text":site["site_syntax_source_text"],
-        "read_target_symbol_kind":kind,
-        "bound_read_evidence":bound
-    });
+    let target = match &resolution {
+        HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
+        _ => None,
+    };
     Ok(Some(HldEdgeInputRecord {
         run_generation_digest_value: generation,
         edge_source_reference: source.clone(),
         edge_relation_kind_value: HldRelationKindValue::Reads,
-        edge_resolution_value: HldEdgeResolutionValue::Extracted {
-            target: target.clone(),
-        },
+        edge_resolution_value: resolution,
         edge_evidence_row_key: HldEvidenceRowKey {
             evidence_site_occurrence_key: occurrence,
             evidence_source_occurrence_key: source,
             evidence_relation_kind_value: HldRelationKindValue::Reads,
-            evidence_target_reference_value: Some(target),
+            evidence_target_reference_value: target,
         },
         edge_dispatch_metadata_text: Some(metadata.to_string()),
     }))
