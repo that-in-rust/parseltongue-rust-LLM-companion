@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Rules for any agent working in this repository. Read top to bottom: the answer first,
-then the five rules that follow from it, then reference facts.
+then the six rules that follow from it, then reference facts.
 
 ## The answer
 
@@ -156,19 +156,6 @@ Two limits:
   claim taken from it against the source lines before writing it down or acting on it
   (Rule 1: navigation, not evidence).
 
-## Rule 6 — An open graph design choice goes to the form with the most information
-
-- The user's rule (2026-11-15): "our intention should be to provide maximum information which
-  helps the coding agent code better."
-- When a choice about what the graph stores is open, pick the form that tells a coding agent
-  reading the graph the most (a named target over an unresolved one, an edge and a field
-  over either alone, a node over a hidden record). Do not ask the user again for this kind
-  of choice.
-- Record each such choice as decided in the PRD ("Decisions in force") and the backlog in the
-  same commit, with its date and what it costs in rows.
-- More information never means a guessed fact (Rule 1). A name is stored only as far as the
-  source proves it.
-
 ## Rule 5 — Get a second opinion before a design decision
 
 GLM-5.3 on the Z.ai Coding Plan is a second reader with no stake in the current plan. Use it
@@ -205,6 +192,19 @@ at its maximum setting, read-only, and treat what it says as claims to check.
 
 Setup, quota and settings: [second-opinion SOP](docs/devin-research/sop/SOP-zai-glm-coding-plan-second-opinion.md).
 Latest review: [2026-11-15](docs/devin-research/1794719045-second-opinion-glm-5-3-max-two-harness-review-of-itoa-open-questions.md).
+
+## Rule 6 — An open graph design choice goes to the form with the most information
+
+- The user's rule (2026-11-15): "our intention should be to provide maximum information which
+  helps the coding agent code better."
+- When a choice about what the graph stores is open, pick the form that tells a coding agent
+  reading the graph the most (a named target over an unresolved one, an edge and a field
+  over either alone, a node over a hidden record). Do not ask the user again for this kind
+  of choice.
+- Record each such choice as decided in the PRD ("Decisions in force") and the backlog in the
+  same commit, with its date and what it costs in rows.
+- More information never means a guessed fact (Rule 1). A name is stored only as far as the
+  source proves it.
 
 ## Reference
 
