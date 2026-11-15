@@ -244,6 +244,7 @@ fn resolve_import_outcome_targets(
                 None => HldUnresolvedReasonKind::MissingTarget,
                 Some("external_source_missing") => HldUnresolvedReasonKind::ExternalSourceMissing,
                 Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,
+                Some("trait_solver_needed") => HldUnresolvedReasonKind::TraitSolverNeeded,
                 Some(_) => HldUnresolvedReasonKind::Other,
             });
         }
