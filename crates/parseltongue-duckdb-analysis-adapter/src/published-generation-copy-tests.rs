@@ -453,6 +453,111 @@ fn final_namespace_products_contract() {
     );
 }
 
+/// REQ-RUST-049.0 R1
+#[test]
+fn test_import_outcome_rows_written() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    let mut source = namespace_source_fixture();
+    let graph = &mut source
+        .records
+        .get_mut("crate-dependency-graph-table")
+        .unwrap()[0];
+    let mut value: serde_json::Value = serde_json::from_str(&graph.stage_row_payload_text).unwrap();
+    value[parseltongue_core_row_types::MAPPED_TARGET_FLAG_FIELD] = json!(true);
+    graph.stage_row_payload_text = value.to_string();
+    let scope_row: serde_json::Value = serde_json::from_str(
+        &source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text,
+    )
+    .unwrap();
+    let imports = [
+        ("local", vec!["Item"]),
+        ("sysroot", vec!["core", "mem"]),
+        ("absent", vec!["missing", "Thing"]),
+    ];
+    let mut import_rows = imports
+        .iter()
+        .map(|(site, segments)| {
+            let text = json!({
+                "import_site_occurrence_key": {"site": site},
+                "import_lexical_scope_key": scope_row["scope_module_identity_key"],
+                "import_path_segment_rows": segments
+                    .iter()
+                    .map(|name| json!({"kind": "name", "name": name}))
+                    .collect::<Vec<_>>(),
+                "import_binding_alias_text": null,
+                "import_glob_expansion_flag": false,
+                "import_visibility_scope_kind": {"visibility_scope_kind_value": "public"},
+                "import_resolution_source_kind": "Import",
+            })
+            .to_string();
+            StageTableRowRecord {
+                stage_owned_table_name: "syntax-namespace-input-imports".into(),
+                stage_row_record_key: blake3::hash(text.as_bytes()).to_hex().to_string(),
+                stage_row_payload_text: text,
+            }
+        })
+        .collect::<Vec<_>>();
+    import_rows.sort_by(|left, right| left.stage_row_record_key.cmp(&right.stage_row_record_key));
+    source
+        .records
+        .insert("syntax-namespace-input-imports".into(), import_rows);
+    store
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    store
+        .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    let mut rows = BTreeMap::new();
+    store
+        .visit_frozen_namespace_products(&scope(), &mut |row| {
+            if row.stage_owned_table_name == "import-resolution-site-records" {
+                let value: serde_json::Value =
+                    serde_json::from_str(&row.stage_row_payload_text).unwrap();
+                rows.insert(
+                    value["import_site_occurrence_key"]["site"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned(),
+                    (
+                        value["import_resolution_state_kind"].clone(),
+                        value["import_unresolved_reason_kind"].clone(),
+                        value["import_target_symbol_rows"]
+                            .as_array()
+                            .map_or(usize::MAX, Vec::len),
+                    ),
+                );
+            }
+            Ok(())
+        })
+        .unwrap();
+    let expected = [
+        ("absent", ("unresolved", serde_json::Value::Null, 0)),
+        ("local", ("resolved", serde_json::Value::Null, 1)),
+        (
+            "sysroot",
+            ("unresolved", json!("external_source_missing"), 0),
+        ),
+    ]
+    .into_iter()
+    .map(|(site, (state, reason, targets))| (site.to_owned(), (json!(state), reason, targets)))
+    .collect::<BTreeMap<_, _>>();
+    assert_eq!(rows, expected);
+}
+
 #[test]
 fn disposable_namespace_cache_lifetime() {
     let directory = tempfile::tempdir().unwrap();

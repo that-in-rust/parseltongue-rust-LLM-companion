@@ -20,10 +20,11 @@ use std::{
 
 const NAMESPACE_OUTPUT_BATCH_BYTES: usize = 8 * 1024 * 1024;
 const NAMESPACE_RECEIPT_TABLE_NAME: &str = "analysis-resolution-receipt-records";
-const NAMESPACE_PRODUCT_TABLE_NAMES: [&str; 3] = [
+const NAMESPACE_PRODUCT_TABLE_NAMES: [&str; 4] = [
     "name-resolution-scope-records",
     "module-scope-binding-table",
     "path-resolution-site-records",
+    "import-resolution-site-records",
 ];
 
 fn read_stage_table_values(

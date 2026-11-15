@@ -35,13 +35,16 @@ type TargetNamespaceGroups = BTreeMap<String, (Value, BTreeSet<String>)>;
 #[derive(Default)]
 struct PathNamespaceProduct {
     key: String,
-    value: Value,
+    /// The path metadata of the request; absent for a request made only by an import.
+    value: Option<Value>,
     resolved: TargetNamespaceGroups,
     candidates: TargetNamespaceGroups,
     ambiguous: bool,
     reason: Option<String>,
     /// REQ-RUST-038.0: set when the path starts at a sysroot crate with no unit in this generation.
     absent_sysroot_reason: Option<String>,
+    /// REQ-RUST-049.0 R1: the request key is an import request; its outcome is also an import row.
+    import: Option<Value>,
 }
 
 fn grouped_targets(groups: TargetNamespaceGroups) -> Vec<Value> {
@@ -54,24 +57,57 @@ fn grouped_targets(groups: TargetNamespaceGroups) -> Vec<Value> {
         .collect()
 }
 
+/// One outcome row: the base value plus the four outcome fields under one field prefix.
+fn build_outcome_row_value(
+    mut value: Value,
+    prefix: &str,
+    outcome: &(&str, Vec<Value>, Vec<Value>, Option<String>),
+) -> Value {
+    value[format!("{prefix}_resolution_state_kind")] = json!(outcome.0);
+    value[format!("{prefix}_target_symbol_rows")] = json!(outcome.1);
+    value[format!("{prefix}_candidate_target_rows")] = json!(outcome.2);
+    value[format!("{prefix}_unresolved_reason_kind")] = json!(outcome.3);
+    value
+}
+
 impl PathNamespaceProduct {
-    fn finish(self) -> Value {
-        let mut value = self.value;
+    /// The rows of this request: its path row when it has path metadata, and its import row
+    /// when the request key is an import request (REQ-RUST-049.0 R1).
+    fn finish(self) -> Vec<(&'static str, Value)> {
         let reason = self.reason.or_else(|| {
             self.absent_sysroot_reason
                 .filter(|_| !self.ambiguous && self.resolved.is_empty())
         });
-        value["path_resolution_state_kind"] = json!(if self.ambiguous {
+        let state = if self.ambiguous {
             "ambiguous"
         } else if self.resolved.is_empty() {
             "unresolved"
         } else {
             "resolved"
+        };
+        let outcome = (
+            state,
+            grouped_targets(self.resolved),
+            grouped_targets(self.candidates),
+            reason,
+        );
+        let path = self.value.map(|value| {
+            (
+                "path-resolution-site-records",
+                build_outcome_row_value(value, "path", &outcome),
+            )
         });
-        value["path_target_symbol_rows"] = json!(grouped_targets(self.resolved));
-        value["path_candidate_target_rows"] = json!(grouped_targets(self.candidates));
-        value["path_unresolved_reason_kind"] = json!(reason);
-        value
+        let import = self.import.map(|site| {
+            (
+                "import-resolution-site-records",
+                build_outcome_row_value(
+                    json!({ "import_site_occurrence_key": site }),
+                    "import",
+                    &outcome,
+                ),
+            )
+        });
+        path.into_iter().chain(import).collect()
     }
 }
 
@@ -177,16 +213,30 @@ impl DuckdbAnalysisStoreAdapter {
                 let key: String = row.get(0).map_err(build_analysis_error)?;
                 if key != current.key {
                     if !current.key.is_empty() {
-                        emit(
-                            "path-resolution-site-records",
-                            std::mem::take(&mut current).finish(),
-                        )?;
+                        for (table, value) in std::mem::take(&mut current).finish() {
+                            emit(table, value)?;
+                        }
+                    }
+                    let import = row
+                        .get::<_, bool>(7)
+                        .map_err(build_analysis_error)?
+                        .then(|| parse(&key))
+                        .transpose()?;
+                    let value = row
+                        .get::<_, Option<String>>(1)
+                        .map_err(build_analysis_error)?
+                        .as_deref()
+                        .map(parse)
+                        .transpose()?;
+                    if value.is_none() && import.is_none() {
+                        return Err(build_analysis_error("path metadata absent"));
                     }
                     current = PathNamespaceProduct {
                         key,
-                        value: parse(&row.get::<_, String>(1).map_err(build_analysis_error)?)?,
+                        value,
                         reason: row.get(2).map_err(build_analysis_error)?,
                         absent_sysroot_reason: row.get(6).map_err(build_analysis_error)?,
+                        import,
                         ..Default::default()
                     };
                 }
@@ -213,7 +263,9 @@ impl DuckdbAnalysisStoreAdapter {
                 }
             }
             if !current.key.is_empty() {
-                emit("path-resolution-site-records", current.finish())?;
+                for (table, value) in current.finish() {
+                    emit(table, value)?;
+                }
             }
         }
         Ok(count)

@@ -684,6 +684,7 @@ fn assert_receipt_product_rows(
         "name-resolution-scope-records",
         "module-scope-binding-table",
         "path-resolution-site-records",
+        "import-resolution-site-records",
     ];
     let proofs = receipt["analysis_product_content_proofs"]
         .as_object()

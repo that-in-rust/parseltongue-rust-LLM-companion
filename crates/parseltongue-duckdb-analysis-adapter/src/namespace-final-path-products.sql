@@ -62,9 +62,11 @@ SELECT DISTINCT r.request_key,p.metadata,r.unavailable_reason,c.state,m.metadata
         WHERE d.generation_key=r.generation_key AND d.attempt_key=r.attempt_key
             AND d.scope_key=r.extern_scope AND d.name=h.segment_text AND d.namespace='type'))
         OR x.request_key IS NOT NULL
-        THEN 'external_source_missing' END AS absent_sysroot_reason
+        THEN 'external_source_missing' END AS absent_sysroot_reason,
+    -- REQ-RUST-049.0 R1: the request key is an import request; its outcome is also one import row.
+    i.request_key IS NOT NULL AS import_request_flag
 FROM "namespace-path-source-requests" r
-JOIN "namespace-path-metadata-records" p USING(generation_key,attempt_key,request_key)
+LEFT JOIN "namespace-path-metadata-records" p USING(generation_key,attempt_key,request_key)
 JOIN "namespace-scope-context-records" s ON s.generation_key=r.generation_key AND s.attempt_key=r.attempt_key AND s.scope_key=r.scope_key
 JOIN "namespace-mapped-output-contexts" u ON u.generation_key=s.generation_key AND u.attempt_key=s.attempt_key AND u.unit_key=s.unit_key
 LEFT JOIN "namespace-path-candidate-records" c ON c.generation_key=r.generation_key AND c.attempt_key=r.attempt_key AND c.request_key=r.request_key
@@ -75,4 +77,7 @@ LEFT JOIN "namespace-path-segment-records" h ON h.generation_key=r.generation_ke
     AND h.position=CASE WHEN g.request_key IS NULL THEN 0 ELSE 1 END AND h.segment_kind='name'
     AND h.segment_text IN ('core','alloc','std','proc_macro','test')
 LEFT JOIN "absent-sysroot-name-requests" x ON x.generation_key=r.generation_key AND x.attempt_key=r.attempt_key AND x.request_key=r.request_key
+LEFT JOIN (SELECT DISTINCT generation_key,attempt_key,request_key FROM "namespace-import-request-records") i
+    ON i.generation_key=r.generation_key AND i.attempt_key=r.attempt_key AND i.request_key=r.request_key
+WHERE p.metadata IS NOT NULL OR i.request_key IS NOT NULL
 ORDER BY r.request_key,p.metadata,r.unavailable_reason NULLS FIRST,c.state NULLS FIRST,m.metadata NULLS FIRST,c.namespace NULLS FIRST
