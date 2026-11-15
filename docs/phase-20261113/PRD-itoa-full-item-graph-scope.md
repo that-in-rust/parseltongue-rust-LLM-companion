@@ -178,7 +178,10 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   - Generating call: named twice, as a field on the node and as a `generates` edge from
     the call node to the item (itoa: 45 rows). `generates` is a new relation kind.
   - A macro call points to the definition it expands by an `expands` edge (itoa: 15 rows).
-  - None of this is built yet; it is part 5.
+  - Built (part 5a): identity, container, and the generating call in both forms, for a
+    macro call written in a source file. A macro call written by another macro is not a
+    node yet; a run that meets one stops with a typed error and guesses nothing.
+  - Not built: `expands`.
 
 ### Open
 

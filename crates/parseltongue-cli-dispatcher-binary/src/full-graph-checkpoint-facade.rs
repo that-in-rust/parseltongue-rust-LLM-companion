@@ -82,10 +82,20 @@ pub(crate) fn publish_full_graph_checkpoint(
         .input_node_records
         .extend(parseltongue_syntax_span_extractor::collect_builtin_endpoint_nodes(&semantic));
     input.input_node_records.sort();
+    let count_structural_relation_rows = |relation| {
+        input
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == relation)
+            .count()
+    };
     eprintln!(
-        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} reads={} reads_in_expanded_bodies={} imports={} imports_glob_skipped={} imports_in_expanded_items={} imports_without_source={} completeness=incomplete",
+        "stage=full-item-dependency-graph nodes={} containment={} generates={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} reads={} reads_in_expanded_bodies={} imports={} imports_glob_skipped={} imports_in_expanded_items={} imports_without_source={} completeness=incomplete",
         input.input_node_records.len(),
-        input.input_edge_records.len(),
+        count_structural_relation_rows(parseltongue_core_row_types::HldRelationKindValue::Contains),
+        count_structural_relation_rows(
+            parseltongue_core_row_types::HldRelationKindValue::Generates
+        ),
         calls.len(),
         resolved,
         type_use_count,

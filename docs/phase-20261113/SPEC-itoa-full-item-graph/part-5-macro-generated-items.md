@@ -1,6 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
-**State: SPECIFIED for 5a, no code. Rules R2, R3 and R5 decided by the user on 2026-11-15
+**State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
+5b to 5e are not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
 ## The answer
@@ -20,8 +21,12 @@ of the graph. Part 5 lets them in, in five sub-parts, starting with nodes and co
     `.parseltongue/macro-source/<call digest>/expanded.rs`, its byte range in the expanded
     text, its kind, and the chain of call digests.
   - The filter is `original-item-graph-projection.sql` line 11 (chain length = 0).
-- **Predicted, not measured:** after 5a, 103 nodes (58 + 45), 88 `contains` rows
-  (43 + 45) and 45 `generates` rows; 285 edges in all (195 + 90).
+- **Measured after 5a** at commit `bbdb98524` (3 release runs): 103 nodes, 88 `contains`
+  rows, 45 `generates` rows, 285 edges in all. The prediction was the same.
+  - 11 of the 15 expanded calls write an active item: five `impl_Integer!` (7 each), two
+    `impl_Integer_size!` (3 each), four `impl_Unsigned!` (1 each). The other four
+    `impl_Integer_size!` calls write only items under a `#[cfg]` that is off.
+  - All 15 expanded calls are one level deep. itoa has no nested expansion.
 - **What the expected graph has for these items:** 45 `contains` rows, and 202 edges that
   start at a generated item (80 `calls`, 66 `uses_type`, 56 `reads`). 4 more end at one.
 
@@ -29,8 +34,8 @@ of the graph. Part 5 lets them in, in five sub-parts, starting with nodes and co
 
 ```text
 part  target                                              rows on itoa (predicted)   state
-5a    generated items as nodes, contained, with their     45 nodes, 45 contains      SPECIFIED
-      generating call
+5a    generated items as nodes, contained, with their     45 nodes, 45 contains,     BUILT (measured)
+      generating call                                     45 generates
 5b    labels: impl header and macro call text in the      58 + 45 labels             not specified
       node's path text
 5c    `expands`: macro call -> macro definition          15 rows                    not specified
@@ -60,13 +65,18 @@ resolvers of parts 2 to 4 are not touched in 5a.
   a member of a generated impl, THEN one `contains` row SHALL go from the file area or
   inline module that holds the outermost macro call to the item. The macro call node is not
   its container. (Same rule as original impl members, REQ-RUST-043.0.)
-- **R4 (nested expansion).** WHEN the chain has more than one call, THEN the container SHALL
-  come from the first call of the chain, the one written in a source file.
+- **R4 (nested expansion; NOT BUILT).** WHEN the chain has more than one call, THEN the
+  container SHALL come from the first call of the chain, the one written in a source file.
+  Today the generating call (R5) is found only when it is written in a source file. A call
+  written by another macro has no node yet, so the projection stops with
+  `InvalidSourceRow` and writes no graph. It does not guess a call. See Q5.
 - **R5 (generating call; decided: both forms).** Each generated node SHALL name the macro
   call node that produced it (the last call of its chain) in two ways: a field on the node
   row, and one `generates` row from the call node to the item, sited at the call.
   `generates` is a new relation kind; it is never collapsed and never counted as a
-  dependency between items.
+  dependency between items. The validator rejects a generated node without a call, a
+  source-written node with one, a named call that is not a `MacroInvocation` node, and a
+  `generates` row whose source or site is not the call its target names.
 - **R6 (evidence).** The node's source text SHALL equal the stored expanded text at its
   range, checked by digest; a mismatch SHALL be a typed error, not a skipped row.
 - **R7 (inactive).** WHEN the span's `#[cfg]` is off, THEN no node and no row.
@@ -106,14 +116,23 @@ R3       test_generated_const_node_contained      real source   itoa-source-acce
 R1 R7    test_generated_item_node_counts          real source   itoa-source-acceptance-tests
 R5       test_generated_node_names_call           real source   itoa-source-acceptance-tests
 R5       test_generates_edge_row_counts           real source   itoa-source-acceptance-tests
+R5       test_generated_node_call_required        unit          generated-node-validation-tests
+R5       test_generating_call_node_kind           unit          generated-node-validation-tests
+R5       test_original_node_call_rejected         unit          generated-node-validation-tests
+R5       test_generates_edge_call_accepted        unit          generated-node-validation-tests
+R5       test_generates_edge_site_checked         unit          generated-node-validation-tests
+R5       test_generates_edge_source_checked       unit          generated-node-validation-tests
 R10      test_generated_item_node_counts          real source   itoa-source-acceptance-tests
 R11      test_generated_nodes_read_twice          real source   itoa-source-acceptance-tests
-R1 R8    test_expanded_item_projected_node        fixture       original-item-projection-tests
-R4       test_nested_expansion_outer_container    fixture       original-item-projection-tests
-R6       test_expanded_text_digest_mismatch       fixture       original-item-projection-tests
-R7       test_inactive_expanded_item_skipped      fixture       original-item-projection-tests
-R1       test_expanded_body_item_evidence         fixture       original-item-projection-tests
-R9       test_generated_item_node_counts          real source   itoa-source-acceptance-tests
+R1 R8    test_expanded_item_projected_node        fixture       generated-item-projection-tests
+R4       test_nested_expansion_call_rejected      fixture       generated-item-projection-tests
+         (pins the typed rejection; R4 itself has no passing test)
+R6       test_expanded_text_digest_mismatch       fixture       generated-item-projection-tests
+R7       test_inactive_expanded_item_skipped      fixture       generated-item-projection-tests
+R1       test_expanded_body_item_evidence         fixture       generated-item-projection-tests
+R1       test_reject_orphan_generated_span        fixture       original-item-projection-tests
+R9       (no test) stage line stage=generated-item-source-inventory, read on one run:
+         impl-record 28, inactive 20, included 45
 ```
 
 ## 5 — Implementation plan (5a)
@@ -129,6 +148,9 @@ R9       test_generated_item_node_counts          real source   itoa-source-acce
    own RED and GREEN.
 6. REFACTOR, workspace gates, cost of one run, this file and the log.
 
+All six steps are done, except that step 2 was not done as written: the fixture tests
+were written after the code and passed on first run, and R4 has a rejection test only.
+
 Tests that pin today's behaviour and will change in 5a or 5d (named by the second review,
 not yet read by me): `original-item-projection-tests.rs` lines 203 to 210,
 `test_expanded_body_read_counted`, `test_expanded_header_keeps_chain`,
@@ -136,7 +158,24 @@ not yet read by me): `original-item-projection-tests.rs` lines 203 to 210,
 
 ## 6 — Quality gate results
 
-None yet.
+Measured at commit `bbdb98524`, release build, one thread.
+
+```text
+gate                                   result
+cargo fmt --all -- --check             pass
+clippy, workspace, -D warnings         pass
+cargo build --release --workspace      pass
+workspace tests                        514 passed, 0 failed, 4 ignored
+                                       (test_lang_items_in_sysroot skipped: not a full PASS)
+real-source itoa tests                 33 passed, 461 s
+adapter tests                          175 passed
+one run, 3 times                       13.7 to 15.9 s; 359 to 378 MB peak; 12.88 MB store
+stored                                 103 nodes, 285 edges, marked incomplete
+```
+
+Tests that passed on first run and so were not seen failing: `test_generated_item_node_counts`,
+`test_generated_nodes_read_twice`, and the five fixture tests in
+`generated-item-projection-tests`.
 
 ## 7 — Open questions
 
@@ -149,6 +188,12 @@ None yet.
   evidence key is not widened.
 - **Q3. Expanded files have no "file missing" or "item without owner" check** in
   `hld-original-source-projection.sql` (second review; not yet read by me).
+- **Q5. Nested expansion.** R4 is not built. To build it, a macro call written inside an
+  expansion must itself be a node (identity: its range in the expanded text and its chain),
+  generated by the call before it. Then the last call of any chain is a node and R5 holds
+  for every depth. itoa has no such call, so this waits until a repo needs it.
+- **Q6. `contains` and `generates` say different things and both stay.** The file area
+  contains the item (where a reader finds it); the call generates it (what to edit).
 - **Q4. The expected graph has no macro call or definition nodes.** It gains them when it
   is repaired, per the user's decision.
 

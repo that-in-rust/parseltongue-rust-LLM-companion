@@ -6,7 +6,7 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-15)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 240 edges (88 `contains`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+(45 written by macro expansions) and 285 edges (88 `contains`, 45 `generates`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 21 `reads` rows (15 with a
 target, 6 unresolved) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,9 +15,11 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5a step 2, the generating call as a node field and a `generates`
-  edge (45 rows predicted). Step 1 (generated items as nodes with containment) is built.
-  Parts 4a to 4d are built.
+- **Next target:** part 5b, readable labels for generated items and macro calls. Part 5a
+  (generated items as nodes, contained, each naming its macro call as a field and by a
+  `generates` row) is built. Parts 4a to 4d are built.
+- **Not built in 5a:** a generated item whose macro call is itself written by a macro
+  (nested expansion). The run stops with a typed error; itoa has none.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -35,7 +37,7 @@ step                                   state         measured or missing
 2  first call from source              DONE          default -> Buffer::new, read back frozen
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21, imports 4
-5  macro-generated items and bodies    5a SPECIFIED  45 of 73 expected nodes come from macros
+5  macro-generated items and bodies    5a BUILT      45 generated nodes, 45 generates; bodies are not edge sources yet
 6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
@@ -46,22 +48,23 @@ step                                   state         measured or missing
 
 - **Run.** `parseltongue map-workspace-full-run --mapping-final-stage-kind
   full-item-dependency-graph` on the pinned source writes and reads back a frozen graph.
-- **Nodes.** 58: 43 original items outside function bodies, one file area per source file,
-  and 13 builtin types that an edge starts or ends at.
+- **Nodes.** 103: 43 original items outside function bodies, 45 items written by macro
+  expansions, one file area per source file (2), and 13 builtin types that an edge starts
+  or ends at. Each generated node names its macro call.
   Visibility and reachability are stored as unknown, not guessed.
-- **Edges.** 195: 43 `contains`, 61 `calls`, 34 `uses_type`, 32 `implements`, 21 `reads` and 4 `imports`. 3 calls are resolved; 58 are stored unresolved
+- **Edges.** 285: 88 `contains`, 45 `generates`, 61 `calls`, 34 `uses_type`, 32 `implements`, 21 `reads` and 4 `imports`. 3 calls are resolved; 58 are stored unresolved
   with a typed reason (`HldUnresolvedReasonKind`). Trait dispatch and generic or ambiguous
   inherent members are stored as `TraitSolverNeeded`. The 58 by stored reason: 1 `ExternalSourceMissing`, 10 `MissingTarget`, 47 `TraitSolverNeeded`.
 - **Impl headers.** All 33 active impl blocks have header rows. They are records, not nodes.
-- **Tests.** 28 real-source itoa tests pass at commit `5dabc3279` (331 s, release build, one
+- **Tests.** 33 real-source itoa tests pass at commit `bbdb98524` (461 s, release build, one
   thread).
-- **Workspace gates** after part 4d: format, lint and release build pass; 494 tests pass,
+- **Workspace gates** after part 5a: format, lint and release build pass; 514 tests pass,
   0 fail, 4 ignored. `test_lang_items_in_sysroot` is skipped, so the gate is not a full PASS.
-- **Cost of one run** (2026-11-15, after part 4d, sysroot excluded, 2 workers): 13.5 to
-  14.1 s, 334 to 345 MB peak over the whole process tree (sampled about every 17 ms, not the
-  SOP's 10 ms), 11.5 MB store, no memory cap.
+- **Cost of one run** (2026-11-16, after part 5a, sysroot excluded, 2 workers): 13.7 to
+  15.9 s, 359 to 378 MB peak over the whole process tree (sampled about every 18 ms, not the
+  SOP's 10 ms), 12.9 MB store, no memory cap.
 
-All counts above were read at commit `5dabc3279`.
+All counts above were read at commit `bbdb98524`.
 
 ## What is missing, in build order
 
@@ -72,9 +75,10 @@ All counts above were read at commit `5dabc3279`.
    itoa's calls need them. Everything else stays unresolved with a reason.
 3. **Signature lowering.** Parameter and return types, `Self`, generics and bounds as semantic
    records. Only impl headers exist.
-4. **Other edge kinds.** `implements` from impl headers, `uses_type` from signatures and
-   bodies, `reads` of consts and statics, `imports` from `use` nodes.
-5. **Macro-generated items.** Nodes, signatures and bodies for items generated by
+4. **Other edge kinds.** Built for original source text. Not built: `uses_type` from
+   bodies, and any edge that starts in a macro-generated signature or body.
+5. **Macro-generated items.** Nodes are built (5a). Not built: labels, `expands`,
+   signatures and bodies as edge sources, for items generated by
    `impl_Integer`, `impl_Integer_size` and `impl_Unsigned`, with expansion identity. Needed for
    `<u128 as Sealed>::write -> <u128 as Unsigned>::fmt -> div_rem_1e16 -> u128_ext::mulhi`.
 6. **Targets in `core`.** Real identities for `MaybeUninit`, `Default`, `Clone`, `hint`,
@@ -99,6 +103,61 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-16 00:05 IST — Part 5a closed: each generated node names its macro call, twice
+
+**Pinned itoa now stores 285 edges (was 240): 45 `generates` rows, one from a macro call
+to each active item it wrote. Each of the 45 generated nodes also carries that call as a
+typed field. Nodes are unchanged at 103. The graph is still marked incomplete.**
+
+- **Node field.** `node_generating_call_reference` on `HldNodeInputRecord`: the call for a
+  generated node, nothing for a source-written node. RED on real source:
+  `test_generated_node_names_call`, "no call named: ...::src/lib.rs::_". GREEN after the
+  candidate view also returned the call's own span.
+- **Relation.** `HldRelationKindValue::Generates`, written and read through DuckDB text,
+  the Turso graph input and publication. RED: `test_generates_edge_row_counts`, 0 rows.
+- **Validator.** A `generates` row must start at the call its target names and be sited
+  at that call. RED: `test_generates_edge_site_checked` and
+  `test_generates_edge_source_checked` returned `Ok(())`; GREEN with one check in the
+  edge loop (`InvalidGeneratingCall`). Core validator tests: 21 passed.
+- **My test was wrong once.** I asserted that all 15 expanded macro calls write an item.
+  Measured: 11 do. Five `impl_Integer!` calls write 7 items each, the two
+  `impl_Integer_size!` calls for 64-bit pointers write 3 each, four `impl_Unsigned!` calls
+  write 1 each (35 + 6 + 4 = 45). The other four `impl_Integer_size!` calls write only
+  items under a `#[cfg]` that is off. The assertion now pins
+  `[1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]`.
+- **Repeat.** `test_generated_nodes_read_twice`: a second read of the store gives the same
+  node list and the same edge list, in order. It passed on first run, so it records
+  behaviour and was not seen failing.
+- **Fixture tests, 5, all passed on first run** (so they record behaviour):
+  `test_expanded_item_projected_node`, `test_expanded_text_digest_mismatch`,
+  `test_inactive_expanded_item_skipped`, `test_expanded_body_item_evidence`,
+  `test_nested_expansion_call_rejected`.
+- **Not built: nested expansion (R4).** The projection finds the generating call only
+  when it is written in a source file. A call written by another macro stops the run with
+  `InvalidSourceRow` ("generating macro call is not a source-written macro call span").
+  itoa has 15 expanded calls, all one level deep, so nothing in itoa reaches it. The
+  fixture test pins the rejection, not the rule in R4.
+- **Stage line corrected.** `containment=` printed the count of all structural rows (133
+  after this step). It now prints `containment=88 generates=45`. No test reads that line;
+  checked on one run.
+- **Workspace gates at `bbdb98524`:** format, lint, release build pass; 514 tests passed,
+  0 failed, 4 ignored (`test_lang_items_in_sysroot` skipped, so not a full PASS). The 33
+  real-source itoa tests took 461 s.
+- **Cost, 3 runs** (binary sha256 `6981f029…9107250`): 13.7, 14.6, 15.9 s; 359, 371,
+  378 MB peak over the process tree; 12.88 MB store; 103 nodes, 285 edges each run.
+- **Against the expected graph:** it has no `generates` rows, no macro call nodes and no
+  macro definition nodes yet, so nothing here can be matched until it is repaired (part 7).
+  45 of its 45 generated nodes have a stored node of the same kind and name count
+  (5 `const _`, 12 `MAX_STR_LEN`, 12 `Buffer`, 12 `write`, 4 `fmt`).
+- **Codebase-memory:** `trace_path publish_full_graph_checkpoint --direction inbound`
+  (2 callers, both in `main.rs`) before the stage-line change; re-index after the commit.
+  The queries before the earlier step-2 edits were not written down.
+- **Commits:** `a59f8c4a9` (field), `21af05d9d` (real-source test), `a5d23c030`
+  (`generates` rows), `decaf5962`, `2a6879741` (real-source tests), `bbdb98524` (fixture
+  tests), and this commit (stage line, docs).
+- **Next:** part 5b, labels. Today all 15 macro calls read `itoa::src/lib.rs::MACRO_CALL`
+  and the 12 generated `write` functions share one label.
 
 ### 2026-11-15 23:25 IST — Part 5a step 1: macro-generated items are nodes with one container
 
