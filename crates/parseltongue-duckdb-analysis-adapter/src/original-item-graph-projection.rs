@@ -7,6 +7,9 @@ mod original_item_projection_tests;
 #[path = "generated-item-graph-projection.rs"]
 mod generated_item_graph_projection;
 
+#[path = "item-node-label-text.rs"]
+mod item_node_label_text;
+
 impl DuckdbAnalysisStoreAdapter {
     pub fn derive_original_graph_input(
         &self,
@@ -68,9 +71,12 @@ impl DuckdbAnalysisStoreAdapter {
                 node_effective_visibility_kind: None,
                 node_reachable_outside_crate_flag: None,
                 node_source_relative_path: Some(context.path.clone()),
-                node_qualified_path_text: format!(
-                    "{}::{}::<file-area>",
-                    context.unit.unit_cargo_package_identifier, context.path
+                node_qualified_path_text: item_node_label_text::join_node_label_segments(
+                    &context.unit,
+                    &context.path,
+                    &[],
+                    None,
+                    "<file-area>",
                 ),
                 node_signature_text: None,
                 node_generating_call_reference: None,
@@ -110,18 +116,17 @@ impl DuckdbAnalysisStoreAdapter {
                     build_original_item_identity(&context, &container)?,
                 ))
             };
-            let kind =
-                required_string(&span, "span_syntax_kind_value", "span-reference-text-table")?;
-            let name = span["span_declared_name_value"]
-                .as_str()
-                .filter(|name| !name.is_empty())
-                .unwrap_or(kind);
-            let label = std::iter::once(context.unit.unit_cargo_package_identifier.as_str())
-                .chain(std::iter::once(context.path.as_str()))
-                .chain(names.iter().map(String::as_str))
-                .chain(std::iter::once(name.trim_start_matches("r#")))
-                .collect::<Vec<_>>()
-                .join("::");
+            required_string(&span, "span_syntax_kind_value", "span-reference-text-table")?;
+            let label = item_node_label_text::join_node_label_segments(
+                &context.unit,
+                &context.path,
+                &names,
+                bridges
+                    .first()
+                    .filter(|_| owner_kind == HldOwnerKindValue::Impl)
+                    .map(|bridge| &bridge["header"]),
+                &item_node_label_text::build_item_name_segment(&span, None),
+            );
             nodes.insert(HldNodeInputRecord {
                 run_generation_digest_value: generation,
                 node_target_reference: target.clone(),

@@ -574,7 +574,7 @@ fn test_preserve_known_syntax_kinds() {
             "MacroDefinition",
         ),
         ("macro m2() {}", "MACRO_DEF", "m2", "MacroDefinition"),
-        ("m!();", "MACRO_CALL", "invoke", "MacroInvocation"),
+        ("m!();", "MACRO_CALL", "", "MacroInvocation"),
         (
             "extern \"C\" { fn foreign(); static FOREIGN: u8; type Opaque; }",
             "EXTERN_BLOCK",
@@ -597,7 +597,13 @@ fn test_preserve_known_syntax_kinds() {
     }
     let input = derive_fixture_graph_input(&source).unwrap();
     assert_eq!(input.input_node_records.len(), 11);
-    for (_, _, name, kind) in spans {
+    for (_, syntax_kind, name, kind) in spans {
+        // REQ-RUST-050.0 L3: a macro call is labelled with its own source text.
+        let name = if syntax_kind == "MACRO_CALL" {
+            "m!()"
+        } else {
+            name
+        };
         assert_eq!(
             format!(
                 "{:?}",

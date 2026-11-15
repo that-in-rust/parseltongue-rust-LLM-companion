@@ -102,20 +102,17 @@ fn build_generated_item_pair(
     } else {
         build_original_area_identity(&area)?
     };
-    let kind = required_string(&span, "span_syntax_kind_value", SPAN_TABLE)?;
-    let name = span["span_declared_name_value"]
-        .as_str()
-        .filter(|name| !name.is_empty())
-        .unwrap_or(if kind == "CONST" { "_" } else { kind });
-    let label = [
-        area.unit.unit_cargo_package_identifier.as_str(),
-        area.path.as_str(),
-    ]
-    .into_iter()
-    .chain(names.iter().map(String::as_str))
-    .chain(std::iter::once(name.trim_start_matches("r#")))
-    .collect::<Vec<_>>()
-    .join("::");
+    required_string(&span, "span_syntax_kind_value", SPAN_TABLE)?;
+    let label = item_node_label_text::join_node_label_segments(
+        &area.unit,
+        &area.path,
+        &names,
+        bridges
+            .first()
+            .filter(|_| owner_kind == HldOwnerKindValue::Impl)
+            .map(|bridge| &bridge["header"]),
+        &item_node_label_text::build_item_name_segment(&span, Some(&call_span)),
+    );
     let node = HldNodeInputRecord {
         run_generation_digest_value: generation,
         node_target_reference: target.clone(),

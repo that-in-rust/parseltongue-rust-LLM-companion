@@ -2489,10 +2489,9 @@ fn test_generated_const_node_contained() {
         Some("src/lib.rs"),
         "a generated node names the file of its macro call"
     );
-    assert!(
-        node.node_qualified_path_text.ends_with("::_"),
-        "{}",
-        node.node_qualified_path_text
+    assert_eq!(
+        node.node_qualified_path_text,
+        "itoa::src/lib.rs::const _ #impl_Integer!(i8, u8)"
     );
     let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
         &node.node_target_reference
@@ -2559,15 +2558,18 @@ fn test_generated_item_node_counts() {
             .iter()
             .filter(|node| {
                 node.node_item_kind_value == Some(kind)
-                    && node
+                    && (node
                         .node_qualified_path_text
                         .ends_with(&format!("::{name}"))
+                        || node
+                            .node_qualified_path_text
+                            .contains(&format!("::{name} #")))
             })
             .count()
     };
     assert_eq!(
         [
-            count(HldItemKindValue::Constant, "_"),
+            count(HldItemKindValue::Constant, "const _"),
             count(HldItemKindValue::AssociatedConstant, "MAX_STR_LEN"),
             count(HldItemKindValue::AssociatedType, "Buffer"),
             count(HldItemKindValue::AssociatedFunction, "write"),
@@ -2677,7 +2679,9 @@ fn test_generated_node_names_call() {
         assert_eq!(call_parts.span_source_file_path, "src/lib.rs");
         assert!(call_parts.span_expansion_provenance_chain.is_empty());
         assert_eq!(range, call_ranges[&digest], "the call of the node's chain");
-        if node.node_qualified_path_text.ends_with("::_") && first_call_text.is_empty() {
+        if node.node_item_kind_value == Some(HldItemKindValue::Constant)
+            && first_call_text.is_empty()
+        {
             first_call_text = source[range.0 as usize..range.1 as usize].to_vec();
         }
         named += 1;
@@ -2763,4 +2767,105 @@ fn test_generated_nodes_read_twice() {
     assert_eq!(input.input_edge_records, again.input_edge_records);
     check_relation_rows_twice(HldRelationKindValue::Generates, 45);
     check_relation_rows_twice(HldRelationKindValue::Contains, 88);
+}
+
+/// REQ-RUST-050.0 L1, L3, L4: every node label is distinct on itoa, none carries the
+/// checkout path, and a macro call or use item reads as its own source text.
+#[test]
+fn test_node_labels_all_distinct() {
+    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let labels = input
+        .input_node_records
+        .iter()
+        .map(|node| node.node_qualified_path_text.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(input.input_node_records.len(), 103);
+    assert_eq!(labels.len(), 103, "every label is distinct");
+    assert!(
+        labels.iter().all(|label| !label.contains("file:///")),
+        "no label carries the checkout path"
+    );
+    let (mut calls, mut uses) = (0, 0);
+    for node in &input.input_node_records {
+        match node.node_item_kind_value {
+            Some(HldItemKindValue::MacroInvocation) => calls += 1,
+            Some(HldItemKindValue::UseStatement) => uses += 1,
+            _ => continue,
+        }
+        let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(key)) =
+            &node.node_target_reference
+        else {
+            panic!("item identity expected");
+        };
+        let range = key
+            .read_semantic_occurrence_parts()
+            .span_byte_range_value
+            .read_source_range_pair();
+        let text = source[range.0 as usize..range.1 as usize].trim_end_matches(';');
+        assert_eq!(
+            node.node_qualified_path_text,
+            format!("itoa::src/lib.rs::{text}")
+        );
+    }
+    assert_eq!((calls, uses), (15, 3));
+}
+
+/// REQ-RUST-050.0 L2, L5: an impl member names its impl header, original or generated,
+/// and a generated `const _` names the call that wrote it.
+#[test]
+fn test_impl_member_label_segment() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let read_label_node_count = |label: &str| {
+        input
+            .input_node_records
+            .iter()
+            .filter(|node| node.node_qualified_path_text == label)
+            .count()
+    };
+    for label in [
+        "itoa::src/lib.rs::<file-area>",
+        "itoa::src/lib.rs::Buffer::new",
+        "itoa::src/lib.rs::Buffer::format",
+        "itoa::src/lib.rs::<Buffer as Default>::default",
+        "itoa::src/lib.rs::<Buffer as Clone>::clone",
+        "itoa::src/lib.rs::<u128 as Unsigned>::fmt",
+        "itoa::src/lib.rs::<u8 as Unsigned>::fmt",
+        "itoa::src/lib.rs::<u8 as private::Sealed>::write",
+        "itoa::src/lib.rs::<u8 as Integer>::MAX_STR_LEN",
+        "itoa::src/lib.rs::<usize as private::Sealed>::Buffer",
+        "itoa::src/lib.rs::private::Sealed::write",
+        "itoa::src/lib.rs::Integer::MAX_STR_LEN",
+        "itoa::src/lib.rs::impl_Integer",
+        "itoa::src/lib.rs::const _ #impl_Integer!(i8, u8)",
+        "itoa::src/u128_ext.rs::mulhi",
+    ] {
+        assert_eq!(read_label_node_count(label), 1, "{label}");
+    }
+    let unnamed = input
+        .input_node_records
+        .iter()
+        .filter(|node| {
+            node.node_item_kind_value == Some(HldItemKindValue::Constant)
+                && node.node_generating_call_reference.is_some()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(unnamed.len(), 5);
+    for node in unnamed {
+        let call = input
+            .input_node_records
+            .iter()
+            .find(|other| {
+                Some(&other.node_target_reference) == node.node_generating_call_reference.as_ref()
+            })
+            .unwrap_or_else(|| panic!("the named call is not a node"));
+        let segment = call
+            .node_qualified_path_text
+            .strip_prefix("itoa::src/lib.rs::")
+            .unwrap();
+        assert_eq!(
+            node.node_qualified_path_text,
+            format!("itoa::src/lib.rs::const _ #{segment}")
+        );
+    }
 }
