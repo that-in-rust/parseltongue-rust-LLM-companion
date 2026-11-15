@@ -63,18 +63,27 @@ pub(crate) fn publish_full_graph_checkpoint(
         cancel,
     )
     .map_err(map_full_graph_error)?;
+    let imports = parseltongue_syntax_span_extractor::resolve_use_import_edges(
+        store,
+        &source_snapshot,
+        &input,
+        cancel,
+    )
+    .map_err(map_full_graph_error)?;
     let (type_use_count, implements_count) =
         (type_uses.len(), implements.implements_edge_records.len());
     let read_count = reads.read_edge_input_records.len();
+    let import_count = imports.import_edge_input_records.len();
     let mut semantic = type_uses;
     semantic.extend(implements.implements_edge_records);
     semantic.extend(reads.read_edge_input_records);
+    semantic.extend(imports.import_edge_input_records);
     input
         .input_node_records
         .extend(parseltongue_syntax_span_extractor::collect_builtin_endpoint_nodes(&semantic));
     input.input_node_records.sort();
     eprintln!(
-        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} reads={} reads_in_expanded_bodies={} completeness=incomplete",
+        "stage=full-item-dependency-graph nodes={} containment={} calls={} resolved_calls={} type_uses={} implements={} implements_without_source={} reads={} reads_in_expanded_bodies={} imports={} imports_glob_skipped={} imports_in_expanded_items={} imports_without_source={} completeness=incomplete",
         input.input_node_records.len(),
         input.input_edge_records.len(),
         calls.len(),
@@ -83,7 +92,11 @@ pub(crate) fn publish_full_graph_checkpoint(
         implements_count,
         implements.headers_without_source,
         read_count,
-        reads.read_expanded_site_count
+        reads.read_expanded_site_count,
+        import_count,
+        imports.imports_glob_skipped,
+        imports.imports_in_expanded_items,
+        imports.imports_without_source
     );
     input.input_edge_records.extend(calls);
     input.input_edge_records.extend(semantic);

@@ -2297,7 +2297,6 @@ fn test_itoa_reads_row_counts() {
 
 /// REQ-RUST-049.0 R6 R7 R11
 #[test]
-#[ignore = "RED until part 4d step 4 wires imports rows into the full graph"]
 fn test_itoa_imports_row_counts() {
     let (_directory, root, _database, input) = run_original_graph_fixture();
     let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
@@ -2351,15 +2350,15 @@ fn test_itoa_imports_row_counts() {
     assert_eq!(rows, expected);
 }
 
-/// REQ-RUST-048.0 R8
-#[test]
-fn test_reads_rows_read_twice() {
+/// Reads the stored graph a second time and checks the rows of one relation: the expected
+/// number, the same rows in the same order on both reads, and no row stored twice.
+fn check_relation_rows_twice(relation: HldRelationKindValue, expected: usize) {
     let (_directory, _root, database, input) = run_original_graph_fixture();
     let read = |graph: &HldMaterializationInputRecord| {
         graph
             .input_edge_records
             .iter()
-            .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+            .filter(|edge| edge.edge_relation_kind_value == relation)
             .cloned()
             .collect::<Vec<_>>()
     };
@@ -2370,11 +2369,23 @@ fn test_reads_rows_read_twice() {
         .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
         .unwrap();
     let rows = read(&input);
-    assert_eq!(rows.len(), 21);
+    assert_eq!(rows.len(), expected);
     assert_eq!(rows, read(&again), "same rows in the same order");
     assert_eq!(
         rows.iter().collect::<std::collections::BTreeSet<_>>().len(),
-        21,
+        expected,
         "no row is stored twice"
     );
+}
+
+/// REQ-RUST-048.0 R8
+#[test]
+fn test_reads_rows_read_twice() {
+    check_relation_rows_twice(HldRelationKindValue::Reads, 21);
+}
+
+/// REQ-RUST-049.0 R12
+#[test]
+fn test_imports_rows_read_twice() {
+    check_relation_rows_twice(HldRelationKindValue::Imports, 4);
 }
