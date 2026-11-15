@@ -114,8 +114,9 @@ impl ContractInputCodec {
                 path_source_segment_rows:import.import_path_segment_rows.clone(),path_requested_namespace_kind:NameNamespaceFilterKind::Any,
                 path_resolution_source_kind:import.import_resolution_source_kind,path_unavailable_reason_kind:None,
             })?;
-            connection.execute("INSERT INTO \"namespace-import-request-records\" VALUES ('contract','0',?,?,?,?)",
-                duckdb::params![request,key(&import.import_lexical_scope_key),import.import_binding_alias_text,import.import_glob_expansion_flag]).map_err(error)?;
+            connection.execute("INSERT INTO \"namespace-import-request-records\" VALUES ('contract','0',?,?,?,?,?)",
+                duckdb::params![request,key(&import.import_lexical_scope_key),import.import_binding_alias_text,import.import_glob_expansion_flag,
+                    match import.import_resolution_source_kind {NameResolutionPathKind::Import=>"import",NameResolutionPathKind::Signature=>"signature"}]).map_err(error)?;
             Ok::<_,NameResolutionStageError>(())
         })?;
         Ok(result)

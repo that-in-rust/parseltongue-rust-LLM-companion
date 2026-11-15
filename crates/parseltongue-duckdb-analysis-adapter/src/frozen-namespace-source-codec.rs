@@ -465,6 +465,9 @@ impl NamespaceSourceAppender<'_> {
                                 .as_bool()
                                 .ok_or_else(|| build_analysis_error("import glob flag absent"))?,
                         ),
+                        text(value, "import_resolution_source_kind")?
+                            .to_lowercase()
+                            .into(),
                     ],
                 )?;
                 self.append(

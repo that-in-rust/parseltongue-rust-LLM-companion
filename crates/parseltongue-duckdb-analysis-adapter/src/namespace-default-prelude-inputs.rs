@@ -29,7 +29,7 @@ pub(super) fn prepare_default_prelude_inputs(
         UNION ALL SELECT generation_key,attempt_key,'namespace-default-prelude-import/'||unit_key,1,'name','prelude' FROM \"namespace-default-prelude-records\"
         UNION ALL SELECT generation_key,attempt_key,'namespace-default-prelude-import/'||unit_key,2,'name','rust_'||edition::VARCHAR FROM \"namespace-default-prelude-records\";
         INSERT INTO \"namespace-import-request-records\"
-        SELECT generation_key,attempt_key,'namespace-default-prelude-import/'||unit_key,prelude_scope,NULL,true FROM \"namespace-default-prelude-records\";
+        SELECT generation_key,attempt_key,'namespace-default-prelude-import/'||unit_key,prelude_scope,NULL,true,'prelude' FROM \"namespace-default-prelude-records\";
         INSERT INTO \"namespace-import-visibility-records\"
         SELECT generation_key,attempt_key,'namespace-default-prelude-import/'||unit_key,NULL FROM \"namespace-default-prelude-records\";
         INSERT INTO \"namespace-macro-prelude-records\"
