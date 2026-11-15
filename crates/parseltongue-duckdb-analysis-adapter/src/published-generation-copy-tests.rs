@@ -475,14 +475,16 @@ fn test_import_outcome_rows_written() {
         &source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text,
     )
     .unwrap();
+    // The Signature request is a bound's import of its trait: it gets no import row.
     let imports = [
-        ("local", vec!["Item"]),
-        ("sysroot", vec!["core", "mem"]),
-        ("absent", vec!["missing", "Thing"]),
+        ("local", "Import", vec!["Item"]),
+        ("sysroot", "Import", vec!["core", "mem"]),
+        ("absent", "Import", vec!["missing", "Thing"]),
+        ("bound", "Signature", vec!["Item"]),
     ];
     let mut import_rows = imports
         .iter()
-        .map(|(site, segments)| {
+        .map(|(site, kind, segments)| {
             let text = json!({
                 "import_site_occurrence_key": {"site": site},
                 "import_lexical_scope_key": scope_row["scope_module_identity_key"],
@@ -493,7 +495,7 @@ fn test_import_outcome_rows_written() {
                 "import_binding_alias_text": null,
                 "import_glob_expansion_flag": false,
                 "import_visibility_scope_kind": {"visibility_scope_kind_value": "public"},
-                "import_resolution_source_kind": "Import",
+                "import_resolution_source_kind": kind,
             })
             .to_string();
             StageTableRowRecord {
