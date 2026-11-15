@@ -368,7 +368,7 @@ fn resolve_type_path_target(
 
 /// The graph reason for a reason name resolution stored. A path stored
 /// without a reason needs more than name lookup to resolve.
-fn read_stored_reason_kind(reason: &Value) -> HldUnresolvedReasonKind {
+pub(crate) fn read_stored_reason_kind(reason: &Value) -> HldUnresolvedReasonKind {
     match reason.as_str() {
         Some("external_source_missing") => HldUnresolvedReasonKind::ExternalSourceMissing,
         Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,

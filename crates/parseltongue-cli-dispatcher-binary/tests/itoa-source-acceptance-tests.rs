@@ -700,6 +700,42 @@ fn test_clone_self_type_edge() {
 
 /// REQ-RUST-047.0
 #[test]
+fn test_buffer_clone_trait_unresolved() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT").clone();
+    let text = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_relation_kind_value == HldRelationKindValue::Implements
+                && edge.edge_source_reference == buffer.node_target_reference
+        })
+        .map(|edge| {
+            let (start, end) = read_edge_site_range(edge);
+            (
+                text[start as usize..end as usize].to_owned(),
+                text[..start as usize].ends_with("impl "),
+                edge.edge_resolution_value.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.0.cmp(&right.0));
+    let external = HldEdgeResolutionValue::Unresolved {
+        reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+    };
+    assert_eq!(
+        rows,
+        ["Clone", "Copy", "Default"]
+            .map(|name| (name.to_owned(), true, external.clone()))
+            .to_vec(),
+        "Buffer implements three core traits; core source is excluded from this run"
+    );
+}
+
+/// REQ-RUST-047.0
+#[test]
 fn test_unsigned_impl_builtin_source() {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");

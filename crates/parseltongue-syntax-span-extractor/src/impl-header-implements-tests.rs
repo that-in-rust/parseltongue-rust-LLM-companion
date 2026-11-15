@@ -194,3 +194,83 @@ fn test_builtin_source_one_node() {
     graph.input_edge_records.extend(set.implements_edge_records);
     assert_eq!(validate_full_graph_input(&graph), Ok(()));
 }
+
+/// REQ-RUST-047.0
+#[test]
+fn test_unresolved_trait_keeps_reason() {
+    let source = "struct Buffer; trait Make {} impl Clone for Buffer {} impl Gone for Buffer {} \
+        impl Lost for Buffer {}";
+    let outside = NameSymbolTargetKey::Definition(
+        SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+            &make_call_fixture_unit(),
+            "src/other.rs",
+            SpanByteRangeValue::try_from((0, 4)).unwrap(),
+            SpanDigestIdValue::from([9; 32]),
+            &[],
+        )
+        .unwrap(),
+    );
+    let (store, input) = make_header_fixture(source, |header| {
+        let resolution = &mut header["impl_trait_type_resolution"];
+        if resolution["type_source_evidence"]["type_source_text"] == "Clone" {
+            resolution["unresolved_reason_kind"] = json!("external_source_missing");
+        }
+        if resolution["type_source_evidence"]["type_source_text"] == "Lost" {
+            resolution["resolution_state_kind"] = json!("resolved");
+            resolution["unresolved_reason_kind"] = Value::Null;
+            resolution["target_identity"] = encode_symbol_target_value(&outside);
+        }
+    });
+    let (mut edges, without_source) = read_header_fixture_edges(source, &store, &input);
+    edges.sort_by_key(|(_, _, site)| site.clone());
+    let unresolved = |reason| HldEdgeResolutionValue::Unresolved { reason };
+    assert_eq!(
+        edges,
+        vec![
+            (
+                "Buffer".to_owned(),
+                unresolved(HldUnresolvedReasonKind::ExternalSourceMissing),
+                format!("{}:Clone", source.find("Clone").unwrap())
+            ),
+            (
+                "Buffer".to_owned(),
+                unresolved(HldUnresolvedReasonKind::TraitSolverNeeded),
+                format!("{}:Gone", source.find("Gone").unwrap())
+            ),
+            (
+                "Buffer".to_owned(),
+                unresolved(HldUnresolvedReasonKind::MissingTarget),
+                format!("{}:Lost", source.find("Lost").unwrap())
+            ),
+        ],
+        "a trait that is not a node keeps its row with one reason: the stored one, \
+         or MissingTarget when it resolved to an item outside the graph"
+    );
+    assert_eq!(without_source, 0);
+    let mut graph = input.clone();
+    graph.input_edge_records.extend(
+        resolve_impl_header_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap()
+        .implements_edge_records,
+    );
+    assert_eq!(validate_full_graph_input(&graph), Ok(()));
+}
+
+/// REQ-RUST-047.0
+#[test]
+fn test_unresolved_self_counted_only() {
+    let source = "struct Buffer; trait Make {} impl Make for Gone {} impl<T> Make for T {} \
+        impl Gone {}";
+    let (store, input) = make_header_fixture(source, |_| {});
+    assert_eq!(
+        read_header_fixture_edges(source, &store, &input),
+        (Vec::new(), 2),
+        "a trait impl whose self type is not a node has no row and is counted; \
+         an inherent impl is not counted"
+    );
+}

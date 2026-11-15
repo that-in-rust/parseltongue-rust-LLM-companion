@@ -1,4 +1,5 @@
 use crate::impl_header_source_records::{ImplHeaderSourceError, read_impl_stage_values};
+use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
@@ -62,32 +63,39 @@ pub fn resolve_impl_header_edges(
         })
         .map(|node| &node.node_target_reference)
         .collect::<BTreeSet<_>>();
-    let mut edges = Vec::new();
+    let mut set = ImplHeaderEdgeSet::default();
     for header in read_impl_stage_values(store, source_scope, "impl-header-index-table")? {
         if cancel.check_stage_work_cancelled() {
             return Err(ImplHeaderEdgeError::Cancelled);
         }
-        edges.extend(build_impl_header_edge(
-            &header,
-            &endpoints,
-            input.run_generation_digest_value,
-        )?);
+        match build_impl_header_edge(&header, &endpoints, input.run_generation_digest_value)? {
+            ImplHeaderRowOutcome::NoTraitImplemented => {}
+            ImplHeaderRowOutcome::SourceNotNode => set.headers_without_source += 1,
+            ImplHeaderRowOutcome::Edge(edge) => set.implements_edge_records.push(*edge),
+        }
     }
-    edges.sort();
-    edges.dedup();
-    Ok(ImplHeaderEdgeSet {
-        implements_edge_records: edges,
-        headers_without_source: 0,
-    })
+    set.implements_edge_records.sort();
+    set.implements_edge_records.dedup();
+    Ok(set)
 }
 
-/// The row of one header: none unless it is an original, positive trait impl
-/// outside any function body whose self type and trait are both graph nodes.
+/// What one impl header contributes to the graph.
+enum ImplHeaderRowOutcome {
+    /// Inherent, negative, inside a function body, or macro-expanded.
+    NoTraitImplemented,
+    /// A trait impl whose self type is not a node of the graph.
+    SourceNotNode,
+    Edge(Box<HldEdgeInputRecord>),
+}
+
+/// The row of one original, positive trait impl header outside any function
+/// body: from its self type to its trait, or unresolved with one reason when
+/// the trait is not a node of the graph.
 fn build_impl_header_edge(
     header: &Value,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
     generation: RunGenerationDigestValue,
-) -> Result<Option<HldEdgeInputRecord>, ImplHeaderEdgeError> {
+) -> Result<ImplHeaderRowOutcome, ImplHeaderEdgeError> {
     let (self_type, trait_type) = (
         &header["impl_self_type_resolution"],
         &header["impl_trait_type_resolution"],
@@ -99,13 +107,22 @@ fn build_impl_header_edge(
         || header["impl_function_body_ancestry_flag"] == true
         || !header_parts.span_expansion_provenance_chain.is_empty()
     {
-        return Ok(None);
+        return Ok(ImplHeaderRowOutcome::NoTraitImplemented);
     }
-    let (Some(source), Some(target)) = (
-        read_header_node_target(self_type, endpoints)?,
-        read_header_node_target(trait_type, endpoints)?,
-    ) else {
-        return Ok(None);
+    let Some(source) = read_header_node_target(self_type, endpoints)? else {
+        return Ok(ImplHeaderRowOutcome::SourceNotNode);
+    };
+    let target = read_header_node_target(trait_type, endpoints)?;
+    let resolution = match (&target, trait_type["resolution_state_kind"].as_str()) {
+        (Some(target), _) => HldEdgeResolutionValue::Extracted {
+            target: target.clone(),
+        },
+        (None, Some("resolved")) => HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::MissingTarget,
+        },
+        (None, _) => HldEdgeResolutionValue::Unresolved {
+            reason: read_stored_reason_kind(&trait_type["unresolved_reason_kind"]),
+        },
     };
     let evidence = &trait_type["type_source_evidence"];
     let invalid = |field| ImplHeaderEdgeError::InvalidEvidence { field };
@@ -130,21 +147,19 @@ fn build_impl_header_edge(
         "self_type_source_text":self_type["type_source_evidence"]["type_source_text"],
         "trait_source_text":text
     });
-    Ok(Some(HldEdgeInputRecord {
+    Ok(ImplHeaderRowOutcome::Edge(Box::new(HldEdgeInputRecord {
         run_generation_digest_value: generation,
         edge_source_reference: source.clone(),
         edge_relation_kind_value: HldRelationKindValue::Implements,
-        edge_resolution_value: HldEdgeResolutionValue::Extracted {
-            target: target.clone(),
-        },
+        edge_resolution_value: resolution,
         edge_evidence_row_key: HldEvidenceRowKey {
             evidence_site_occurrence_key: site,
             evidence_source_occurrence_key: source,
             evidence_relation_kind_value: HldRelationKindValue::Implements,
-            evidence_target_reference_value: Some(target),
+            evidence_target_reference_value: target,
         },
         edge_dispatch_metadata_text: Some(metadata.to_string()),
-    }))
+    })))
 }
 
 /// What a header's self type or trait names when that is a node of the
