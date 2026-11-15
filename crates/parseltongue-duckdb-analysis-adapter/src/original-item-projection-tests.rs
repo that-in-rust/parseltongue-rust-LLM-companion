@@ -203,11 +203,6 @@ fn build_original_fixture_store() -> OriginalGraphFixtureStore {
             source.insert_source_fixture_row("span-byte-ownership-ranges", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":start, "span_byte_end_offset":end, "span_gap_classification_kind":"item", "span_expansion_provenance_chain":[]}));
         }
     }
-    let mut expanded = spans["fn café() {}"].clone();
-    expanded["span_expansion_provenance_chain"] = json!(["33".repeat(32)]);
-    expanded["span_semantic_occurrence_key"] = json!("expanded");
-    expanded["span_declared_name_value"] = json!("generated");
-    source.insert_source_fixture_row("span-reference-text-table", expanded);
     source
 }
 
@@ -370,7 +365,6 @@ fn test_impl_body_members_excluded() {
         "local",
         "off",
         "disabled",
-        "generated",
         "A",
     ] {
         assert!(
@@ -450,6 +444,27 @@ fn test_child_file_owner_identity() {
             HldTargetIdentityValue::FilePublicArea(_)
         ));
     }
+}
+
+/// REQ-RUST-046.0 R6: a span that names a macro expansion with no stored macro call is
+/// rejected; it is neither read as original text nor dropped.
+#[test]
+fn test_reject_orphan_generated_span() {
+    let mut source = build_original_fixture_store();
+    let mut expanded = source.rows["span-reference-text-table"]
+        .iter()
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .find(|value| value["span_declared_name_value"] == "café")
+        .unwrap();
+    expanded["span_expansion_provenance_chain"] = json!(["33".repeat(32)]);
+    expanded["span_semantic_occurrence_key"] = json!("expanded");
+    expanded["span_declared_name_value"] = json!("generated");
+    source.insert_source_fixture_row("span-reference-text-table", expanded);
+    assert!(matches!(
+        derive_fixture_graph_input(&source),
+        Err(OriginalSourceProjectionError::InvalidSourceRow { table, .. })
+            if table == "macro-expanded-item-table"
+    ));
 }
 
 /// REQ-RUST-045.0

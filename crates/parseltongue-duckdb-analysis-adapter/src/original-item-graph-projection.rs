@@ -4,6 +4,9 @@ use super::*;
 #[path = "original-item-projection-tests.rs"]
 mod original_item_projection_tests;
 
+#[path = "generated-item-graph-projection.rs"]
+mod generated_item_graph_projection;
+
 impl DuckdbAnalysisStoreAdapter {
     pub fn derive_original_graph_input(
         &self,
@@ -25,7 +28,7 @@ impl DuckdbAnalysisStoreAdapter {
         let tables = ORIGINAL_SOURCE_PROJECTION_TABLE_NAMES
             .iter()
             .copied()
-            .chain(std::iter::once("impl-header-index-table"))
+            .chain(["impl-header-index-table", "macro-expanded-item-table"])
             .collect::<Vec<_>>();
         self.copy_published_stage_rows(source, source_scope, &tables, cancel)?;
         let connection = self
@@ -147,6 +150,17 @@ impl DuckdbAnalysisStoreAdapter {
                 edge_dispatch_metadata_text: None,
             });
         }
+        let (generated_nodes, generated_edges) =
+            generated_item_graph_projection::build_generated_item_records(
+                &connection,
+                source,
+                source_scope,
+                workspace_root,
+                generation,
+                cancel,
+            )?;
+        nodes.extend(generated_nodes);
+        edges.extend(generated_edges);
         let inventory = read_projection_rows::<2>(
             &connection,
             "SELECT projection_state, count(*)::VARCHAR FROM \"original-item-source-inventory\" WHERE generation_key=? AND attempt_key=? GROUP BY projection_state ORDER BY projection_state",
@@ -225,6 +239,7 @@ struct OriginalGraphSourceContext {
     bytes: Vec<u8>,
     file_digest: String,
     file_is_crate_root: bool,
+    chain_digests: Vec<String>,
 }
 
 fn read_original_graph_source(
@@ -255,6 +270,7 @@ fn read_original_graph_source(
             "file_source_absolute_path",
             "syntax-file-work-requests",
         )?),
+        chain_digests: Vec::new(),
     })
 }
 
@@ -292,7 +308,11 @@ fn build_original_item_identity(
         SpanByteRangeValue::try_from((start, end))
             .map_err(|error| invalid_source_row("span-reference-text-table", error.to_string()))?,
         SpanDigestIdValue::from(decode_digest(digest)?),
-        &[],
+        &context
+            .chain_digests
+            .iter()
+            .map(|digest| decode_digest(digest))
+            .collect::<Result<Vec<_>, _>>()?,
     )
     .map_err(|error| invalid_source_row("span-reference-text-table", error.to_string()))
 }
@@ -303,7 +323,7 @@ fn encode_original_bridge_identity(context: &OriginalGraphSourceContext, span: &
         "span_source_file_path": context.path,
         "span_byte_range_value": [span["span_byte_start_offset"], span["span_byte_end_offset"]],
         "span_content_digest_full": span["span_content_digest_full"],
-        "span_expansion_provenance_chain": [],
+        "span_expansion_provenance_chain": context.chain_digests,
     })
 }
 
