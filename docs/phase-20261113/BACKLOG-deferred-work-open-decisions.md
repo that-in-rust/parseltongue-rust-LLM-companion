@@ -33,6 +33,19 @@ OD-4   Enum variants and struct fields: nodes, or evidence only.  not counted; i
                                                                   private fields only
 ```
 
+Working decisions (2026-11-15). The user delegated these to best judgement; they are not yet
+confirmed. Each is used so work can continue and is reversed if the user rules otherwise.
+
+- **OD-2:** a macro-generated item is identified by its macro call site plus its place in the
+  expansion; its container is the module and file area where the macro is called. Confirm in
+  part 5's part file before any code depends on it.
+- **core:** edges into `core` are stored unresolved with reason "source missing" and listed
+  explicitly; no sysroot run in this phase.
+- **OD-8:** yes, `reads` and `uses_type` may start at a non-function item.
+- **Disagreement with the expected graph:** show the source lines, the user rules, and the
+  wrong side is fixed.
+- **Order:** finish part 4c for original bodies, then part 5, then part 4d.
+
 Also open, in code rather than in the graph rules:
 
 - **Two unresolved-reason lists.** `SiteUnresolvedReasonKind` for sites and
