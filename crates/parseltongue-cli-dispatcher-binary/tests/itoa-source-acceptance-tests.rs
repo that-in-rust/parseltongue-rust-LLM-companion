@@ -2295,6 +2295,62 @@ fn test_itoa_reads_row_counts() {
     }
 }
 
+/// REQ-RUST-049.0 R6 R7 R11
+#[test]
+#[ignore = "RED until part 4d step 4 wires imports rows into the full graph"]
+fn test_itoa_imports_row_counts() {
+    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let use_nodes = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_item_kind_value == Some(HldItemKindValue::UseStatement))
+        .map(|node| &node.node_target_reference)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        use_nodes.len(),
+        3,
+        "the two cfg-inactive uses are not nodes"
+    );
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Imports)
+        .map(|edge| {
+            let (start, end) = read_edge_site_range(edge);
+            let metadata = edge
+                .edge_dispatch_metadata_text
+                .as_deref()
+                .and_then(|text| serde_json::from_str::<Value>(text).ok())
+                .unwrap_or(Value::Null);
+            assert!(use_nodes.contains(&&edge.edge_source_reference));
+            assert_eq!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved {
+                    reason: HldUnresolvedReasonKind::ExternalSourceMissing
+                },
+                "the core source is not read in this run"
+            );
+            (
+                source[start as usize..end as usize].to_owned(),
+                metadata["import_path_text"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let expected = [
+        ("MaybeUninit", "core::mem::MaybeUninit"),
+        ("core::hint", "core::hint"),
+        ("core::str", "core::str"),
+        ("self", "core::mem"),
+    ]
+    .map(|(site, path)| (site.to_owned(), path.to_owned()));
+    assert_eq!(rows, expected);
+}
+
 /// REQ-RUST-048.0 R8
 #[test]
 fn test_reads_rows_read_twice() {
