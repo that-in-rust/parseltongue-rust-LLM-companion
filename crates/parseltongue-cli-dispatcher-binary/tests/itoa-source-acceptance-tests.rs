@@ -2736,3 +2736,31 @@ fn test_generates_edge_row_counts() {
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
     assert_eq!(input.input_edge_records.len(), 285);
 }
+
+/// REQ-RUST-046.0 R11: a second read of the store gives the same 45 generated nodes, each
+/// naming the same macro call, and the same `generates` and `contains` rows.
+#[test]
+fn test_generated_nodes_read_twice() {
+    let (_directory, _root, database, input) = run_original_graph_fixture();
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let again = store
+        .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
+        .unwrap();
+    let read_nodes = |graph: &HldMaterializationInputRecord| {
+        graph
+            .input_node_records
+            .iter()
+            .filter(|node| node.node_generating_call_reference.is_some())
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let nodes = read_nodes(&input);
+    assert_eq!(nodes.len(), 45);
+    assert_eq!(nodes, read_nodes(&again), "same nodes in the same order");
+    assert_eq!(input.input_node_records, again.input_node_records);
+    assert_eq!(input.input_edge_records, again.input_edge_records);
+    check_relation_rows_twice(HldRelationKindValue::Generates, 45);
+    check_relation_rows_twice(HldRelationKindValue::Contains, 88);
+}
