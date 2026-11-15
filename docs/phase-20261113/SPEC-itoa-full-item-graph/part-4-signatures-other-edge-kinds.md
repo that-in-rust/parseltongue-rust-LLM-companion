@@ -1,12 +1,12 @@
 # Part 4 — signatures and the other edge kinds
 
-**State: 4a BUILT for original signatures (all 7 steps). 4b to 4d are stubs.**
+**State: 4a BUILT for original signatures (all 7 steps). 4b BUILT in its own file. 4c and 4d are stubs.**
 
 This part adds the four edge kinds that have no producer. They are picked one at a time:
 
 ```text
 4a  uses_type from signatures   REQ-RUST-018.2   BUILT; Q3 and Q4 stay open
-4b  implements from impl headers                 stub
+4b  implements from impl headers  REQ-RUST-047.0  BUILT (part-4b file)
 4c  reads of consts and statics                  stub
 4d  imports from use nodes                       stub
 ```
@@ -191,11 +191,11 @@ A `Self` whose impl header is unresolved stores nothing until step 6.
 - **Q4: `Self::Buffer` inside an impl** is left unresolved by name resolution with no reason.
   4a stores it as `TraitSolverNeeded` (R5) rather than resolving the projection.
 
-## Stubs: 4b to 4d
+## 4b, and the stubs 4c and 4d
 
 - **4b `implements`.** Specified in
   [part-4b-implements-from-impl-headers.md](part-4b-implements-from-impl-headers.md)
-  (REQ-RUST-047.0). Not built.
+  (REQ-RUST-047.0). Built: 32 rows on pinned itoa.
 - **4c `reads`.** Paths to consts and statics in bodies and initializers
   (`I::MAX_STR_LEN`, `DECIMAL_PAIRS.0`). Part of REQ-RUST-032.0.
 - **4d `imports`.** One edge per `use` node to what it names. All four in itoa point into

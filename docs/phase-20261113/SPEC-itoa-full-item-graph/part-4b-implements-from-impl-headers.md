@@ -4,10 +4,17 @@ Written 2026-11-15 with `rust-executable-specs-spec-first-architecture`, before 
 
 ## The answer
 
-**State: SPECIFIED, not built. One `implements` row per trait impl header, from the self
-type to the trait. On pinned itoa that is 32 rows: 29 with a target and 3 unresolved. The
-first target is `u128 --implements--> Unsigned`, the only original header whose trait is in
-itoa.**
+**State: BUILT (all 7 steps, 2026-11-15). One `implements` row per trait impl header, from
+the self type to the trait. Pinned itoa stores 32 rows: 29 with a target and 3 unresolved,
+including the 28 macro-generated headers. The first target was
+`u128 --implements--> Unsigned`, the only original header whose trait is in itoa.**
+
+- **Stored by one run:** 58 nodes and 170 edges (43 `contains`, 61 `calls`, 34 `uses_type`,
+  32 `implements`). `implements_without_source` is 0. The graph is still `incomplete`.
+- **The 32 rows:** 12 to `Integer`, 12 to `private::Sealed`, 5 to `Unsigned`, and 3 from
+  `Buffer` unresolved with `ExternalSourceMissing` (`Default`, `Clone`, `Copy`).
+- **Macro-generated headers stayed in this part.** The frozen store accepts a site in
+  expanded text, so the 28 did not move to part 5.
 
 - **No new table and no inference.** `impl-header-index-table` already stores, per header,
   the resolved self type and the resolved trait, each with its own source range.
@@ -78,20 +85,27 @@ source through for other edge kinds.
 ```text
 req    test                                   type          assertion
 R1 R2  test_unsigned_impl_builtin_source      real source   u128 --implements--> Unsigned, Extracted
-R3     test_buffer_clone_trait_unresolved     real source   Buffer row for Clone, ExternalSourceMissing
-R1     test_trait_impl_header_edge            fixture       item self type, item trait: one row
-R2     test_builtin_source_one_node           fixture       two headers on u8: one u8 node
-R3     test_unresolved_trait_keeps_reason     fixture       cfg_inactive and ambiguous reasons kept
-R4     test_implements_site_trait_range       fixture       site equals the trait path range
+R4                                                          site equals the range of `Unsigned`
+R3     test_buffer_clone_trait_unresolved     real source   Buffer: Clone, Copy, Default, ExternalSourceMissing
+R1 R4  test_trait_impl_header_edge            fixture       item self type, item trait: one row at the trait path
+R2     test_builtin_source_two_headers        fixture       u8 and u16 each source one row
+R2     test_builtin_source_one_node           fixture       two headers on u8: one u8 node; graph validates
+R3     test_unresolved_trait_keeps_reason     fixture       stored reason kept; MissingTarget outside the graph
 R5     test_inherent_negative_no_edge         fixture       inherent and negative impls: zero rows
-R6     test_unresolved_self_counted_only      fixture       zero rows, headers_without_source = 1
-R7     test_macro_header_edge_provenance      fixture       macro header: row carries the chain
-R7     test_itoa_implements_row_counts        real source   32 rows: 29 Extracted, 3 Unresolved
-R8     test_builtin_source_implements_only    L1 unit       implements passes; uses_type fails
-R9     test_implements_rows_read_twice        fixture       two reads equal
+R6     test_unresolved_self_counted_only      fixture       zero rows, headers_without_source = 2
+R7     test_expanded_header_keeps_chain       fixture       expanded header: same row, path and chain kept
+R7     test_macro_header_edge_provenance      real source   28 rows; each site is the trait path in expanded text
+R1 R2  test_itoa_implements_row_counts        real source   32 rows: 12 + 12 + 5 with a target, 3 unresolved
+R8     test_builtin_source_implements_only    L1 unit       implements passes; uses_type, calls, contains fail
+R9     test_implements_rows_read_twice        real source   two reads of the frozen graph are equal, no duplicate
 ```
 
 Metric for every row: exact equality of source, target or reason, relation and site range.
+
+Changes from the plan: `test_implements_site_trait_range` was not written as its own test;
+R4 is asserted inside the three tests marked R4 and in `test_macro_header_edge_provenance`.
+`test_expanded_header_keeps_chain` is the fixture test for R7, and the two macro tests and
+the read-twice test run on real source instead of a fixture.
 
 ## 5 — Implementation plan
 
@@ -107,16 +121,44 @@ Each step is one commit of about 200 changed lines, test first.
 
 ## 6 — Quality gate results
 
-Not run. Nothing is built.
+Run 2026-11-15 at commit `7e2a2ef87`, the four `AGENTS.md` commands.
+
+```text
+cargo fmt --all -- --check                                   pass
+cargo clippy --release --workspace --all-targets -D warnings pass
+cargo test --release --workspace --all-targets               470 passed, 0 failed, 4 ignored
+cargo build --release --workspace --all-targets              pass
+```
+
+- `test_lang_items_in_sysroot` is skipped, as before, so this is not a full PASS.
+- The 22 real-source itoa tests pass inside that run (232.7 s on their own).
+- **Cost of one run** (3 runs, sysroot excluded, 2 workers, executable sha256
+  `5be64c7b…41d825f3`): 13.0 to 13.7 s, 369 to 371 MB peak over the whole process tree,
+  9.5 MB store. Memory is resident memory summed over the tree, sampled about every 18 ms;
+  the SOP asks for 10 ms.
+- **Test first:** every test had a failing run before its code, with these exceptions.
+  - `test_inherent_negative_no_edge` and `test_implements_rows_read_twice` passed on their
+    first run; they assert an absence and an equality the code never broke.
+  - The `MissingTarget` case of `test_unresolved_trait_keeps_reason` was added after its code.
+  - `test_expanded_header_keeps_chain` was written after the code and shown to fail with
+    the old skip restored.
+  - The expanded-text slice check in `test_macro_header_edge_provenance` was added after
+    its code; the test's row count had failed before (0 of 28).
+- **Refactor pass:** none needed.
 
 ## 7 — Open questions
 
-- **Q1. Site of a macro-generated header.** R7 stores the range in the expanded text with the
-  provenance chain. The expected graph anchors these rows in the macro definition in
-  `src/lib.rs`. Part 5 decides which is canonical; step 6 may move to part 5 if the frozen
-  store rejects an expanded-text site.
+- **Q1. Site of a macro-generated header.** Built as R7 says: the site is the range in the
+  expanded text, under the path `.parseltongue/macro-source/<digest>/expanded.rs`, with a
+  one-entry provenance chain. The expected graph anchors these rows in the macro definition
+  in `src/lib.rs`. Part 5 decides which is canonical.
 - **Q2. Site anchor.** The expected graph anchors each row at `impl `, not at the trait path.
   Its anchors are marked not canonical, so part 7 reconciles them to R4.
 - **Q3. `Buffer`'s three `core` traits** stay unresolved until part 6 decides how `core`
   targets are stored.
 - **Q4. Derived traits.** itoa has no `#[derive]`. `derives` edges are not part of 4b.
+- **Q5. Row order.** Two reads return the same order, but it is the store's row-key order,
+  not the order of the Rust record type. Nothing depends on the difference today.
+- **Q6. Identity across directories.** A row's identity includes the workspace's absolute
+  path (through the package id), so two runs in different directories do not give equal
+  rows. Part 7 must settle this before any cross-run comparison.

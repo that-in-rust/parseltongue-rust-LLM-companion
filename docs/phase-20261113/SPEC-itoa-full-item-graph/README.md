@@ -7,8 +7,9 @@ full item dependency graph only.
 
 **Fourteen requirements in seven parts, in build order. Parts 1 and 2 are built for the
 bounded graph. Part 3 is built for one receiver shape: the generic call
-`Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is built: `uses_type` rows from original signatures. Part 4b is next and
-specified: `implements` rows from impl headers, first `u128 --implements--> Unsigned`.**
+`Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is built: `uses_type` rows from original signatures. Part 4b is built: 32
+`implements` rows from impl headers, including the 28 macro-generated ones. Part 4c
+(`reads`) is next and not yet specified.**
 
 ```text
 part  file                                       requirements                   state
@@ -17,7 +18,7 @@ part  file                                       requirements                   
 2     part-2-first-call-default-new.md           034.0 036.0                    PARTLY
 3     part-3-generic-call-format-write.md        042.0                          BUILT (one shape)
 4     part-4-signatures-other-edge-kinds.md      018.2 032.0                    4a BUILT; 4c 4d stubs
-4b    part-4b-implements-from-impl-headers.md    047.0                          SPECIFIED
+4b    part-4b-implements-from-impl-headers.md    047.0                          BUILT
 5     part-5-macro-generated-items.md            046.0                          NOT STARTED
 6     part-6-targets-in-core.md                  (decision first)               BLOCKED
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED
@@ -75,7 +76,7 @@ A6 frozen readback, failure safety,   045.0 044.0                  S2, S4
 
 ```bash
 cargo test --release -p parseltongue-cli-dispatcher-binary \
-  --test itoa-source-acceptance-tests -- --test-threads=1          # 17 real-source tests
+  --test itoa-source-acceptance-tests -- --test-threads=1          # 22 real-source tests
 ```
 
 Doc comments naming each requirement in `crates/`, counted 2026-11-15 (one comment can
@@ -84,7 +85,7 @@ cover several tests):
 ```text
 042.0  17    045.0  15    018.2  15    034.0  10    032.0  7
 043.0   6    036.0   5    038.0   4    033.0   2    035.0  1
-038.1   1    044.0   1    046.0   0    047.0   0
+038.1   1    044.0   1    046.0   0    047.0  13
 ```
 
 ### Open points across parts
