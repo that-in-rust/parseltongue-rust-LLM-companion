@@ -473,6 +473,7 @@ pub(super) fn extract_impl_header_syntax(
             "member_syntax_kind_value":format!("{:?}",member.kind()),
             "member_generic_parameters_flag":member.children().any(|child| child.kind() == ra_ap_syntax::SyntaxKind::GENERIC_PARAM_LIST || child.kind() == ra_ap_syntax::SyntaxKind::WHERE_CLAUSE),
             "member_self_parameter_flag":ast::Fn::cast(member.clone()).and_then(|function| function.param_list()).is_some_and(|parameters| parameters.self_param().is_some()),
+            "member_self_parameter_kind":ast::Fn::cast(member.clone()).and_then(|function| function.param_list()).and_then(|parameters| parameters.self_param()).map(|parameter| if parameter.ty().is_some() { "typed" } else if parameter.amp_token().is_some() { "reference" } else { "value" }),
         })).collect::<Vec<_>>();
     let type_source = |ty: ast::Type| {
         let simple = ast::PathType::cast(ty.syntax().clone())

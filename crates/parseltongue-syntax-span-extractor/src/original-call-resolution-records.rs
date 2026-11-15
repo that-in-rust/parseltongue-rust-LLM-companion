@@ -26,6 +26,9 @@ mod callee_path_call_tests;
 #[cfg(test)]
 #[path = "original-call-resolution-tests.rs"]
 pub(crate) mod original_call_resolution_tests;
+#[cfg(test)]
+#[path = "self-argument-member-tests.rs"]
+mod self_argument_member_tests;
 
 #[derive(Debug, thiserror::Error)]
 pub enum OriginalCallResolutionError {
@@ -413,6 +416,86 @@ fn list_trait_method_candidates(headers: &[Value], trait_identity: &Value, name:
     })
 }
 
+/// What `Trait::name(self, ..)` runs when `self` is the calling method's own
+/// by-value `self` (REQ-RUST-052.0 G12): the member `name` of the one stored impl
+/// of `trait_identity` for the type whose impl holds the calling method
+/// `site_owner_occurrence_key`, with that impl's header.
+///
+/// The calling method's impl must be for a stored type written as a plain path,
+/// without generic parameters, not negative and not inside a function body. The
+/// candidates are the functions `name` in every stored trait impl that is not
+/// shown to be of another trait or for another type (an impl whose trait or self
+/// type has no stored target may be one of this trait for this type). The member
+/// is chosen only when there is exactly one candidate, its impl is as plain as
+/// the calling method's and of the stored trait, and both take `self` by value,
+/// so the argument's type is the impl's `Self`.
+fn find_self_argument_member<'a>(
+    headers: &'a [Value],
+    trait_identity: &Value,
+    site: &Value,
+) -> Option<(&'a Value, &'a Value)> {
+    let syntax = &site["call_syntax_evidence"];
+    let owner_key = &site["site_owner_occurrence_key"];
+    if syntax["call_first_argument_self_flag"] != true || !owner_key.is_string() {
+        return None;
+    }
+    let plain = |header: &Value| {
+        let stored = &header["impl_self_type_resolution"];
+        header["impl_generic_parameters_flag"] == false
+            && header["impl_negative_implementation_flag"] == false
+            && header["impl_function_body_ancestry_flag"] == false
+            && stored["resolution_state_kind"] == "resolved"
+            && stored["type_source_evidence"]["type_simple_path_flag"] == true
+    };
+    let members = |header: &'a Value| {
+        header["impl_member_occurrence_rows"]
+            .as_array()
+            .into_iter()
+            .flatten()
+    };
+    let by_value = |member: &Value| {
+        member["member_syntax_kind_value"] == "FN"
+            && member["member_self_parameter_kind"] == "value"
+    };
+    let owner = headers
+        .iter()
+        .filter(|header| plain(header))
+        .find(|header| {
+            members(header).any(|member| {
+                member["member_source_occurrence_key"] == *owner_key && by_value(member)
+            })
+        })?;
+    let self_type = &owner["impl_self_type_resolution"]["target_identity"];
+    let stored = |resolution: &Value| resolution["resolution_state_kind"] == "resolved";
+    let of_trait = |header: &Value| {
+        let named = &header["impl_trait_type_resolution"];
+        stored(named) && named["target_identity"] == *trait_identity
+    };
+    let mut found = headers
+        .iter()
+        .filter(|header| {
+            let named = &header["impl_trait_type_resolution"];
+            let target = &header["impl_self_type_resolution"];
+            !named.is_null()
+                && (!stored(named) || of_trait(header))
+                && (!stored(target) || target["target_identity"] == *self_type)
+        })
+        .flat_map(|header| members(header).map(move |member| (header, member)))
+        .filter(|(_, member)| {
+            member["member_syntax_kind_value"] == "FN"
+                && member["member_declared_name_value"]
+                    .as_str()
+                    .map(|name| name.trim_start_matches("r#"))
+                    == syntax["member_declared_name_value"].as_str()
+        });
+    match (found.next(), found.next()) {
+        (Some((header, member)), None) => {
+            (plain(header) && of_trait(header) && by_value(member)).then_some((member, owner))
+        }
+        _ => None,
+    }
+}
+
 /// Reads the stored name lookup of a call's whole callee path. The call gets a
 /// target only when the path names one function that is a graph node.
 ///
@@ -422,7 +505,10 @@ fn list_trait_method_candidates(headers: &[Value], trait_identity: &Value, name:
 /// as evidence (G10). A qualifier that is a type names a member, whose target
 /// depends on more than the path; such a row keeps the record and goes to the
 /// type-prefix lookup. A struct found in the Value namespace is a tuple
-/// struct's constructor and is the target of the call (G11). One exception: a qualifier stored as a builtin type whose
+/// struct's constructor and is the target of the call (G11).
+/// When the first argument of a trait's function is the calling method's own
+/// `self`, the member of the impl for that method's type is the target (G12).
+/// One exception: a qualifier stored as a builtin type whose
 /// whole path has a stored reason. `str::from_utf8_unchecked` under
 /// `use core::str` is in a module that was not read, whatever the Type lookup
 /// of `str` says.
@@ -524,9 +610,10 @@ fn resolve_callee_path_target(
             ));
         }
     };
-    let target = context
-        .read_single_target_identity(symbol)?
-        .map(|identity| decode_symbol_target_value(&identity))
+    let declared = context.read_single_target_identity(symbol)?;
+    let target = declared
+        .as_ref()
+        .map(decode_symbol_target_value)
         .transpose()?
         .map(HldTargetIdentityValue::from)
         .filter(|target| endpoints.contains(target));
@@ -537,21 +624,49 @@ fn resolve_callee_path_target(
             true,
         ));
     };
-    let candidates = match prefix_symbol.filter(|_| through_trait) {
-        Some(prefix) => context
-            .read_single_target_identity(prefix)?
-            .map(|identity| {
-                list_trait_method_candidates(
-                    headers,
-                    &identity,
-                    &syntax["member_declared_name_value"],
-                )
-            }),
+    let name = &syntax["member_declared_name_value"];
+    let trait_identity = match prefix_symbol.filter(|_| through_trait) {
+        Some(prefix) => context.read_single_target_identity(prefix)?,
         None => None,
+    };
+    // G12: the first argument is the calling method's own `self`.
+    let by_self = trait_identity
+        .as_ref()
+        .and_then(|identity| find_self_argument_member(headers, identity, site))
+        .map(|(member, owner)| {
+            decode_occurrence_identity_value(&member["member_semantic_occurrence_key"]).map(|key| {
+                (
+                    HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(key)),
+                    (member, owner),
+                )
+            })
+        })
+        .transpose()?
+        .filter(|(member, _)| endpoints.contains(member));
+    let evidence = trait_identity.as_ref().map(|identity| {
+        let listed = list_trait_method_candidates(headers, identity, name);
+        match &by_self {
+            Some((_, (member, owner))) => json!({
+                "trait_member_outcome_kind":"single_impl_member_by_self",
+                "trait_member_candidate_rows":listed["trait_member_candidate_rows"],
+                "selected_member_occurrence_key":member["member_semantic_occurrence_key"],
+                "receiver_type_stored_flag":true,
+                "receiver_self_type_identity":owner["impl_self_type_resolution"]["target_identity"],
+                "receiver_self_type_source_text":owner["impl_self_type_resolution"]["type_source_evidence"]["type_source_text"],
+                "receiver_impl_header_occurrence":owner["impl_semantic_occurrence_key"],
+                "trait_method_declaration_identity":declared,
+                "sources_not_read":listed["sources_not_read"]
+            }),
+            None => listed,
+        }
+    });
+    let (target, dispatch) = match by_self {
+        Some((member, _)) => (member, "trait_path_impl_method"),
+        None => (target, dispatch),
     };
     Ok(CalleePathLookupValue {
         callee_path_dispatch_kind: dispatch,
-        trait_method_lookup_evidence: candidates,
+        trait_method_lookup_evidence: evidence,
         ..finish(
             Some((HldEdgeResolutionValue::Extracted { target }, "")),
             outcome,
@@ -892,6 +1007,30 @@ pub(super) fn check_body_call_callee(path: &ast::Path) -> bool {
         && !super::body_value_read_records::check_local_value_binding(path)
 }
 
+/// The argument is the path `self`, and the function it is written in declares
+/// `self` by value with no type and is not inside a block: the argument's type
+/// is the `Self` of the impl that holds that function, which owns the call site.
+fn check_own_self_argument(argument: &ast::Expr) -> bool {
+    ast::PathExpr::cast(argument.syntax().clone())
+        .and_then(|expr| expr.path())
+        .and_then(|path| path.segment())
+        .is_some_and(|segment| segment.self_token().is_some())
+        && argument
+            .syntax()
+            .ancestors()
+            .find_map(ast::Fn::cast)
+            .filter(|function| {
+                !function
+                    .syntax()
+                    .ancestors()
+                    .skip(1)
+                    .any(|node| node.kind() == SyntaxKind::BLOCK_EXPR)
+            })
+            .and_then(|function| function.param_list())
+            .and_then(|parameters| parameters.self_param())
+            .is_some_and(|parameter| parameter.amp_token().is_none() && parameter.ty().is_none())
+}
+
 pub(super) fn extract_original_call_syntax(
     input: &SyntaxFileInputData,
     node: &SyntaxNode,
@@ -926,6 +1065,10 @@ pub(super) fn extract_original_call_syntax(
         .is_some_and(|prefix| check_call_lexical_shadowing(prefix, node));
     let receiver =
         ast::MethodCallExpr::cast(node.clone()).map(|call| extract_method_receiver_syntax(&call));
+    let own_self = ast::CallExpr::cast(node.clone())
+        .and_then(|call| ast::HasArgList::arg_list(&call))
+        .and_then(|list| list.args().next())
+        .is_some_and(|argument| check_own_self_argument(&argument));
     // What is called, as written: the callee expression, or the method's name.
     let callee = ast::CallExpr::cast(node.clone())
         .and_then(|call| call.expr())
@@ -950,7 +1093,7 @@ pub(super) fn extract_original_call_syntax(
             let text = std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()?;
             Some(json!({"span_byte_start_offset":start,"span_byte_end_offset":end,"type_source_text":text}))
         });
-    json!({"callee_source_text":callee,"callee_path_evidence":callee_path,"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"method_receiver_evidence":receiver})
+    json!({"callee_source_text":callee,"callee_path_evidence":callee_path,"call_supported_path_flag":supported,"member_declared_name_value":member,"type_source_evidence":type_source,"call_lexical_shadowing_flag":shadowed,"call_first_argument_self_flag":own_self,"method_receiver_evidence":receiver})
 }
 
 /// Syntax-only evidence for `receiver.method(..)`. Nothing is resolved here:

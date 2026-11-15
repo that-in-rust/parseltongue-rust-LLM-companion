@@ -3425,6 +3425,7 @@ fn test_generated_body_call_rows() {
                         "type_path_associated_function",
                         "callee_path_function",
                         "trait_path_method",
+                        "trait_path_impl_method",
                         "tuple_struct_constructor"
                     ]
                     .contains(&kind)
@@ -3605,10 +3606,11 @@ fn test_type_relative_member_targets() {
     );
 }
 
-/// REQ-RUST-052.0 G10, G11: a trait's method called through the trait
+/// REQ-RUST-052.0 G10, G11, G12: a trait's method called through the trait
 /// (`Unsigned::fmt(x, ..)`) has the trait's method declaration as target and lists the
-/// stored impl members that could run; a tuple struct called as a function
-/// (`DecimalPairs(..)`) has the struct as target.
+/// stored impl members that could run; when its first argument is the calling method's
+/// own by-value `self`, the member of the impl for that method's type is the target. A
+/// tuple struct called as a function (`DecimalPairs(..)`) has the struct as target.
 #[test]
 fn test_trait_path_call_targets() {
     let (_directory, _root, _database, input) = run_original_graph_fixture();
@@ -3619,8 +3621,9 @@ fn test_trait_path_call_targets() {
             .find(|node| &node.node_target_reference == reference)
             .map(|node| node.node_qualified_path_text.clone())
             .unwrap()
+            .replace("itoa::src/lib.rs::", "")
     };
-    let mut found = std::collections::BTreeMap::<String, usize>::new();
+    let mut found = std::collections::BTreeSet::<String>::new();
     for edge in input
         .input_edge_records
         .iter()
@@ -3635,47 +3638,66 @@ fn test_trait_path_call_targets() {
         if !["Unsigned::fmt", "DecimalPairs"].contains(&callee.as_str()) {
             continue;
         }
+        let caller = label(&edge.edge_source_reference);
         let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
-            panic!(
-                "{} calls {callee} without a target: {metadata}",
-                label(&edge.edge_source_reference)
-            );
+            panic!("{caller} calls {callee} without a target: {metadata}");
         };
         assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
-        let candidates = metadata["trait_method_lookup_evidence"]["trait_member_candidate_rows"]
-            .as_array()
-            .map(|rows| {
-                rows.iter()
-                    .map(|row| row["impl_self_type_source_text"].as_str().unwrap())
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .join(",")
-            })
-            .unwrap_or_default();
-        *found
-            .entry(format!(
-                "{callee} -> {} {} [{candidates}]",
+        let record = &metadata["trait_method_lookup_evidence"];
+        if callee == "Unsigned::fmt" {
+            // Every row lists the same five impl members that could run.
+            let candidates = record["trait_member_candidate_rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["impl_self_type_source_text"].as_str().unwrap())
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                candidates.into_iter().collect::<Vec<_>>().join(","),
+                "u128,u16,u32,u64,u8",
+                "{metadata}"
+            );
+        } else {
+            assert!(record.is_null(), "{metadata}");
+        }
+        assert!(
+            found.insert(format!(
+                "{caller} | {} | {} {} {} {}",
                 label(target),
-                metadata["dispatch_kind"].as_str().unwrap()
-            ))
-            .or_default() += 1;
+                metadata["dispatch_kind"].as_str().unwrap(),
+                record["trait_member_outcome_kind"].as_str().unwrap_or("-"),
+                record["receiver_type_stored_flag"],
+                record["receiver_self_type_source_text"]
+                    .as_str()
+                    .unwrap_or("-")
+            )),
+            "{metadata}"
+        );
     }
+    let by_self = |ty: &str| {
+        format!(
+            "<{ty} as private::Sealed>::write | <{ty} as Unsigned>::fmt | \
+             trait_path_impl_method single_impl_member_by_self true {ty}"
+        )
+    };
+    let by_trait = |ty: &str| {
+        format!(
+            "<{ty} as private::Sealed>::write | Unsigned::fmt | \
+             trait_path_method trait_method_declaration false -"
+        )
+    };
     assert_eq!(
         found,
-        std::collections::BTreeMap::from([
-            (
-                "DecimalPairs -> itoa::src/lib.rs::DecimalPairs tuple_struct_constructor []"
-                    .to_owned(),
-                1
-            ),
-            (
-                "Unsigned::fmt -> itoa::src/lib.rs::Unsigned::fmt trait_path_method \
-                 [u128,u16,u32,u64,u8]"
-                    .to_owned(),
-                10
-            ),
-        ])
+        ["u8", "u16", "u32", "u64", "u128"]
+            .into_iter()
+            .map(by_self)
+            .chain(
+                ["i8", "i16", "i32", "i64", "i128"]
+                    .into_iter()
+                    .map(by_trait)
+            )
+            .chain(["DECIMAL_PAIRS | DecimalPairs | tuple_struct_constructor - null -".to_owned()])
+            .collect::<std::collections::BTreeSet<_>>()
     );
 }
 
