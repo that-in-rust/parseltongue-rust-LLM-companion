@@ -2,8 +2,9 @@ use super::*;
 
 const SPAN_TABLE: &str = "span-reference-text-table";
 
-/// REQ-RUST-046.0 R1-R4, R6-R8: items written by a macro expansion become nodes, each
-/// held by the file area or module of the outermost source-written macro call.
+/// REQ-RUST-046.0 R1-R8: items written by a macro expansion become nodes, each held by
+/// the file area or module of the outermost source-written macro call and each with one
+/// `generates` row from the macro call that wrote it.
 pub(super) fn build_generated_item_records(
     connection: &duckdb::Connection,
     source: &dyn StageTableStorePort,
@@ -42,7 +43,10 @@ pub(super) fn build_generated_item_records(
             build_generated_item_pair(source, row, workspace_root, generation)
         })
         .collect::<Result<Vec<_>, _>>()
-        .map(|pairs| pairs.into_iter().unzip())
+        .map(|pairs| {
+            let (nodes, edges): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+            (nodes, edges.into_iter().flatten().collect())
+        })
 }
 
 fn build_generated_item_pair(
@@ -50,7 +54,7 @@ fn build_generated_item_pair(
     row: &[String; 14],
     workspace_root: &Path,
     generation: RunGenerationDigestValue,
-) -> Result<(HldNodeInputRecord, HldEdgeInputRecord), OriginalSourceProjectionError> {
+) -> Result<(HldNodeInputRecord, [HldEdgeInputRecord; 2]), OriginalSourceProjectionError> {
     let area = read_original_graph_source(source, &row[..4], workspace_root)?;
     let span: Value = decode_json(&row[4], SPAN_TABLE)?;
     let owner: Value = decode_json(&row[5], SPAN_TABLE)?;
@@ -63,9 +67,9 @@ fn build_generated_item_pair(
             "generating macro call is not a source-written macro call span".into(),
         ));
     }
-    let call = HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(
-        build_original_item_identity(&area, &call_span)?,
-    ));
+    let call_occurrence = build_original_item_identity(&area, &call_span)?;
+    let call =
+        HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(call_occurrence.clone()));
     let names = decode_lexical_name_list(&row[12])?
         .into_iter()
         .chain(decode_lexical_name_list(&row[7])?)
@@ -124,7 +128,22 @@ fn build_generated_item_pair(
         node_source_relative_path: Some(area.path),
         node_qualified_path_text: label,
         node_signature_text: None,
-        node_generating_call_reference: Some(call),
+        node_generating_call_reference: Some(call.clone()),
+    };
+    let generates = HldEdgeInputRecord {
+        run_generation_digest_value: generation,
+        edge_source_reference: call.clone(),
+        edge_relation_kind_value: HldRelationKindValue::Generates,
+        edge_resolution_value: HldEdgeResolutionValue::Extracted {
+            target: target.clone(),
+        },
+        edge_evidence_row_key: HldEvidenceRowKey {
+            evidence_site_occurrence_key: call_occurrence,
+            evidence_source_occurrence_key: call,
+            evidence_relation_kind_value: HldRelationKindValue::Generates,
+            evidence_target_reference_value: Some(target.clone()),
+        },
+        edge_dispatch_metadata_text: None,
     };
     let edge = HldEdgeInputRecord {
         run_generation_digest_value: generation,
@@ -141,7 +160,7 @@ fn build_generated_item_pair(
         },
         edge_dispatch_metadata_text: None,
     };
-    Ok((node, edge))
+    Ok((node, [edge, generates]))
 }
 
 fn decode_lexical_name_list(text: &str) -> Result<Vec<String>, OriginalSourceProjectionError> {

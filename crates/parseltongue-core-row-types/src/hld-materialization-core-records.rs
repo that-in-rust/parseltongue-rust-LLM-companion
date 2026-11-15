@@ -226,6 +226,8 @@ pub enum HldRelationKindValue {
     Reexports,
     Contains,
     Derives,
+    /// A macro call wrote this item: macro call node to generated item, sited at the call.
+    Generates,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -695,6 +697,23 @@ fn validate_graph_input_records(
             HldEdgeResolutionValue::Inferred { candidate_target }
             | HldEdgeResolutionValue::Proposed { candidate_target } => candidate_target.as_ref(),
         };
+        // A `generates` row goes from the call its target names, and is sited at that call.
+        if edge_record.edge_relation_kind_value == HldRelationKindValue::Generates
+            && (!matches!(
+                &edge_record.edge_resolution_value,
+                HldEdgeResolutionValue::Extracted { target }
+                    if node_records.get(target).is_some_and(|target_record| {
+                        target_record.node_generating_call_reference.as_ref()
+                            == Some(&edge_record.edge_source_reference)
+                    })
+            ) || !matches!(
+                &edge_record.edge_source_reference,
+                HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call))
+                    if *call == edge_record.edge_evidence_row_key.evidence_site_occurrence_key
+            ))
+        {
+            return Err(HldMaterializationValidationError::InvalidGeneratingCall);
+        }
         if input_record.source_coverage_kind == HldSourceCoverageKind::OriginalTopLevelContainment {
             let source_area = match &edge_record.edge_source_reference {
                 HldTargetIdentityValue::FilePublicArea(file_area) => file_area,

@@ -201,3 +201,86 @@ fn test_original_node_call_rejected() {
         Err(HldMaterializationValidationError::InvalidGeneratingCall)
     );
 }
+
+/// A `generates` row from `source` to the generated item of the fixture, sited at `site`.
+fn build_generates_edge_fixture(
+    input: &HldMaterializationInputRecord,
+    source: usize,
+    site: usize,
+) -> HldEdgeInputRecord {
+    let source = input.input_node_records[source]
+        .node_target_reference
+        .clone();
+    let item = input.input_node_records[1].node_target_reference.clone();
+    let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(site)) =
+        input.input_node_records[site].node_target_reference.clone()
+    else {
+        unreachable!()
+    };
+    HldEdgeInputRecord {
+        run_generation_digest_value: input.run_generation_digest_value,
+        edge_source_reference: source.clone(),
+        edge_relation_kind_value: HldRelationKindValue::Generates,
+        edge_resolution_value: HldEdgeResolutionValue::Extracted {
+            target: item.clone(),
+        },
+        edge_evidence_row_key: HldEvidenceRowKey {
+            evidence_site_occurrence_key: site,
+            evidence_source_occurrence_key: source,
+            evidence_relation_kind_value: HldRelationKindValue::Generates,
+            evidence_target_reference_value: Some(item),
+        },
+        edge_dispatch_metadata_text: None,
+    }
+}
+
+/// REQ-RUST-046.0 R5: a `generates` row goes from the call the item names, sited at it.
+#[test]
+fn test_generates_edge_call_accepted() {
+    let mut input = build_generated_node_fixture();
+    let edge = build_generates_edge_fixture(&input, 2, 2);
+    input.input_edge_records.push(edge);
+    assert_eq!(validate_full_graph_input(&input), Ok(()));
+}
+
+/// REQ-RUST-046.0 R5: a `generates` row sited at the item, not at the call, is rejected.
+#[test]
+fn test_generates_edge_site_checked() {
+    let mut input = build_generated_node_fixture();
+    let edge = build_generates_edge_fixture(&input, 2, 1);
+    input.input_edge_records.push(edge);
+    assert_eq!(
+        validate_full_graph_input(&input),
+        Err(HldMaterializationValidationError::InvalidGeneratingCall)
+    );
+}
+
+/// REQ-RUST-046.0 R5: a `generates` row whose target names another call is rejected.
+#[test]
+fn test_generates_edge_source_checked() {
+    let mut input = build_generated_node_fixture();
+    let mut other = input.input_node_records[2].clone();
+    let HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(call)) =
+        &other.node_target_reference
+    else {
+        unreachable!()
+    };
+    let parts = call.read_semantic_occurrence_parts();
+    other.node_target_reference = HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(
+        SemanticOccurrenceKeyValue::build_semantic_occurrence_key(
+            parts.unit_compilation_identity_key,
+            parts.span_source_file_path,
+            SpanByteRangeValue::try_from((20, 26)).unwrap(),
+            *parts.span_content_digest_full,
+            &[],
+        )
+        .unwrap(),
+    ));
+    input.input_node_records.push(other);
+    let edge = build_generates_edge_fixture(&input, 3, 3);
+    input.input_edge_records.push(edge);
+    assert_eq!(
+        validate_full_graph_input(&input),
+        Err(HldMaterializationValidationError::InvalidGeneratingCall)
+    );
+}
