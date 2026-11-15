@@ -5,8 +5,8 @@ newest first: add each new checkpoint at the top of that section and never edit 
 
 ## Current state (2026-11-15)
 
-**The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 58 nodes and
-195 edges, with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
+**The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
+(45 written by macro expansions) and 240 edges (88 `contains`), with 3 of 61 calls resolved, 34 `uses_type` rows (29 with a target, 5 unresolved),
 32 `implements` rows (29 with a target, 3 unresolved), 21 `reads` rows (15 with a
 target, 6 unresolved) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
@@ -15,9 +15,9 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5a step 1, the failing real-source test for one generated
-  `const _`. Part 5a is specified and its three open rules are decided. Parts 4a to 4d are
-  built.
+- **Next target:** part 5a step 2, the generating call as a node field and a `generates`
+  edge (45 rows predicted). Step 1 (generated items as nodes with containment) is built.
+  Parts 4a to 4d are built.
 - **Decided 2026-11-15:** targets in `core` are named external targets (sysroot stays out);
   macro definitions and macro calls at item position are nodes. Neither is built.
 - **Produced today:** `contains`, `calls`, `uses_type` from signatures, `implements`
@@ -99,6 +99,55 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 Add new entries directly below this line. One entry per checkpoint: time, what changed, the
 test names and exact command, pass and fail counts, measured numbers, commit, next target.
+
+### 2026-11-15 23:25 IST — Part 5a step 1: macro-generated items are nodes with one container
+
+**Pinned itoa now stores 103 nodes (was 58): the 45 active items written by macro expansions
+are nodes, each held by the `src/lib.rs` file area. `contains` rows are 88 (was 43). Both
+match the prediction. The generating call is not yet on the node or an edge (step 2).**
+
+- **RED:** `test_generated_const_node_contained` failed on behaviour: "the generated const _
+  is one node", left 0, right 1 (the pipeline ran; the node was absent).
+- **GREEN, three runs:** first failed in the node validator ("node category does not match
+  its typed identity"): it required a local node's file to equal the file in its identity.
+  Fixed in the validator for nodes whose expansion chain is not empty, with three validator
+  tests (one failed first: `test_generated_node_call_file`, `InvalidNodeCategory`). Second
+  run passed.
+- **Measured** by `test_generated_item_node_counts` (passed on first run, so it records
+  behaviour and was not seen failing): 5 `const _`, 12 `MAX_STR_LEN`, 12 `Buffer`,
+  12 `write`, 4 `fmt`; 45 generated nodes; 103 nodes; 88 `contains`; every generated node
+  has one container, the `src/lib.rs` file area. Inventory of expanded spans: 45 included,
+  28 impl blocks, 20 inactive.
+- **Edge total:** 240, computed (195 + 45), not read from a run report.
+- **Regression found by the adapter tests, not by the itoa tests:** the original-item fixture
+  carried a span with an expansion chain and no macro call, to show it was left out. The new
+  projection rejects it, so 5 fixture tests failed and every `test_reject_*` in that file
+  would have passed for the wrong reason. The span is out of the base fixture and has its
+  own test, `test_reject_orphan_generated_span`.
+- **Changed existing test:** `test_original_member_graph_roundtrip` now reads original
+  nodes only (43).
+- **Commands:**
+  - `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+    itoa-source-acceptance-tests -- --test-threads=1`: 30 passed, 0 failed, 385 s.
+  - `cargo test --release -p parseltongue-duckdb-analysis-adapter --lib --
+    --test-threads=1`: 170 passed, 0 failed.
+  - `cargo test --release -p parseltongue-core-row-types`: 15 passed, 0 failed.
+  - `cargo fmt --all -- --check` and `cargo clippy --release -p
+    parseltongue-core-row-types -p parseltongue-duckdb-analysis-adapter -p
+    parseltongue-cli-dispatcher-binary --all-targets --all-features -- -D warnings`: pass.
+  - Workspace gates not run; they run at the end of 5a.
+- **Refactor:** none yet. `build_generated_item_pair` is 95 lines and reuses the original
+  item helpers through an `OriginalGraphSourceContext` that now carries the chain; it is
+  split when step 2 adds the `generates` edge.
+- **Not checked:** a nested expansion (a macro call inside expanded text) and a macro call
+  inside an inline module. itoa has neither at item position.
+- **Codebase-memory queries:** `search_code` for the validator message (found
+  `validate_hld_node_input`); `detect_changes`; `trace_path validate_hld_node_input`
+  inbound, depth 2 (3 callers); `search_code node_signature_text` (27 places build or read
+  a node record, the cost of step 2's field).
+- **Commits:** `74829b098` (validator), `64521d5ae` (projection), `fae98c496` (itoa tests).
+- **Next:** step 2, `node_generating_call_reference` on the node and the `generates`
+  relation, test first on the same `const _`.
 
 ### 2026-11-15 17:40 IST — Part 5a specified: macro-generated items as nodes
 
