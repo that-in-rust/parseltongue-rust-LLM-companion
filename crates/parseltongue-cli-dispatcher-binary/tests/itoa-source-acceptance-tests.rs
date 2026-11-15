@@ -2239,3 +2239,86 @@ fn test_generic_const_bound_read() {
         "the row names the bounds walked and the trait whose source was not read"
     );
 }
+
+/// REQ-RUST-048.0 R5 R7
+#[test]
+fn test_itoa_reads_row_counts() {
+    let (_directory, root, database, input) = run_original_graph_fixture();
+    let spans = read_published_stage_rows(&database, "span-reference-text-table");
+    let new = locate_original_member_node(&input, &spans, "new");
+    let source = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+    let rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+        .map(|edge| {
+            let (start, end) = read_edge_site_range(edge);
+            (edge, &source[start as usize..end as usize])
+        })
+        .collect::<Vec<_>>();
+    let count = |text: &str, extracted: bool| {
+        rows.iter()
+            .filter(|(edge, site)| {
+                *site == text
+                    && extracted
+                        == matches!(
+                            edge.edge_resolution_value,
+                            HldEdgeResolutionValue::Extracted { .. }
+                        )
+            })
+            .count()
+    };
+    assert_eq!(rows.len(), 21, "15 reads with a target and 6 without");
+    assert_eq!(
+        (count("DECIMAL_PAIRS", true), count("I::MAX_STR_LEN", true)),
+        (14, 1)
+    );
+    assert_eq!(
+        (
+            count("u128::MAX_STR_LEN", false),
+            count("i128::MAX_STR_LEN", false)
+        ),
+        (5, 1),
+        "consts of macro-generated impls are not nodes until part 5"
+    );
+    for (edge, site) in &rows {
+        if let HldEdgeResolutionValue::Unresolved { reason } = &edge.edge_resolution_value {
+            assert_eq!(
+                *reason,
+                HldUnresolvedReasonKind::TraitSolverNeeded,
+                "no reason was stored for {site}"
+            );
+        }
+        if *site == "i128::MAX_STR_LEN" {
+            assert_eq!(edge.edge_source_reference, new.node_target_reference);
+        }
+    }
+}
+
+/// REQ-RUST-048.0 R8
+#[test]
+fn test_reads_rows_read_twice() {
+    let (_directory, _root, database, input) = run_original_graph_fixture();
+    let read = |graph: &HldMaterializationInputRecord| {
+        graph
+            .input_edge_records
+            .iter()
+            .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let again = store
+        .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
+        .unwrap();
+    let rows = read(&input);
+    assert_eq!(rows.len(), 21);
+    assert_eq!(rows, read(&again), "same rows in the same order");
+    assert_eq!(
+        rows.iter().collect::<std::collections::BTreeSet<_>>().len(),
+        21,
+        "no row is stored twice"
+    );
+}
