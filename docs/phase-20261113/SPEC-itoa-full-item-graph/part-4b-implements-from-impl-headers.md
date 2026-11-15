@@ -137,8 +137,10 @@ cargo build --release --workspace --all-targets              pass
   9.5 MB store. Memory is resident memory summed over the tree, sampled about every 18 ms;
   the SOP asks for 10 ms.
 - **Test first:** every test had a failing run before its code, with these exceptions.
-  - `test_inherent_negative_no_edge` and `test_implements_rows_read_twice` passed on their
-    first run; they assert an absence and an equality the code never broke.
+  - `test_inherent_negative_no_edge` passed on the stub; it asserts an absence.
+  - `test_implements_rows_read_twice`: its equality check never failed. Its first version
+    also required the rows to be in the Rust record type's sort order, which failed; that
+    check was replaced by a no-duplicate check (see Q5).
   - The `MissingTarget` case of `test_unresolved_trait_keeps_reason` was added after its code.
   - `test_expanded_header_keeps_chain` was written after the code and shown to fail with
     the old skip restored.
