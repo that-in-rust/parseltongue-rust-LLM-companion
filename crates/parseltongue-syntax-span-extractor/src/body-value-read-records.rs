@@ -2,6 +2,10 @@ use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
 };
+use crate::original_call_resolution_records::{
+    BoundMethodLookupIndex, OriginalCallResolutionError, build_bound_method_index,
+    walk_parameter_bound_traits,
+};
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
@@ -27,6 +31,8 @@ pub enum BodyReadEdgeError {
     Store(#[from] StoreBackendFailureError),
     #[error("body read edge identity: {0}")]
     Identity(#[from] ImplHeaderSourceError),
+    #[error("body read edge bound lookup: {0}")]
+    Bound(#[from] OriginalCallResolutionError),
     #[error("body read edge evidence field is invalid: {field}")]
     InvalidEvidence { field: &'static str },
     #[error("body read edge input scope does not match its graph")]
@@ -68,6 +74,7 @@ pub fn resolve_body_read_edges(
         .and_then(|row| row["workspace_source_root_path"].as_str())
         .unwrap_or("");
     let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
+    let lookup = build_bound_method_index(store, source_scope, &context, input)?;
     let endpoints = input
         .input_node_records
         .iter()
@@ -94,6 +101,7 @@ pub fn resolve_body_read_edges(
             &site,
             request,
             &context,
+            &lookup,
             &endpoints,
             input.run_generation_digest_value,
         )? {
@@ -146,13 +154,30 @@ fn read_value_path_request<'a>(
         .find(|record| record["site_path_context_kind"] == "body_value_path"))
 }
 
+/// The first segment of a two-segment path such as `T::NAME`, when it is one
+/// plain identifier.
+fn read_type_relative_prefix(text: &str) -> Option<&str> {
+    let (prefix, member) = text.split_once("::")?;
+    let prefix = prefix.trim();
+    (!prefix.is_empty()
+        && !member.contains("::")
+        && prefix
+            .chars()
+            .all(|letter| letter.is_alphanumeric() || letter == '_'))
+    .then_some(prefix)
+}
+
 /// The `reads` edge of one original path expression, when its owner is a
 /// graph node and `request` resolved to one `static` or `const` graph node.
 /// A const declared in a function body is not a node, so it gives no edge.
+/// A path through a type parameter of the owner gives an edge only when the
+/// target is a member of a trait the parameter is bound by; the edge then
+/// names the bounds walked and each bound trait whose source was not read.
 fn build_body_read_edge(
     site: &Value,
     request: &Value,
     context: &ImplHeaderSourceContext<'_>,
+    lookup: &BoundMethodLookupIndex,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, BodyReadEdgeError> {
@@ -186,12 +211,42 @@ fn build_body_read_edge(
     else {
         return Ok(None);
     };
+    let walk = read_type_relative_prefix(read_site_text_field(site, "site_syntax_source_text")?)
+        .map(|prefix| {
+            walk_parameter_bound_traits(
+                read_site_text_field(site, "site_owner_occurrence_key")?,
+                prefix,
+                context,
+                lookup,
+            )
+            .map_err(BodyReadEdgeError::from)
+        })
+        .transpose()?;
+    let bound = match walk {
+        // A bound in a form the walk cannot prove: no edge.
+        Some(None) => return Ok(None),
+        Some(Some(walk))
+            if !walk.bound_trait_targets.is_empty() || !walk.missing_source_traits.is_empty() =>
+        {
+            let member = walk.bound_trait_targets.iter().any(|found| {
+                lookup
+                    .contained_item_pairs
+                    .contains(&(found.clone(), target.clone()))
+            });
+            if !member {
+                return Ok(None);
+            }
+            walk.build_walk_evidence_value()
+        }
+        _ => Value::Null,
+    };
     let evidence = build_site_evidence_value(site)?;
     let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
     let metadata = json!({
         "read_kind":"body_value_path",
         "read_source_text":site["site_syntax_source_text"],
-        "read_target_symbol_kind":kind
+        "read_target_symbol_kind":kind,
+        "bound_read_evidence":bound
     });
     Ok(Some(HldEdgeInputRecord {
         run_generation_digest_value: generation,

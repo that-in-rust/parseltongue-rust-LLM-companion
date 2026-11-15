@@ -242,14 +242,31 @@ fn build_original_call_edge(
 /// Bound rows by owner item, traits that declare supertraits, methods with a
 /// `self` parameter, and the graph's containment pairs: all a bound walk needs.
 #[derive(Default)]
-struct BoundMethodLookupIndex {
+pub(super) struct BoundMethodLookupIndex {
     owner_bound_rows: BTreeMap<String, Vec<Value>>,
     trait_owner_keys: BTreeMap<HldTargetIdentityValue, String>,
     self_method_targets: Vec<(String, HldTargetIdentityValue)>,
-    contained_item_pairs: BTreeSet<(HldTargetIdentityValue, HldTargetIdentityValue)>,
+    pub(super) contained_item_pairs: BTreeSet<(HldTargetIdentityValue, HldTargetIdentityValue)>,
 }
 
-fn build_bound_method_index(
+/// The traits a type parameter is bound by, with their supertraits.
+/// `bound_chain_texts` starts with the parameter; `missing_source_traits`
+/// names each bound whose trait has no source in the run.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct BoundTraitWalkValue {
+    pub(super) bound_chain_texts: Vec<String>,
+    pub(super) missing_source_traits: Vec<String>,
+    pub(super) bound_trait_targets: Vec<HldTargetIdentityValue>,
+}
+
+impl BoundTraitWalkValue {
+    /// The record an edge carries to say which bounds chose its target.
+    pub(super) fn build_walk_evidence_value(&self) -> Value {
+        json!({"bound_chain":self.bound_chain_texts,"missing_source_traits":self.missing_source_traits})
+    }
+}
+
+pub(super) fn build_bound_method_index(
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
     context: &ImplHeaderSourceContext<'_>,
@@ -307,6 +324,68 @@ fn build_bound_method_index(
     Ok(index)
 }
 
+/// Walk the bounds that `owner_key` declares on its type parameter
+/// `parameter`, then the supertraits of each trait found. `None` when a bound
+/// has a form the walk cannot prove. A name that is not a bounded type
+/// parameter of the owner gives a walk with no trait and no missing source.
+pub(super) fn walk_parameter_bound_traits(
+    owner_key: &str,
+    parameter: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    index: &BoundMethodLookupIndex,
+) -> Result<Option<BoundTraitWalkValue>, OriginalCallResolutionError> {
+    let mut walk = BoundTraitWalkValue {
+        bound_chain_texts: vec![parameter.to_owned()],
+        ..BoundTraitWalkValue::default()
+    };
+    let mut visited = BTreeSet::new();
+    let mut pending = vec![(owner_key.to_owned(), false)];
+    while let Some((key, supertraits)) = pending.pop() {
+        let span = context.span(&key)?;
+        for row in index.owner_bound_rows.get(&key).into_iter().flatten() {
+            let bound = &row["bound_syntax_evidence"];
+            let applies = if supertraits {
+                bound["bound_subject_kind"] == "supertrait"
+            } else {
+                matches!(
+                    bound["bound_subject_kind"].as_str(),
+                    Some("type_parameter" | "where_predicate")
+                ) && bound["bound_subject_name_value"] == parameter
+            };
+            if !applies || bound["bound_form_kind"] == "lifetime" {
+                continue;
+            }
+            let text = row["site_syntax_source_text"].as_str().unwrap_or_default();
+            if bound["bound_form_kind"] != "trait" {
+                // `?Sized` relaxes a default and adds no member; other forms are unproven.
+                if text.starts_with('?') {
+                    continue;
+                }
+                return Ok(None);
+            }
+            let resolved = context.resolve_type(span, &bound["trait_type_source"], true)?;
+            if resolved["resolution_state_kind"] != "resolved" {
+                if resolved["unresolved_reason_kind"] == "external_source_missing" {
+                    walk.missing_source_traits.push(text.to_owned());
+                    continue;
+                }
+                return Ok(None);
+            }
+            let found: HldTargetIdentityValue =
+                decode_symbol_target_value(&resolved["target_identity"])?.into();
+            if !visited.insert(found.clone()) {
+                continue;
+            }
+            walk.bound_chain_texts.push(text.to_owned());
+            if let Some(next) = index.trait_owner_keys.get(&found) {
+                pending.push((next.clone(), true));
+            }
+            walk.bound_trait_targets.push(found);
+        }
+    }
+    Ok(Some(walk))
+}
+
 /// `parameter.method(..)` where the parameter's declared type is a type
 /// parameter of the enclosing function: the candidates are the methods of the
 /// parameter's bound traits and their supertraits. Exactly one gives an edge to
@@ -336,66 +415,27 @@ fn resolve_bound_method_target(
     {
         return Ok(unproven);
     }
-    let mut chain = vec![parameter.to_owned()];
-    let mut missing = Vec::new();
-    let mut visited = BTreeSet::new();
-    let mut candidates = BTreeSet::new();
-    let mut pending = vec![(owner_key.to_owned(), false)];
-    while let Some((key, supertraits)) = pending.pop() {
-        let span = context.span(&key)?;
-        for row in index.owner_bound_rows.get(&key).into_iter().flatten() {
-            let bound = &row["bound_syntax_evidence"];
-            let applies = if supertraits {
-                bound["bound_subject_kind"] == "supertrait"
-            } else {
-                matches!(
-                    bound["bound_subject_kind"].as_str(),
-                    Some("type_parameter" | "where_predicate")
-                ) && bound["bound_subject_name_value"] == parameter
-            };
-            if !applies || bound["bound_form_kind"] == "lifetime" {
-                continue;
-            }
-            let text = row["site_syntax_source_text"].as_str().unwrap_or_default();
-            if bound["bound_form_kind"] != "trait" {
-                // `?Sized` relaxes a default and adds no method; other forms are unproven.
-                if text.starts_with('?') {
-                    continue;
-                }
-                return Ok(unproven);
-            }
-            let resolved = context.resolve_type(span, &bound["trait_type_source"], true)?;
-            if resolved["resolution_state_kind"] != "resolved" {
-                if resolved["unresolved_reason_kind"] == "external_source_missing" {
-                    missing.push(text.to_owned());
-                    continue;
-                }
-                return Ok(unproven);
-            }
-            let found: HldTargetIdentityValue =
-                decode_symbol_target_value(&resolved["target_identity"])?.into();
-            if !visited.insert(found.clone()) {
-                continue;
-            }
-            chain.push(text.to_owned());
-            candidates.extend(
-                index
-                    .self_method_targets
-                    .iter()
-                    .filter(|(name, target)| {
-                        name == method
-                            && index
-                                .contained_item_pairs
-                                .contains(&(found.clone(), target.clone()))
-                    })
-                    .map(|(_, target)| target.clone()),
-            );
-            if let Some(next) = index.trait_owner_keys.get(&found) {
-                pending.push((next.clone(), true));
-            }
-        }
-    }
-    let evidence = json!({"bound_chain":chain,"missing_source_traits":missing});
+    let Some(walk) = walk_parameter_bound_traits(owner_key, parameter, context, index)? else {
+        return Ok(unproven);
+    };
+    let candidates = walk
+        .bound_trait_targets
+        .iter()
+        .flat_map(|found| {
+            index
+                .self_method_targets
+                .iter()
+                .filter(move |(name, target)| {
+                    name == method
+                        && index
+                            .contained_item_pairs
+                            .contains(&(found.clone(), target.clone()))
+                })
+                .map(|(_, target)| target.clone())
+        })
+        .collect::<BTreeSet<_>>();
+    let missing = &walk.missing_source_traits;
+    let evidence = walk.build_walk_evidence_value();
     let mut found = candidates.into_iter();
     let resolution = match (found.next(), found.next()) {
         (Some(target), None) if endpoints.contains(&target) => {
