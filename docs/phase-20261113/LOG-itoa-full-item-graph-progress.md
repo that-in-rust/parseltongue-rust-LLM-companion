@@ -117,6 +117,14 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 06:20 IST — Correction to the step 7 entry below: 5 and 5, not 6 and 4
+
+- The part file said six of the 10 `Unsigned ::fmt` calls pass `self` and four pass
+  `self.unsigned_abs()`. I had not counted them. Counted in the stored `calls` rows of the
+  step 7 run: 5 are `Unsigned ::fmt (self , buf )`, 5 are
+  `Unsigned ::fmt (self .unsigned_abs () , ..)`. The part file (10.12) is corrected.
+- No code or test changed; no total changed.
+
 ### 2026-11-16 06:00 IST — Part 5d step 7: a trait's method through the trait; a tuple struct's constructor (REQ-RUST-052.0 G10, G11)
 
 - **Built.** A callee qualified by a trait whose whole path stores one Function that is a

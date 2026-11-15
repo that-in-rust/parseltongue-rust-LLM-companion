@@ -943,13 +943,14 @@ Each candidate row has the impl header's occurrence key, the impl's self type te
 that self type is stored as resolved, whether the impl has generic parameters, and the
 member's occurrence key.
 
-**What the 10 calls are.** Six are `Unsigned::fmt(self, buf)` in the `write` of an unsigned
-type; four are `Unsigned::fmt(self.unsigned_abs(), ..)` in the `write` of a signed type.
+**What the 10 calls are (counted in the stored rows).** Five are `Unsigned::fmt(self, buf)`
+in the `write` of an unsigned type (`u8` to `u128`); five are
+`Unsigned::fmt(self.unsigned_abs(), ..)` in the `write` of a signed type (`i8` to `i128`).
 
-**Not built: the impl member as target.** For the six `Unsigned::fmt(self, buf)` calls the
+**Not built: the impl member as target.** For the five `Unsigned::fmt(self, buf)` calls the
 first argument is the `self` parameter of a method in an impl for a stored type, so the
 impl member that runs is provable from source without type inference. No rule reads the
-first argument yet, so these rows also stop at the declaration (Q27). The other four need
+first argument yet, so these rows also stop at the declaration (Q27). The other five need
 the return type of `unsigned_abs`, which is in `core`.
 
 **Tests.** Real source: `test_trait_path_call_targets` (failed first: "`<u8 as
