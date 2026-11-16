@@ -220,6 +220,33 @@ prim("divmod100", "u32", L, 231, "u32", n=3)
 edge("slice_buffer_to_str", "uses_type", MU, L, 247, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
 edge("slice_buffer_to_str", "uses_type", MU, L, 252, "*const [MaybeUninit<u8>]", dkind="external", via=USE_MEM, flags=[EXT, "body_type_mention"])
 for p in ("u8", "usize", "str"): prim("slice_buffer_to_str", p, L, 247, p)
+# ---------------- uses_type: types written in an expression (REQ-RUST-018.3 R10) ----------------
+BT = ["body_type_mention"]
+SELF_BT = BT + ["Self_resolved_to_impl_self_type"]
+for ln in (8, 9, 10, 11, 18): prim("u128_ext::mulhi", "u64", X, ln, "as u64", flags=BT)
+prim("Buffer::new", "u8", L, 99, "::<u8>", flags=BT)
+prim("slice_buffer_to_str", "u8", L, 252, "u8", n=2, flags=BT)
+for s, u, inv in PAIRS:
+    g = G("impl_Integer", inv)
+    prim(mx(u), "usize", L, 144, "as usize", gen=g, flags=BT); prim(mx(s), "usize", L, 160, "as usize", gen=g, flags=BT)
+for t, p, inv in SIZES:
+    g = G("impl_Integer_size", inv)
+    prim(mx(t), p, L, 195, "$primitive as Integer", gen=g, flags=BT)
+    edge(mx(t), "uses_type", "Integer", L, 195, "as Integer>", gen=g, flags=BT)
+    prim(sw(t), p, L, 205, "$primitive).write(buf)", gen=g, flags=BT)
+for u, inv in UNS:
+    g = G("impl_Unsigned", inv); f = uf(u)
+    prim(f, u, L, 271, "::<Self>", gen=g, flags=SELF_BT); prim(f, u, L, 280, ": Self", gen=g, flags=SELF_BT); prim(f, u, L, 303, "as Self", gen=g, flags=SELF_BT)
+    for ln in (285, 302): prim(f, "u32", L, ln, "as u32", gen=g, flags=BT)
+    for ln in (288, 290, 292, 294, 306, 308): prim(f, "usize", L, ln, "as usize", gen=g, flags=BT)
+    prim(f, "u8", L, 318, "as u8", gen=g, flags=BT)
+FU = "<u128 as Unsigned>::fmt"
+for ln, p in ((360, "u64"), (371, "u32"), (384, "u32"), (385, "u64"), (398, "u8")): prim(FU, p, L, ln, "as " + p, flags=BT)
+for ln in (373, 374, 375, 376, 387, 388): prim(FU, "usize", L, ln, "as usize", flags=BT)
+for ln in (417, 431): prim("enc_16lsd", "u32", L, ln, "as u32", flags=BT)
+for ln in (420, 422, 424, 426, 433, 434, 435, 436): prim("enc_16lsd", "usize", L, ln, "as usize", flags=BT)
+for ln in (454, 465): prim("div_rem_1e16", "u64", L, ln, "as u64", flags=BT)
+
 edge("Unsigned", "uses_type", "Integer", L, 255, ": Integer")
 edge("Unsigned::fmt", "uses_type", "private::Sealed::Buffer", L, 256, "Self::Buffer", flags=["through_supertraits_Integer_Sealed"]); prim("Unsigned::fmt", "usize", L, 256, "-> usize")
 edge("enc_16lsd", "uses_type", MU, L, 408, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
@@ -400,7 +427,7 @@ candidate_provenance = {"status": "LLM_PARSED_DRAFT", "author": "Devin",
 candidate_header = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
                     "candidate_provenance": candidate_provenance, "candidate_rows_preserved": True,
                     "source_coverage": {"whole_source_coverage_claimed": False,
-                        "known_uncovered_constructs": ["operators", "body_types", "literals", "repeated_same_line_sites"]},
+                        "known_uncovered_constructs": ["operators", "literals", "repeated_same_line_sites"]},
                     "canonical_identity_status": "SYMBOLIC_NONCANONICAL", "production_input": False,
                     "source_commit": source_commit, "source_pin_file": PIN_PATH.name}
 dump("itoa-expected-graph-nodes.json", {**candidate_header, "row_count": len(node_rows), "rows": node_rows})
@@ -430,12 +457,12 @@ summary = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
            "relation_kind_counts": RULES.relation_counts(edge_rows), "target_kind_counts": target_kind_counts,
            "blocker_counts": blocked_rows["blocker_counts"],
            "source_coverage": {"whole_source_coverage_claimed": False,
-               "known_uncovered_constructs": ["operators", "body_types", "literals", "repeated_same_line_sites"]},
+               "known_uncovered_constructs": ["operators", "literals", "repeated_same_line_sites"]},
            "open_decisions": ["OD-2", "OD-7", "OD-8"], "production_comparison_status": "NOT_RUN"}
 dump("itoa-expected-graph-summary.json", summary)
 md = "# itoa expected full item graph: summary\n\n"
 md += "**Status: LLM_PARSED_DRAFT_NOT_FROZEN.** Written by Devin from reading the pinned source. Not reviewed, not frozen, never a production input. Identities are symbolic labels, not production keys.\n\n"
-md += "Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, body types, literals and repeated same-line sites are not covered. Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.\n\n"
+md += "Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, literals and repeated same-line sites are not covered. A type written in an expression is covered (REQ-RUST-018.3 R10). Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.\n\n"
 md += "```text\n" + "\n".join(f"{key}: {value}" for key, value in counts.items()) + "\n"
 md += "\n".join(f"relation {key}: {value}" for key, value in summary["relation_kind_counts"].items()) + "\n"
 md += "\n".join(f"target {key}: {value}" for key, value in target_kind_counts.items()) + "\n"

@@ -1493,6 +1493,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         }
         if let Some(path) = ast::Path::cast(node.clone())
             && (check_exported_signature_path(&path)
+                || check_body_type_path(&path)
                 || super::original_call_resolution_records::check_body_call_prefix(&path)
                 || super::body_value_read_records::check_body_value_path(&path)
                 || super::body_value_read_records::check_body_value_prefix(&path)
@@ -1501,6 +1502,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         {
             let cast_type =
                 super::original_call_resolution_records::check_cast_receiver_type(&path);
+            let body_type = !cast_type && check_body_type_path(&path);
             let call_callee =
                 super::original_call_resolution_records::check_body_call_callee(&path);
             let value_prefix = super::body_value_read_records::check_body_value_prefix(&path);
@@ -1516,7 +1518,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     "site_source_range_start":restore_source_byte_offset(range.start(),&file.source_crlf_removed_offsets),
                     "site_source_range_end":restore_source_byte_offset(range.end(),&file.source_crlf_removed_offsets),
                     "path_site_source_text":read_original_node_source(node,file),
-                    "site_path_context_kind":if cast_type {"body_cast_receiver_type"} else if body_prefix {"body_call_type_prefix"} else if value_prefix {"body_value_type_prefix"} else if call_callee {"body_call_callee_path"} else if body_value {"body_value_path"} else if in_use {"import"} else {"signature"},
+                    "site_path_context_kind":if body_type {"body_type_path"} else if cast_type {"body_cast_receiver_type"} else if body_prefix {"body_call_type_prefix"} else if value_prefix {"body_value_type_prefix"} else if call_callee {"body_call_callee_path"} else if body_value {"body_value_path"} else if in_use {"import"} else {"signature"},
                     "site_expansion_provenance_chain":file.source_expansion_provenance_rows.iter().map(encode_digest_hex_value).collect::<Vec<_>>(),
                     "site_compilation_scope_record":self.build_compilation_scope_record(scope),
                 }));
@@ -1530,7 +1532,11 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     } else {
                         read_contextual_path_segments(&path, file, false)
                     },
-                    path_requested_namespace_kind: if body_prefix || value_prefix || cast_type {
+                    path_requested_namespace_kind: if body_prefix
+                        || value_prefix
+                        || cast_type
+                        || body_type
+                    {
                         NameNamespaceFilterKind::Type
                     } else if body_value || call_callee {
                         NameNamespaceFilterKind::Value
@@ -1783,6 +1789,28 @@ fn read_grouped_import_segments(path: &ast::Path) -> Vec<NamePathSegmentKind> {
         .flat_map(read_ast_path_segments)
         .chain(read_ast_path_segments(path))
         .collect()
+}
+
+/// Whether `path` is the whole path of a type written in a function body
+/// (REQ-RUST-018.3 R10). It is submitted as a Type request in its lexical scope.
+/// The nearest item around the path must be that function: a path in the header of an
+/// impl written in a function body is not requested, so such an impl stays stored with
+/// neither its type nor its trait resolved (REQ-RUST-053.0 N5).
+fn check_body_type_path(path: &ast::Path) -> bool {
+    path.syntax()
+        .parent()
+        .is_some_and(|parent| parent.kind() == SyntaxKind::PATH_TYPE)
+        && path
+            .syntax()
+            .ancestors()
+            .find(|node| ast::Item::can_cast(node.kind()))
+            .and_then(ast::Fn::cast)
+            .and_then(|function| function.body())
+            .is_some_and(|body| {
+                body.syntax()
+                    .text_range()
+                    .contains_range(path.syntax().text_range())
+            })
 }
 
 fn check_exported_signature_path(path: &ast::Path) -> bool {

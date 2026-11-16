@@ -52,6 +52,18 @@ pub(super) fn read_declared_type_owner(node: &SyntaxNode) -> Option<&'static str
     }
 }
 
+/// Whether `node` is a type written in an expression of its owning item, and not inside
+/// another type of that expression (REQ-RUST-018.3 R10).
+pub(super) fn check_expression_type_node(node: &SyntaxNode) -> bool {
+    ast::Type::can_cast(node.kind())
+        && node
+            .ancestors()
+            .skip(1)
+            .take_while(|owner| !check_syntax_item_node(owner))
+            .find(|owner| ast::Type::can_cast(owner.kind()) || ast::Expr::can_cast(owner.kind()))
+            .is_some_and(|owner| ast::Expr::can_cast(owner.kind()))
+}
+
 /// Whether `node` is a signature row: one of the row kinds, or a declared type.
 fn check_signature_row_node(node: &SyntaxNode) -> bool {
     check_signature_row_kind(node.kind()) || read_declared_type_owner(node).is_some()
@@ -63,32 +75,27 @@ fn check_signature_row_node(node: &SyntaxNode) -> bool {
 /// expression (an array length, a const argument) are not listed. The declared
 /// type of a `const` or `static` and the aliased type of a type alias are rows
 /// too (REQ-RUST-052.0 G7).
-/// `Value::Null` when the row is not in signature position: it sits under an
-/// expression of its owning item, such as a closure parameter.
+/// A type written in an expression is a row of its own, and so is a signature row inside
+/// it, such as a parameter of a function pointer type (REQ-RUST-018.3 R10).
+/// `Value::Null` when `node` is neither.
 pub(super) fn extract_signature_type_paths(
     input: &SyntaxFileInputData,
     node: &SyntaxNode,
     removed: &[usize],
 ) -> Value {
-    if !check_signature_row_node(node)
-        || node
-            .ancestors()
-            .skip(1)
-            .take_while(|owner| !check_syntax_item_node(owner))
-            .any(|owner| ast::Expr::can_cast(owner.kind()))
-    {
+    if !check_signature_row_node(node) && !check_expression_type_node(node) {
         return Value::Null;
     }
     node.descendants()
         .filter(|path| path.kind() == SyntaxKind::PATH_TYPE)
         .filter(|path| {
-            // A declared type that is itself a path is its own nearest row.
-            let nearest = path
-                .ancestors()
-                .skip(usize::from(path != node))
-                .find(|holder| {
-                    check_signature_row_node(holder) || ast::Expr::can_cast(holder.kind())
-                });
+            // A declared type or an expression's type that is itself a path is its own
+            // nearest row.
+            let nearest = path.ancestors().find(|holder| {
+                check_signature_row_node(holder)
+                    || ast::Expr::can_cast(holder.kind())
+                    || check_expression_type_node(holder)
+            });
             nearest.as_ref() == Some(node)
         })
         .map(|path| {
@@ -414,7 +421,7 @@ fn build_type_path_edge(
         _ => None,
     };
     let mut metadata = json!({
-        "type_use_kind":"signature",
+        "type_use_kind":row["type_use_position_kind"].as_str().unwrap_or("signature"),
         "signature_row_kind":row["site_syntax_kind_value"],
         "type_source_text":text,
         "type_path_self_flag":path["type_path_self_flag"]

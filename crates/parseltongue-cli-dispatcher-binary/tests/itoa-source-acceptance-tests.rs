@@ -588,6 +588,11 @@ fn read_signature_type_uses(
         .filter(|edge| {
             edge.edge_source_reference == owner.node_target_reference
                 && edge.edge_relation_kind_value == HldRelationKindValue::UsesType
+                // A type written in the body is not a signature site (REQ-RUST-018.3 R10).
+                && edge
+                    .edge_dispatch_metadata_text
+                    .as_deref()
+                    .is_some_and(|text| !text.contains("\"type_use_kind\":\"expression\""))
         })
         .cloned()
         .collect();
@@ -609,6 +614,83 @@ fn read_edge_site_range(edge: &HldEdgeInputRecord) -> Option<(u64, u64)> {
     site.span_expansion_provenance_chain
         .is_empty()
         .then(|| site.span_byte_range_value.read_source_range_pair())
+}
+
+/// REQ-RUST-018.3 R10: every type written in an expression of pinned itoa is a
+/// `uses_type` row of the item it is written in.
+#[test]
+fn test_itoa_expression_type_uses() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+    };
+    let mut shapes = std::collections::BTreeMap::<(String, String, String), usize>::new();
+    let mut signature_rows = 0;
+    for edge in input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::UsesType)
+    {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        if metadata["type_use_kind"] != "expression" {
+            assert_eq!(metadata["type_use_kind"], "signature");
+            signature_rows += 1;
+            continue;
+        }
+        let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
+            panic!("every expression type of itoa has a target: {metadata}");
+        };
+        let origin = metadata["expansion_source_origin"]["site_first_token_origin"]
+            ["token_source_origin_kind"]
+            .as_str()
+            .unwrap_or("source")
+            .to_owned();
+        let text = metadata["type_source_text"]
+            .as_str()
+            .unwrap()
+            .split_whitespace()
+            .collect::<String>();
+        *shapes.entry((text, label(target), origin)).or_insert(0) += 1;
+    }
+    let row = |text: &str, target: &str, origin: &str, count: usize| {
+        (
+            (text.to_owned(), target.to_owned(), origin.to_owned()),
+            count,
+        )
+    };
+    assert_eq!(
+        shapes.into_iter().collect::<Vec<_>>(),
+        vec![
+            row(
+                "I::Buffer",
+                "itoa::src/lib.rs::private::Sealed::Buffer",
+                "source",
+                1
+            ),
+            row("Integer", "itoa::src/lib.rs::Integer", "definition", 2),
+            row("MaybeUninit<u8>", "core::mem::MaybeUninit", "source", 1),
+            row("Self", "u16", "definition", 3),
+            row("Self", "u32", "definition", 3),
+            row("Self", "u64", "definition", 3),
+            row("Self", "u8", "definition", 3),
+            row("i64", "i64", "invocation", 2),
+            row("u32", "u32", "definition", 8),
+            row("u32", "u32", "source", 4),
+            row("u64", "u64", "invocation", 2),
+            row("u64", "u64", "source", 9),
+            row("u8", "u8", "definition", 4),
+            row("u8", "u8", "source", 4),
+            row("usize", "usize", "definition", 34),
+            row("usize", "usize", "source", 14),
+        ]
+    );
+    assert_eq!(signature_rows, 106);
 }
 
 /// REQ-RUST-018.2
@@ -2294,7 +2376,8 @@ fn test_sysroot_reached_names_reasoned() {
             .count()
     };
     let missing = || Value::from("external_source_missing");
-    assert_eq!(count_sites("MaybeUninit<u8>", missing()), 13);
+    // 13 signature sites and the cast `*const [MaybeUninit<u8>]` in slice_buffer_to_str.
+    assert_eq!(count_sites("MaybeUninit<u8>", missing()), 14);
     assert_eq!(count_sites("Copy", missing()), 2);
     assert_eq!(count_sites("Default", missing()), 1);
     assert_eq!(count_sites("Clone", missing()), 1);
@@ -2329,14 +2412,16 @@ fn test_sysroot_reached_names_reasoned() {
             .count()
     };
     // G7: 11 fewer than before; the array-length paths above are value paths now.
-    assert_eq!(paths.len(), 193);
-    assert_eq!(count_state("resolved"), 166);
+    // REQ-RUST-018.3 R10: 81 more, the type paths written in function bodies; 80 resolve
+    // and one (`MaybeUninit<u8>` in a cast) is in `core`.
+    assert_eq!(paths.len(), 274);
+    assert_eq!(count_state("resolved"), 246);
     assert_eq!(count_state("ambiguous"), 0);
     let reasoned = paths
         .iter()
         .filter(|row| row["path_unresolved_reason_kind"] == "external_source_missing")
         .count();
-    assert_eq!(reasoned, 22);
+    assert_eq!(reasoned, 23);
 }
 
 /// REQ-RUST-048.0 R4
@@ -2935,7 +3020,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 585);
+    assert_eq!(input.input_edge_records.len(), 682);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3431,6 +3516,10 @@ fn test_generated_signature_type_uses() {
             if !metadata["declared_type_owner_kind"].is_null() {
                 continue;
             }
+            // A type written in a generated body has its own test (REQ-RUST-018.3 R10).
+            if metadata["type_use_kind"] == "expression" {
+                continue;
+            }
             let text = metadata["type_source_text"].as_str().unwrap();
             let origin = &metadata["expansion_source_origin"];
             let copied = |token: &Value| {
@@ -3501,8 +3590,9 @@ fn test_generated_signature_type_uses() {
             .iter()
             .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::UsesType)
             .count(),
-        106,
-        "34 from original signatures, 32 from generated ones and (G7) 40 from declared types"
+        203,
+        "34 from original signatures, 32 from generated ones, (G7) 40 from declared types \
+         and (REQ-RUST-018.3 R10) 97 from expressions"
     );
 }
 
@@ -4634,9 +4724,11 @@ fn test_itoa_external_type_uses() {
         rows,
         std::iter::repeat_n(row("ARRAY_TYPE"), 10)
             .chain(std::iter::repeat_n(row("PARAM"), 2))
+            .chain(std::iter::once(row("PTR_TYPE")))
             .chain(std::iter::once(row("RECORD_FIELD")))
             .collect::<Vec<_>>(),
-        "10 generated Buffer aliases, 2 function parameters, the field of Buffer"
+        "10 generated Buffer aliases, 2 function parameters, the cast in \
+         slice_buffer_to_str, the field of Buffer"
     );
     // The import of the name and its 13 uses share one node.
     let node = |edge: &HldEdgeInputRecord| match &edge.edge_resolution_value {
@@ -4658,11 +4750,11 @@ fn test_itoa_external_type_uses() {
         uses.iter()
             .filter(|edge| node(edge).as_ref() == Some(&imported[0]))
             .count(),
-        13
+        14
     );
     // No type use is left without a target: the bound `Copy` is a prelude name, pinned by
     // test_itoa_prelude_name_targets.
-    assert_eq!(uses.len(), 106);
+    assert_eq!(uses.len(), 203);
     let open = uses
         .iter()
         .filter(|edge| {
@@ -4900,9 +4992,9 @@ fn test_itoa_builtin_member_targets() {
     assert_eq!(input.input_node_records.len(), 150);
 }
 
-/// The `calls` and `reads` rows of the full item graph of a one-file crate `source`,
-/// which must compile: the written path, the target, and why a name was withheld.
-fn read_shadow_case_rows(source: &str) -> Vec<(String, String, String)> {
+/// The stored edge rows of the full item graph of a one-file crate `source`, which must
+/// compile.
+fn read_shadow_edge_records(source: &str) -> Vec<Value> {
     let directory = tempfile::tempdir().unwrap();
     let root = prepare_source_scope_fixture(directory.path(), "Exposed");
     fs::write(root.join("src/lib.rs"), source).unwrap();
@@ -4914,7 +5006,110 @@ fn read_shadow_case_rows(source: &str) -> Vec<(String, String, String)> {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let mut rows = read_published_stage_rows(&database, "edge-evidence-record-table")
+    read_published_stage_rows(&database, "edge-evidence-record-table")
+}
+
+/// The `uses_type` rows of `source` whose type is written in an expression: the type's
+/// text and its target. A local target is shown by the start of its declaration.
+fn read_shadow_type_rows(source: &str) -> Vec<(String, String)> {
+    let mut rows = read_shadow_edge_records(source)
+        .into_iter()
+        .filter(|row| row["edge_relation_kind"] == "UsesType")
+        .filter_map(|row| {
+            let metadata: Value =
+                serde_json::from_str(row["edge_dispatch_metadata_text"].as_str()?).ok()?;
+            (metadata["type_use_kind"] == "expression").then_some(())?;
+            let resolution = &row["edge_resolution"];
+            let target = match resolution["target"]["kind"].as_str() {
+                Some("ExternalNamed") => format!(
+                    "external:{}",
+                    resolution["target"]["external_item_path_text"]
+                        .as_str()
+                        .unwrap()
+                ),
+                Some("Definition") => {
+                    let start = resolution["target"]["occurrence_identity"]["byte_range"][0]
+                        .as_u64()
+                        .unwrap() as usize;
+                    let declaration = &source[start..];
+                    let end = declaration.find([';', '{', '(']).unwrap();
+                    format!("local:{}", declaration[..end].trim())
+                }
+                Some("Builtin") => format!(
+                    "builtin:{}",
+                    resolution["target"]["builtin_name"].as_str().unwrap()
+                ),
+                Some(kind) => panic!("unexpected target kind {kind}"),
+                None => format!("none:{}", resolution["reason"].as_str().unwrap()),
+            };
+            Some((
+                metadata["type_source_text"]
+                    .as_str()?
+                    .split_whitespace()
+                    .collect::<String>(),
+                target,
+            ))
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    rows
+}
+
+/// REQ-RUST-018.3 R10, R10a, R10b: the forms a type takes in an expression, run through
+/// the whole pipeline on a small crate that compiles. A path that starts at a type
+/// parameter targets the member of a trait the parameter is bound by in its declaration,
+/// directly or through a supertrait. A struct literal, a tuple-struct call and a type
+/// parameter give no row.
+#[test]
+fn test_expression_type_shadow_cases() {
+    let source = concat!(
+        "#![no_std]\n#![allow(dead_code, unused_variables)]\n",
+        "pub struct W(pub u8);\n",
+        "pub trait S { type N; }\n",
+        "pub trait A: S { type M; }\n",
+        "pub trait B { type M: Sized; }\n",
+        "pub fn sup<I: A>(p: *const u8) { let q = p.cast::<I::N>(); }\n",
+        "pub fn one<I: A>(p: *const u8) { let q = p.cast::<I::M>(); }\n",
+        "pub fn wh<J>(p: *const u8) where J: A { let q = p.cast::<J::M>(); }\n",
+        "pub fn two<I: A + B>(p: *const u8) { let q = p.cast::<<I as B>::M>(); }\n",
+        "pub fn forms(x: u32) -> u8 {\n",
+        "    let a: W = W(x as u8);\n",
+        "    let f = |b: W| -> u8 { b.0 };\n",
+        "    let c = W { 0: 1 };\n",
+        "    let d = core::mem::size_of::<W>();\n",
+        "    let e = <u8 as Default>::default();\n",
+        "    struct Loc;\n",
+        "    let g: Loc = Loc;\n",
+        "    f(a).wrapping_add(c.0)\n",
+        "}\n",
+    );
+    let row = |text: &str, target: &str| (text.to_owned(), target.to_owned());
+    assert_eq!(
+        read_shadow_type_rows(source),
+        vec![
+            row("<IasB>::M", "local:type M: Sized"),
+            row("B", "local:pub trait B"),
+            row("Default", "external:Default"),
+            row("I::M", "local:type M"),
+            row("I::N", "local:type N"),
+            // A bound written in a `where` clause is not walked: no target, not a wrong one.
+            row("J::M", "none:TraitSolverNeeded"),
+            // A struct declared in a function body is not a node.
+            row("Loc", "none:MissingTarget"),
+            row("W", "local:pub struct W"),
+            row("W", "local:pub struct W"),
+            row("W", "local:pub struct W"),
+            row("u8", "builtin:u8"),
+            row("u8", "builtin:u8"),
+            row("u8", "builtin:u8"),
+        ]
+    );
+}
+
+/// The `calls` and `reads` rows of the full item graph of a one-file crate `source`,
+/// which must compile: the written path, the target, and why a name was withheld.
+fn read_shadow_case_rows(source: &str) -> Vec<(String, String, String)> {
+    let mut rows = read_shadow_edge_records(source)
         .into_iter()
         .filter_map(|row| {
             let metadata: Value =

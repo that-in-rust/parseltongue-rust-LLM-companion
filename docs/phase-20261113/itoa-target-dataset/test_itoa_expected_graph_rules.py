@@ -140,7 +140,7 @@ class ReferenceGraphRulesTests(unittest.TestCase):
         coverage = full.get("source_coverage", {})
         self.assertIn("whole_source_coverage_claimed", coverage)
         self.assertFalse(coverage.get("whole_source_coverage_claimed", True))
-        self.assertTrue({"operators", "body_types", "literals", "repeated_same_line_sites"}
+        self.assertTrue({"operators", "literals", "repeated_same_line_sites"}
                         <= set(coverage["known_uncovered_constructs"]))
 
     def test_builder_pin_cli_supported(self):

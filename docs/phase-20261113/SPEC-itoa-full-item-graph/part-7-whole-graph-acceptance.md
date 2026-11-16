@@ -80,5 +80,32 @@ The dataset is never edited to match production: each change cites the source li
   two rules cannot both hold.
 - **Q2 (decided 2026-11-16 from PRD graph rule 1).** The crate root is a node: every module
   is. It has no edge until OD-7 (file module and file area) is decided.
-- **Q3** Which type mentions in a function body are `uses_type` rows (turbofish arguments,
-  `as` casts, `let` annotations, array types). The draft lists one.
+- **Q3 (decided 2026-11-16 from the maximum-information rule).** Every type written in
+  an expression is a `uses_type` site. Rule: REQ-RUST-018.3 R10 below.
+
+## 4. REQ-RUST-018.3 — types written in an expression (step 7.3, added 2026-11-16)
+
+REQ-RUST-018.2 R1 to R9 stay as written, except that R8 no longer excludes macro
+expansions (part 5). One rule is added.
+
+- **R10.** WHEN a type is written inside an expression of an item that is a graph node (a
+  function body, the initializer of a const or static, an array length), THEN each type
+  path in it SHALL be a `uses_type` site of that item under R1 to R5 and R7. The forms are
+  the type of an `as` cast, a generic argument (`cast::<T>()`, `Name::<T>::new()`), a
+  `let` annotation, a closure's parameter and return types, and the type and the trait of
+  `<T as Trait>::NAME`. The row's metadata says `type_use_kind = "expression"`; a
+  signature row says `"signature"`.
+- **R10a.** WHEN the path starts at a type parameter of the item (`I::Buffer`), THEN the
+  target SHALL be given only if name lookup stores exactly one member for it: a member of
+  a trait the parameter is bound by in its declaration, or of a supertrait of one.
+  Otherwise the row is unresolved with `TraitSolverNeeded`. Not built: a bound written in
+  a `where` clause is not walked (the row is unresolved), and the row does not list the
+  bounds walked.
+- **R10c.** WHEN the type names an item declared in a function body, THEN the row is
+  unresolved with `MissingTarget`; such an item is not a node.
+- **R10d.** A path in the header of an impl written in a function body is not requested:
+  the stored header of such an impl keeps neither its type nor its trait resolved
+  (REQ-RUST-053.0 N5 depends on it).
+- **R10b.** A struct literal (`Buffer { bytes }`), a pattern and the qualifier of a value
+  path (`u128::from`, `MaybeUninit::<u8>::uninit`) are not types in the grammar and give
+  no `uses_type` row. The call or read row of the value path already names its target.

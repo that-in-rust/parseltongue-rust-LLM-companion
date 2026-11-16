@@ -107,6 +107,8 @@ fn test_declared_type_paths_listed() {
             ),
             row("PATH_TYPE", "O", &["O"]),
             row("TYPE_BOUND", "Q", &["Q"]),
+            // REQ-RUST-018.3 R10: the type of a `let` in a function body.
+            row("PATH_TYPE", "R", &["R"]),
             row("PATH_TYPE", "U", &["U"]),
         ]
     );
@@ -147,22 +149,113 @@ fn test_expression_paths_not_types() {
             row("RECORD_FIELD", "a: [u8; N::LEN]", &["u8"]),
             row("RECORD_FIELD", "b: W<{ LEN }>", &["W<{ LEN }>"]),
             row("RECORD_FIELD", "c: [u8; size::<X>()]", &["u8"]),
+            // REQ-RUST-018.3 R10: a type written in an expression is its own row.
+            row("PATH_TYPE", "X", &["X"]),
         ],
-        "a path under an expression is not a signature type path"
+        "a value path under an expression is not a type path"
     );
 }
 
 /// REQ-RUST-018.2
 #[test]
-fn test_body_position_rows_unlisted() {
+fn test_closure_types_listed_once() {
     let source = "fn run(a: A) { let f = |b: B| -> C { loop {} }; }\n";
-    let rows = read_signature_path_lists(source);
-    assert_eq!(rows[0], row("PARAM", "a: A", &["A"]));
-    assert!(
-        rows[1..].iter().all(|(_, _, paths)| paths.is_none()),
-        "closure parameters and return types are body sites: {rows:?}"
+    assert_eq!(
+        read_signature_path_lists(source),
+        vec![
+            row("PARAM", "a: A", &["A"]),
+            row("PARAM", "b: B", &[]),
+            row("PATH_TYPE", "B", &["B"]),
+            row("RET_TYPE", "-> C", &[]),
+            row("PATH_TYPE", "C", &["C"]),
+        ],
+        "REQ-RUST-018.3 R10: a closure's types are rows of their own"
     );
-    assert_eq!(rows.len(), 3);
+}
+
+/// REQ-RUST-018.3 R10
+#[test]
+fn test_expression_types_listed_rows() {
+    for (text, expected) in [
+        ("y as A", true),
+        ("fn f(a: A) {}", false),
+        ("const C: A = 0;", false),
+    ] {
+        let source = format!("fn run() {{ {text}; }}\n");
+        let file = ra_ap_syntax::SourceFile::parse(&source, ra_ap_syntax::Edition::Edition2021)
+            .syntax_node();
+        let node = file
+            .descendants()
+            .find(|node| node.kind() == SyntaxKind::PATH_TYPE)
+            .unwrap();
+        assert_eq!(check_expression_type_node(&node), expected, "{text}");
+    }
+    let source = "fn run<I: T>(a: A) { let f = |b: B| -> C { loop {} }; \
+        let x: D = y as *const [E<F>]; z.cast::<I::G>(); H::<J>::new(); \
+        let k = <K as L>::M; let p = q as fn(N) -> O; }\n";
+    let rows = read_signature_path_lists(source);
+    let body = rows
+        .iter()
+        .skip_while(|found| **found != row("PARAM", "a: A", &["A"]))
+        .skip(1)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        body,
+        vec![
+            row("PARAM", "b: B", &[]),
+            row("PATH_TYPE", "B", &["B"]),
+            row("RET_TYPE", "-> C", &[]),
+            row("PATH_TYPE", "C", &["C"]),
+            row("PATH_TYPE", "D", &["D"]),
+            row("PTR_TYPE", "*const [E<F>]", &["E<F>", "F"]),
+            row("PATH_TYPE", "I::G", &["I::G"]),
+            row("PATH_TYPE", "J", &["J"]),
+            row("PATH_TYPE", "K", &["K"]),
+            row("PATH_TYPE", "L", &["L"]),
+            row("FN_PTR_TYPE", "fn(N) -> O", &[]),
+            row("PARAM", "N", &["N"]),
+            row("RET_TYPE", "-> O", &["O"]),
+        ],
+        "each type path of an expression is listed once, on its nearest row"
+    );
+}
+
+/// REQ-RUST-018.3 R10
+#[test]
+fn test_expression_type_edge_stored() {
+    let source = "struct Buffer; fn make(a: Buffer) { let b = a as Buffer; }";
+    let (store, input) = make_call_fixture_graph(source);
+    let buffer = read_fixture_node_target(&input, "Buffer");
+    let mut edges = read_type_fixture_edges(source, &store, &input);
+    edges.sort_by_key(|(_, _, site)| site.clone());
+    assert_eq!(
+        edges,
+        vec![
+            ("make".to_owned(), buffer.clone(), "26:Buffer".to_owned()),
+            ("make".to_owned(), buffer, "49:Buffer".to_owned()),
+        ]
+    );
+    let kinds = resolve_signature_type_edges(
+        &store,
+        &make_call_fixture_scope(),
+        &input,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap()
+    .iter()
+    .map(|edge| {
+        serde_json::from_str::<Value>(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap()
+            ["type_use_kind"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    })
+    .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        kinds.into_iter().collect::<Vec<_>>(),
+        ["expression", "signature"]
+    );
 }
 
 /// `uses_type` edges of a fixture as (source name, resolution, site text).

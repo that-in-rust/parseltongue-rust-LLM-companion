@@ -3690,7 +3690,6 @@
   "source_coverage": {
     "known_uncovered_constructs": [
       "operators",
-      "body_types",
       "literals",
       "repeated_same_line_sites"
     ],

@@ -2295,3 +2295,90 @@ expected 1 stored 0: slice_buffer_to_str --uses_type--> core::mem::MaybeUninit @
   `--release`: 323 s for one test and 2,531 s for the file, against about 145 s in release.
   No result depended on it.
 - **No refactor needed.**
+
+
+## Part 7 step 7.3b — a type written in an expression is a `uses_type` site (2026-11-16)
+
+- **REQ:** REQ-RUST-018.3 R10, R10a to R10d (new, part 7 file section 4); REQ-RUST-044.0.
+  Q3 decided from the maximum-information rule: every type written in an expression is a
+  site; a struct literal, a pattern and the qualifier of a value path are not types.
+- **STUB:** `check_expression_type_node` with `todo!("REQ-RUST-018.3 R10")` in
+  `signature-type-edge-records.rs`.
+- **RED:** `CARGO_BUILD_JOBS=2 cargo test --release -p parseltongue-syntax-span-extractor
+  --lib test_expression_type`
+
+```text
+test ...::test_expression_types_listed_rows ... FAILED   (not yet implemented: REQ-RUST-018.3 R10)
+test ...::test_expression_type_edge_stored ... FAILED
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 135 filtered out
+```
+
+  The real-source RED is `test_itoa_whole_graph_equality` of step 7.4a (the two rows at
+  `src/lib.rs` 107 and 252).
+- **GREEN, what was built:** a type whose nearest type-or-expression ancestor is an
+  expression is a row of `field-signature-detail-table` with its type paths
+  (`type_use_position_kind = expression`); a whole type path in a function body is
+  submitted to name lookup as a Type request (`body_type_path`); the edge says
+  `type_use_kind = expression`.
+- **Commands and results:**
+
+```text
+cargo fmt --all --check                                                   exit 0
+cargo clippy --release -p parseltongue-syntax-span-extractor
+  -p parseltongue-cli-dispatcher-binary --all-targets -- -D warnings      exit 0
+cargo test --release -p parseltongue-syntax-span-extractor                137 + 17 passed
+cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests                                     56 passed, 1 failed (126.7 s)
+```
+
+- **The one failure is the whole-graph test, on rows this step does not touch:**
+
+```text
+nodes expected 152 stored 150; edge rows expected 682 stored 682
+expected, not stored: itoa
+expected, not stored: str::len
+expected 1 stored 0: Buffer::format --calls--> str::len @ src/lib.rs:109 definition
+expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_needed] @ src/lib.rs:109 definition
+```
+
+- **Measured on pinned itoa:** 682 edges (was 585), 203 `uses_type` rows (was 106), all
+  with a target; 150 nodes (unchanged); 274 stored path rows (was 193), 246 resolved,
+  23 `external_source_missing`. Still marked incomplete.
+- **The 97 new rows, each checked against its source line:** 48 `as usize`, 12 `as u32`,
+  9 `as u64`, 8 `u8` (casts and `MaybeUninit::<u8>`), 12 `Self` in the four generated
+  `fmt` (to u8, u16, u32, u64), 4 `$primitive` (i64, u64; the site starts at the macro
+  call), 2 `Integer` in `<$primitive as Integer>::MAX_STR_LEN`, `I::Buffer` at line 107
+  (to `private::Sealed::Buffer`) and `MaybeUninit<u8>` at line 252.
+- **Expected graph re-cut:** the builder gained those 95 rows (it had 2); 124 distinct
+  `uses_type` edges; `body_types` is no longer listed as uncovered; 16 Python tests pass.
+- **Wrong-name regression found by an existing test and fixed before commit:** my first
+  version also requested the paths in the header of an impl written in a function body.
+  That resolved such an impl and gave builtin-member names the part 6 guard withholds
+  (`test_external_name_shadow_cases`: `u8::FOO6` named again). Now the nearest item around
+  the path must be the function itself (R10d).
+- **Existing tests changed:** `test_declared_type_paths_listed` and
+  `test_expression_paths_not_types` (one more row each);
+  `test_body_position_rows_unlisted` renamed `test_closure_types_listed_once` (its rule is
+  reversed by R10); pinned values in `test_generates_edge_row_counts` (585 to 682),
+  `test_generated_signature_type_uses` (106 to 203, skips expression rows),
+  `test_itoa_external_type_uses` (13 to 14, one `PTR_TYPE` row),
+  `test_sysroot_reached_names_reasoned` (paths 193 to 274, resolved 166 to 246, reasoned
+  22 to 23); `read_signature_type_uses` keeps signature rows only.
+- **New real-source test, written after the code:** `test_itoa_expression_type_uses`. Its
+  16 predicted (type, target, origin) counts were stored as predicted; the first run
+  failed only on two node labels I wrote without their file prefix.
+- **New pipeline test, written after the code:** `test_expression_type_shadow_cases`, a
+  small crate that compiles. 12 of 13 predicted rows were stored as predicted. The
+  thirteenth: `J::M` with `where J: A` has no target (`TraitSolverNeeded`); a bound in a
+  `where` clause is not walked. Recorded in R10a as not built.
+- **My predictions that were wrong:** a closure parameter listed its type twice (holder
+  rule fixed before GREEN); a site offset miscounted by one in the fixture.
+- **Deliberate breaks (6), each fails a test:** no expression type row; any type under an
+  expression (nested types listed twice); kind always `signature`; the row not written;
+  impl headers in function bodies requested (only `test_external_name_shadow_cases`); body
+  type paths not requested (only `test_expression_type_shadow_cases`).
+- **Not built:** bounds walked are not listed on the `I::Buffer` row; `where`-clause
+  bounds; a type naming an item declared in a function body has no target (R10c).
+- **Not run:** workspace gates and the timed release runs (end of part 7); the GLM-5.3
+  review of this step; no codebase-memory trace before the change.
+- **No refactor needed.**
