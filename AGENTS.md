@@ -118,7 +118,7 @@ cargo build --release --workspace --all-targets --all-features
   cap in this phase.
 - **Stop.** Kill a run that exceeds 2× its expected wall time. After 3 failed attempts at one
   step, stop, log what was tried, and cut the step smaller.
-- **Log.** After each GREEN or REFACTOR commit, add a newest-first entry to the log: test names, exact command, pass/fail counts, commit, next target, and the codebase-memory queries run (Rule 4).
+- **Log.** After each GREEN or REFACTOR commit, add an entry at the bottom of the log, and update its "Where we are" page: test names, exact command, pass/fail counts, commit, next target, and the codebase-memory queries run (Rule 4).
 
 ## Rule 4 — Query codebase-memory at every step
 
@@ -186,7 +186,7 @@ SOP      SOP-itoa-full-item-graph-acceptance.md         steps S1–S4 that decid
 PRD      PRD-itoa-full-item-graph-scope.md              what is built and what is out of scope
 ARCH     ARCH-itoa-full-item-graph-pipeline.md          pipeline, tables, graph rules
 TARGET   itoa-target-dataset/                           the expected itoa graph and its builder
-LOG      LOG-itoa-full-item-graph-progress.md           the single progress record, newest first
+LOG      LOG-itoa-full-item-graph-progress.md           the progress record: a "Where we are" page, then entries (older ones in LOG-itoa-full-item-graph-entries-history.md)
 BACKLOG  BACKLOG-deferred-work-open-decisions.md        deferred work and open decisions
 MAP      MAP-parseltongue-crates-as-measured.md         crates, files, verbs, stages as measured
 SPEC     SPEC-itoa-full-item-graph/                     README.md is the index; one part file per
