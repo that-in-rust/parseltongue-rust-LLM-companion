@@ -261,6 +261,13 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     generated items do not repeat the call text; they have the node field and `generates`.
   - Chosen by the design rule above. On itoa all 103 labels are now distinct (was 45).
 
+- **Qualified paths (2026-11-16, built in part 5d step 10b).** `<T as Trait>::NAME` targets
+  the member of the one stored impl of `Trait` for `T`, not the trait's declaration, when
+  the stored impls prove exactly one. Chosen by the design rule: an agent changing
+  `<u64 as Integer>::MAX_STR_LEN` must see that the `usize` const reads that one, not all
+  twelve. The row keeps the trait's declaration, every candidate impl and the sources not
+  read; when the member is not proven the target stays the declaration.
+
 - **Non-function sources (2026-11-16, built in part 5d step 10a for `reads` and step 10c
   for `uses_type`).** A `uses_type` row from a const, static or type alias names the kind
   of that item (`declared_type_owner_kind`); a qualified path (`<u64 as Sealed>::Buffer`)

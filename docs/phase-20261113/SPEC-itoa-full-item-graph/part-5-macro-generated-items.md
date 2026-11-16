@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15) and step 10c BUILT (`uses_type` from declared and aliased types, section 10.16); the impl member for `<T as Trait>::NAME` (10b) and arguments of builtin macros (`assert!`) are not built.
+5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15) and step 10c BUILT (`uses_type` from declared and aliased types, section 10.16). G14 step 10b BUILT (the impl member for `<T as Trait>::NAME`, section 10.17). Arguments of builtin macros (`assert!`, step 11) are not built.
 5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
@@ -1348,3 +1348,97 @@ end of 5d.
 - **Q42.** A const or static written inside a function body has a declared-type row
   (fixture: `const S: U`), owned by that const's own span. Whether the graph has a node
   for such an item is the rule of part 1; itoa has none.
+
+### 10.17 Step 10b: the impl member for `<T as Trait>::NAME` (rule G14, measured)
+
+Built at `9171dab2e`.
+
+**Cause found (measured on the step 10c store).** Name lookup of the whole path
+`<u64 as Integer>::MAX_STR_LEN` gives the trait's declaration `Integer::MAX_STR_LEN`: it
+does not use the anchor type. The lookups of the anchor `u64` and of the trait path
+`Integer` are stored (every path under a type outside a function body is requested), so
+the impl member can be read from stored rows.
+
+**Rule G14 as built.**
+
+```text
+Applies to a reads row whose stored target is a const, and to a uses_type row with a
+stored target, when the path's text is  <A as T>::NAME  with A and T plain paths (no
+generic arguments, reference, slice or tuple) and NAME one identifier.
+
+1. A is read from its stored type lookup (struct, enum, union or builtin).
+   T is read from its stored lookup and must be a trait.
+2. Candidates: stored impls that declare NAME, whose self type is A or has no stored
+   target, less the impls the path cannot name:
+     an inherent impl;
+     an impl of another stored trait.
+   An impl whose trait has no stored target stays a candidate.
+3. The member is the target only when there is exactly one candidate, it is an impl of T
+   for A with no generic parameter and no negation, and the member has the kind asked for
+   (CONST for reads, TYPE_ALIAS for uses_type), and the member is a graph node.
+4. Otherwise the target stays the trait's declaration.
+
+Either way the row carries, in type_relative_member_evidence: the anchor, its identity,
+every candidate impl, qualified_trait_source_text, qualified_trait_resolution,
+qualified_path_outcome_kind (impl_member_of_named_trait | impl_member_not_proven |
+qualified_trait_not_stored | anchor_type_not_stored) and the sources not read; and in
+trait_declaration_symbol_row the stored lookup row of the trait's declaration.
+```
+
+**Why the candidate set is narrower than rule G5's.** In `u8::N` any impl for `u8` may
+supply `N`, so an inherent `N` or a second trait's `N` blocks the target. In
+`<u8 as A>::N` the path names the trait: only an impl of `A` can supply `N`. Two stored
+impls of `A` for `u8` (`impl A<u16> for u8` beside `impl A for u8`) are still two
+candidates and give no member.
+
+**Measured on pinned itoa (3 release runs, executable `15a836e1…bec71`).**
+
+```text
+nodes=103 edges=565 reads=78 type_uses=106 calls=197 resolved_calls=43   (all unchanged)
+completeness=incomplete
+wall 16.7 to 21.9 s, peak 359 to 398 MB, store 18,001,920 bytes
+
+row        source                              path                              target, was -> is
+reads      <usize as Integer>::MAX_STR_LEN     <u64 as Integer>::MAX_STR_LEN     Integer::MAX_STR_LEN
+                                                                                 -> <u64 as Integer>::MAX_STR_LEN
+reads      <isize as Integer>::MAX_STR_LEN     <i64 as Integer>::MAX_STR_LEN     -> <i64 as Integer>::MAX_STR_LEN
+uses_type  <usize as private::Sealed>::Buffer  <u64 as private::Sealed>::Buffer  private::Sealed::Buffer
+                                                                                 -> <u64 as private::Sealed>::Buffer
+uses_type  <isize as private::Sealed>::Buffer  <i64 as private::Sealed>::Buffer  -> <i64 as private::Sealed>::Buffer
+```
+
+- Prediction (written before the code): no total changes, 4 rows get the impl member.
+  Measured the same. The four targets are the ones the expected graph has.
+
+**Tests.** Stub first (`read_qualified_path_parts`, `find_qualified_path_member`,
+`find_qualified_member_target` with `todo!()`; `cargo check` passed with 4 dead-code
+warnings). RED: the two fixture tests panicked at the `todo!()`; the two itoa tests
+(`test_item_initializer_read_rows`, `test_declared_type_use_rows`, expectations changed
+to the impl member) failed on their row comparison. GREEN: 47 of 47 itoa tests (143 s),
+122 + 17 syntax crate tests, format, lint on the two touched crates.
+`test_qualified_path_member_evidence` (itoa, the record on all four rows) was written
+after the code and passed on first run.
+
+**Rule changed after the first GREEN.** The first version used rule G5's candidates
+unchanged and then checked the trait, so `impl B for u8 { N }` beside `impl A for u8
+{ N }` gave no member for `<u8 as A>::N`. The narrower candidate set above replaced it;
+the fixture test's expectations for that case were changed with it and were not seen
+failing first.
+
+**Deliberate breaks.** Eleven, each fails a test: an inherent impl admitted; an impl of
+another stored trait admitted; an impl with an unstored trait dropped; a member given
+when the named trait is not stored; part offsets wrong; the candidate filter not
+applied; generic arguments accepted in a part; the `reads` rule off; `reads` keeps the
+declaration; `uses_type` asks for a const member; the trait path looked up as a type.
+
+- **Q43.** A qualified path in a function body (`let n = <u64 as Integer>::MAX_STR_LEN;`)
+  has no stored lookup of its anchor and trait: paths under a type are requested only
+  outside function bodies. Such a row keeps the trait's declaration, with
+  `anchor_type_not_stored`. It can only be less exact, not wrong. itoa has none.
+- **Q44.** An anchor that is `Self`, a generic parameter, a reference, a slice or a path
+  with generic arguments (`<Vec<u8> as T>::N`) is not read; the row keeps the trait's
+  declaration and carries no G14 record.
+- **Q45.** A qualified callee (`<u64 as Sealed>::write(..)`) is a `calls` row and is not
+  covered by this rule. itoa has none.
+- **Q46.** The filter "the member is a graph node" is not covered by a test: every impl
+  member on itoa is a node.

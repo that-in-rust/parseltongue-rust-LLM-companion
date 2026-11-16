@@ -15,9 +15,9 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 10b (the impl member for `<T as Trait>::NAME`: 2 `reads`
-  and 2 `uses_type` rows), step 11 (arguments of `assert!`: 20 expected `reads`), then
-  the 5d workspace gates and part 6. Step 10c is built (40 new `uses_type` rows).
+- **Next target:** part 5d step 11 (arguments of `assert!`: 20 expected `reads`), then
+  the 5d workspace gates and part 6. Steps 10b and 10c are built (40 new `uses_type`
+  rows; 4 qualified-path rows on the impl member).
   Part 5d step 9 is built: the two cast-receiver calls have a target (part 5 Q34 closed).
   Part 5d step 8 is built: the five `Unsigned ::fmt(self, buf)` calls target
   `<uN as Unsigned>::fmt`, the member of the impl for the calling method's type, and keep
@@ -121,6 +121,47 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 02:05 IST — Part 5d step 10b: the impl member for `<T as Trait>::NAME` (REQ-RUST-052.0 G14)
+
+- **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.
+- **Built at** `9171dab2e`. Spec: part 5 section 10.17.
+- **Cause, measured first:** name lookup of the whole path drops the anchor type and gives
+  the trait's declaration. The lookups of the anchor and the trait path are stored for a
+  path outside a function body, so no new request was needed (my 10a note said they were
+  not stored; that was wrong for these four rows).
+- **STUB:** three signatures with `todo!()`; `cargo check -p
+  parseltongue-syntax-span-extractor` finished with 4 dead-code warnings.
+- **RED:** `test_qualified_path_parts_read` and `test_qualified_member_trait_match`
+  panicked at `not yet implemented: REQ-RUST-052.0 G14 step 10b`;
+  `test_item_initializer_read_rows` and `test_declared_type_use_rows` failed on their row
+  comparison (0 passed, 2 failed).
+- **GREEN:** 47 of 47 itoa tests (142.51 s), 122 + 17 syntax crate tests, format, lint on
+  the two touched crates.
+- **Measured (3 release runs, executable `15a836e11ef8c635b505de6ff498d0b0f51f24338daca22a8ed3242655bbec71`):**
+
+```text
+nodes=103 containment=88 generates=45 expands=15 calls=197 resolved_calls=43 type_uses=106
+implements=32 reads=78 reads_in_expanded_bodies=56 imports=4 edges=565 completeness=incomplete
+run1 wall=21.87s maxrss=398096kB
+run2 wall=18.86s maxrss=378808kB
+run3 wall=16.74s maxrss=358516kB
+store_bytes=18001920
+```
+
+- **Changed rows (4), totals unchanged:** 2 `reads` now on `<u64|i64 as
+  Integer>::MAX_STR_LEN`, 2 `uses_type` now on `<u64|i64 as private::Sealed>::Buffer`.
+  These are the expected graph's targets.
+- **Rule changed after the first GREEN:** candidates are now only impls the path can name
+  (not an inherent impl, not an impl of another stored trait). The fixture expectations
+  for that case were changed with the rule and not seen failing first.
+- **Weak evidence:** `test_qualified_path_member_evidence` was written after the code and
+  passed on first run. Breaking the code makes it fail (below).
+- **Deliberate breaks:** 11, all fail a test (7 on fixtures, 4 on itoa).
+- **Slips:** no codebase-memory trace before the change. Second opinion for 10a, 10b and
+  10c is being taken now and gets its own record.
+- **Workspace gates:** not run; they run at the end of part 5d.
+- **Next:** step 11.
 
 ### 2026-11-16 01:10 IST — Part 5d step 10c: declared and aliased types as `uses_type` sites (REQ-RUST-052.0 G7)
 
