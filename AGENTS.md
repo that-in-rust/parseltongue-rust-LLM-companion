@@ -77,12 +77,14 @@ Scope:
   undecided choice; ask, or backlog it.
 - If most of a part's expected rows wait on an open decision, ask for that decision before
   starting the part.
-- An acceptance run passes `--sysroot-source-scope-kind excluded`. A target in `core` is
-  then a named external target, or a row without a target that the frozen expected graph
-  lists (PRD, decided 2026-11-15).
-- The value `declarations` (SPEC part 8) also reads the `core` source of the sysroot, syntax
-  only, to name method calls into `core`. No SOP run covers it: the SOP's S1 does not freeze
-  those files, and the expected graph has no target for those calls.
+- A target in `core` is a named external target, or a row without a target that the frozen
+  expected graph lists (PRD, decided 2026-11-15). No node or edge of `core` itself is stored.
+- A method call into `core` is named from the `core` source (PRD, decided 2026-11-16): the
+  run passes `--sysroot-source-scope-kind declarations` and reads the declarations of
+  `core`, which the SOP freezes by digest like the pinned source. The accepted run of
+  2026-11-16 passed `excluded`; no run with `declarations` is accepted yet.
+- The expected target of a call is written from source and frozen before the code that
+  names it. A target the run names and the expected graph does not list is a FAIL.
 
 ## Rule 3 — One VM, one branch, test first, measure
 

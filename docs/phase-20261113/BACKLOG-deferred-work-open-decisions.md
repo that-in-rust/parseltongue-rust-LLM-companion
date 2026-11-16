@@ -4,7 +4,7 @@ Updated 2026-11-16.
 
 ## The answer
 
-**This file holds two lists. List A is the decisions of this phase: four are open and the
+**This file holds two lists. List A is the decisions of this phase: three are open and the
 rest are made. The expected itoa graph was frozen on 2026-11-16 with the open ones left as
 they are, so deciding one needs a new freeze. List B is work that waits until the itoa full
 item graph passes. Nothing in list B is built, extended or tested in this phase.**
@@ -20,10 +20,6 @@ Open:
 
 ```text
 id      decision                                                    state in the frozen graph
-part 8  Method calls into core: the label of a method on a slice,   133 calls without a target
-        array or raw pointer (Q1), and whether a call is named
-        when a prelude trait declares the same name (Q2). Both
-        are in SPEC part 8, section 5 (Q2 again in section 8).
 OD-7    How a file's module node relates to its file-area node.     no edge between them
 OD-4    Enum variants and struct fields: nodes, or evidence only.   not nodes; itoa has private
                                                                     fields only
@@ -47,6 +43,10 @@ that reads the graph":
   the item. The generating call is named twice: a field on the node, and a `generates` edge
   from the call to the item (itoa: 45 rows). Part 5a, REQ-RUST-046.0 R2, R3, R5.
 
+- **Method calls into `core` (decided 2026-11-16):** the run reads the declarations of
+  `core` as a frozen input; the label is the type as `core` writes it (`[T]::len`); a call
+  a prelude trait could also answer is named with that assumption stored on the row. The
+  frozen graph still has those 133 calls without a target; the re-freeze is part 8.
 - **OD-8 (decided 2026-11-16, built in part 5d steps 10a and 10c):** `reads` and
   `uses_type` start at any item a path is written in, not only a function.
 - **Disagreement with the expected graph:** show the source lines, the user rules, and the

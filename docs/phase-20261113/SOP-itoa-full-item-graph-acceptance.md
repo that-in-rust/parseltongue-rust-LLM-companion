@@ -30,7 +30,8 @@ S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers st
   native sysroot, which itoa runs exclude. Accepted by the user on 2026-11-16 as a known
   open defect.
 - The expected graph was written and checked by one author (Rule 1).
-- The scope value `declarations` (SPEC part 8) is outside this SOP: see the last section.
+- The next acceptance run uses the scope value `declarations` (decided 2026-11-16). What
+  must exist before it is judged is in the last section.
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
 and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md); requirement ids and their
@@ -50,7 +51,12 @@ tests are in the [SPEC](SPEC-itoa-full-item-graph/README.md).
 - Never edit the expected graph to match the mapper. A correction needs a source citation and
   a new freeze.
 
-## Rule 2 — Production reads only the pinned source
+## Rule 2 — Production reads only the frozen inputs
+
+- The inputs are the pinned source and, with the scope value `declarations`, the `.rs`
+  files under `<sysroot>/lib/rustlib/src/rust/library/core/src` of the compiler in use
+  (decided 2026-11-16). Both are frozen in S1. `core` is read for the methods it declares;
+  no node or edge of `core` itself is stored.
 
 - Expected rows live only in test assertions. Never feed them or fixtures into production, and
   never hardcode an edge.
@@ -95,8 +101,13 @@ python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py \
 python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
 ```
 
+- For a run with `declarations`: record `rustc -vV`, and one sha256 over the path and
+  bytes of every `.rs` file under the `core` source directory, in path order. The freeze
+  record of the expected graph names both values.
+
 Pass: source commit and file digests match the pin; the expected-data tests pass; the frozen
-files' digests equal the freeze record.
+files' digests equal the freeze record; for `declarations`, the compiler version and the
+`core` digest equal the freeze record.
 
 ### S2 — Gates and production run
 
@@ -134,10 +145,13 @@ Pass:
 - Direct children are exactly the three allowed commands. Beneath `cargo metadata`, only
   `rustc -vV` and Cargo's stdin `--print` probe are allowed.
 - No file under `target/` is read except Cargo's `.rustc_info.json`.
+- With `declarations`, files under the `core` source directory of Rule 2 are read. No
+  other file of the sysroot source is.
 - Time and memory come only from the untraced run.
 
-Add `--sysroot-source-scope-kind excluded` to both runs. A target in `core` is then stored
-as a named external target, or without a target and with a reason (below).
+Add `--sysroot-source-scope-kind` to both runs. The accepted run of 2026-11-16 passed
+`excluded`: a target in `core` is a named external target, or a row without a target and
+with a reason (below). From the next freeze on, the value is `declarations`.
 
 ### S3 — Exact comparison
 
@@ -193,17 +207,24 @@ as the expected row: the name as far as itoa's source proves it, the crate, and 
 the target's source was not read. A site whose target name source cannot prove matches an
 expected unresolved row with the same reason.
 
-### The scope value `declarations` (SPEC part 8): not covered
+### The scope value `declarations` (decided 2026-11-16): what the next run needs
 
-`--sysroot-source-scope-kind declarations` reads the `core` source under
-`<sysroot>/lib/rustlib/src/rust/library`, syntax only, to name method calls into `core`. A run
-with it cannot pass this SOP as written:
+Decided in the [PRD](PRD-itoa-full-item-graph-scope.md) ("Method calls into `core`"): the run
+reads the `core` source for its method declarations, and a method call into `core` is
+matched like every other row: same target label, same proof record, same assumptions as the
+expected row.
 
-- **Rule 2** names the pinned source as the only source production reads.
-- **S1** does not freeze the `core` files, and the run id hashes the compiler version, not
-  those files.
-- **S2** has no rule for reads under the sysroot source directory.
-- **The expected graph** lists those method calls without a target.
+No run with `declarations` has been judged. Before one is:
 
-Before such a run is judged, this SOP is changed in the same commit as the ARCH and
-`AGENTS.md`, and the expected graph is re-frozen from source.
+```text
+needed                                                        state on 2026-11-16
+expected target of each of the 133 calls, from source          not written
+expected graph re-frozen with those targets                    not done
+S1 record of the compiler version and the core digest          no command writes it yet
+the run id covers the core files                               not built: it hashes the
+                                                               compiler version only
+S2 audit accepts reads under the core source directory only    not checked on a run
+```
+
+A row is in the expected graph before the code that produces it is written (Rule 1). A
+target the run names that the expected graph does not list is a FAIL, not a new expected row.

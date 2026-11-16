@@ -80,14 +80,16 @@ So a target is proven only when:
 8.6  expected graph re-cut and re-frozen; new acceptance run
 ```
 
-## 5. Open questions
+## 5. Questions, decided by the user on 2026-11-16
 
 - **Q1. The label of a method on a slice, an array or a raw pointer.** `core` writes
-  `impl<T> [T]` and `impl<T> *mut T`. Proposed: the impl's self type as written, without
+  `impl<T> [T]` and `impl<T> *mut T`. Decided: the impl's self type as written, without
   its generic names bound: `[T]::len`, `*mut T::cast`.
 - **Q2. A prelude trait of `core` that declares the same name** (`ExactSizeIterator::len`
-  for `buf.len()` on `&mut [T; N]`). Proposed: name the target and record the assumption
-  that the trait is not implemented for the earlier types; the alternative is no target.
+  for `buf.len()` on `&mut [T; N]`). Decided: name the target and record the assumption
+  that the trait is not implemented for the earlier types. This replaces "no target" in
+  REQ-RUST-056.0 P5 for that case; the requirement text is revised in section 9.
+- **The `core` read is an input of the run** (PRD, SOP Rule 2 and S1).
 
 ## 6. REQ-RUST-054.0 — the member declarations of `core` (step 8.1, added 2026-11-16)
 

@@ -97,7 +97,7 @@ The run for this phase is
 Process boundary: production may start only `cargo metadata --offline`, `rustc --print cfg`
 and `rustc --print sysroot`. It never compiles, never runs build scripts or proc macros, never
 reads `target/`, and never uses the network. With scope `declarations` it also reads the
-files under `<sysroot>/lib/rustlib/src/rust/library` (part 8, not accepted).
+`core` source files of the sysroot (decided 2026-11-16, below; no accepted run yet).
 
 ## 3 — How it is proven
 
@@ -173,8 +173,8 @@ general behaviour, nothing keyed on itoa names.
 
 - **Targets in `core` (2026-11-15).** Stored with a named external target: the name as far as
   itoa's source proves it, the crate, and a flag that the target's source was not read. The
-  sysroot source stays out of the run. Chosen because it is the most explicit form for an
-  agent reading the graph.
+  sysroot crates stay out of the mapped crate graph: no node or edge of `core` itself is
+  stored. Chosen because it is the most explicit form for an agent reading the graph.
   - **What the name is (2026-11-16, REQ-RUST-053.0).** The path as the read source writes
     it. It claims "this item is outside the read source", never where the item is defined
     (a written path may be a re-export) and never which impl declares a member.
@@ -187,8 +187,22 @@ general behaviour, nothing keyed on itoa names.
     target. How each site reached the name (path root, `use` item, prelude, builtin
     member) is on the edge, so an import and a use of the same path share one node.
   - **No name is given** when a nearer scope could bind the first name differently, when a
-    trait in read source declares a member of the same name, or for a method call. The row
-    stays unresolved with its reason.
+    trait in read source declares a member of the same name, or for a method call that
+    the next decision does not name. The row stays unresolved with its reason.
+- **Method calls into `core` (2026-11-16, by the same rule: most explicit for an agent).**
+  - **The run reads the `core` source, declarations only.** Production reads the `.rs`
+    files under `<sysroot>/lib/rustlib/src/rust/library/core/src` of the compiler in use,
+    by syntax, to learn which methods `core` declares. This is an input of the run like
+    the pinned source: the SOP freezes it by digest and the run id covers it.
+  - **The label is the type as `core` writes it** (Q1 of part 8): the impl's self type,
+    `::`, the method name. `MaybeUninit<T>::write`, `[T]::get_unchecked`, `*mut T::cast`.
+  - **A call that a prelude trait could also answer is named, with the doubt on the row**
+    (Q2 of part 8). `buf.len()` on an array reference is stored with the target
+    `[T]::len` and an assumption saying that a prelude trait declares the same name and
+    the mapper did not rule it out. The assumption is a stored field, compared with the
+    expected graph. Without it the target is not stored.
+  - **The expected target of every such call is written from source first**, then frozen,
+    then the code is built to equal it.
   - **A call by a written path (2026-11-16).** The row says `external_written_path` as how
     its target was chosen, so an agent can tell it from a call to a node of read source.
     `MaybeUninit::<u8>::uninit` targets `core::mem::MaybeUninit::uninit`: the written path
@@ -333,12 +347,13 @@ general behaviour, nothing keyed on itoa names.
   finish name resolution in 2,400 s (the run report is deleted). Accepted runs use
   `--sysroot-source-scope-kind excluded`. Paths into `core` that itoa's source proves are
   built as named external targets (47 nodes).
-  - **Part 8, in progress, not accepted.** A third scope value, `declarations`, reads the
-    `core` source by syntax only and names a method call when the receiver's written type
-    and the declaration are both proven
-    ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)). It changes
-    "no name for a method call" above, reads files S1 does not freeze, and needs the
-    expected graph re-frozen. None of that is decided here yet.
+  - **Part 8, in progress, no accepted run.** The scope value `declarations` reads the
+    `core` source and names a method call when the receiver's written type and the
+    declaration are both proven
+    ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)). The rules are
+    decided ("Method calls into `core`" above). Not done: the expected targets of the 133
+    calls, the digest of the `core` files in S1 and in the run id, and the code for most
+    of the calls.
 - **Node fields.** Visibility, reachability outside the crate and signature text are not
   filled on any node, and the whole-graph test does not compare them.
 - **Rows depend on the source directory.** Two copies of the pinned source in different

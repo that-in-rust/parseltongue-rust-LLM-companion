@@ -133,6 +133,8 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 The SOP run at `822da80cf` is done. Part 8 is under way:
 
+0. First, by the decision of 2026-11-16 20:48: write the expected target of each of the 133
+   calls from source and re-freeze, before more lookup code (spec in part 8, section 9).
 1. Close step 8.3b-2b: find why 37 of the 46 calls typed `&mut Self::Buffer` do not reach
    the new rule, check the 8 new targets against the source, then GREEN.
 2. Steps 8.3b-3, 8.4 and 8.5 (not started).
@@ -141,11 +143,9 @@ The SOP run at `822da80cf` is done. Part 8 is under way:
 
 Open, each needing a decision from the user:
 
-1. Part 8 questions Q1 (label of a method on a slice, array or raw pointer) and Q2 (the 5
-   `len` calls a prelude trait also declares).
-2. Why rows depend on the source directory.
-3. `test_lang_items_in_sysroot`.
-4. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
+1. Why rows depend on the source directory.
+2. `test_lang_items_in_sysroot`.
+3. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
    to its file's contents; visibility, reachability and signature on nodes.
 
 ## Entries — add new ones at the bottom
@@ -701,4 +701,24 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  not fixed  part 8 changed the pipeline without the ARCH, SOP and AGENTS.md change that
             AGENTS.md asks for in the same commit. The documents now say what the code
             does and that no run with it is accepted; SOP Rule 2 and S1 are as they were
+```
+
+
+## 2026-11-16 20:48 IST Decided by the user: method calls into core (documents only)
+
+```text
+ rule used   "choose what is most explicit for a coding agent that reads the graph" (2026-11-15)
+ decided  1  the run reads the declarations of core; they are an input like the pinned
+             source: frozen by digest in SOP S1, covered by the run id
+          2  Q1: the label is the impl's self type as core writes it ([T]::len, *mut T::cast)
+          3  Q2: a call a prelude trait could also answer (5 buf.len() calls) is named
+             [T]::len with that assumption stored on the row; never named without it
+          4  order: expected targets of the 133 calls from source, freeze, then code
+ written in  PRD (decisions in force), SOP (Rule 2, S1, S2, last section), ARCH (step 6a),
+             AGENTS.md (Rule 2), SPEC part 8 section 5, BACKLOG list A: one commit
+ not built   the S1 record of the compiler version and core digest; the run id over the
+             core files; the expected targets; the assumption field for decision 3
+ also        rust-agent-mega-01 installed under .agents/skills (bd9e43350); AGENTS.md asks
+             for functional Rust wherever possible
+ not run     nothing was built or run
 ```

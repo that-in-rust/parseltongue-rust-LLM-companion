@@ -22,7 +22,7 @@ source files
   -> Rust    crate graph, ingest, one parse per file                  built
   -> DuckDB  name resolution rounds  <->  Rust item-macro expander    built
   -> Rust    impl headers                                             built
-  -> Rust    method declarations of core (scope `declarations`)       part 8, not accepted
+  -> Rust    method declarations of core (scope `declarations`)       built; no accepted run
   -> DuckDB  item nodes, contains, generates, expands                 built
   -> Rust    calls, uses_type, implements, reads, imports             built
   -> Turso   frozen full graph, read back and compared                built: marked incomplete
@@ -61,10 +61,15 @@ step  function (crate)                                          writes
 
 - Step 4 runs when a file mentions `std`, `core`, `alloc`, `Clone` and similar, and
   `--sysroot-source-scope-kind` is `included` (the default). itoa triggers it. `excluded` and
-  `declarations` add no sysroot crate; acceptance runs pass `excluded`.
-- Step 6a runs only with `declarations`. It reads the files under
-  `<sysroot>/lib/rustlib/src/rust/library` and stores one row per method `core` declares.
-  The SOP does not freeze those files, so no accepted run uses it (SPEC part 8).
+  `declarations` add no sysroot crate. The accepted run passed `excluded`; the next one
+  passes `declarations` (PRD, decided 2026-11-16).
+- Step 6a runs only with `declarations`. It reads the `.rs` files under
+  `<sysroot>/lib/rustlib/src/rust/library/core/src` and stores one row per method `core`
+  declares. Those files are an input of the run: the SOP freezes them by digest. The run id
+  does not cover them yet (it hashes the compiler version).
+- A method call into `core` is named by the impl's self type as `core` writes it
+  (`[T]::len`). When a prelude trait declares the same name and cannot be ruled out, the
+  target is stored with that assumption on the row, never without it.
 - Step 5 copies one frozen Turso generation into a DuckDB file and runs SQL rounds for scopes,
   bindings, imports and path candidates. Each resolved item macro is expanded in Rust; its
   output becomes a virtual source file that goes back through step 3. Repeat to a fixed point.
