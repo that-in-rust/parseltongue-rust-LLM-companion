@@ -250,3 +250,33 @@ workers  wall s  peak MB  store bytes  nodes  edges
   fixed.
 - **Acceptance:** the run of 2026-11-16 stays valid until the first production change of
   step 8.1.
+
+### Part 8 step 8.1a — member declaration rows from one file (2026-11-16)
+
+- **REQ:** REQ-RUST-054.0 D1 to D5 (part 8, section 6).
+- **STUB:** `extract_member_declaration_rows` with `todo!`, in
+  `crates/parseltongue-syntax-span-extractor/src/sysroot-member-declaration-records.rs`.
+- **RED:** `cargo test --release -p parseltongue-syntax-span-extractor sysroot_member`
+
+```text
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 137 filtered out
+each: not yet implemented: REQ-RUST-054.0
+```
+
+- **GREEN:** same command
+
+```text
+test sysroot_member_declaration_tests::test_macro_body_member_rows ... ok
+test sysroot_member_declaration_tests::test_member_rows_offset_order ... ok
+test sysroot_member_declaration_tests::test_inherent_member_row_fields ... ok
+test sysroot_member_declaration_tests::test_trait_member_row_fields ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 137 filtered out
+```
+
+- **Whole crate:** 141 + 17 tests pass; format and lint pass on the crate.
+- **REFACTOR:** none needed; the function is a pure walk with one row builder per owner
+  kind.
+- **Weak evidence:** the four tests failed only on `todo!`, so RED shows they ran, not that
+  each assertion can fail. No deliberate breaks yet.
+- **Not built:** nothing calls the function. No run reads `core`. Step 8.1b adds the stage.
+- **Decision:** the D3 text also covers a `macro` definition, not only `macro_rules!`.

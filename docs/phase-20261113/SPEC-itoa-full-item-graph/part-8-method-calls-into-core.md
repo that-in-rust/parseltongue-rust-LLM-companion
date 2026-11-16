@@ -1,8 +1,7 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-16: **measured and designed; nothing built.** Requirement ids
-REQ-RUST-054.0 to REQ-RUST-056.0 are reserved here and get their test rows when each step
-starts.
+Status on 2026-11-16: **step 8.1 in progress.** REQ-RUST-055.0 and REQ-RUST-056.0 are
+reserved and get their test rows when their steps start.
 
 ## Requirement
 
@@ -89,3 +88,29 @@ So a target is proven only when:
 - **Q2. A prelude trait of `core` that declares the same name** (`ExactSizeIterator::len`
   for `buf.len()` on `&mut [T; N]`). Proposed: name the target and record the assumption
   that the trait is not implemented for the earlier types; the alternative is no target.
+
+## 6. REQ-RUST-054.0 — the member declarations of `core` (step 8.1, added 2026-11-16)
+
+One row per method that a `core` source file declares, from syntax only.
+
+- D1. A row for each `fn` written directly in an impl or in a trait declaration.
+- D2. The row holds: the file path relative to the scanned directory; the byte range of
+  the name; the name; the owner kind (`inherent_impl`, `trait_impl`, `trait_declaration`);
+  the impl's self type and generic parameters as written; the trait path of a trait impl
+  or the name of the declaring trait; the self parameter kind (`value`, `reference`,
+  `mutable_reference`, `typed`, `none`); the return type as written, or null; the
+  attributes written on the function and on its owner; whether the owner is inside a
+  function body.
+- D3. A row with owner kind `macro_definition_body` for each `fn NAME` written in the body
+  of a `macro_rules!` or `macro` definition, with the macro's name. `fn $name` gives a row whose
+  name is the parameter text and whose parameter flag is true. No self type is claimed.
+- D4. Rows are ordered by the byte offset of the name. The row key is the path and that
+  offset.
+- D5. Nothing is resolved: no path, no `cfg`, no macro call.
+
+```text
+test_inherent_member_row_fields      D1 D2   crates/parseltongue-syntax-span-extractor/src/sysroot-member-declaration-tests.rs
+test_trait_member_row_fields         D1 D2   same file
+test_macro_body_member_rows          D3 D5   same file
+test_member_rows_offset_order        D4      same file
+```
