@@ -4,12 +4,34 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-16, commit `822da80cf`)
+## Where we are (2026-11-16, production code of commit `37ea1755d`)
 
-**The mapper stores a graph of pinned itoa 1.0.18 that equals the frozen expected graph:
-151 nodes and 682 edge rows. The acceptance run passed SOP steps S1 to S4 on one frozen
-executable. The graph is marked `incomplete` because 133 method calls into `core` have no
-target, and the expected graph was written and checked by one author.**
+**Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
+1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
+passed SOP steps S1 to S4 on one frozen executable. That graph is marked `incomplete`: 133
+method calls into `core` have no target, and the expected graph was written and checked by
+one author. Not accepted: the branch head, where part 8 has changed production to name those
+calls. No SOP step has been run on it and one real-source test fails.**
+
+### The branch head (part 8, scope `declarations`; no SOP run)
+
+```text
+                              accepted run   part 8 pushed   head (WIP, run once,
+                              822da80cf      7ed552478       targets not checked)
+nodes                         151            153             not counted
+edge rows                     682            682             682
+calls with a target            64 of 197      73 of 197       81 of 197
+edge rows with a target       549 of 682     558 of 682      566 of 682
+method calls into core named    0 of 133       9 of 133       17 of 133
+```
+
+- **Failing at the head:** `test_itoa_core_member_targets`. The run names 17 calls, the test
+  lists 9, and the 8 new targets are not checked against the source.
+- **Default scope at `7ed552478`:** 151 nodes and 682 edge rows, equal to the expected graph;
+  60 of 60 real-source tests passed. Not run again since.
+- **Step open:** 8.3b-2b, GREEN not closed (last two entries below).
+
+Everything from here to "What is left" describes the accepted run at `822da80cf`.
 
 ### What the pinned itoa run stores (measured)
 
@@ -29,7 +51,7 @@ run          15.3 to 19.3 s wall, 370 to 414 MB peak (whole process tree), 21.0 
 workers      1, 4 and 16, twice each, store byte-identical node and edge rows
 ```
 
-### What the whole-graph test compares (`test_itoa_whole_graph_equality`, passes)
+### What the whole-graph test compares (`test_itoa_whole_graph_equality`)
 
 - **Nodes, all 151:** label, category, item kind, owner kind, file, generating macro call,
   declared in a function body or not, byte range in the file (the 43 nodes written directly
@@ -66,7 +88,9 @@ S4  determinism, time, memory          PASS   six runs identical; 11 ms samples
 Run report: the last entry below. Executable sha256
 `43d999e173241c4b9a8011aade1871916a5c92cc9c86157dd8e92f6d1e0d1b88`.
 
-### The code, from the codebase-memory index of this commit
+### The code, from the codebase-memory index of `822da80cf`
+
+Counts at the head are in the [MAP](MAP-parseltongue-crates-as-measured.md).
 
 Index: 26,725 nodes, 62,052 edges; 1,628 functions, 619 methods, 7,186 call edges.
 
@@ -89,12 +113,16 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 ### What does not work or is not built
 
 - **133 method calls have no target** (`buf[i].write(..)`, `x.try_into()`, `MAX.ilog10()`,
-  `string.len()`). The receiver's type is declared in `core`, which the run does not read.
+  `string.len()`). The receiver's type is declared in `core`, which the accepted run does
+  not read. Part 8 reads it with scope `declarations` (table above).
 - **Nodes store no visibility, reachability or signature.** The PRD allows "unknown".
 - **No edge from a module to the contents of its file** (OD-7). `itoa` and `u128_ext` do
   not lead to their items by an edge.
 - **Struct fields and enum variants are not nodes** (open in the PRD).
-- **Reading the sysroot** did not finish in 2,400 s on 2026-11-13; itoa runs exclude it.
+- **Reading the whole sysroot** did not finish in 2,400 s on 2026-11-13, and stops with a
+  store copy mismatch since; accepted itoa runs exclude it.
+- **The `core` files part 8 reads are not frozen.** The run id hashes the compiler version,
+  not those files, and SOP S1 does not list them.
 - **Rows depend on the source directory.** Two copies of the pinned source in different
   directories store different run ids and macro-expansion ids. Cause: the store's file
   identity is the absolute path, and the run id hashes those rows. Not fixed.
@@ -103,9 +131,18 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 ### What is left
 
-The SOP run is done. Open, each needing a decision from the user before any work:
+The SOP run at `822da80cf` is done. Part 8 is under way:
 
-1. The 133 method calls without a target (needs `core` read, or a trait solver).
+1. Close step 8.3b-2b: find why 37 of the 46 calls typed `&mut Self::Buffer` do not reach
+   the new rule, check the 8 new targets against the source, then GREEN.
+2. Steps 8.3b-3, 8.4 and 8.5 (not started).
+3. Step 8.6: change the SOP for the `core` read, re-freeze the expected graph, repeat the
+   acceptance run.
+
+Open, each needing a decision from the user:
+
+1. Part 8 questions Q1 (label of a method on a slice, array or raw pointer) and Q2 (the 5
+   `len` calls a prelude trait also declares).
 2. Why rows depend on the source directory.
 3. `test_lang_items_in_sysroot`.
 4. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
@@ -638,4 +675,30 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
             deliberate breaks
  next       find why 37 of the 46 "&mut Self::Buffer" calls do not reach the new rule; check the
             8 new targets against the source; then close GREEN
+```
+
+
+## 2026-11-16 20:40 IST Documents brought in line with the code (documents only)
+
+```text
+ why        a review of the code against these documents (REVIEW-code-versus-phase-documents/)
+            found six of them describing the state of 2026-11-14
+ changed    AGENTS.md  0ac91465c   status only in this log; core targets decided; scope
+                                   "declarations" named as not accepted; macro edge kinds
+            PRD        640977f93   stage table, build order, DuckDB wording, part 8 and node
+                                   fields under "Open"
+            ARCH       4774ef207   eight edge kinds, five resolvers, step 6a, section 4
+            SOP        a9dd33379   the PASS covers 822da80cf only; scope "declarations" is
+                                   outside the SOP
+            MAP        c4e701d96   re-measured at 37ea1755d
+            SPEC index f584373fd   part 8 state, 60 tests, requirement counts
+            BACKLOG    196d5d9b5   list A: four open decisions, the rest made
+            LOG        this commit "Where we are" shows the accepted run and the head apart
+ unchanged  all code, all tests, the frozen expected graph, every SOP rule and step
+ not run    nothing was built or run: this machine has no ~/repos/rust-tools. Counts of
+            files, lines, tests and requirement ids were taken with git and grep; run
+            results are quoted from the entries above
+ not fixed  part 8 changed the pipeline without the ARCH, SOP and AGENTS.md change that
+            AGENTS.md asks for in the same commit. The documents now say what the code
+            does and that no run with it is accepted; SOP Rule 2 and S1 are as they were
 ```
