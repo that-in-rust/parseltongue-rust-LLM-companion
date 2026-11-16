@@ -131,6 +131,60 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 12:05 IST — Part 6 review fix: a body-declared trait's default member no longer gets an external name
+
+- **Milestone:** itoa full item graph, part 6. No SOP step has passed. The graph is still
+  marked incomplete.
+- **REQ:** REQ-RUST-053.0 N5 (a fifth condition added to the part file before the code).
+- **Defect, found by running code after the GLM-5.3 review of steps 6.2 to 6.5:** a trait
+  declared in a function body with a default member, plus an impl of it that declares no
+  member, gave a builtin-member name to a local member. Three rows on a small crate that
+  compiles (`/home/ubuntu/phase6-work/probe-gaps3/p/src/lib.rs`): `u8::FOO2`, `u16::mk`,
+  `u64::FOO5` were stored as external names. The review had judged this case covered.
+  No itoa row was wrong: itoa has no impl in a function body.
+- **Cause:** the impl declares no member of that name, so the lookup says
+  `no_stored_impl_member`; a trait in a function body is not a node, so its member names
+  are not in the withheld set.
+- **Fix:** `ImplMemberLookupIndex::has_unresolved_trait_impl`. `find_builtin_member_name`
+  returns `external_member_trait_not_resolved` when a stored trait impl whose self type is
+  this builtin or was not resolved is of a trait that was not resolved.
+- **Measured on the way:** the stored header of an impl in a function body has neither its
+  self type nor its trait resolved (`impl Loc for u8`: self `unknown_receiver`). One such
+  impl withholds every builtin-member name in the crate (part 6 Q6).
+- **STUB:** none; the change is one condition in an existing function.
+- **RED** (tests written, code unchanged):
+  `cargo test --release -p parseltongue-syntax-span-extractor --lib test_builtin_member_external_name`:
+  `test result: FAILED. 0 passed; 1 failed`, left `Some(Ok(.. "u8::MAX" ..))`, right
+  `Some(Err("external_member_trait_not_resolved"))`.
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests test_external_name_shadow_cases`:
+  `test result: FAILED. 0 passed; 1 failed`, left `("u16::mk", "external:u16::mk", "")`,
+  `("u8::FOO6", "external:u8::FOO6", "")`.
+- **GREEN:** `cargo test --release -p parseltongue-syntax-span-extractor`:
+  `test result: ok. 134 passed; 0 failed` and `ok. 17 passed`.
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  `test result: ok. 53 passed; 0 failed` (144.57 s). Clippy with `--all-features -D warnings`
+  on the two crates and `cargo fmt --all --check`: exit 0.
+- **The first GREEN run of the pipeline test failed twice on my expectations, not on the
+  code:** an impl in a function body in the first small crate now withholds `u8::MIN` and
+  `u8::BITS` there. I moved the body-impl cases to the second crate.
+- **REFACTOR:** no refactor needed.
+- **New test `test_external_name_shadow_cases`** (three small crates, each checked with
+  `cargo check`, run through the whole pipeline; 17 rows asserted). Its first version (10
+  rows, before the defect was found) was written after the code and passed on first run.
+- **Deliberate breaks:** 7, each failed a test. Removing the local-trait check and making
+  the lookup gate always true each fail the pipeline test; five breaks of
+  `has_unresolved_trait_impl` (inherent impl counts; any self type; unresolved self not
+  counted; same type not counted; resolved trait counts) each fail
+  `test_builtin_member_external_name`.
+- **Measured on pinned itoa after the fix (release, three runs `tfix-1..3`, executable
+  sha256 `82eab2623b928d9a1a5abd673d99c7440752ae3fda091a673d1026663cae7182`):** unchanged,
+  145 nodes, 585 edges, 59 of 197 calls with a target; 15.27 to 16.67 s wall, 343 to 360 MB
+  peak resident set, 18.8 MB store.
+- **Review record:**
+  `docs/devin-research/1794804575-second-opinion-glm-5-3-max-part-6-steps-two-to-five.md`.
+  Not built: its test gaps 1 and 3 (part 6 Q7, Q8).
+- **Next:** workspace gates on this code.
+
 ### 2026-11-16 10:18 IST — Part 6 step 5: members of builtin types (`u128::from`, `uN::MAX`, `MIN`, `BITS`) target named external nodes
 
 - **Milestone:** itoa full item graph, part 6 step 6.5. No SOP step has passed. The graph is

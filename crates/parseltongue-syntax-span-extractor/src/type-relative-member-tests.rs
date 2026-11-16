@@ -529,6 +529,33 @@ fn test_builtin_member_external_name() {
         assert_eq!(named(vec![stored], &[], &u8_type, "MAX"), None);
     }
 
+    // A stored trait impl for this type, or for a type that was not resolved, whose trait
+    // was not resolved (a trait declared in a function body): the trait's members were not
+    // read, and one with a default body may be the target.
+    let unread_trait = |self_type: Value| {
+        let mut stored = header(self_type, Some("A"), &[]);
+        stored["impl_trait_type_resolution"] = json!({"resolution_state_kind":"unresolved"});
+        stored
+    };
+    for self_type in [
+        u8_type.clone(),
+        json!({"resolution_state_kind":"unresolved"}),
+    ] {
+        assert_eq!(
+            named(vec![unread_trait(self_type)], &[], &u8_type, "MAX"),
+            Some(Err("external_member_trait_not_resolved"))
+        );
+    }
+    // Such an impl for another type, an inherent impl and an impl of a resolved trait
+    // withhold nothing.
+    for stored in [
+        unread_trait(resolved_builtin_type("u16")),
+        header(u8_type.clone(), None, &[]),
+        header(u8_type.clone(), Some("A"), &[]),
+    ] {
+        assert!(named(vec![stored], &[], &u8_type, "MAX").is_some_and(|name| name.is_ok()));
+    }
+
     // Not a builtin type, and a builtin name the graph has no node for.
     let struct_type = json!({"resolution_state_kind":"resolved",
         "target_identity":{"target_symbol_kind_value":"Struct"}});

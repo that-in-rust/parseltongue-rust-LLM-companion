@@ -187,6 +187,9 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     source declares that member. A call row says `external_builtin_member`. The row keeps
     the member lookup and names what was not read (the type's inherent items and its trait
     impls in unread crates). Which `From` impl runs is not claimed.
+    No name is given when a stored impl that may apply to the type is of a trait that was
+    not resolved (a trait declared in a function body): a default member of that trait
+    could be the target.
 - **Macro definitions and calls (2026-11-15).** Both are nodes, for the same reason.
 - **Design rule (user, 2026-11-15).** "Our intention should be to provide maximum
   information which helps the coding agent code better." When a graph design choice is

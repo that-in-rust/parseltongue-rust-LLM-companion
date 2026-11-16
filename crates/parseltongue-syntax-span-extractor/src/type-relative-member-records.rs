@@ -160,7 +160,8 @@ impl ImplMemberLookupIndex {
     /// REQ-RUST-053.0 N3, N5: the external name of a member reached through a builtin
     /// type, from the record `evidence` of its member lookup. `None` when the type is not
     /// a builtin or a stored impl declares the name; the withholding reason when a trait
-    /// in read source declares it, since an impl of that trait may be the target.
+    /// in read source declares it, since an impl of that trait may be the target, or when
+    /// a stored impl that may apply to the type is of a trait that was not resolved.
     pub(super) fn find_builtin_member_name(
         &self,
         evidence: &Value,
@@ -173,6 +174,9 @@ impl ImplMemberLookupIndex {
         (evidence["member_lookup_outcome_kind"] == "no_stored_impl_member").then(|| {
             if self.trait_declared_member_names.contains(name) {
                 return Err("external_member_name_in_local_trait");
+            }
+            if self.has_unresolved_trait_impl(&evidence["self_type_identity"]) {
+                return Err("external_member_trait_not_resolved");
             }
             Ok(ExternalNameProofRecord {
                 external_target_identity_value: HldTargetIdentityValue::ExternalNamed(
@@ -188,6 +192,21 @@ impl ImplMemberLookupIndex {
                     Value::Null,
                 ),
             })
+        })
+    }
+
+    /// REQ-RUST-053.0 N5: whether a stored trait impl for the type `identity`, or for a
+    /// self type that was not resolved, is of a trait that was not resolved (a trait
+    /// declared in a function body). That trait's members are not node rows, so a member
+    /// it declares with a default body may be what a path through the type reaches.
+    fn has_unresolved_trait_impl(&self, identity: &Value) -> bool {
+        self.impl_header_value_rows.iter().any(|header| {
+            let stored = &header["impl_self_type_resolution"];
+            let named = &header["impl_trait_type_resolution"];
+            (stored["resolution_state_kind"] != "resolved"
+                || stored["target_identity"] == *identity)
+                && !named.is_null()
+                && named["resolution_state_kind"] != "resolved"
         })
     }
 

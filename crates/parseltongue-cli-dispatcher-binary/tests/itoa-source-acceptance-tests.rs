@@ -4877,3 +4877,178 @@ fn test_itoa_builtin_member_targets() {
     }
     assert_eq!(input.input_node_records.len(), 145);
 }
+
+/// The `calls` and `reads` rows of the full item graph of a one-file crate `source`,
+/// which must compile: the written path, the target, and why a name was withheld.
+fn read_shadow_case_rows(source: &str) -> Vec<(String, String, String)> {
+    let directory = tempfile::tempdir().unwrap();
+    let root = prepare_source_scope_fixture(directory.path(), "Exposed");
+    fs::write(root.join("src/lib.rs"), source).unwrap();
+    verify_source_fixture_compiles(&root);
+    let database = directory.path().join("shadow.db");
+    let output = run_source_scope_mapping(&root, &database, "full-item-dependency-graph");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mut rows = read_published_stage_rows(&database, "edge-evidence-record-table")
+        .into_iter()
+        .filter_map(|row| {
+            let metadata: Value =
+                serde_json::from_str(row["edge_dispatch_metadata_text"].as_str()?).ok()?;
+            let text = match row["edge_relation_kind"].as_str()? {
+                "Calls" => metadata["callee_source_text"].as_str()?,
+                "Reads" => metadata["read_source_text"].as_str()?,
+                _ => return None,
+            }
+            .to_owned();
+            let resolution = &row["edge_resolution"];
+            let target = match resolution["target"]["kind"].as_str() {
+                Some("ExternalNamed") => format!(
+                    "external:{}",
+                    resolution["target"]["external_item_path_text"]
+                        .as_str()
+                        .unwrap()
+                ),
+                Some("Definition") => format!(
+                    "local:{}",
+                    resolution["target"]["occurrence_identity"]["byte_range"][0]
+                ),
+                _ => format!("none:{}", resolution["reason"].as_str().unwrap()),
+            };
+            let detail = ["unresolved_detail_kind", "external_name_withheld_kind"]
+                .iter()
+                .find_map(|key| metadata[*key].as_str())
+                .unwrap_or("")
+                .to_owned();
+            Some((text, target, detail))
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    rows
+}
+
+/// REQ-RUST-053.0 N5: the cases where a nearer binding or a local trait could supply the
+/// name, run through the whole pipeline on a small crate that compiles. A member name a
+/// macro-written trait declares takes no builtin-member name; `core` bound by a `use` in
+/// an enclosing block takes no external name; `core` bound by a macro-written `use` leads
+/// to the local function. A member a trait with a blanket impl declares takes no name. A
+/// trait declared in a function body with no impl is not a node and does not withhold a
+/// name (`u8::BITS` below). An impl in a function body of a trait declared there
+/// withholds the member names of every builtin type in the crate: the trait's members are
+/// not read, one with a default body may be the target, and the stored header of such an
+/// impl has neither its self type nor its trait resolved.
+#[test]
+fn test_external_name_shadow_cases() {
+    let source = concat!(
+        "#![no_std]\n#![allow(dead_code)]\n",
+        "pub mod fake { pub mod mem { pub fn size_of() -> usize { 0 } } ",
+        "pub mod hint { pub fn spin_loop() {} } }\n",
+        "macro_rules! make_trait { () => { pub trait Gen { const MAX: u8; ",
+        "fn from(x: u8) -> Self; } }; }\nmake_trait!();\n",
+        "pub fn a() -> u8 { u8::MAX }\n",
+        "pub fn b() -> u8 { u8::MIN }\n",
+        "pub fn c() -> u32 { trait Loc { const BITS: u32; } u8::BITS }\n",
+        "pub fn d() -> u64 { u64::from(1u8) }\n",
+        "pub fn e() -> usize { use crate::fake as core; { core::mem::size_of() } }\n",
+        "pub mod m3 { macro_rules! mk { () => { use crate::fake as core; }; } mk!(); ",
+        "pub fn g() { core::hint::spin_loop() } }\n",
+        "pub fn ok() -> usize { core::mem::size_of::<u8>() }\n",
+        "pub trait Blanket { const BAR2: u32 = 3; }\nimpl<T> Blanket for T {}\n",
+        "pub fn k() -> u32 { u64::BAR2 }\n",
+    );
+    let rows = read_shadow_case_rows(source);
+    let row = |text: &str, target: &str, detail: &str| {
+        (text.to_owned(), target.to_owned(), detail.to_owned())
+    };
+    let local = format!("local:{}", source.find("pub fn spin_loop").unwrap());
+    assert_eq!(
+        rows,
+        vec![
+            row("core::hint::spin_loop", &local, ""),
+            row(
+                "core::mem::size_of",
+                "none:TraitSolverNeeded",
+                "callee_prefix_lexically_shadowed"
+            ),
+            row(
+                "core::mem::size_of::<u8>",
+                "external:core::mem::size_of",
+                ""
+            ),
+            row(
+                "u64::BAR2",
+                "none:TraitSolverNeeded",
+                "external_member_name_in_local_trait"
+            ),
+            row(
+                "u64::from",
+                "none:MissingTarget",
+                "external_member_name_in_local_trait"
+            ),
+            row("u8::BITS", "external:u8::BITS", ""),
+            row(
+                "u8::MAX",
+                "none:TraitSolverNeeded",
+                "external_member_name_in_local_trait"
+            ),
+            row("u8::MIN", "external:u8::MIN", ""),
+        ]
+    );
+    let body_trait = concat!(
+        "#![no_std]\n#![allow(dead_code)]\n",
+        "pub fn p() -> u32 { trait Loc6 { const FOO6: u32 = 1; } ",
+        "impl Loc6 for u8 {} u8::FOO6 }\n",
+        "pub fn q() -> u32 { trait Loc7 { fn mk() -> u32 { 1 } } ",
+        "{ impl Loc7 for u16 {} } u16::mk() }\n",
+        "pub fn f() -> u32 { trait Loc2 { const FOO: u32; } ",
+        "impl Loc2 for i8 { const FOO: u32 = 1; } i8::FOO }\n",
+        "pub fn g() -> u32 { trait Loc3 { fn make() -> u32; } ",
+        "impl Loc3 for u16 { fn make() -> u32 { 1 } } u16::make() }\n",
+        "pub fn r() -> u32 { u32::MAX }\n",
+    );
+    assert_eq!(
+        read_shadow_case_rows(body_trait),
+        vec![
+            row("i8::FOO", "none:TraitSolverNeeded", ""),
+            row("u16::make", "none:MissingTarget", "member_lookup_unproven"),
+            row(
+                "u16::mk",
+                "none:MissingTarget",
+                "external_member_trait_not_resolved"
+            ),
+            row(
+                "u32::MAX",
+                "none:TraitSolverNeeded",
+                "external_member_trait_not_resolved"
+            ),
+            row(
+                "u8::FOO6",
+                "none:TraitSolverNeeded",
+                "external_member_trait_not_resolved"
+            ),
+        ]
+    );
+    let blanket_trait = concat!(
+        "#![no_std]\n#![allow(dead_code)]\n",
+        "pub fn s() -> u32 { trait Loc8 { const FOO8: u32 = 1; } ",
+        "impl<T> Loc8 for T {} u64::FOO8 }\n",
+        "pub fn t() -> u8 { u8::MAX }\n",
+    );
+    assert_eq!(
+        read_shadow_case_rows(blanket_trait),
+        vec![
+            row(
+                "u64::FOO8",
+                "none:TraitSolverNeeded",
+                "external_member_trait_not_resolved"
+            ),
+            row(
+                "u8::MAX",
+                "none:TraitSolverNeeded",
+                "external_member_trait_not_resolved"
+            ),
+        ]
+    );
+}

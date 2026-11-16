@@ -67,6 +67,10 @@ builtin_member      a member reached through a builtin type; no stored      none
   - for a prelude name, any scope on the chain imports the name or holds a glob import;
   - the path has two or more segments and a trait in read source declares a member with the
     name of the last segment (a local impl could be the target);
+  - for a member of a builtin type, a stored trait impl for that type, or for a self type
+    that was not resolved, is of a trait that was not resolved (a trait declared in a
+    function body: its members are not read, and one with a default body could be the
+    target);
   - the site is a method call (the receiver's type is not proven).
 - **N6 Method calls.** A method call whose receiver type is not determined stays unresolved,
   with the method name and the reason, as it is stored today.
@@ -137,6 +141,7 @@ N3 N4 N6   test_itoa_builtin_member_targets (39 rows, 31 new nodes; the 138 rows
 N3 N4 N5   test_builtin_member_external_name                          type-relative-member-tests.rs
 N3 N4 N5   test_builtin_member_call_target                            callee-path-call-tests.rs
 N3 N4 N5   test_builtin_member_read_target                            body-read-edge-tests.rs
+N5         test_external_name_shadow_cases (three small crates through the whole pipeline)   itoa-source-acceptance-tests.rs
 ```
 
 Planned at the start of the part:
@@ -187,6 +192,15 @@ says `external_member_name_in_local_trait`: a call in `unresolved_detail_kind`, 
 `external_name_withheld_kind`. A read row does not say its target is a const; the
 declaration was not read. After this step every row without a target is a method call (N6).
 
+Review fix as built (after step 6.5): a trait declared in a function body with a default
+member, and an impl of it that declares no member, gave a builtin-member name to a local
+member (`trait Loc { const FOO: u32 = 1; } impl Loc for u8 {} u8::FOO` was named `u8::FOO`).
+The fifth condition of N5 withholds it: `has_unresolved_trait_impl` on the member index. The
+row says `external_member_trait_not_resolved`. The stored header of an impl written in a
+function body has neither its self type nor its trait resolved, so one such impl withholds
+the builtin-member names of every builtin type in the crate. itoa has no such impl; its
+rows did not change.
+
 Step 6.4 as built: an `implements` row whose trait is left unresolved with
 `ExternalSourceMissing` takes the name its stored lookup proved; the impl header row carries
 that name as `external_name_record`. The third condition of N5 is not applied to the trait
@@ -207,7 +221,11 @@ not blocked by it. A blocked row says `external_member_name_in_local_trait`.
 
 Per step: syntax crate tests, the real-source itoa suite, format and clippy on the touched
 crates (see the log). Timed release runs after step 6.5 (three, pinned itoa): 14.8 to 15.2 s
-wall, 339 to 351 MB peak resident set, 18.3 MB store. Workspace gates: not run yet.
+wall, 339 to 351 MB peak resident set, 18.3 MB store. After the review fix (three runs):
+15.3 to 16.7 s, 343 to 360 MB, 18.8 MB store, the same 145 nodes and 585 edges.
+
+Workspace gates: see the log entry "Part 6 workspace gates". `test_lang_items_in_sysroot`
+is skipped by the standing command and fails when run, so the gate is not a full PASS.
 
 ## 7 — Open questions
 
@@ -221,6 +239,18 @@ wall, 339 to 351 MB peak resident set, 18.3 MB store. Workspace gates: not run y
 - **Q4** The trait of `.try_into()` could be stored as a prelude name on the unresolved row.
   Not planned.
 - **Q5** A crate that is not a sysroot crate and has no unit in the run is not recognised.
+- **Q6** An impl written in a function body is stored with its self type and its trait not
+  resolved. One such impl of a body-declared trait therefore withholds every builtin-member
+  name in the crate. Resolving those headers would give the names back.
+- **Q7** No lookup-level test has a binder or a glob in an enclosing scope (only in the
+  same scope). The pipeline test covers a `use` in an enclosing block.
+- **Q8** A `use` or glob written by a macro is covered by one pipeline case only
+  (`use crate::fake as core` written by a macro leads to the local function).
+- **Q9** A leading `::` path skips the chain check, which is wrong for edition 2015. Whether
+  the prelude scope depends on the edition is not verified.
+- **Q10** Of the 138 method calls, `buf[offset].write(..)` with the written parameter type
+  `&mut [MaybeUninit<u8>]` is provable in principle as `core::mem::MaybeUninit::write`. It
+  needs the parameter's type carried to the receiver and one indexing step. Not built.
 
 ## Second opinion
 
@@ -230,3 +260,9 @@ Adopted: a node, not a name inside each edge row; a name-keyed identity, not the
 `ExternalDefinition` arm; no crate claimed for a builtin member or a prelude name; the
 conditions of N5. Changed: the variant sits on the graph identity, and the kind of proof for
 one site is edge metadata, so an import and a use of the same written path share one node.
+
+GLM-5.3 reviewed the built steps 6.2 to 6.5:
+`docs/devin-research/1794804575-second-opinion-glm-5-3-max-part-6-steps-two-to-five.md`.
+It found no wrong target. Running its untested cases through the pipeline found one it had
+judged covered (the review fix above). Adopted: the test of a macro-written or body-declared
+trait. Its other two test gaps are Q7 and Q8.
