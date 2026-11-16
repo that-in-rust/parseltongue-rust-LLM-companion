@@ -2382,3 +2382,59 @@ expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_nee
 - **Not run:** workspace gates and the timed release runs (end of part 7); the GLM-5.3
   review of this step; no codebase-memory trace before the change.
 - **No refactor needed.**
+
+
+## Part 7 step 7.3c — the crate-root node (2026-11-16)
+
+- **REQ:** REQ-RUST-043.1 C1 to C3 (new, part 7 file section 5); Q2 was decided from the
+  PRD ("every module is a node").
+- **STUB:** `build_crate_root_node` with `todo!("REQ-RUST-043.1 C1")` in
+  `original-item-graph-projection.rs`, called for the area of the unit's root file.
+- **RED:** `CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo test --release -p
+  parseltongue-duckdb-analysis-adapter --lib test_crate_root_node`
+
+```text
+test ...::test_crate_root_node_stored ... FAILED   (not yet implemented: REQ-RUST-043.1 C1)
+test ...::test_crate_root_node_absent ... ok
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 185 filtered out
+```
+
+  `test_crate_root_node_absent` does not reach the stub, so it was not seen failing here;
+  the second deliberate break below fails it. The real-source RED is the `itoa` line of
+  `test_itoa_whole_graph_equality` in step 7.3b.
+- **GREEN, what was built:** one node of the existing crate-root category, identified by
+  the unit, labelled by the unit's target name, with no file, kind, owner or visibility. No
+  edge. The core validation and the Turso write and read-back already accepted the
+  category; nothing else changed.
+- **Commands and results:**
+
+```text
+cargo fmt --all --check                                                   exit 0
+cargo clippy --release -p parseltongue-duckdb-analysis-adapter
+  -p parseltongue-cli-dispatcher-binary --all-targets -- -D warnings      exit 0
+cargo test --release -p parseltongue-duckdb-analysis-adapter --lib        187 passed
+cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests                                     57 passed, 1 failed (133.2 s)
+```
+
+- **The one failure, the whole-graph test, now on one site:**
+
+```text
+nodes expected 152 stored 151; edge rows expected 682 stored 682
+expected, not stored: str::len
+expected 1 stored 0: Buffer::format --calls--> str::len @ src/lib.rs:109 definition
+expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_needed] @ src/lib.rs:109 definition
+```
+
+- **Measured on pinned itoa:** 151 nodes (was 150), 682 edges (unchanged).
+- **Existing tests changed (pinned values):** node count 150 to 151 in seven real-source
+  tests and the distinct-label count in `test_node_labels_all_distinct`; node count 17 to
+  18 and 11 to 12 in two adapter fixture tests.
+- **New real-source test, written after the code:** `test_itoa_crate_root_node`; passed on
+  first run.
+- **Deliberate breaks (3), each fails a test:** node not stored; stored for every file
+  (only `test_crate_root_node_absent`); label taken from the file path.
+- **Not decided (OD-7):** no row links a module to the file area of its body, so neither
+  `itoa` nor `u128_ext` leads to its contents by an edge.
+- **Not run:** workspace gates and timed release runs (end of part 7).
+- **No refactor needed.**

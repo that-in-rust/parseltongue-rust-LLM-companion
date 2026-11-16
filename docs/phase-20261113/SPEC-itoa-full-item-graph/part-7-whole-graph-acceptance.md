@@ -83,6 +83,17 @@ The dataset is never edited to match production: each change cites the source li
 - **Q3 (decided 2026-11-16 from the maximum-information rule).** Every type written in
   an expression is a `uses_type` site. Rule: REQ-RUST-018.3 R10 below.
 
+## 5. REQ-RUST-043.1 — the crate-root node (step 7.3c, added 2026-11-16)
+
+- **C1.** WHEN a mapped unit's root file is read, THEN the graph SHALL hold one node for
+  the unit's root module. Its identity is the unit; its label is the unit's target name
+  (`itoa`). It is of the crate-root category and carries no file, kind, owner or
+  visibility: the root module has no declaration of its own.
+- **C2.** The node has no edge. The file's top-level items stay contained by the file
+  area (REQ-RUST-043.0). Which row links a module to the file area of its body is not
+  decided (OD-7); until then neither `itoa` nor `u128_ext` has such a row.
+- **C3.** A unit whose root file is not among the files read gets no crate-root node.
+
 ## 4. REQ-RUST-018.3 — types written in an expression (step 7.3, added 2026-11-16)
 
 REQ-RUST-018.2 R1 to R9 stay as written, except that R8 no longer excludes macro

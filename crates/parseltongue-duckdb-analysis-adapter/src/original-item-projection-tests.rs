@@ -362,7 +362,7 @@ fn test_impl_body_members_excluded() {
     let source = build_original_fixture_store();
     let before = source.rows.clone();
     let input = derive_fixture_graph_input(&source).unwrap();
-    assert_eq!(input.input_node_records.len(), 17);
+    assert_eq!(input.input_node_records.len(), 18);
     assert_eq!(input.input_edge_records.len(), 16);
     for name in [
         "hidden",
@@ -450,6 +450,66 @@ fn test_child_file_owner_identity() {
             HldTargetIdentityValue::FilePublicArea(_)
         ));
     }
+}
+
+/// REQ-RUST-043.1 C1, C2: the unit's root module is one node, labelled by the target
+/// name, identified by the unit, with no file, kind, owner or visibility and no edge.
+#[test]
+fn test_crate_root_node_stored() {
+    let input = derive_fixture_graph_input(&build_original_fixture_store()).unwrap();
+    let roots = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_input_category == HldNodeInputCategory::CrateRoot)
+        .collect::<Vec<_>>();
+    assert_eq!(roots.len(), 1);
+    let root = roots[0];
+    assert_eq!(root.node_qualified_path_text, "fixture");
+    let unit = &input.input_unit_provenance_records[0].unit_compilation_identity_key;
+    assert_eq!(
+        root.node_target_reference,
+        HldTargetIdentityValue::from(NameSymbolTargetKey::CrateRoot(unit.clone()))
+    );
+    assert_eq!(
+        (
+            root.node_item_kind_value,
+            root.node_owner_kind_value,
+            root.node_effective_visibility_kind,
+            root.node_reachable_outside_crate_flag,
+            root.node_source_relative_path.as_deref(),
+            root.node_function_body_ancestry_flag,
+        ),
+        (None, None, None, None, None, false)
+    );
+    let touching = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_source_reference == root.node_target_reference
+                || edge.edge_resolution_value
+                    == HldEdgeResolutionValue::Extracted {
+                        target: root.node_target_reference.clone(),
+                    }
+        })
+        .count();
+    assert_eq!(touching, 0);
+}
+
+/// REQ-RUST-043.1 C3: a unit whose root file is not read has no crate-root node.
+#[test]
+fn test_crate_root_node_absent() {
+    let mut source = build_original_fixture_store();
+    let row = &mut source.rows.get_mut("crate-dependency-graph-table").unwrap()[0];
+    let mut unit: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+    unit["unit_source_root_path"] = json!("/fixture/src/entry.rs");
+    row.stage_row_payload_text = unit.to_string();
+    let input = derive_fixture_graph_input(&source).unwrap();
+    assert!(
+        input
+            .input_node_records
+            .iter()
+            .all(|node| node.node_input_category != HldNodeInputCategory::CrateRoot)
+    );
 }
 
 /// REQ-RUST-046.0 R6: a span that names a macro expansion with no stored macro call is
@@ -596,7 +656,7 @@ fn test_preserve_known_syntax_kinds() {
         source.insert_fixture_span_record(text, kind, name, true);
     }
     let input = derive_fixture_graph_input(&source).unwrap();
-    assert_eq!(input.input_node_records.len(), 11);
+    assert_eq!(input.input_node_records.len(), 12);
     for (_, syntax_kind, name, kind) in spans {
         // REQ-RUST-050.0 L3: a macro call is labelled with its own source text.
         let name = if syntax_kind == "MACRO_CALL" {

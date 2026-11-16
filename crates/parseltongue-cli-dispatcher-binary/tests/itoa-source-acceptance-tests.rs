@@ -2650,7 +2650,7 @@ fn test_itoa_imports_row_counts() {
             "core::str"
         ]
     );
-    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(input.input_node_records.len(), 151);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -2860,7 +2860,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(input.input_node_records.len(), 151);
     let area = input
         .input_node_records
         .iter()
@@ -3150,8 +3150,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 150);
-    assert_eq!(labels.len(), 150, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(labels.len(), 151, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"
@@ -4676,7 +4676,7 @@ fn test_itoa_external_path_calls() {
             "core::str::from_utf8_unchecked",
         ]
     );
-    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(input.input_node_records.len(), 151);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: each of the 13 `MaybeUninit<u8>` type uses targets the node
@@ -4771,7 +4771,7 @@ fn test_itoa_external_type_uses() {
         })
         .collect::<Vec<_>>();
     assert_eq!(open, Vec::<String>::new());
-    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(input.input_node_records.len(), 151);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: the three traits `Buffer` implements and the supertrait bound
@@ -4860,7 +4860,7 @@ fn test_itoa_prelude_name_targets() {
     assert_eq!(open(Some(HldRelationKindValue::Implements)), 0);
     assert_eq!(open(Some(HldRelationKindValue::UsesType)), 0);
     assert_eq!(open(None), 133);
-    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(input.input_node_records.len(), 151);
 }
 
 /// REQ-RUST-053.0 N3, N4, N6: a member reached through a builtin type that no impl in itoa
@@ -4989,7 +4989,7 @@ fn test_itoa_builtin_member_targets() {
         assert_eq!(metadata["call_shape_kind"], "method_call");
         assert!(metadata["external_target_proof_record"].is_null());
     }
-    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(input.input_node_records.len(), 151);
 }
 
 /// The stored edge rows of the full item graph of a one-file crate `source`, which must
@@ -5484,6 +5484,46 @@ fn test_self_receiver_shadow_cases() {
             row("unsigned_abs", "external:i32::unsigned_abs", ""),
         ]
     );
+}
+
+/// REQ-RUST-043.1 C1, C2: pinned itoa has one crate-root node, `itoa`, read back from the
+/// published generation with no file, kind or owner, and no edge names it.
+#[test]
+fn test_itoa_crate_root_node() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let roots = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_input_category == HldNodeInputCategory::CrateRoot)
+        .collect::<Vec<_>>();
+    assert_eq!(roots.len(), 1);
+    let root = roots[0];
+    assert_eq!(root.node_qualified_path_text, "itoa");
+    assert!(matches!(
+        &root.node_target_reference,
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit))
+            if unit.unit_cargo_target_name == "itoa"
+    ));
+    assert_eq!(
+        (
+            root.node_item_kind_value,
+            root.node_owner_kind_value,
+            root.node_source_relative_path.as_deref(),
+        ),
+        (None, None, None)
+    );
+    let touching = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            edge.edge_source_reference == root.node_target_reference
+                || edge.edge_resolution_value
+                    == HldEdgeResolutionValue::Extracted {
+                        target: root.node_target_reference.clone(),
+                    }
+        })
+        .count();
+    assert_eq!(touching, 0);
 }
 
 /// REQ-RUST-044.0: every node and every edge row production stores for pinned itoa is

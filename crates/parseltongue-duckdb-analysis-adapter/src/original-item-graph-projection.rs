@@ -67,6 +67,9 @@ impl DuckdbAnalysisStoreAdapter {
                 unit_compilation_identity_key: context.unit.clone(),
                 unit_origin_kind: HldUnitOriginKind::Workspace,
             });
+            if context.file_is_crate_root {
+                nodes.insert(build_crate_root_node(&context, generation));
+            }
             nodes.insert(HldNodeInputRecord {
                 run_generation_digest_value: generation,
                 node_target_reference: build_original_area_identity(&context)?,
@@ -293,6 +296,29 @@ fn read_original_graph_source(
         )?),
         chain_digests: Vec::new(),
     })
+}
+
+/// REQ-RUST-043.1 C1: the node of a unit's root module.
+fn build_crate_root_node(
+    context: &OriginalGraphSourceContext,
+    generation: RunGenerationDigestValue,
+) -> HldNodeInputRecord {
+    HldNodeInputRecord {
+        run_generation_digest_value: generation,
+        node_target_reference: HldTargetIdentityValue::from(NameSymbolTargetKey::CrateRoot(
+            context.unit.clone(),
+        )),
+        node_input_category: HldNodeInputCategory::CrateRoot,
+        node_item_kind_value: None,
+        node_owner_kind_value: None,
+        node_function_body_ancestry_flag: false,
+        node_effective_visibility_kind: None,
+        node_reachable_outside_crate_flag: None,
+        node_source_relative_path: None,
+        node_qualified_path_text: context.unit.unit_cargo_target_name.clone(),
+        node_signature_text: None,
+        node_generating_call_reference: None,
+    }
 }
 
 fn build_original_area_identity(
