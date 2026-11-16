@@ -199,3 +199,19 @@ It is never copied from a production run.
 - **H4.** Not compared: the lookup evidence a row keeps (candidate impls, the `use` item a
   name went through, the proof of an external name). The feature tests of parts 5 and 6
   check those.
+
+## 9. REQ-RUST-044.3 — the freeze and the PASS rule (added 2026-11-16)
+
+- **F1.** The frozen expected graph is the five files named in
+  `itoa-target-dataset/itoa-expected-graph-freeze.json`, with their sha256 digests, the
+  digests of the builder and rules files, and the digests of the two pinned source files.
+- **F2.** `test_itoa_whole_graph_equality` fails before it runs production when a frozen
+  file's digest differs from the record. The expected-data tests fail when the folder's
+  files differ from the record or when the builder, run on the pinned source, writes
+  different files.
+- **F3.** The freeze record is written only by the builder with `--write-freeze-manifest`.
+- **F4 (PASS rule).** A run marked `incomplete` passes the comparison when every row
+  without a target is an expected row of the frozen graph. The report states the mark and
+  the number of such rows (133 on pinned itoa).
+- **F5 (review).** The expected graph was written and checked against the pinned source by
+  one author. No second reviewer and no compiler oracle (user decision, 2026-11-16).

@@ -1,18 +1,16 @@
 # itoa expected full item graph: summary
 
-**Status: LLM_PARSED_DRAFT_NOT_FROZEN.** Written by Devin from reading the pinned source. Not reviewed, not frozen, never a production input. Identities are symbolic labels, not production keys.
+**Status: FROZEN_EXPECTED_GRAPH.** Written and checked against the pinned source by Devin alone; no second reviewer. Never a production input. Identities are symbolic labels, not production keys.
 
-Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, literals and repeated same-line sites are not covered. A type written in an expression is covered (REQ-RUST-018.3 R10). Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.
+Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators and literals are not covered. A type written in an expression is covered (REQ-RUST-018.3 R10).
 
 ```text
-candidate_nodes: 151
-eligible_nodes: 104
-blocked_nodes: 47
-candidate_edges: 473
-eligible_edges: 51
-blocked_edges: 422
+nodes: 151
+edge_rows_grouped: 473
+edge_sites: 682
+edge_sites_without_target: 133
 impl_block_records: 33
-unresolved_or_inactive_sites: 10
+sites_expected_to_store_no_row: 10
 relation calls: 103
 relation uses_type: 124
 relation implements: 32

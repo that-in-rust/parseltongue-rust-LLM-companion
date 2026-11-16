@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the itoa full-graph target dataset (LLM_PARSED_DRAFT, not production input).
+"""Builds the expected full item graph of pinned itoa (comparison data, never production input).
 
 Candidate identities remain symbolic. This script checks every cited source anchor against the
 pinned source and writes the candidate nodes, edges and unresolved sites. It writes no
@@ -15,6 +15,8 @@ parser.add_argument("source", nargs="?")
 parser.add_argument("--source-root")
 parser.add_argument("--pin-file", default=str(ROOT / "docs/phase-20261111/phase-one-benchmark-pin.json"))
 parser.add_argument("--output-directory", default=str(HERE))
+parser.add_argument("--write-freeze-manifest", action="store_true",
+                    help="REQ-RUST-044.3: record the digests of the files written now as the frozen expected graph")
 args = parser.parse_args()
 PIN_PATH = pathlib.Path(args.pin_file).resolve()
 PIN = json.loads(PIN_PATH.read_text())
@@ -360,8 +362,8 @@ for u, inv in UNS:
 unresolved = []
 def site(f, line, anchor, kind, reason, count=1):
     check(f, line, anchor); unresolved.append(dict(file=f, line=line, anchor=anchor, kind=kind, reason=reason, occurrences=count))
-for ln in (138, 139, 140): site(L, ln, "assert!(", "body_macro", "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot", 5)
-site(L, 232, "debug_assert!(", "body_macro", "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot")
+for ln in (138, 139, 140): site(L, ln, "assert!(", "body_macro", "a macro of core: no node and no expands row is expected; value paths in its arguments are expected reads rows", 5)
+site(L, 232, "debug_assert!(", "body_macro", "a macro of core: no node and no expands row is expected; value paths in its arguments are expected reads rows")
 site(L, 60, "use no_panic::no_panic;", "use", "cfg_inactive(feature no-panic off)"); site(X, 2, "use no_panic::no_panic;", "use", "cfg_inactive(feature no-panic off)")
 for ln in (211, 212, 213, 214): site(L, ln, "impl_Integer_size!(", "generated_impls", "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes")
 
@@ -574,61 +576,49 @@ for row in impls:
     row["source_evidence"] = source_evidence(row["file"], row["start_line"], row["source_anchor"])
 for row in unresolved:
     row["source_evidence"] = source_evidence(row["file"], row["line"], row["anchor"])
-    row.update(RULES.classify_diagnostic_site({"reason_candidate": row["reason"], "reason_verified": False}))
 
 if range_errors:
     raise SystemExit("\n".join(range_errors))
-classified = RULES.classify_candidates(node_rows, edge_rows)
-eligible_nodes = classified["eligible_nodes"]
-
 def dump(name, value):
     (OUT / name).write_text(RULES.serialize_dataset(value))
 
-candidate_provenance = {"status": "LLM_PARSED_DRAFT", "author": "Devin",
-                        "basis": "PINNED_SOURCE_READING",
-                        "independent_compiler_oracle_verification": "NOT_FROZEN"}
-candidate_header = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
-                    "candidate_provenance": candidate_provenance, "candidate_rows_preserved": True,
-                    "source_coverage": {"whole_source_coverage_claimed": False,
-                        "known_uncovered_constructs": ["operators", "literals", "repeated_same_line_sites"]},
-                    "canonical_identity_status": "SYMBOLIC_NONCANONICAL", "production_input": False,
-                    "source_commit": source_commit, "source_pin_file": PIN_PATH.name}
-dump("itoa-expected-graph-nodes.json", {**candidate_header, "row_count": len(node_rows), "rows": node_rows})
-dump("itoa-expected-graph-edges.json", {**candidate_header, "row_count": len(edge_rows),
+# REQ-RUST-044.3: written and checked against the pinned source by one author; no second reviewer, no compiler oracle.
+provenance = {"author": "Devin", "basis": "PINNED_SOURCE_READING", "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER",
+              "independent_compiler_oracle_verification": "NONE"}
+header = {"artifact_status": "FROZEN_EXPECTED_GRAPH", "provenance": provenance,
+          "source_coverage": {"whole_source_coverage_claimed": False, "known_uncovered_constructs": ["operators", "literals"]},
+          "identity_status": "SYMBOLIC_LABELS", "production_input": False,
+          "source_commit": source_commit, "source_pin_file": PIN_PATH.name}
+dump("itoa-expected-graph-nodes.json", {**header, "row_count": len(node_rows), "rows": node_rows})
+dump("itoa-expected-graph-edges.json", {**header, "row_count": len(edge_rows),
                                      "relation_kind_counts": RULES.relation_counts(edge_rows), "rows": edge_rows})
-dump("itoa-unblocked-rows-subset.json", {"artifact_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
-     "candidate_provenance": candidate_provenance,
-     "nodes": eligible_nodes, "edges": classified["eligible_edges"],
-     "counts": {"candidate_nodes": len(node_rows), "eligible_nodes": len(eligible_nodes),
-                "candidate_edges": len(edge_rows), "eligible_edges": len(classified["eligible_edges"])}})
-blocked_rows = {"candidate_provenance": candidate_provenance,
-                "nodes": classified["blocked_nodes"], "edges": classified["blocked_edges"],
-                "unresolved_or_inactive_sites": unresolved,
-                "blocker_counts": dict(sorted(collections.Counter(blocker for row in
-                    classified["blocked_nodes"] + classified["blocked_edges"] for blocker in row["blockers"]).items()))}
-dump("itoa-blocked-rows-reasons.json", blocked_rows)
-dump("itoa-expected-impl-blocks.json", {"artifact_status": "LLM_PARSED_DRAFT_NOT_PRODUCTION",
-     "candidate_provenance": candidate_provenance, "rows": impls})
-dump("itoa-expected-unresolved-sites.json", {"artifact_status": "BLOCKED_DIAGNOSTIC_EXPECTATIONS", "rows": unresolved})
+dump("itoa-expected-impl-blocks.json", {**header, "rows": impls})
+dump("itoa-expected-unresolved-sites.json", {**header, "meaning": "sites of the source that are expected to store no row", "rows": unresolved})
 
-counts = {"candidate_nodes": len(node_rows), "eligible_nodes": len(eligible_nodes), "blocked_nodes": len(classified["blocked_nodes"]),
-          "candidate_edges": len(edge_rows), "eligible_edges": len(classified["eligible_edges"]), "blocked_edges": len(classified["blocked_edges"]),
-          "impl_block_records": len(impls), "unresolved_or_inactive_sites": len(unresolved)}
+site_count = lambda rows: sum(len(row["sites"]) for row in rows)
+counts = {"nodes": len(node_rows), "edge_rows_grouped": len(edge_rows), "edge_sites": site_count(edge_rows),
+          "edge_sites_without_target": site_count([row for row in edge_rows if row["target_kind"] == "unresolved"]),
+          "impl_block_records": len(impls), "sites_expected_to_store_no_row": len(unresolved)}
 target_kind_counts = dict(sorted(collections.Counter(row["target_kind"] for row in edge_rows).items()))
-summary = {"artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
-           "candidate_provenance": candidate_provenance, "counts": counts,
-           "relation_kind_counts": RULES.relation_counts(edge_rows), "target_kind_counts": target_kind_counts,
-           "blocker_counts": blocked_rows["blocker_counts"],
-           "source_coverage": {"whole_source_coverage_claimed": False,
-               "known_uncovered_constructs": ["operators", "literals", "repeated_same_line_sites"]},
-           "open_decisions": ["OD-2", "OD-7", "OD-8"], "production_comparison_status": "NOT_RUN"}
+summary = {**header, "counts": counts, "relation_kind_counts": RULES.relation_counts(edge_rows),
+           "target_kind_counts": target_kind_counts}
 dump("itoa-expected-graph-summary.json", summary)
 md = "# itoa expected full item graph: summary\n\n"
-md += "**Status: LLM_PARSED_DRAFT_NOT_FROZEN.** Written by Devin from reading the pinned source. Not reviewed, not frozen, never a production input. Identities are symbolic labels, not production keys.\n\n"
-md += "Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, literals and repeated same-line sites are not covered. A type written in an expression is covered (REQ-RUST-018.3 R10). Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.\n\n"
+md += "**Status: FROZEN_EXPECTED_GRAPH.** Written and checked against the pinned source by Devin alone; no second reviewer. Never a production input. Identities are symbolic labels, not production keys.\n\n"
+md += "Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators and literals are not covered. A type written in an expression is covered (REQ-RUST-018.3 R10).\n\n"
 md += "```text\n" + "\n".join(f"{key}: {value}" for key, value in counts.items()) + "\n"
 md += "\n".join(f"relation {key}: {value}" for key, value in summary["relation_kind_counts"].items()) + "\n"
 md += "\n".join(f"target {key}: {value}" for key, value in target_kind_counts.items()) + "\n"
 md += f"source commit: {source_commit}\n```\n"
 (OUT / "itoa-expected-graph-summary.md").write_text(md)
 print(md)
+
+if args.write_freeze_manifest:
+    frozen = ("itoa-expected-graph-nodes.json", "itoa-expected-graph-edges.json", "itoa-expected-impl-blocks.json",
+              "itoa-expected-unresolved-sites.json", "itoa-expected-graph-summary.json")
+    digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    dump("itoa-expected-graph-freeze.json", {
+        "source_commit": source_commit, "source_file_sha256": source_hashes,
+        "frozen_file_sha256": {name: digest(OUT / name) for name in frozen},
+        "builder_file_sha256": {path.name: digest(path) for path in (pathlib.Path(__file__).resolve(), HERE / "itoa-expected-graph-rules.py")},
+        "counts": counts, "provenance": provenance})

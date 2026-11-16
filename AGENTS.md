@@ -40,8 +40,9 @@ code itself. Current numbers and the next target are the top entry of
   stored sites against a count of expected rows.
 - A number in a part file or the log is measured, with its command, or marked predicted.
 - `codebase-memory-mcp` and `clarity` show structure. They are navigation aids, not evidence.
-- `docs/phase-20261113/itoa-target-dataset/` is the expected graph. Today it is an unreviewed
-  draft; it becomes the reference only after review against source and a freeze (SOP S1).
+- `docs/phase-20261113/itoa-target-dataset/` is the expected graph, frozen on
+  2026-11-16 and checked against source by its author alone. A correction needs a source
+  citation and a new freeze (SOP S1).
 
 ## Rule 2 — The itoa full graph only; everything else is backlog
 

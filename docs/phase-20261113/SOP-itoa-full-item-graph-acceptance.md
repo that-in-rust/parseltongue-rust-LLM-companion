@@ -35,8 +35,11 @@ tests are in the [SPEC](SPEC-itoa-full-item-graph/README.md).
   dependency edge and every unresolved site of `src/lib.rs` and `src/u128_ext.rs` (488 lines),
   each with a source range.
 - It is written by reading the pinned source. No tool output is its authority.
-- Today it is a draft (`LLM_PARSED_DRAFT_NOT_FROZEN`). It becomes the reference only after
-  every row is reviewed against the source lines it cites, then serialized, hashed and frozen.
+- It is frozen (2026-11-16). The digests of its files are in
+  `itoa-expected-graph-freeze.json`; the comparison test fails when a file differs from them.
+- It was written and checked against the source by one author, with no second reviewer
+  (user decision, 2026-11-16). An error made the same way in the expected graph and in the
+  code is not caught.
 - Never edit the expected graph to match the mapper. A correction needs a source citation and
   a new freeze.
 
@@ -57,7 +60,9 @@ tests are in the [SPEC](SPEC-itoa-full-item-graph/README.md).
   differ.
 - **BLOCKED:** a precondition is missing, for example the expected graph is not frozen.
 - **NOT STARTED:** the producer or the check does not exist yet.
-- A run the code marks `incomplete` cannot pass.
+- A run the code marks `incomplete` can pass only when every row without a target is an
+  expected row of the frozen graph. On pinned itoa these are the 133 method calls whose
+  receiver type is declared in `core`. The report states the mark and the count.
 - A PASS belongs to one executable digest. Any production change needs a new run.
 - Memory and time are measured and reported on every run. This phase sets no memory cap.
 - Declare the expected wall time before each command; kill it at twice that.
@@ -83,8 +88,8 @@ python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py \
 python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
 ```
 
-Pass: source commit and file digests match the pin; every expected row is reviewed against
-source; the frozen files' digests are recorded.
+Pass: source commit and file digests match the pin; the expected-data tests pass; the frozen
+files' digests equal the freeze record.
 
 ### S2 — Gates and production run
 
@@ -117,8 +122,8 @@ parseltongue export-published-stage-rows --workspace-store-file-path "$STORE" \
 
 Pass:
 
-- The run publishes, and `workspace_full_map_completeness_kind` in
-  `workspace-config-state-records` is not `incomplete`.
+- The run publishes. `workspace_full_map_completeness_kind` in
+  `workspace-config-state-records` is recorded in the report (Rule 3).
 - Direct children are exactly the three allowed commands. Beneath `cargo metadata`, only
   `rustc -vV` and Cargo's stdin `--print` probe are allowed.
 - No file under `target/` is read except Cargo's `.rustc_info.json`.
@@ -159,7 +164,8 @@ Limits today:
 ### S4 — Determinism, time, memory
 
 - Run production twice at each of 1, 4 and 16 workers. Export nodes and edges as in S2 and
-  compare with `cmp`. Any difference is FAIL.
+  compare every line after the first. The first line of an export is its header and carries
+  that run's attempt id. Any other difference is FAIL.
 - Record wall time, whole-process-tree peak memory (10 ms samples) and store size.
 
 ### Report

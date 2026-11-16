@@ -1,17 +1,22 @@
 {
-  "artifact_status": "BLOCKED_DIAGNOSTIC_EXPECTATIONS",
+  "artifact_status": "FROZEN_EXPECTED_GRAPH",
+  "identity_status": "SYMBOLIC_LABELS",
+  "meaning": "sites of the source that are expected to store no row",
+  "production_input": false,
+  "provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NONE",
+    "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
+  },
   "rows": [
     {
       "anchor": "assert!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "body_macro",
       "line": 138,
       "occurrences": 5,
-      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
+      "reason": "a macro of core: no node and no expands row is expected; value paths in its arguments are expected reads rows",
       "source_evidence": {
         "anchor_text": "assert!(",
         "byte_range": [
@@ -26,15 +31,11 @@
     },
     {
       "anchor": "assert!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "body_macro",
       "line": 139,
       "occurrences": 5,
-      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
+      "reason": "a macro of core: no node and no expands row is expected; value paths in its arguments are expected reads rows",
       "source_evidence": {
         "anchor_text": "assert!(",
         "byte_range": [
@@ -49,15 +50,11 @@
     },
     {
       "anchor": "assert!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "body_macro",
       "line": 140,
       "occurrences": 5,
-      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
+      "reason": "a macro of core: no node and no expands row is expected; value paths in its arguments are expected reads rows",
       "source_evidence": {
         "anchor_text": "assert!(",
         "byte_range": [
@@ -72,15 +69,11 @@
     },
     {
       "anchor": "debug_assert!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "body_macro",
       "line": 232,
       "occurrences": 1,
-      "reason": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_candidate": "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
+      "reason": "a macro of core: no node and no expands row is expected; value paths in its arguments are expected reads rows",
       "source_evidence": {
         "anchor_text": "debug_assert!(",
         "byte_range": [
@@ -95,15 +88,11 @@
     },
     {
       "anchor": "use no_panic::no_panic;",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "use",
       "line": 60,
       "occurrences": 1,
       "reason": "cfg_inactive(feature no-panic off)",
-      "reason_candidate": "cfg_inactive(feature no-panic off)",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
       "source_evidence": {
         "anchor_text": "use no_panic::no_panic;",
         "byte_range": [
@@ -118,15 +107,11 @@
     },
     {
       "anchor": "use no_panic::no_panic;",
-      "eligibility_status": "BLOCKED",
       "file": "src/u128_ext.rs",
       "kind": "use",
       "line": 2,
       "occurrences": 1,
       "reason": "cfg_inactive(feature no-panic off)",
-      "reason_candidate": "cfg_inactive(feature no-panic off)",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
       "source_evidence": {
         "anchor_text": "use no_panic::no_panic;",
         "byte_range": [
@@ -141,15 +126,11 @@
     },
     {
       "anchor": "impl_Integer_size!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "generated_impls",
       "line": 211,
       "occurrences": 1,
       "reason": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_candidate": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(",
         "byte_range": [
@@ -164,15 +145,11 @@
     },
     {
       "anchor": "impl_Integer_size!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "generated_impls",
       "line": 212,
       "occurrences": 1,
       "reason": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_candidate": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(",
         "byte_range": [
@@ -187,15 +164,11 @@
     },
     {
       "anchor": "impl_Integer_size!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "generated_impls",
       "line": 213,
       "occurrences": 1,
       "reason": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_candidate": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(",
         "byte_range": [
@@ -210,15 +183,11 @@
     },
     {
       "anchor": "impl_Integer_size!(",
-      "eligibility_status": "BLOCKED",
       "file": "src/lib.rs",
       "kind": "generated_impls",
       "line": 214,
       "occurrences": 1,
       "reason": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_candidate": "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes",
-      "reason_claim_status": "NOT_ASSERTED",
-      "reason_verified": false,
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(",
         "byte_range": [
@@ -231,5 +200,14 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       }
     }
-  ]
+  ],
+  "source_commit": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+  "source_coverage": {
+    "known_uncovered_constructs": [
+      "operators",
+      "literals"
+    ],
+    "whole_source_coverage_claimed": false
+  },
+  "source_pin_file": "phase-one-benchmark-pin.json"
 }

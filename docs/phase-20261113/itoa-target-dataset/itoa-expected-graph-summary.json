@@ -1,39 +1,21 @@
 {
-  "artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
-  "blocker_counts": {
-    "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 64,
-    "EXTERNAL_TRAIT_VISIBILITY_UNVERIFIED": 8,
-    "INFERRED_CORE_DEPENDENT_CALL_UNDECIDED": 12,
-    "MACRO_FILE_ASSIGNMENT_UNRESOLVED": 389,
-    "OD-2_MACRO_OWNERSHIP_UNDECIDED": 389,
-    "OD-7_OWNERSHIP_UNDECIDED": 2,
-    "OD-8_NON_FUNCTION_RULE_UNDECIDED": 48,
-    "RESOLUTION_NOT_EXTRACTED": 55,
-    "SOURCE_ITEM_IDENTITY_UNVERIFIED": 29,
-    "SOURCE_SITE_RANGE_UNVERIFIED": 93
+  "artifact_status": "FROZEN_EXPECTED_GRAPH",
+  "counts": {
+    "edge_rows_grouped": 473,
+    "edge_sites": 682,
+    "edge_sites_without_target": 133,
+    "impl_block_records": 33,
+    "nodes": 151,
+    "sites_expected_to_store_no_row": 10
   },
-  "candidate_provenance": {
+  "identity_status": "SYMBOLIC_LABELS",
+  "production_input": false,
+  "provenance": {
     "author": "Devin",
     "basis": "PINNED_SOURCE_READING",
-    "independent_compiler_oracle_verification": "NOT_FROZEN",
-    "status": "LLM_PARSED_DRAFT"
+    "independent_compiler_oracle_verification": "NONE",
+    "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
   },
-  "counts": {
-    "blocked_edges": 422,
-    "blocked_nodes": 47,
-    "candidate_edges": 473,
-    "candidate_nodes": 151,
-    "eligible_edges": 51,
-    "eligible_nodes": 104,
-    "impl_block_records": 33,
-    "unresolved_or_inactive_sites": 10
-  },
-  "open_decisions": [
-    "OD-2",
-    "OD-7",
-    "OD-8"
-  ],
-  "production_comparison_status": "NOT_RUN",
   "relation_kind_counts": {
     "calls": 103,
     "contains": 88,
@@ -46,14 +28,15 @@
     "reexports": 0,
     "uses_type": 124
   },
+  "source_commit": "af77385d0daf4d0e949e81f2588be2e44f69f086",
   "source_coverage": {
     "known_uncovered_constructs": [
       "operators",
-      "literals",
-      "repeated_same_line_sites"
+      "literals"
     ],
     "whole_source_coverage_claimed": false
   },
+  "source_pin_file": "phase-one-benchmark-pin.json",
   "target_kind_counts": {
     "builtin": 77,
     "external": 64,

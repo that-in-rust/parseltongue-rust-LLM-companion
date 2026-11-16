@@ -1,14 +1,13 @@
 {
-  "artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
-  "candidate_provenance": {
+  "artifact_status": "FROZEN_EXPECTED_GRAPH",
+  "identity_status": "SYMBOLIC_LABELS",
+  "production_input": false,
+  "provenance": {
     "author": "Devin",
     "basis": "PINNED_SOURCE_READING",
-    "independent_compiler_oracle_verification": "NOT_FROZEN",
-    "status": "LLM_PARSED_DRAFT"
+    "independent_compiler_oracle_verification": "NONE",
+    "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
   },
-  "candidate_rows_preserved": true,
-  "canonical_identity_status": "SYMBOLIC_NONCANONICAL",
-  "production_input": false,
   "row_count": 151,
   "rows": [
     {
@@ -4427,8 +4426,7 @@
   "source_coverage": {
     "known_uncovered_constructs": [
       "operators",
-      "literals",
-      "repeated_same_line_sites"
+      "literals"
     ],
     "whole_source_coverage_claimed": false
   },

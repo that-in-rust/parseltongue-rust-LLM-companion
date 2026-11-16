@@ -48,7 +48,7 @@ real-source itoa tests   58 pass, 0 fail (145 s)                       at 64a5c0
 workspace tests          601 pass, 0 fail, 4 ignored                   at b0cc7ac81
                          test_lang_items_in_sysroot skipped; it fails when run
 format, lint, release    pass                                          at b0cc7ac81
-expected-data tests      16 pass
+expected-data tests      9 pass (7 tests of the removed "blocked rows" layer deleted)
 ```
 
 The workspace gate is not a full PASS while that test is skipped. It reads the native
@@ -57,9 +57,9 @@ sysroot, which itoa runs exclude.
 ### SOP status
 
 ```text
-S1  freeze inputs and expected graph   NOT PASSED   dataset still marked LLM_PARSED_DRAFT_NOT_FROZEN
+S1  freeze inputs and expected graph   NOT PASSED   frozen 2026-11-16 (step 7.10); not yet run as a step
 S2  gates and production run           NOT PASSED   one test skipped; process audit not run; graph marked incomplete
-S3  exact comparison                   NOT PASSED   the test passes, but against an unfrozen graph
+S3  exact comparison                   NOT PASSED   the test passes on the frozen graph; not yet on a frozen binary
 S4  determinism, time, memory          NOT PASSED   measured once, not on a frozen binary; 19 ms samples, not 10
 ```
 
@@ -98,9 +98,8 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 ### What is left to finish the PRD
 
 1. Done (step 7.9): node position and external-name kind are compared.
-2. Fix two SOP lines that make PASS impossible as written ("incomplete cannot pass";
-   `cmp` on exports whose header carries a run id).
-3. S1: freeze the expected graph and record its digests.
+2. Done (step 7.10): the two SOP lines are fixed.
+3. Done (step 7.10): the expected graph is frozen and its digests recorded.
 4. S2 to S4 on one frozen binary, with the process audit and 10 ms memory samples.
 5. The run report as an entry below.
 
@@ -126,3 +125,25 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 - **codebase-memory:** re-indexed before this step (26,725 nodes, 62,052 edges);
   `search_graph` for the full-run entry functions returned no rows, so the files were read
   directly.
+
+### Part 7 step 7.10 — the expected graph is frozen (2026-11-16)
+
+- **REQ:** REQ-RUST-044.3 F1 to F5 (part 7 file, section 9).
+- **What changed:** the builder writes `itoa-expected-graph-freeze.json` (sha256 of the five
+  expected files, of the builder and rules files, and of the two source files) only with
+  `--write-freeze-manifest`. The "blocked rows" layer of 2026-11-14 is removed: its two
+  output files, its classifier and its 7 tests. Every reason it listed is decided since.
+- **Frozen digests:** nodes `29aed6ef…f7954e7`, edges `a51f7d6e…d06b156`; all seven are
+  in the freeze record.
+- **STUB / RED:** `verify_frozen_expected_files` as `todo!()`:
+  `0 passed; 1 failed; 57 filtered out`, `not yet implemented: REQ-RUST-044.3 F2`. The two
+  new Python tests errored on the missing record. Both show reach only.
+- **GREEN:** `test_itoa_whole_graph_equality`: `1 passed; 0 failed; 57 filtered out`.
+  Expected-data tests: `Ran 9 tests`, `OK`.
+- **One change that fails it:** a newline appended to the edges file:
+  `itoa-expected-graph-edges.json differs from the frozen expected graph`.
+- **SOP changed in place:** Rule 1 (frozen, one author), Rule 3 (an incomplete run passes
+  only when every row without a target is expected), S1 and S2 pass lines, S4 (exports
+  compared after the header line).
+- **Limit:** the review is by the author alone. No production code changed. No refactor.
+- **codebase-memory:** no query; only test and dataset files changed.

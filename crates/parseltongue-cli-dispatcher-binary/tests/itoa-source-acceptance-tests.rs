@@ -5410,6 +5410,34 @@ fn convert_camel_snake_text(name: &str) -> String {
         })
 }
 
+/// REQ-RUST-044.3 F2: the files compared against are the frozen ones. Panics when a file's
+/// digest differs from the freeze record written beside it.
+fn verify_frozen_expected_files() {
+    let directory =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/phase-20261113/itoa-target-dataset");
+    let record: Value = serde_json::from_str(
+        &fs::read_to_string(directory.join("itoa-expected-graph-freeze.json")).unwrap(),
+    )
+    .unwrap();
+    let frozen = record["frozen_file_sha256"].as_object().unwrap();
+    assert!(
+        [
+            "itoa-expected-graph-nodes.json",
+            "itoa-expected-graph-edges.json"
+        ]
+        .iter()
+        .all(|name| frozen.contains_key(*name)),
+        "the freeze record names the node and edge files"
+    );
+    frozen.iter().for_each(|(name, digest)| {
+        assert_eq!(
+            digest.as_str().unwrap(),
+            hash_file_sha256_hex(&directory.join(name)),
+            "{name} differs from the frozen expected graph"
+        )
+    });
+}
+
 fn read_expected_graph_rows(name: &str) -> Vec<Value> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs/phase-20261113/itoa-target-dataset")
@@ -5658,6 +5686,7 @@ fn test_itoa_crate_root_node() {
 /// production stores for it (N1).
 #[test]
 fn test_itoa_whole_graph_equality() {
+    verify_frozen_expected_files();
     let (_directory, _root, _database, input) = run_original_graph_fixture();
     let labels = input
         .input_node_records

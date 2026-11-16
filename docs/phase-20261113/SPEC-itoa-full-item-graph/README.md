@@ -25,7 +25,7 @@ part  file                                       requirements                   
 4d    part-4d-imports-from-use-items.md          049.0                          BUILT
 5     part-5-macro-generated-items.md            046.0                          5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
-7     part-7-whole-graph-acceptance.md           044.0                          IN PROGRESS (measured: 267 of 368 draft edges match)
+7     part-7-whole-graph-acceptance.md           044.0 to 044.3                 comparison passes on the frozen graph; acceptance run pending
 ```
 
 MET means the part's real-source tests pass on pinned itoa (11 of 11 at commit `15643ec4f`).
