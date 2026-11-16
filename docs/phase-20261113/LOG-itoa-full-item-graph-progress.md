@@ -724,7 +724,7 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
 ```
 
 
-## 2026-11-16 21:50 IST Part 8 step 9.2: the expected target of the 133 method calls, drafted
+## 2026-11-16 20:59 IST Part 8 step 9.2: the expected target of the 133 method calls, drafted
 
 ```text
  what        itoa-expected-core-member-targets.json, written by a new builder from the pinned
@@ -753,7 +753,7 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
 ```
 
 
-## 2026-11-16 22:20 IST Part 8 steps 9.3 and 9.4: self-review of the 133 rows, then frozen
+## 2026-11-16 21:05 IST Part 8 steps 9.3 and 9.4: self-review of the 133 rows, then frozen
 
 ```text
  asked       the user: review the rows as a coding agent would read them, then take the call
@@ -786,7 +786,7 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
 ```
 
 
-## 2026-11-16 22:45 IST Compile check of the 133 expected core targets (one-off, user approved)
+## 2026-11-16 21:08 IST Compile check of the 133 expected core targets (one-off, user approved)
 
 ```text
  why         the rows and the mapper have one author; a misreading of Rust's lookup rules would
@@ -820,5 +820,36 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
              check only, never by production or a gate.
  recorded    provenance of itoa-expected-core-member-targets.json; PRD "No oracle" names the
              exception; re-frozen (rows unchanged), 11 of 11 data-set tests pass
+```
+
+
+## 2026-11-16 22:00 IST Part 8 step 9.5: the real-source test compares a run with the frozen rows
+
+```text
+ what        test_itoa_core_member_targets no longer holds a list of its own. It runs the
+             mapper with `declarations` on pinned itoa and compares every call it names in
+             core with the frozen row of that site: label, crate, owner kind, declaration
+             file and line, and the assumptions the row asks for (REQ-RUST-058.0 T8).
+             It also fails when the core source of the compiler in use is not the one the
+             rows were written from (T6), or the file differs from its freeze record (T7).
+ result      stored 17, equal 17, wrong 0, without a target 116 (of 133)
+               16  MaybeUninit<T>::write      1  [T]::get_unchecked
+             nodes 153, edge rows 682, calls 197
+ RED shown   with one expected line number raised by one, the test reported
+             "17 of 17 stored core targets differ"; the change was reverted
+ also        the expected rows gained site_span_key (copied from the frozen graph, the key
+             the test joins on); re-frozen, rows otherwise unchanged; 11 data-set tests pass
+             format_stored_site_span is now shared with test_itoa_whole_graph_equality
+ gates       cargo fmt --check                                  ok
+             clippy -D warnings, cli crate, all targets         ok   359 s
+             real-source tests, frozen executable               60 passed, 0 failed, 1,177 s
+             executable sha256 216d454cd70eb807..., same before and after the run
+             not run: the workspace clippy, test and build gates
+ this VM     ~/repos/rust-tools restored: rust-analyzer 2a362a4 plus the bundle in tools/
+             (bf6b209), itoa af77385 (digests equal the pin). Release build 7 min 56 s.
+             `cargo fetch --locked` was needed once so that `cargo metadata --offline` finds
+             no-panic. The DuckDB json extension had to be downloaded (immediate backlog 6).
+             One run with `declarations`: 16.5 s, 376 MB resident, one process, untraced.
+ not done    no SOP step was run for this head. S1 to S4: NOT STARTED.
 ```
 

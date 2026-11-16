@@ -656,6 +656,7 @@
         "generated_by": null,
         "line": 107,
         "method_name": "as_mut_ptr",
+        "site_span_key": "src/lib.rs definition:3256..definition:3279",
         "source": "Buffer::format"
       },
       "target_crate_name": "core",
@@ -707,6 +708,7 @@
         "generated_by": null,
         "line": 107,
         "method_name": "cast",
+        "site_span_key": "src/lib.rs definition:3256..definition:3299",
         "source": "Buffer::format"
       },
       "target_crate_name": "core",
@@ -764,6 +766,7 @@
         "generated_by": null,
         "line": 109,
         "method_name": "len",
+        "site_span_key": "src/lib.rs definition:3368..definition:3380",
         "source": "Buffer::format"
       },
       "target_crate_name": "core",
@@ -835,6 +838,7 @@
         },
         "line": 144,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:6025..definition:4480",
         "source": "<u128 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -906,6 +910,7 @@
         },
         "line": 144,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5949..definition:4480",
         "source": "<u16 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -977,6 +982,7 @@
         },
         "line": 144,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5974..definition:4480",
         "source": "<u32 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1048,6 +1054,7 @@
         },
         "line": 144,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5999..definition:4480",
         "source": "<u64 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1119,6 +1126,7 @@
         },
         "line": 144,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5925..definition:4480",
         "source": "<u8 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1190,6 +1198,7 @@
         },
         "line": 160,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:6019..definition:5082",
         "source": "<i128 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1261,6 +1270,7 @@
         },
         "line": 160,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5944..definition:5082",
         "source": "<i16 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1332,6 +1342,7 @@
         },
         "line": 160,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5969..definition:5082",
         "source": "<i32 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1403,6 +1414,7 @@
         },
         "line": 160,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5994..definition:5082",
         "source": "<i64 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1474,6 +1486,7 @@
         },
         "line": 160,
         "method_name": "ilog10",
+        "site_span_key": "src/lib.rs invocation:5921..definition:5082",
         "source": "<i8 as Integer>::MAX_STR_LEN"
       },
       "target_crate_name": "core",
@@ -1535,6 +1548,7 @@
         },
         "line": 172,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:5534..definition:5565",
         "source": "<i128 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1596,6 +1610,7 @@
         },
         "line": 172,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:5534..definition:5565",
         "source": "<i16 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1657,6 +1672,7 @@
         },
         "line": 172,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:5534..definition:5565",
         "source": "<i32 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1718,6 +1734,7 @@
         },
         "line": 172,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:5534..definition:5565",
         "source": "<i64 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1779,6 +1796,7 @@
         },
         "line": 172,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:5534..definition:5565",
         "source": "<i8 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1834,6 +1852,7 @@
         },
         "line": 172,
         "method_name": "unwrap",
+        "site_span_key": "src/lib.rs definition:5534..definition:5574",
         "source": "<i128 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1889,6 +1908,7 @@
         },
         "line": 172,
         "method_name": "unwrap",
+        "site_span_key": "src/lib.rs definition:5534..definition:5574",
         "source": "<i16 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1944,6 +1964,7 @@
         },
         "line": 172,
         "method_name": "unwrap",
+        "site_span_key": "src/lib.rs definition:5534..definition:5574",
         "source": "<i32 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -1999,6 +2020,7 @@
         },
         "line": 172,
         "method_name": "unwrap",
+        "site_span_key": "src/lib.rs definition:5534..definition:5574",
         "source": "<i64 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2054,6 +2076,7 @@
         },
         "line": 172,
         "method_name": "unwrap",
+        "site_span_key": "src/lib.rs definition:5534..definition:5574",
         "source": "<i8 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2115,6 +2138,7 @@
         },
         "line": 176,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:5678..definition:5701",
         "source": "<i128 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2176,6 +2200,7 @@
         },
         "line": 176,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:5678..definition:5701",
         "source": "<i16 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2237,6 +2262,7 @@
         },
         "line": 176,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:5678..definition:5701",
         "source": "<i32 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2298,6 +2324,7 @@
         },
         "line": 176,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:5678..definition:5701",
         "source": "<i64 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2359,6 +2386,7 @@
         },
         "line": 176,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:5678..definition:5701",
         "source": "<i8 as private::Sealed>::write"
       },
       "target_crate_name": "core",
@@ -2410,6 +2438,7 @@
         "generated_by": null,
         "line": 249,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:8340..definition:8367",
         "source": "slice_buffer_to_str"
       },
       "target_crate_name": "core",
@@ -2488,6 +2517,7 @@
         },
         "line": 265,
         "method_name": "len",
+        "site_span_key": "src/lib.rs definition:9034..definition:9043",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2566,6 +2596,7 @@
         },
         "line": 265,
         "method_name": "len",
+        "site_span_key": "src/lib.rs definition:9034..definition:9043",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2644,6 +2675,7 @@
         },
         "line": 265,
         "method_name": "len",
+        "site_span_key": "src/lib.rs definition:9034..definition:9043",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2722,6 +2754,7 @@
         },
         "line": 265,
         "method_name": "len",
+        "site_span_key": "src/lib.rs definition:9034..definition:9043",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2783,6 +2816,7 @@
         },
         "line": 274,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9399..definition:9442",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2844,6 +2878,7 @@
         },
         "line": 274,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9399..definition:9442",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2905,6 +2940,7 @@
         },
         "line": 274,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9399..definition:9442",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -2966,6 +3002,7 @@
         },
         "line": 274,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9399..definition:9442",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3021,6 +3058,7 @@
         },
         "line": 275,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9399..definition:9534",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3076,6 +3114,7 @@
         },
         "line": 275,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9399..definition:9534",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3131,6 +3170,7 @@
         },
         "line": 275,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9399..definition:9534",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3186,6 +3226,7 @@
         },
         "line": 275,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9399..definition:9534",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3247,6 +3288,7 @@
         },
         "line": 281,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9663..definition:9706",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3308,6 +3350,7 @@
         },
         "line": 281,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9663..definition:9706",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3369,6 +3412,7 @@
         },
         "line": 281,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9663..definition:9706",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3430,6 +3474,7 @@
         },
         "line": 281,
         "method_name": "try_into",
+        "site_span_key": "src/lib.rs definition:9663..definition:9706",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3485,6 +3530,7 @@
         },
         "line": 282,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9663..definition:9794",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3540,6 +3586,7 @@
         },
         "line": 282,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9663..definition:9794",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3595,6 +3642,7 @@
         },
         "line": 282,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9663..definition:9794",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3650,6 +3698,7 @@
         },
         "line": 282,
         "method_name": "expect",
+        "site_span_key": "src/lib.rs definition:9663..definition:9794",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3711,6 +3760,7 @@
         },
         "line": 288,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:9998..definition:10104",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3772,6 +3822,7 @@
         },
         "line": 288,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:9998..definition:10104",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3833,6 +3884,7 @@
         },
         "line": 288,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:9998..definition:10104",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3894,6 +3946,7 @@
         },
         "line": 288,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:9998..definition:10104",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -3955,6 +4008,7 @@
         },
         "line": 288,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10050..definition:10103",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4016,6 +4070,7 @@
         },
         "line": 288,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10050..definition:10103",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4077,6 +4132,7 @@
         },
         "line": 288,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10050..definition:10103",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4138,6 +4194,7 @@
         },
         "line": 288,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10050..definition:10103",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4199,6 +4256,7 @@
         },
         "line": 290,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10130..definition:10236",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4260,6 +4318,7 @@
         },
         "line": 290,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10130..definition:10236",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4321,6 +4380,7 @@
         },
         "line": 290,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10130..definition:10236",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4382,6 +4442,7 @@
         },
         "line": 290,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10130..definition:10236",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4443,6 +4504,7 @@
         },
         "line": 290,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10182..definition:10235",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4504,6 +4566,7 @@
         },
         "line": 290,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10182..definition:10235",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4565,6 +4628,7 @@
         },
         "line": 290,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10182..definition:10235",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4626,6 +4690,7 @@
         },
         "line": 290,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10182..definition:10235",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4687,6 +4752,7 @@
         },
         "line": 292,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10262..definition:10368",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4748,6 +4814,7 @@
         },
         "line": 292,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10262..definition:10368",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4809,6 +4876,7 @@
         },
         "line": 292,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10262..definition:10368",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4870,6 +4938,7 @@
         },
         "line": 292,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10262..definition:10368",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4931,6 +5000,7 @@
         },
         "line": 292,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10314..definition:10367",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -4992,6 +5062,7 @@
         },
         "line": 292,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10314..definition:10367",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5053,6 +5124,7 @@
         },
         "line": 292,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10314..definition:10367",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5114,6 +5186,7 @@
         },
         "line": 292,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10314..definition:10367",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5175,6 +5248,7 @@
         },
         "line": 294,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10394..definition:10500",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5236,6 +5310,7 @@
         },
         "line": 294,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10394..definition:10500",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5297,6 +5372,7 @@
         },
         "line": 294,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10394..definition:10500",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5358,6 +5434,7 @@
         },
         "line": 294,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10394..definition:10500",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5419,6 +5496,7 @@
         },
         "line": 294,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10446..definition:10499",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5480,6 +5558,7 @@
         },
         "line": 294,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10446..definition:10499",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5541,6 +5620,7 @@
         },
         "line": 294,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10446..definition:10499",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5602,6 +5682,7 @@
         },
         "line": 294,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10446..definition:10499",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5663,6 +5744,7 @@
         },
         "line": 306,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10834..definition:10939",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5724,6 +5806,7 @@
         },
         "line": 306,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10834..definition:10939",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5785,6 +5868,7 @@
         },
         "line": 306,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10834..definition:10939",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5846,6 +5930,7 @@
         },
         "line": 306,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10834..definition:10939",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5907,6 +5992,7 @@
         },
         "line": 306,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10886..definition:10938",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -5968,6 +6054,7 @@
         },
         "line": 306,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10886..definition:10938",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6029,6 +6116,7 @@
         },
         "line": 306,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10886..definition:10938",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6090,6 +6178,7 @@
         },
         "line": 306,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:10886..definition:10938",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6151,6 +6240,7 @@
         },
         "line": 308,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10965..definition:11070",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6212,6 +6302,7 @@
         },
         "line": 308,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10965..definition:11070",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6273,6 +6364,7 @@
         },
         "line": 308,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10965..definition:11070",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6334,6 +6426,7 @@
         },
         "line": 308,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:10965..definition:11070",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6395,6 +6488,7 @@
         },
         "line": 308,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:11017..definition:11069",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6456,6 +6550,7 @@
         },
         "line": 308,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:11017..definition:11069",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6517,6 +6612,7 @@
         },
         "line": 308,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:11017..definition:11069",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6578,6 +6674,7 @@
         },
         "line": 308,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:11017..definition:11069",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6639,6 +6736,7 @@
         },
         "line": 319,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:11453..definition:11483",
         "source": "<u16 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6700,6 +6798,7 @@
         },
         "line": 319,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:11453..definition:11483",
         "source": "<u32 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6761,6 +6860,7 @@
         },
         "line": 319,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:11453..definition:11483",
         "source": "<u64 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6822,6 +6922,7 @@
         },
         "line": 319,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:11453..definition:11483",
         "source": "<u8 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6896,6 +6997,7 @@
         "generated_by": null,
         "line": 340,
         "method_name": "len",
+        "site_span_key": "src/lib.rs definition:11979..definition:11988",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -6953,6 +7055,7 @@
         "generated_by": null,
         "line": 341,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:12006..definition:12029",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7010,6 +7113,7 @@
         "generated_by": null,
         "line": 373,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:13188..definition:13265",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7067,6 +7171,7 @@
         "generated_by": null,
         "line": 373,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:13211..definition:13264",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7124,6 +7229,7 @@
         "generated_by": null,
         "line": 374,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:13283..definition:13360",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7181,6 +7287,7 @@
         "generated_by": null,
         "line": 374,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:13306..definition:13359",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7238,6 +7345,7 @@
         "generated_by": null,
         "line": 375,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:13378..definition:13455",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7295,6 +7403,7 @@
         "generated_by": null,
         "line": 375,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:13401..definition:13454",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7352,6 +7461,7 @@
         "generated_by": null,
         "line": 376,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:13473..definition:13550",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7409,6 +7519,7 @@
         "generated_by": null,
         "line": 376,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:13496..definition:13549",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7466,6 +7577,7 @@
         "generated_by": null,
         "line": 387,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:13811..definition:13887",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7523,6 +7635,7 @@
         "generated_by": null,
         "line": 387,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:13834..definition:13886",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7580,6 +7693,7 @@
         "generated_by": null,
         "line": 388,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:13905..definition:13981",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7637,6 +7751,7 @@
         "generated_by": null,
         "line": 388,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:13928..definition:13980",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7694,6 +7809,7 @@
         "generated_by": null,
         "line": 399,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:14279..definition:14309",
         "source": "<u128 as Unsigned>::fmt"
       },
       "target_crate_name": "core",
@@ -7745,6 +7861,7 @@
         "generated_by": null,
         "line": 413,
         "method_name": "rev",
+        "site_span_key": "src/lib.rs definition:14749..definition:14761",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -7796,6 +7913,7 @@
         "generated_by": null,
         "line": 420,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:14936..definition:15047",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -7853,6 +7971,7 @@
         "generated_by": null,
         "line": 420,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:14993..definition:15046",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -7904,6 +8023,7 @@
         "generated_by": null,
         "line": 422,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15061..definition:15172",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -7961,6 +8081,7 @@
         "generated_by": null,
         "line": 422,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15118..definition:15171",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8012,6 +8133,7 @@
         "generated_by": null,
         "line": 424,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15186..definition:15297",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8069,6 +8191,7 @@
         "generated_by": null,
         "line": 424,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15243..definition:15296",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8120,6 +8243,7 @@
         "generated_by": null,
         "line": 426,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15311..definition:15422",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8177,6 +8301,7 @@
         "generated_by": null,
         "line": 426,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15368..definition:15421",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8228,6 +8353,7 @@
         "generated_by": null,
         "line": 433,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15536..definition:15613",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8285,6 +8411,7 @@
         "generated_by": null,
         "line": 433,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15559..definition:15612",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8336,6 +8463,7 @@
         "generated_by": null,
         "line": 434,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15623..definition:15700",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8393,6 +8521,7 @@
         "generated_by": null,
         "line": 434,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15646..definition:15699",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8444,6 +8573,7 @@
         "generated_by": null,
         "line": 435,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15710..definition:15787",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8501,6 +8631,7 @@
         "generated_by": null,
         "line": 435,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15733..definition:15786",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8552,6 +8683,7 @@
         "generated_by": null,
         "line": 436,
         "method_name": "write",
+        "site_span_key": "src/lib.rs definition:15797..definition:15874",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",
@@ -8609,6 +8741,7 @@
         "generated_by": null,
         "line": 436,
         "method_name": "get_unchecked",
+        "site_span_key": "src/lib.rs definition:15820..definition:15873",
         "source": "enc_16lsd"
       },
       "target_crate_name": "core",

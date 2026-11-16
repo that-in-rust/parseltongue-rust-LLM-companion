@@ -5630,6 +5630,45 @@ fn derive_stored_site_record(relation: &str, metadata: &Value) -> String {
     }
 }
 
+/// The span of a stored site as the expected files write it (REQ-RUST-044.0 E1 to E7):
+/// the file, the byte where its first token starts and the byte where its last token ends,
+/// each with the text it is written in (the macro definition or the macro call).
+fn format_stored_site_span(edge: &HldEdgeInputRecord, metadata: &Value) -> String {
+    let read_token_origin = |token: &Value, bound: usize| {
+        format!(
+            "{}:{}",
+            token["token_source_origin_kind"].as_str().unwrap(),
+            token["token_source_byte_range"][bound].as_u64().unwrap()
+        )
+    };
+    let origin = &metadata["expansion_source_origin"];
+    if origin.is_object() {
+        let (first, last) = (
+            &origin["site_first_token_origin"],
+            &origin["site_last_token_origin"],
+        );
+        assert_eq!(
+            first["token_source_relative_path"],
+            last["token_source_relative_path"]
+        );
+        return format!(
+            "{} {}..{}",
+            first["token_source_relative_path"].as_str().unwrap(),
+            read_token_origin(first, 0),
+            read_token_origin(last, 1)
+        );
+    }
+    let site = edge
+        .edge_evidence_row_key
+        .evidence_site_occurrence_key
+        .read_semantic_occurrence_parts();
+    let (start, end) = site.span_byte_range_value.read_source_range_pair();
+    format!(
+        "{} definition:{start}..definition:{end}",
+        site.span_source_file_path
+    )
+}
+
 /// The same text rows from what production stores.
 fn collect_production_graph_rows(
     input: &HldMaterializationInputRecord,
@@ -5668,39 +5707,10 @@ fn collect_production_graph_rows(
             if !check_relation_site_compared(&relation) {
                 return head;
             }
-            let record = derive_stored_site_record(&relation, &metadata);
-            let origin = &metadata["expansion_source_origin"];
-            let read_token_origin = |token: &Value, bound: usize| {
-                format!(
-                    "{}:{}",
-                    token["token_source_origin_kind"].as_str().unwrap(),
-                    token["token_source_byte_range"][bound].as_u64().unwrap()
-                )
-            };
-            if origin.is_object() {
-                let (first, last) = (
-                    &origin["site_first_token_origin"],
-                    &origin["site_last_token_origin"],
-                );
-                assert_eq!(
-                    first["token_source_relative_path"],
-                    last["token_source_relative_path"]
-                );
-                return format!(
-                    "{head} @ {} {}..{} by {record}",
-                    first["token_source_relative_path"].as_str().unwrap(),
-                    read_token_origin(first, 0),
-                    read_token_origin(last, 1)
-                );
-            }
-            let site = edge
-                .edge_evidence_row_key
-                .evidence_site_occurrence_key
-                .read_semantic_occurrence_parts();
-            let (start, end) = site.span_byte_range_value.read_source_range_pair();
             format!(
-                "{head} @ {} definition:{start}..definition:{end} by {record}",
-                site.span_source_file_path
+                "{head} @ {} by {}",
+                format_stored_site_span(edge, &metadata),
+                derive_stored_site_record(&relation, &metadata)
             )
         })
         .collect::<Vec<_>>();
@@ -5878,11 +5888,190 @@ fn test_itoa_whole_graph_equality() {
     );
 }
 
-/// REQ-RUST-056.0 I1: with the declarations of `core` read, a method call on a
-/// parameter whose written type names the receiver has the member `core` declares as
-/// its target. Every other method call into `core` stays without one.
+const EXPECTED_DATASET_DIRECTORY_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/phase-20261113/itoa-target-dataset"
+);
+const CORE_TARGET_DATASET_NAME: &str = "itoa-expected-core-member-targets.json";
+const CORE_TARGET_FREEZE_NAME: &str = "itoa-expected-core-target-freeze.json";
+
+/// REQ-RUST-058.0 T8: what a stored call into `core` must equal in its expected row.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct CoreTargetComparedRow {
+    target_label_text: String,
+    target_crate_name: String,
+    target_owner_kind: String,
+    declaration_file_path: String,
+    declaration_line_number: usize,
+}
+
+/// A call site of the expected rows: the item that makes the call, and the site's span.
+type CoreTargetSiteKey = (String, String);
+type CoreTargetAssumptionSet = std::collections::BTreeSet<String>;
+type CoreTargetRowMap =
+    std::collections::BTreeMap<CoreTargetSiteKey, (CoreTargetComparedRow, CoreTargetAssumptionSet)>;
+
+fn read_sysroot_library_path() -> PathBuf {
+    let output = Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    Path::new(String::from_utf8(output.stdout).unwrap().trim()).join("lib/rustlib/src/rust/library")
+}
+
+/// Every `.rs` file under `directory`, as paths relative to `library`.
+fn list_rust_source_paths(library: &Path, directory: &Path) -> Vec<String> {
+    fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .flat_map(|path| {
+            if path.is_dir() {
+                list_rust_source_paths(library, &path)
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                vec![
+                    path.strip_prefix(library)
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_owned(),
+                ]
+            } else {
+                Vec::new()
+            }
+        })
+        .collect()
+}
+
+/// REQ-RUST-058.0 T6: the digest of the `core` source, as SOP S1 computes it:
+/// the sha256 of the `sha256sum` listing of every `.rs` file under `core/src`, in path order.
+fn hash_core_source_listing(library: &Path) -> String {
+    let mut paths = list_rust_source_paths(library, &library.join("core/src"));
+    paths.sort();
+    let listing = paths
+        .iter()
+        .map(|path| format!("{}  {path}\n", hash_file_sha256_hex(&library.join(path))))
+        .collect::<String>();
+    Sha256::digest(listing.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// REQ-RUST-058.0 T6, T7: the expected rows are the frozen ones, and the `core` source
+/// this run reads is the one they were written from.
+fn verify_frozen_core_targets(library: &Path) {
+    let directory = Path::new(EXPECTED_DATASET_DIRECTORY_PATH);
+    let record: Value =
+        serde_json::from_str(&fs::read_to_string(directory.join(CORE_TARGET_FREEZE_NAME)).unwrap())
+            .unwrap();
+    assert_eq!(
+        record["frozen_file_sha256"][CORE_TARGET_DATASET_NAME]
+            .as_str()
+            .unwrap(),
+        hash_file_sha256_hex(&directory.join(CORE_TARGET_DATASET_NAME)),
+        "{CORE_TARGET_DATASET_NAME} differs from its freeze record"
+    );
+    assert_eq!(
+        record["expected_graph_edges_sha256"].as_str().unwrap(),
+        hash_file_sha256_hex(&directory.join("itoa-expected-graph-edges.json")),
+        "the expected core targets were written for another expected graph"
+    );
+    assert_eq!(
+        record["core_source"]["listing_sha256"].as_str().unwrap(),
+        hash_core_source_listing(library),
+        "the core source of this compiler is not the one the expected rows were written from"
+    );
+}
+
+/// REQ-RUST-058.0 T1, T8: the expected rows, by call site.
+fn read_expected_core_targets() -> CoreTargetRowMap {
+    let text = |value: &Value| value.as_str().unwrap().to_owned();
+    read_expected_graph_rows(CORE_TARGET_DATASET_NAME)
+        .iter()
+        .map(|row| {
+            assert_eq!(
+                "target", row["expected"],
+                "a row without a target is not compared yet"
+            );
+            let (site, declaration) = (&row["site"], &row["core"]["declaration"]);
+            (
+                (text(&site["source"]), text(&site["site_span_key"])),
+                (
+                    CoreTargetComparedRow {
+                        target_label_text: text(&row["target_label"]),
+                        target_crate_name: text(&row["target_crate_name"]),
+                        target_owner_kind: text(&row["target_owner_kind"]),
+                        declaration_file_path: text(&declaration["file"]),
+                        declaration_line_number: declaration["line"].as_u64().unwrap() as usize,
+                    },
+                    row["assumptions"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|assumption| text(&assumption["assumption_kind"]))
+                        .collect(),
+                ),
+            )
+        })
+        .collect()
+}
+
+/// What production stores for a call it names by a declaration of `core`, in the terms of
+/// the expected rows. `None` for every other call.
+fn derive_stored_core_target(
+    edge: &HldEdgeInputRecord,
+    metadata: &Value,
+    library: &Path,
+) -> Option<(CoreTargetComparedRow, CoreTargetAssumptionSet)> {
+    let HldEdgeResolutionValue::Extracted {
+        target: HldTargetIdentityValue::ExternalNamed(named),
+    } = &edge.edge_resolution_value
+    else {
+        return None;
+    };
+    (named.external_name_kind_value == HldExternalNameKind::CoreDeclaredMember).then(|| {
+        let evidence = &metadata["core_member_lookup_evidence"];
+        let file = evidence["declaration_source_relative_path"]
+            .as_str()
+            .unwrap();
+        let name_start = evidence["member_name_start_offset"].as_u64().unwrap() as usize;
+        let line_breaks_before = fs::read(library.join(file)).unwrap()[..name_start]
+            .iter()
+            .filter(|byte| **byte == b'\n')
+            .count();
+        (
+            CoreTargetComparedRow {
+                target_label_text: named.external_item_path_text.clone(),
+                target_crate_name: named.external_crate_name_value.clone().unwrap_or_default(),
+                target_owner_kind: match metadata["dispatch_kind"].as_str().unwrap() {
+                    "core_inherent_member" => "inherent_impl".to_owned(),
+                    other => other.to_owned(),
+                },
+                declaration_file_path: file.to_owned(),
+                declaration_line_number: line_breaks_before + 1,
+            },
+            evidence["lookup_assumption_values"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|kind| kind.as_str().unwrap().to_owned())
+                .collect(),
+        )
+    })
+}
+
+/// REQ-RUST-058.0 T8: with the declarations of `core` read, every method call into `core`
+/// that the run names equals its frozen expected row: the label, the crate, the kind of
+/// owner, the declaration's file and line, and the assumptions the row asks for. A call the
+/// run leaves without a target is counted. The counts are what the run gives today; they
+/// rise as the lookup is built and reach 133 when part 8 is done (T9).
 #[test]
 fn test_itoa_core_member_targets() {
+    let library = read_sysroot_library_path();
+    verify_frozen_core_targets(&library);
+    let expected = read_expected_core_targets();
+    assert_eq!(133, expected.len());
     let directory = tempfile::tempdir().unwrap();
     let root = prepare_pinned_itoa_workspace(directory.path());
     let database = directory.path().join("d.db");
@@ -5907,58 +6096,64 @@ fn test_itoa_core_member_targets() {
     let input = store
         .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
         .unwrap();
+    let labels = input
+        .input_node_records
+        .iter()
+        .map(|node| {
+            (
+                &node.node_target_reference,
+                derive_expected_graph_label(node),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
     let calls = input
         .input_edge_records
         .iter()
         .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
         .collect::<Vec<_>>();
-    let mut found = calls
+    let stored = calls
         .iter()
         .filter_map(|edge| {
             let metadata: Value =
                 serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref()?).unwrap();
-            let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
-                return None;
-            };
-            let target = format!("{target:?}");
-            let path = target
-                .split("external_item_path_text: \"")
-                .nth(1)?
-                .split('"')
-                .next()?
-                .to_owned();
-            let evidence = &metadata["core_member_lookup_evidence"];
-            (metadata["dispatch_kind"] == "core_inherent_member").then(|| {
-                format!(
-                    "{path} on {} at {} in {}",
-                    evidence["receiver_type_text"].as_str().unwrap(),
-                    evidence["method_probe_step_text"].as_str().unwrap(),
-                    evidence["declaration_source_relative_path"]
-                        .as_str()
-                        .unwrap()
-                )
-            })
+            let key = (
+                labels.get(&edge.edge_source_reference)?.clone(),
+                format_stored_site_span(edge, &metadata),
+            );
+            derive_stored_core_target(edge, &metadata, &library).map(|row| (key, row))
+        })
+        .collect::<CoreTargetRowMap>();
+    // A stored row may carry more assumptions than its expected row asks for: those of the
+    // mapper's own proof. The set of their kinds is fixed here, so a new kind is reviewed.
+    let differing = stored
+        .iter()
+        .filter_map(|(key, (row, assumptions))| match expected.get(key) {
+            None => Some(format!("stored, not an expected site: {key:?} {row:?}")),
+            Some((wanted, _)) if wanted != row => Some(format!(
+                "{key:?}\n  expected {wanted:?}\n  stored   {row:?}"
+            )),
+            Some((_, required)) if !required.is_subset(assumptions) => Some(format!(
+                "{key:?}: the row asks for the assumptions {required:?}, stored {assumptions:?}"
+            )),
+            Some(_) => None,
         })
         .collect::<Vec<_>>();
-    found.sort();
-    let write = "MaybeUninit<T>::write on MaybeUninit<u8> at step 0 by mutable reference \
-        in core/src/mem/maybe_uninit.rs";
-    // REQ-RUST-057.0: calls on a parameter typed `&mut Self::Buffer`.
-    let alias = calls
+    let proof_assumptions = stored
         .iter()
-        .filter(|edge| {
-            edge.edge_dispatch_metadata_text
-                .as_deref()
-                .is_some_and(|text| text.contains("parameter_associated_type_alias"))
+        .flat_map(|(key, (_, assumptions))| {
+            let required = expected.get(key).map(|(_, required)| required.clone());
+            assumptions
+                .iter()
+                .filter(move |kind| required.as_ref().is_none_or(|set| !set.contains(*kind)))
+                .cloned()
         })
-        .count();
-    assert!(alias > 0, "no call is named through an associated type");
-    let mut expected = vec![write.to_owned(); 8];
-    expected.push(
-        "[T]::get_unchecked on &[MaybeUninit<u8>] at step 0 by value in core/src/slice/mod.rs"
-            .to_owned(),
-    );
-    assert_eq!(expected, found);
+        .collect::<CoreTargetAssumptionSet>();
+    let count_stored_label = |label: &str| {
+        stored
+            .values()
+            .filter(|(row, _)| row.target_label_text == label)
+            .count()
+    };
     let unresolved = calls
         .iter()
         .filter(|edge| {
@@ -5968,8 +6163,34 @@ fn test_itoa_core_member_targets() {
             )
         })
         .count();
+    assert!(
+        differing.is_empty(),
+        "{} of {} stored core targets differ from the frozen expected rows:\n{}",
+        differing.len(),
+        stored.len(),
+        differing.join("\n")
+    );
     assert_eq!(
-        (153, 682, 197, 124),
+        [
+            "core_macro_expansions_import_no_trait",
+            "source_compiles_one_associated_type"
+        ]
+        .map(str::to_owned)
+        .into_iter()
+        .collect::<CoreTargetAssumptionSet>(),
+        proof_assumptions
+    );
+    // Equal to their expected rows: 17 of 133. Without a stored target: 116.
+    assert_eq!(
+        (17, 16, 1),
+        (
+            stored.len(),
+            count_stored_label("MaybeUninit<T>::write"),
+            count_stored_label("[T]::get_unchecked")
+        )
+    );
+    assert_eq!(
+        (153, 682, 197, 116),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),

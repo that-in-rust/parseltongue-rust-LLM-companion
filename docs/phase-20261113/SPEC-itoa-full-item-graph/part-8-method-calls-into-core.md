@@ -373,9 +373,13 @@ author of the expected rows is also the author of the mapper.
   change needs a source citation and a new freeze. It is never a production input.
 - T8. WHEN a run with scope `declarations` stores a target for one of the 133 sites THEN
   the real-source test SHALL fail unless the fields the file lists as `compared_fields`
-  equal the row: the label, the crate, the owner kind, the declaration's file and line, and
-  the assumption kinds. A site the run leaves without a target is counted, not failed,
-  until step 8.6.
+  equal the row: the label, the crate, the owner kind, the declaration's file and line. The
+  stored row SHALL carry every assumption the expected row lists. It may carry more: the
+  assumptions of the mapper's own proof (today `core_macro_expansions_import_no_trait` and
+  `source_compiles_one_associated_type`). The test fixes the set of those kinds, so a new
+  kind fails until it is reviewed. A site the run leaves without a target is counted, not
+  failed, until step 8.6. The test also fails when the `core` source of the compiler in
+  use is not the one the rows were written from (T6).
 - T9. Part 8 is DONE when the count of T8 is 133 of 133 equal (rows with `no_target`
   equal when the run stores no target and the same reason). Then the rows are merged into
   the expected graph, it is re-frozen, and S1 to S4 run with `declarations` (step 8.6).
@@ -422,9 +426,10 @@ req      test                                  type         assertion           
      133 rows
 9.3  review. The user asked for a self-review from the point of view of a coding agent
      that reads the row, and for the call to be taken. Six changes followed (T5a, T8 and
-     three checks that replace prose claims); the log entry of 22:20 lists them    done
+     three checks that replace prose claims); the log entry of 21:05 lists them    done
 9.4  freeze (T7): itoa-expected-core-target-freeze.json, 11 tests pass               done
 9.5  test_itoa_core_member_targets compares with the file (T8): STUB, RED, GREEN, REFACTOR
+     done 2026-11-16: 17 stored targets, 17 equal, 0 wrong, 116 without a target
 9.6  close step 8.3b-2b against the frozen rows, then 8.3b-3, 8.4, 8.5 in the order the
      missing count falls fastest
 ```

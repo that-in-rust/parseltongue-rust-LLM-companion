@@ -354,7 +354,10 @@ def list_untargeted_call_sites(edges):
     """T1: every `calls` site the frozen expected graph lists without a target, in source order."""
     sites = [{"source": row["source"], "method_name": row["callee_name"], "file": site["file"], "line": site["line"],
               "anchor_text": evidence["anchor_text"], "byte_range": evidence["byte_range"],
-              "call_expression_text": exact["text"], "generated_by": row.get("generated_by")}
+              "call_expression_text": exact["text"], "generated_by": row.get("generated_by"),
+              # The key the real-source test joins on (REQ-RUST-044.0 E1 to E7), copied from the frozen graph.
+              "site_span_key": f"{site['file']} {exact['first_token_kind']}:{exact['first_token_start']}"
+                               f"..{exact['last_token_kind']}:{exact['last_token_end']}"}
              for row in edges["rows"] if row["relation"] == "calls" and row["target_kind"] == "unresolved"
              for site, evidence, exact in zip(row["sites"], row["source_evidence_sites"], row["site_exact_ranges"])]
     return sorted(sites, key=lambda site: (site["file"], site["byte_range"], site["source"]))
