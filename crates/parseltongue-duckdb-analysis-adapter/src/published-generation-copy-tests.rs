@@ -453,9 +453,11 @@ fn final_namespace_products_contract() {
     );
 }
 
-/// The import outcome rows of one fixture run, by site name.
+/// The import outcome rows of one fixture run, by site name. A site named in `bounds` is
+/// the request of a bound for its trait, not a `use` item.
 fn read_import_name_fixture(
     imports: &[(&str, Vec<serde_json::Value>, Option<&str>, bool)],
+    bounds: &[&str],
 ) -> BTreeMap<String, serde_json::Value> {
     let directory = tempfile::tempdir().unwrap();
     let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
@@ -486,7 +488,8 @@ fn read_import_name_fixture(
                 "import_binding_alias_text": alias,
                 "import_glob_expansion_flag": glob,
                 "import_visibility_scope_kind": {"visibility_scope_kind_value": "public"},
-                "import_resolution_source_kind": "Import",
+                "import_resolution_source_kind":
+                    if bounds.contains(site) { "Signature" } else { "Import" },
             })
             .to_string();
             StageTableRowRecord {
@@ -553,12 +556,15 @@ fn test_external_name_proof_rows() {
             "external_import_site_key": null,
         })
     };
-    let rows = read_import_name_fixture(&[
-        ("plain", names(&["core", "mem", "MaybeUninit"]), None, false),
-        ("alias", names(&["core", "hint"]), Some("h"), false),
-        ("local", names(&["Item"]), None, false),
-        ("absent", names(&["missing", "Thing"]), None, false),
-    ]);
+    let rows = read_import_name_fixture(
+        &[
+            ("plain", names(&["core", "mem", "MaybeUninit"]), None, false),
+            ("alias", names(&["core", "hint"]), Some("h"), false),
+            ("local", names(&["Item"]), None, false),
+            ("absent", names(&["missing", "Thing"]), None, false),
+        ],
+        &[],
+    );
     assert_eq!(
         rows["plain"]["import_external_name_record"],
         rooted("core::mem::MaybeUninit")
@@ -578,21 +584,41 @@ fn test_external_name_proof_rows() {
         );
     }
     // A glob import in the same scope may bring in a module named `core`.
-    let rows = read_import_name_fixture(&[
-        ("plain", names(&["core", "mem"]), None, false),
-        ("glob", names(&["Item"]), None, true),
-    ]);
+    let rows = read_import_name_fixture(
+        &[
+            ("plain", names(&["core", "mem"]), None, false),
+            ("glob", names(&["Item"]), None, true),
+        ],
+        &[],
+    );
     assert!(rows["plain"].get("import_external_name_record").is_none());
     assert_eq!(
         rows["plain"]["import_unresolved_reason_kind"],
         json!("external_source_missing")
     );
     // Another import in the same scope binds the name `core`.
-    let rows = read_import_name_fixture(&[
-        ("plain", names(&["core", "mem"]), None, false),
-        ("rebind", names(&["missing", "Thing"]), Some("core"), false),
-    ]);
+    let rows = read_import_name_fixture(
+        &[
+            ("plain", names(&["core", "mem"]), None, false),
+            ("rebind", names(&["missing", "Thing"]), Some("core"), false),
+        ],
+        &[],
+    );
     assert!(rows["plain"].get("import_external_name_record").is_none());
+    // A bound's request for its trait is stored as a glob of the trait's members. It puts
+    // no name in lexical scope, so it is neither a glob import nor a binder of `core`.
+    let rows = read_import_name_fixture(
+        &[
+            ("plain", names(&["core", "mem"]), None, false),
+            ("supertrait", names(&["Item"]), None, true),
+            ("named", names(&["missing", "core"]), None, false),
+        ],
+        &["supertrait", "named"],
+    );
+    assert_eq!(
+        rows["plain"]["import_external_name_record"],
+        rooted("core::mem")
+    );
 }
 
 /// REQ-RUST-049.0 R1

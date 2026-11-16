@@ -115,7 +115,7 @@ store the crate or the path it proved. That is the first producer gap.
 
 ## 4 — Verification matrix
 
-Each step adds its tests and its row here. Built so far: steps 6.1, 6.2 and 6.3.
+Each step adds its tests and its row here. Built so far: steps 6.1 to 6.4.
 
 ```text
 rule       test (exists)                                              where
@@ -129,6 +129,10 @@ N1         test_signature_external_type_named                         itoa-sourc
 N1 N4 N5   test_external_type_names_target                            signature-type-edge-tests.rs
 N5         test_written_path_last_name                                signature-type-edge-tests.rs
 N1         test_self_unresolved_header_reason (Self takes no name)    signature-type-edge-tests.rs
+N1 N3 N4   test_itoa_prelude_name_targets (4 rows, 3 new nodes)       itoa-source-acceptance-tests.rs
+N1         test_buffer_prelude_traits_named                           itoa-source-acceptance-tests.rs
+N1 N4      test_external_trait_names_target                           impl-header-implements-tests.rs
+N3 N5      test_external_name_proof_rows (a bound is not a glob import or a binder)   published-generation-copy-tests.rs
 ```
 
 Planned at the start of the part:
@@ -162,7 +166,16 @@ step  rows gaining a target   new nodes   nodes after   unresolved after   as pr
 6.1   4                       4           107           201                yes
 6.2   7                       4           111           194                yes
 6.3   13                      0           111           181                yes
+6.4   4                       3           114           177                yes
 ```
+
+Step 6.4 as built: an `implements` row whose trait is left unresolved with
+`ExternalSourceMissing` takes the name its stored lookup proved; the impl header row carries
+that name as `external_name_record`. The third condition of N5 is not applied to the trait
+of an impl header: it is never a member reached through a type. The bound `Copy` needed a
+correction to the proof in SQL, not a new rule: a bound's request for its trait is stored
+beside the `use` requests as a glob, and the proof counted it as a glob import of the scope.
+Only `use` requests are glob imports or binders now.
 
 Step 6.3 as built: the third condition of N5 for a type path reads the names of the written
 path outside `<..>` and `(..)` groups; a leading `<A as T>` counts as one name. `Self`

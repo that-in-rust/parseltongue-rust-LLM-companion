@@ -24,7 +24,7 @@ part  file                                       requirements                   
 4c    part-4c-reads-of-consts-statics.md         048.0                          BUILT (original bodies)
 4d    part-4d-imports-from-use-items.md          049.0                          BUILT
 5     part-5-macro-generated-items.md            046.0                          5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
-6     part-6-targets-in-core.md                  053.0                          IN PROGRESS (6.1-6.3 built: 111 nodes)
+6     part-6-targets-in-core.md                  053.0                          IN PROGRESS (6.1-6.4 built: 114 nodes)
 7     part-7-whole-graph-acceptance.md           044.0                          NOT STARTED
 ```
 

@@ -353,7 +353,12 @@ impl ImplHeaderSourceContext<'_> {
                     field: "path_unresolved_reason_kind",
                 });
             }
-            return Ok(unresolved(reason));
+            // REQ-RUST-053.0 N4: the external name the lookup proved stays beside its reason.
+            let mut value = unresolved(reason);
+            if !path["path_external_name_record"].is_null() {
+                value["external_name_record"] = path["path_external_name_record"].clone();
+            }
+            return Ok(value);
         }
         let targets = path["path_target_symbol_rows"].as_array().ok_or(
             ImplHeaderSourceError::InvalidField {

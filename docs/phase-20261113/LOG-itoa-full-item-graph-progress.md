@@ -15,12 +15,13 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1, 6.2 and 6.3 are built.
-  The graph is 111 nodes and 585 edges; 8 nodes are written paths into `core` with no file,
-  kind or signature. All 4 `imports` rows, 50 of 197 calls and 105 of 106 `uses_type` rows
-  have a target; 181 rows have none (147 calls, 30 reads, 3 implements, 1 uses_type).
-  Next is step 6.4 (prelude names). Numbers above this line that say 103
-  nodes or 43 calls are from before part 6.
+- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1 to 6.4 are built.
+  The graph is 114 nodes and 585 edges; 11 nodes are written names outside itoa with no file,
+  kind or signature (8 paths into `core`, 3 prelude names). All 4 `imports` rows, all 32
+  `implements` rows, all 106 `uses_type` rows and 50 of 197 calls have a target; 177 rows
+  have none (147 calls, 30 reads).
+  Next is step 6.5 (builtin members). Numbers above this line that say 103
+  nodes, 43 calls or 3 unresolved `implements` are from before part 6.
 - **Earlier target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
   10b, 10c and 11 are built (40 new `uses_type` rows; 4 qualified-path rows on the impl
   member; 20 `reads` rows from `assert!` arguments).
@@ -127,6 +128,79 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 09:43 IST — Part 6 step 4: prelude names `Clone`, `Copy`, `Default` target named external nodes
+
+- **Milestone:** itoa full item graph, part 6 step 6.4. No SOP step has passed. The graph is
+  still marked incomplete.
+- **REQ:** REQ-RUST-053.0 N1, N3, N4, N5.
+- **Measured on pinned itoa (release run, `/home/ubuntu/phase6-work/s64b`, executable sha256
+  `394c1659…7c08`):** 114 nodes (was 111), 585 edges (unchanged), 32 of 32 `implements` rows
+  with a target (was 29), 106 of 106 `uses_type` rows with a target (was 105), 177 rows
+  without a target (was 181: 147 calls, 30 reads). As predicted in the part file.
+
+```text
+row         written in                    name      target node
+implements  impl Clone for Buffer         Clone     Clone
+implements  impl Copy for Buffer          Copy      Copy
+implements  impl Default for Buffer       Default   Default
+uses_type   pub trait Sealed: Copy        Copy      Copy   (the node of the row above)
+```
+
+- **The node is the written name, not `core::clone::Clone`:** nothing read proves which
+  item the prelude gives that name. Each row says `implicit_prelude_name`, source not read,
+  defining path not claimed.
+- **Cause found for the bound `Copy` (measured in the stored lookup tables):** the lookup
+  input stores a bound's request for its trait beside the `use` requests, as a glob
+  (4 rows on itoa: `Integer: private::Sealed`, `Sealed: Copy`, `I: Integer`,
+  `Unsigned: Integer`). The proof counted each as a glob import of its scope, so the trait
+  scope of `Sealed` failed "no glob import on the chain" for its own bound. A bound puts no
+  name in lexical scope.
+- **What changed:**
+  - `namespace-final-path-products.sql`: `glob-import-scope-records` and the import half of
+    `scope-name-binder-records` read only `request_kind='import'` rows.
+  - `impl-header-source-records.rs`: an unresolved header resolution keeps the lookup's
+    proved name as `external_name_record`.
+  - `impl-header-implements-records.rs`: `read_header_external_name`; a row left unresolved
+    with `ExternalSourceMissing` and a proved name is `Extracted` to that name, with
+    `external_target_proof_record` on the row and the name as the evidence target.
+  - No change for `uses_type`: the step 6.3 producer reads the new proof row.
+- **RED (SQL):** `cargo test --release -p parseltongue-duckdb-analysis-adapter --lib test_external_name_proof_rows`:
+  `FAILED. 0 passed; 1 failed` (`left: Null`, right the `core::mem` name) on the new bound
+  case. **GREEN:** adapter crate `185 passed; 0 failed`.
+- **Measured between the two changes (`s64a`):** 112 nodes; 35 stored lookups with a name
+  (was 34). The only new one is the bound `Copy`.
+- **STUB:** `read_header_external_name` as `todo!()`, wired in; compiled.
+- **RED (producer):** `cargo test --release -p parseltongue-syntax-span-extractor --lib`:
+  `test_external_trait_names_target ... FAILED` (`not yet implemented: REQ-RUST-053.0 N1`),
+  with the other impl-header tests, which reach the stub too.
+- **GREEN:** syntax crate `131 passed; 0 failed`;
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  `51 passed; 0 failed` (163.84 s), with the new `test_itoa_prelude_name_targets`.
+- **Existing real-source tests that pinned the old values (7):** the first run after the
+  code gave `43 passed; 7 failed`. `test_buffer_clone_trait_unresolved` is renamed
+  `test_buffer_prelude_traits_named`; `test_itoa_implements_row_counts`,
+  `test_itoa_external_type_uses`, `test_itoa_external_path_calls` and three node counts
+  (111 to 114) are updated.
+- **One wrong expectation of mine:** the new test first expected the source labels `Buffer`
+  and `private::Sealed`; the stored labels are `itoa::src/lib.rs::Buffer` and
+  `itoa::src/lib.rs::private::Sealed`. The test pins the stored ones.
+- **Deliberate breaks (8), each fails a test:** SQL glob filter off; SQL binder filter off;
+  any unresolved reason accepted; proof not on the row; evidence target withheld; a
+  malformed stored name swallowed; stored state not checked; the header row not carrying
+  the name (fails the real-source test only).
+- **Weak evidence:** `test_itoa_prelude_name_targets` was written after the code. The
+  fixture test of the header-row field is the real-source test; no fixture covers it.
+- **REFACTOR:** none needed.
+- **Not covered:** N5 for a prelude name on real source (a local item, an import or a glob
+  import that could supply `Clone`); the SQL fixture test covers the lookup, itoa has no
+  such site.
+- **Checked:** format; `cargo clippy --release --all-targets -D warnings` on the syntax,
+  adapter and CLI crates: clean.
+- **Not done:** three timed release runs and workspace gates (end of part 6); second
+  opinion on steps 6.2 to 6.4.
+- **Next:** step 6.5, builtin members (9 calls, 30 reads; 31 new nodes predicted, 145 nodes,
+  138 rows without a target).
 
 ### 2026-11-16 09:19 IST — Part 6 step 3: the 13 `MaybeUninit<u8>` type uses target the named external node
 

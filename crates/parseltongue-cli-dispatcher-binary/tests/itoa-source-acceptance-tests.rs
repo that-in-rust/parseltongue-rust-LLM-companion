@@ -764,7 +764,7 @@ fn test_decimal_pairs_static_read() {
 
 /// REQ-RUST-047.0
 #[test]
-fn test_buffer_clone_trait_unresolved() {
+fn test_buffer_prelude_traits_named() {
     let (_directory, root, database, input) = run_original_graph_fixture();
     let spans = read_published_stage_rows(&database, "span-reference-text-table");
     let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT").clone();
@@ -786,15 +786,20 @@ fn test_buffer_clone_trait_unresolved() {
         })
         .collect::<Vec<_>>();
     rows.sort_by(|left, right| left.0.cmp(&right.0));
-    let external = HldEdgeResolutionValue::Unresolved {
-        reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+    let named = |name: &str| HldEdgeResolutionValue::Extracted {
+        target: HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+            external_name_kind_value: HldExternalNameKind::PreludeName,
+            external_crate_name_value: None,
+            external_item_path_text: name.into(),
+        }),
     };
     assert_eq!(
         rows,
         ["Clone", "Copy", "Default"]
-            .map(|name| (name.to_owned(), true, external.clone()))
+            .map(|name| (name.to_owned(), true, named(name)))
             .to_vec(),
-        "Buffer implements three core traits; core source is excluded from this run"
+        "Buffer implements three prelude traits; each row targets the written name, \
+         core source is excluded from this run"
     );
 }
 
@@ -849,12 +854,11 @@ fn test_itoa_implements_row_counts() {
         (12, 12, 5)
     );
     assert_eq!(
-        rows.iter()
-            .filter(|(_, target, _)| target.is_none())
-            .count(),
-        3,
-        "Buffer's three core traits"
+        (count("Clone"), count("Copy"), count("Default")),
+        (1, 1, 1),
+        "Buffer's three prelude traits, each a named external node"
     );
+    assert!(rows.iter().all(|(_, target, _)| target.is_some()));
     let sources = rows
         .iter()
         .filter_map(|(source, _, _)| source.as_deref())
@@ -2561,7 +2565,7 @@ fn test_itoa_imports_row_counts() {
             "core::str"
         ]
     );
-    assert_eq!(input.input_node_records.len(), 111);
+    assert_eq!(input.input_node_records.len(), 114);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -2771,7 +2775,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 111);
+    assert_eq!(input.input_node_records.len(), 114);
     let area = input
         .input_node_records
         .iter()
@@ -3061,8 +3065,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 111);
-    assert_eq!(labels.len(), 111, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 114);
+    assert_eq!(labels.len(), 114, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"
@@ -4517,7 +4521,8 @@ fn test_itoa_external_path_calls() {
         metadata["call_shape_kind"] != "method_call"
             || metadata.get("external_target_proof_record").is_none()
     }));
-    // One node per written path, with no file, kind or signature: 4 imports, 4 callees.
+    // One node per written path, with no file, kind or signature: 4 imports, 4 callees,
+    // 3 prelude names.
     let mut externals = input
         .input_node_records
         .iter()
@@ -4535,6 +4540,9 @@ fn test_itoa_external_path_calls() {
     assert_eq!(
         externals,
         [
+            "Clone",
+            "Copy",
+            "Default",
             "core::hint",
             "core::hint::unreachable_unchecked",
             "core::mem",
@@ -4545,7 +4553,7 @@ fn test_itoa_external_path_calls() {
             "core::str::from_utf8_unchecked",
         ]
     );
-    assert_eq!(input.input_node_records.len(), 111);
+    assert_eq!(input.input_node_records.len(), 114);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: each of the 13 `MaybeUninit<u8>` type uses targets the node
@@ -4564,14 +4572,10 @@ fn test_itoa_external_type_uses() {
         .filter_map(|edge| match &edge.edge_resolution_value {
             HldEdgeResolutionValue::Extracted {
                 target: HldTargetIdentityValue::ExternalNamed(key),
-            } => {
+            } if key.external_name_kind_value == HldExternalNameKind::CrateRootedPath => {
                 let metadata: Value =
                     serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap())
                         .unwrap();
-                assert_eq!(
-                    key.external_name_kind_value,
-                    HldExternalNameKind::CrateRootedPath
-                );
                 assert_eq!(key.external_crate_name_value.as_deref(), Some("core"));
                 assert_eq!(key.external_item_path_text, "core::mem::MaybeUninit");
                 let proof = &metadata["external_target_proof_record"];
@@ -4623,7 +4627,8 @@ fn test_itoa_external_type_uses() {
             .count(),
         13
     );
-    // One type use is left without a target: the bound `Copy`, a prelude name (step 6.4).
+    // No type use is left without a target: the bound `Copy` is a prelude name, pinned by
+    // test_itoa_prelude_name_targets.
     assert_eq!(uses.len(), 106);
     let open = uses
         .iter()
@@ -4640,6 +4645,95 @@ fn test_itoa_external_type_uses() {
             metadata["type_source_text"].as_str().unwrap().to_owned()
         })
         .collect::<Vec<_>>();
-    assert_eq!(open, ["Copy"]);
-    assert_eq!(input.input_node_records.len(), 111);
+    assert_eq!(open, Vec::<String>::new());
+    assert_eq!(input.input_node_records.len(), 114);
+}
+
+/// REQ-RUST-053.0 N1, N3, N4: the three traits `Buffer` implements and the supertrait bound
+/// of `private::Sealed` are prelude names. Each row targets the node of the one written
+/// name; the two `Copy` rows share a node.
+#[test]
+fn test_itoa_prelude_name_targets() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| node.node_qualified_path_text.clone())
+            .unwrap()
+    };
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted {
+                target: target @ HldTargetIdentityValue::ExternalNamed(key),
+            } if key.external_name_kind_value == HldExternalNameKind::PreludeName => {
+                let metadata: Value =
+                    serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap())
+                        .unwrap();
+                assert_eq!(key.external_crate_name_value, None);
+                let proof = &metadata["external_target_proof_record"];
+                assert_eq!(proof["external_site_proof_kind"], "implicit_prelude_name");
+                assert_eq!(proof["external_source_read_flag"], false);
+                assert_eq!(proof["external_definition_path_claimed_flag"], false);
+                assert!(proof["external_import_site_key"].is_null(), "{proof}");
+                let node = input
+                    .input_node_records
+                    .iter()
+                    .find(|node| &node.node_target_reference == target)
+                    .unwrap();
+                assert_eq!(
+                    node.node_input_category,
+                    HldNodeInputCategory::ExternalDefinition
+                );
+                assert_eq!(node.node_qualified_path_text, key.external_item_path_text);
+                assert!(
+                    node.node_item_kind_value.is_none()
+                        && node.node_source_relative_path.is_none()
+                        && node.node_signature_text.is_none()
+                );
+                Some((
+                    format!("{:?}", edge.edge_relation_kind_value),
+                    key.external_item_path_text.clone(),
+                    label(&edge.edge_source_reference),
+                ))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    assert_eq!(
+        rows,
+        [
+            ("Implements", "Clone", "itoa::src/lib.rs::Buffer"),
+            ("Implements", "Copy", "itoa::src/lib.rs::Buffer"),
+            ("Implements", "Default", "itoa::src/lib.rs::Buffer"),
+            ("UsesType", "Copy", "itoa::src/lib.rs::private::Sealed"),
+        ]
+        .map(|(relation, name, source)| (
+            relation.to_owned(),
+            name.to_owned(),
+            source.to_owned()
+        ))
+    );
+    // Every `implements` and `uses_type` row has a target; 177 rows of the graph have none.
+    let open = |relation: Option<HldRelationKindValue>| {
+        input
+            .input_edge_records
+            .iter()
+            .filter(|edge| {
+                relation.is_none_or(|relation| edge.edge_relation_kind_value == relation)
+                    && matches!(
+                        edge.edge_resolution_value,
+                        HldEdgeResolutionValue::Unresolved { .. }
+                    )
+            })
+            .count()
+    };
+    assert_eq!(open(Some(HldRelationKindValue::Implements)), 0);
+    assert_eq!(open(Some(HldRelationKindValue::UsesType)), 0);
+    assert_eq!(open(None), 177);
+    assert_eq!(input.input_node_records.len(), 114);
 }

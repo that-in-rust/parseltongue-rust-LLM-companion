@@ -319,3 +319,129 @@ fn test_expanded_header_keeps_chain() {
     assert_eq!(parts.span_source_file_path, path);
     assert_eq!(parts.span_expansion_provenance_chain, chain);
 }
+
+/// REQ-RUST-053.0 N1, N4: the trait of an impl header left unresolved because its source
+/// is absent targets the external name its stored lookup proved.
+#[test]
+fn test_external_trait_names_target() {
+    let source = "struct Buffer; trait Make {} impl Clone for Buffer {} impl Copy for Buffer {} \
+        impl Default for Buffer {} impl Make for Buffer {}";
+    let prelude = |name: &str| {
+        json!({"external_name_kind":"prelude_name", "external_crate_name":null,
+            "external_item_path_text":name, "external_site_proof_kind":"implicit_prelude_name",
+            "external_import_site_key":null})
+    };
+    let patch = |malformed: bool| {
+        move |header: &mut Value| {
+            let resolution = &mut header["impl_trait_type_resolution"];
+            let text = resolution["type_source_evidence"]["type_source_text"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            match text.as_str() {
+                // Proved: the stored reason and the stored name.
+                "Clone" => {
+                    resolution["unresolved_reason_kind"] = json!("external_source_missing");
+                    resolution["external_name_record"] = prelude("Clone");
+                }
+                // The reason without a proved name.
+                "Copy" => resolution["unresolved_reason_kind"] = json!("external_source_missing"),
+                // A name beside another reason is not read.
+                "Default" => {
+                    resolution["unresolved_reason_kind"] = json!("trait_solver_needed");
+                    resolution["external_name_record"] = if malformed {
+                        json!({"external_name_kind":"other"})
+                    } else {
+                        prelude("Default")
+                    };
+                }
+                // A name beside a resolved trait is not read.
+                "Make" => resolution["external_name_record"] = prelude("Make"),
+                _ => {}
+            }
+            if malformed && text == "Copy" {
+                resolution["external_name_record"] = json!({"external_name_kind":"other"});
+            }
+        }
+    };
+    let (store, input) = make_header_fixture(source, patch(false));
+    let run = |store: &OriginalCallFixtureStore| {
+        resolve_impl_header_edges(
+            store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+    };
+    let set = run(&store).unwrap();
+    let row = |name: &str| {
+        let rows = set
+            .implements_edge_records
+            .iter()
+            .filter(|edge| {
+                serde_json::from_str::<Value>(edge.edge_dispatch_metadata_text.as_deref().unwrap())
+                    .unwrap()["trait_source_text"]
+                    == name
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(rows.len(), 1, "{name}");
+        let metadata: Value =
+            serde_json::from_str(rows[0].edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        (rows[0].clone(), metadata)
+    };
+    let (clone, metadata) = row("Clone");
+    let named = HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+        external_name_kind_value: HldExternalNameKind::PreludeName,
+        external_crate_name_value: None,
+        external_item_path_text: "Clone".into(),
+    });
+    assert_eq!(
+        clone.edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: named.clone()
+        }
+    );
+    assert_eq!(
+        clone.edge_evidence_row_key.evidence_target_reference_value,
+        Some(named)
+    );
+    let proof = &metadata["external_target_proof_record"];
+    assert_eq!(proof["external_site_proof_kind"], "implicit_prelude_name");
+    assert_eq!(proof["external_source_read_flag"], false);
+    assert_eq!(proof["external_definition_path_claimed_flag"], false);
+    assert_eq!(metadata["implements_kind"], "impl_header");
+    let unresolved = |reason| HldEdgeResolutionValue::Unresolved { reason };
+    for (name, reason) in [
+        ("Copy", HldUnresolvedReasonKind::ExternalSourceMissing),
+        ("Default", HldUnresolvedReasonKind::TraitSolverNeeded),
+    ] {
+        let (edge, metadata) = row(name);
+        assert_eq!(edge.edge_resolution_value, unresolved(reason), "{name}");
+        assert!(
+            metadata.get("external_target_proof_record").is_none(),
+            "{name}"
+        );
+    }
+    let (make, metadata) = row("Make");
+    assert_eq!(make.edge_resolution_value, read_make_node_target(&input));
+    assert!(metadata.get("external_target_proof_record").is_none());
+    // The graph with the external node passes validation.
+    let mut graph = input.clone();
+    graph
+        .input_node_records
+        .extend(crate::collect_external_endpoint_nodes(
+            &set.implements_edge_records,
+        ));
+    graph
+        .input_edge_records
+        .extend(set.implements_edge_records.clone());
+    assert_eq!(validate_full_graph_input(&graph), Ok(()));
+    // A stored name that cannot be read is an error, not a missing target.
+    let (store, _) = make_header_fixture(source, patch(true));
+    assert!(matches!(
+        run(&store),
+        Err(ImplHeaderEdgeError::InvalidEvidence {
+            field: "external_name_kind"
+        })
+    ));
+}

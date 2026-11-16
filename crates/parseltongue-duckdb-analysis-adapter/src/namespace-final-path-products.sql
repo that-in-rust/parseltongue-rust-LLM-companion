@@ -83,10 +83,11 @@ WITH RECURSIVE "absent-sysroot-unit-scopes" AS (
             SELECT arg_max(l.segment_text,l.position) FROM "namespace-path-segment-records" l
             WHERE l.generation_key=i.generation_key AND l.attempt_key=i.attempt_key
                 AND l.request_key=i.request_key AND l.segment_kind='name')),i.request_key
-    FROM "namespace-import-request-records" i WHERE NOT i.is_glob
+    FROM "namespace-import-request-records" i WHERE NOT i.is_glob AND i.request_kind='import'
 ), "glob-import-scope-records" AS (
+    -- A bound's request for its trait is stored as a glob too; it puts no name in lexical scope.
     SELECT DISTINCT generation_key,attempt_key,importer_scope AS scope_key
-    FROM "namespace-import-request-records" WHERE is_glob
+    FROM "namespace-import-request-records" WHERE is_glob AND request_kind='import'
 ), "crate-rooted-request-names" AS (
     -- Proof 1: the path starts at the name of a sysroot crate with no unit in this generation.
     -- Without a leading `::`, no scope on the chain may bind that name or hold a glob import.

@@ -1,3 +1,4 @@
+use crate::external_named_target_records::{ExternalNameProofRecord, decode_external_name_record};
 use crate::impl_header_source_records::{ImplHeaderSourceError, read_impl_stage_values};
 use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
@@ -111,8 +112,8 @@ fn build_impl_header_edge(
     let Some(source) = read_header_node_target(self_type, endpoints)? else {
         return Ok(ImplHeaderRowOutcome::SourceNotNode);
     };
-    let target = read_header_node_target(trait_type, endpoints)?;
-    let resolution = match (&target, trait_type["resolution_state_kind"].as_str()) {
+    let node = read_header_node_target(trait_type, endpoints)?;
+    let stored = match (&node, trait_type["resolution_state_kind"].as_str()) {
         (Some(target), _) => HldEdgeResolutionValue::Extracted {
             target: target.clone(),
         },
@@ -122,6 +123,17 @@ fn build_impl_header_edge(
         (None, _) => HldEdgeResolutionValue::Unresolved {
             reason: read_stored_reason_kind(&trait_type["unresolved_reason_kind"]),
         },
+    };
+    let named = read_header_external_name(trait_type, &stored)?;
+    let (resolution, target, external) = match named {
+        Some(named) => (
+            HldEdgeResolutionValue::Extracted {
+                target: named.external_target_identity_value.clone(),
+            },
+            Some(named.external_target_identity_value),
+            Some(named.external_proof_metadata_value),
+        ),
+        None => (stored, node, None),
     };
     let evidence = &trait_type["type_source_evidence"];
     let invalid = |field| ImplHeaderEdgeError::InvalidEvidence { field };
@@ -141,11 +153,14 @@ fn build_impl_header_edge(
         header_parts.span_expansion_provenance_chain,
     )
     .map_err(|_| invalid("impl_semantic_occurrence_key"))?;
-    let metadata = json!({
+    let mut metadata = json!({
         "implements_kind":"impl_header",
         "self_type_source_text":self_type["type_source_evidence"]["type_source_text"],
         "trait_source_text":text
     });
+    if let Some(external) = external {
+        metadata["external_target_proof_record"] = external;
+    }
     Ok(ImplHeaderRowOutcome::Edge(Box::new(HldEdgeInputRecord {
         run_generation_digest_value: generation,
         edge_source_reference: source.clone(),
@@ -159,6 +174,24 @@ fn build_impl_header_edge(
         },
         edge_dispatch_metadata_text: Some(metadata.to_string()),
     })))
+}
+
+/// REQ-RUST-053.0 N1, N4: the external name the stored lookup of a header's trait proved,
+/// read only when the row is left unresolved because the trait's source is absent. The
+/// trait of an impl header is never a member reached through a type, so the third
+/// condition of N5 does not apply.
+fn read_header_external_name(
+    trait_type: &Value,
+    stored: &HldEdgeResolutionValue,
+) -> Result<Option<ExternalNameProofRecord>, ImplHeaderEdgeError> {
+    (*stored
+        == HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+        })
+    .then(|| decode_external_name_record(&trait_type["external_name_record"]))
+    .transpose()
+    .map_err(|error| ImplHeaderEdgeError::InvalidEvidence { field: error.0 })
+    .map(Option::flatten)
 }
 
 /// What a header's self type or trait names when that is a node of the

@@ -5,8 +5,9 @@ Written 2026-11-15 with `rust-executable-specs-01`, before any code.
 ## The answer
 
 **State: BUILT (all 7 steps, 2026-11-15). One `implements` row per trait impl header, from
-the self type to the trait. Pinned itoa stores 32 rows: 29 with a target and 3 unresolved,
-including the 28 macro-generated headers. The first target was
+the self type to the trait. Pinned itoa stores 32 rows, including the 28 macro-generated
+headers: 29 with a target in itoa and 3 that part 6 step 6.4 targets at a prelude name
+(unresolved when this part was built). The first target was
 `u128 --implements--> Unsigned`, the only original header whose trait is in itoa.**
 
 - **Stored by one run:** 58 nodes and 170 edges (43 `contains`, 61 `calls`, 34 `uses_type`,
@@ -86,7 +87,7 @@ source through for other edge kinds.
 req    test                                   type          assertion
 R1 R2  test_unsigned_impl_builtin_source      real source   u128 --implements--> Unsigned, Extracted
 R4                                                          site equals the range of `Unsigned`
-R3     test_buffer_clone_trait_unresolved     real source   Buffer: Clone, Copy, Default, ExternalSourceMissing
+R3     test_buffer_prelude_traits_named       real source   Buffer: Clone, Copy, Default, each a prelude name (part 6 step 6.4)
 R1 R4  test_trait_impl_header_edge            fixture       item self type, item trait: one row at the trait path
 R2     test_builtin_source_two_headers        fixture       u8 and u16 each source one row
 R2     test_builtin_source_one_node           fixture       two headers on u8: one u8 node; graph validates
@@ -95,7 +96,7 @@ R5     test_inherent_negative_no_edge         fixture       inherent and negativ
 R6     test_unresolved_self_counted_only      fixture       zero rows, headers_without_source = 2
 R7     test_expanded_header_keeps_chain       fixture       expanded header: same row, path and chain kept
 R7     test_macro_header_edge_provenance      real source   28 rows; each site is the trait path in expanded text
-R1 R2  test_itoa_implements_row_counts        real source   32 rows: 12 + 12 + 5 with a target, 3 unresolved
+R1 R2  test_itoa_implements_row_counts        real source   32 rows: 12 + 12 + 5 in itoa, 3 prelude names; none unresolved
 R8     test_builtin_source_implements_only    L1 unit       implements passes; uses_type, calls, contains fail
 R9     test_implements_rows_read_twice        real source   two reads of the frozen graph are equal, no duplicate
 ```
@@ -156,8 +157,8 @@ cargo build --release --workspace --all-targets              pass
   in `src/lib.rs`. Part 5 decides which is canonical.
 - **Q2. Site anchor.** The expected graph anchors each row at `impl `, not at the trait path.
   Its anchors are marked not canonical, so part 7 reconciles them to R4.
-- **Q3. `Buffer`'s three `core` traits** stay unresolved until part 6 decides how `core`
-  targets are stored.
+- **Q3. `Buffer`'s three `core` traits.** Closed by part 6 step 6.4: each row targets the
+  node of the written prelude name.
 - **Q4. Derived traits.** itoa has no `#[derive]`. `derives` edges are not part of 4b.
 - **Q5. Row order.** Two reads return the same order, but it is the store's row-key order,
   not the order of the Rust record type. Nothing depends on the difference today.
