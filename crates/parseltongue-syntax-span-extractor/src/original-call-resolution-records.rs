@@ -1678,7 +1678,16 @@ fn read_parameter_written_type(
     input: &SyntaxFileInputData,
     removed: &[usize],
 ) -> Option<Value> {
-    let written = parameter.ty()?;
+    read_written_type_evidence(&parameter.ty()?, input, removed)
+}
+
+/// REQ-RUST-055.0 R1: the text and byte range of a type as written, and the range of
+/// each type path in it.
+pub(super) fn read_written_type_evidence(
+    written: &ast::Type,
+    input: &SyntaxFileInputData,
+    removed: &[usize],
+) -> Option<Value> {
     let read_source_range = |node: &SyntaxNode| {
         let range = node.text_range();
         let start = restore_source_byte_offset(range.start(), removed);

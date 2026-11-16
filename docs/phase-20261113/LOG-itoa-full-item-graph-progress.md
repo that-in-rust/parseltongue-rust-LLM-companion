@@ -464,3 +464,21 @@ NEXT   8.3b-1 (ii-b): core-member-target-records.rs, the lookup for a parameter 
  not done   deliberate breaks; workspace tests; release build; re-freeze; acceptance run
  next       receivers typed "&mut Self::Buffer" (46), then fields and statics (78 group)
 ```
+
+
+## 2026-11-16 Part 8 step 8.3b-2a: the written type of an impl's associated type (GREEN)
+
+```text
+ phase      RED -> GREEN, REQ-RUST-055.0 R1, REQ-RUST-056.0 P1 (no STUB: one new field)
+ change     an impl member row of a "type NAME = ..;" carries member_alias_type_evidence:
+            the type's text, byte range and the range of each type path in it
+            (read_written_type_evidence, the reader a parameter's written type already used)
+ test       test_alias_member_type_evidence: first run failed in its own setup (wrong row key),
+            not counted; second run failed on the missing field ("Buffer -"); passes after
+ gates      extractor crate 159 + 17 pass; cargo fmt --check pass; workspace clippy pass;
+            60 of 60 real-source itoa tests pass (also 60 of 60 on the commit before, 07b95dfbc)
+ effect     no call gains a target yet; nothing reads the field
+ next       8.3b-2b: a parameter typed "&mut Self::Buffer" takes its type from the one stored
+            impl of the enclosing impl's self type that writes "type Buffer", when that impl's
+            trait is the enclosing impl's trait or one of its supertraits
+```

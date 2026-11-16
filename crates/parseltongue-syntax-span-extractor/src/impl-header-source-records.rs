@@ -484,6 +484,7 @@ pub(super) fn extract_impl_header_syntax(
             "member_source_occurrence_key":build_syntax_occurrence_key(input, &member, removed).0,
             "member_declared_name_value":member.children().find(|child| child.kind() == ra_ap_syntax::SyntaxKind::NAME).map(|name| name.text().to_string()),
             "member_syntax_kind_value":format!("{:?}",member.kind()),
+            "member_alias_type_evidence":ast::TypeAlias::cast(member.clone()).and_then(|alias| alias.ty()).and_then(|written| crate::original_call_resolution_records::read_written_type_evidence(&written, input, removed)),
             "member_generic_parameters_flag":member.children().any(|child| child.kind() == ra_ap_syntax::SyntaxKind::GENERIC_PARAM_LIST || child.kind() == ra_ap_syntax::SyntaxKind::WHERE_CLAUSE),
             "member_self_parameter_flag":ast::Fn::cast(member.clone()).and_then(|function| function.param_list()).is_some_and(|parameters| parameters.self_param().is_some()),
             "member_self_parameter_kind":ast::Fn::cast(member.clone()).and_then(|function| function.param_list()).and_then(|parameters| parameters.self_param()).map(|parameter| if parameter.ty().is_some() { "typed" } else if parameter.amp_token().is_some() { "reference" } else { "value" }),

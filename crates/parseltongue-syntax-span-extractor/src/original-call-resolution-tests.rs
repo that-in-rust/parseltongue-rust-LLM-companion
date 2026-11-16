@@ -1097,3 +1097,60 @@ fn test_trait_rename_changes_identity() {
         json!(["I", "Number", "Hidden"])
     );
 }
+
+/// REQ-RUST-055.0 R1, REQ-RUST-056.0 P1: an associated type an impl writes carries the
+/// type's text, range and type paths, as a parameter's written type does.
+#[test]
+fn test_alias_member_type_evidence() {
+    let source = "struct Buffer; impl Sealed for u8 { type Buffer = [MaybeUninit<u8>; Self::LEN]; \
+        const LEN: usize = 3; fn f(self) {} }";
+    let rows = extract_file_syntax_rows(&make_call_syntax_input(source))
+        .unwrap()
+        .stage_unit_output_rows;
+    let members = rows
+        .iter()
+        .filter_map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).ok())
+        .find_map(|row| {
+            row["impl_header_syntax_record"]["impl_member_occurrence_rows"]
+                .as_array()
+                .cloned()
+        })
+        .unwrap();
+    let found = members
+        .iter()
+        .map(|member| {
+            let written = &member["member_alias_type_evidence"];
+            let range = |row: &Value| {
+                let start = row["span_byte_start_offset"].as_u64().unwrap() as usize;
+                let end = row["span_byte_end_offset"].as_u64().unwrap() as usize;
+                source[start..end].to_owned()
+            };
+            match written["type_source_text"].as_str() {
+                Some(text) => format!(
+                    "{} = {text} [{}] {:?}",
+                    member["member_declared_name_value"].as_str().unwrap(),
+                    range(written),
+                    written["type_path_range_rows"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(range)
+                        .collect::<Vec<_>>()
+                ),
+                None => format!(
+                    "{} -",
+                    member["member_declared_name_value"].as_str().unwrap()
+                ),
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            "Buffer = [MaybeUninit<u8>; Self::LEN] [[MaybeUninit<u8>; Self::LEN]] \
+             [\"MaybeUninit<u8>\", \"u8\"]",
+            "LEN -",
+            "f -"
+        ],
+        found
+    );
+}
