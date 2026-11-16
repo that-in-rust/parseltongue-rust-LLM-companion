@@ -12,16 +12,15 @@ Out of scope for this phase: every other repository, any rust-analyzer export or
 comparison, and every higher-abstraction table (interface level, HLD, file and folder
 roll-ups). Those are later queries over this graph, not part of it.
 
-Status on 2026-11-14: **in progress, not passed.**
+Status on 2026-11-16: **the acceptance run passed all four SOP steps on one frozen
+executable. The graph is marked incomplete: 133 method calls into `core` have no target.**
 
 ```text
-itoa run today, sysroot excluded, marked incomplete by the code
-nodes   45    43 items + 2 file areas                       draft expected: 73
-edges  104    43 contains + 61 calls                        draft expected: 368
-              2 calls resolved, 59 stored unresolved with a reason
-kinds    2 of the 6 that itoa needs: contains, calls
-proven   <Buffer as Default>::default --calls--> Buffer::new, from source through frozen readback
-next     Buffer::format --calls--> private::Sealed::write
+itoa run, sysroot excluded, equal to the frozen expected graph
+nodes  151    88 items of itoa, 47 names outside itoa, 13 builtin types, 2 file areas, 1 crate root
+edges  682    calls 197 (64 with a target), uses_type 203, reads 98, contains 88,
+              generates 45, expands 15, implements 32, imports 4
+open          the items under "Open" below; the expected graph was checked by its author alone
 ```
 
 Proof procedure: [SOP](SOP-itoa-full-item-graph-acceptance.md). Requirements:
@@ -110,9 +109,9 @@ Acceptance:
 - **A6** Frozen readback preserves evidence and generation identity; a cancelled or failed run
   leaves the previous output serving; output is identical at 1, 4 and 16 workers.
 
-The expected graph is written from the pinned source, reviewed row by row and frozen before
-comparison. Today's dataset is an unreviewed draft. It is comparison data only, never
-production input.
+The expected graph is written from the pinned source and frozen before comparison. It was
+frozen on 2026-11-16, checked against the source by its author alone. It is comparison data
+only, never production input.
 
 Build order, one real-source test per relationship:
 
@@ -317,14 +316,14 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
 
 ### Open
 
-- **Targets in `core`, not built.** 119 of the 368 draft edges point into `core`. Resolving them needs
-  the sysroot source in the run; measured on 2026-11-13, that run did not finish name
-  resolution in 2,400 s (the run report is deleted). Runs today use
-  `--sysroot-source-scope-kind excluded` and store those edges unresolved; the named external
-  target is not built yet.
-- **Macro-generated items, not built.** 45 of the 73 draft nodes come from `impl_Integer`,
-  `impl_Integer_size` and `impl_Unsigned` calls. The rules are decided (above); the store
-  already holds the 45 items as spans (measured 2026-11-15).
+- **Method calls into `core`, 133 without a target.** Naming them needs the sysroot source
+  in the run or a trait solver; measured on 2026-11-13, a run with the sysroot did not
+  finish name resolution in 2,400 s (the run report is deleted). Runs use
+  `--sysroot-source-scope-kind excluded`. Paths into `core` that itoa's source proves are
+  built as named external targets (47 nodes).
+- **Rows depend on the source directory.** Two copies of the pinned source in different
+  directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause
+  not found.
 - **Enum variants and struct fields:** nodes, or evidence only.
 - **File module and file area:** how a file's module node relates to its file-area node.
 - **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for

@@ -4,12 +4,12 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-16, commit `cb40f3d2f`)
+## Where we are (2026-11-16, commit `822da80cf`)
 
-**The mapper stores a graph of pinned itoa 1.0.18 that equals the expected graph on
-everything the comparison checks: 151 nodes and 682 edge rows. No SOP step is PASS yet: the
-expected graph is not frozen and no acceptance run on a frozen binary has been made. The
-graph is marked `incomplete` because 133 method calls into `core` have no target.**
+**The mapper stores a graph of pinned itoa 1.0.18 that equals the frozen expected graph:
+151 nodes and 682 edge rows. The acceptance run passed SOP steps S1 to S4 on one frozen
+executable. The graph is marked `incomplete` because 133 method calls into `core` have no
+target, and the expected graph was written and checked by one author.**
 
 ### What the pinned itoa run stores (measured)
 
@@ -25,8 +25,8 @@ edges  682   relation    rows  with a target
              expands       15    15
              implements    32    32
              imports        4     4
-run          16 to 19 s wall, 365 to 386 MB peak (whole process tree), 20.9 MB store
-workers      1, 4 and 16 store byte-identical node and edge rows
+run          15.3 to 19.3 s wall, 370 to 414 MB peak (whole process tree), 21.0 MB store
+workers      1, 4 and 16, twice each, store byte-identical node and edge rows
 ```
 
 ### What the whole-graph test compares (`test_itoa_whole_graph_equality`, passes)
@@ -44,10 +44,10 @@ workers      1, 4 and 16 store byte-identical node and edge rows
 ### Checks at the last full run
 
 ```text
-real-source itoa tests   58 pass, 0 fail (145 s)                       at 64a5c0bc9
-workspace tests          601 pass, 0 fail, 4 ignored                   at b0cc7ac81
+real-source itoa tests   58 pass, 0 fail (872 s, one thread, frozen executable)  at 822da80cf
+workspace tests          602 pass, 0 fail, 4 ignored                   at 822da80cf
                          test_lang_items_in_sysroot skipped; it fails when run
-format, lint, release    pass                                          at b0cc7ac81
+format, lint, release    pass                                          at 822da80cf
 expected-data tests      9 pass (7 tests of the removed "blocked rows" layer deleted)
 ```
 
@@ -57,10 +57,16 @@ sysroot, which itoa runs exclude.
 ### SOP status
 
 ```text
-S1  freeze inputs and expected graph   NOT PASSED   frozen 2026-11-16 (step 7.10); not yet run as a step
-S2  gates and production run           NOT PASSED   one test skipped; process audit not run; graph marked incomplete
-S3  exact comparison                   NOT PASSED   the test passes on the frozen graph; not yet on a frozen binary
-S4  determinism, time, memory          NOT PASSED   measured once, not on a frozen binary; 19 ms samples, not 10
+S1  freeze inputs and expected graph   PASS   digests equal the pin and the freeze record
+S2  gates and production run           PASS   audit clean; one workspace test skipped (accepted by the user)
+S3  exact comparison                   PASS   58 tests on the frozen executable
+S4  determinism, time, memory          PASS   six runs identical; 11 ms samples
+```
+
+Run report: the last entry below. Executable sha256
+`43d999e173241c4b9a8011aade1871916a5c92cc9c86157dd8e92f6d1e0d1b88`.
+
+```text
 ```
 
 ### The code, from the codebase-memory index of this commit
@@ -92,16 +98,20 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
   not lead to their items by an edge.
 - **Struct fields and enum variants are not nodes** (open in the PRD).
 - **Reading the sysroot** did not finish in 2,400 s on 2026-11-13; itoa runs exclude it.
+- **Rows depend on the source directory.** Two copies of the pinned source in different
+  directories store different run ids and macro-expansion ids. Cause not found.
 - **Only itoa has been run** in this phase. Other repositories and higher-level tables are
   out of scope.
 
-### What is left to finish the PRD
+### What is left
 
-1. Done (step 7.9): node position and external-name kind are compared.
-2. Done (step 7.10): the two SOP lines are fixed.
-3. Done (step 7.10): the expected graph is frozen and its digests recorded.
-4. S2 to S4 on one frozen binary, with the process audit and 10 ms memory samples.
-5. The run report as an entry below.
+The SOP run is done. Open, each needing a decision from the user before any work:
+
+1. The 133 method calls without a target (needs `core` read, or a trait solver).
+2. Why rows depend on the source directory.
+3. `test_lang_items_in_sysroot`.
+4. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
+   to its file's contents; visibility, reachability and signature on nodes.
 
 ## Entries — add new ones at the bottom
 
@@ -147,3 +157,83 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
   compared after the header line).
 - **Limit:** the review is by the author alone. No production code changed. No refactor.
 - **codebase-memory:** no query; only test and dataset files changed.
+
+### Part 7 step 7.11 — the acceptance tests run a named frozen executable (2026-11-16)
+
+- **REQ:** REQ-RUST-044.3 F6.
+- **Why:** the first acceptance run copied `target/release/parseltongue` after
+  `cargo build --release` (sha256 `43d999e1…`). The 58 tests then ran
+  `CARGO_BIN_EXE_parseltongue`, which `cargo test` builds separately (sha256
+  `2803c417…`). That comparison did not count.
+- **Change:** `read_mapper_executable_path` returns `PARSELTONGUE_FROZEN_EXECUTABLE_PATH`
+  when set. Test file only.
+- **Evidence it takes effect:** with the variable set to `/bin/false`,
+  `test_itoa_whole_graph_equality`: `0 passed; 1 failed; 57 filtered out`. Set to the
+  frozen executable: `1 passed; 0 failed`. Unset: `1 passed; 0 failed`.
+- **No stub step:** the change is one function in a test file; the `/bin/false` run is the
+  failing evidence. Commit `822da80cf`.
+
+### Acceptance run report — pinned itoa, frozen executable (2026-11-16)
+
+```text
+source      itoa af77385d0daf4d0e949e81f2588be2e44f69f086, clean
+            src/lib.rs       e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f
+            src/u128_ext.rs  498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c
+            Cargo.toml 44ca1ae5…dec0483, Cargo.lock 965fa758…a8d019d, benches/bench.rs 29a0bdb9…498b154
+executable  43d999e173241c4b9a8011aade1871916a5c92cc9c86157dd8e92f6d1e0d1b88 (103,268,432 bytes),
+            built by cargo build --release at 8580ca2bd; same digest after the last step
+expected    nodes 29aed6efdaef15ad4564b787ee381d6fec16ac23cdc726bc9460db824f7954e7
+            edges a51f7d6e499d8340e1d37b6b809366a307a3c903b14758482e6cba69ad06b156
+commits     S1, S2, S4 at 8580ca2bd; S3 and the workspace gates at 822da80cf
+            (822da80cf changes one test function and documents; no production code)
+```
+
+```text
+S1  PASS  source commit and digests equal the pin; the builder reproduces the frozen files;
+          9 expected-data tests pass
+S2  PASS  run publishes; completeness = incomplete (recorded, Rule 3)
+          untraced, 4 workers: 15.14 s, 387.6 MB peak, 1,388 samples
+          strace audit: auditor pass, no violation rows; 0 connect calls; direct children are
+          cargo metadata --offline, rustc --print cfg, rustc --print sysroot; the only file
+          opened under a target/ directory is .rustc_info.json
+S3  PASS  58 passed, 0 failed, one thread, 872 s, on the frozen executable
+          151 nodes and 682 edge rows equal the frozen expected graph; 133 calls without a
+          target, each an expected row
+S4  PASS  six runs, node and edge rows byte-identical after the header line
+          nodes body cdc95c726e4e8015f899699198973aa75d6f60d9a8f3bb975766328f4d52235d
+          edges body 4560b32c54b48dd2c3dc15403c87623801e7b253cce525fc2cdf4e63eeff17f9
+```
+
+```text
+workers  wall s  peak MB  store bytes  nodes  edges
+1        18.46   385.1    21,046,310   151    682
+1 again  15.27   370.7    21,046,310   151    682
+4        19.29   384.4    21,046,310   151    682
+4 again  16.09   369.8    21,046,310   151    682
+16       18.89   393.3    21,046,310   151    682
+16 again 16.26   413.9    21,046,310   151    682
+```
+
+- **Workspace gates at `822da80cf`:** format, lint (all targets, all features) and release
+  build pass. Tests: 602 passed, 0 failed, 4 ignored, with `test_lang_items_in_sysroot`
+  skipped. That test fails when run; the user accepted it on 2026-11-16 as a known open
+  defect outside the itoa run.
+- **Deviations from the SOP text:**
+  - The run maps a copy of the pinned source (the test tree, byte-equal to the pinned
+    checkout for the four source files) with the pinned `Cargo.lock` added. The checkout
+    has no `Cargo.lock`.
+  - Memory samples are 11 ms apart, not 10: the sampler sleeps 10 ms and reads `/proc`.
+  - The first S4 pass (same executable, another directory) used a 19 ms sampler; it is
+    replaced by the table above. Its six runs were also identical to each other.
+  - The first S3 pass ran the wrong executable (step 7.11) and is replaced.
+- **Found by the run:** the six runs of the first S4 pass and the six of the second map the
+  same source from two directories. Their rows differ in `run_generation_digest_full` and
+  in the ids inside `expansion_provenance_chain`, in every row. Replacing the directory
+  name in the text does not make them equal. Cause not found. S4 compares runs of one
+  directory, so it passes.
+- **Limits:** the graph is marked incomplete (133 calls); the expected graph was written and
+  checked by its author alone; only itoa was run.
+- **Commands:** `/home/ubuntu/phase7-work/accept/run-acceptance.sh`, `run-s3.sh`,
+  `run-s4.sh` (not in the repository); they run the SOP commands with
+  `--sysroot-source-scope-kind excluded`.
+- **codebase-memory:** re-indexed after this entry; no query was needed for the run.

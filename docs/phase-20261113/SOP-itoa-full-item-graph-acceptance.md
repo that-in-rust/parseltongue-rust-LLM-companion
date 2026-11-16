@@ -12,18 +12,22 @@ every run.**
   comparison, and every higher-abstraction table (interface level, file and folder roll-ups).
 - Passing unit tests, a bounded checkpoint or a planned command are not a PASS.
 
-Status on 2026-11-14: **no step has passed.**
+Status on 2026-11-16: **all four steps passed on one frozen executable** (run report in
+[the log](LOG-itoa-full-item-graph-progress.md)).
 
 ```text
-S1  freeze inputs and expected graph   NOT STARTED   the expected graph is an unreviewed draft
-S2  gates and production run           PARTLY        runs with sysroot excluded; marked incomplete
-S3  exact comparison                   NOT STARTED   no whole-graph comparison test exists
-S4  determinism, time, memory          NOT STARTED
+S1  freeze inputs and expected graph   PASS   digests equal the pin and the freeze record
+S2  gates and production run           PASS   process audit clean; one workspace test skipped (below)
+S3  exact comparison                   PASS   58 tests; 151 nodes and 682 edge rows equal the frozen graph
+S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers store identical rows
 ```
 
-What the code produces today, with sysroot excluded: 51 nodes and 138 edges (43 `contains`,
-61 `calls` of which 3 are resolved, 34 `uses_type` of which 5 are unresolved). The draft expected graph has 73 nodes and 368 edges.
-Details are in the top entry of [the log](LOG-itoa-full-item-graph-progress.md).
+- The graph is marked `incomplete`: 133 method calls into `core` have no target. Each is
+  an expected row (Rule 3).
+- The workspace gate skips `test_lang_items_in_sysroot`, which fails when run. It reads the
+  native sysroot, which itoa runs exclude. Accepted by the user on 2026-11-16 as a known
+  open defect.
+- The expected graph was written and checked by one author (Rule 1).
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
 and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md); requirement ids and their
@@ -172,14 +176,13 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
 
 ### Report
 
-Each run writes one entry at the top of [the log](LOG-itoa-full-item-graph-progress.md): source and executable
+Each run writes one entry at the bottom of [the log](LOG-itoa-full-item-graph-progress.md): source and executable
 digests; each step PASS / FAIL / BLOCKED / NOT STARTED with row counts; the first differing
 row; time and peak memory. A step with no entry was not observed.
 
 ### Targets outside itoa (decided 2026-11-15)
 
-**Targets outside itoa.** 119 of the 368 draft edges point at items in `core`, and 55 at
-builtin types. Resolving a `core` target to an item needs the sysroot source in the run; on
+**Targets outside itoa.** Resolving a `core` target to an item needs the sysroot source in the run; on
 2026-11-13 that run did not finish name resolution in 2,400 s. Decided: the sysroot stays out of
 the run. An edge into `core` matches when production stores the same named external target
 as the expected row: the name as far as itoa's source proves it, the crate, and the flag that
