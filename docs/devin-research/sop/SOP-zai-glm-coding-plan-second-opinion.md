@@ -1,3 +1,5 @@
+> **RETIRED 2026-11-16 by user decision. Do not run this procedure.** AGENTS.md Rule 5 is retired; the text below is history.
+
 # SOP — Using the Z.ai GLM Coding Plan ("zcode") as a second-opinion reviewer and worker from this repo
 
 *Written 2026-11-06 from a working setup in the Devin VM. Everything in §3 (quotas, prices, endpoints) was read live from Z.ai's monitor API and docs.z.ai that day; re-check before relying on numbers.*
