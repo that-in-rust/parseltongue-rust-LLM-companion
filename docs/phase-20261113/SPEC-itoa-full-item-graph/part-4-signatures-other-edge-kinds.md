@@ -85,7 +85,7 @@ L3  parseltongue-cli-dispatcher-binary   full-graph-checkpoint-facade adds the e
 | 018.2 R1 | test_new_return_type_edge | real source, CLI | `Buffer::new --uses_type--> Buffer`, site is `Buffer` on line 98, read back frozen | exactly 1 edge |
 | 018.2 R2 | test_clone_self_type_edge | real source, CLI | `<Buffer as Clone>::clone --uses_type--> Buffer`, site is `Self` on line 88 | exactly 1 edge |
 | 018.2 R3 | test_write_builtin_type_edge | real source, CLI | `private::Sealed::write --uses_type--> str`; one `Builtin` node for `str` | 1 edge, 1 node |
-| 018.2 R5 | test_signature_external_type_unresolved | real source, CLI, sysroot excluded | `MaybeUninit` in `enc_16lsd` is stored unresolved | `ExternalSourceMissing` |
+| 018.2 R5 | test_signature_external_type_named | real source, CLI, sysroot excluded | `MaybeUninit` in `enc_16lsd` is stored once; since part 6 step 6.3 it targets the written path | `core::mem::MaybeUninit` |
 | 018.2 R1 R7 | test_signature_paths_listed_once | fixture | params, return, fields, bounds; nested generic arguments | one entry per type path |
 | 018.2 R6 | test_expression_paths_not_types | fixture | `[u8; N::LEN]` and `Foo<{ LEN }>` | no entry for the expression |
 | 018.2 R4 | test_type_parameter_no_edge | fixture | `fn f<T>(t: T)`; `Self` in a trait method | 0 rows |
@@ -154,7 +154,8 @@ A `Self` whose impl header is unresolved stores nothing until step 6.
     `enc_16lsd`, one more parameter) and `Copy` in `Sealed: Copy`.
   - 1 `TraitSolverNeeded`: `Self::Buffer` in a parameter (Q4).
 - Correction: step 3 predicted 6 unresolved sites. The list it gave has 5, and 5 is measured.
-- `test_signature_external_type_unresolved` passes on pinned itoa.
+- `test_signature_external_type_unresolved` passes on pinned itoa (renamed
+  `test_signature_external_type_named` in part 6 step 6.3, when the row gained a target).
 - Reason rule as built: no stored row or no stored reason gives `TraitSolverNeeded`;
   several rows or several targets give `AmbiguousTarget`; a stored
   `external_source_missing` or `cfg_inactive` is kept; a resolved target that is not a

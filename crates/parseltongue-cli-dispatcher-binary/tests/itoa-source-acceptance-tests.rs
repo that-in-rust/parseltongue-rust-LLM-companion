@@ -668,9 +668,9 @@ fn test_write_builtin_type_edge() {
     assert_eq!(nodes[0].node_input_category, HldNodeInputCategory::Builtin);
 }
 
-/// REQ-RUST-018.2
+/// REQ-RUST-018.2, REQ-RUST-053.0 N1
 #[test]
-fn test_signature_external_type_unresolved() {
+fn test_signature_external_type_named() {
     let (_input, uses, _buffer, expected_site) = read_signature_type_uses(
         "enc_16lsd",
         "fn enc_16lsd<const OFFSET: usize>(buf: &mut [MaybeUninit<u8>], n: u64) {",
@@ -687,10 +687,14 @@ fn test_signature_external_type_unresolved() {
     );
     assert_eq!(
         at_site[0].edge_resolution_value,
-        HldEdgeResolutionValue::Unresolved {
-            reason: HldUnresolvedReasonKind::ExternalSourceMissing
+        HldEdgeResolutionValue::Extracted {
+            target: HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+                external_name_kind_value: HldExternalNameKind::CrateRootedPath,
+                external_crate_name_value: Some("core".into()),
+                external_item_path_text: "core::mem::MaybeUninit".into(),
+            })
         },
-        "core is excluded from this run, so the reason is missing source"
+        "core is excluded from this run, so the target is the path the source writes"
     );
 }
 
@@ -4064,7 +4068,7 @@ fn test_declared_type_use_rows() {
                 "TYPE_ALIAS",
                 "definition",
                 "MaybeUninit<u8>",
-                "-",
+                "core::mem::MaybeUninit",
             ),
             row(alias, "TYPE_ALIAS", "definition", "u8", "u8"),
         ]
@@ -4541,5 +4545,101 @@ fn test_itoa_external_path_calls() {
             "core::str::from_utf8_unchecked",
         ]
     );
+    assert_eq!(input.input_node_records.len(), 111);
+}
+
+/// REQ-RUST-053.0 N1, N3, N4: each of the 13 `MaybeUninit<u8>` type uses targets the node
+/// of the written path `core::mem::MaybeUninit`, the node the import of that name targets.
+/// No node is added.
+#[test]
+fn test_itoa_external_type_uses() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let uses = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::UsesType)
+        .collect::<Vec<_>>();
+    let mut rows = uses
+        .iter()
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted {
+                target: HldTargetIdentityValue::ExternalNamed(key),
+            } => {
+                let metadata: Value =
+                    serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap())
+                        .unwrap();
+                assert_eq!(
+                    key.external_name_kind_value,
+                    HldExternalNameKind::CrateRootedPath
+                );
+                assert_eq!(key.external_crate_name_value.as_deref(), Some("core"));
+                assert_eq!(key.external_item_path_text, "core::mem::MaybeUninit");
+                let proof = &metadata["external_target_proof_record"];
+                assert_eq!(proof["external_site_proof_kind"], "use_import_names_path");
+                assert_eq!(proof["external_source_read_flag"], false);
+                assert_eq!(proof["external_definition_path_claimed_flag"], false);
+                assert!(proof["external_import_site_key"].is_object(), "{proof}");
+                Some((
+                    metadata["type_source_text"]
+                        .as_str()
+                        .unwrap()
+                        .split_whitespace()
+                        .collect::<String>(),
+                    metadata["signature_row_kind"].as_str().unwrap().to_owned(),
+                ))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let row = |kind: &str| ("MaybeUninit<u8>".to_owned(), kind.to_owned());
+    assert_eq!(
+        rows,
+        std::iter::repeat_n(row("ARRAY_TYPE"), 10)
+            .chain(std::iter::repeat_n(row("PARAM"), 2))
+            .chain(std::iter::once(row("RECORD_FIELD")))
+            .collect::<Vec<_>>(),
+        "10 generated Buffer aliases, 2 function parameters, the field of Buffer"
+    );
+    // The import of the name and its 13 uses share one node.
+    let node = |edge: &HldEdgeInputRecord| match &edge.edge_resolution_value {
+        HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
+        _ => None,
+    };
+    let imported = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Imports)
+        .filter_map(node)
+        .filter(|target| {
+            matches!(target, HldTargetIdentityValue::ExternalNamed(key)
+                if key.external_item_path_text == "core::mem::MaybeUninit")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(imported.len(), 1);
+    assert_eq!(
+        uses.iter()
+            .filter(|edge| node(edge).as_ref() == Some(&imported[0]))
+            .count(),
+        13
+    );
+    // One type use is left without a target: the bound `Copy`, a prelude name (step 6.4).
+    assert_eq!(uses.len(), 106);
+    let open = uses
+        .iter()
+        .filter(|edge| {
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            )
+        })
+        .map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            assert!(metadata.get("external_target_proof_record").is_none());
+            metadata["type_source_text"].as_str().unwrap().to_owned()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(open, ["Copy"]);
     assert_eq!(input.input_node_records.len(), 111);
 }

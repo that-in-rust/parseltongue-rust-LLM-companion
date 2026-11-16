@@ -1,4 +1,7 @@
 use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
+use crate::external_named_target_records::{
+    check_local_trait_member, collect_trait_member_names, decode_external_name_record,
+};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -154,7 +157,10 @@ pub fn resolve_signature_type_edges(
         context: &context,
         endpoints: &endpoints,
         self_types: &read_member_self_types(store, source_scope)?,
-        members: &read_impl_member_index(store, source_scope)?,
+        members: &ImplMemberLookupIndex {
+            trait_declared_member_names: collect_trait_member_names(&input.input_node_records),
+            ..read_impl_member_index(store, source_scope)?
+        },
         origins: &read_expanded_token_origins(store, source_scope)?,
         generation: input.run_generation_digest_value,
     };
@@ -319,6 +325,34 @@ fn build_type_path_edge(
     let Some(resolution) = resolve_type_path_target(path, &evidence, graph, source)? else {
         return Ok(None);
     };
+    // REQ-RUST-053.0 N1, N5: the type's source was not read; the path the site writes is
+    // proved. A path of two or more names whose last name a trait in read source declares
+    // gets no name.
+    let named = (resolution
+        == HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+        }
+        && path["type_path_self_flag"] != true)
+        .then(|| context.read_type_path_records(&evidence, path))
+        .transpose()?
+        .and_then(|records| match records {
+            [record] => Some(&record["path_external_name_record"]),
+            _ => None,
+        })
+        .map(decode_external_name_record)
+        .transpose()
+        .map_err(|error| SignatureTypeEdgeError::InvalidEvidence { field: error.0 })?
+        .flatten()
+        .filter(|_| !check_local_trait_member(text, &graph.members.trait_declared_member_names));
+    let (resolution, external) = match named {
+        Some(named) => (
+            HldEdgeResolutionValue::Extracted {
+                target: named.external_target_identity_value,
+            },
+            Some(named.external_proof_metadata_value),
+        ),
+        None => (resolution, None),
+    };
     // `Self::NAME` that name lookup left without a target: the type alias member of the one
     // stored trait impl of the owner's self type (REQ-RUST-052.0 G5).
     let proven = (resolution
@@ -398,6 +432,9 @@ fn build_type_path_edge(
     }
     if let Some(declaration) = declaration {
         metadata["trait_declaration_symbol_row"] = declaration;
+    }
+    if let Some(external) = external {
+        metadata["external_target_proof_record"] = external;
     }
     let origin = graph.origins.build_site_origin_value(&evidence, context)?;
     if !origin.is_null() {

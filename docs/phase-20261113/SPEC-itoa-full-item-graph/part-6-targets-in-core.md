@@ -115,7 +115,7 @@ store the crate or the path it proved. That is the first producer gap.
 
 ## 4 — Verification matrix
 
-Each step adds its tests and its row here. Built so far: steps 6.1 and 6.2.
+Each step adds its tests and its row here. Built so far: steps 6.1, 6.2 and 6.3.
 
 ```text
 rule       test (exists)                                              where
@@ -124,6 +124,11 @@ N1 N3 N4   test_itoa_external_path_calls (7 calls, 8 external nodes)  itoa-sourc
 N6         same test: no method call row carries a proof record       itoa-source-acceptance-tests.rs
 N1 N3      test_external_import_names_target, test_external_record_fields_checked   use-import-edge-tests.rs
 N1 N4 N5   test_external_callee_names_target                          callee-path-call-tests.rs
+N1 N3 N4   test_itoa_external_type_uses (13 rows, no new node)        itoa-source-acceptance-tests.rs
+N1         test_signature_external_type_named                         itoa-source-acceptance-tests.rs
+N1 N4 N5   test_external_type_names_target                            signature-type-edge-tests.rs
+N5         test_written_path_last_name                                signature-type-edge-tests.rs
+N1         test_self_unresolved_header_reason (Self takes no name)    signature-type-edge-tests.rs
 ```
 
 Planned at the start of the part:
@@ -156,7 +161,12 @@ Measured after each built step (pinned itoa, release run):
 step  rows gaining a target   new nodes   nodes after   unresolved after   as predicted
 6.1   4                       4           107           201                yes
 6.2   7                       4           111           194                yes
+6.3   13                      0           111           181                yes
 ```
+
+Step 6.3 as built: the third condition of N5 for a type path reads the names of the written
+path outside `<..>` and `(..)` groups; a leading `<A as T>` counts as one name. `Self`
+takes no name from a lookup stored at its site.
 
 Step 6.2 as built: the row's `dispatch_kind` is `external_written_path`. The third
 condition of N5 is applied in the call producer from the node rows; a one-segment callee is

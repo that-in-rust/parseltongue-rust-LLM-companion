@@ -92,6 +92,40 @@ pub(crate) fn collect_trait_member_names(nodes: &[HldNodeInputRecord]) -> BTreeS
         .collect()
 }
 
+/// REQ-RUST-053.0 N5: whether the written path `text` has two or more names and its last
+/// name is in `names`. Generic and parenthesized arguments are not names of the path; a
+/// leading `<A as T>` qualifier counts as one name; a return type after `->` is not read.
+pub(crate) fn check_local_trait_member(text: &str, names: &BTreeSet<String>) -> bool {
+    // Text outside every `<..>` and `(..)` group, up to a `->` outside all groups.
+    let (outside, ..) = text.chars().fold(
+        (String::new(), 0_usize, false, ' '),
+        |(mut kept, depth, ended, before), c| match c {
+            _ if ended => (kept, depth, ended, c),
+            '<' | '(' => (kept, depth + 1, ended, c),
+            // The `>` of an arrow inside a group closes nothing.
+            '>' if before == '-' => (kept, depth, depth == 0, c),
+            '>' | ')' => (kept, depth.saturating_sub(1), ended, c),
+            _ if depth == 0 => {
+                kept.push(c);
+                (kept, depth, ended, c)
+            }
+            _ => (kept, depth, ended, c),
+        },
+    );
+    let written = outside
+        .split("::")
+        .map(|name| {
+            name.trim()
+                .trim_end_matches('-')
+                .trim()
+                .trim_start_matches("r#")
+        })
+        .filter(|name| !name.is_empty())
+        .collect::<Vec<_>>();
+    let qualifier = usize::from(text.trim_start().starts_with('<'));
+    written.len() + qualifier >= 2 && written.last().is_some_and(|name| names.contains(*name))
+}
+
 /// REQ-RUST-053.0 N1: one external node per named external target the edges end at, in
 /// identity order. The node claims no file, kind, owner, visibility or signature.
 pub fn collect_external_endpoint_nodes(edges: &[HldEdgeInputRecord]) -> Vec<HldNodeInputRecord> {

@@ -15,10 +15,11 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1 and 6.2 are built. The
-  graph is 111 nodes and 585 edges; 8 nodes are written paths into `core` with no file, kind
-  or signature. All 4 `imports` rows and 50 of 197 calls have a target; 194 rows have none.
-  Next is step 6.3 (`uses_type` of `MaybeUninit<u8>`). Numbers above this line that say 103
+- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1, 6.2 and 6.3 are built.
+  The graph is 111 nodes and 585 edges; 8 nodes are written paths into `core` with no file,
+  kind or signature. All 4 `imports` rows, 50 of 197 calls and 105 of 106 `uses_type` rows
+  have a target; 181 rows have none (147 calls, 30 reads, 3 implements, 1 uses_type).
+  Next is step 6.4 (prelude names). Numbers above this line that say 103
   nodes or 43 calls are from before part 6.
 - **Earlier target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
   10b, 10c and 11 are built (40 new `uses_type` rows; 4 qualified-path rows on the impl
@@ -126,6 +127,66 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 09:19 IST — Part 6 step 3: the 13 `MaybeUninit<u8>` type uses target the named external node
+
+- **Milestone:** itoa full item graph, part 6 step 6.3. No SOP step has passed. The graph is
+  still marked incomplete.
+- **REQ:** REQ-RUST-053.0 N1, N3, N4, N5.
+- **Measured on pinned itoa (release run, `/home/ubuntu/phase6-work/s63`, executable sha256
+  `f0de39df…e5e94`):** 111 nodes (unchanged), 585 edges (unchanged), 105 of 106 `uses_type`
+  rows with a target (was 92), 181 rows without a target (was 194). As predicted in the part file.
+
+```text
+rows  written in                              type as written    target node
+10    generated Buffer type aliases           MaybeUninit<u8>    core::mem::MaybeUninit
+2     parameters of enc_16lsd, slice_buffer   MaybeUninit<u8>    core::mem::MaybeUninit
+1     the field of struct Buffer              MaybeUninit<u8>    core::mem::MaybeUninit
+```
+
+- **No node is added:** the 13 rows end at the node the import `use core::mem::MaybeUninit`
+  already targets. One `uses_type` row is left without a target: the bound `Copy`, a
+  prelude name (step 6.4).
+- **What changed:**
+  - `signature-type-edge-records.rs`: a type path left unresolved with
+    `ExternalSourceMissing` whose one stored lookup row carries a proved name gives an
+    `Extracted` row to that name, with `external_target_proof_record` on the row. `Self`
+    is excluded: its reason comes from the impl header, not from a lookup at the site.
+  - `external-named-target-records.rs`: `check_local_trait_member(text, names)`, the third
+    condition of N5 for a written path. It reads the names outside `<..>` and `(..)`,
+    stops at `->`, strips `r#`, and counts a leading `<A as T>` as one name.
+  - No SQL change.
+- **STUB:** `check_local_trait_member` as `todo!()`, producer wired to it; compiled.
+- **RED:** `cargo test --release -p parseltongue-syntax-span-extractor --lib`:
+  `FAILED. 128 passed; 2 failed` (`not yet implemented: REQ-RUST-053.0 N5`):
+  `test_external_type_names_target`, `test_written_path_last_name`.
+- **GREEN:** syntax crate `130 passed; 0 failed` and 17 in the second target;
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  `50 passed; 0 failed` (168.25 s), with the new `test_itoa_external_type_uses`.
+- **One failed attempt on the way:** the fixture test first expected one edge; the generic
+  argument `Gone` is a second row. The test now picks the row by its site range.
+- **REFACTOR:** a second check of the stored reason inside the producer was removed: the
+  row's resolution is already that reason. The helper was widened after GREEN (parenthesized
+  arguments, `->`, the `<A as T>` qualifier), each with a case in `test_written_path_last_name`.
+- **Existing real-source tests that pinned the old values (2):**
+  `test_signature_external_type_unresolved` is renamed `test_signature_external_type_named`
+  and expects the external node; `test_declared_type_use_rows` expects
+  `core::mem::MaybeUninit` on the 10 alias rows.
+- **Deliberate breaks (14), each fails a test:** N5 gate off; trait names not filled;
+  `Self` not excluded; proof not on the row; target withheld; reason not checked; one name
+  blocked too; generic arguments read as names; parentheses read as names; `r#` kept; any
+  name instead of the last; qualifier not counted; return type read; arrow closes a group.
+  "`Self` not excluded" passed at first; `test_self_unresolved_header_reason` gained a
+  stored name at the site of `Self` and now fails it.
+- **Weak evidence:** `test_itoa_external_type_uses` was written after the code and passed
+  on first run.
+- **Not covered on real source:** N5 for a type path. itoa has no type path of two names
+  into `core`.
+- **Checked:** format; `cargo clippy --release --all-targets -D warnings` on the syntax and
+  CLI crates: clean (one `redundant_closure` in the new test fixed).
+- **Not done:** three timed release runs and workspace gates (end of part 6); second
+  opinion on steps 6.2 and 6.3.
+- **Next:** step 6.4, prelude names (3 `implements` rows and the bound `Copy`; 3 new nodes predicted, 114).
 
 ### 2026-11-16 08:59 IST — Part 6 step 2: calls by a written path target named external nodes
 

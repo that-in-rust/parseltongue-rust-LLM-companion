@@ -466,6 +466,23 @@ fn test_self_unresolved_header_reason() {
             "path_unresolved_reason_kind":"external_source_missing", "path_target_symbol_rows":[]
         }),
     ));
+    // REQ-RUST-053.0 N1: a name stored at the site of `Self` is not the header's self type.
+    let site = source.find("Self").unwrap();
+    store.rows.lock().unwrap().push(make_call_fixture_row(
+        "path-resolution-site-records",
+        json!({
+            "site_compilation_scope_record":{"unit_semantic_identity_record":
+                encode_compilation_unit_value(&make_call_fixture_unit())},
+            "site_source_absolute_path":"/fixture/src/lib.rs",
+            "site_source_range_start":site, "site_source_range_end":site + 4,
+            "site_expansion_provenance_chain":[], "path_resolution_state_kind":"unresolved",
+            "path_unresolved_reason_kind":"external_source_missing", "path_target_symbol_rows":[],
+            "path_external_name_record":{"external_name_kind":"crate_rooted_path",
+                "external_crate_name":"core", "external_item_path_text":"core::Missing",
+                "external_site_proof_kind":"path_root_names_crate",
+                "external_import_site_key":null}
+        }),
+    ));
     crate::persist_impl_header_rows(
         &store,
         &make_call_fixture_scope(),
@@ -536,4 +553,155 @@ fn test_ambiguous_type_path_reason() {
         ],
         "several targets are ambiguous; a recorded reason is kept"
     );
+}
+
+/// REQ-RUST-053.0 N1, N4, N5: a type path whose stored lookup proves an external name
+/// targets that name and keeps how the site reached it. No name: without a stored proof,
+/// beside another stored reason, or when the path has two or more names and a trait in
+/// read source declares its last name.
+#[test]
+fn test_external_type_names_target() {
+    let import = json!({"span_byte_range_value":[0, 9]});
+    let composed = json!({"external_name_kind":"crate_rooted_path", "external_crate_name":"core",
+        "external_item_path_text":"core::mem::MaybeUninit",
+        "external_site_proof_kind":"use_import_names_path", "external_import_site_key":import});
+    let outcome = |source: &str, text: &str, reason: &str, record: Value| {
+        let (store, mut input) = make_call_fixture_graph(source);
+        // The fixture graph holds no trait member; a source that declares one gets its node.
+        if source.contains("trait Shape") {
+            let member = HldNodeInputRecord {
+                node_owner_kind_value: Some(HldOwnerKindValue::Trait),
+                node_qualified_path_text: "Shape::r#MaybeUninit".into(),
+                ..input.input_node_records[0].clone()
+            };
+            input.input_node_records.push(member);
+        }
+        let start = source.rfind(text).unwrap();
+        store.rows.lock().unwrap().push(make_call_fixture_row(
+            "path-resolution-site-records",
+            json!({
+                "site_compilation_scope_record":{"unit_semantic_identity_record":
+                    encode_compilation_unit_value(&make_call_fixture_unit())},
+                "site_source_absolute_path":"/fixture/src/lib.rs",
+                "site_source_range_start":start, "site_source_range_end":start + text.len(),
+                "site_expansion_provenance_chain":[], "path_resolution_state_kind":"unresolved",
+                "path_unresolved_reason_kind":reason, "path_target_symbol_rows":[],
+                "path_external_name_record":record
+            }),
+        ));
+        resolve_signature_type_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .map(|edges| {
+            // The row of the whole path; its generic argument `Gone` is another row.
+            let rows = edges
+                .iter()
+                .filter(|edge| {
+                    edge.edge_evidence_row_key
+                        .evidence_site_occurrence_key
+                        .read_semantic_occurrence_parts()
+                        .span_byte_range_value
+                        .read_source_range_pair()
+                        == (start as u64, (start + text.len()) as u64)
+                })
+                .collect::<Vec<_>>();
+            let [edge] = rows.as_slice() else {
+                panic!("one type use expected, found {}", rows.len());
+            };
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            (edge.edge_resolution_value.clone(), metadata)
+        })
+    };
+    let named = HldEdgeResolutionValue::Extracted {
+        target: HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+            external_name_kind_value: HldExternalNameKind::CrateRootedPath,
+            external_crate_name_value: Some("core".into()),
+            external_item_path_text: "core::mem::MaybeUninit".into(),
+        }),
+    };
+    let unresolved = HldEdgeResolutionValue::Unresolved {
+        reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+    };
+    let missing = "external_source_missing";
+    let plain = "struct Buffer; fn make(a: MaybeUninit<Gone>) { loop {} }";
+    let text = "MaybeUninit<Gone>";
+
+    // One name with generic arguments, composed through a use item.
+    let (resolution, metadata) = outcome(plain, text, missing, composed.clone()).unwrap();
+    assert_eq!(resolution, named);
+    assert_eq!(
+        metadata["external_target_proof_record"],
+        json!({"external_name_kind":"crate_rooted_path",
+            "external_site_proof_kind":"use_import_names_path",
+            "external_import_site_key":import,
+            "external_source_read_flag":false,
+            "external_definition_path_claimed_flag":false})
+    );
+
+    // No stored proof: the row is as before.
+    let (resolution, metadata) = outcome(plain, text, missing, Value::Null).unwrap();
+    assert_eq!(resolution, unresolved);
+    assert!(metadata.get("external_target_proof_record").is_none());
+
+    // A proof beside any other stored reason is not used.
+    let (resolution, metadata) = outcome(plain, text, "cfg_inactive", composed.clone()).unwrap();
+    assert_eq!(
+        resolution,
+        HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::CfgInactive
+        }
+    );
+    assert!(metadata.get("external_target_proof_record").is_none());
+
+    // A trait in read source declares `MaybeUninit`: one name keeps its target ...
+    let local = "struct Buffer; trait Shape { type MaybeUninit; } \
+        fn make(a: MaybeUninit<Gone>) { loop {} }";
+    let (resolution, _) = outcome(local, text, missing, composed.clone()).unwrap();
+    assert_eq!(resolution, named);
+
+    // ... and a path of two names gets none. Generic arguments are not names of the path.
+    let local = "struct Buffer; trait Shape { type MaybeUninit; } \
+        fn make(a: m::MaybeUninit<Gone>) { loop {} }";
+    let (resolution, metadata) =
+        outcome(local, "m::MaybeUninit<Gone>", missing, composed.clone()).unwrap();
+    assert_eq!(resolution, unresolved);
+    assert!(metadata.get("external_target_proof_record").is_none());
+    let plain_two = "struct Buffer; fn make(a: m::MaybeUninit<Gone>) { loop {} }";
+    let (resolution, _) =
+        outcome(plain_two, "m::MaybeUninit<Gone>", missing, composed.clone()).unwrap();
+    assert_eq!(resolution, named);
+
+    // A stored record that cannot be read is a typed error, not a guess.
+    assert!(matches!(
+        outcome(plain, text, missing, json!({"external_name_kind":"guess"})),
+        Err(SignatureTypeEdgeError::InvalidEvidence {
+            field: "external_name_kind"
+        })
+    ));
+}
+
+/// REQ-RUST-053.0 N5: the names of a written path, without its generic arguments.
+#[test]
+fn test_written_path_last_name() {
+    let names = ["Item".to_owned()].into_iter().collect();
+    let check = |text| crate::external_named_target_records::check_local_trait_member(text, &names);
+    assert!(check("m::Item"));
+    assert!(check("m :: Item < u8 >"));
+    assert!(check("Vec::<u8>::Item"));
+    assert!(check("m::r#Item"));
+    assert!(!check("Item"));
+    assert!(!check("Item<m::Item>"));
+    assert!(!check("m::Other"));
+    assert!(!check("m::Other<Item>"));
+    assert!(!check("Item::Other"));
+    assert!(check("<A as T>::Item"));
+    assert!(!check("<A as T>::Other"));
+    assert!(check("m::Item<dyn Fn() -> u8>"));
+    assert!(!check("Fn(m::Item) -> m::Item"));
+    assert!(!check("Fn(m::Item)"));
+    assert!(check("m::Item(u8) -> u8"));
 }
