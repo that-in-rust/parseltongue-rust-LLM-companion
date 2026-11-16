@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use crate::extract_member_declaration_rows;
 use crate::original_call_resolution_records::original_call_resolution_tests::{
-    make_call_fixture_graph, make_call_fixture_occurrence, make_call_fixture_row,
-    make_call_fixture_scope, make_call_fixture_unit,
+    OriginalCallFixtureStore, make_call_fixture_graph, make_call_fixture_occurrence,
+    make_call_fixture_row, make_call_fixture_scope, make_call_fixture_unit,
 };
 use crate::original_call_resolution_records::resolve_original_call_edges;
 use crate::persist_impl_header_rows;
@@ -182,6 +182,42 @@ fn read_core_fixture_rows(
             ));
         }
     }
+    // REQ-RUST-059.0: each `static` is a namespace item, and each place its name is
+    // written has a stored value-path lookup that names it.
+    for found in read_fixture_table_values(&store, "span-reference-text-table")
+        .iter()
+        .filter(|span| span["span_syntax_kind_value"] == "STATIC")
+    {
+        let name = found["span_declared_name_value"].as_str().unwrap();
+        let (start, end) = (
+            found["span_byte_start_offset"].as_u64().unwrap(),
+            found["span_byte_end_offset"].as_u64().unwrap(),
+        );
+        let occurrence = make_call_fixture_occurrence(
+            start,
+            end,
+            found["span_source_code_text"].as_str().unwrap(),
+        );
+        let metadata = json!({"target_symbol_kind_value":"Static",
+            "target_source_file_path":"/fixture/src/lib.rs",
+            "target_source_range_start":start, "target_source_range_end":end,
+            "target_compilation_scope_record":{"unit_semantic_identity_record":unit}});
+        extra.push(make_call_fixture_row(
+            "syntax-namespace-input-items",
+            json!({"binding_target_identity_key":encode_symbol_target_value(
+                &NameSymbolTargetKey::Definition(occurrence)),
+                "binding_target_metadata_value":metadata}),
+        ));
+        extra.extend(source.match_indices(name).map(|(at, _)| {
+            path_row(
+                name,
+                at,
+                json!({"path_resolution_state_kind":"resolved",
+                    "site_path_context_kind":"body_value_path",
+                    "path_target_symbol_rows":[metadata]}),
+            )
+        }));
+    }
     for (path, text) in CORE_FIXTURE_FILES {
         extra.extend(
             extract_member_declaration_rows(path, text)
@@ -227,6 +263,17 @@ fn read_core_fixture_rows(
     let metadata: Value =
         serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
     (edge.clone(), metadata)
+}
+
+fn read_fixture_table_values(store: &OriginalCallFixtureStore, table: &str) -> Vec<Value> {
+    store
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|row| row.stage_owned_table_name == table)
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .collect()
 }
 
 fn make_core_member_target(path: &str) -> HldEdgeResolutionValue {
@@ -469,4 +516,89 @@ fn test_alias_parameter_core_member() {
              fn put(self, buf: &mut Self::Store) { buf[0].write(1); } }"
         )
     );
+}
+
+/// REQ-RUST-059.0 S1 to S5: a receiver that is a `static` of the workspace, then fields of
+/// workspace structs, has the type the last field declares. A stored field with an
+/// attribute, a type that is not one plain struct name, and a name with no stored proof
+/// each withhold it.
+#[test]
+fn test_static_field_receiver_member() {
+    let named = |source: &str, label: &str, kind: &str| {
+        let (edge, metadata) = read_core_fixture_edge(source, true, true, "");
+        assert_eq!(
+            make_core_member_target(label),
+            edge.edge_resolution_value,
+            "{metadata}"
+        );
+        let lookup = &metadata["core_member_lookup_evidence"];
+        assert_eq!(kind, lookup["receiver_type_proof_kind"], "{metadata}");
+        lookup.clone()
+    };
+    let detail = |source: &str| {
+        let (edge, metadata) = read_core_fixture_edge(source, true, true, "");
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+        metadata["unresolved_detail_kind"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    // A tuple field, by its position.
+    let tuple = "struct Buffer(usize, [MaybeUninit<u8>; 4]); \
+        static PAIRS: Buffer = Buffer(0, [MaybeUninit::uninit(); 4]); \
+        fn f(i: usize) { PAIRS.1.get_unchecked(i); }";
+    let lookup = named(tuple, "[T]::get_unchecked", "static_declared_type_field");
+    assert_eq!("Buffer", lookup["receiver_written_type_text"]);
+    assert_eq!("[MaybeUninit<u8>; _]", lookup["receiver_type_text"]);
+    assert_eq!(
+        json!(["1", "[MaybeUninit<u8>; 4]"]),
+        json!([
+            lookup["receiver_field_step_rows"][0]["field_declared_name_value"],
+            lookup["receiver_field_step_rows"][0]["field_type_source_text"]
+        ])
+    );
+    // A named field, behind a visibility and a reference to the struct.
+    let record = "struct Buffer { len: usize, pub(crate) bytes: [MaybeUninit<u8>; 4] } \
+        static PAIRS: &Buffer = &Buffer { len: 0, bytes: [MaybeUninit::uninit(); 4] }; \
+        fn f(i: usize) { PAIRS.bytes.get_unchecked(i); }";
+    named(record, "[T]::get_unchecked", "static_declared_type_field");
+    // No field step: the type the `static` declares.
+    let plain = "struct Buffer; static PAIRS: [MaybeUninit<u8>; 4] = [MaybeUninit::uninit(); 4]; \
+        fn f(i: usize) { PAIRS.get_unchecked(i); }";
+    named(plain, "[T]::get_unchecked", "static_declared_type");
+    // An index after the field.
+    let indexed = "struct Buffer([MaybeUninit<u8>; 4]); \
+        static mut PAIRS: Buffer = Buffer([MaybeUninit::uninit(); 4]); \
+        fn f(i: usize) { unsafe { PAIRS.0[i].write(1); } }";
+    named(
+        indexed,
+        "MaybeUninit<T>::write",
+        "static_declared_type_field",
+    );
+    // A field that a `cfg` removes is not stored, so it takes no position.
+    let removed = "struct Buffer(#[cfg(any())] usize, [MaybeUninit<u8>; 4]); \
+        static PAIRS: Buffer = Buffer([MaybeUninit::uninit(); 4]); \
+        fn f(i: usize) { PAIRS.0.get_unchecked(i); }";
+    named(removed, "[T]::get_unchecked", "static_declared_type_field");
+    // A stored field with an attribute is not read: the attribute may remove it.
+    let gated = "struct Buffer(#[cfg(all())] usize, [MaybeUninit<u8>; 4]); \
+        static PAIRS: Buffer = Buffer(0, [MaybeUninit::uninit(); 4]); \
+        fn f(i: usize) { PAIRS.1.get_unchecked(i); }";
+    assert_eq!("receiver_field_type_unproven", detail(gated));
+    // A field of a type that is not one plain struct name.
+    let nested = "struct Buffer([MaybeUninit<u8>; 4]); \
+        static PAIRS: (Buffer, usize) = (Buffer([MaybeUninit::uninit(); 4]), 0); \
+        fn f(i: usize) { PAIRS.0.0.get_unchecked(i); }";
+    assert_eq!("receiver_field_type_unproven", detail(nested));
+    // A field type with a name that has no stored proof.
+    let unproven = "struct Buffer([Other; 4]); struct Other; \
+        static PAIRS: Buffer = Buffer([Other; 4]); \
+        fn f(i: usize) { PAIRS.0.get_unchecked(i); }";
+    assert_eq!("receiver_type_name_unproven", detail(unproven));
 }

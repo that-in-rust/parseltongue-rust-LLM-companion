@@ -457,3 +457,100 @@ that is more explicit"); the rows use the proposals. Each stays open to the row 
   `Result<T, E>::expect`, with the return type cited as a proof step.
 - Q4. **Which compiler.** No file pins the compiler. T6 records the one read; the SOP run
   must use the same one or the freeze fails.
+
+## 10. A receiver that is a `static`, then fields (spec first, added 2026-11-16)
+
+### Rust work mode
+
+Delivery Mode and Reliability Mode. Component: the Rust resolver of a batch mapper. The
+main risk is a wrong target: a field read at the wrong position, or a type name taken for
+a `core` type without proof.
+
+### Measured before writing (commit `d1ab2f1ee`, scope `declarations`)
+
+```text
+ 38  get_unchecked   receiver DECIMAL_PAIRS.0   reason receiver_type_not_determined
+     the stored receiver place:  value_path "DECIMAL_PAIRS", then field_access "0"
+     stored already (field-signature-detail-table):
+       the declared type of the static   PATH_TYPE, STATIC, "DecimalPairs"
+       the field of the struct           TUPLE_FIELD, "[u8; 200]", owner: the struct
+```
+
+Expected for the 38 (frozen rows): `[T]::get_unchecked`, `core/src/slice/mod.rs`, no
+assumption.
+
+### The Rust rule this follows
+
+- A value path that names a `static` has the type the `static` declares.
+- A field expression takes the field of the first type, in the order of automatic
+  dereference, that has a field of that name. A struct's own field is found at step 0, or
+  after the `&` and `&mut` layers of a reference are taken off. No `Deref` impl is
+  consulted before that.
+- A tuple field's name is its position among the fields that remain after `cfg`.
+
+### Executable requirements: REQ-RUST-059.0
+
+```text
+S1  WHEN the first step of a receiver place is a value path
+    THEN the lookup SHALL apply only if the stored value-path lookup at that range is
+    resolved to exactly one symbol of kind Static with exactly one graph identity.
+    Otherwise the lookup does not apply and the row keeps its reason.
+S2  The type of the place SHALL start as the text of the one stored declared type whose
+    owner is that static. None or several: the lookup does not apply.
+S3  WHEN a field step follows
+    THEN the type so far SHALL be one path without generic arguments, behind `&` and
+    `&mut` only, that the stored lookup resolved to exactly one symbol of kind Struct with
+    one graph identity; and the field SHALL be found among the stored fields of that
+    struct: a tuple field by its position in source order, a record field by its name.
+    The type of the place becomes the type that field writes.
+    A stored field with an attribute, a field text that is not one field, a missing field,
+    or a type that is not such a path SHALL withhold the name with
+    receiver_field_type_unproven.
+S4  Field steps SHALL come before index steps. Any other order: the lookup does not apply.
+    A parameter followed by a field step: the lookup does not apply (not built).
+S5  Every type path of the final written type SHALL be proven as in REQ-RUST-056.0 (a
+    builtin, or a name of core), looked up in the file and expansion of the row that
+    writes it. Otherwise receiver_type_name_unproven.
+S6  The probe, the scope rules and the withheld reasons of REQ-RUST-056.0 then apply
+    unchanged. The lookup record SHALL carry receiver_type_proof_kind
+    (static_declared_type or static_declared_type_field), the declared type text, the
+    path as written, and for each field step its name, its stored text and its type.
+```
+
+A field that `cfg` removes has no stored row (the extractor skips inactive nodes), so the
+position among stored fields is the position after `cfg`. An attribute on a stored field is
+not read by this lookup, so S3 withholds: a missed target is preferable to a wrong one.
+
+### Design (L1 / L2 / L3)
+
+```text
+L1  pure, in core-member-target-records.rs
+      parse_stored_field_text        one stored field -> (name, written type)
+      find_struct_field_type         fields of one struct -> the field of a step
+      find_static_declared_type      the one declared type of a static
+      build_row_path_evidence        a type path of a stored row -> its lookup key
+      read_record_definition_identity  a stored path lookup -> one definition of a kind
+      find_field_step_type, find_static_place_type   S1 to S5, a fold over the field steps
+      find_parameter_place_type      the existing parameter rule, moved, unchanged
+L2  read_core_member_index reads field-signature-detail-table into the index
+L3  none added
+```
+
+No new stage, table or dependency. Typed errors are the existing
+`OriginalCallResolutionError`.
+
+### Verification matrix
+
+| req_id | test_id | test_type | assertion | metric |
+| --- | --- | --- | --- | --- |
+| S1, S2 | test_static_field_receiver_member (plain) | unit, fixture | a static with no field step gives the target | proof kind static_declared_type |
+| S3 | same (tuple, record, removed) | unit, fixture | position 1 of two, a named field behind `pub(crate)` and `&`, position after a removed field | `[T]::get_unchecked` |
+| S3 | same (gated, nested) | unit, fixture | attribute on a stored field; tuple type | receiver_field_type_unproven |
+| S4 | same (indexed) | unit, fixture | field then index | `MaybeUninit<T>::write` |
+| S5 | same (unproven) | unit, fixture | field type names a workspace struct | receiver_type_name_unproven |
+| S1 to S6 | test_itoa_core_member_targets | real source | each named call equals its frozen row | wrong 0 |
+
+### Open questions
+
+- A receiver rooted at `self` (`self.bytes.as_mut_ptr()`, 1 call) and at a parameter with
+  a field step are not built.

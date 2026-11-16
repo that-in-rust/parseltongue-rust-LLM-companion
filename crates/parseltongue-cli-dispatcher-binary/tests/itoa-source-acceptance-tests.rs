@@ -6180,9 +6180,9 @@ fn test_itoa_core_member_targets() {
         .collect::<CoreTargetAssumptionSet>(),
         proof_assumptions
     );
-    // Equal to their expected rows: 50 of 133. Without a stored target: 83.
+    // Equal to their expected rows: 88 of 133. Without a stored target: 45.
     assert_eq!(
-        (50, 49, 1),
+        (88, 49, 39),
         (
             stored.len(),
             count_stored_label("MaybeUninit<T>::write"),
@@ -6190,7 +6190,7 @@ fn test_itoa_core_member_targets() {
         )
     );
     assert_eq!(
-        (153, 682, 197, 83),
+        (153, 682, 197, 45),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),

@@ -14,10 +14,13 @@ use crate::receiver_type_probe_records::{
     CoreMemberProbeOutcome, ScopeTraitMethodValue, WrittenTypeShapeValue, parse_written_type_shape,
     probe_core_member_declaration,
 };
-use crate::syntax_namespace_record_codec::decode_symbol_target_value;
+use crate::syntax_namespace_record_codec::{
+    decode_occurrence_identity_value, decode_symbol_target_value,
+};
 use crate::type_relative_member_records::{BuiltinMemberNameOutcome, ImplMemberLookupIndex};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
+use ra_ap_syntax::ast::{self, HasAttrs, HasName};
 use ra_ap_syntax::{AstNode, Edition, SourceFile, SyntaxKind};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -42,6 +45,31 @@ pub(crate) struct CoreMemberLookupIndex {
     workspace_token_name_values: BTreeSet<String>,
     /// `(trait name, member name)` for each member a workspace trait declares.
     workspace_trait_member_names: BTreeSet<(String, String)>,
+    /// REQ-RUST-059.0: `(owner, row)` for the stored declared type of each `static` and
+    /// each stored field; the owner is the graph identity of the `static`, or of the item
+    /// that declares the field.
+    owner_declared_type_rows: Vec<(HldTargetIdentityValue, Value)>,
+}
+
+/// The graph identity of the active stored span `key`; `None` when it has none.
+fn read_span_graph_identity(
+    key: &str,
+    context: &ImplHeaderSourceContext<'_>,
+) -> Option<HldTargetIdentityValue> {
+    let span = context
+        .span(key)
+        .ok()
+        .filter(|span| span["span_configuration_active_flag"] == true)?;
+    let occurrence = decode_occurrence_identity_value(&context.occurrence(span).ok()?).ok()?;
+    Some(NameSymbolTargetKey::Definition(occurrence).into())
+}
+
+fn check_declared_type_row(row: &Value) -> bool {
+    row["declared_type_owner_kind"] == "STATIC"
+        || matches!(
+            row["site_syntax_kind_value"].as_str(),
+            Some("TUPLE_FIELD" | "RECORD_FIELD")
+        )
 }
 
 /// The identifiers written in `text`, and whether a `use` in it may import by glob: a
@@ -168,7 +196,17 @@ pub(crate) fn read_core_member_index(
             ))
         })
         .collect();
+    let owned = read_impl_stage_values(store, scope, "field-signature-detail-table")?
+        .into_iter()
+        .filter(check_declared_type_row)
+        .filter_map(|row| {
+            let owner =
+                read_span_graph_identity(row["site_owner_occurrence_key"].as_str()?, context)?;
+            Some((owner, row))
+        })
+        .collect();
     Ok(CoreMemberLookupIndex {
+        owner_declared_type_rows: owned,
         core_rename_name_pairs: renames,
         core_declaration_value_rows: declarations,
         scope_proof_withheld_reason: reason,
@@ -555,34 +593,22 @@ fn read_self_alias_parts(text: &str) -> Option<(&str, &str)> {
     .then(|| (&text[..text.len() - rest.len()], name))
 }
 
-/// The `core` member that the method call at `span` names, with the record of its
-/// lookup, or the reason the name is withheld. `None` when the lookup does not apply:
-/// no declarations stored, or a receiver that is not a parameter with a written type.
-pub(crate) fn find_core_member_target(
+/// What the base of a receiver place proves: the written type its index steps start
+/// from, or the reason that type is withheld; with the record of the lookup so far.
+type ReceiverPlaceTypeOutcome = (Result<String, &'static str>, Value);
+
+/// REQ-RUST-055.0, REQ-RUST-057.0: the type a parameter writes, each name in it proven.
+/// `None` when the parameter's evidence holds no written type.
+fn find_parameter_place_type(
     span: &Value,
-    receiver: &Value,
+    first: &Value,
     context: &ImplHeaderSourceContext<'_>,
     members: &ImplMemberLookupIndex,
     index: &CoreMemberLookupIndex,
     bounds: &BoundMethodLookupIndex,
-) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
-    let declarations = index.core_declaration_value_rows.as_slice();
-    let (Some(method), Some([first, steps @ ..])) = (
-        receiver["method_declared_name_value"].as_str(),
-        receiver["receiver_place_step_rows"]
-            .as_array()
-            .map(Vec::as_slice),
-    ) else {
-        return Ok(None);
-    };
+) -> Result<Option<ReceiverPlaceTypeOutcome>, OriginalCallResolutionError> {
     let written = &first["receiver_written_type_evidence"];
-    let Some(text) = written["type_source_text"].as_str().filter(|_| {
-        !declarations.is_empty()
-            && first["place_step_kind"] == "parameter_identifier"
-            && steps
-                .iter()
-                .all(|step| step["place_step_kind"] == "index_access")
-    }) else {
+    let Some(text) = written["type_source_text"].as_str() else {
         return Ok(None);
     };
     let mut evidence = json!({
@@ -595,31 +621,7 @@ pub(crate) fn find_core_member_target(
     if let Some(reason) = index.scope_proof_withheld_reason {
         return withheld(reason, evidence);
     }
-    let mut shape_text = text.to_owned();
-    if let Some((layers, name)) = read_self_alias_parts(text) {
-        // REQ-RUST-057.0: the type is what a stored impl writes for `NAME`.
-        evidence["receiver_type_proof_kind"] = json!("parameter_associated_type_alias");
-        let Some(owner) = span["site_owner_occurrence_key"].as_str() else {
-            return withheld("associated_type_impl_unproven", evidence);
-        };
-        match find_alias_receiver_type(owner, name, context, members, bounds)? {
-            Ok(found) => {
-                shape_text = format!("{layers}{}", found.alias_type_source_text);
-                for (key, value) in found
-                    .alias_lookup_evidence_value
-                    .as_object()
-                    .into_iter()
-                    .flatten()
-                {
-                    evidence[key.as_str()] = value.clone();
-                }
-                if let Some(assumed) = evidence["lookup_assumption_values"].as_array_mut() {
-                    assumed.push(json!("source_compiles_one_associated_type"));
-                }
-            }
-            Err(reason) => return withheld(reason, evidence),
-        }
-    } else {
+    let Some((layers, name)) = read_self_alias_parts(text) else {
         let Some(paths) = written["type_path_range_rows"].as_array() else {
             return withheld("receiver_type_name_unproven", evidence);
         };
@@ -628,7 +630,327 @@ pub(crate) fn find_core_member_target(
                 return withheld("receiver_type_name_unproven", evidence);
             }
         }
+        return Ok(Some((Ok(text.to_owned()), evidence)));
+    };
+    // REQ-RUST-057.0: the type is what a stored impl writes for `NAME`.
+    evidence["receiver_type_proof_kind"] = json!("parameter_associated_type_alias");
+    let Some(owner) = span["site_owner_occurrence_key"].as_str() else {
+        return withheld("associated_type_impl_unproven", evidence);
+    };
+    match find_alias_receiver_type(owner, name, context, members, bounds)? {
+        Ok(found) => {
+            for (key, value) in found
+                .alias_lookup_evidence_value
+                .as_object()
+                .into_iter()
+                .flatten()
+            {
+                evidence[key.as_str()] = value.clone();
+            }
+            if let Some(assumed) = evidence["lookup_assumption_values"].as_array_mut() {
+                assumed.push(json!("source_compiles_one_associated_type"));
+            }
+            Ok(Some((
+                Ok(format!("{layers}{}", found.alias_type_source_text)),
+                evidence,
+            )))
+        }
+        Err(reason) => withheld(reason, evidence),
     }
+}
+
+/// The stored lookup evidence of one type path that the stored row `row` writes.
+fn build_row_path_evidence(row: &Value, path: &Value) -> Option<Value> {
+    let text = path["type_source_text"].as_str()?;
+    Some(json!({
+        "unit_compilation_identity_key":row["unit_compilation_identity_key"],
+        "file_source_absolute_path":row["file_source_absolute_path"],
+        "span_byte_start_offset":path["span_byte_start_offset"],
+        "span_byte_end_offset":path["span_byte_end_offset"],
+        "span_source_code_text":text,
+        "span_content_digest_full":blake3::hash(text.as_bytes()).to_hex().to_string(),
+        "span_expansion_provenance_chain":row["span_expansion_provenance_chain"]
+    }))
+}
+
+/// The one definition of symbol kind `kind` that a stored path lookup resolved to.
+fn read_record_definition_identity(
+    record: &Value,
+    kind: &str,
+    context: &ImplHeaderSourceContext<'_>,
+) -> Result<Option<HldTargetIdentityValue>, OriginalCallResolutionError> {
+    let Some([symbol]) = record["path_target_symbol_rows"]
+        .as_array()
+        .map(Vec::as_slice)
+        .filter(|_| record["path_resolution_state_kind"] == "resolved")
+    else {
+        return Ok(None);
+    };
+    if symbol["target_symbol_kind_value"] != kind {
+        return Ok(None);
+    }
+    Ok(context
+        .read_single_target_identity(symbol)?
+        .map(|identity| decode_symbol_target_value(&identity))
+        .transpose()?
+        .map(HldTargetIdentityValue::from))
+}
+
+/// REQ-RUST-059.0 S3: the declared name of a record field, and the type the field
+/// writes. `None` when the stored text is not one field, or the field has an attribute.
+/// A field that a `cfg` removed has no stored row; an attribute on a stored field is not
+/// read here and may remove it, and then no position among the stored fields is proven.
+fn parse_stored_field_text(row: &Value) -> Option<(Option<String>, String)> {
+    let text = row["site_syntax_source_text"].as_str()?;
+    let tuple = row["site_syntax_kind_value"] == "TUPLE_FIELD";
+    let wrapped = if tuple {
+        format!("struct X({text});")
+    } else {
+        format!("struct X {{ {text} }}")
+    };
+    let parse = SourceFile::parse(&wrapped, Edition::Edition2021);
+    if !parse.errors().is_empty() {
+        return None;
+    }
+    let tree = parse.tree();
+    let written = |ty: Option<ast::Type>| ty.map(|ty| ty.syntax().text().to_string());
+    if tuple {
+        let mut fields = tree
+            .syntax()
+            .descendants()
+            .filter_map(ast::TupleField::cast);
+        let field = fields.next().filter(|_| fields.next().is_none())?;
+        (field.attrs().next().is_none())
+            .then(|| written(field.ty()))
+            .flatten()
+            .map(|ty| (None, ty))
+    } else {
+        let mut fields = tree
+            .syntax()
+            .descendants()
+            .filter_map(ast::RecordField::cast);
+        let field = fields.next().filter(|_| fields.next().is_none())?;
+        let name = field.name()?.text().trim_start_matches("r#").to_owned();
+        (field.attrs().next().is_none())
+            .then(|| written(field.ty()))
+            .flatten()
+            .map(|ty| (Some(name), ty))
+    }
+}
+
+impl CoreMemberLookupIndex {
+    /// REQ-RUST-059.0 S2: the one stored declared type of the `static` `owner`.
+    fn find_static_declared_type(&self, owner: &HldTargetIdentityValue) -> Option<&Value> {
+        let mut rows = self
+            .owner_declared_type_rows
+            .iter()
+            .filter(|(found, row)| found == owner && row["declared_type_owner_kind"] == "STATIC")
+            .map(|(_, row)| row);
+        rows.next().filter(|_| rows.next().is_none())
+    }
+
+    /// REQ-RUST-059.0 S3: the stored field `name` of the struct `owner`, with the type
+    /// it writes: a tuple field by its position among the stored fields, a record field
+    /// by its name. `None` when any field of the struct is not read.
+    fn find_struct_field_type(
+        &self,
+        owner: &HldTargetIdentityValue,
+        name: &str,
+    ) -> Option<(&Value, String)> {
+        let mut rows = self
+            .owner_declared_type_rows
+            .iter()
+            .filter(|(found, row)| found == owner && row["declared_type_owner_kind"].is_null())
+            .map(|(_, row)| row)
+            .collect::<Vec<_>>();
+        rows.sort_by_key(|row| row["span_byte_start_offset"].as_u64());
+        let fields = rows
+            .iter()
+            .map(|row| parse_stored_field_text(row))
+            .collect::<Option<Vec<_>>>()?;
+        rows.into_iter()
+            .zip(fields)
+            .enumerate()
+            .find(|(position, (_, (declared, _)))| match declared {
+                Some(declared) => declared == name,
+                None => position.to_string() == name,
+            })
+            .map(|(_, (row, (_, written)))| (row, written))
+    }
+}
+
+/// REQ-RUST-059.0 S3: the field `name` of the workspace struct that the type `written`
+/// of the stored row `row` names: one path without generic arguments, behind `&` and
+/// `&mut` only, that the stored lookup resolved to one struct.
+fn find_field_step_type<'index>(
+    row: &Value,
+    written: &str,
+    name: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    index: &'index CoreMemberLookupIndex,
+) -> Result<Option<(&'index Value, String)>, OriginalCallResolutionError> {
+    let shape = parse_written_type_shape(written, &[]);
+    let (WrittenTypeShapeValue::Named { arguments, .. }, Some([path])) = (
+        strip_shape_reference_layers(&shape),
+        row["type_path_source_rows"].as_array().map(Vec::as_slice),
+    ) else {
+        return Ok(None);
+    };
+    if !arguments.is_empty() || path["type_path_self_flag"] == true {
+        return Ok(None);
+    }
+    let Some(evidence) = build_row_path_evidence(row, path) else {
+        return Ok(None);
+    };
+    let [record] = context.read_type_path_records(&evidence, path)? else {
+        return Ok(None);
+    };
+    Ok(read_record_definition_identity(record, "Struct", context)?
+        .and_then(|owner| index.find_struct_field_type(&owner, name)))
+}
+
+/// REQ-RUST-059.0 S1 to S5: the type written for the place `first` then `fields`, when
+/// `first` is a value path that the stored lookup resolved to one `static` of the
+/// workspace. `None` when it names no such `static`.
+fn find_static_place_type(
+    span: &Value,
+    first: &Value,
+    fields: &[Value],
+    context: &ImplHeaderSourceContext<'_>,
+    index: &CoreMemberLookupIndex,
+) -> Result<Option<ReceiverPlaceTypeOutcome>, OriginalCallResolutionError> {
+    // S1: the value path names one `static`.
+    let Some(record) = context
+        .read_type_path_records(span, first)?
+        .iter()
+        .find(|record| record["site_path_context_kind"] == "body_value_path")
+    else {
+        return Ok(None);
+    };
+    let Some(owner) = read_record_definition_identity(record, "Static", context)? else {
+        return Ok(None);
+    };
+    // S2: the type the `static` declares, as written.
+    let Some((declared, text)) = index
+        .find_static_declared_type(&owner)
+        .and_then(|row| Some((row, row["site_syntax_source_text"].as_str()?)))
+    else {
+        return Ok(None);
+    };
+    let mut evidence = json!({
+        "receiver_type_proof_kind":if fields.is_empty() {
+            "static_declared_type"
+        } else {
+            "static_declared_type_field"
+        },
+        "receiver_written_type_text":text,
+        "receiver_static_path_text":first["path_source_text"],
+        "method_probe_unread_source":["alloc", "std"],
+        "lookup_assumption_values":["core_macro_expansions_import_no_trait"]
+    });
+    let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
+    if let Some(reason) = index.scope_proof_withheld_reason {
+        return withheld(reason, evidence);
+    }
+    // S3: each field step, from the struct the type so far names.
+    let walked = fields.iter().try_fold(
+        Some((Vec::new(), declared, text.to_owned())),
+        |state, step| -> Result<_, OriginalCallResolutionError> {
+            let (Some((rows, row, written)), Some(name)) =
+                (state, step["field_declared_name_value"].as_str())
+            else {
+                return Ok(None);
+            };
+            Ok(
+                find_field_step_type(row, &written, name, context, index)?.map(
+                    |(field, written)| {
+                        let walked = json!({
+                            "field_declared_name_value":name,
+                            "field_source_text":field["site_syntax_source_text"],
+                            "field_type_source_text":written
+                        });
+                        (
+                            rows.into_iter().chain([walked]).collect::<Vec<_>>(),
+                            field,
+                            written,
+                        )
+                    },
+                ),
+            )
+        },
+    )?;
+    let Some((rows, row, written)) = walked else {
+        return withheld("receiver_field_type_unproven", evidence);
+    };
+    if !rows.is_empty() {
+        evidence["receiver_field_step_rows"] = json!(rows);
+    }
+    // S5: every type path of the type the place has is proven.
+    let Some(paths) = row["type_path_source_rows"].as_array() else {
+        return withheld("receiver_type_name_unproven", evidence);
+    };
+    for path in paths {
+        let proven = match build_row_path_evidence(row, path) {
+            Some(site) => check_written_path_proven(&site, path, context)?,
+            None => false,
+        };
+        if !proven {
+            return withheld("receiver_type_name_unproven", evidence);
+        }
+    }
+    Ok(Some((Ok(written), evidence)))
+}
+
+/// The `core` member that the method call at `span` names, with the record of its
+/// lookup, or the reason the name is withheld. `None` when the lookup does not apply:
+/// no declarations stored, or a receiver that is neither a parameter with a written type
+/// nor a `static` of the workspace followed by fields (REQ-RUST-059.0).
+pub(crate) fn find_core_member_target(
+    span: &Value,
+    receiver: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+    index: &CoreMemberLookupIndex,
+    bounds: &BoundMethodLookupIndex,
+) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
+    let declarations = index.core_declaration_value_rows.as_slice();
+    let (Some(method), Some([first, places @ ..])) = (
+        receiver["method_declared_name_value"].as_str(),
+        receiver["receiver_place_step_rows"]
+            .as_array()
+            .map(Vec::as_slice),
+    ) else {
+        return Ok(None);
+    };
+    // REQ-RUST-059.0 S4: field steps first, then index steps only.
+    let (fields, steps) = places.split_at(
+        places
+            .iter()
+            .take_while(|step| step["place_step_kind"] == "field_access")
+            .count(),
+    );
+    if declarations.is_empty()
+        || !steps
+            .iter()
+            .all(|step| step["place_step_kind"] == "index_access")
+    {
+        return Ok(None);
+    }
+    let place = match first["place_step_kind"].as_str() {
+        Some("parameter_identifier") if fields.is_empty() => {
+            find_parameter_place_type(span, first, context, members, index, bounds)?
+        }
+        Some("value_path") => find_static_place_type(span, first, fields, context, index)?,
+        _ => None,
+    };
+    let Some((written, mut evidence)) = place else {
+        return Ok(None);
+    };
+    let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
+    let shape_text = match written {
+        Ok(text) => text,
+        Err(reason) => return withheld(reason, evidence),
+    };
     // A workspace impl of a trait from outside for a type from outside may give an index
     // expression another type: `impl Index<Local> for [u8]`.
     if !steps.is_empty()
