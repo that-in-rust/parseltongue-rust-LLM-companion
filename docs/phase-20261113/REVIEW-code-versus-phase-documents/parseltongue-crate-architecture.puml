@@ -1,0 +1,73 @@
+@startuml parseltongue-crate-architecture
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_TOP_DOWN()
+HIDE_STEREOTYPE()
+skinparam wrapWidth 230
+skinparam defaultFontSize 13
+
+AddElementTag("phase", $bgColor="#1168bd", $fontColor="#ffffff", $legendText="used by the full-item-dependency-graph run")
+AddElementTag("legacy", $bgColor="#9a9a9a", $fontColor="#ffffff", $legendText="in the tree, out of scope for this phase")
+AddElementTag("ported", $bgColor="#2e7d32", $fontColor="#ffffff", $legendText="ported from rust-analyzer")
+AddRelTag("dev", $lineStyle=DashedLine(), $legendText="process or data, not a Cargo dependency")
+
+title parseltongue (branch research/tiny-rust-code-mapper, commit 37ea1755d) - crates as built\n10 crates, 138 Rust files, 70,497 lines, 13 SQL files
+
+Person(dev, "Developer / acceptance test", "Runs the CLI on pinned itoa 1.0.18")
+
+System_Ext(itoa, "Pinned itoa 1.0.18 source", "src/lib.rs 466 lines, src/u128_ext.rs 22 lines")
+System_Ext(tool, "cargo and rustc", "cargo metadata --offline, rustc --print cfg, rustc --print sysroot")
+System_Ext(ra, "rust-analyzer checkout", "../rust-tools/rust-analyzer: syntax and parser crates, path dependency")
+
+System_Boundary(pt, "parseltongue workspace") {
+
+  Container(cli, "parseltongue-cli-dispatcher-binary", "Rust binary, 2,267 lines", "5 verbs. main.rs runs the stages in order; facades for namespace publication, sysroot member rows, full-graph checkpoint, stage export. Also holds HLD and oracle facades", $tags="phase")
+
+  Container_Boundary(l2, "Stage logic (Rust)") {
+    Container(loader, "parseltongue-crate-graph-loader", "Rust, 644 lines", "Crate graph, cfg, sysroot, source ingest. The only production Command::new", $tags="phase")
+    Container(syntax, "parseltongue-syntax-span-extractor", "Rust, 12,114 lines", "One parse per file; span, signature and body-site rows; namespace inputs; impl headers; resolvers for calls, uses_type, implements, reads, imports; core member targets (part 8, WIP)", $tags="phase")
+    Container(expander, "parseltongue-port-macro-expander", "Rust, 3,916 lines", "macro_rules! matcher and transcriber", $tags="ported")
+    Container(spans, "parseltongue-macro-span-records", "Rust, 236 lines", "Span type, patched in as ra_ap_span", $tags="ported")
+    Container(sched, "parseltongue-stage-worker-scheduler", "Rust, 67 lines", "Bounded worker pool, ordered results", $tags="phase")
+  }
+
+  Container_Boundary(l3, "Store adapters") {
+    Container(duck, "parseltongue-duckdb-analysis-adapter", "Rust 11,844 lines + SQL 949 lines", "Name-resolution rounds; item, generated-item and macro-call projection (nodes, contains, generates, expands). Also HLD builder and oracle comparison (about 4,700 lines)", $tags="phase")
+    Container(turso, "parseltongue-turso-store-adapter", "Rust, 4,055 lines", "36 stage-owned tables, generations, frozen snapshots, full-graph write and readback, publication with busy retry", $tags="phase")
+  }
+
+  Container_Boundary(l1, "Contracts") {
+    Container(traits, "parseltongue-table-store-traits", "Rust, 494 lines", "10 ports: StageTableStorePort, AnalysisTableStorePort, FullGraphInputStorePort, ItemMacroExpansionPort, ...", $tags="phase")
+    Container(core, "parseltongue-core-row-types", "Rust, 2,122 lines", "Row and identity types, graph records, 10 relation kinds, validate_graph_input_records. No dependencies", $tags="phase")
+  }
+
+  ContainerDb(tdb, "Turso store file", "turso =0.9.0-pre.5", "Durable rows, generations, the frozen graph (21 MB for itoa)")
+  ContainerDb(ddb, "Run-local DuckDB files", "duckdb =1.20000.1 bundled", "Copy of one frozen generation, in a run-local directory")
+}
+
+Rel(dev, cli, "map-workspace-full-run --mapping-final-stage-kind full-item-dependency-graph")
+Rel(cli, loader, "calls")
+Rel(cli, syntax, "calls")
+Rel(cli, sched, "calls")
+Rel(cli, duck, "calls")
+Rel(cli, turso, "calls")
+Rel(syntax, expander, "expands item macros")
+Rel(syntax, traits, "reads and writes rows through ports")
+Rel(loader, traits, "writes rows through ports")
+Rel(duck, traits, "implements analysis ports")
+Rel(turso, traits, "implements store ports")
+Rel(traits, core, "uses")
+Rel(expander, core, "uses")
+Rel(sched, core, "uses")
+Rel(duck, ddb, "SQL")
+Rel(turso, tdb, "SQL")
+Rel(duck, turso, "copies a frozen generation, through ports", $tags="dev")
+Rel(loader, tool, "starts 3 offline commands", $tags="dev")
+Rel(loader, itoa, "reads source files", $tags="dev")
+Rel(syntax, ra, "syntax, parser")
+Rel(expander, ra, "syntax, parser")
+Rel(spans, ra, "syntax")
+
+SHOW_LEGEND()
+@enduml

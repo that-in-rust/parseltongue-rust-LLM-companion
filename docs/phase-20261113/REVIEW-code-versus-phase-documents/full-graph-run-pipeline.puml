@@ -1,0 +1,77 @@
+@startuml full-graph-run-pipeline
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_TOP_DOWN()
+HIDE_STEREOTYPE()
+skinparam wrapWidth 240
+skinparam defaultFontSize 13
+
+AddElementTag("rust", $bgColor="#1168bd", $fontColor="#ffffff", $legendText="Rust stage logic")
+AddElementTag("duck", $bgColor="#b26a00", $fontColor="#ffffff", $legendText="DuckDB relational step")
+AddElementTag("turso", $bgColor="#6a1b9a", $fontColor="#ffffff", $legendText="Turso durable step")
+AddElementTag("wip", $bgColor="#c62828", $fontColor="#ffffff", $legendText="part 8, work in progress at HEAD")
+
+title The full-item-dependency-graph run as built (run_workspace_mapping_pipeline, main.rs)\nnumbers are the call order; every step reads and writes Turso stage tables
+
+Person(dev, "Developer / acceptance test", "parseltongue map-workspace-full-run")
+System_Ext(itoa, "Pinned itoa 1.0.18", "Rust source files")
+System_Ext(tool, "cargo and rustc", "metadata, cfg, sysroot")
+
+System_Boundary(run, "One mapper run") {
+
+  Container_Boundary(front, "Source to resolved names") {
+    Component(s0, "1 load_workspace_crate_graph", "crate-graph-loader", "crate-dependency-graph-table, workspace-config-state-records", $tags="rust")
+    Component(s1, "2 ingest_workspace_source_files", "crate-graph-loader", "file-source-text-table", $tags="rust")
+    Component(s2, "3 run_persisted_syntax_stage", "syntax-span-extractor + worker scheduler", "Discovery, then extraction: span, ownership, field-signature, body-site rows; module closure requests", $tags="rust")
+    Component(s3, "4 persist_namespace_syntax_inputs", "syntax-span-extractor", "9 syntax-namespace-input tables", $tags="rust")
+    Component(s4, "5 run_namespace_analysis_pipeline", "cli facade driving duckdb-analysis-adapter, SQL rounds", "bindings, scopes, path and import resolution sites, receipts", $tags="duck")
+    Component(s4m, "item-macro expander", "port-macro-expander through ItemMacroExpansionPort", "macro-expanded-item-table; loops with step 5 until no new items", $tags="rust")
+    Component(s5, "6 persist_impl_header_rows", "syntax-span-extractor", "impl-header-index-table (stage signature-type-lowering-stage)", $tags="rust")
+    Component(s5b, "6b persist_sysroot_member_rows", "syntax-span-extractor, only with --sysroot-source-scope-kind declarations", "sysroot-member-declaration-records", $tags="wip")
+  }
+
+  Container_Boundary(cp, "7 publish_full_graph_checkpoint (full-graph-checkpoint-facade.rs)") {
+    Component(c1, "7.1 publish_analysis_input_snapshot", "turso-store-adapter", "Freezes the source rows of this generation", $tags="turso")
+    Component(c2, "7.2 derive_original_graph_input", "duckdb-analysis-adapter", "Item nodes; contains, generates, expands edges", $tags="duck")
+    Component(c3, "7.3 edge resolvers", "syntax-span-extractor", "resolve_original_call_edges, resolve_signature_type_edges, resolve_impl_header_edges, resolve_body_read_edges, resolve_use_import_edges; builtin and external endpoint nodes", $tags="rust")
+    Component(c3w, "core member targets", "core-member-target-records.rs, receiver-type-probe-records.rs", "Names a target in core for a method call. test_itoa_core_member_targets fails at HEAD (per the log; not rerun here)", $tags="wip")
+    Component(c4, "7.4 write_full_graph_input", "turso-store-adapter", "item-effective-visibility-records, edge-evidence-record-table", $tags="turso")
+    Component(c5, "7.5 assemble_full_graph_input + compare", "turso-store-adapter, facade", "Readback must equal what was derived, or the run fails. Prints completeness=incomplete (a constant)", $tags="turso")
+  }
+
+  Component(s8, "8 publish_workspace_generation_manifest", "turso-store-adapter", "Publishes the generation manifest", $tags="turso")
+
+  ContainerDb(tdb, "Turso store file", "36 stage-owned tables", "Generations, frozen snapshots, the stored graph")
+  ContainerDb(ddb, "Run-local DuckDB", "namespace analysis db, original-item-graph-projection.duckdb", "Copies of one frozen generation")
+}
+
+System_Ext(exp, "Frozen expected graph", "Test data only: 151 nodes, 682 edge rows. test_itoa_whole_graph_equality")
+
+Rel(dev, s0, "starts")
+Rel(s0, tool, "3 offline commands")
+Rel(s1, itoa, "reads")
+Rel(s0, s1, "")
+Rel(s1, s2, "")
+Rel(s2, s3, "")
+Rel(s3, s4, "")
+BiRel(s4, s4m, "rounds")
+Rel(s4, s5, "")
+Rel(s5, s5b, "optional")
+Rel(s5, c1, "")
+Rel(c1, c2, "snapshot")
+Rel(c2, c3, "nodes and structural edges, in memory")
+Rel(c3, c3w, "method calls with a receiver")
+Rel(c3, c4, "nodes and 8 edge kinds")
+Rel(c4, c5, "")
+Rel(c5, s8, "")
+Rel(s4, ddb, "SQL")
+Rel(c2, ddb, "SQL")
+Rel(c1, tdb, "freeze")
+Rel(c4, tdb, "write")
+Rel(c5, tdb, "read back")
+Rel(s8, tdb, "publish")
+Rel(exp, tdb, "export-published-stage-rows, compared in the test")
+
+SHOW_LEGEND()
+@enduml
