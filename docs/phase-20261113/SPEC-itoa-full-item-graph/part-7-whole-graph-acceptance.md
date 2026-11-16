@@ -215,3 +215,7 @@ It is never copied from a production run.
   the number of such rows (133 on pinned itoa).
 - **F5 (review).** The expected graph was written and checked against the pinned source by
   one author. No second reviewer and no compiler oracle (user decision, 2026-11-16).
+- **F6 (added after the first acceptance run).** The itoa acceptance tests run the executable
+  named in `PARSELTONGUE_FROZEN_EXECUTABLE_PATH` when it is set. Reason: the executable Cargo
+  builds for a test has a different digest from the `cargo build --release` executable, so
+  without the variable the comparison and the timed runs use two executables.

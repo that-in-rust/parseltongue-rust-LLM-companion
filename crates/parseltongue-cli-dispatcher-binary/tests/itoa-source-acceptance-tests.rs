@@ -142,8 +142,16 @@ fn prepare_pinned_itoa_workspace(parent: &Path) -> PathBuf {
     root
 }
 
+/// REQ-RUST-044.3 F6: an acceptance run names its frozen executable in
+/// `PARSELTONGUE_FROZEN_EXECUTABLE_PATH`; otherwise the executable Cargo built for this test runs.
+fn read_mapper_executable_path() -> PathBuf {
+    std::env::var_os("PARSELTONGUE_FROZEN_EXECUTABLE_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_BIN_EXE_parseltongue")))
+}
+
 fn run_itoa_mapping_command(root: &Path, database: &Path, extra: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_parseltongue"))
+    Command::new(read_mapper_executable_path())
         .args([
             "map-workspace-full-run",
             "--workspace-root-path-value",
@@ -1327,7 +1335,7 @@ fn prepare_source_scope_fixture(parent: &Path, exposed_name: &str) -> PathBuf {
 }
 
 fn run_source_scope_mapping(root: &Path, database: &Path, final_stage: &str) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_parseltongue"))
+    Command::new(read_mapper_executable_path())
         .args([
             "map-workspace-full-run",
             "--workspace-root-path-value",

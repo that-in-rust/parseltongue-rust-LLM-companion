@@ -129,8 +129,8 @@ Pass:
 - No file under `target/` is read except Cargo's `.rustc_info.json`.
 - Time and memory come only from the untraced run.
 
-`--sysroot-source-scope-kind excluded` is how the code runs today. Targets in `core` are then
-stored unresolved with a reason; the decided form is a named external target (below), not built.
+Add `--sysroot-source-scope-kind excluded` to both runs. A target in `core` is then stored
+as a named external target, or without a target and with a reason (below).
 
 ### S3 — Exact comparison
 
@@ -150,16 +150,18 @@ The comparison runs as real-source tests in
 `crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs`:
 
 ```bash
+PARSELTONGUE_FROZEN_EXECUTABLE_PATH=<the frozen executable> \
 cargo test --release -p parseltongue-cli-dispatcher-binary \
   --test itoa-source-acceptance-tests -- --test-threads=1
 ```
 
-Limits today:
-
-- 11 tests exist and check parts of the graph, including `default -> Buffer::new`. No test
-  compares the whole graph.
-- The expected graph names items by symbolic label; production uses canonical identities. The
-  mapping between the two has to be defined before whole-graph comparison.
+- The variable is required. Without it the tests run the executable Cargo builds for the
+  test, whose digest differs from the `cargo build --release` executable (measured
+  2026-11-16).
+- `test_itoa_whole_graph_equality` compares the whole graph: every node, every edge site by
+  byte range and record, and `contains` and `implements` by source, relation and target.
+- The expected graph names items by symbolic label; the test derives the same label from
+  each stored identity.
 
 ### S4 — Determinism, time, memory
 
