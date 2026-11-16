@@ -2683,3 +2683,26 @@ edge rows  682, sha256 eb1f86aca93683e05e9846793dab595f8a0131dc1dca00e9dc5da5e26
 - **Not an SOP PASS:** the expected graph is reviewed only by its author and not frozen,
   and the graph is marked incomplete.
 - **Next:** workspace gates, codebase-memory re-index.
+
+
+## Part 7 — workspace gates after steps 7.3b to 7.7 (2026-11-16)
+
+- **Commit:** b0cc7ac81 (clean tree). `CARGO_BUILD_JOBS=2 CXXFLAGS=-g0`.
+
+```text
+cargo fmt --all -- --check                                                    exit 0
+cargo clippy --release --workspace --all-targets --all-features -- -D warnings exit 0
+cargo test --release --workspace --all-targets --all-features
+  -- --skip test_lang_items_in_sysroot --test-threads=1                       exit 0
+  21 result lines: 601 passed, 0 failed, 4 ignored, 1 filtered out
+cargo build --release --workspace --all-targets --all-features                exit 0
+codebase-memory-mcp cli index_repository                                      status indexed, 26718 nodes, 62039 edges
+```
+
+- **Not a full PASS:** `test_lang_items_in_sysroot` is skipped by the filter. It is the open
+  native-sysroot defect recorded at the end of part 6; it was not rerun and not fixed.
+- **Not run:** the GLM-5.3 review of steps 7.3b and 7.3c.
+- **State of part 7:** the whole-graph test passes for pinned itoa on 151 nodes (seven
+  fields each) and 682 edge rows (562 by byte range). The expected graph is reviewed only
+  by its author and not frozen. The graph is marked incomplete (133 calls without a
+  target). No SOP step is claimed as PASS.
