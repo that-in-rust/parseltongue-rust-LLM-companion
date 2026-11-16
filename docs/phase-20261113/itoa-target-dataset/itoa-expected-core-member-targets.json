@@ -591,7 +591,15 @@
   "provenance": {
     "author": "Devin",
     "basis": "PINNED_SOURCE_AND_CORE_SOURCE_READING",
-    "independent_compiler_oracle_verification": "NONE",
+    "compiler_check": {
+      "command": "RUSTC_BOOTSTRAP=1 rustc --edition 2021 --crate-type lib --crate-name itoa -Zmir-opt-level=0 --emit=mir src/lib.rs",
+      "compared": "for each method name, the callee the MIR names and how many calls name it",
+      "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "date": "2026-11-16",
+      "limit": "matched by label and count, not site by site; one compiler, one target",
+      "result": "133 of 133 calls agree with the row labels, in 11 groups"
+    },
+    "independent_compiler_oracle_verification": "RUSTC_MIR_CALLEE_COUNTS_BY_LABEL_GROUP_ONCE",
     "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
   },
   "requirement": "REQ-RUST-058.0",

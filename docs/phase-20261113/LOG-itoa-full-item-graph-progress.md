@@ -785,3 +785,40 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  next        9.5: the Rust test that compares a `declarations` run with these rows
 ```
 
+
+## 2026-11-16 22:45 IST Compile check of the 133 expected core targets (one-off, user approved)
+
+```text
+ why         the rows and the mapper have one author; a misreading of Rust's lookup rules would
+             repeat in both. The user allowed one check against the compiler ("ok go ahead").
+ how         the pinned src/lib.rs, unchanged (sha256 e962338e...), compiled outside the repo:
+             RUSTC_BOOTSTRAP=1 rustc --edition 2021 --crate-type lib --crate-name itoa \
+               -Zmir-opt-level=0 --emit=mir src/lib.rs
+             then, for each of the 11 method names, the callee each MIR call names was counted.
+             rustc 1.99.1, target x86_64-unknown-linux-gnu, no features.
+ result      133 of 133 agree with the frozen labels. No row changed.
+   rows  label                    callee in the MIR
+     49  MaybeUninit<T>::write    MaybeUninit::<u8>::write
+     39  [T]::get_unchecked       slice::<impl [u8]>::get_unchecked 38, <impl [MaybeUninit<u8>]> 1
+     13  TryInto::try_into        <i32 as TryInto<uN>>::try_into 8,
+                                  <&mut [MaybeUninit<u8>] as TryInto<&mut [MaybeUninit<u8>; N]>> 5
+      8  Result<T, E>::expect     Result::<uN, TryFromIntError>::expect
+      5  Result<T, E>::unwrap     Result::<&mut [MaybeUninit<u8>; N], TryFromSliceError>::unwrap
+      5  [T]::len                 slice::<impl [MaybeUninit<u8>]>::len
+     10  u8::ilog10 .. i128       core::num::<impl u8>::ilog10 .. <impl i128>, one each
+      1  str::len                 str::<impl str>::len
+      1  [T]::as_mut_ptr          slice::<impl [MaybeUninit<u8>]>::as_mut_ptr
+      1  *mut T::cast             core::ptr::mut_ptr::<impl *mut MaybeUninit<u8>>::cast
+      1  Iterator::rev            <core::ops::Range<usize> as Iterator>::rev
+ learned     the literal in `999.try_into()` is i32, as assumed.
+             The 5 `buf.len()` calls are `[T]::len`. The assumption stays on those rows: it says
+             what the mapper did not prove, not what is true.
+             With default MIR optimisation those 5 calls do not appear (the compiler lowers a
+             slice `len` call to a pointer-metadata read), hence -Zmir-opt-level=0.
+ limits      matched by label and count, not site by site. One compiler, one target.
+             RUSTC_BOOTSTRAP=1 turns on an unstable flag on the stable compiler; used for this
+             check only, never by production or a gate.
+ recorded    provenance of itoa-expected-core-member-targets.json; PRD "No oracle" names the
+             exception; re-frozen (rows unchanged), 11 of 11 data-set tests pass
+```
+

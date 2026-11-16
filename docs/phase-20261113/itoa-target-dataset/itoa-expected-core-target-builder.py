@@ -405,7 +405,17 @@ def main():
         "compared_fields": list(COMPARED_FIELDS),
         "production_input": False,
         "provenance": {"author": "Devin", "basis": "PINNED_SOURCE_AND_CORE_SOURCE_READING",
-                       "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER", "independent_compiler_oracle_verification": "NONE"},
+                       "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER",
+                       # One-off exception to "No oracle" (user, 2026-11-16). The rows were written first; the
+                       # compiler's output was then read once and changed no row. It is not their authority.
+                       "independent_compiler_oracle_verification": "RUSTC_MIR_CALLEE_COUNTS_BY_LABEL_GROUP_ONCE",
+                       "compiler_check": {
+                           "date": "2026-11-16", "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+                           "command": "RUSTC_BOOTSTRAP=1 rustc --edition 2021 --crate-type lib --crate-name itoa "
+                                      "-Zmir-opt-level=0 --emit=mir src/lib.rs",
+                           "compared": "for each method name, the callee the MIR names and how many calls name it",
+                           "result": "133 of 133 calls agree with the row labels, in 11 groups",
+                           "limit": "matched by label and count, not site by site; one compiler, one target"}},
         "source_commit": freeze["source_commit"], "source_file_sha256": freeze["source_file_sha256"],
         "core_source": {"compiler_version_lines": read_compiler_version(), "directory": "<sysroot>/lib/rustlib/src/rust/library/core/src",
                         "file_count": len(core_files), "byte_count": sum(map(len, core_files.values())),

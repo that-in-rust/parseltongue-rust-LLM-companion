@@ -160,7 +160,9 @@ general behaviour, nothing keyed on itoa names.
 - **Calls** are resolved in Rust, reading persisted namespace and impl rows.
 - **Nodes** are projected in DuckDB and written under `item-effective-visibility-stage`.
 - **Inference:** build only what the current target needs; store the rest unresolved.
-- **Expected graph:** written from the pinned source and reviewed. No oracle.
+- **Expected graph:** written from the pinned source and reviewed. No oracle. One exception
+  (user, 2026-11-16): the 133 expected targets in `core` were written first, then checked
+  once against the callees in the compiler's MIR. The check is test-side and changed no row.
 - **Containment:** each item has one lexical source container. File-level items and impl
   members belong to the file area; nested items belong to their inline module or trait. Impl
   identity, self type and trait are metadata, never a second parent.
