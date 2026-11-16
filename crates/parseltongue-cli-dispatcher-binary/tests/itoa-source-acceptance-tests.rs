@@ -5421,12 +5421,13 @@ fn collect_expected_graph_rows() -> Vec<String> {
                 .zip(edge["site_exact_ranges"].as_array().unwrap())
                 .map(|(site, range)| {
                     format!(
-                        "{head} @ {} {}:{}..{}:{}",
+                        "{head} @ {} {}:{}..{}:{} by {}",
                         site["file"].as_str().unwrap(),
                         range["first_token_kind"].as_str().unwrap(),
                         range["first_token_start"].as_u64().unwrap(),
                         range["last_token_kind"].as_str().unwrap(),
-                        range["last_token_end"].as_u64().unwrap()
+                        range["last_token_end"].as_u64().unwrap(),
+                        site["record"].as_str().unwrap_or("none")
                     )
                 })
                 .collect()
@@ -5434,6 +5435,23 @@ fn collect_expected_graph_rows() -> Vec<String> {
         .collect::<Vec<_>>();
     rows.sort();
     rows
+}
+
+/// REQ-RUST-044.2 H1 to H3: the record of a stored site. For a call, how its target was
+/// chosen, and for a call without a target also what stopped the proof; for a type use,
+/// whether it is written in a signature or in an expression; for a read, whether it is
+/// written in a body or in a macro's arguments.
+fn derive_stored_site_record(relation: &str, metadata: &Value) -> String {
+    let read_kind_text = |key: &str| metadata[key].as_str().unwrap_or("none").to_string();
+    match relation {
+        "calls" => match metadata["unresolved_detail_kind"].as_str() {
+            Some(detail) => format!("{}/{detail}", read_kind_text("dispatch_kind")),
+            None => read_kind_text("dispatch_kind"),
+        },
+        "uses_type" => read_kind_text("type_use_kind"),
+        "reads" => read_kind_text("read_kind"),
+        _ => "none".to_string(),
+    }
 }
 
 /// The same text rows from what production stores.
@@ -5474,6 +5492,7 @@ fn collect_production_graph_rows(
             if !check_relation_site_compared(&relation) {
                 return head;
             }
+            let record = derive_stored_site_record(&relation, &metadata);
             let origin = &metadata["expansion_source_origin"];
             let read_token_origin = |token: &Value, bound: usize| {
                 format!(
@@ -5492,7 +5511,7 @@ fn collect_production_graph_rows(
                     last["token_source_relative_path"]
                 );
                 return format!(
-                    "{head} @ {} {}..{}",
+                    "{head} @ {} {}..{} by {record}",
                     first["token_source_relative_path"].as_str().unwrap(),
                     read_token_origin(first, 0),
                     read_token_origin(last, 1)
@@ -5504,7 +5523,7 @@ fn collect_production_graph_rows(
                 .read_semantic_occurrence_parts();
             let (start, end) = site.span_byte_range_value.read_source_range_pair();
             format!(
-                "{head} @ {} definition:{start}..definition:{end}",
+                "{head} @ {} definition:{start}..definition:{end} by {record}",
                 site.span_source_file_path
             )
         })

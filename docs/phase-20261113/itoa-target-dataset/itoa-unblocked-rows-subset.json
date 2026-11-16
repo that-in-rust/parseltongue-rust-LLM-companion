@@ -48,6 +48,7 @@
           },
           "line": 345,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -60,6 +61,7 @@
           },
           "line": 353,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -130,6 +132,7 @@
           },
           "line": 371,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -142,6 +145,7 @@
           },
           "line": 384,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -212,6 +216,7 @@
           },
           "line": 350,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -224,6 +229,7 @@
           },
           "line": 358,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -322,6 +328,7 @@
           },
           "line": 373,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -334,6 +341,7 @@
           },
           "line": 374,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -346,6 +354,7 @@
           },
           "line": 375,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -358,6 +367,7 @@
           },
           "line": 376,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -370,6 +380,7 @@
           },
           "line": 387,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -382,6 +393,7 @@
           },
           "line": 388,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -498,6 +510,7 @@
           },
           "line": 371,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -510,6 +523,7 @@
           },
           "line": 384,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -582,6 +596,7 @@
           },
           "line": 360,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -594,6 +609,7 @@
           },
           "line": 385,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         }
@@ -659,6 +675,7 @@
           },
           "line": 398,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -755,6 +772,7 @@
           },
           "line": 373,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -767,6 +785,7 @@
           },
           "line": 374,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -779,6 +798,7 @@
           },
           "line": 375,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -791,6 +811,7 @@
           },
           "line": 376,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -803,6 +824,7 @@
           },
           "line": 387,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -815,6 +837,7 @@
           },
           "line": 388,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -827,6 +850,7 @@
           },
           "line": 336,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -945,6 +969,7 @@
           },
           "line": 73,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -999,6 +1024,7 @@
           },
           "line": 108,
           "occurrence": 0,
+          "record": "generic_bound_trait_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1053,6 +1079,7 @@
           },
           "line": 109,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1105,6 +1132,7 @@
           },
           "line": 106,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Integer",
           "site_text_offset": 4
         }
@@ -1159,6 +1187,7 @@
           },
           "line": 107,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "I::Buffer",
           "site_text_offset": 7
         }
@@ -1211,6 +1240,7 @@
           },
           "line": 106,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -1263,6 +1293,7 @@
           },
           "line": 98,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Buffer",
           "site_text_offset": 3
         }
@@ -1317,6 +1348,7 @@
           },
           "line": 99,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -1371,6 +1403,7 @@
           },
           "line": 222,
           "occurrence": 0,
+          "record": "tuple_struct_constructor",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1423,6 +1456,7 @@
           },
           "line": 219,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -1475,6 +1509,7 @@
           },
           "line": 119,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "private::Sealed",
           "site_text_offset": 2
         }
@@ -1527,6 +1562,7 @@
           },
           "line": 122,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -1579,6 +1615,7 @@
           },
           "line": 255,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Integer",
           "site_text_offset": 2
         }
@@ -1633,6 +1670,7 @@
           },
           "line": 256,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1685,6 +1723,7 @@
           },
           "line": 256,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -1737,6 +1776,7 @@
           },
           "line": 463,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1805,6 +1845,7 @@
           },
           "line": 454,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -1817,6 +1858,7 @@
           },
           "line": 465,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -1829,6 +1871,7 @@
           },
           "line": 450,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1910,6 +1953,7 @@
           },
           "line": 417,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -1922,6 +1966,7 @@
           },
           "line": 431,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2034,6 +2079,7 @@
           },
           "line": 420,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2046,6 +2092,7 @@
           },
           "line": 422,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2058,6 +2105,7 @@
           },
           "line": 424,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2070,6 +2118,7 @@
           },
           "line": 426,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2082,6 +2131,7 @@
           },
           "line": 433,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2094,6 +2144,7 @@
           },
           "line": 434,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2106,6 +2157,7 @@
           },
           "line": 435,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -2118,6 +2170,7 @@
           },
           "line": 436,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -2256,6 +2309,7 @@
           },
           "line": 417,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -2268,6 +2322,7 @@
           },
           "line": 431,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -2331,6 +2386,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2383,6 +2439,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2493,6 +2550,7 @@
           },
           "line": 420,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2505,6 +2563,7 @@
           },
           "line": 422,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2517,6 +2576,7 @@
           },
           "line": 424,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2529,6 +2589,7 @@
           },
           "line": 426,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2541,6 +2602,7 @@
           },
           "line": 433,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2553,6 +2615,7 @@
           },
           "line": 434,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2565,6 +2628,7 @@
           },
           "line": 435,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2577,6 +2641,7 @@
           },
           "line": 436,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2589,6 +2654,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2729,6 +2795,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2781,6 +2848,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2833,6 +2901,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2885,6 +2954,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2937,6 +3007,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2989,6 +3060,7 @@
           },
           "line": 211,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3041,6 +3113,7 @@
           },
           "line": 213,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3093,6 +3166,7 @@
           },
           "line": 215,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3145,6 +3219,7 @@
           },
           "line": 212,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3197,6 +3272,7 @@
           },
           "line": 214,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3249,6 +3325,7 @@
           },
           "line": 216,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3301,6 +3378,7 @@
           },
           "line": 330,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3353,6 +3431,7 @@
           },
           "line": 331,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3405,6 +3484,7 @@
           },
           "line": 332,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3457,6 +3537,7 @@
           },
           "line": 329,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3509,6 +3590,7 @@
           },
           "line": 131,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3561,6 +3643,7 @@
           },
           "line": 131,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -3613,6 +3696,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -3665,6 +3749,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -3747,6 +3832,7 @@
           },
           "line": 8,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -3759,6 +3845,7 @@
           },
           "line": 9,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -3771,6 +3858,7 @@
           },
           "line": 10,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -3783,6 +3871,7 @@
           },
           "line": 11,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -3795,6 +3884,7 @@
           },
           "line": 18,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         }

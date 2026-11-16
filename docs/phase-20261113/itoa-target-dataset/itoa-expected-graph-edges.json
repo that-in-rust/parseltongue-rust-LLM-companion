@@ -48,6 +48,7 @@
           },
           "line": 89,
           "occurrence": 0,
+          "record": "type_path_associated_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -99,6 +100,7 @@
           },
           "line": 88,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Self",
           "site_text_offset": 3
         }
@@ -148,6 +150,7 @@
           },
           "line": 79,
           "occurrence": 0,
+          "record": "type_path_associated_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -197,6 +200,7 @@
           },
           "line": 78,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Buffer",
           "site_text_offset": 3
         }
@@ -252,6 +256,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -310,6 +315,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -372,6 +378,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -384,6 +391,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -450,6 +458,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -505,6 +514,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -558,6 +568,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -613,6 +624,7 @@
           },
           "line": 170,
           "occurrence": 0,
+          "record": "trait_path_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -669,6 +681,7 @@
           },
           "line": 171,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -722,6 +735,7 @@
           },
           "line": 179,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -777,6 +791,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -834,6 +849,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -891,6 +907,7 @@
           },
           "line": 176,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -946,6 +963,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -999,6 +1017,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1052,6 +1071,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1105,6 +1125,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -1160,6 +1181,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1218,6 +1240,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1280,6 +1303,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -1292,6 +1316,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -1358,6 +1383,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1413,6 +1439,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1466,6 +1493,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -1521,6 +1549,7 @@
           },
           "line": 170,
           "occurrence": 0,
+          "record": "trait_path_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1577,6 +1606,7 @@
           },
           "line": 171,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1630,6 +1660,7 @@
           },
           "line": 179,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1685,6 +1716,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1742,6 +1774,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1799,6 +1832,7 @@
           },
           "line": 176,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1854,6 +1888,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1907,6 +1942,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -1960,6 +1996,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2013,6 +2050,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -2068,6 +2106,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2126,6 +2165,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2188,6 +2228,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -2200,6 +2241,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -2266,6 +2308,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2321,6 +2364,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2374,6 +2418,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -2429,6 +2474,7 @@
           },
           "line": 170,
           "occurrence": 0,
+          "record": "trait_path_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2485,6 +2531,7 @@
           },
           "line": 171,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2538,6 +2585,7 @@
           },
           "line": 179,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2593,6 +2641,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2650,6 +2699,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2707,6 +2757,7 @@
           },
           "line": 176,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2762,6 +2813,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2815,6 +2867,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2868,6 +2921,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -2921,6 +2975,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -2976,6 +3031,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3034,6 +3090,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3096,6 +3153,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -3108,6 +3166,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -3174,6 +3233,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3229,6 +3289,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3282,6 +3343,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -3337,6 +3399,7 @@
           },
           "line": 170,
           "occurrence": 0,
+          "record": "trait_path_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3393,6 +3456,7 @@
           },
           "line": 171,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3446,6 +3510,7 @@
           },
           "line": 179,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3501,6 +3566,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3558,6 +3624,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3615,6 +3682,7 @@
           },
           "line": 176,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3670,6 +3738,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3723,6 +3792,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3776,6 +3846,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3829,6 +3900,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -3884,6 +3956,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -3942,6 +4015,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4004,6 +4078,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -4016,6 +4091,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -4082,6 +4158,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4137,6 +4214,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4190,6 +4268,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -4245,6 +4324,7 @@
           },
           "line": 170,
           "occurrence": 0,
+          "record": "trait_path_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4301,6 +4381,7 @@
           },
           "line": 171,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4354,6 +4435,7 @@
           },
           "line": 179,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4409,6 +4491,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4466,6 +4549,7 @@
           },
           "line": 172,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4523,6 +4607,7 @@
           },
           "line": 176,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4578,6 +4663,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4631,6 +4717,7 @@
           },
           "line": 169,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4684,6 +4771,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4737,6 +4825,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -4792,6 +4881,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -4847,6 +4937,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Integer",
           "site_text_offset": 3
         }
@@ -4902,6 +4993,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "$primitive",
           "site_text_offset": 0
         }
@@ -4955,6 +5047,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -5010,6 +5103,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5063,6 +5157,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "$primitive",
           "site_text_offset": 0
         }
@@ -5118,6 +5213,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "private::Sealed",
           "site_text_offset": 0
         }
@@ -5173,6 +5269,7 @@
           },
           "line": 205,
           "occurrence": 0,
+          "record": "cast_receiver_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5226,6 +5323,7 @@
           },
           "line": 204,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5281,6 +5379,7 @@
           },
           "line": 205,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "$primitive",
           "site_text_offset": 0
         }
@@ -5334,6 +5433,7 @@
           },
           "line": 204,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -5389,6 +5489,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5447,6 +5548,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5509,6 +5611,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -5521,6 +5624,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -5588,6 +5692,7 @@
           },
           "line": 345,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5600,6 +5705,7 @@
           },
           "line": 353,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5667,6 +5773,7 @@
           },
           "line": 371,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5679,6 +5786,7 @@
           },
           "line": 384,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5746,6 +5854,7 @@
           },
           "line": 350,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5758,6 +5867,7 @@
           },
           "line": 358,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -5855,6 +5965,7 @@
           },
           "line": 373,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5867,6 +5978,7 @@
           },
           "line": 374,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5879,6 +5991,7 @@
           },
           "line": 375,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5891,6 +6004,7 @@
           },
           "line": 376,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5903,6 +6017,7 @@
           },
           "line": 387,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -5915,6 +6030,7 @@
           },
           "line": 388,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -6023,6 +6139,7 @@
           },
           "line": 340,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -6125,6 +6242,7 @@
           },
           "line": 341,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6137,6 +6255,7 @@
           },
           "line": 373,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6149,6 +6268,7 @@
           },
           "line": 374,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6161,6 +6281,7 @@
           },
           "line": 375,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6173,6 +6294,7 @@
           },
           "line": 376,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6185,6 +6307,7 @@
           },
           "line": 387,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6197,6 +6320,7 @@
           },
           "line": 388,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6209,6 +6333,7 @@
           },
           "line": 399,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -6365,6 +6490,7 @@
           },
           "line": 347,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6377,6 +6503,7 @@
           },
           "line": 350,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6389,6 +6516,7 @@
           },
           "line": 355,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6401,6 +6529,7 @@
           },
           "line": 358,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -6413,6 +6542,7 @@
           },
           "line": 360,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -6541,6 +6671,7 @@
           },
           "line": 373,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -6553,6 +6684,7 @@
           },
           "line": 374,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -6565,6 +6697,7 @@
           },
           "line": 375,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -6577,6 +6710,7 @@
           },
           "line": 376,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -6589,6 +6723,7 @@
           },
           "line": 387,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -6601,6 +6736,7 @@
           },
           "line": 388,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -6705,6 +6841,7 @@
           },
           "line": 336,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -6763,6 +6900,7 @@
           },
           "line": 371,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -6775,6 +6913,7 @@
           },
           "line": 384,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -6844,6 +6983,7 @@
           },
           "line": 360,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -6856,6 +6996,7 @@
           },
           "line": 385,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         }
@@ -6918,6 +7059,7 @@
           },
           "line": 398,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -7011,6 +7153,7 @@
           },
           "line": 373,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7023,6 +7166,7 @@
           },
           "line": 374,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7035,6 +7179,7 @@
           },
           "line": 375,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7047,6 +7192,7 @@
           },
           "line": 376,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7059,6 +7205,7 @@
           },
           "line": 387,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7071,6 +7218,7 @@
           },
           "line": 388,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7083,6 +7231,7 @@
           },
           "line": 336,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -7204,6 +7353,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7259,6 +7409,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7312,6 +7463,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -7367,6 +7519,7 @@
           },
           "line": 153,
           "occurrence": 0,
+          "record": "trait_path_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7420,6 +7573,7 @@
           },
           "line": 155,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7473,6 +7627,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7526,6 +7681,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -7581,6 +7737,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7639,6 +7796,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7701,6 +7859,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -7713,6 +7872,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -7779,6 +7939,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7839,6 +8000,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -7851,6 +8013,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -7924,6 +8087,7 @@
           },
           "line": 275,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -7936,6 +8100,7 @@
           },
           "line": 282,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -8039,6 +8204,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8051,6 +8217,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8063,6 +8230,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8075,6 +8243,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8087,6 +8256,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8099,6 +8269,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -8211,6 +8382,7 @@
           },
           "line": 265,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -8275,6 +8447,7 @@
           },
           "line": 274,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8287,6 +8460,7 @@
           },
           "line": 281,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -8397,6 +8571,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8409,6 +8584,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8421,6 +8597,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8433,6 +8610,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8445,6 +8623,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8457,6 +8636,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -8469,6 +8649,7 @@
           },
           "line": 319,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -8625,6 +8806,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -8637,6 +8819,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -8649,6 +8832,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -8661,6 +8845,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -8673,6 +8858,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -8685,6 +8871,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -8793,6 +8980,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -8863,6 +9051,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         },
@@ -8875,6 +9064,7 @@
           },
           "line": 280,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 2
         },
@@ -8887,6 +9077,7 @@
           },
           "line": 303,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         }
@@ -8971,6 +9162,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -8983,6 +9175,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -9049,6 +9242,7 @@
           },
           "line": 318,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -9146,6 +9340,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9158,6 +9353,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9170,6 +9366,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9182,6 +9379,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9194,6 +9392,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9206,6 +9405,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9218,6 +9418,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -9339,6 +9540,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9394,6 +9596,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9447,6 +9650,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -9502,6 +9706,7 @@
           },
           "line": 153,
           "occurrence": 0,
+          "record": "trait_path_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9555,6 +9760,7 @@
           },
           "line": 155,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9608,6 +9814,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9661,6 +9868,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -9716,6 +9924,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9774,6 +9983,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9836,6 +10046,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -9848,6 +10059,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -9914,6 +10126,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -9974,6 +10187,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -9986,6 +10200,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -10059,6 +10274,7 @@
           },
           "line": 275,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10071,6 +10287,7 @@
           },
           "line": 282,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -10174,6 +10391,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10186,6 +10404,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10198,6 +10417,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10210,6 +10430,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10222,6 +10443,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10234,6 +10456,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -10346,6 +10569,7 @@
           },
           "line": 265,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -10410,6 +10634,7 @@
           },
           "line": 274,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10422,6 +10647,7 @@
           },
           "line": 281,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -10532,6 +10758,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10544,6 +10771,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10556,6 +10784,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10568,6 +10797,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10580,6 +10810,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10592,6 +10823,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -10604,6 +10836,7 @@
           },
           "line": 319,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -10760,6 +10993,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -10772,6 +11006,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -10784,6 +11019,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -10796,6 +11032,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -10808,6 +11045,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -10820,6 +11058,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -10928,6 +11167,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11012,6 +11252,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         },
@@ -11024,6 +11265,7 @@
           },
           "line": 280,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 2
         },
@@ -11036,6 +11278,7 @@
           },
           "line": 303,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         },
@@ -11048,6 +11291,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -11060,6 +11304,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -11159,6 +11404,7 @@
           },
           "line": 318,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -11256,6 +11502,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11268,6 +11515,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11280,6 +11528,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11292,6 +11541,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11304,6 +11554,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11316,6 +11567,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11328,6 +11580,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -11449,6 +11702,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11504,6 +11758,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11557,6 +11812,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -11612,6 +11868,7 @@
           },
           "line": 153,
           "occurrence": 0,
+          "record": "trait_path_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11665,6 +11922,7 @@
           },
           "line": 155,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11718,6 +11976,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11771,6 +12030,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -11826,6 +12086,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11884,6 +12145,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -11946,6 +12208,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -11958,6 +12221,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -12024,6 +12288,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12084,6 +12349,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12096,6 +12362,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12169,6 +12436,7 @@
           },
           "line": 275,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12181,6 +12449,7 @@
           },
           "line": 282,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12284,6 +12553,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12296,6 +12566,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12308,6 +12579,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12320,6 +12592,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12332,6 +12605,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12344,6 +12618,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12456,6 +12731,7 @@
           },
           "line": 265,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12520,6 +12796,7 @@
           },
           "line": 274,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12532,6 +12809,7 @@
           },
           "line": 281,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12642,6 +12920,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12654,6 +12933,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12666,6 +12946,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12678,6 +12959,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12690,6 +12972,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12702,6 +12985,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -12714,6 +12998,7 @@
           },
           "line": 319,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -12870,6 +13155,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -12882,6 +13168,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -12894,6 +13181,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -12906,6 +13194,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -12918,6 +13207,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -12930,6 +13220,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -13038,6 +13329,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -13100,6 +13392,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -13112,6 +13405,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -13193,6 +13487,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         },
@@ -13205,6 +13500,7 @@
           },
           "line": 280,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 2
         },
@@ -13217,6 +13513,7 @@
           },
           "line": 303,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         }
@@ -13294,6 +13591,7 @@
           },
           "line": 318,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -13391,6 +13689,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -13403,6 +13702,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -13415,6 +13715,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -13427,6 +13728,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -13439,6 +13741,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -13451,6 +13754,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -13463,6 +13767,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -13584,6 +13889,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -13639,6 +13945,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -13692,6 +13999,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -13747,6 +14055,7 @@
           },
           "line": 153,
           "occurrence": 0,
+          "record": "trait_path_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -13800,6 +14109,7 @@
           },
           "line": 155,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -13853,6 +14163,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -13906,6 +14217,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -13961,6 +14273,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14019,6 +14332,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14081,6 +14395,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -14093,6 +14408,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -14159,6 +14475,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14219,6 +14536,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14231,6 +14549,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14304,6 +14623,7 @@
           },
           "line": 275,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14316,6 +14636,7 @@
           },
           "line": 282,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14419,6 +14740,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14431,6 +14753,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14443,6 +14766,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14455,6 +14779,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14467,6 +14792,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14479,6 +14805,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14591,6 +14918,7 @@
           },
           "line": 265,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14655,6 +14983,7 @@
           },
           "line": 274,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14667,6 +14996,7 @@
           },
           "line": 281,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -14777,6 +15107,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14789,6 +15120,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14801,6 +15133,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14813,6 +15146,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14825,6 +15159,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14837,6 +15172,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -14849,6 +15185,7 @@
           },
           "line": 319,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -15005,6 +15342,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -15017,6 +15355,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -15029,6 +15368,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -15041,6 +15381,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -15053,6 +15394,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -15065,6 +15407,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -15173,6 +15516,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -15235,6 +15579,7 @@
           },
           "line": 285,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -15247,6 +15592,7 @@
           },
           "line": 302,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -15335,6 +15681,7 @@
           },
           "line": 271,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         },
@@ -15347,6 +15694,7 @@
           },
           "line": 280,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 2
         },
@@ -15359,6 +15707,7 @@
           },
           "line": 303,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Self",
           "site_text_offset": 3
         },
@@ -15371,6 +15720,7 @@
           },
           "line": 318,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -15501,6 +15851,7 @@
           },
           "line": 288,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -15513,6 +15864,7 @@
           },
           "line": 290,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -15525,6 +15877,7 @@
           },
           "line": 292,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -15537,6 +15890,7 @@
           },
           "line": 294,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -15549,6 +15903,7 @@
           },
           "line": 306,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -15561,6 +15916,7 @@
           },
           "line": 308,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -15573,6 +15929,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -15694,6 +16051,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -15749,6 +16107,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -15802,6 +16161,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -15857,6 +16217,7 @@
           },
           "line": 153,
           "occurrence": 0,
+          "record": "trait_path_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -15910,6 +16271,7 @@
           },
           "line": 155,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -15963,6 +16325,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16016,6 +16379,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -16071,6 +16435,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16126,6 +16491,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "Integer",
           "site_text_offset": 3
         }
@@ -16181,6 +16547,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "$primitive",
           "site_text_offset": 0
         }
@@ -16234,6 +16601,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -16289,6 +16657,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16344,6 +16713,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "private::Sealed",
           "site_text_offset": 0
         }
@@ -16397,6 +16767,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "$primitive",
           "site_text_offset": 0
         }
@@ -16452,6 +16823,7 @@
           },
           "line": 205,
           "occurrence": 0,
+          "record": "cast_receiver_impl_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16505,6 +16877,7 @@
           },
           "line": 204,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16558,6 +16931,7 @@
           },
           "line": 204,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -16613,6 +16987,7 @@
           },
           "line": 205,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "$primitive",
           "site_text_offset": 0
         }
@@ -16656,6 +17031,7 @@
           },
           "line": 86,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16699,6 +17075,7 @@
           },
           "line": 83,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16742,6 +17119,7 @@
           },
           "line": 76,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16793,6 +17171,7 @@
           },
           "line": 73,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16844,6 +17223,7 @@
           },
           "line": 73,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16893,6 +17273,7 @@
           },
           "line": 73,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -16944,6 +17325,7 @@
           },
           "line": 110,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -16995,6 +17377,7 @@
           },
           "line": 108,
           "occurrence": 0,
+          "record": "generic_bound_trait_method",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17046,6 +17429,7 @@
           },
           "line": 107,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17099,6 +17483,7 @@
           },
           "line": 107,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17152,6 +17537,7 @@
           },
           "line": 109,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17205,6 +17591,7 @@
           },
           "line": 109,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17254,6 +17641,7 @@
           },
           "line": 106,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Integer",
           "site_text_offset": 4
         }
@@ -17305,6 +17693,7 @@
           },
           "line": 107,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "I::Buffer",
           "site_text_offset": 7
         }
@@ -17354,6 +17743,7 @@
           },
           "line": 106,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -17405,6 +17795,7 @@
           },
           "line": 99,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17454,6 +17845,7 @@
           },
           "line": 99,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17503,6 +17895,7 @@
           },
           "line": 98,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Buffer",
           "site_text_offset": 3
         }
@@ -17554,6 +17947,7 @@
           },
           "line": 99,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u8",
           "site_text_offset": 3
         }
@@ -17605,6 +17999,7 @@
           },
           "line": 222,
           "occurrence": 0,
+          "record": "tuple_struct_constructor",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17656,6 +18051,7 @@
           },
           "line": 222,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "DecimalPairs",
           "site_text_offset": 2
         }
@@ -17705,6 +18101,7 @@
           },
           "line": 219,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         }
@@ -17746,6 +18143,7 @@
           },
           "line": 122,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17792,6 +18190,7 @@
           },
           "line": 119,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "private::Sealed",
           "site_text_offset": 2
         }
@@ -17841,6 +18240,7 @@
           },
           "line": 122,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -17882,6 +18282,7 @@
           },
           "line": 256,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -17928,6 +18329,7 @@
           },
           "line": 255,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Integer",
           "site_text_offset": 2
         }
@@ -17979,6 +18381,7 @@
           },
           "line": 256,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18028,6 +18431,7 @@
           },
           "line": 256,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 3
         }
@@ -18069,6 +18473,7 @@
           },
           "line": 88,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18107,6 +18512,7 @@
           },
           "line": 78,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18151,6 +18557,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18195,6 +18602,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18239,6 +18647,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18283,6 +18692,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18327,6 +18737,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18371,6 +18782,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18415,6 +18827,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18459,6 +18872,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18503,6 +18917,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18547,6 +18962,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18591,6 +19007,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18635,6 +19052,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18679,6 +19097,7 @@
           },
           "line": 160,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18723,6 +19142,7 @@
           },
           "line": 164,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18767,6 +19187,7 @@
           },
           "line": 168,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18811,6 +19232,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18855,6 +19277,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18899,6 +19322,7 @@
           },
           "line": 204,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18943,6 +19367,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -18981,6 +19406,7 @@
           },
           "line": 336,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19025,6 +19451,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19069,6 +19496,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19113,6 +19541,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19157,6 +19586,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19201,6 +19631,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19245,6 +19676,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19289,6 +19721,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19333,6 +19766,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19377,6 +19811,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19421,6 +19856,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19465,6 +19901,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19509,6 +19946,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19553,6 +19991,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19597,6 +20036,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19641,6 +20081,7 @@
           },
           "line": 144,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19685,6 +20126,7 @@
           },
           "line": 263,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19729,6 +20171,7 @@
           },
           "line": 148,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19773,6 +20216,7 @@
           },
           "line": 152,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19817,6 +20261,7 @@
           },
           "line": 195,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19861,6 +20306,7 @@
           },
           "line": 200,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19905,6 +20351,7 @@
           },
           "line": 204,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19943,6 +20390,7 @@
           },
           "line": 72,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -19983,6 +20431,7 @@
           },
           "line": 106,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20023,6 +20472,7 @@
           },
           "line": 98,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20061,6 +20511,7 @@
           },
           "line": 222,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20099,6 +20550,7 @@
           },
           "line": 219,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20137,6 +20589,7 @@
           },
           "line": 119,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20175,6 +20628,7 @@
           },
           "line": 255,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20219,6 +20673,7 @@
           },
           "line": 137,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20263,6 +20718,7 @@
           },
           "line": 137,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20307,6 +20763,7 @@
           },
           "line": 137,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20351,6 +20808,7 @@
           },
           "line": 137,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20395,6 +20853,7 @@
           },
           "line": 137,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20433,6 +20892,7 @@
           },
           "line": 450,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20471,6 +20931,7 @@
           },
           "line": 231,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20509,6 +20970,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20547,6 +21009,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20585,6 +21048,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20623,6 +21087,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20661,6 +21126,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20699,6 +21165,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20737,6 +21204,7 @@
           },
           "line": 211,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20775,6 +21243,7 @@
           },
           "line": 213,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20813,6 +21282,7 @@
           },
           "line": 215,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20851,6 +21321,7 @@
           },
           "line": 212,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20889,6 +21360,7 @@
           },
           "line": 214,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20927,6 +21399,7 @@
           },
           "line": 216,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -20965,6 +21438,7 @@
           },
           "line": 330,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21003,6 +21477,7 @@
           },
           "line": 331,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21041,6 +21516,7 @@
           },
           "line": 332,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21079,6 +21555,7 @@
           },
           "line": 329,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21117,6 +21594,7 @@
           },
           "line": 135,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21155,6 +21633,7 @@
           },
           "line": 191,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21193,6 +21672,7 @@
           },
           "line": 259,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21231,6 +21711,7 @@
           },
           "line": 126,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21269,6 +21750,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21307,6 +21789,7 @@
           },
           "line": 54,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21345,6 +21828,7 @@
           },
           "line": 56,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21383,6 +21867,7 @@
           },
           "line": 57,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21421,6 +21906,7 @@
           },
           "line": 58,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21459,6 +21945,7 @@
           },
           "line": 7,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21512,6 +21999,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21568,6 +22056,7 @@
           },
           "line": 138,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21624,6 +22113,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21680,6 +22170,7 @@
           },
           "line": 139,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21736,6 +22227,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21792,6 +22284,7 @@
           },
           "line": 138,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21848,6 +22341,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21904,6 +22398,7 @@
           },
           "line": 139,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -21960,6 +22455,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22016,6 +22512,7 @@
           },
           "line": 138,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22072,6 +22569,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22128,6 +22626,7 @@
           },
           "line": 139,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22184,6 +22683,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22240,6 +22740,7 @@
           },
           "line": 138,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22296,6 +22797,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22352,6 +22854,7 @@
           },
           "line": 139,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22408,6 +22911,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22464,6 +22968,7 @@
           },
           "line": 138,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22520,6 +23025,7 @@
           },
           "line": 140,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22576,6 +23082,7 @@
           },
           "line": 139,
           "occurrence": 0,
+          "record": "macro_argument_value_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22625,6 +23132,7 @@
           },
           "line": 463,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22681,6 +23189,7 @@
           },
           "line": 450,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -22693,6 +23202,7 @@
           },
           "line": 450,
           "occurrence": 1,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22763,6 +23273,7 @@
           },
           "line": 454,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -22775,6 +23286,7 @@
           },
           "line": 465,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -22787,6 +23299,7 @@
           },
           "line": 450,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22872,6 +23385,7 @@
           },
           "line": 231,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -22884,6 +23398,7 @@
           },
           "line": 231,
           "occurrence": 1,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -22896,6 +23411,7 @@
           },
           "line": 231,
           "occurrence": 2,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -22965,6 +23481,7 @@
           },
           "line": 417,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -22977,6 +23494,7 @@
           },
           "line": 431,
           "occurrence": 0,
+          "record": "callee_path_function",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -23088,6 +23606,7 @@
           },
           "line": 420,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23100,6 +23619,7 @@
           },
           "line": 422,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23112,6 +23632,7 @@
           },
           "line": 424,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23124,6 +23645,7 @@
           },
           "line": 426,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23136,6 +23658,7 @@
           },
           "line": 433,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23148,6 +23671,7 @@
           },
           "line": 434,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23160,6 +23684,7 @@
           },
           "line": 435,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23172,6 +23697,7 @@
           },
           "line": 436,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -23302,6 +23828,7 @@
           },
           "line": 413,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -23404,6 +23931,7 @@
           },
           "line": 420,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23416,6 +23944,7 @@
           },
           "line": 422,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23428,6 +23957,7 @@
           },
           "line": 424,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23440,6 +23970,7 @@
           },
           "line": 426,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23452,6 +23983,7 @@
           },
           "line": 433,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23464,6 +23996,7 @@
           },
           "line": 434,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23476,6 +24009,7 @@
           },
           "line": 435,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -23488,6 +24022,7 @@
           },
           "line": 436,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -23665,6 +24200,7 @@
           },
           "line": 420,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23677,6 +24213,7 @@
           },
           "line": 422,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23689,6 +24226,7 @@
           },
           "line": 424,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23701,6 +24239,7 @@
           },
           "line": 426,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23713,6 +24252,7 @@
           },
           "line": 433,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23725,6 +24265,7 @@
           },
           "line": 434,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23737,6 +24278,7 @@
           },
           "line": 435,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         },
@@ -23749,6 +24291,7 @@
           },
           "line": 436,
           "occurrence": 0,
+          "record": "body_value_path",
           "site_text": "DECIMAL_PAIRS",
           "site_text_offset": 0
         }
@@ -23877,6 +24420,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -23935,6 +24479,7 @@
           },
           "line": 417,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         },
@@ -23947,6 +24492,7 @@
           },
           "line": 431,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u32",
           "site_text_offset": 3
         }
@@ -24007,6 +24553,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24056,6 +24603,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24163,6 +24711,7 @@
           },
           "line": 420,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24175,6 +24724,7 @@
           },
           "line": 422,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24187,6 +24737,7 @@
           },
           "line": 424,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24199,6 +24750,7 @@
           },
           "line": 426,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24211,6 +24763,7 @@
           },
           "line": 433,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24223,6 +24776,7 @@
           },
           "line": 434,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24235,6 +24789,7 @@
           },
           "line": 435,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24247,6 +24802,7 @@
           },
           "line": 436,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "usize",
           "site_text_offset": 3
         },
@@ -24259,6 +24815,7 @@
           },
           "line": 408,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24394,6 +24951,7 @@
           },
           "line": 159,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24441,6 +24999,7 @@
           },
           "line": 163,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24488,6 +25047,7 @@
           },
           "line": 159,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24535,6 +25095,7 @@
           },
           "line": 163,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24582,6 +25143,7 @@
           },
           "line": 159,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24629,6 +25191,7 @@
           },
           "line": 163,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24676,6 +25239,7 @@
           },
           "line": 159,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24723,6 +25287,7 @@
           },
           "line": 163,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24770,6 +25335,7 @@
           },
           "line": 159,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24817,6 +25383,7 @@
           },
           "line": 163,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24866,6 +25433,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24915,6 +25483,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -24964,6 +25533,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25013,6 +25583,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25062,6 +25633,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25111,6 +25683,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25160,6 +25733,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25209,6 +25783,7 @@
           },
           "line": 189,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25258,6 +25833,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25307,6 +25883,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25356,6 +25933,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25405,6 +25983,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25454,6 +26033,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25503,6 +26083,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25552,6 +26133,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25601,6 +26183,7 @@
           },
           "line": 186,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25650,6 +26233,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25699,6 +26283,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25748,6 +26333,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25797,6 +26383,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25846,6 +26433,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25895,6 +26483,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25944,6 +26533,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -25993,6 +26583,7 @@
           },
           "line": 187,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26042,6 +26633,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26091,6 +26683,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26140,6 +26733,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26189,6 +26783,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26238,6 +26833,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26287,6 +26883,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26336,6 +26933,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26385,6 +26983,7 @@
           },
           "line": 188,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26434,6 +27033,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26483,6 +27083,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26532,6 +27133,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26581,6 +27183,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26630,6 +27233,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26679,6 +27283,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26728,6 +27333,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26777,6 +27383,7 @@
           },
           "line": 185,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26826,6 +27433,7 @@
           },
           "line": 211,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26875,6 +27483,7 @@
           },
           "line": 213,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26924,6 +27533,7 @@
           },
           "line": 215,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -26973,6 +27583,7 @@
           },
           "line": 215,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27022,6 +27633,7 @@
           },
           "line": 215,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27071,6 +27683,7 @@
           },
           "line": 215,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27120,6 +27733,7 @@
           },
           "line": 212,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27169,6 +27783,7 @@
           },
           "line": 214,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27218,6 +27833,7 @@
           },
           "line": 216,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27267,6 +27883,7 @@
           },
           "line": 216,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27316,6 +27933,7 @@
           },
           "line": 216,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27365,6 +27983,7 @@
           },
           "line": 216,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27414,6 +28033,7 @@
           },
           "line": 330,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27463,6 +28083,7 @@
           },
           "line": 330,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27512,6 +28133,7 @@
           },
           "line": 331,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27561,6 +28183,7 @@
           },
           "line": 331,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27610,6 +28233,7 @@
           },
           "line": 332,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27659,6 +28283,7 @@
           },
           "line": 332,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27708,6 +28333,7 @@
           },
           "line": 329,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27757,6 +28383,7 @@
           },
           "line": 329,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27804,6 +28431,7 @@
           },
           "line": 194,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27851,6 +28479,7 @@
           },
           "line": 199,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27892,6 +28521,7 @@
           },
           "line": 128,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27930,6 +28560,7 @@
           },
           "line": 130,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -27968,6 +28599,7 @@
           },
           "line": 131,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28017,6 +28649,7 @@
           },
           "line": 128,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "Copy",
           "site_text_offset": 2
         }
@@ -28066,6 +28699,7 @@
           },
           "line": 131,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28115,6 +28749,7 @@
           },
           "line": 131,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -28166,6 +28801,7 @@
           },
           "line": 252,
           "occurrence": 0,
+          "record": "external_written_path",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28217,6 +28853,7 @@
           },
           "line": 249,
           "occurrence": 0,
+          "record": "undetermined/receiver_type_not_determined",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28278,6 +28915,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28290,6 +28928,7 @@
           },
           "line": 252,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "MaybeUninit<u8>",
           "site_text_offset": 8
         }
@@ -28350,6 +28989,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "str",
           "site_text_offset": 4
         }
@@ -28415,6 +29055,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "u8",
           "site_text_offset": 1
         },
@@ -28427,6 +29068,7 @@
           },
           "line": 252,
           "occurrence": 0,
+          "record": "expression",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28439,6 +29081,7 @@
           },
           "line": 252,
           "occurrence": 1,
+          "record": "expression",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28504,6 +29147,7 @@
           },
           "line": 247,
           "occurrence": 0,
+          "record": "signature",
           "site_text": "usize",
           "site_text_offset": 2
         }
@@ -28551,6 +29195,7 @@
           },
           "line": 143,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28594,6 +29239,7 @@
           },
           "line": 334,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28641,6 +29287,7 @@
           },
           "line": 147,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28749,6 +29396,7 @@
           },
           "line": 14,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28761,6 +29409,7 @@
           },
           "line": 14,
           "occurrence": 1,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28773,6 +29422,7 @@
           },
           "line": 15,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28785,6 +29435,7 @@
           },
           "line": 15,
           "occurrence": 1,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28797,6 +29448,7 @@
           },
           "line": 19,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28809,6 +29461,7 @@
           },
           "line": 19,
           "occurrence": 1,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28821,6 +29474,7 @@
           },
           "line": 19,
           "occurrence": 2,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28833,6 +29487,7 @@
           },
           "line": 21,
           "occurrence": 0,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28845,6 +29500,7 @@
           },
           "line": 21,
           "occurrence": 1,
+          "record": "external_builtin_member",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -28969,6 +29625,7 @@
           },
           "line": 7,
           "occurrence": 0,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28981,6 +29638,7 @@
           },
           "line": 7,
           "occurrence": 1,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         },
@@ -28993,6 +29651,7 @@
           },
           "line": 7,
           "occurrence": 2,
+          "record": "signature",
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29085,6 +29744,7 @@
           },
           "line": 8,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -29097,6 +29757,7 @@
           },
           "line": 9,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -29109,6 +29770,7 @@
           },
           "line": 10,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -29121,6 +29783,7 @@
           },
           "line": 11,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         },
@@ -29133,6 +29796,7 @@
           },
           "line": 18,
           "occurrence": 0,
+          "record": "expression",
           "site_text": "u64",
           "site_text_offset": 3
         }
@@ -29224,6 +29888,7 @@
           },
           "line": 143,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29271,6 +29936,7 @@
           },
           "line": 261,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29318,6 +29984,7 @@
           },
           "line": 147,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29365,6 +30032,7 @@
           },
           "line": 143,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29412,6 +30080,7 @@
           },
           "line": 261,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29459,6 +30128,7 @@
           },
           "line": 147,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29506,6 +30176,7 @@
           },
           "line": 143,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29553,6 +30224,7 @@
           },
           "line": 261,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29600,6 +30272,7 @@
           },
           "line": 147,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29647,6 +30320,7 @@
           },
           "line": 143,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29694,6 +30368,7 @@
           },
           "line": 261,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29741,6 +30416,7 @@
           },
           "line": 147,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29792,6 +30468,7 @@
           },
           "line": 56,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29843,6 +30520,7 @@
           },
           "line": 57,
           "occurrence": 0,
+          "record": null,
           "site_text": "self",
           "site_text_offset": 6
         }
@@ -29894,6 +30572,7 @@
           },
           "line": 57,
           "occurrence": 0,
+          "record": null,
           "site_text": "MaybeUninit",
           "site_text_offset": 0
         }
@@ -29945,6 +30624,7 @@
           },
           "line": 58,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -29992,6 +30672,7 @@
           },
           "line": 194,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }
@@ -30039,6 +30720,7 @@
           },
           "line": 199,
           "occurrence": 0,
+          "record": null,
           "site_text": null,
           "site_text_offset": 0
         }

@@ -2706,3 +2706,83 @@ codebase-memory-mcp cli index_repository                                      st
   fields each) and 682 edge rows (562 by byte range). The expected graph is reviewed only
   by its author and not frozen. The graph is marked incomplete (133 calls without a
   target). No SOP step is claimed as PASS.
+
+
+## Part 7 step 7.8 — sites compared by their record (2026-11-16)
+
+- **REQ:** REQ-RUST-044.2 H1 to H4 (new, part 7 section 8). Test and expected data only;
+  no production code changed.
+- **What changed:**
+  - The expected-graph builder states, on each of its 21 `calls` statements, how the
+    target is chosen (H1), and marks the 20 reads written in `assert!` arguments (H3). A
+    type use is `expression` when its statement carries `body_type_mention` (H2). The
+    builder fails on a call without that statement.
+  - Every expected site carries the value as `record`.
+  - `test_itoa_whole_graph_equality` ends each compared row with ` by <record>`; the
+    stored side reads it in `derive_stored_site_record` from `dispatch_kind` and
+    `unresolved_detail_kind`, `type_use_kind`, `read_kind`.
+- **The names are production's vocabulary.** I assigned each by reading the call in the
+  pinned source against rule H1, before the test ran; the aggregate counts were then equal
+  to production's (measured from the 1-worker export of step 7.7):
+
+```text
+calls      27 callee_path_function, 14 external_builtin_member, 7 external_written_path,
+           5 trait_path_impl_method, 5 trait_path_method, 2 cast_receiver_impl_method,
+           2 type_path_associated_function, 1 generic_bound_trait_method,
+           1 tuple_struct_constructor, 133 undetermined/receiver_type_not_determined
+uses_type  106 signature, 97 expression
+reads      78 body_value_path, 20 macro_argument_value_path
+```
+
+- **STUB / RED** (`derive_stored_site_record` as `todo!()`), one test selected:
+
+```text
+not yet implemented: REQ-RUST-044.2: calls {"call_shape_kind":"method_call","call_source_text":"buf [offset + 
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 18.10s
+```
+
+  This RED shows only that the test reaches the new function, not a behavioural failure.
+- **GREEN:** `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 57 filtered out`
+  on the first run with the real function. Weak evidence, so five changes to the expected
+  edges file were made one at a time; each failed the test, and the builder restored the
+  file:
+
+```text
+## call <Buffer as Default>::default -> Buffer::new: type_path_associated_function -> callee_path_function
+expected 1 stored 0: <Buffer as Default>::default --calls--> Buffer::new @ src/lib.rs definition:2506..definition:2519 by callee_path_function
+expected 0 stored 1: <Buffer as Default>::default --calls--> Buffer::new @ src/lib.rs definition:2506..definition:2519 by type_path_associated_functio
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.56s
+## call <i8 as private::Sealed>::write -> Unsigned::fmt: trait_path_method -> trait_path_impl_method
+expected 1 stored 0: <i8 as private::Sealed>::write --calls--> Unsigned::fmt @ src/lib.rs definition:5458..definition:5593 by trait_path_impl_method
+expected 0 stored 1: <i8 as private::Sealed>::write --calls--> Unsigned::fmt @ src/lib.rs definition:5458..definition:5593 by trait_path_method
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 16.10s
+## uses_type Buffer::format -> private::Sealed::Buffer: expression -> signature
+expected 0 stored 1: Buffer::format --uses_type--> private::Sealed::Buffer @ src/lib.rs definition:3287..definition:3296 by expression
+expected 1 stored 0: Buffer::format --uses_type--> private::Sealed::Buffer @ src/lib.rs definition:3287..definition:3296 by signature
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.56s
+## first macro-argument read: macro_argument_value_path -> body_value_path
+expected 1 stored 0: const _ #impl_Integer(i128,u128) --reads--> i128::BITS @ src/lib.rs invocation:6019..definition:4326 by body_value_path
+expected 0 stored 1: const _ #impl_Integer(i128,u128) --reads--> i128::BITS @ src/lib.rs invocation:6019..definition:4326 by macro_argument_value_path
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.91s
+## first call without a target: detail receiver_type_not_determined -> callee_path_not_requested
+expected 1 stored 0: <i128 as Integer>::MAX_STR_LEN --calls--> unresolved .ilog10 [trait_solver_needed] @ src/lib.rs invocation:6019..definition:5082 
+expected 0 stored 1: <i128 as Integer>::MAX_STR_LEN --calls--> unresolved .ilog10 [trait_solver_needed] @ src/lib.rs invocation:6019..definition:5082 
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 19.67s
+```
+
+- **Commands and results:**
+
+```text
+python3 .../itoa-expected-graph-builder.py --source-root /home/ubuntu/repos/rust-tools/itoa
+  --output-directory docs/phase-20261113/itoa-target-dataset                     exit 0
+python3 -m unittest .../test_itoa_expected_graph_rules.py                        Ran 16 tests, OK
+cargo fmt --all --check                                                          exit 0
+cargo clippy --release -p parseltongue-cli-dispatcher-binary --all-targets -- -D warnings  exit 0
+cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 144.73s
+```
+
+- **Not compared (H4):** the lookup evidence kept on a row.
+- **Refactor:** none needed.
+- **Next:** the GLM-5.3 review of steps 7.3b, 7.3c and 7.4a; then the freeze, which waits
+  on the user's answers (PASS rule; reviewer).

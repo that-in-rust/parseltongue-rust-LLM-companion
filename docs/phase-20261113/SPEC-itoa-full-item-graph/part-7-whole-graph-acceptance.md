@@ -165,3 +165,26 @@ It is never copied from a production run.
 - **N3.** The owner of a top-level item of the root file is the crate root; of another
   file, the module that file is the body of (`mod u128_ext;`). A file area and the crate
   root have no owner (OD-7).
+
+## 8. REQ-RUST-044.2 — which record of a site is compared (step 7.8, added 2026-11-16)
+
+- **H1.** A `calls` site is compared by how its target was chosen:
+  - `callee_path_function`: the callee is a path that names a function in read source.
+  - `type_path_associated_function`: `Type::name(..)` where an impl of the type declares it.
+  - `tuple_struct_constructor`: the callee names a tuple struct.
+  - `trait_path_impl_method`: `Trait::method(arg, ..)`, and the argument's type picks the impl.
+  - `trait_path_method`: `Trait::method(..)`, and the target is the trait's declaration.
+  - `generic_bound_trait_method`: a method on a value whose type is a generic parameter;
+    the target is the declaration in the bound's trait.
+  - `cast_receiver_impl_method`: `(x as T).method(..)`, and the cast names the type.
+  - `external_written_path`: the callee is a path into source that was not read.
+  - `external_builtin_member`: the callee is a member of a builtin type.
+  - `undetermined`: no target. The site also states what stopped the proof; on pinned
+    itoa that is `receiver_type_not_determined` for all 133.
+- **H2.** A `uses_type` site is compared by whether it is written in a `signature` or in
+  an `expression`.
+- **H3.** A `reads` site is compared by whether it is written in a body
+  (`body_value_path`) or in the arguments of a macro (`macro_argument_value_path`).
+- **H4.** Not compared: the lookup evidence a row keeps (candidate impls, the `use` item a
+  name went through, the proof of an external name). The feature tests of parts 5 and 6
+  check those.
