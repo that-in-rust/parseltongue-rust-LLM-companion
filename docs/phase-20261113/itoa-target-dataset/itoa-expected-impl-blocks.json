@@ -25,7 +25,7 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 76,
-      "trait": "core::default::Default"
+      "trait": "Default"
     },
     {
       "end_line": 83,
@@ -45,7 +45,7 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 83,
-      "trait": "core::marker::Copy"
+      "trait": "Copy"
     },
     {
       "end_line": 91,
@@ -65,7 +65,7 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 86,
-      "trait": "core::clone::Clone"
+      "trait": "Clone"
     },
     {
       "end_line": 114,

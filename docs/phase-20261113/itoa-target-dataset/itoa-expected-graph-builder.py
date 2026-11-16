@@ -44,11 +44,15 @@ def node(label, kind, vis, f, a, b, anchor, owner, reach=False, gen=None, flags=
         reachable_outside_crate=reach, file=f, start_line=a, end_line=b, owner=owner,
         generated_by=gen, source_anchor=anchor, flags=sorted(flags))
 
-def edge(src, rel, dst, f, line, anchor, dkind="node", skind="node", via=None, gen=None, flags=()):
+def edge(src, rel, dst, f, line, anchor, dkind="node", skind="node", via=None, gen=None, flags=(), n=1):
     check(f, line, anchor)
+    if n != 1 and TEXT[f][line - 1].count(anchor) != n:
+        errors.append(f"{f}:{line} has {TEXT[f][line - 1].count(anchor)} of {anchor!r}, not {n}")
     e = edges.setdefault((src, rel, dst), dict(source=src, source_kind=skind, relation=rel,
         target=dst, target_kind=dkind, via_use_node=via, generated_by=gen, sites=[], flags=set()))
-    e["sites"].append(dict(file=f, line=line, anchor=anchor))
+    # A site that starts with a macro parameter starts, after expansion, at the argument written in the macro call.
+    first = dict(kind="invocation", line=gen["invocation_line"]) if gen and anchor.startswith("$") else dict(kind="definition", line=line)
+    e["sites"].extend(dict(file=f, line=line, anchor=anchor, occurrence=i, first_token=first) for i in range(n))
     e["flags"].update(flags)
 
 EXT, BI, OD7, OD8 = "external_identity_unverified", "builtin", "OD-7_containment", "OD-8_non_function_source"
@@ -95,9 +99,9 @@ def impl(line, end, trait, self_ty, anchor, gen=None):
     check(L, line, anchor)
     impls.append(dict(file=L, start_line=line, end_line=end, trait=trait, self_type=self_ty,
                       source_anchor=anchor, generated_by=gen))
-impl(76, 81, "core::default::Default", "Buffer", "impl Default for Buffer")
-impl(83, 83, "core::marker::Copy", "Buffer", "impl Copy for Buffer {}")
-impl(86, 91, "core::clone::Clone", "Buffer", "impl Clone for Buffer")
+impl(76, 81, "Default", "Buffer", "impl Default for Buffer")
+impl(83, 83, "Copy", "Buffer", "impl Copy for Buffer {}")
+impl(86, 91, "Clone", "Buffer", "impl Clone for Buffer")
 impl(93, 114, None, "Buffer", "impl Buffer {")
 impl(334, 404, "Unsigned", "u128", "impl Unsigned for u128")
 
@@ -150,9 +154,9 @@ ext(USE_MEM, "imports", MU, L, 57, "MaybeUninit}")
 ext(USE_STR, "imports", "core::str", L, 58, "core::str")
 
 # ---------------- implements ----------------
-ext("Buffer", "implements", "core::default::Default", L, 76, "impl Default for Buffer")
-ext("Buffer", "implements", "core::marker::Copy", L, 83, "impl Copy for Buffer")
-ext("Buffer", "implements", "core::clone::Clone", L, 86, "impl Clone for Buffer")
+ext("Buffer", "implements", "Default", L, 76, "impl Default for Buffer")
+ext("Buffer", "implements", "Copy", L, 83, "impl Copy for Buffer")
+ext("Buffer", "implements", "Clone", L, 86, "impl Clone for Buffer")
 for i in impls:
     if i["self_type"] != "Buffer" and i["trait"]:
         edge(i["self_type"], "implements", i["trait"], L, i["start_line"], "impl ", skind=BI, gen=i["generated_by"], flags=["builtin_source_never_seeds_interface_edge"])
@@ -166,10 +170,11 @@ edge("Buffer::new", "uses_type", "Buffer", L, 98, "-> Buffer")
 edge("Buffer::format", "uses_type", "Integer", L, 106, "<I: Integer>"); prim("Buffer::format", "str", L, 106, "-> &str")
 edge("Buffer::format", "uses_type", "private::Sealed::Buffer", L, 107, "cast::<I::Buffer>()", flags=["body_type_mention"])
 edge("Integer", "uses_type", "private::Sealed", L, 119, ": private::Sealed"); prim("Integer::MAX_STR_LEN", "usize", L, 122, ": usize")
-ext("private::Sealed", "uses_type", "core::marker::Copy", L, 128, ": Copy", flags=["via_prelude"])
+ext("private::Sealed", "uses_type", "Copy", L, 128, ": Copy", flags=["via_prelude"])
 edge("private::Sealed::write", "uses_type", "private::Sealed::Buffer", L, 131, "Self::Buffer"); prim("private::Sealed::write", "str", L, 131, "-> &str")
 prim("DecimalPairs", "u8", L, 219, "[u8; 200]"); edge("DECIMAL_PAIRS", "uses_type", "DecimalPairs", L, 222, ": DecimalPairs", flags=[OD8])
-prim("divmod100", "u32", L, 231, "u32")
+edge("DECIMAL_PAIRS", "calls", "DecimalPairs", L, 222, "= DecimalPairs(", flags=["tuple_struct_constructor"])
+prim("divmod100", "u32", L, 231, "u32", n=3)
 edge("slice_buffer_to_str", "uses_type", MU, L, 247, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
 edge("slice_buffer_to_str", "uses_type", MU, L, 252, "*const [MaybeUninit<u8>]", dkind="external", via=USE_MEM, flags=[EXT, "body_type_mention"])
 for p in ("u8", "usize", "str"): prim("slice_buffer_to_str", p, L, 247, p)
@@ -177,8 +182,8 @@ edge("Unsigned", "uses_type", "Integer", L, 255, ": Integer")
 edge("Unsigned::fmt", "uses_type", "private::Sealed::Buffer", L, 256, "Self::Buffer", flags=["through_supertraits_Integer_Sealed"]); prim("Unsigned::fmt", "usize", L, 256, "-> usize")
 edge("enc_16lsd", "uses_type", MU, L, 408, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
 for p in ("usize", "u8", "u64"): prim("enc_16lsd", p, L, 408, p)
-for p in ("u128", "u64"): prim("div_rem_1e16", p, L, 450, p)
-prim("u128_ext::mulhi", "u128", X, 7, "u128")
+prim("div_rem_1e16", "u128", L, 450, "u128", n=2); prim("div_rem_1e16", "u64", L, 450, "u64")
+prim("u128_ext::mulhi", "u128", X, 7, "u128", n=3)
 edge("<u128 as Unsigned>::fmt", "uses_type", sb("u128"), L, 336, "Self::Buffer"); prim("<u128 as Unsigned>::fmt", "usize", L, 336, "-> usize")
 
 # ---------------- calls and reads in hand-written bodies ----------------
@@ -195,8 +200,8 @@ ext("Buffer::format", "calls", "core::hint::unreachable_unchecked", L, 110, "hin
 ext("slice_buffer_to_str", "calls", "core::slice::<impl [T]>::get_unchecked", L, 249, "buf.get_unchecked(")
 ext("slice_buffer_to_str", "calls", "core::str::from_utf8_unchecked", L, 252, "str::from_utf8_unchecked(", via=USE_STR)
 edge("div_rem_1e16", "calls", "u128_ext::mulhi", L, 463, "u128_ext::mulhi(n, M_HIGH)")
-for ln in (14, 15, 19, 21):
-    ext("u128_ext::mulhi", "calls", "<u128 as core::convert::From<u64>>::from", X, ln, "u128::from(", flags=["concrete_trait_impl_in_core"])
+for ln, count in ((14, 2), (15, 2), (19, 3), (21, 2)):
+    ext("u128_ext::mulhi", "calls", "u128::from", X, ln, "u128::from(", n=count, flags=["which_From_impl_not_claimed"])
 
 def table_sites(src, lines, f=L):
     for ln in lines:
@@ -221,12 +226,12 @@ table_sites(E, (420, 422, 424, 426, 433, 434, 435, 436)); pairs_sites(E, (420, 4
 # ---------------- macro-generated bodies ----------------
 for s, u, inv in PAIRS:
     g = G("impl_Integer", inv); c = f"const _ #impl_Integer({s},{u})"
-    for ln, t, k in ((138, s, "MIN"), (139, u, "MIN"), (140, s, "BITS"), (140, u, "BITS")):
-        ext(c, "reads", f"core::num::<impl {t}>::{k}", L, ln, f"::{k}", gen=g, flags=[OD8])
+    for ln, t, p, k in ((138, s, "$Signed", "MIN"), (139, u, "$Unsigned", "MIN"), (140, s, "$Signed", "BITS"), (140, u, "$Unsigned", "BITS")):
+        ext(c, "reads", f"{t}::{k}", L, ln, f"{p}::{k}", gen=g, flags=[OD8])
     for t, ln, sgn in ((u, 144, "$Unsigned"), (s, 160, "$Signed")):
         prim(mx(t), "usize", L, ln, ": usize", gen=g)
-        ext(mx(t), "reads", f"core::num::<impl {t}>::MAX", L, ln, f"{sgn}::MAX", gen=g, flags=[OD8])
-        ext(mx(t), "calls", f"core::num::<impl {t}>::ilog10", L, ln, ".ilog10()", gen=g, flags=[OD8])
+        ext(mx(t), "reads", f"{t}::MAX", L, ln, f"{sgn}::MAX", gen=g, flags=[OD8])
+        ext(mx(t), "calls", f"core::num::<impl {t}>::ilog10", L, ln, f"{sgn}::MAX.ilog10()", gen=g, flags=[OD8])
         bl = 148 if t == u else 164
         edge(sb(t), "uses_type", MU, L, bl, "MaybeUninit<u8>", dkind="external", via=USE_MEM, gen=g, flags=[EXT]); prim(sb(t), "u8", L, bl, "<u8>", gen=g)
         edge(sb(t), "reads", mx(t), L, bl, "Self::MAX_STR_LEN", gen=g, flags=[OD8])
@@ -247,6 +252,9 @@ for t, p, inv in SIZES:
     prim(mx(t), "usize", L, 195, ": usize", gen=g)
     edge(mx(t), "reads", mx(p), L, 195, "<$primitive as Integer>::MAX_STR_LEN", gen=g, flags=[OD8])
     edge(sb(t), "uses_type", sb(p), L, 200, "<$primitive as private::Sealed>::Buffer", gen=g, flags=[OD8])
+    # The same path names the type $primitive (written in the macro call) and the trait private::Sealed.
+    prim(sb(t), p, L, 200, "$primitive as private::Sealed", gen=g)
+    edge(sb(t), "uses_type", "private::Sealed", L, 200, "private::Sealed>::Buffer", gen=g, flags=[OD8])
     edge(sw(t), "uses_type", sb(t), L, 204, "Self::Buffer", gen=g); prim(sw(t), "str", L, 204, "-> &str", gen=g)
     edge(sw(t), "calls", sw(p), L, 205, "(self as $primitive).write(buf)", gen=g, flags=["concrete_receiver_from_cast"])
 for u, inv in UNS:

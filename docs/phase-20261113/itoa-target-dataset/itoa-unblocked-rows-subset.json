@@ -7,9 +7,9 @@
     "status": "LLM_PARSED_DRAFT"
   },
   "counts": {
-    "candidate_edges": 368,
+    "candidate_edges": 373,
     "candidate_nodes": 73,
-    "eligible_edges": 29,
+    "eligible_edges": 30,
     "eligible_nodes": 26
   },
   "edges": [
@@ -26,12 +26,22 @@
         {
           "anchor": "div_rem_1e16(",
           "file": "src/lib.rs",
-          "line": 345
+          "first_token": {
+            "kind": "definition",
+            "line": 345
+          },
+          "line": 345,
+          "occurrence": 0
         },
         {
           "anchor": "div_rem_1e16(",
           "file": "src/lib.rs",
-          "line": 353
+          "first_token": {
+            "kind": "definition",
+            "line": 353
+          },
+          "line": 353,
+          "occurrence": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -78,12 +88,22 @@
         {
           "anchor": "divmod100(",
           "file": "src/lib.rs",
-          "line": 371
+          "first_token": {
+            "kind": "definition",
+            "line": 371
+          },
+          "line": 371,
+          "occurrence": 0
         },
         {
           "anchor": "divmod100(",
           "file": "src/lib.rs",
-          "line": 384
+          "first_token": {
+            "kind": "definition",
+            "line": 384
+          },
+          "line": 384,
+          "occurrence": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -130,12 +150,22 @@
         {
           "anchor": "enc_16lsd::<",
           "file": "src/lib.rs",
-          "line": 350
+          "first_token": {
+            "kind": "definition",
+            "line": 350
+          },
+          "line": 350,
+          "occurrence": 0
         },
         {
           "anchor": "enc_16lsd::<",
           "file": "src/lib.rs",
-          "line": 358
+          "first_token": {
+            "kind": "definition",
+            "line": 358
+          },
+          "line": 358,
+          "occurrence": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -182,32 +212,62 @@
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 373
+          "first_token": {
+            "kind": "definition",
+            "line": 373
+          },
+          "line": 373,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 374
+          "first_token": {
+            "kind": "definition",
+            "line": 374
+          },
+          "line": 374,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 375
+          "first_token": {
+            "kind": "definition",
+            "line": 375
+          },
+          "line": 375,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 376
+          "first_token": {
+            "kind": "definition",
+            "line": 376
+          },
+          "line": 376,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 387
+          "first_token": {
+            "kind": "definition",
+            "line": 387
+          },
+          "line": 387,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 388
+          "first_token": {
+            "kind": "definition",
+            "line": 388
+          },
+          "line": 388,
+          "occurrence": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -298,7 +358,12 @@
         {
           "anchor": "-> usize",
           "file": "src/lib.rs",
-          "line": 336
+          "first_token": {
+            "kind": "definition",
+            "line": 336
+          },
+          "line": 336,
+          "occurrence": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -334,7 +399,12 @@
         {
           "anchor": "<u8>",
           "file": "src/lib.rs",
-          "line": 73
+          "first_token": {
+            "kind": "definition",
+            "line": 73
+          },
+          "line": 73,
+          "occurrence": 0
         }
       ],
       "source": "Buffer",
@@ -372,7 +442,12 @@
         {
           "anchor": "i.write(",
           "file": "src/lib.rs",
-          "line": 108
+          "first_token": {
+            "kind": "definition",
+            "line": 108
+          },
+          "line": 108,
+          "occurrence": 0
         }
       ],
       "source": "Buffer::format",
@@ -410,7 +485,12 @@
         {
           "anchor": "I::MAX_STR_LEN",
           "file": "src/lib.rs",
-          "line": 109
+          "first_token": {
+            "kind": "definition",
+            "line": 109
+          },
+          "line": 109,
+          "occurrence": 0
         }
       ],
       "source": "Buffer::format",
@@ -446,7 +526,12 @@
         {
           "anchor": "<I: Integer>",
           "file": "src/lib.rs",
-          "line": 106
+          "first_token": {
+            "kind": "definition",
+            "line": 106
+          },
+          "line": 106,
+          "occurrence": 0
         }
       ],
       "source": "Buffer::format",
@@ -484,7 +569,12 @@
         {
           "anchor": "cast::<I::Buffer>()",
           "file": "src/lib.rs",
-          "line": 107
+          "first_token": {
+            "kind": "definition",
+            "line": 107
+          },
+          "line": 107,
+          "occurrence": 0
         }
       ],
       "source": "Buffer::format",
@@ -520,7 +610,12 @@
         {
           "anchor": "-> &str",
           "file": "src/lib.rs",
-          "line": 106
+          "first_token": {
+            "kind": "definition",
+            "line": 106
+          },
+          "line": 106,
+          "occurrence": 0
         }
       ],
       "source": "Buffer::format",
@@ -556,7 +651,12 @@
         {
           "anchor": "-> Buffer",
           "file": "src/lib.rs",
-          "line": 98
+          "first_token": {
+            "kind": "definition",
+            "line": 98
+          },
+          "line": 98,
+          "occurrence": 0
         }
       ],
       "source": "Buffer::new",
@@ -583,6 +683,49 @@
       "blockers": [],
       "candidate_status": "LLM_PARSED_DRAFT",
       "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:222:[7278, 7293]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [
+        "tuple_struct_constructor"
+      ],
+      "generated_by": null,
+      "relation": "calls",
+      "sites": [
+        {
+          "anchor": "= DecimalPairs(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 222
+          },
+          "line": 222,
+          "occurrence": 0
+        }
+      ],
+      "source": "DECIMAL_PAIRS",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "= DecimalPairs(",
+          "byte_range": [
+            7278,
+            7293
+          ],
+          "line": 222,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "DecimalPairs",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
       "evidence_key": "src/lib.rs:219:[7148, 7157]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
@@ -592,7 +735,12 @@
         {
           "anchor": "[u8; 200]",
           "file": "src/lib.rs",
-          "line": 219
+          "first_token": {
+            "kind": "definition",
+            "line": 219
+          },
+          "line": 219,
+          "occurrence": 0
         }
       ],
       "source": "DecimalPairs",
@@ -628,7 +776,12 @@
         {
           "anchor": ": private::Sealed",
           "file": "src/lib.rs",
-          "line": 119
+          "first_token": {
+            "kind": "definition",
+            "line": 119
+          },
+          "line": 119,
+          "occurrence": 0
         }
       ],
       "source": "Integer",
@@ -664,7 +817,12 @@
         {
           "anchor": ": usize",
           "file": "src/lib.rs",
-          "line": 122
+          "first_token": {
+            "kind": "definition",
+            "line": 122
+          },
+          "line": 122,
+          "occurrence": 0
         }
       ],
       "source": "Integer::MAX_STR_LEN",
@@ -700,7 +858,12 @@
         {
           "anchor": ": Integer",
           "file": "src/lib.rs",
-          "line": 255
+          "first_token": {
+            "kind": "definition",
+            "line": 255
+          },
+          "line": 255,
+          "occurrence": 0
         }
       ],
       "source": "Unsigned",
@@ -738,7 +901,12 @@
         {
           "anchor": "Self::Buffer",
           "file": "src/lib.rs",
-          "line": 256
+          "first_token": {
+            "kind": "definition",
+            "line": 256
+          },
+          "line": 256,
+          "occurrence": 0
         }
       ],
       "source": "Unsigned::fmt",
@@ -774,7 +942,12 @@
         {
           "anchor": "-> usize",
           "file": "src/lib.rs",
-          "line": 256
+          "first_token": {
+            "kind": "definition",
+            "line": 256
+          },
+          "line": 256,
+          "occurrence": 0
         }
       ],
       "source": "Unsigned::fmt",
@@ -810,7 +983,12 @@
         {
           "anchor": "u128_ext::mulhi(n, M_HIGH)",
           "file": "src/lib.rs",
-          "line": 463
+          "first_token": {
+            "kind": "definition",
+            "line": 463
+          },
+          "line": 463,
+          "occurrence": 0
         }
       ],
       "source": "div_rem_1e16",
@@ -846,7 +1024,12 @@
         {
           "anchor": "u64",
           "file": "src/lib.rs",
-          "line": 450
+          "first_token": {
+            "kind": "definition",
+            "line": 450
+          },
+          "line": 450,
+          "occurrence": 0
         }
       ],
       "source": "div_rem_1e16",
@@ -882,12 +1065,22 @@
         {
           "anchor": "divmod100(",
           "file": "src/lib.rs",
-          "line": 417
+          "first_token": {
+            "kind": "definition",
+            "line": 417
+          },
+          "line": 417,
+          "occurrence": 0
         },
         {
           "anchor": "divmod100(",
           "file": "src/lib.rs",
-          "line": 431
+          "first_token": {
+            "kind": "definition",
+            "line": 431
+          },
+          "line": 431,
+          "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
@@ -934,42 +1127,82 @@
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 420
+          "first_token": {
+            "kind": "definition",
+            "line": 420
+          },
+          "line": 420,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 422
+          "first_token": {
+            "kind": "definition",
+            "line": 422
+          },
+          "line": 422,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 424
+          "first_token": {
+            "kind": "definition",
+            "line": 424
+          },
+          "line": 424,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 426
+          "first_token": {
+            "kind": "definition",
+            "line": 426
+          },
+          "line": 426,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 433
+          "first_token": {
+            "kind": "definition",
+            "line": 433
+          },
+          "line": 433,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 434
+          "first_token": {
+            "kind": "definition",
+            "line": 434
+          },
+          "line": 434,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 435
+          "first_token": {
+            "kind": "definition",
+            "line": 435
+          },
+          "line": 435,
+          "occurrence": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
           "file": "src/lib.rs",
-          "line": 436
+          "first_token": {
+            "kind": "definition",
+            "line": 436
+          },
+          "line": 436,
+          "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1082,7 +1315,12 @@
         {
           "anchor": "u64",
           "file": "src/lib.rs",
-          "line": 408
+          "first_token": {
+            "kind": "definition",
+            "line": 408
+          },
+          "line": 408,
+          "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1118,7 +1356,12 @@
         {
           "anchor": "u8",
           "file": "src/lib.rs",
-          "line": 408
+          "first_token": {
+            "kind": "definition",
+            "line": 408
+          },
+          "line": 408,
+          "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1154,7 +1397,12 @@
         {
           "anchor": "usize",
           "file": "src/lib.rs",
-          "line": 408
+          "first_token": {
+            "kind": "definition",
+            "line": 408
+          },
+          "line": 408,
+          "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1190,7 +1438,12 @@
         {
           "anchor": "Self::Buffer",
           "file": "src/lib.rs",
-          "line": 131
+          "first_token": {
+            "kind": "definition",
+            "line": 131
+          },
+          "line": 131,
+          "occurrence": 0
         }
       ],
       "source": "private::Sealed::write",
@@ -1226,7 +1479,12 @@
         {
           "anchor": "-> &str",
           "file": "src/lib.rs",
-          "line": 131
+          "first_token": {
+            "kind": "definition",
+            "line": 131
+          },
+          "line": 131,
+          "occurrence": 0
         }
       ],
       "source": "private::Sealed::write",
@@ -1262,7 +1520,12 @@
         {
           "anchor": "u8",
           "file": "src/lib.rs",
-          "line": 247
+          "first_token": {
+            "kind": "definition",
+            "line": 247
+          },
+          "line": 247,
+          "occurrence": 0
         }
       ],
       "source": "slice_buffer_to_str",
@@ -1298,7 +1561,12 @@
         {
           "anchor": "usize",
           "file": "src/lib.rs",
-          "line": 247
+          "first_token": {
+            "kind": "definition",
+            "line": 247
+          },
+          "line": 247,
+          "occurrence": 0
         }
       ],
       "source": "slice_buffer_to_str",

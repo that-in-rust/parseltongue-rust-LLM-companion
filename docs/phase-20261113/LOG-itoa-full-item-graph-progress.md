@@ -137,6 +137,62 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 14:40 IST — Part 7 step 7.2a: expected graph re-cut for names, repeated sites and site starts
+
+- **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed; the
+  expected graph is still an unreviewed draft.
+- **Changed:** `itoa-expected-graph-builder.py` and the files it writes. No production code.
+  Every change is from the pinned source or a recorded decision, not from production output:
+
+```text
+change                                                        basis
+core::num::<impl T>::MAX/MIN/BITS -> T::MAX/MIN/BITS (30)     PRD, written-name rule (2026-11-15)
+core::default::Default, ::Copy, ::Clone -> Default, Copy,     same rule; lib.rs 76, 83, 86, 128
+  Clone (4 rows)
+<u128 as core::convert::From<u64>>::from -> u128::from;       same rule; u128_ext.rs 14 (2), 15 (2),
+  9 sites, was 4 lines                                          19 (3), 21 (2)
+repeated same-line sites counted on the pinned line           u128_ext.rs 7 (u128 x3); lib.rs 231
+                                                                (u32 x3), 450 (u128 x2)
+DECIMAL_PAIRS --calls--> DecimalPairs                         lib.rs 222; PRD, tuple struct constructor
+<$primitive as private::Sealed>::Buffer also names the type   lib.rs 200
+  $primitive and the trait private::Sealed (4 rows)
+each site records where its first token is written: in the    lib.rs 138-140, 144, 160, 169
+  macro definition, or in the macro call when the site starts
+  with a macro parameter
+```
+
+- **Command:** `python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py --source-root /home/ubuntu/repos/rust-tools/itoa --output-directory docs/phase-20261113/itoa-target-dataset`,
+  then `python3 -m unittest docs/phase-20261113/itoa-target-dataset/test_itoa_expected_graph_rules.py`:
+  `Ran 16 tests`, `OK`.
+- **Measured against production rows** (throwaway script, one row per site, keyed by source,
+  relation, target, file, line of the first token, and whether that token is in the macro
+  definition or the macro call):
+
+```text
+SITES expected 509 production 585 matched 273 | production rows with no source line: {'contains': 45, 'implements': 28}
+ calls       expected  197 production  197 matched   54
+ contains    expected   70 production   88 matched    7
+ expands     expected    0 production   15 matched    0
+ generates   expected    0 production   45 matched    0
+ implements  expected   32 production   32 matched    4
+ imports     expected    4 production    4 matched    4
+ reads       expected   98 production   98 matched   98
+ uses_type   expected  108 production  106 matched  106
+```
+
+- **Reading:** `reads` and `imports` match site by site. `uses_type` differs by the two
+  expected rows for a type written in a function body (lib.rs 107 and 252), which production
+  does not make. `contains` and `implements` match by source, relation and target (70 of 70
+  and 32 of 32); most of their production rows carry no source line, so the per-site count
+  above is low for a reason of the script, not of the rows.
+- **Source fact found:** all six `impl_Integer_size!` calls (lib.rs 211-216) are active
+  calls. The `#[cfg(target_pointer_width = ..)]` is an argument and applies to the generated
+  impls. The draft's four "cfg-inactive item macro" unresolved sites are wrong as written.
+- **Not done:** macro definition and call nodes, `generates` and `expands` rows, external
+  and builtin nodes, method calls (wait on part 7 Q1), the blocker rules, byte-range
+  equality (the comparison is by line).
+- **Next:** macro nodes and their rows in the builder.
+
 ### 2026-11-16 13:20 IST — Part 7 started: first comparison of the draft expected graph with production rows
 
 - **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed.
