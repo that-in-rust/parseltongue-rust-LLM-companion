@@ -1,17 +1,17 @@
 # SPEC — requirements for the itoa full item graph
 
-Updated 2026-11-14. This folder states only what is in force. Scope: pinned itoa 1.0.18, the
+Updated 2026-11-16. This folder states only what is in force. Scope: pinned itoa 1.0.18, the
 full item dependency graph only.
 
 ## The answer
 
-**Fourteen requirements in seven parts, in build order. Parts 1 and 2 are built for the
-bounded graph. Part 3 is built for one receiver shape: the generic call
-`Buffer::format --calls--> private::Sealed::write` is stored. Part 4a is built: `uses_type` rows from original signatures. Part 4b is built: 32
-`implements` rows from impl headers, including the 28 macro-generated ones. Part 4c
-is built: 21 `reads` rows from original function bodies, 15 with a target. Part 4d
-is built: 4 `imports` rows from the 3 `use` nodes, all unresolved until part 6 names
-`core` targets.**
+**Eight parts, in build order. Parts 1 to 7 were closed by the acceptance run at commit
+`822da80cf`: the whole stored graph equalled the frozen expected graph. Part 8 (a target for the
+133 method calls into `core`) is in progress behind the scope value `declarations`; it is
+in no accepted run, and one of its real-source tests fails at the branch head.**
+
+Counts and the current step are on the [log](../LOG-itoa-full-item-graph-progress.md)'s
+"Where we are" page.
 
 ```text
 part  file                                       requirements                   state
@@ -23,14 +23,16 @@ part  file                                       requirements                   
 4b    part-4b-implements-from-impl-headers.md    047.0                          BUILT
 4c    part-4c-reads-of-consts-statics.md         048.0                          BUILT (original bodies)
 4d    part-4d-imports-from-use-items.md          049.0                          BUILT
-5     part-5-macro-generated-items.md            046.0                          5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
+5     part-5-macro-generated-items.md            046.0 050.0 051.0 052.0        5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
-7     part-7-whole-graph-acceptance.md           044.0 to 044.3                 acceptance run passed S1 to S4 on 2026-11-16 (log)
-8     part-8-method-calls-into-core.md           054.0 to 056.0 (reserved)      measured and designed; nothing built
+7     part-7-whole-graph-acceptance.md           043.1, 044.0 to 044.3          acceptance run passed S1 to S4 on 2026-11-16 (log)
+8     part-8-method-calls-into-core.md           054.0 to 057.0                 steps 8.1 to 8.3b-2a BUILT; 8.3b-2b open; not accepted
 ```
 
-MET means the part's real-source tests pass on pinned itoa (11 of 11 at commit `15643ec4f`).
-It does not mean the SOP passed: only part 7 decides that.
+MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of
+the 60 tests was at commit `7ed552478` (60 pass, log). At the head,
+`test_itoa_core_member_targets` fails (step 8.3b-2b is open). Neither word means the SOP
+passed: only an acceptance run decides that.
 
 Out of scope: every other repository, any rust-analyzer export or oracle comparison, and
 every higher-abstraction table (interface level, HLD, file and folder roll-ups).
@@ -81,24 +83,24 @@ A6 frozen readback, failure safety,   045.0 044.0                  S2, S4
 
 ```bash
 cargo test --release -p parseltongue-cli-dispatcher-binary \
-  --test itoa-source-acceptance-tests -- --test-threads=1          # 22 real-source tests
+  --test itoa-source-acceptance-tests -- --test-threads=1          # 60 real-source tests
 ```
 
-Doc comments naming each requirement in `crates/`, counted 2026-11-15 (one comment can
-cover several tests):
+Occurrences of each requirement id in the Rust files under `crates/`, counted 2026-11-16
+at commit `37ea1755d` (one occurrence can cover several tests):
 
 ```text
-042.0  17    045.0  15    018.2  15    034.0  10    032.0  7
-043.0   6    036.0   5    038.0   4    033.0   2    035.0  1
-038.1   1    044.0   1    046.0   0    047.0  13
+018.2  15    032.0   7    033.0   2    034.0  11    035.0   4    036.0   8
+038.0   4    038.1   1    042.0  17    043.0  12    043.1   4    044.0   4
+044.1   3    044.2   1    044.3   2    045.0  38    046.0  21    047.0  13
+048.0  16    049.0  11    050.0   8    051.0   9    052.0  72    053.0  60
+054.0  29    055.0  10    056.0  14    057.0   7
 ```
 
 ### Open points across parts
 
 - **Two reason lists.** `SiteUnresolvedReasonKind` (sites) and `HldUnresolvedReasonKind` (graph
-  edges) differ. One must win before part 7 compares unresolved rows.
-- **Labels and identities.** The expected graph names items by symbolic label; production uses
-  canonical identities. Part 7 needs the mapping defined.
+  edges) both still exist in the code.
 
 ### Requirement ids not listed here
 
@@ -106,7 +108,7 @@ Tests of earlier-work code (name resolution, storage, HLD builder, oracle compar
 ids defined in [the wider-scope SPEC](../../phase-20261111/SPEC-wider-scope-requirements-not-current.md),
 which is history. This phase adds no test against those ids.
 
-Five of the eleven real-source tests are tagged REQ-RUST-040.0 (top-level containment through
+Five of the 60 real-source tests are tagged REQ-RUST-040.0 (top-level containment through
 the `original-top-level-containment` stage). They guard source ingest, module ownership and
 visibility scope on pinned itoa, so they stay in the suite, but that stage's output is not
 this phase's deliverable.
