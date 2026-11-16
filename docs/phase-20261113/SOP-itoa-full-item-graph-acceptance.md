@@ -101,9 +101,14 @@ python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py \
 python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset -p 'test_*.py' -v
 ```
 
-- For a run with `declarations`: record `rustc -vV`, and one sha256 over the path and
-  bytes of every `.rs` file under the `core` source directory, in path order. The freeze
-  record of the expected graph names both values.
+- For a run with `declarations`: record `rustc -vV` and the digest of the `core` source.
+  The freeze record of the expected graph names both values.
+
+```bash
+cd "$(rustc --print sysroot)/lib/rustlib/src/rust/library"
+find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum
+```
+
 
 Pass: source commit and file digests match the pin; the expected-data tests pass; the frozen
 files' digests equal the freeze record; for `declarations`, the compiler version and the
@@ -218,7 +223,8 @@ No run with `declarations` has been judged. Before one is:
 
 ```text
 needed                                                        state on 2026-11-16
-expected target of each of the 133 calls, from source          not written
+expected target of each of the 133 calls, from source          drafted, not frozen:
+                                                               itoa-expected-core-member-targets.json
 expected graph re-frozen with those targets                    not done
 S1 record of the compiler version and the core digest          no command writes it yet
 the run id covers the core files                               not built: it hashes the

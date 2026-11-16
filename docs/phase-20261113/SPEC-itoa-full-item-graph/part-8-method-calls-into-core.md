@@ -342,7 +342,8 @@ author of the expected rows is also the author of the mapper.
 
 - T1. WHEN the frozen expected graph lists a `calls` site without a target (133 sites, 55
   rows) THEN the file `itoa-expected-core-member-targets.json` SHALL hold exactly one row
-  for that site, keyed by file and byte range. No other site has a row.
+  for that site, keyed by the calling item, the file and the byte range (a site inside a
+  macro body has one row per item the macro generates). No other site has a row.
 - T2. Each row SHALL give either a target label, or `no_target` with a reason. `no_target`
   is allowed only when Rust's lookup rules and the two read sources (pinned itoa, the
   frozen `core` files) cannot prove one declaration.
@@ -358,8 +359,8 @@ author of the expected rows is also the author of the mapper.
   trait could also answer SHALL carry `prelude_trait_impl_unrefuted` (decided, Q2). A
   declaration written inside a `macro_rules!` body of `core` SHALL carry
   `core_macro_body_declaration` and name the macro.
-- T6. The file SHALL record the compiler version (`rustc -vV`) and one sha256 over the path
-  and bytes of every `.rs` file under `library/core/src`, in path order. WHEN a cited
+- T6. The file SHALL record the compiler version (`rustc -vV`) and one sha256 over the
+  `sha256sum` listing of every `.rs` file under `library/core/src`, in path order. WHEN a cited
   declaration line does not hold the cited text in those files THEN the data-set test SHALL
   fail.
 - T7. The file is frozen like the expected graph: its sha256 is in a freeze record, and a
@@ -409,7 +410,8 @@ req      test                                  type         assertion           
 ```text
 9.1  this section; decisions in PRD, SOP, ARCH, AGENTS.md           done (documents)
 9.2  read each of the 55 rows' sites in the pinned source and the declaration in core;
-     write the builder and the 133 rows; data-set tests T1 to T6 pass
+     write the builder and the 133 rows; data-set tests T1 to T6 pass    done 2026-11-16:
+     133 rows, 9 tests pass, the file says DRAFT_NOT_FROZEN
 9.3  the user reads the rows by method group (11 groups) and rules on any I marked open
 9.4  freeze (T7)
 9.5  test_itoa_core_member_targets compares with the file (T8): STUB, RED, GREEN, REFACTOR
@@ -419,14 +421,19 @@ req      test                                  type         assertion           
 
 ### Quality gate results
 
-Not run. This section is a specification; 9.2 runs the data-set tests.
+9.2, 2026-11-16: `python3 -m unittest test_itoa_expected_core_targets` runs 9 tests, all
+pass, against rustc 1.99.1 and the vendored copy of the pinned source (same sha256 as the
+pin). No Rust was written, so no cargo gate ran.
 
 ### Open questions
 
+The user answered Q1 to Q3 on 2026-11-16 ("as long as you are moving towards a solution
+that is more explicit"); the rows use the proposals. Each stays open to the row review (9.3).
+
 - Q1. **Trait methods** (`try_into` 13, `rev` 1): the label `TryInto::try_into` names the
   trait's declaration, as the PRD does for itoa's own traits. The impl that runs (`impl<T,
-  U> TryInto<U> for T where U: TryFrom<T>`) is not named. Proposed: keep the trait label
-  and cite the blanket impl in the proof.
+  U> TryInto<U> for T where U: TryFrom<T>`) is not named. Used: the trait label, with the
+  blanket impl cited in the proof.
 - Q2. **`ilog10`** (10): `core` writes it inside `uint_impl!` and `int_impl!`, called from
   `impl u64 { .. }`. Proposed label: the builtin type, as the PRD does for `u8::MAX`
   (`u64::ilog10`), with `core_macro_body_declaration`.

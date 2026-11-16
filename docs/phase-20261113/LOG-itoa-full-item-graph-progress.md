@@ -722,3 +722,33 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
              for functional Rust wherever possible
  not run     nothing was built or run
 ```
+
+
+## 2026-11-16 21:50 IST Part 8 step 9.2: the expected target of the 133 method calls, drafted
+
+```text
+ what        itoa-expected-core-member-targets.json, written by a new builder from the pinned
+             source and the core source; status DRAFT_NOT_FROZEN; not merged into the graph
+ inputs      itoa: the vendored copy in the test tree, sha256 equal to the pin
+             core: rustc 1.99.1 (58cf8f9c3 2026-10-13), 288 files, 6,419,461 bytes,
+                   listing sha256 39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780
+ rows        133 of 133 sites have a target label; 0 rows say no_target
+   49  MaybeUninit<T>::write
+   39  [T]::get_unchecked
+   13  TryInto::try_into                 trait label; the blanket impl is cited
+    8  Result<T, E>::expect              receiver type from the return type of try_into
+    5  Result<T, E>::unwrap
+    5  [T]::len                          assumption prelude_trait_impl_unrefuted
+   10  u8::ilog10 .. i128::ilog10        assumption core_macro_body_declaration
+    1  str::len    1  [T]::as_mut_ptr    1  *mut T::cast    1  Iterator::rev
+ checked     every cited line of itoa and core holds the cited text; each declaration's owner
+             is the nearest enclosing impl or trait; the core digest equals the shell command
+ tests       test_itoa_expected_core_targets: 9 of 9 pass
+             test_itoa_expected_graph_rules: 6 pass, 3 FAIL here: they need
+             /home/ubuntu/repos/rust-tools/itoa, which this VM does not have
+ not done    user review of the rows (9.3); freeze (9.4); the Rust test that compares a run
+             with these rows (9.5); the run id over the core files; any production change
+ not known   no compiler or second reader checked a label; the author of the rows is the
+             author of the mapper
+```
+
