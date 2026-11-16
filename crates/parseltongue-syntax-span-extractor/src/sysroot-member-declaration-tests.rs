@@ -29,6 +29,11 @@ fn test_inherent_member_row_fields() {
             "declaration_owner_kind_value":"inherent_impl",
             "impl_self_type_text":"MaybeUninit<T>",
             "impl_generic_parameter_text":"<T>",
+            "impl_generic_parameter_names":["T"],
+            "impl_bound_restriction_flag":false,
+            "macro_self_parameter_flag":null,
+            "macro_owner_shape_kind":null,
+            "type_declaration_kind_value":null,
             "owner_trait_path_text":null,
             "owner_macro_name_value":null,
             "member_self_parameter_kind":"mutable_reference",
@@ -124,5 +129,126 @@ fn test_member_rows_offset_order() {
     assert!(
         offsets.windows(2).all(|pair| pair[0] < pair[1]),
         "{offsets:?}"
+    );
+}
+
+/// REQ-RUST-054.0 D6: what an impl's header says about which types it applies to.
+#[test]
+fn test_impl_bound_restriction_rows() {
+    let source = "impl<T> A<T> { fn a(&self) {} }\n\
+        impl<T: ?Sized> B<T> { fn b(&self) {} }\n\
+        impl<T: Copy> C<T> { fn c(&self) {} }\n\
+        impl<T> D<T> where T: Copy { fn d(&self) {} }\n\
+        impl<'a, T, const N: usize> E<'a, T, N> { fn e(&self) {} }\n\
+        trait Tr { fn t(&self); }\n";
+    let rows = extract_member_declaration_rows("x.rs", source);
+    let read = |name: &str| {
+        let row = find_member_row_named(&rows, "inherent_impl", name);
+        (
+            row["impl_bound_restriction_flag"].clone(),
+            row["impl_generic_parameter_names"].clone(),
+        )
+    };
+    assert_eq!((json!(false), json!(["T"])), read("a"));
+    assert_eq!((json!(false), json!(["T"])), read("b"));
+    assert_eq!((json!(true), json!(["T"])), read("c"));
+    assert_eq!((json!(true), json!(["T"])), read("d"));
+    assert_eq!((json!(false), json!(["T", "N"])), read("e"));
+    let declared = find_member_row_named(&rows, "trait_declaration", "t");
+    assert_eq!(Value::Null, declared["impl_bound_restriction_flag"]);
+}
+
+/// REQ-RUST-054.0 D7: what the tokens around a `fn` in a macro body say about its owner.
+#[test]
+fn test_macro_owner_shape_rows() {
+    let source = "macro_rules! m { ($t:ty, $n:ident) => {\n\
+        impl Index for $t { fn get(self) {} $(fn $n(&self) {})* }\n\
+        impl $t { fn put(&mut self) {} }\n\
+        impl<T> Wrap<for<'a> fn(&'a T)> { fn call(&self) {} }\n\
+        impl<T> Held<T> where for<'a> T: Fn(&'a u8) { fn held(&self) {} }\n\
+        trait Local { fn decl(&self); }\n\
+        fn $n(val: u8) {}\n\
+        fn bare(self) {}\n\
+        } }\n";
+    let rows = extract_member_declaration_rows("x.rs", source);
+    let read = |name: &str| {
+        let row = find_member_row_named(&rows, "macro_definition_body", name);
+        (
+            row["macro_self_parameter_flag"].as_bool(),
+            row["macro_owner_shape_kind"].as_str().map(str::to_owned),
+        )
+    };
+    let shape = |flag: bool, kind: &str| (Some(flag), Some(kind.to_owned()));
+    assert_eq!(shape(true, "trait_impl"), read("get"));
+    assert_eq!(shape(true, "inherent_impl"), read("put"));
+    assert_eq!(shape(true, "inherent_impl"), read("call"));
+    assert_eq!(shape(true, "inherent_impl"), read("held"));
+    assert_eq!(shape(true, "trait_declaration"), read("decl"));
+    assert_eq!(shape(true, "unknown"), read("bare"));
+    let named = rows
+        .iter()
+        .filter(|row| row["member_declared_name_value"] == "$n")
+        .map(|row| {
+            (
+                row["macro_self_parameter_flag"].as_bool(),
+                row["macro_owner_shape_kind"].as_str().map(str::to_owned),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![shape(true, "trait_impl"), shape(false, "unknown")],
+        named
+    );
+}
+
+/// REQ-RUST-054.0 D8: a `fn` written in the arguments of a macro call.
+#[test]
+fn test_macro_call_argument_rows() {
+    let source = "forward! { impl Foo { fn made(&self) {} } }\n\
+        fn body() { other!(fn inner() {}); }\n";
+    let rows = extract_member_declaration_rows("x.rs", source);
+    let made = find_member_row_named(&rows, "macro_call_argument", "made");
+    assert_eq!(json!("forward"), made["owner_macro_name_value"]);
+    assert_eq!(json!(true), made["macro_self_parameter_flag"]);
+    assert_eq!(json!("inherent_impl"), made["macro_owner_shape_kind"]);
+    assert_eq!(json!(false), made["owner_function_body_flag"]);
+    let inner = find_member_row_named(&rows, "macro_call_argument", "inner");
+    assert_eq!(json!("other"), inner["owner_macro_name_value"]);
+    assert_eq!(json!(false), inner["macro_self_parameter_flag"]);
+    assert_eq!(json!(true), inner["owner_function_body_flag"]);
+}
+
+/// REQ-RUST-054.0 D9: the type names a file declares or renames.
+#[test]
+fn test_type_name_declaration_rows() {
+    let source = "pub struct S<T>(T);\nenum E {}\nunion U { a: u8 }\ntype A = u8;\n\
+        use x::Y as Z;\nuse x::W as _;\nimpl S<u8> { type Inner = u8; }\ntrait Tr { type Out; }\n";
+    let rows = extract_member_declaration_rows("x.rs", source);
+    let found = rows
+        .iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "type_name_declaration")
+        .map(|row| {
+            let start = row["member_name_start_offset"].as_u64().unwrap() as usize;
+            let end = row["member_name_end_offset"].as_u64().unwrap() as usize;
+            assert_eq!(
+                json!(&source[start..end]),
+                row["member_declared_name_value"]
+            );
+            format!(
+                "{} {}",
+                row["type_declaration_kind_value"].as_str().unwrap(),
+                &source[start..end]
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            "struct S",
+            "enum E",
+            "union U",
+            "type_alias A",
+            "use_rename Z"
+        ],
+        found
     );
 }

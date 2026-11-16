@@ -369,3 +369,35 @@ WEAK   the RED run failed on the stub only; no run with an empty result was made
 NOT RUN the real-source itoa tests and the workspace tests
 NEXT   8.3a: the probe over the declaration table
 ```
+
+## TDD entry — step 8.3a, the lookup rule over the core table (REQ-RUST-056.0 P1 to P5; REQ-RUST-054.0 D6 to D9)
+
+```text
+STUB   receiver-type-probe-records.rs: WrittenTypeShapeValue, ScopeTraitMethodValue, CoreMemberProbeOutcome,
+       parse_written_type_shape and probe_core_member_declaration with todo!() bodies
+RED    cargo test --release -p parseltongue-syntax-span-extractor receiver_type_probe_tests
+       5 selected, 0 passed, 5 failed: "not yet implemented: REQ-RUST-056.0 P1"
+       cargo test ... sysroot_member_declaration_tests: 4 new tests failed on the missing keys
+       (left (false, ["T"]), right (Null, Null); left ["struct S", ..], right [])
+GREEN  the table gained: impl_generic_parameter_names, impl_bound_restriction_flag (D6);
+       macro_self_parameter_flag, macro_owner_shape_kind (D7); rows for fn written in macro call
+       arguments (D8); rows for type names: struct, enum, union, alias, use rename (D9)
+       the probe: receiver, each dereference, array to slice; per step by value, &, &mut;
+       inherent members first, then traits in scope; one fit names, anything undecided withholds
+       receiver_type_probe_tests 5 passed; sysroot_member_declaration_tests 8 passed; crate 152 passed
+BREAKS array not unsized to a slice -> FAILED test_array_unsize_probe_order
+       scope traits ignored         -> FAILED test_scope_trait_blocks_target
+       mutability ignored           -> FAILED three tests
+       type name not checked        -> FAILED test_unproven_member_stays_withheld (Twice<T>::get named)
+       impl bound ignored           -> FAILED test_unproven_member_stays_withheld (Cell<T>::get named)
+       macro member ignored         -> FAILED test_unproven_member_stays_withheld
+GATES  cargo fmt --check and clippy --all-targets -D warnings pass on the crate
+REFACTOR none
+WEAK   the probe tests were seen failing on the stub only
+       a type or an inherent method that core declares through a macro with a metavariable
+       name, beyond what the rows show, is an assumption, not a proof
+       rustc uses impl-level bounds, not method-level where clauses, to select a candidate:
+       stated from knowledge of rustc, not measured here
+NOT RUN the real-source itoa tests (the declaration row count changes) and the workspace tests
+NEXT   8.3b: connect the probe to the resolver; real-source test on pinned itoa
+```
