@@ -10,18 +10,21 @@ boundary.**
 Scope: itoa only, the full item graph only. No other repository, no oracle, no
 higher-abstraction table.
 
-Built today: source to resolved names, then a bounded graph step that
-writes item nodes, `contains` edges and `calls` edges and reads them back from a frozen
-generation. Not built: type lowering, body inference, method lookup, and the other four edge
-kinds itoa needs (`uses_type`, `reads`, `implements`, `imports`).
+Built: source to resolved names, then one graph step that writes item nodes and eight edge
+kinds (`contains`, `calls`, `uses_type`, `reads`, `implements`, `imports`, `generates`,
+`expands`) and reads them back from a frozen generation. Not built: lowered signature types,
+type inference in bodies, a trait solver, and node visibility, reachability and signature
+text. A method call whose receiver type is declared in `core` has no target; part 8 is
+adding one from a syntax-only read of `core` and is in no accepted run.
 
 ```text
 source files
   -> Rust    crate graph, ingest, one parse per file                  built
   -> DuckDB  name resolution rounds  <->  Rust item-macro expander    built
-  -> Rust    impl headers                                             built: header paths only
-  -> DuckDB  item nodes + contains edges                              built: bounded
-  -> Rust    calls edges                                              built: type-relative paths only
+  -> Rust    impl headers                                             built
+  -> Rust    method declarations of core (scope `declarations`)       part 8, not accepted
+  -> DuckDB  item nodes, contains, generates, expands                 built
+  -> Rust    calls, uses_type, implements, reads, imports             built
   -> Turso   frozen full graph, read back and compared                built: marked incomplete
 ```
 
@@ -51,29 +54,42 @@ step  function (crate)                                          writes
                                                                 path-resolution-site-records,
                                                                 macro-expanded-item-table
 6     persist_impl_header_rows (syntax-span-extractor)          impl-header-index-table
+6a    persist_sysroot_member_rows (cli)                         sysroot-member-declaration-records
 7     publish_full_graph_checkpoint (cli)                       item-effective-visibility-records,
                                                                 edge-evidence-record-table
 ```
 
-- Step 4 runs when a file mentions `std`, `core`, `alloc`, `Clone` and similar, unless
-  `--sysroot-source-scope-kind excluded` is passed. itoa triggers it.
+- Step 4 runs when a file mentions `std`, `core`, `alloc`, `Clone` and similar, and
+  `--sysroot-source-scope-kind` is `included` (the default). itoa triggers it. `excluded` and
+  `declarations` add no sysroot crate; acceptance runs pass `excluded`.
+- Step 6a runs only with `declarations`. It reads the files under
+  `<sysroot>/lib/rustlib/src/rust/library` and stores one row per method `core` declares.
+  The SOP does not freeze those files, so no accepted run uses it (SPEC part 8).
 - Step 5 copies one frozen Turso generation into a DuckDB file and runs SQL rounds for scopes,
   bindings, imports and path candidates. Each resolved item macro is expanded in Rust; its
   output becomes a virtual source file that goes back through step 3. Repeat to a fixed point.
 - Step 7 runs only with `--mapping-final-stage-kind full-item-dependency-graph`:
-  1. `derive_original_graph_input` (DuckDB) projects item nodes and `contains` edges.
-  2. `resolve_original_call_edges` (Rust) resolves body calls against namespace and impl rows.
-  3. `FullGraphInputStorePort` writes the graph to Turso, reads the frozen copy back, and fails
+  1. `derive_original_graph_input` (DuckDB) projects item nodes and the `contains`,
+     `generates` and `expands` edges.
+  2. Five Rust resolvers in `syntax-span-extractor` read the stored rows:
+     `resolve_original_call_edges`, `resolve_signature_type_edges`,
+     `resolve_impl_header_edges`, `resolve_body_read_edges`, `resolve_use_import_edges`.
+  3. `collect_builtin_endpoint_nodes` and `collect_external_endpoint_nodes` add a node for
+     each builtin type and each name outside the read source that an edge targets.
+  4. `FullGraphInputStorePort` writes the graph to Turso, reads the frozen copy back, and fails
      unless it equals what was derived.
-  4. The result is marked `incomplete`.
+  5. The result is marked `incomplete`; that value is written in the code, not computed.
 
 Three facts in the code that shape the remaining work:
 
 - **C1** Name resolution takes only import and signature paths (`NameResolutionPathKind`). Body
   paths are stored as text in `body-site-reference-table`; only step 7 reads them.
 - **C2** Header paths are resolved. Full signature types (parameters, returns, bounds) are not
-  lowered, so nothing can type a receiver.
-- **C3** itoa with the sysroot did not finish step 5 in 2,400 s. Development runs exclude it.
+  lowered into rows: `lowered-signature-type-table` has no writer. Resolvers work from
+  resolved path lookups; part 8 adds the written type text of a parameter. So a receiver is
+  typed only in the shapes a resolver handles.
+- **C3** itoa with the sysroot did not finish step 5 in 2,400 s (2026-11-13); on 2026-11-16
+  the same run stopped after 171 s with a store copy mismatch. Acceptance runs exclude it.
 
 ## 2 — The tables, top to bottom
 
@@ -81,10 +97,11 @@ Levels 1 and 2 are the full graph, the deliverable. Levels 3–7 are the facts i
 
 ```text
 level  table                                  owner stage                        state
-1      edge-evidence-record-table             semantic-edge-evidence-stage       bounded: contains, calls
-2      item-effective-visibility-records      item-effective-visibility-stage    bounded: visibility unknown
-3      impl-header-index-table                signature-type-lowering-stage      header paths only
+1      edge-evidence-record-table             semantic-edge-evidence-stage       eight kinds
+2      item-effective-visibility-records      item-effective-visibility-stage    three fields empty
+3      impl-header-index-table                signature-type-lowering-stage      produced
        lowered-signature-type-table                                              no producer
+       sysroot-member-declaration-records     sysroot-member-declaration-stage   part 8 only
 4      path-resolution-site-records           name-resolution                    produced
        name-resolution-scope-records
        module-scope-binding-table
@@ -95,6 +112,9 @@ level  table                                  owner stage                       
        body-site-reference-table
 7      span-reference-text-table              syntax-spans                       produced
 ```
+
+The three empty node fields are effective visibility, reachable outside crate, and signature
+text. `sysroot-member-declaration-records` is written only with scope `declarations`.
 
 Supporting tables:
 
@@ -167,63 +187,52 @@ Open:
 
 - **G10** Enum variants and struct fields: nodes or evidence (PRD, open).
 - **F12** Does a `pub use` carry both an `imports` and a `reexports` edge?
-- **F14** May `reads` and `uses_type` start at a non-function item (PRD, open)?
-- **I4** How a macro-generated item maps back to its original file (PRD, open).
+- **G4, G5** are rules without a producer: every node stores them empty or unknown.
 
-## 4 — What remains, in build order
+Decided since (PRD, "Decisions in force"):
 
-Each target is one real-source test on pinned itoa. Fix the earliest missing producer.
+- **F14** `reads` and `uses_type` start at any item a path is written in.
+- **I4** A macro-generated item is identified by its macro call and its place in that call's
+  expansion; a row sited in expanded text also names where its tokens were copied from.
+
+## 4 — What remains
+
+The build order of the PRD is done up to the whole-graph comparison, which passed at
+`822da80cf`. What the pipeline still lacks:
 
 ```text
-target                                                   what it needs that is not built
-done  <Buffer as Default>::default -> Buffer::new        -
-next  Buffer::format -> private::Sealed::write           signature bounds (I: Integer, Integer:
-                                                         Sealed); method call on a generic
-                                                         receiver; one edge, not twelve
-      <Buffer as Clone>::clone -> Buffer::new            implements and uses_type edges
-      u128 write -> Unsigned::fmt -> div_rem_1e16        calls inside macro-generated impls;
-        -> u128_ext::mulhi                               concrete-receiver impl selection
-      use nodes -> imports; reads of MAX_STR_LEN         imports and reads producers
-last  whole library equals the frozen expected graph     all of the above; targets in core as decided
+what                                              why it is hard
+targets for method calls into core (part 8)       needs the receiver's type and core's
+                                                  declarations; no lowered types (C2), no
+                                                  trait solver
+return type of a core method (part 8 step 8.4)    try_into, expect, unwrap chain on a result
+methods written by a macro in core (step 8.5)     ilog10; the syntax scan sees text, not a
+                                                  member
+node visibility, reachability, signature (G4,     no producer; a trait-impl member's
+G5, E9)                                           visibility comes from its trait (E8)
+rows that depend on the source directory          file identity is the absolute path, and
+                                                  the run id hashes those rows
+the run with the whole sysroot (C3)               stops with a store copy mismatch
 ```
 
-What reading itoa's source showed:
+Counts, steps and the next target are in
+[SPEC part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md) and on the
+[log](LOG-itoa-full-item-graph-progress.md)'s "Where we are" page, not here.
 
-- **E1** `default` and `clone` call `Buffer::new()`, not `Self::new()`. The lookup is
-  type-relative: resolve `Buffer`, then find `new` in its inherent impls.
-- **E2** itoa uses five type-relative shapes: `Buffer::new`, `i128::MAX_STR_LEN`,
-  `Self::MAX_STR_LEN`, `I::MAX_STR_LEN`, `<$primitive as Integer>::MAX_STR_LEN`. Only the first
-  is handled.
+What reading itoa's source showed, still in force:
+
 - **E3** A reference to an associated const is a `reads` edge.
 - **E4** Some itoa-to-itoa edges need `core`. The signed `write` calls
   `Unsigned::fmt(self.unsigned_abs(), ..)`; choosing the impl needs the return type of a core
   method.
-- **E5** Two concrete-receiver shapes are uncovered: `Unsigned::fmt(self, buf)` inside
-  `impl Sealed for u8` must reach `<u8 as Unsigned>::fmt`, and `(self as $primitive).write(buf)`
-  must reach `<i64 as Sealed>::write`. A trait being implemented is in scope inside its own impl.
-- **E6** Macro-generated impls have spans in a virtual file. The rule mapping them to
-  `src/lib.rs` is not written (I4).
-- **E7** Body macros (`assert!`, `debug_assert!`) add no itoa-to-itoa edge. Record them
-  unresolved; do not expand them.
+- **E7** Body macros are not expanded. The arguments of the assertion macros are parsed again
+  as expressions for `reads` rows (PRD).
 - **E8** A trait-impl member's visibility comes from the trait, so the visibility step reads impl
   headers.
 - **E9** Node rows need a qualified path and signature text, for example
-  `<u8 as private::Sealed>::write`.
+  `<u8 as private::Sealed>::write`. The label carries the path (PRD, node labels); the
+  signature is not stored.
 
 itoa's shape: three item macros (`impl_Integer`, `impl_Integer_size`, `impl_Unsigned`) generate
 12 `Integer` impls, 12 `private::Sealed` impls and 4 `Unsigned` impls; five impls are
 hand-written.
-
-How unclear each piece still is (1 clear, 5 needs a decision or an experiment):
-
-```text
-5  sysroot (core) handling: the native path does not finish (C3, E4)
-4  type-relative lookup beyond Buffer::new (E2)
-4  calls with a concrete receiver (E5)
-4  macro-generated identity and evidence (E6)
-4  reviewing and freezing the expected itoa graph
-3  method call on a generic receiver (next target)
-3  lowered signature types; uses_type and implements rules
-3  effective visibility (E8)
-2  use nodes, imports, contains, reads; body macros recorded unresolved
-```
