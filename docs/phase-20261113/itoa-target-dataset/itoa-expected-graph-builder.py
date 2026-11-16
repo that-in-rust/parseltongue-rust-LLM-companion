@@ -44,14 +44,17 @@ def node(label, kind, vis, f, a, b, anchor, owner, reach=False, gen=None, flags=
         reachable_outside_crate=reach, file=f, start_line=a, end_line=b, owner=owner,
         generated_by=gen, source_anchor=anchor, flags=sorted(flags))
 
-def edge(src, rel, dst, f, line, anchor, dkind="node", skind="node", via=None, gen=None, flags=(), n=1):
+def edge(src, rel, dst, f, line, anchor, dkind="node", skind="node", via=None, gen=None, flags=(), n=1, start=None):
     check(f, line, anchor)
     if n != 1 and TEXT[f][line - 1].count(anchor) != n:
         errors.append(f"{f}:{line} has {TEXT[f][line - 1].count(anchor)} of {anchor!r}, not {n}")
     e = edges.setdefault((src, rel, dst), dict(source=src, source_kind=skind, relation=rel,
         target=dst, target_kind=dkind, via_use_node=via, generated_by=gen, sites=[], flags=set()))
     # A site that starts with a macro parameter starts, after expansion, at the argument written in the macro call.
-    first = dict(kind="invocation", line=gen["invocation_line"]) if gen and anchor.startswith("$") else dict(kind="definition", line=line)
+    first = dict(kind="invocation", line=gen["invocation_line"]) if gen and anchor.startswith("$") else dict(kind="definition", line=start or line)
+    # 'start' is the line of the receiver's first token when a method call chain is written over several lines.
+    if start is not None and not (start < line and TEXT[f][start - 1].strip() and not TEXT[f][start - 1].strip().startswith(".")):
+        errors.append(f"{f}:{line} start line {start} is not an earlier receiver line")
     e["sites"].extend(dict(file=f, line=line, anchor=anchor, occurrence=i, first_token=first) for i in range(n))
     e["flags"].update(flags)
 
@@ -63,6 +66,26 @@ def ext(src, rel, dst, f, line, anchor, **k):
     edge(src, rel, dst, f, line, anchor, dkind="external", **k)
 def prim(src, name, f, line, anchor, **k):
     edge(src, "uses_type", name, f, line, anchor, dkind=BI, **k)
+# A method call whose receiver type itoa's own source does not prove. The row is expected without a target.
+# The reason is the SPEC's (part 4): the path does not prove it leaves read source, so it is not external_source_missing.
+WHY = {
+    "write": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
+    "get_unchecked": "the receiver is an array or a slice; its methods are declared in core",
+    "len": "the receiver is a slice; its methods are declared in core",
+    "as_mut_ptr": "the receiver is an array behind a raw-pointer cast chain; its methods are declared in core",
+    "cast": "the receiver is the result of as_mut_ptr, which has no target",
+    "rev": "the receiver is a range expression; its type and the trait method are declared in core",
+    "ilog10": "the receiver is an associated const of a builtin type; the const's type is declared in core",
+    "try_into": "the receiver is the result of a call into core",
+    "unwrap": "the receiver is the result of try_into, which has no target",
+    "expect": "the receiver is the result of try_into, which has no target",
+}
+def unres(src, method, f, line, anchor, gen=None, n=1, flags=(), start=None):
+    if "." + method not in anchor:
+        errors.append(f"{f}:{line} anchor {anchor!r} does not call .{method}")
+    edge(src, "calls", f"unresolved .{method}", f, line, anchor, dkind="unresolved", gen=gen, n=n, start=start)
+    row = edges[(src, "calls", f"unresolved .{method}")]
+    row.update(resolution_status="unresolved", unresolved_reason="trait_solver_needed", unresolved_why=WHY[method], callee_name=method)
 
 # ---------------- hand-written nodes ----------------
 AL, AX = "area:src/lib.rs", "area:src/u128_ext.rs"
@@ -210,37 +233,38 @@ edge("<Buffer as Default>::default", "calls", "Buffer::new", L, 79, "Buffer::new
 edge("<Buffer as Clone>::clone", "calls", "Buffer::new", L, 89, "Buffer::new()")
 ext("Buffer::new", "calls", MU + "::uninit", L, 99, "MaybeUninit::<u8>::uninit()", via=USE_MEM)
 edge("Buffer::new", "reads", mx("i128"), L, 99, "i128::MAX_STR_LEN")
-ext("Buffer::format", "calls", "core::slice::<impl [T]>::as_mut_ptr", L, 107, ".as_mut_ptr()")
-ext("Buffer::format", "calls", "core::ptr::<impl *mut T>::cast", L, 107, ".cast::<")
+unres("Buffer::format", "as_mut_ptr", L, 107, ".as_mut_ptr()")
+unres("Buffer::format", "cast", L, 107, ".cast::<")
 edge("Buffer::format", "calls", "private::Sealed::write", L, 108, "i.write(", flags=["generic_dispatch_one_edge_through_bound_I:Integer:Sealed"])
-ext("Buffer::format", "calls", "core::str::<impl str>::len", L, 109, "string.len()")
+# 'string' is the value of i.write(..); private::Sealed::write is declared '-> &str', so the receiver is a str.
+ext("Buffer::format", "calls", "str::len", L, 109, "string.len()", flags=["receiver_type_from_declared_return_type_of_private::Sealed::write"])
 edge("Buffer::format", "reads", "Integer::MAX_STR_LEN", L, 109, "I::MAX_STR_LEN", flags=["generic_trait_const"])
 ext("Buffer::format", "calls", "core::hint::unreachable_unchecked", L, 110, "hint::unreachable_unchecked()", via=USE_HINT)
-ext("slice_buffer_to_str", "calls", "core::slice::<impl [T]>::get_unchecked", L, 249, "buf.get_unchecked(")
+unres("slice_buffer_to_str", "get_unchecked", L, 249, "buf.get_unchecked(")
 ext("slice_buffer_to_str", "calls", "core::str::from_utf8_unchecked", L, 252, "str::from_utf8_unchecked(", via=USE_STR)
 edge("div_rem_1e16", "calls", "u128_ext::mulhi", L, 463, "u128_ext::mulhi(n, M_HIGH)")
 for ln, count in ((14, 2), (15, 2), (19, 3), (21, 2)):
     ext("u128_ext::mulhi", "calls", "u128::from", X, ln, "u128::from(", n=count, flags=["which_From_impl_not_claimed"])
 
-def table_sites(src, lines, f=L):
+def table_sites(src, lines, f=L, chained=()):
     for ln in lines:
-        ext(src, "calls", MU + "::write", f, ln, ".write(")
+        unres(src, "write", f, ln, ".write(", start=ln - 1 if ln in chained else None)
 def pairs_sites(src, lines):
     for ln in lines:
         edge(src, "reads", "DECIMAL_PAIRS", L, ln, "DECIMAL_PAIRS.0")
-        ext(src, "calls", "core::slice::<impl [T]>::get_unchecked", L, ln, ".get_unchecked(")
+        unres(src, "get_unchecked", L, ln, ".get_unchecked(")
 
 F = "<u128 as Unsigned>::fmt"
-ext(F, "calls", "core::slice::<impl [T]>::len", L, 340, "buf.len()")
+unres(F, "len", L, 340, "buf.len()")
 table_sites(F, (341, 373, 374, 375, 376, 387, 388, 399)); pairs_sites(F, (373, 374, 375, 376, 387, 388))
 for ln in (345, 353): edge(F, "calls", "div_rem_1e16", L, ln, "div_rem_1e16(")
 for ln in (347, 350, 355, 358, 360): edge(F, "reads", mx("u128"), L, ln, "u128::MAX_STR_LEN")
 for ln in (350, 358): edge(F, "calls", "enc_16lsd", L, ln, "enc_16lsd::<")
 for ln in (371, 384): edge(F, "calls", "divmod100", L, ln, "divmod100(")
 E = "enc_16lsd"
-ext(E, "calls", "core::iter::Iterator::rev", L, 413, ".rev()", flags=["trait_method"])
+unres(E, "rev", L, 413, ".rev()", flags=["trait_method"])
 for ln in (417, 431): edge(E, "calls", "divmod100", L, ln, "divmod100(")
-table_sites(E, (420, 422, 424, 426, 433, 434, 435, 436)); pairs_sites(E, (420, 422, 424, 426, 433, 434, 435, 436))
+table_sites(E, (420, 422, 424, 426, 433, 434, 435, 436), chained=(420, 422, 424, 426)); pairs_sites(E, (420, 422, 424, 426, 433, 434, 435, 436))
 
 # ---------------- macro-generated bodies ----------------
 for s, u, inv in PAIRS:
@@ -250,7 +274,7 @@ for s, u, inv in PAIRS:
     for t, ln, sgn in ((u, 144, "$Unsigned"), (s, 160, "$Signed")):
         prim(mx(t), "usize", L, ln, ": usize", gen=g)
         ext(mx(t), "reads", f"{t}::MAX", L, ln, f"{sgn}::MAX", gen=g, flags=[OD8])
-        ext(mx(t), "calls", f"core::num::<impl {t}>::ilog10", L, ln, f"{sgn}::MAX.ilog10()", gen=g, flags=[OD8])
+        unres(mx(t), "ilog10", L, ln, f"{sgn}::MAX.ilog10()", gen=g, flags=[OD8])
         bl = 148 if t == u else 164
         edge(sb(t), "uses_type", MU, L, bl, "MaybeUninit<u8>", dkind="external", via=USE_MEM, gen=g, flags=[EXT]); prim(sb(t), "u8", L, bl, "<u8>", gen=g)
         edge(sb(t), "reads", mx(t), L, bl, "Self::MAX_STR_LEN", gen=g, flags=[OD8])
@@ -260,11 +284,13 @@ for s, u, inv in PAIRS:
     edge(sw(u), "calls", "slice_buffer_to_str", L, 155, "slice_buffer_to_str(buf, offset)", gen=g)
     edge(sw(s), "reads", mx(s), L, 169, "Self::MAX_STR_LEN", gen=g)
     edge(sw(s), "reads", mx(u), L, 169, "$Unsigned::MAX_STR_LEN", gen=g)
-    edge(sw(s), "calls", uf(u), L, 170, "Unsigned::fmt(", gen=g, flags=["concrete_impl_needs_core_return_type_of_unsigned_abs"])
-    ext(sw(s), "calls", f"core::num::<impl {s}>::unsigned_abs", L, 171, "self.unsigned_abs()", gen=g)
-    ext(sw(s), "calls", "core::convert::TryInto::try_into", L, 172, ".try_into()", gen=g, flags=["trait_method"])
-    ext(sw(s), "calls", "core::result::Result::unwrap", L, 172, ".unwrap()", gen=g)
-    ext(sw(s), "calls", MU + "::write", L, 176, ".write(b'-')", gen=g)
+    # The impl member cannot be chosen: the first argument's type is the return type of unsigned_abs, declared in core.
+    edge(sw(s), "calls", "Unsigned::fmt", L, 170, "Unsigned::fmt(", gen=g, flags=["trait_declaration_impl_member_needs_core_return_type_of_unsigned_abs"])
+    # 'self' is taken by value in an impl whose self type is the builtin written in the macro call.
+    ext(sw(s), "calls", f"{s}::unsigned_abs", L, 171, "self.unsigned_abs()", gen=g, flags=["receiver_type_is_self_type_of_impl"])
+    unres(sw(s), "try_into", L, 172, ".try_into()", gen=g, flags=["trait_method"])
+    unres(sw(s), "unwrap", L, 172, ".unwrap()", gen=g)
+    unres(sw(s), "write", L, 176, ".write(b'-')", gen=g)
     edge(sw(s), "calls", "slice_buffer_to_str", L, 179, "slice_buffer_to_str(buf, offset)", gen=g)
 for t, p, inv in SIZES:
     g = G("impl_Integer_size", inv)
@@ -279,15 +305,15 @@ for t, p, inv in SIZES:
 for u, inv in UNS:
     g = G("impl_Unsigned", inv); f = uf(u)
     edge(f, "uses_type", sb(u), L, 263, "Self::Buffer", gen=g); prim(f, "usize", L, 263, "-> usize", gen=g)
-    ext(f, "calls", "core::slice::<impl [T]>::len", L, 265, "buf.len()", gen=g)
+    unres(f, "len", L, 265, "buf.len()", gen=g)
     ext(f, "calls", "core::mem::size_of", L, 271, "mem::size_of::<Self>()", via=USE_MEM, gen=g)
-    for ln in (274, 281): ext(f, "calls", "core::convert::TryInto::try_into", L, ln, ".try_into()", gen=g, flags=["trait_method"])
-    for ln in (275, 282): ext(f, "calls", "core::result::Result::expect", L, ln, ".expect(", gen=g)
+    for ln in (274, 281): unres(f, "try_into", L, ln, ".try_into()", gen=g, flags=["trait_method"], start=ln - 1)
+    for ln in (275, 282): unres(f, "expect", L, ln, ".expect(", gen=g, start=ln - 2)
     for ln in (285, 302): edge(f, "calls", "divmod100", L, ln, "divmod100(", gen=g)
-    for ln in (288, 290, 292, 294, 306, 308, 319): ext(f, "calls", MU + "::write", L, ln, ".write(", gen=g)
+    for ln in (288, 290, 292, 294, 306, 308, 319): unres(f, "write", L, ln, ".write(", gen=g, start=None if ln == 319 else ln - 1)
     for ln in (288, 290, 292, 294, 306, 308):
         edge(f, "reads", "DECIMAL_PAIRS", L, ln, "DECIMAL_PAIRS.0", gen=g)
-        ext(f, "calls", "core::slice::<impl [T]>::get_unchecked", L, ln, ".get_unchecked(", gen=g)
+        unres(f, "get_unchecked", L, ln, ".get_unchecked(", gen=g)
 
 # ---------------- sites expected to stay unresolved or inactive ----------------
 unresolved = []
@@ -340,6 +366,20 @@ for row in edges.values():
     candidate["evidence_key"] = "|".join(f"{site['source_path']}:{site['line']}:{site['byte_range']}" for site in candidate["source_evidence_sites"])
     candidate["evidence_ref_kind"] = "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL"
     edge_rows.append(candidate)
+# One node per name outside itoa that an edge ends at, and one per builtin type an edge starts from or ends at (PRD).
+def external_name_kind(name):
+    if name.startswith("core::"): return "crate_rooted_path"
+    return "builtin_member" if name.split("::")[0] in RULES.BUILTIN_PRIMITIVES and "::" in name else "prelude_name"
+endpoints = {}
+for row in edge_rows:
+    for label, kind in ((row["source"], row["source_kind"]), (row["target"], row["target_kind"])):
+        if kind in ("external", BI):
+            endpoints[label] = kind
+for label, kind in sorted(endpoints.items()):
+    node_rows.append(dict(label=label, item_kind=None, node_category="external_name" if kind == "external" else "builtin_type",
+        external_name_kind=external_name_kind(label) if kind == "external" else None, source_read=False,
+        effective_visibility=None, reachable_outside_crate=None, file="", start_line=0, end_line=0, owner=None,
+        generated_by=None, source_anchor=None, flags=[], source_evidence=None, file_assignment_status="NO_SOURCE_FILE_NOT_READ"))
 node_rows.sort(key=lambda row: (row["file"], row["start_line"], row["label"]))
 edge_rows.sort(key=lambda row: (row["source"], row["relation"], row["target"]))
 for row in impls:

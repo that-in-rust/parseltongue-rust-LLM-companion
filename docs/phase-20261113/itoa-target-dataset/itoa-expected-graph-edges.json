@@ -178,18 +178,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:160:[5061, 5082]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Signed::MAX.ilog10()",
@@ -218,8 +217,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i128>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -443,7 +444,7 @@
       "evidence_key": "src/lib.rs:170:[5458, 5472]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "concrete_impl_needs_core_return_type_of_unsigned_abs"
+        "trait_declaration_impl_member_needs_core_return_type_of_unsigned_abs"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -479,104 +480,16 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "<u128 as Unsigned>::fmt",
+      "target": "Unsigned::fmt",
       "target_kind": "node",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5554, 5565]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 189,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i128 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            5554,
-            5565
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:176:[5689, 5701]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 189,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(b'-')",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 176
-          },
-          "line": 176,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i128 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(b'-')",
-          "byte_range": [
-            5689,
-            5701
-          ],
-          "line": 176,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
       "via_use_node": null
     },
     {
       "evidence_key": "src/lib.rs:171:[5493, 5512]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "external_identity_unverified"
+        "external_identity_unverified",
+        "receiver_type_is_self_type_of_impl"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -612,51 +525,7 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i128>::unsigned_abs",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5565, 5574]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 189,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".unwrap()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i128 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".unwrap()",
-          "byte_range": [
-            5565,
-            5574
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::unwrap",
+      "target": "i128::unsigned_abs",
       "target_kind": "external",
       "via_use_node": null
     },
@@ -700,6 +569,144 @@
       "source_site_evidence_status": "EXACT",
       "target": "slice_buffer_to_str",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:172:[5554, 5565]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".try_into()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i128 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".try_into()",
+          "byte_range": [
+            5554,
+            5565
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "unwrap",
+      "evidence_key": "src/lib.rs:172:[5565, 5574]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".unwrap()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i128 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".unwrap()",
+          "byte_range": [
+            5565,
+            5574
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .unwrap",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:176:[5689, 5701]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(b'-')",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 176
+          },
+          "line": 176,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i128 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(b'-')",
+          "byte_range": [
+            5689,
+            5701
+          ],
+          "line": 176,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -871,18 +878,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:160:[5061, 5082]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Signed::MAX.ilog10()",
@@ -911,8 +917,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i16>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -1136,7 +1144,7 @@
       "evidence_key": "src/lib.rs:170:[5458, 5472]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "concrete_impl_needs_core_return_type_of_unsigned_abs"
+        "trait_declaration_impl_member_needs_core_return_type_of_unsigned_abs"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -1172,104 +1180,16 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "<u16 as Unsigned>::fmt",
+      "target": "Unsigned::fmt",
       "target_kind": "node",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5554, 5565]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 186,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i16 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            5554,
-            5565
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:176:[5689, 5701]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 186,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(b'-')",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 176
-          },
-          "line": 176,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i16 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(b'-')",
-          "byte_range": [
-            5689,
-            5701
-          ],
-          "line": 176,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
       "via_use_node": null
     },
     {
       "evidence_key": "src/lib.rs:171:[5493, 5512]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "external_identity_unverified"
+        "external_identity_unverified",
+        "receiver_type_is_self_type_of_impl"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -1305,51 +1225,7 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i16>::unsigned_abs",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5565, 5574]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 186,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".unwrap()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i16 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".unwrap()",
-          "byte_range": [
-            5565,
-            5574
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::unwrap",
+      "target": "i16::unsigned_abs",
       "target_kind": "external",
       "via_use_node": null
     },
@@ -1393,6 +1269,144 @@
       "source_site_evidence_status": "EXACT",
       "target": "slice_buffer_to_str",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:172:[5554, 5565]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".try_into()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i16 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".try_into()",
+          "byte_range": [
+            5554,
+            5565
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "unwrap",
+      "evidence_key": "src/lib.rs:172:[5565, 5574]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".unwrap()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i16 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".unwrap()",
+          "byte_range": [
+            5565,
+            5574
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .unwrap",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:176:[5689, 5701]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(b'-')",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 176
+          },
+          "line": 176,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i16 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(b'-')",
+          "byte_range": [
+            5689,
+            5701
+          ],
+          "line": 176,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -1564,18 +1578,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:160:[5061, 5082]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Signed::MAX.ilog10()",
@@ -1604,8 +1617,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i32>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -1829,7 +1844,7 @@
       "evidence_key": "src/lib.rs:170:[5458, 5472]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "concrete_impl_needs_core_return_type_of_unsigned_abs"
+        "trait_declaration_impl_member_needs_core_return_type_of_unsigned_abs"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -1865,104 +1880,16 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "<u32 as Unsigned>::fmt",
+      "target": "Unsigned::fmt",
       "target_kind": "node",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5554, 5565]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 187,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i32 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            5554,
-            5565
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:176:[5689, 5701]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 187,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(b'-')",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 176
-          },
-          "line": 176,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i32 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(b'-')",
-          "byte_range": [
-            5689,
-            5701
-          ],
-          "line": 176,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
       "via_use_node": null
     },
     {
       "evidence_key": "src/lib.rs:171:[5493, 5512]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "external_identity_unverified"
+        "external_identity_unverified",
+        "receiver_type_is_self_type_of_impl"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -1998,51 +1925,7 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i32>::unsigned_abs",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5565, 5574]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 187,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".unwrap()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i32 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".unwrap()",
-          "byte_range": [
-            5565,
-            5574
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::unwrap",
+      "target": "i32::unsigned_abs",
       "target_kind": "external",
       "via_use_node": null
     },
@@ -2086,6 +1969,144 @@
       "source_site_evidence_status": "EXACT",
       "target": "slice_buffer_to_str",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:172:[5554, 5565]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".try_into()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i32 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".try_into()",
+          "byte_range": [
+            5554,
+            5565
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "unwrap",
+      "evidence_key": "src/lib.rs:172:[5565, 5574]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".unwrap()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i32 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".unwrap()",
+          "byte_range": [
+            5565,
+            5574
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .unwrap",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:176:[5689, 5701]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(b'-')",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 176
+          },
+          "line": 176,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i32 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(b'-')",
+          "byte_range": [
+            5689,
+            5701
+          ],
+          "line": 176,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -2257,18 +2278,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:160:[5061, 5082]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Signed::MAX.ilog10()",
@@ -2297,8 +2317,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i64>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -2522,7 +2544,7 @@
       "evidence_key": "src/lib.rs:170:[5458, 5472]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "concrete_impl_needs_core_return_type_of_unsigned_abs"
+        "trait_declaration_impl_member_needs_core_return_type_of_unsigned_abs"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -2558,104 +2580,16 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "<u64 as Unsigned>::fmt",
+      "target": "Unsigned::fmt",
       "target_kind": "node",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5554, 5565]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 188,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i64 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            5554,
-            5565
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:176:[5689, 5701]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 188,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(b'-')",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 176
-          },
-          "line": 176,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i64 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(b'-')",
-          "byte_range": [
-            5689,
-            5701
-          ],
-          "line": 176,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
       "via_use_node": null
     },
     {
       "evidence_key": "src/lib.rs:171:[5493, 5512]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "external_identity_unverified"
+        "external_identity_unverified",
+        "receiver_type_is_self_type_of_impl"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -2691,51 +2625,7 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i64>::unsigned_abs",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5565, 5574]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 188,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".unwrap()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i64 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".unwrap()",
-          "byte_range": [
-            5565,
-            5574
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::unwrap",
+      "target": "i64::unsigned_abs",
       "target_kind": "external",
       "via_use_node": null
     },
@@ -2779,6 +2669,144 @@
       "source_site_evidence_status": "EXACT",
       "target": "slice_buffer_to_str",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:172:[5554, 5565]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".try_into()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i64 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".try_into()",
+          "byte_range": [
+            5554,
+            5565
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "unwrap",
+      "evidence_key": "src/lib.rs:172:[5565, 5574]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".unwrap()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i64 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".unwrap()",
+          "byte_range": [
+            5565,
+            5574
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .unwrap",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:176:[5689, 5701]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(b'-')",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 176
+          },
+          "line": 176,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i64 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(b'-')",
+          "byte_range": [
+            5689,
+            5701
+          ],
+          "line": 176,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -2950,18 +2978,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:160:[5061, 5082]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Signed::MAX.ilog10()",
@@ -2990,8 +3017,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i8>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -3215,7 +3244,7 @@
       "evidence_key": "src/lib.rs:170:[5458, 5472]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "concrete_impl_needs_core_return_type_of_unsigned_abs"
+        "trait_declaration_impl_member_needs_core_return_type_of_unsigned_abs"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -3251,104 +3280,16 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "<u8 as Unsigned>::fmt",
+      "target": "Unsigned::fmt",
       "target_kind": "node",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5554, 5565]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 185,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i8 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            5554,
-            5565
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:176:[5689, 5701]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 185,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(b'-')",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 176
-          },
-          "line": 176,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i8 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(b'-')",
-          "byte_range": [
-            5689,
-            5701
-          ],
-          "line": 176,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
       "via_use_node": null
     },
     {
       "evidence_key": "src/lib.rs:171:[5493, 5512]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
-        "external_identity_unverified"
+        "external_identity_unverified",
+        "receiver_type_is_self_type_of_impl"
       ],
       "generated_by": {
         "invocation_file": "src/lib.rs",
@@ -3384,51 +3325,7 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl i8>::unsigned_abs",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:172:[5565, 5574]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 185,
-        "macro": "impl_Integer"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".unwrap()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 172
-          },
-          "line": 172,
-          "occurrence": 0
-        }
-      ],
-      "source": "<i8 as private::Sealed>::write",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".unwrap()",
-          "byte_range": [
-            5565,
-            5574
-          ],
-          "line": 172,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::unwrap",
+      "target": "i8::unsigned_abs",
       "target_kind": "external",
       "via_use_node": null
     },
@@ -3472,6 +3369,144 @@
       "source_site_evidence_status": "EXACT",
       "target": "slice_buffer_to_str",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:172:[5554, 5565]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".try_into()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i8 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".try_into()",
+          "byte_range": [
+            5554,
+            5565
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "unwrap",
+      "evidence_key": "src/lib.rs:172:[5565, 5574]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".unwrap()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 172
+          },
+          "line": 172,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i8 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".unwrap()",
+          "byte_range": [
+            5565,
+            5574
+          ],
+          "line": 172,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .unwrap",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:176:[5689, 5701]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(b'-')",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 176
+          },
+          "line": 176,
+          "occurrence": 0
+        }
+      ],
+      "source": "<i8 as private::Sealed>::write",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(b'-')",
+          "byte_range": [
+            5689,
+            5701
+          ],
+          "line": 176,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -3987,18 +4022,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:144:[4457, 4480]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Unsigned::MAX.ilog10()",
@@ -4027,8 +4061,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl u128>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -4116,378 +4152,6 @@
       "source_site_evidence_status": "EXACT",
       "target": "usize",
       "target_kind": "builtin",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:341:[12017, 12024]|src/lib.rs:373:[13203, 13210]|src/lib.rs:374:[13298, 13305]|src/lib.rs:375:[13393, 13400]|src/lib.rs:376:[13488, 13495]|src/lib.rs:387:[13826, 13833]|src/lib.rs:388:[13920, 13927]|src/lib.rs:399:[14290, 14297]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 341
-          },
-          "line": 341,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 373
-          },
-          "line": 373,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 374
-          },
-          "line": 374,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 375
-          },
-          "line": 375,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 376
-          },
-          "line": 376,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 387
-          },
-          "line": 387,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 388
-          },
-          "line": 388,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 399
-          },
-          "line": 399,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u128 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            12017,
-            12024
-          ],
-          "line": 341,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            13203,
-            13210
-          ],
-          "line": 373,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            13298,
-            13305
-          ],
-          "line": 374,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            13393,
-            13400
-          ],
-          "line": 375,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            13488,
-            13495
-          ],
-          "line": 376,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            13826,
-            13833
-          ],
-          "line": 387,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            13920,
-            13927
-          ],
-          "line": 388,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            14290,
-            14297
-          ],
-          "line": 399,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:373:[13226, 13241]|src/lib.rs:374:[13321, 13336]|src/lib.rs:375:[13416, 13431]|src/lib.rs:376:[13511, 13526]|src/lib.rs:387:[13849, 13864]|src/lib.rs:388:[13943, 13958]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 373
-          },
-          "line": 373,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 374
-          },
-          "line": 374,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 375
-          },
-          "line": 375,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 376
-          },
-          "line": 376,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 387
-          },
-          "line": 387,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 388
-          },
-          "line": 388,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u128 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".get_unchecked(",
-          "byte_range": [
-            13226,
-            13241
-          ],
-          "line": 373,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".get_unchecked(",
-          "byte_range": [
-            13321,
-            13336
-          ],
-          "line": 374,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".get_unchecked(",
-          "byte_range": [
-            13416,
-            13431
-          ],
-          "line": 375,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".get_unchecked(",
-          "byte_range": [
-            13511,
-            13526
-          ],
-          "line": 376,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".get_unchecked(",
-          "byte_range": [
-            13849,
-            13864
-          ],
-          "line": 387,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".get_unchecked(",
-          "byte_range": [
-            13943,
-            13958
-          ],
-          "line": 388,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:340:[11979, 11988]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": "buf.len()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 340
-          },
-          "line": 340,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u128 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": "buf.len()",
-          "byte_range": [
-            11979,
-            11988
-          ],
-          "line": 340,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::len",
-      "target_kind": "external",
       "via_use_node": null
     },
     {
@@ -4665,6 +4329,384 @@
       "source_site_evidence_status": "EXACT",
       "target": "enc_16lsd",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "get_unchecked",
+      "evidence_key": "src/lib.rs:373:[13226, 13241]|src/lib.rs:374:[13321, 13336]|src/lib.rs:375:[13416, 13431]|src/lib.rs:376:[13511, 13526]|src/lib.rs:387:[13849, 13864]|src/lib.rs:388:[13943, 13958]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 373
+          },
+          "line": 373,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 374
+          },
+          "line": 374,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 375
+          },
+          "line": 375,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 376
+          },
+          "line": 376,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 387
+          },
+          "line": 387,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 388
+          },
+          "line": 388,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u128 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".get_unchecked(",
+          "byte_range": [
+            13226,
+            13241
+          ],
+          "line": 373,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".get_unchecked(",
+          "byte_range": [
+            13321,
+            13336
+          ],
+          "line": 374,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".get_unchecked(",
+          "byte_range": [
+            13416,
+            13431
+          ],
+          "line": 375,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".get_unchecked(",
+          "byte_range": [
+            13511,
+            13526
+          ],
+          "line": 376,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".get_unchecked(",
+          "byte_range": [
+            13849,
+            13864
+          ],
+          "line": 387,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".get_unchecked(",
+          "byte_range": [
+            13943,
+            13958
+          ],
+          "line": 388,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "len",
+      "evidence_key": "src/lib.rs:340:[11979, 11988]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": "buf.len()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 340
+          },
+          "line": 340,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u128 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "buf.len()",
+          "byte_range": [
+            11979,
+            11988
+          ],
+          "line": 340,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .len",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a slice; its methods are declared in core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:341:[12017, 12024]|src/lib.rs:373:[13203, 13210]|src/lib.rs:374:[13298, 13305]|src/lib.rs:375:[13393, 13400]|src/lib.rs:376:[13488, 13495]|src/lib.rs:387:[13826, 13833]|src/lib.rs:388:[13920, 13927]|src/lib.rs:399:[14290, 14297]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 341
+          },
+          "line": 341,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 373
+          },
+          "line": 373,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 374
+          },
+          "line": 374,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 375
+          },
+          "line": 375,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 376
+          },
+          "line": 376,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 387
+          },
+          "line": 387,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 388
+          },
+          "line": 388,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 399
+          },
+          "line": 399,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u128 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            12017,
+            12024
+          ],
+          "line": 341,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            13203,
+            13210
+          ],
+          "line": 373,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            13298,
+            13305
+          ],
+          "line": 374,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            13393,
+            13400
+          ],
+          "line": 375,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            13488,
+            13495
+          ],
+          "line": 376,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            13826,
+            13833
+          ],
+          "line": 387,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            13920,
+            13927
+          ],
+          "line": 388,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            14290,
+            14297
+          ],
+          "line": 399,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -5309,18 +5351,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:144:[4457, 4480]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Unsigned::MAX.ilog10()",
@@ -5349,8 +5390,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl u16>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -5441,242 +5484,6 @@
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 330,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 274
-          },
-          "line": 274,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 281
-          },
-          "line": 281,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u16 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9431,
-            9442
-          ],
-          "line": 274,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9695,
-            9706
-          ],
-          "line": 281,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 330,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 288
-          },
-          "line": 288,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 290
-          },
-          "line": 290,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 292
-          },
-          "line": 292,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 294
-          },
-          "line": 294,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 306
-          },
-          "line": 306,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 308
-          },
-          "line": 308,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 319
-          },
-          "line": 319,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u16 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10042,
-            10049
-          ],
-          "line": 288,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10174,
-            10181
-          ],
-          "line": 290,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10306,
-            10313
-          ],
-          "line": 292,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10438,
-            10445
-          ],
-          "line": 294,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10878,
-            10885
-          ],
-          "line": 306,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11009,
-            11016
-          ],
-          "line": 308,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11464,
-            11471
-          ],
-          "line": 319,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
       "evidence_key": "src/lib.rs:271:[9316, 9338]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -5721,11 +5528,9 @@
       "via_use_node": "use core::mem::{self, MaybeUninit}"
     },
     {
-      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 330,
@@ -5734,11 +5539,76 @@
       "relation": "calls",
       "sites": [
         {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 285
+          },
+          "line": 285,
+          "occurrence": 0
+        },
+        {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 302
+          },
+          "line": 302,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u16 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            9921,
+            9931
+          ],
+          "line": 285,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            10712,
+            10722
+          ],
+          "line": 302,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "divmod100",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "expect",
+      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 330,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
           "anchor": ".expect(",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 275
+            "line": 273
           },
           "line": 275,
           "occurrence": 0
@@ -5748,7 +5618,7 @@
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 282
+            "line": 280
           },
           "line": 282,
           "occurrence": 0
@@ -5781,22 +5651,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::expect",
-      "target_kind": "external",
+      "target": "unresolved .expect",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
       "via_use_node": null
     },
     {
+      "callee_name": "get_unchecked",
       "evidence_key": "src/lib.rs:288:[10065, 10080]|src/lib.rs:290:[10197, 10212]|src/lib.rs:292:[10329, 10344]|src/lib.rs:294:[10461, 10476]|src/lib.rs:306:[10901, 10916]|src/lib.rs:308:[11032, 11047]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 330,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": ".get_unchecked(",
@@ -5930,22 +5802,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
+      "callee_name": "len",
       "evidence_key": "src/lib.rs:265:[9034, 9043]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 330,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "buf.len()",
@@ -5974,12 +5848,15 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::len",
-      "target_kind": "external",
+      "target": "unresolved .len",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
       "generated_by": {
@@ -5988,48 +5865,49 @@
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 285
+            "line": 273
           },
-          "line": 285,
+          "line": 274,
           "occurrence": 0
         },
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 302
+            "line": 280
           },
-          "line": 302,
+          "line": 281,
           "occurrence": 0
         }
       ],
       "source": "<u16 as Unsigned>::fmt",
       "source_evidence_sites": [
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            9921,
-            9931
+            9431,
+            9442
           ],
-          "line": 285,
+          "line": 274,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
         },
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            10712,
-            10722
+            9695,
+            9706
           ],
-          "line": 302,
+          "line": 281,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
@@ -6037,8 +5915,182 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "divmod100",
-      "target_kind": "node",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 330,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 287
+          },
+          "line": 288,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 289
+          },
+          "line": 290,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 291
+          },
+          "line": 292,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 293
+          },
+          "line": 294,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 305
+          },
+          "line": 306,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 307
+          },
+          "line": 308,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 319
+          },
+          "line": 319,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u16 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10042,
+            10049
+          ],
+          "line": 288,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10174,
+            10181
+          ],
+          "line": 290,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10306,
+            10313
+          ],
+          "line": 292,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10438,
+            10445
+          ],
+          "line": 294,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10878,
+            10885
+          ],
+          "line": 306,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11009,
+            11016
+          ],
+          "line": 308,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11464,
+            11471
+          ],
+          "line": 319,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -6573,18 +6625,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:144:[4457, 4480]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Unsigned::MAX.ilog10()",
@@ -6613,8 +6664,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl u32>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -6705,242 +6758,6 @@
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 331,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 274
-          },
-          "line": 274,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 281
-          },
-          "line": 281,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u32 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9431,
-            9442
-          ],
-          "line": 274,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9695,
-            9706
-          ],
-          "line": 281,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 331,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 288
-          },
-          "line": 288,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 290
-          },
-          "line": 290,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 292
-          },
-          "line": 292,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 294
-          },
-          "line": 294,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 306
-          },
-          "line": 306,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 308
-          },
-          "line": 308,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 319
-          },
-          "line": 319,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u32 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10042,
-            10049
-          ],
-          "line": 288,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10174,
-            10181
-          ],
-          "line": 290,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10306,
-            10313
-          ],
-          "line": 292,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10438,
-            10445
-          ],
-          "line": 294,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10878,
-            10885
-          ],
-          "line": 306,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11009,
-            11016
-          ],
-          "line": 308,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11464,
-            11471
-          ],
-          "line": 319,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
       "evidence_key": "src/lib.rs:271:[9316, 9338]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -6985,11 +6802,9 @@
       "via_use_node": "use core::mem::{self, MaybeUninit}"
     },
     {
-      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 331,
@@ -6998,11 +6813,76 @@
       "relation": "calls",
       "sites": [
         {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 285
+          },
+          "line": 285,
+          "occurrence": 0
+        },
+        {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 302
+          },
+          "line": 302,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u32 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            9921,
+            9931
+          ],
+          "line": 285,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            10712,
+            10722
+          ],
+          "line": 302,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "divmod100",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "expect",
+      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 331,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
           "anchor": ".expect(",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 275
+            "line": 273
           },
           "line": 275,
           "occurrence": 0
@@ -7012,7 +6892,7 @@
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 282
+            "line": 280
           },
           "line": 282,
           "occurrence": 0
@@ -7045,22 +6925,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::expect",
-      "target_kind": "external",
+      "target": "unresolved .expect",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
       "via_use_node": null
     },
     {
+      "callee_name": "get_unchecked",
       "evidence_key": "src/lib.rs:288:[10065, 10080]|src/lib.rs:290:[10197, 10212]|src/lib.rs:292:[10329, 10344]|src/lib.rs:294:[10461, 10476]|src/lib.rs:306:[10901, 10916]|src/lib.rs:308:[11032, 11047]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 331,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": ".get_unchecked(",
@@ -7194,22 +7076,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
+      "callee_name": "len",
       "evidence_key": "src/lib.rs:265:[9034, 9043]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 331,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "buf.len()",
@@ -7238,12 +7122,15 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::len",
-      "target_kind": "external",
+      "target": "unresolved .len",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
       "generated_by": {
@@ -7252,48 +7139,49 @@
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 285
+            "line": 273
           },
-          "line": 285,
+          "line": 274,
           "occurrence": 0
         },
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 302
+            "line": 280
           },
-          "line": 302,
+          "line": 281,
           "occurrence": 0
         }
       ],
       "source": "<u32 as Unsigned>::fmt",
       "source_evidence_sites": [
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            9921,
-            9931
+            9431,
+            9442
           ],
-          "line": 285,
+          "line": 274,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
         },
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            10712,
-            10722
+            9695,
+            9706
           ],
-          "line": 302,
+          "line": 281,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
@@ -7301,8 +7189,182 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "divmod100",
-      "target_kind": "node",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 331,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 287
+          },
+          "line": 288,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 289
+          },
+          "line": 290,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 291
+          },
+          "line": 292,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 293
+          },
+          "line": 294,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 305
+          },
+          "line": 306,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 307
+          },
+          "line": 308,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 319
+          },
+          "line": 319,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u32 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10042,
+            10049
+          ],
+          "line": 288,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10174,
+            10181
+          ],
+          "line": 290,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10306,
+            10313
+          ],
+          "line": 292,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10438,
+            10445
+          ],
+          "line": 294,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10878,
+            10885
+          ],
+          "line": 306,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11009,
+            11016
+          ],
+          "line": 308,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11464,
+            11471
+          ],
+          "line": 319,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -7837,18 +7899,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:144:[4457, 4480]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Unsigned::MAX.ilog10()",
@@ -7877,8 +7938,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl u64>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -7969,242 +8032,6 @@
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 332,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 274
-          },
-          "line": 274,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 281
-          },
-          "line": 281,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u64 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9431,
-            9442
-          ],
-          "line": 274,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9695,
-            9706
-          ],
-          "line": 281,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 332,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 288
-          },
-          "line": 288,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 290
-          },
-          "line": 290,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 292
-          },
-          "line": 292,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 294
-          },
-          "line": 294,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 306
-          },
-          "line": 306,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 308
-          },
-          "line": 308,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 319
-          },
-          "line": 319,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u64 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10042,
-            10049
-          ],
-          "line": 288,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10174,
-            10181
-          ],
-          "line": 290,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10306,
-            10313
-          ],
-          "line": 292,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10438,
-            10445
-          ],
-          "line": 294,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10878,
-            10885
-          ],
-          "line": 306,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11009,
-            11016
-          ],
-          "line": 308,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11464,
-            11471
-          ],
-          "line": 319,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
       "evidence_key": "src/lib.rs:271:[9316, 9338]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -8249,11 +8076,9 @@
       "via_use_node": "use core::mem::{self, MaybeUninit}"
     },
     {
-      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 332,
@@ -8262,11 +8087,76 @@
       "relation": "calls",
       "sites": [
         {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 285
+          },
+          "line": 285,
+          "occurrence": 0
+        },
+        {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 302
+          },
+          "line": 302,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u64 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            9921,
+            9931
+          ],
+          "line": 285,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            10712,
+            10722
+          ],
+          "line": 302,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "divmod100",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "expect",
+      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 332,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
           "anchor": ".expect(",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 275
+            "line": 273
           },
           "line": 275,
           "occurrence": 0
@@ -8276,7 +8166,7 @@
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 282
+            "line": 280
           },
           "line": 282,
           "occurrence": 0
@@ -8309,22 +8199,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::expect",
-      "target_kind": "external",
+      "target": "unresolved .expect",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
       "via_use_node": null
     },
     {
+      "callee_name": "get_unchecked",
       "evidence_key": "src/lib.rs:288:[10065, 10080]|src/lib.rs:290:[10197, 10212]|src/lib.rs:292:[10329, 10344]|src/lib.rs:294:[10461, 10476]|src/lib.rs:306:[10901, 10916]|src/lib.rs:308:[11032, 11047]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 332,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": ".get_unchecked(",
@@ -8458,22 +8350,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
+      "callee_name": "len",
       "evidence_key": "src/lib.rs:265:[9034, 9043]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 332,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "buf.len()",
@@ -8502,12 +8396,15 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::len",
-      "target_kind": "external",
+      "target": "unresolved .len",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
       "generated_by": {
@@ -8516,48 +8413,49 @@
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 285
+            "line": 273
           },
-          "line": 285,
+          "line": 274,
           "occurrence": 0
         },
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 302
+            "line": 280
           },
-          "line": 302,
+          "line": 281,
           "occurrence": 0
         }
       ],
       "source": "<u64 as Unsigned>::fmt",
       "source_evidence_sites": [
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            9921,
-            9931
+            9431,
+            9442
           ],
-          "line": 285,
+          "line": 274,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
         },
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            10712,
-            10722
+            9695,
+            9706
           ],
-          "line": 302,
+          "line": 281,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
@@ -8565,8 +8463,182 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "divmod100",
-      "target_kind": "node",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 332,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 287
+          },
+          "line": 288,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 289
+          },
+          "line": 290,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 291
+          },
+          "line": 292,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 293
+          },
+          "line": 294,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 305
+          },
+          "line": 306,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 307
+          },
+          "line": 308,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 319
+          },
+          "line": 319,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u64 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10042,
+            10049
+          ],
+          "line": 288,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10174,
+            10181
+          ],
+          "line": 290,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10306,
+            10313
+          ],
+          "line": 292,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10438,
+            10445
+          ],
+          "line": 294,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10878,
+            10885
+          ],
+          "line": 306,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11009,
+            11016
+          ],
+          "line": 308,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11464,
+            11471
+          ],
+          "line": 319,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -9101,18 +9173,17 @@
       "via_use_node": null
     },
     {
+      "callee_name": "ilog10",
       "evidence_key": "src/lib.rs:144:[4457, 4480]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "OD-8_non_function_source",
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "$Unsigned::MAX.ilog10()",
@@ -9141,8 +9212,10 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::num::<impl u8>::ilog10",
-      "target_kind": "external",
+      "target": "unresolved .ilog10",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an associated const of a builtin type; the const's type is declared in core",
       "via_use_node": null
     },
     {
@@ -9233,242 +9306,6 @@
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 329,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 274
-          },
-          "line": 274,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".try_into()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 281
-          },
-          "line": 281,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u8 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9431,
-            9442
-          ],
-          "line": 274,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".try_into()",
-          "byte_range": [
-            9695,
-            9706
-          ],
-          "line": 281,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::convert::TryInto::try_into",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": {
-        "invocation_file": "src/lib.rs",
-        "invocation_line": 329,
-        "macro": "impl_Unsigned"
-      },
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 288
-          },
-          "line": 288,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 290
-          },
-          "line": 290,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 292
-          },
-          "line": 292,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 294
-          },
-          "line": 294,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 306
-          },
-          "line": 306,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 308
-          },
-          "line": 308,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 319
-          },
-          "line": 319,
-          "occurrence": 0
-        }
-      ],
-      "source": "<u8 as Unsigned>::fmt",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10042,
-            10049
-          ],
-          "line": 288,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10174,
-            10181
-          ],
-          "line": 290,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10306,
-            10313
-          ],
-          "line": 292,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10438,
-            10445
-          ],
-          "line": 294,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            10878,
-            10885
-          ],
-          "line": 306,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11009,
-            11016
-          ],
-          "line": 308,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            11464,
-            11471
-          ],
-          "line": 319,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
       "evidence_key": "src/lib.rs:271:[9316, 9338]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -9513,11 +9350,9 @@
       "via_use_node": "use core::mem::{self, MaybeUninit}"
     },
     {
-      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 329,
@@ -9526,11 +9361,76 @@
       "relation": "calls",
       "sites": [
         {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 285
+          },
+          "line": 285,
+          "occurrence": 0
+        },
+        {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 302
+          },
+          "line": 302,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u8 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            9921,
+            9931
+          ],
+          "line": 285,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            10712,
+            10722
+          ],
+          "line": 302,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "divmod100",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "expect",
+      "evidence_key": "src/lib.rs:275:[9471, 9479]|src/lib.rs:282:[9731, 9739]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 329,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
           "anchor": ".expect(",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 275
+            "line": 273
           },
           "line": 275,
           "occurrence": 0
@@ -9540,7 +9440,7 @@
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 282
+            "line": 280
           },
           "line": 282,
           "occurrence": 0
@@ -9573,22 +9473,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::result::Result::expect",
-      "target_kind": "external",
+      "target": "unresolved .expect",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of try_into, which has no target",
       "via_use_node": null
     },
     {
+      "callee_name": "get_unchecked",
       "evidence_key": "src/lib.rs:288:[10065, 10080]|src/lib.rs:290:[10197, 10212]|src/lib.rs:292:[10329, 10344]|src/lib.rs:294:[10461, 10476]|src/lib.rs:306:[10901, 10916]|src/lib.rs:308:[11032, 11047]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 329,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": ".get_unchecked(",
@@ -9722,22 +9624,24 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
+      "callee_name": "len",
       "evidence_key": "src/lib.rs:265:[9034, 9043]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": {
         "invocation_file": "src/lib.rs",
         "invocation_line": 329,
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": "buf.len()",
@@ -9766,12 +9670,15 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::len",
-      "target_kind": "external",
+      "target": "unresolved .len",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:285:[9921, 9931]|src/lib.rs:302:[10712, 10722]",
+      "callee_name": "try_into",
+      "evidence_key": "src/lib.rs:274:[9431, 9442]|src/lib.rs:281:[9695, 9706]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
       "generated_by": {
@@ -9780,48 +9687,49 @@
         "macro": "impl_Unsigned"
       },
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 285
+            "line": 273
           },
-          "line": 285,
+          "line": 274,
           "occurrence": 0
         },
         {
-          "anchor": "divmod100(",
+          "anchor": ".try_into()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 302
+            "line": 280
           },
-          "line": 302,
+          "line": 281,
           "occurrence": 0
         }
       ],
       "source": "<u8 as Unsigned>::fmt",
       "source_evidence_sites": [
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            9921,
-            9931
+            9431,
+            9442
           ],
-          "line": 285,
+          "line": 274,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
         },
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".try_into()",
           "byte_range": [
-            10712,
-            10722
+            9695,
+            9706
           ],
-          "line": 302,
+          "line": 281,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
@@ -9829,8 +9737,182 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "divmod100",
-      "target_kind": "node",
+      "target": "unresolved .try_into",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of a call into core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:288:[10042, 10049]|src/lib.rs:290:[10174, 10181]|src/lib.rs:292:[10306, 10313]|src/lib.rs:294:[10438, 10445]|src/lib.rs:306:[10878, 10885]|src/lib.rs:308:[11009, 11016]|src/lib.rs:319:[11464, 11471]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 329,
+        "macro": "impl_Unsigned"
+      },
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 287
+          },
+          "line": 288,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 289
+          },
+          "line": 290,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 291
+          },
+          "line": 292,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 293
+          },
+          "line": 294,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 305
+          },
+          "line": 306,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 307
+          },
+          "line": 308,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 319
+          },
+          "line": 319,
+          "occurrence": 0
+        }
+      ],
+      "source": "<u8 as Unsigned>::fmt",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10042,
+            10049
+          ],
+          "line": 288,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10174,
+            10181
+          ],
+          "line": 290,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10306,
+            10313
+          ],
+          "line": 292,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10438,
+            10445
+          ],
+          "line": 294,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            10878,
+            10885
+          ],
+          "line": 306,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11009,
+            11016
+          ],
+          "line": 308,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            11464,
+            11471
+          ],
+          "line": 319,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -10987,126 +11069,6 @@
       "via_use_node": "use core::hint"
     },
     {
-      "evidence_key": "src/lib.rs:107:[3279, 3287]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".cast::<",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 107
-          },
-          "line": 107,
-          "occurrence": 0
-        }
-      ],
-      "source": "Buffer::format",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".cast::<",
-          "byte_range": [
-            3279,
-            3287
-          ],
-          "line": 107,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::ptr::<impl *mut T>::cast",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:107:[3266, 3279]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".as_mut_ptr()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 107
-          },
-          "line": 107,
-          "occurrence": 0
-        }
-      ],
-      "source": "Buffer::format",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".as_mut_ptr()",
-          "byte_range": [
-            3266,
-            3279
-          ],
-          "line": 107,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::as_mut_ptr",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "evidence_key": "src/lib.rs:109:[3368, 3380]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": "string.len()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 109
-          },
-          "line": 109,
-          "occurrence": 0
-        }
-      ],
-      "source": "Buffer::format",
-      "source_evidence_sites": [
-        {
-          "anchor_text": "string.len()",
-          "byte_range": [
-            3368,
-            3380
-          ],
-          "line": 109,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::str::<impl str>::len",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
       "evidence_key": "src/lib.rs:108:[3322, 3330]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -11144,6 +11106,131 @@
       "source_site_evidence_status": "EXACT",
       "target": "private::Sealed::write",
       "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "evidence_key": "src/lib.rs:109:[3368, 3380]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [
+        "external_identity_unverified",
+        "receiver_type_from_declared_return_type_of_private::Sealed::write"
+      ],
+      "generated_by": null,
+      "relation": "calls",
+      "sites": [
+        {
+          "anchor": "string.len()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 109
+          },
+          "line": 109,
+          "occurrence": 0
+        }
+      ],
+      "source": "Buffer::format",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "string.len()",
+          "byte_range": [
+            3368,
+            3380
+          ],
+          "line": 109,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "str::len",
+      "target_kind": "external",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "as_mut_ptr",
+      "evidence_key": "src/lib.rs:107:[3266, 3279]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".as_mut_ptr()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 107
+          },
+          "line": 107,
+          "occurrence": 0
+        }
+      ],
+      "source": "Buffer::format",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".as_mut_ptr()",
+          "byte_range": [
+            3266,
+            3279
+          ],
+          "line": 107,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .as_mut_ptr",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array behind a raw-pointer cast chain; its methods are declared in core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "cast",
+      "evidence_key": "src/lib.rs:107:[3279, 3287]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".cast::<",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 107
+          },
+          "line": 107,
+          "occurrence": 0
+        }
+      ],
+      "source": "Buffer::format",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".cast::<",
+          "byte_range": [
+            3279,
+            3287
+          ],
+          "line": 107,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .cast",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is the result of as_mut_ptr, which has no target",
       "via_use_node": null
     },
     {
@@ -16078,35 +16165,53 @@
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:413:[14755, 14761]",
+      "evidence_key": "src/lib.rs:417:[14883, 14893]|src/lib.rs:431:[15489, 15499]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "trait_method"
-      ],
+      "flags": [],
       "generated_by": null,
       "relation": "calls",
       "sites": [
         {
-          "anchor": ".rev()",
+          "anchor": "divmod100(",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 413
+            "line": 417
           },
-          "line": 413,
+          "line": 417,
+          "occurrence": 0
+        },
+        {
+          "anchor": "divmod100(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 431
+          },
+          "line": 431,
           "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
       "source_evidence_sites": [
         {
-          "anchor_text": ".rev()",
+          "anchor_text": "divmod100(",
           "byte_range": [
-            14755,
-            14761
+            14883,
+            14893
           ],
-          "line": 413,
+          "line": 417,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": "divmod100(",
+          "byte_range": [
+            15489,
+            15499
+          ],
+          "line": 431,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
@@ -16114,205 +16219,18 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::iter::Iterator::rev",
-      "target_kind": "external",
+      "target": "divmod100",
+      "target_kind": "node",
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:420:[14985, 14992]|src/lib.rs:422:[15110, 15117]|src/lib.rs:424:[15235, 15242]|src/lib.rs:426:[15360, 15367]|src/lib.rs:433:[15551, 15558]|src/lib.rs:434:[15638, 15645]|src/lib.rs:435:[15725, 15732]|src/lib.rs:436:[15812, 15819]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 420
-          },
-          "line": 420,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 422
-          },
-          "line": 422,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 424
-          },
-          "line": 424,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 426
-          },
-          "line": 426,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 433
-          },
-          "line": 433,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 434
-          },
-          "line": 434,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 435
-          },
-          "line": 435,
-          "occurrence": 0
-        },
-        {
-          "anchor": ".write(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 436
-          },
-          "line": 436,
-          "occurrence": 0
-        }
-      ],
-      "source": "enc_16lsd",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            14985,
-            14992
-          ],
-          "line": 420,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15110,
-            15117
-          ],
-          "line": 422,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15235,
-            15242
-          ],
-          "line": 424,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15360,
-            15367
-          ],
-          "line": 426,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15551,
-            15558
-          ],
-          "line": 433,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15638,
-            15645
-          ],
-          "line": 434,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15725,
-            15732
-          ],
-          "line": 435,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": ".write(",
-          "byte_range": [
-            15812,
-            15819
-          ],
-          "line": 436,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::mem::MaybeUninit::write",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
+      "callee_name": "get_unchecked",
       "evidence_key": "src/lib.rs:420:[15008, 15023]|src/lib.rs:422:[15133, 15148]|src/lib.rs:424:[15258, 15273]|src/lib.rs:426:[15383, 15398]|src/lib.rs:433:[15574, 15589]|src/lib.rs:434:[15661, 15676]|src/lib.rs:435:[15748, 15763]|src/lib.rs:436:[15835, 15850]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
+      "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
           "anchor": ".get_unchecked(",
@@ -16488,58 +16406,41 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:417:[14883, 14893]|src/lib.rs:431:[15489, 15499]",
+      "callee_name": "rev",
+      "evidence_key": "src/lib.rs:413:[14755, 14761]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "resolution_status": "unresolved",
       "sites": [
         {
-          "anchor": "divmod100(",
+          "anchor": ".rev()",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
-            "line": 417
+            "line": 413
           },
-          "line": 417,
-          "occurrence": 0
-        },
-        {
-          "anchor": "divmod100(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 431
-          },
-          "line": 431,
+          "line": 413,
           "occurrence": 0
         }
       ],
       "source": "enc_16lsd",
       "source_evidence_sites": [
         {
-          "anchor_text": "divmod100(",
+          "anchor_text": ".rev()",
           "byte_range": [
-            14883,
-            14893
+            14755,
+            14761
           ],
-          "line": 417,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        },
-        {
-          "anchor_text": "divmod100(",
-          "byte_range": [
-            15489,
-            15499
-          ],
-          "line": 431,
+          "line": 413,
           "range_status": "EXACT_ANCHOR",
           "source_path": "src/lib.rs",
           "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
@@ -16547,8 +16448,199 @@
       ],
       "source_kind": "node",
       "source_site_evidence_status": "EXACT",
-      "target": "divmod100",
-      "target_kind": "node",
+      "target": "unresolved .rev",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a range expression; its type and the trait method are declared in core",
+      "via_use_node": null
+    },
+    {
+      "callee_name": "write",
+      "evidence_key": "src/lib.rs:420:[14985, 14992]|src/lib.rs:422:[15110, 15117]|src/lib.rs:424:[15235, 15242]|src/lib.rs:426:[15360, 15367]|src/lib.rs:433:[15551, 15558]|src/lib.rs:434:[15638, 15645]|src/lib.rs:435:[15725, 15732]|src/lib.rs:436:[15812, 15819]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 419
+          },
+          "line": 420,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 421
+          },
+          "line": 422,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 423
+          },
+          "line": 424,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 425
+          },
+          "line": 426,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 433
+          },
+          "line": 433,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 434
+          },
+          "line": 434,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 435
+          },
+          "line": 435,
+          "occurrence": 0
+        },
+        {
+          "anchor": ".write(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 436
+          },
+          "line": 436,
+          "occurrence": 0
+        }
+      ],
+      "source": "enc_16lsd",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            14985,
+            14992
+          ],
+          "line": 420,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15110,
+            15117
+          ],
+          "line": 422,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15235,
+            15242
+          ],
+          "line": 424,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15360,
+            15367
+          ],
+          "line": 426,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15551,
+            15558
+          ],
+          "line": 433,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15638,
+            15645
+          ],
+          "line": 434,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15725,
+            15732
+          ],
+          "line": 435,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        },
+        {
+          "anchor_text": ".write(",
+          "byte_range": [
+            15812,
+            15819
+          ],
+          "line": 436,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .write",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an element of the buffer; indexing and the methods of its element type are declared in core",
       "via_use_node": null
     },
     {
@@ -19921,46 +20013,6 @@
       "via_use_node": null
     },
     {
-      "evidence_key": "src/lib.rs:249:[8340, 8358]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": "buf.get_unchecked(",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 249
-          },
-          "line": 249,
-          "occurrence": 0
-        }
-      ],
-      "source": "slice_buffer_to_str",
-      "source_evidence_sites": [
-        {
-          "anchor_text": "buf.get_unchecked(",
-          "byte_range": [
-            8340,
-            8358
-          ],
-          "line": 249,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "core::slice::<impl [T]>::get_unchecked",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
       "evidence_key": "src/lib.rs:252:[8547, 8572]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -19999,6 +20051,48 @@
       "target": "core::str::from_utf8_unchecked",
       "target_kind": "external",
       "via_use_node": "use core::str"
+    },
+    {
+      "callee_name": "get_unchecked",
+      "evidence_key": "src/lib.rs:249:[8340, 8358]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": "buf.get_unchecked(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 249
+          },
+          "line": 249,
+          "occurrence": 0
+        }
+      ],
+      "source": "slice_buffer_to_str",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "buf.get_unchecked(",
+          "byte_range": [
+            8340,
+            8358
+          ],
+          "line": 249,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .get_unchecked",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is an array or a slice; its methods are declared in core",
+      "via_use_node": null
     },
     {
       "evidence_key": "src/lib.rs:247:[8197, 8212]|src/lib.rs:252:[8586, 8610]",

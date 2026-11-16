@@ -78,6 +78,7 @@ The dataset is never edited to match production: each change cites the source li
   pass, and also that a site whose target source cannot prove matches an expected
   unresolved row. With method calls into unread `core` the graph stays incomplete, so the
   two rules cannot both hold.
-- **Q2** Whether the crate root is a node (the draft has `itoa`; see OD-7 in the backlog).
+- **Q2 (decided 2026-11-16 from PRD graph rule 1).** The crate root is a node: every module
+  is. It has no edge until OD-7 (file module and file area) is decided.
 - **Q3** Which type mentions in a function body are `uses_type` rows (turbofish arguments,
   `as` casts, `let` annotations, array types). The draft lists one.

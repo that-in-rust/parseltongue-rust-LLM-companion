@@ -5,8 +5,8 @@
 Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, body types, literals and repeated same-line sites are not covered. Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.
 
 ```text
-candidate_nodes: 91
-eligible_nodes: 44
+candidate_nodes: 152
+eligible_nodes: 105
 blocked_nodes: 47
 candidate_edges: 451
 eligible_edges: 45
@@ -24,7 +24,8 @@ relation reads: 62
 relation generates: 45
 relation expands: 15
 target builtin: 57
-target external: 119
+target external: 65
 target node: 275
+target unresolved: 54
 source commit: af77385d0daf4d0e949e81f2588be2e44f69f086
 ```

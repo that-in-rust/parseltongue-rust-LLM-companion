@@ -137,6 +137,71 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 16:05 IST — Part 7 step 7.2c: method calls, external and builtin nodes in the expected graph
+
+- **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed; the
+  expected graph is still an unreviewed draft. Part 7 Q1 (may a graph marked incomplete
+  pass) is not answered; this step assumes the answer I recommended and can be undone.
+- **Changed:** the dataset builder, one line of its rules file, and the files the builder
+  writes. No production code.
+
+```text
+change                                                        basis
+132 method calls are expected rows without a target, reason   SPEC part 4 (the path does not prove it
+  trait_solver_needed, each with the receiver fact that          leaves read source); lib.rs lines per row
+  stops the proof (10 method names)
+5 x self.unsigned_abs() -> iN::unsigned_abs                   lib.rs 171; self is by value in an impl
+                                                                 whose self type is the builtin iN
+string.len() -> str::len                                      lib.rs 109, 131: Sealed::write is
+                                                                 declared -> &str
+5 x Unsigned::fmt(self.unsigned_abs(), ..) -> the trait's     lib.rs 170-171: the argument's type is
+  declaration Unsigned::fmt (was <uN as Unsigned>::fmt)          the return type of a core method
+61 nodes without a file: 48 names outside itoa, 13 builtin    PRD: one node per written name; one per
+  types an edge starts from or ends at                           builtin type at an edge end
+a method call chain over several lines starts at its          lib.rs 273-275, 280-282, 287-294,
+  receiver's line                                                305-308, 419-426
+```
+
+- **Decision (mine, from PRD graph rule 1 "every module is a node"):** the crate-root node
+  `itoa` stays in the expected graph. Production stores the modules `u128_ext` and `private`
+  but not the crate root.
+- **Command:** the builder as in the 14:40 entry; a second run into another directory gave
+  identical files. Unit tests: `Ran 16 tests`, `OK`. Builder output: `candidate_nodes: 152`,
+  `candidate_edges: 451`.
+- **Measured against production rows** (throwaway script):
+
+```text
+NODES expected 152 production 145 both 145
+ expected only: ['i128::unsigned_abs', 'i16::unsigned_abs', 'i32::unsigned_abs', 'i64::unsigned_abs', 'i8::unsigned_abs', 'itoa', 'str::len']
+ production only: 0 Counter()
+SITES expected 587 production 585 matched 488 | production rows with no source line: {'contains': 45, 'implements': 28}
+ calls       expected  197 production  197 matched  191
+ contains    expected   88 production   88 matched   25
+ expands     expected   15 production   15 matched   15
+ generates   expected   45 production   45 matched   45
+ implements  expected   32 production   32 matched    4
+ imports     expected    4 production    4 matched    4
+ reads       expected   98 production   98 matched   98
+ uses_type   expected  108 production  106 matched  106
+```
+
+- **Reading:** `contains` (88 of 88) and `implements` (32 of 32) match by source, relation
+  and target; their production rows mostly carry no source line. Every other row matches by
+  site except eight, all production misses:
+
+```text
+rows  site                                   expected                 production
+5     self.unsigned_abs(), lib.rs 171        iN::unsigned_abs         no target
+1     string.len(), lib.rs 109               str::len                 no target
+1     cast::<I::Buffer>(), lib.rs 107        uses_type Sealed::Buffer no row
+1     *const [MaybeUninit<u8>], lib.rs 252   uses_type MaybeUninit    no row
+```
+
+  and seven nodes: the six names above and the crate root `itoa`.
+- **Weak points:** sites are compared by the line of their first token, not by byte range;
+  the comparison is a script, not a test; nobody but me has reviewed a row.
+- **Next:** the comparison as a real-source test, byte ranges, then the eight rows.
+
 ### 2026-11-16 15:10 IST — Part 7 step 7.2b: macro definitions, macro calls, generates and expands in the expected graph
 
 - **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed; the
