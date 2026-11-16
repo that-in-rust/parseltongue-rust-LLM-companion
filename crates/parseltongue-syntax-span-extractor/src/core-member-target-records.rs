@@ -531,16 +531,23 @@ pub(crate) fn find_alias_receiver_type(
     }))
 }
 
+/// One `&` or `&mut` taken off the front of a written type; `None` when there is none.
+fn strip_reference_layer_prefix<'text>(written: &&'text str) -> Option<&'text str> {
+    let inner = written.strip_prefix('&')?.trim_start();
+    Some(inner.strip_prefix("mut ").map_or(inner, str::trim_start))
+}
+
 /// REQ-RUST-057.0 A2: the reference layers and `NAME` of a written type that is
-/// `Self::NAME` behind `&` and `&mut` only.
+/// `Self::NAME` behind `&` and `&mut` only. White space between the tokens changes
+/// nothing: a macro expansion writes `&mut Self ::NAME`.
 fn read_self_alias_parts(text: &str) -> Option<(&str, &str)> {
     let text = text.trim();
-    let mut rest = text;
-    while let Some(next) = rest.strip_prefix('&') {
-        rest = next.trim_start();
-        rest = rest.strip_prefix("mut ").map_or(rest, str::trim_start);
-    }
-    let name = rest.strip_prefix("Self::")?;
+    let rest = std::iter::successors(Some(text), strip_reference_layer_prefix).last()?;
+    let name = rest
+        .strip_prefix("Self")?
+        .trim_start()
+        .strip_prefix("::")?
+        .trim_start();
     (!name.is_empty()
         && name
             .chars()

@@ -853,3 +853,33 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  not done    no SOP step was run for this head. S1 to S4: NOT STARTED.
 ```
 
+
+## 2026-11-16 22:50 IST Part 8 step 8.3b-2b closed: a type written by a macro expansion
+
+```text
+ cause       a macro expansion writes the parameter type as `&mut Self ::Buffer`, with a
+             space. read_self_alias_parts matched the text `Self::` and missed it. Seen in
+             the stored rows of a run: 37 calls carried receiver_written_type_text
+             "&mut Self ::Buffer" and the reason receiver_type_name_unproven.
+ RED         fixture in test_alias_parameter_core_member: the same impl with the type
+             written `& mut Self :: Store` stayed without a target
+ GREEN       read_self_alias_parts reads `Self`, `::` and the name with any white space
+             between them; strip_reference_layer_prefix takes one `&` or `&mut` off
+ real source test_itoa_core_member_targets, against the frozen expected rows
+               before   stored 17   equal 17   wrong 0   without a target 116
+               after    stored 50   equal 50   wrong 0   without a target  83
+               49 MaybeUninit<T>::write (all of them), 1 [T]::get_unchecked
+             the 4 buf.len() calls of impl_Unsigned moved to the reason scope_trait_may_fit,
+             as the fifth one already was
+             nodes 153, edge rows 682, calls 197; edge rows with a target 599 of 682
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, extractor and cli crates             ok
+             extractor tests                                          177 passed, 0 failed
+             real-source tests, frozen executable                     60 passed, 0 failed, 906 s
+             executable sha256 2004bd6262fe63b1..., same before and after the run
+             not run: the workspace clippy, test and build gates
+ not done    S1 to S4 for this head: NOT STARTED. 83 calls into core have no target.
+             The "Where we are" page above still shows 81 of 197; it is updated with the
+             next step.
+```
+

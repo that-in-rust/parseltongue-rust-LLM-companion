@@ -366,7 +366,7 @@ fn test_parameter_receiver_core_member() {
 /// supertrait of its trait; every other case keeps the call without a target.
 #[test]
 fn test_alias_parameter_core_member() {
-    let named = |source: &str| {
+    let named = |source: &str, written: &str| {
         let (edge, metadata) = read_core_fixture_rows(source, true, true, "", true);
         assert_eq!(
             make_core_member_target("MaybeUninit<T>::write"),
@@ -379,7 +379,7 @@ fn test_alias_parameter_core_member() {
             lookup["receiver_type_proof_kind"]
         );
         assert_eq!("[MaybeUninit<u8>; 3]", lookup["associated_type_alias_text"]);
-        assert_eq!("&mut Self::Store", lookup["receiver_written_type_text"]);
+        assert_eq!(written, lookup["receiver_written_type_text"]);
         assert_eq!("MaybeUninit<u8>", lookup["receiver_type_text"]);
         assert!(
             lookup["lookup_assumption_values"]
@@ -413,6 +413,14 @@ fn test_alias_parameter_core_member() {
         "struct Buffer; trait Sealed { type Store; fn put(self, buf: &mut Self::Store); } \
          impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; \
          fn put(self, buf: &mut Self::Store) { buf[0].write(1); } }",
+        "&mut Self::Store",
+    );
+    // A2: white space between the tokens, as a macro expansion writes them, changes nothing.
+    named(
+        "struct Buffer; trait Sealed { type Store; fn put(self, buf: &mut Self ::Store); } \
+         impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; \
+         fn put(self, buf: & mut Self :: Store) { buf[0].write(1); } }",
+        "& mut Self :: Store",
     );
     // A5: an impl of a supertrait of the function's impl's trait writes it.
     named(
@@ -420,6 +428,7 @@ fn test_alias_parameter_core_member() {
          trait Unsigned: Middle { fn fmt(self, buf: &mut Self::Store); } \
          impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; } \
          impl Unsigned for u8 { fn fmt(self, buf: &mut Self::Store) { buf[0].write(1); } }",
+        "&mut Self::Store",
     );
     // A5: no stored supertrait bound leads from the function's trait to the type's trait.
     assert_eq!(

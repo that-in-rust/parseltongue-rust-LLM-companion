@@ -1,7 +1,7 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-16: **steps 8.1 to 8.3b-2a built; 8.3b-2b open (one real-source test
-fails). The order changed by user decision: the expected target of all 133 calls is written
+Status on 2026-11-16: **steps 8.1 to 8.3b-2b built: 50 of the 133 calls are named and equal
+their frozen rows, 83 have no target. The order changed by user decision: the expected target of all 133 calls is written
 from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
 it.** Counts are on the log's "Where we are" page.
 
