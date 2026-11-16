@@ -1634,11 +1634,32 @@ fn read_parameter_written_type(
     input: &SyntaxFileInputData,
     removed: &[usize],
 ) -> Option<Value> {
-    let range = parameter.ty()?.syntax().text_range();
-    let start = restore_source_byte_offset(range.start(), removed);
-    let end = restore_source_byte_offset(range.end(), removed);
-    let text = std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()?;
-    Some(json!({"span_byte_start_offset":start,"span_byte_end_offset":end,"type_source_text":text}))
+    let written = parameter.ty()?;
+    let read_source_range = |node: &SyntaxNode| {
+        let range = node.text_range();
+        let start = restore_source_byte_offset(range.start(), removed);
+        let end = restore_source_byte_offset(range.end(), removed);
+        let text = std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()?;
+        Some(
+            json!({"span_byte_start_offset":start,"span_byte_end_offset":end,"type_source_text":text}),
+        )
+    };
+    // R5: a path under an expression (an array length, a const argument) is not a type.
+    let paths = written
+        .syntax()
+        .descendants()
+        .filter(|path| path.kind() == SyntaxKind::PATH_TYPE)
+        .filter(|path| {
+            !path
+                .ancestors()
+                .take_while(|holder| holder != written.syntax())
+                .any(|holder| ast::Expr::can_cast(holder.kind()))
+        })
+        .map(|path| read_source_range(&path))
+        .collect::<Option<Vec<_>>>()?;
+    let mut evidence = read_source_range(written.syntax())?;
+    evidence["type_path_range_rows"] = json!(paths);
+    Some(evidence)
 }
 
 /// Syntax-only evidence for one bound: what it bounds (a type parameter, the

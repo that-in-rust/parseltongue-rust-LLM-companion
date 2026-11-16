@@ -142,3 +142,32 @@ fn test_parameter_written_type_rows() {
         assert_eq!(None, read(call), "{call}");
     }
 }
+
+/// REQ-RUST-055.0 R5: each type path in a parameter's written type, by its own range,
+/// which is the key of its stored resolution. A path in an array length is not a type.
+#[test]
+fn test_written_type_path_ranges() {
+    let source =
+        "fn f(a: &mut [m::Slot<u8>; size_of::<Inner>()], b: Wide) { a[0].set(1); b.go(); }\n";
+    let read = |call: &str| {
+        let evidence = read_method_receiver_evidence(source, call);
+        let step = &evidence["receiver_place_step_rows"][0];
+        step["receiver_written_type_evidence"]["type_path_range_rows"]
+            .as_array()
+            .map(|rows| {
+                rows.iter()
+                    .map(|row| {
+                        let start = row["span_byte_start_offset"].as_u64().unwrap() as usize;
+                        let end = row["span_byte_end_offset"].as_u64().unwrap() as usize;
+                        assert_eq!(Some(&source[start..end]), row["type_source_text"].as_str());
+                        source[start..end].to_owned()
+                    })
+                    .collect::<Vec<_>>()
+            })
+    };
+    assert_eq!(
+        Some(vec!["m::Slot<u8>".to_owned(), "u8".to_owned()]),
+        read("a[0].set(1)")
+    );
+    assert_eq!(Some(vec!["Wide".to_owned()]), read("b.go()"));
+}

@@ -614,6 +614,8 @@ fn test_capture_generic_receiver_evidence() {
                 "span_byte_start_offset":41,
                 "span_byte_end_offset":42,
                 "type_source_text":"I",
+                // REQ-RUST-055.0 R5
+                "type_path_range_rows":[{"span_byte_start_offset":41,"span_byte_end_offset":42,"type_source_text":"I"}],
             },
             // REQ-RUST-055.0 R2
             "receiver_place_step_rows":[{
@@ -623,6 +625,7 @@ fn test_capture_generic_receiver_evidence() {
                     "span_byte_start_offset":41,
                     "span_byte_end_offset":42,
                     "type_source_text":"I",
+                    "type_path_range_rows":[{"span_byte_start_offset":41,"span_byte_end_offset":42,"type_source_text":"I"}],
                 },
             }],
         })

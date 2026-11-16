@@ -401,3 +401,18 @@ WEAK   the probe tests were seen failing on the stub only
 NOT RUN the real-source itoa tests (the declaration row count changes) and the workspace tests
 NEXT   8.3b: connect the probe to the resolver; real-source test on pinned itoa
 ```
+
+## TDD entry — step 8.3b-1 (i), type path ranges on a parameter's written type (REQ-RUST-055.0 R5)
+
+```text
+WHY    a stored path resolution is keyed by the path's own byte range; the lookup needs that key
+       to show that itoa's MaybeUninit is core's
+RED    cargo test --release -p parseltongue-syntax-span-extractor test_written_type_path_ranges
+       0 passed, 1 failed: left Some(["m::Slot<u8>", "u8"]), right None
+GREEN  read_parameter_written_type adds type_path_range_rows; crate 153 passed
+BREAK  a path under an expression counted -> first not caught (the fixture's array length held no
+       type path); fixture changed to size_of::<Inner>() and the break then fails the test
+GATES  cargo fmt --check and clippy --all-targets -D warnings pass on the crate
+REFACTOR none
+NEXT   8.3b-1 (ii): the L2 lookup for parameter receivers with a plain written type (9 itoa sites)
+```
