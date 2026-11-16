@@ -186,7 +186,7 @@ SOP      SOP-itoa-full-item-graph-acceptance.md         steps S1–S4 that decid
 PRD      PRD-itoa-full-item-graph-scope.md              what is built and what is out of scope
 ARCH     ARCH-itoa-full-item-graph-pipeline.md          pipeline, tables, graph rules
 TARGET   itoa-target-dataset/                           the expected itoa graph and its builder
-LOG      LOG-itoa-full-item-graph-progress.md           the progress record: a "Where we are" page, then entries (older ones in LOG-itoa-full-item-graph-entries-history.md)
+LOG      LOG-itoa-full-item-graph-progress.md           the progress record: a "Where we are" page, then entries (the log up to step 7.8 is in git at cb40f3d2f)
 BACKLOG  BACKLOG-deferred-work-open-decisions.md        deferred work and open decisions
 MAP      MAP-parseltongue-crates-as-measured.md         crates, files, verbs, stages as measured
 SPEC     SPEC-itoa-full-item-graph/                     README.md is the index; one part file per

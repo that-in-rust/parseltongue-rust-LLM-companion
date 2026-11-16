@@ -1,8 +1,8 @@
 # LOG — progress on the itoa full item graph
 
 **Where we are** (below) is rewritten in place whenever it changes. **Entries** are added at
-the bottom, never edited. Entries up to step 7.8 are in
-[the history file](LOG-itoa-full-item-graph-entries-history.md).
+the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
+`git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
 ## Where we are (2026-11-16, commit `cb40f3d2f`)
 
