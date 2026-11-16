@@ -2,8 +2,8 @@ use super::resolve_snapshot_read_scope;
 use crate::{TursoWorkspaceStoreAdapter, build_store_backend_error, check_sync_runtime_context};
 use parseltongue_core_row_types::{
     CompilationUnitRoleKind, CrateCompilationUnitKey, FileAreaIdentityKey, HldEdgeInputRecord,
-    HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldEvidenceRowKey,
-    HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
+    HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldEvidenceRowKey, HldExternalNameKind,
+    HldExternalNamedKey, HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
     HldNodeInputCategory, HldNodeInputRecord, HldOwnerKindValue, HldRelationKindValue,
     HldSourceCoverageKind, HldTargetIdentityValue, HldUnitOriginKind, HldUnitProvenanceRecord,
     HldUnresolvedReasonKind, NameSymbolTargetKey, RunCancelFlagValue, RunGenerationDigestValue,
@@ -1107,6 +1107,29 @@ fn decode_target_identity_value(
                     .map_err(malformed)?,
             ),
         )),
+        "ExternalNamed" => {
+            let kind = match required_string(value, "external_name_kind").map_err(malformed)? {
+                "crate_rooted_path" => HldExternalNameKind::CrateRootedPath,
+                "prelude_name" => HldExternalNameKind::PreludeName,
+                "builtin_member" => HldExternalNameKind::BuiltinMember,
+                _ => return Err(malformed("unknown external name kind".into())),
+            };
+            let crate_name = match &value["external_crate_name"] {
+                Value::Null => None,
+                Value::String(name) => Some(name.clone()),
+                _ => return Err(malformed("external crate name is not a string".into())),
+            };
+            if value["external_source_read_flag"] != Value::Bool(false) {
+                return Err(malformed("external source read flag is not false".into()));
+            }
+            Ok(HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+                external_name_kind_value: kind,
+                external_crate_name_value: crate_name,
+                external_item_path_text: required_string(value, "external_item_path_text")
+                    .map_err(malformed)?
+                    .into(),
+            }))
+        }
         "FilePublicArea" => {
             let unit = decode_output_unit_identity(&value["unit_compilation_identity"])
                 .map_err(malformed)?;
@@ -1618,7 +1641,66 @@ fn check_graph_input_cancelled(
 
 #[cfg(test)]
 mod full_graph_codec_tests {
+    use super::super::hld_graph_publication_turso::encode_target_identity_json;
     use super::*;
+
+    /// REQ-RUST-053.0 N1: a named external target is stored with its kind, its crate when
+    /// the source writes one, its written path, and a flag that its source was not read.
+    #[test]
+    fn test_external_target_codec_roundtrip() {
+        let row = StageTableRowRecord {
+            stage_owned_table_name: "edge-evidence-record-table".into(),
+            stage_row_record_key: "row".into(),
+            stage_row_payload_text: String::new(),
+        };
+        let build = |kind, crate_name: Option<&str>, path: &str| {
+            HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+                external_name_kind_value: kind,
+                external_crate_name_value: crate_name.map(str::to_owned),
+                external_item_path_text: path.into(),
+            })
+        };
+        let rooted = build(
+            HldExternalNameKind::CrateRootedPath,
+            Some("core"),
+            "core::mem::MaybeUninit",
+        );
+        let stored = encode_target_identity_json(&rooted);
+        assert_eq!(
+            stored,
+            json!({
+                "kind": "ExternalNamed",
+                "external_name_kind": "crate_rooted_path",
+                "external_crate_name": "core",
+                "external_item_path_text": "core::mem::MaybeUninit",
+                "external_source_read_flag": false
+            })
+        );
+        for target in [
+            rooted,
+            build(HldExternalNameKind::PreludeName, None, "Default"),
+            build(HldExternalNameKind::BuiltinMember, None, "u8::MAX"),
+        ] {
+            assert_eq!(
+                decode_target_identity_value(&encode_target_identity_json(&target), &row).ok(),
+                Some(target)
+            );
+        }
+        for (field, value) in [
+            ("external_source_read_flag", json!(true)),
+            ("external_source_read_flag", Value::Null),
+            ("external_name_kind", json!("definition")),
+            ("external_crate_name", json!(1)),
+            ("external_item_path_text", Value::Null),
+        ] {
+            let mut changed = stored.clone();
+            changed[field] = value;
+            assert!(
+                decode_target_identity_value(&changed, &row).is_err(),
+                "{field}"
+            );
+        }
+    }
 
     /// REQ-RUST-045.0
     #[test]

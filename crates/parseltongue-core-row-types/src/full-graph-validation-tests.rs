@@ -249,3 +249,130 @@ fn test_builtin_source_implements_only() {
         Err(HldMaterializationValidationError::MissingUnitProvenance)
     );
 }
+
+/// The fixture with one named external node, and its one edge re-targeted to that node.
+fn build_external_target_fixture(
+    kind: HldExternalNameKind,
+    crate_name: Option<&str>,
+    path: &str,
+) -> HldMaterializationInputRecord {
+    let mut input = build_full_graph_fixture();
+    let external = HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+        external_name_kind_value: kind,
+        external_crate_name_value: crate_name.map(str::to_owned),
+        external_item_path_text: path.into(),
+    });
+    input.input_node_records.push(HldNodeInputRecord {
+        run_generation_digest_value: RunGenerationDigestValue([0; 32]),
+        node_target_reference: external.clone(),
+        node_input_category: HldNodeInputCategory::ExternalDefinition,
+        node_item_kind_value: None,
+        node_owner_kind_value: None,
+        node_function_body_ancestry_flag: false,
+        node_effective_visibility_kind: None,
+        node_reachable_outside_crate_flag: None,
+        node_source_relative_path: None,
+        node_qualified_path_text: path.into(),
+        node_signature_text: None,
+        node_generating_call_reference: None,
+    });
+    let edge = &mut input.input_edge_records[0];
+    edge.edge_resolution_value = HldEdgeResolutionValue::Extracted {
+        target: external.clone(),
+    };
+    edge.edge_evidence_row_key.evidence_target_reference_value = Some(external);
+    input
+}
+
+/// REQ-RUST-053.0 N1, N3: a named external item is a node with no file, kind or
+/// visibility, and an edge may target it. Each kind of name has one shape.
+#[test]
+fn test_external_node_row_validation() {
+    use HldExternalNameKind::{BuiltinMember, CrateRootedPath, PreludeName};
+    for (kind, crate_name, path) in [
+        (CrateRootedPath, Some("core"), "core::mem::MaybeUninit"),
+        (CrateRootedPath, Some("core"), "core"),
+        (PreludeName, None, "Default"),
+        (BuiltinMember, None, "u8::MAX"),
+    ] {
+        assert_eq!(
+            validate_full_graph_input(&build_external_target_fixture(kind, crate_name, path)),
+            Ok(()),
+            "{kind:?} {path}"
+        );
+    }
+    for (kind, crate_name, path) in [
+        (CrateRootedPath, None, "core::mem"),
+        (CrateRootedPath, Some("std"), "core::mem"),
+        (CrateRootedPath, Some("core"), "core::"),
+        (CrateRootedPath, Some("core"), "core::mem ::size_of"),
+        (PreludeName, Some("core"), "Default"),
+        (PreludeName, None, "a::Default"),
+        (BuiltinMember, None, "MAX"),
+        (BuiltinMember, None, "Buffer::MAX"),
+        (BuiltinMember, None, "u8::a::MAX"),
+        (BuiltinMember, Some("core"), "u8::MAX"),
+    ] {
+        assert_eq!(
+            validate_full_graph_input(&build_external_target_fixture(kind, crate_name, path)),
+            Err(HldMaterializationValidationError::MalformedExternalIdentity),
+            "{kind:?} {crate_name:?} {path}"
+        );
+    }
+    // An empty path is refused earlier, as a node without a label.
+    assert!(
+        validate_full_graph_input(&build_external_target_fixture(
+            CrateRootedPath,
+            Some("core"),
+            ""
+        ))
+        .is_err()
+    );
+    let build = || build_external_target_fixture(CrateRootedPath, Some("core"), "core::mem");
+    let mut with_file = build();
+    if let Some(node) = with_file.input_node_records.last_mut() {
+        node.node_source_relative_path = Some("src/lib.rs".into());
+    }
+    let mut with_kind = build();
+    if let Some(node) = with_kind.input_node_records.last_mut() {
+        node.node_item_kind_value = Some(HldItemKindValue::Module);
+    }
+    let mut with_label = build();
+    if let Some(node) = with_label.input_node_records.last_mut() {
+        node.node_qualified_path_text = "core::hint".into();
+    }
+    let mut as_builtin = build();
+    if let Some(node) = as_builtin.input_node_records.last_mut() {
+        node.node_input_category = HldNodeInputCategory::Builtin;
+    }
+    for (name, input) in [
+        ("file", with_file),
+        ("kind", with_kind),
+        ("label", with_label),
+        ("category", as_builtin),
+    ] {
+        assert!(
+            matches!(
+                validate_full_graph_input(&input),
+                Err(HldMaterializationValidationError::MalformedExternalIdentity
+                    | HldMaterializationValidationError::InvalidNodeCategory)
+            ),
+            "{name}"
+        );
+    }
+    // A named external item is never where an edge starts.
+    let mut as_source = build();
+    let external = as_source
+        .input_node_records
+        .last()
+        .map(|node| node.node_target_reference.clone());
+    if let Some(external) = external {
+        let edge = &mut as_source.input_edge_records[0];
+        edge.edge_source_reference = external.clone();
+        edge.edge_evidence_row_key.evidence_source_occurrence_key = external;
+    }
+    assert_eq!(
+        validate_full_graph_input(&as_source),
+        Err(HldMaterializationValidationError::InvalidEdgeRecord)
+    );
+}

@@ -87,10 +87,31 @@ impl std::fmt::Display for FileAreaIdentityError {
 
 impl std::error::Error for FileAreaIdentityError {}
 
+/// REQ-RUST-053.0 N3: what in read source proves the name of an external item.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum HldExternalNameKind {
+    /// A path that starts at the name of a crate with no unit in the run.
+    CrateRootedPath,
+    /// One name that only the implicit prelude can bind.
+    PreludeName,
+    /// A member reached through a builtin type that no read source declares.
+    BuiltinMember,
+}
+
+/// REQ-RUST-053.0 N1: an item outside the read source, known by the path the source writes.
+/// It claims no definition location and no span.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct HldExternalNamedKey {
+    pub external_name_kind_value: HldExternalNameKind,
+    pub external_crate_name_value: Option<String>,
+    pub external_item_path_text: String,
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HldTargetIdentityValue {
     Symbol(NameSymbolTargetKey),
     FilePublicArea(FileAreaIdentityKey),
+    ExternalNamed(HldExternalNamedKey),
 }
 
 impl From<NameSymbolTargetKey> for HldTargetIdentityValue {
@@ -419,6 +440,7 @@ pub enum HldMaterializationValidationError {
     MalformedCompilationUnitIdentity,
     MalformedSemanticOccurrenceIdentity,
     MalformedBuiltinIdentity,
+    MalformedExternalIdentity,
     InvalidSourceRelativePath,
     InvalidNodeCategory,
     UnknownEffectiveVisibility,
@@ -445,6 +467,7 @@ impl std::fmt::Display for HldMaterializationValidationError {
                 "semantic occurrence identity is malformed"
             }
             Self::MalformedBuiltinIdentity => "builtin identity is malformed",
+            Self::MalformedExternalIdentity => "named external identity is malformed",
             Self::InvalidSourceRelativePath => "source-relative path is invalid",
             Self::InvalidNodeCategory => "node category does not match its typed identity",
             Self::UnknownEffectiveVisibility => "effective visibility is unknown",
@@ -958,6 +981,25 @@ fn validate_hld_node_input(
             Ok(())
         }
         (
+            HldNodeInputCategory::ExternalDefinition,
+            HldTargetIdentityValue::ExternalNamed(external_key),
+        ) => {
+            validate_hld_external_key(external_key)?;
+            if node_record.node_item_kind_value.is_some()
+                || node_record.node_owner_kind_value.is_some()
+                || node_record.node_function_body_ancestry_flag
+                || node_record.node_effective_visibility_kind.is_some()
+                || node_record.node_reachable_outside_crate_flag.is_some()
+                || node_record.node_source_relative_path.is_some()
+                || node_record.node_signature_text.is_some()
+                || node_record.node_generating_call_reference.is_some()
+                || node_record.node_qualified_path_text != external_key.external_item_path_text
+            {
+                return Err(HldMaterializationValidationError::MalformedExternalIdentity);
+            }
+            Ok(())
+        }
+        (
             HldNodeInputCategory::Builtin,
             HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(name)),
         ) => {
@@ -974,6 +1016,37 @@ fn validate_hld_node_input(
             Ok(())
         }
         _ => Err(HldMaterializationValidationError::InvalidNodeCategory),
+    }
+}
+
+/// REQ-RUST-053.0 N1, N3: the shape each kind of external name must have.
+fn validate_hld_external_key(
+    external_key: &HldExternalNamedKey,
+) -> Result<(), HldMaterializationValidationError> {
+    let segments = external_key
+        .external_item_path_text
+        .split("::")
+        .collect::<Vec<_>>();
+    let well_formed = segments.iter().all(|segment| {
+        !segment.is_empty()
+            && !segment.contains(|letter: char| letter.is_whitespace() || letter == ':')
+    });
+    let crate_name = external_key.external_crate_name_value.as_deref();
+    let shape_holds = match external_key.external_name_kind_value {
+        HldExternalNameKind::CrateRootedPath => crate_name == segments.first().copied(),
+        HldExternalNameKind::PreludeName => crate_name.is_none() && segments.len() == 1,
+        HldExternalNameKind::BuiltinMember => {
+            crate_name.is_none()
+                && segments.len() == 2
+                && segments
+                    .first()
+                    .is_some_and(|name| is_hld_builtin_type(name))
+        }
+    };
+    if well_formed && shape_holds {
+        Ok(())
+    } else {
+        Err(HldMaterializationValidationError::MalformedExternalIdentity)
     }
 }
 
@@ -1023,6 +1096,9 @@ fn validate_hld_target_key(
                 .validate_crate_unit_identity()
                 .map_err(|_| HldMaterializationValidationError::MalformedCompilationUnitIdentity)
         }
+        HldTargetIdentityValue::ExternalNamed(external_key) => {
+            validate_hld_external_key(external_key)
+        }
         HldTargetIdentityValue::FilePublicArea(file_area_identity) => {
             FileAreaIdentityKey::build_file_area_identity(
                 file_area_identity.read_unit_identity_value(),
@@ -1068,7 +1144,8 @@ fn read_hld_target_unit(
         HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
             unit_identity.clone()
         }
-        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => return Ok(None),
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_))
+        | HldTargetIdentityValue::ExternalNamed(_) => return Ok(None),
         HldTargetIdentityValue::FilePublicArea(file_area_identity) => {
             file_area_identity.read_unit_identity_value().clone()
         }
@@ -1090,7 +1167,8 @@ fn read_hld_target_path(target_reference: &HldTargetIdentityValue) -> Option<&st
             )
         }
         HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(_))
-        | HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => None,
+        | HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_))
+        | HldTargetIdentityValue::ExternalNamed(_) => None,
         HldTargetIdentityValue::FilePublicArea(file_area_identity) => {
             Some(file_area_identity.read_source_relative_path())
         }

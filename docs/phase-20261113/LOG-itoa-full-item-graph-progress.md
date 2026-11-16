@@ -122,6 +122,34 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 08:20 IST — Part 6 step 1a: the named external identity (row types and codecs)
+
+- **Milestone:** itoa full item graph, part 6. No SOP step has passed. No itoa number changed.
+- **REQ:** REQ-RUST-053.0 N1, N3 (written in `405c51091`, with the GLM-5.3 design review).
+- **STUB:** `HldExternalNameKind`, `HldExternalNamedKey`, the variant
+  `HldTargetIdentityValue::ExternalNamed`, the error `MalformedExternalIdentity`, and
+  `validate_hld_external_key` as `todo!()`.
+- **RED:** `cargo test --release -p parseltongue-core-row-types test_external_node_row_validation`
+  gave `test result: FAILED. 0 passed; 1 failed` (panic at the first accepted shape).
+- **GREEN:** the same crate, all tests: `23 passed; 0 failed`. One test case was wrong, not the
+  code: an empty path is refused earlier as a node without a label, so the test now asks only
+  for an error there.
+- **Codecs (written before their test, a slip):** the Turso encode and decode and the DuckDB
+  encode gained the variant. `test_external_target_codec_roundtrip` passed on first run.
+  Three deliberate breaks of the decoder (flag not checked, wrong kind, crate dropped) each
+  failed it.
+- **Checked:** `cargo test --release -p parseltongue-core-row-types -p parseltongue-turso-store-adapter`:
+  23, 46 (3 ignored), 22 and 4 passed, 0 failed. `cargo clippy --release` with
+  `-D warnings` on the three touched crates: clean. `cargo check --release --workspace
+  --all-targets --all-features`: no error.
+- **Not checked:** the DuckDB encode of the variant has no test of its own. Nothing produces
+  the variant yet, so no real-source test can reach it.
+- **Decision:** the variant is on the graph identity, not on `NameSymbolTargetKey` (GLM-5.3
+  proposed the latter). Name lookup never produces it, so three files changed instead of every
+  match on the lookup key. Recorded in the PRD.
+- **Next:** the name lookup stores the path it proved (`namespace-final-path-products.sql`),
+  then the import producer; predicted 107 nodes, 4 imports with a target.
+
 ### 2026-11-16 07:56 IST — Part 5d workspace gates at `41567d710`
 
 - **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.

@@ -4,7 +4,7 @@ use super::{
 };
 use parseltongue_core_row_types::{
     CrateCompilationUnitKey, HldDependencyOriginKind, HldEndpointRollupBucket, HldEvidenceRowKey,
-    HldFolderEndpointBucket, HldGraphEdgeKey, HldInputCompletenessKind,
+    HldExternalNameKind, HldFolderEndpointBucket, HldGraphEdgeKey, HldInputCompletenessKind,
     HldMaterializationOutputRecord, HldOutputCompletenessKind, HldOutputEdgeStatus,
     HldRelationKindValue, HldSourceCoverageKind, HldTargetIdentityValue, HldViaKindValue,
     NameSymbolTargetKey, RunCancelFlagValue, RunGenerationDigestValue, SemanticOccurrenceKeyValue,
@@ -472,6 +472,14 @@ fn encode_occurrence_identity_json(occurrence: &SemanticOccurrenceKeyValue) -> V
     })
 }
 
+pub(super) fn encode_external_name_kind(kind: HldExternalNameKind) -> &'static str {
+    match kind {
+        HldExternalNameKind::CrateRootedPath => "crate_rooted_path",
+        HldExternalNameKind::PreludeName => "prelude_name",
+        HldExternalNameKind::BuiltinMember => "builtin_member",
+    }
+}
+
 pub(super) fn encode_target_identity_json(target: &HldTargetIdentityValue) -> Value {
     match target {
         HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence)) => json!({
@@ -492,6 +500,14 @@ pub(super) fn encode_target_identity_json(target: &HldTargetIdentityValue) -> Va
         HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit)) => json!({
             "kind": "CrateRoot",
             "unit_compilation_identity": encode_unit_identity_json(unit)
+        }),
+        // REQ-RUST-053.0 N1: the name as the read source writes it; its own source was not read.
+        HldTargetIdentityValue::ExternalNamed(external) => json!({
+            "kind": "ExternalNamed",
+            "external_name_kind": encode_external_name_kind(external.external_name_kind_value),
+            "external_crate_name": external.external_crate_name_value,
+            "external_item_path_text": external.external_item_path_text,
+            "external_source_read_flag": false
         }),
         HldTargetIdentityValue::FilePublicArea(file_area) => json!({
             "kind": "FilePublicArea",

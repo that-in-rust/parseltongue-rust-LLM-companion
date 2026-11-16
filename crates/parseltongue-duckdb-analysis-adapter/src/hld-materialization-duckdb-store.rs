@@ -1,12 +1,13 @@
 use crate::DuckdbAnalysisStoreAdapter;
 use parseltongue_core_row_types::{
     CrateCompilationUnitKey, HldDependencyOriginKind, HldEdgeResolutionValue,
-    HldEndpointRollupBucket, HldEvidencePathRecord, HldEvidenceRowKey, HldFileRollupRecord,
-    HldFolderEndpointBucket, HldFolderRollupRecord, HldGraphEdgeKey, HldMaterializationInputRecord,
-    HldMaterializationOutputRecord, HldMaterializationValidationError, HldMaterializedEdgeRecord,
-    HldNodeInputCategory, HldNodeInputRecord, HldOutputCompletenessKind, HldOutputEdgeStatus,
-    HldRelationKindValue, HldSelectedNodeRecord, HldTargetIdentityValue, HldUnitOriginKind,
-    HldViaKindValue, NameSymbolTargetKey, RunCancelFlagValue, SemanticOccurrenceKeyValue,
+    HldEndpointRollupBucket, HldEvidencePathRecord, HldEvidenceRowKey, HldExternalNameKind,
+    HldFileRollupRecord, HldFolderEndpointBucket, HldFolderRollupRecord, HldGraphEdgeKey,
+    HldMaterializationInputRecord, HldMaterializationOutputRecord,
+    HldMaterializationValidationError, HldMaterializedEdgeRecord, HldNodeInputCategory,
+    HldNodeInputRecord, HldOutputCompletenessKind, HldOutputEdgeStatus, HldRelationKindValue,
+    HldSelectedNodeRecord, HldTargetIdentityValue, HldUnitOriginKind, HldViaKindValue,
+    NameSymbolTargetKey, RunCancelFlagValue, SemanticOccurrenceKeyValue,
     validate_hld_materialization_input,
 };
 use parseltongue_table_store_traits::{
@@ -1148,6 +1149,16 @@ fn encode_hld_target_value(target: &HldTargetIdentityValue) -> JsonValue {
         HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
             json!(["crate_root", encode_hld_unit_value(unit_identity)])
         }
+        HldTargetIdentityValue::ExternalNamed(external) => json!([
+            "external_named",
+            match external.external_name_kind_value {
+                HldExternalNameKind::CrateRootedPath => "crate_rooted_path",
+                HldExternalNameKind::PreludeName => "prelude_name",
+                HldExternalNameKind::BuiltinMember => "builtin_member",
+            },
+            external.external_crate_name_value,
+            external.external_item_path_text
+        ]),
         HldTargetIdentityValue::FilePublicArea(file_area) => json!([
             "file_public_area",
             encode_hld_unit_value(file_area.read_unit_identity_value()),
@@ -1194,7 +1205,8 @@ fn read_hld_target_unit(target: &HldTargetIdentityValue) -> Option<CrateCompilat
         HldTargetIdentityValue::Symbol(NameSymbolTargetKey::CrateRoot(unit_identity)) => {
             Some(unit_identity.clone())
         }
-        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_)) => None,
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Builtin(_))
+        | HldTargetIdentityValue::ExternalNamed(_) => None,
         HldTargetIdentityValue::FilePublicArea(file_area) => {
             Some(file_area.read_unit_identity_value().clone())
         }

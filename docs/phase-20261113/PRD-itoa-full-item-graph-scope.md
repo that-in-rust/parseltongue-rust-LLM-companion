@@ -164,6 +164,20 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   itoa's source proves it, the crate, and a flag that the target's source was not read. The
   sysroot source stays out of the run. Chosen because it is the most explicit form for an
   agent reading the graph.
+  - **What the name is (2026-11-16, REQ-RUST-053.0).** The path as the read source writes
+    it. It claims "this item is outside the read source", never where the item is defined
+    (a written path may be a re-export) and never which impl declares a member.
+  - **Three kinds of name.** A path rooted at a crate with no unit in the run
+    (`core::mem::MaybeUninit`; the crate is the root segment). A one-segment name that only
+    the implicit prelude can bind (`Default`; no crate is claimed). A member reached
+    through a builtin type that no read source declares (`u8::MAX`, `u128::from`; no
+    crate and no impl are claimed).
+  - **One node per written name.** The edge is stored as resolved with that node as its
+    target. How each site reached the name (path root, `use` item, prelude, builtin
+    member) is on the edge, so an import and a use of the same path share one node.
+  - **No name is given** when a nearer scope could bind the first name differently, when a
+    trait in read source declares a member of the same name, or for a method call. The row
+    stays unresolved with its reason.
 - **Macro definitions and calls (2026-11-15).** Both are nodes, for the same reason.
 - **Design rule (user, 2026-11-15).** "Our intention should be to provide maximum
   information which helps the coding agent code better." When a graph design choice is
