@@ -268,6 +268,16 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   twelve. The row keeps the trait's declaration, every candidate impl and the sources not
   read; when the member is not proven the target stays the declaration.
 
+- **Arguments of assertion macros (2026-11-16, built in part 5d step 11).** A value path
+  in the arguments of `assert!`, `debug_assert!` and the four `_eq` / `_ne` forms is a
+  `reads` row of the item the call is written in. The arguments are parsed again as
+  expressions; the macro is not expanded. Chosen by the design rule: an agent changing a
+  const must see the assertion that checks it. The row says it was read from a macro's
+  arguments, names the macro, and names what was not read (the macro's definition; a macro
+  of that name imported by `use`). No row when a `macro_rules!` of that name is in
+  textual scope, when the arguments do not parse, or for the name of a named format
+  argument. Other macros' arguments are not read.
+
 - **Non-function sources (2026-11-16, built in part 5d step 10a for `reads` and step 10c
   for `uses_type`).** A `uses_type` row from a const, static or type alias names the kind
   of that item (`declared_type_owner_kind`); a qualified path (`<u64 as Sealed>::Buffer`)

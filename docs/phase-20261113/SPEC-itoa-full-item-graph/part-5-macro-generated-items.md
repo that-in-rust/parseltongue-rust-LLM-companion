@@ -1,7 +1,7 @@
 # Part 5 — macro-generated items as graph nodes
 
 **State: 5a BUILT, except nested expansion (R4), which stops the run with a typed error.
-5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15) and step 10c BUILT (`uses_type` from declared and aliased types, section 10.16). G14 step 10b BUILT (the impl member for `<T as Trait>::NAME`, section 10.17). Arguments of builtin macros (`assert!`, step 11) are not built.
+5b BUILT (section 8). 5c BUILT (section 9). 5d steps 1 to 9 BUILT (section 10). G7 step 10a BUILT (`reads` from consts, statics and types, section 10.15) and step 10c BUILT (`uses_type` from declared and aliased types, section 10.16). G14 step 10b BUILT (the impl member for `<T as Trait>::NAME`, section 10.17). G15 step 11 BUILT (value paths in the arguments of `assert!` and its five relatives, section 10.18).
 5e is not specified. Rules R2, R3 and R5 decided by the user on 2026-11-15
 ("most explicit for an agent reading our artifact").**
 
@@ -576,9 +576,11 @@ step  what                                         rules    predicted           
       to a stored type
 10a   consts, statics and types as reads sources    G7       reads 55 -> 78          78 reads (22 original, 56 in
                                                                                     expanded text); 525 edges
-10b   the impl member for <T as Trait>::NAME       G14      2 rows change target    not built
-10c   declared and aliased types as uses_type      G7       34 generated, 3 orig    not built
-11    arguments of builtin macros (assert!)        -        20 reads sites          not built
+10b   the impl member for <T as Trait>::NAME       G14      2 rows change target    4 rows: target is the impl
+                                                                                    member (2 reads, 2 uses_type)
+10c   declared and aliased types as uses_type      G7       34 generated, 3 orig    106 uses_type (40 new); 565 edges
+11    arguments of assertion macros (assert!)      G15      20 reads sites          98 reads (76 in expanded
+                                                                                    text); 585 edges
 ```
 
 Step 2 was planned after step 4; the second opinion moved it forward so steps 3 and 4 land
@@ -1442,3 +1444,116 @@ declaration; `uses_type` asks for a const member; the trait path looked up as a 
   covered by this rule. itoa has none.
 - **Q46.** The filter "the member is a graph node" is not covered by a test: every impl
   member on itoa is a node.
+
+### 10.18 Step 11: value paths in the arguments of `assert!` (rule G15, measured)
+
+Built at `97894638f`.
+
+**Cause found (measured on the step 10b store).** The arguments of a macro call are a
+token tree, not expressions. `assert!(i8::MIN < 0, "need signed")` was one `MACRO_CALL`
+site row and nothing under it: no path row, no name lookup, so no `reads` row. The five
+generated `const _` blocks hold three such calls each.
+
+**Rule G15 as built.**
+
+```text
+which calls     the macro is named by one name, and the name is one of
+                assert, debug_assert, assert_eq, assert_ne, debug_assert_eq, debug_assert_ne;
+                the call is in expression or statement position, not an item
+how it is read  the text between the call's delimiters is parsed again, by the same pinned
+                parser, as the argument list of one call expression
+refused         any parse error; fewer arguments than the macro compares
+                (1 for assert / debug_assert, 2 for the four _eq / _ne forms)
+a read          a whole path expression in any argument that is not a callee, not rooted
+                at $crate, and not a single name bound by a pattern in scope where the
+                call is written or inside the argument
+not a read      the name of a named format argument: in (cond, "{n}", n = LIMIT) only LIMIT
+name lookup     one Value request per whole path and one Type request per one-name prefix
+                (i8 in i8::MIN), in the scope of the call, with the path's own byte range
+gate            the row is produced only when the stored textual-scope lookups of the macro's
+                name at that call exist and the latest revision finds no macro_rules!
+                definition. A macro_rules! of that name in textual scope: no row
+target          the same rules as any other value path (G5, G14, name lookup)
+```
+
+Each row carries `read_kind = macro_argument_value_path` and
+`macro_argument_read_evidence`: the macro's name, the occurrence key of the call, the
+outcome `no_local_macro_definition`, and `sources_not_read` (the macro's definition in
+the standard library; a macro of this name brought into scope by a `use` item or by
+`#[macro_use] extern crate`). The site row in `body-site-reference-table` is a
+`PATH_EXPR` row with `site_macro_argument_record`.
+
+**Measured on pinned itoa (3 release runs, executable
+`66a74fde41ed76755d2e262530f2e14fe0dbe1d28f13127ce96401fac82cb0c2`).**
+
+```text
+nodes=103 containment=88 generates=45 expands=15 calls=197 resolved_calls=43 type_uses=106
+implements=32 reads=98 reads_in_expanded_bodies=76 imports=4 edges=585 completeness=incomplete
+run1 wall=16.20s maxrss=343184kB
+run2 wall=17.29s maxrss=375944kB
+run3 wall=18.69s maxrss=380104kB
+store_bytes=18608128
+
+rows  written in                              read              target
+5     const _ #impl_Integer!(iN, uN)          iN::MIN           none (in core, waits on part 6)
+5     same                                    uN::MIN           none
+5     same                                    iN::BITS          none
+5     same                                    uN::BITS          none
+```
+
+- Prediction (written before the code): `reads` 78 -> 98, edges 565 -> 585, no new
+  target. Measured the same. Read back from the stored edge table: 20 rows with
+  `read_kind = macro_argument_value_path`, 10 `MIN` and 10 `BITS`.
+- Each of the 20 rows is unresolved with `TraitSolverNeeded` and the G5 record
+  `no_stored_impl_member` (the builtin's inherent items in `core` were not read), like the
+  10 `uN::MAX` rows of step 10a. Each names where its first token (the call's `i8`) and
+  its last token (the definition's `MIN`) were copied from in `src/lib.rs`.
+- itoa's one other assertion call, `debug_assert!` in an original body, names only a
+  local; it has no row.
+- These 20 rows are in the expected graph (its 20 `assert!` reads).
+
+**Tests.** Stub first (`read_macro_argument_paths` with `todo!()`; `cargo check` passed
+with 3 dead-code warnings). RED: `test_macro_argument_paths_read` panicked at the
+`todo!()`; `test_macro_argument_read_rows` (itoa) got 0 rows for 20;
+`test_reads_rows_read_twice` got 78 for 98. GREEN: 48 of 48 itoa tests (118.93 s),
+125 + 17 syntax crate tests, format, lint on the two touched crates. Four older itoa
+expectations were changed to the new totals (`reads` 98, 76 in expanded text, two more
+prefix lookups per builtin, `MIN` and `BITS` among the rows that wait on `core`).
+
+**Second RED.** The second opinion on steps 10a to 10c (recorded in
+`docs/devin-research/1794790189-second-opinion-glm-5-3-max-part-5d-step-ten-item-sources.md`)
+warned that the name of a named format argument is not a path. The fixture case
+`assert!(A, "{n} {}", B, n = C)` then failed: `n` was read. Fixed by the "not a read"
+line above. Positional message arguments stay reads: they are expressions the macro
+evaluates. The review proposed refusing every message argument; not taken.
+
+**Weak evidence.** `test_macro_argument_site_gate` and `test_macro_argument_read_edge`
+were written after the code and passed on first run.
+
+**Deliberate breaks.** 26, each fails a test after two repairs: (1) "a qualified macro
+path is admitted" failed nothing because the check was written twice; the second copy was
+removed and the break then fails; (2) "a type prefix is also a site row" failed nothing;
+`test_macro_argument_read_edge` now pins the site rows. The other 24 failed at once:
+11 in the argument reader, 9 in the gate and the row's record, 4 in the itoa run (no site
+rows, no lookups, prefix requested as a value, macro range off by one).
+
+**Open questions.**
+
+- **Q47.** A macro named `assert` that a `use` item or `#[macro_use] extern crate` brings
+  into scope is not seen by the gate, which reads textual scope only. Its arguments would
+  be read as expressions. The row names this in `sources_not_read`. itoa has none.
+- **Q48.** An implicit capture in the message (`"{LIMIT}"`) is not read. Miss only.
+- **Q49.** A macro call inside the arguments (`assert!(matches!(x, A))`) is not read.
+- **Q50.** Other standard macros whose arguments are expressions (`panic!`, `println!`,
+  `format!`, `write!`, `vec!`, `matches!`, `unreachable!`) are not read. itoa's bodies
+  call none of them.
+- **Q51.** A call or method call in the arguments (`assert!(f(A))`) is not a `calls` row.
+  itoa has none.
+- **Q52.** A refused call leaves only its `MACRO_CALL` site row; nothing says its
+  arguments were not read.
+- **Q53 (from the review of step 10b).** An anchor that is a type alias
+  (`<Alias as T>::N`) keeps the trait's declaration. Reading through the alias would
+  give the member.
+- **Q54 (from the review).** Not covered by a fixture: an impl under an inactive `cfg` or
+  inside a function as a G14 candidate; a multi-byte anchor's offsets; a negative impl
+  on a qualified path; an aliased type that is a macro call.

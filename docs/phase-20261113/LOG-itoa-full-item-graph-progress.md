@@ -6,18 +6,18 @@ newest first: add each new checkpoint at the top of that section and never edit 
 ## Current state (2026-11-16)
 
 **The pipeline runs end to end on pinned itoa 1.0.18 and stores a bounded graph: 103 nodes
-(45 written by macro expansions) and 565 edges (88 `contains`, 45 `generates`, 15 `expands`, 106 `uses_type`: the declared type of a const or static and the aliased type of a type alias are sites since part 5d step 10c), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
-32 `implements` rows (29 with a target, 3 unresolved), 78 `reads` rows (68 with a
-target; 56 of the 78 are sited in macro-expanded text; consts, statics, type aliases and structs are sources since part 5d step 10a) and 4 `imports` rows (all unresolved: their targets are in `core`).
+(45 written by macro expansions) and 585 edges (88 `contains`, 45 `generates`, 15 `expands`, 106 `uses_type`: the declared type of a const or static and the aliased type of a type alias are sites since part 5d step 10c), with 43 of 197 calls resolved (2 `(self as u64/i64).write(buf)` to the impl member for the cast's type, part 5d step 9; 27 by the callee path, part 5d step 6; 5 `Unsigned ::fmt(self, ..)` to the impl member for the calling method's type, step 8; 5 `Unsigned ::fmt(self.unsigned_abs(), ..)` to the trait's declaration and 1 `DecimalPairs(..)` to the struct, step 7; the bracketed breakdown that follows was measured before step 6) (136 of the 197 start in macro-generated function bodies; the 194 without a target: 178 `TraitSolverNeeded`, 10 `MissingTarget`, 6 `ExternalSourceMissing`), 34 `uses_type` rows (29 with a target, 5 unresolved),
+32 `implements` rows (29 with a target, 3 unresolved), 98 `reads` rows (68 with a
+target; 76 of the 98 are sited in macro-expanded text; 20 are value paths in the arguments of `assert!` since part 5d step 11; consts, statics, type aliases and structs are sources since part 5d step 10a) and 4 `imports` rows (all unresolved: their targets are in `core`).
 Five dependencies
 are proven from source by name: `<Buffer as Default>::default --calls--> Buffer::new`,
 `Buffer::format --calls--> private::Sealed::write`, `Buffer::new --uses_type--> Buffer`,
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** part 5d step 11 (arguments of `assert!`: 20 expected `reads`), then
-  the 5d workspace gates and part 6. Steps 10b and 10c are built (40 new `uses_type`
-  rows; 4 qualified-path rows on the impl member).
+- **Next target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
+  10b, 10c and 11 are built (40 new `uses_type` rows; 4 qualified-path rows on the impl
+  member; 20 `reads` rows from `assert!` arguments).
   Part 5d step 9 is built: the two cast-receiver calls have a target (part 5 Q34 closed).
   Part 5d step 8 is built: the five `Unsigned ::fmt(self, buf)` calls target
   `<uN as Unsigned>::fmt`, the member of the impl for the calling method's type, and keep
@@ -121,6 +121,51 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 06:20 IST — Part 5d step 11: value paths in the arguments of `assert!` (REQ-RUST-052.0 G15)
+
+- **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.
+- **Built at** `97894638f`. Spec: part 5 section 10.18.
+- **Cause, measured first:** a macro call's arguments are a token tree; the paths in
+  `assert!(i8::MIN < 0, ..)` had no site row and no name lookup.
+- **STUB:** `read_macro_argument_paths` with `todo!()`; `cargo check -p
+  parseltongue-syntax-span-extractor` finished with 3 dead-code warnings.
+- **RED:** `test_macro_argument_paths_read` panicked at `not yet implemented:
+  REQ-RUST-052.0 G15 step 11`; `test_macro_argument_read_rows` got `[]` for 20 rows;
+  `test_reads_rows_read_twice` got 78 for 98 (0 passed, 2 failed).
+- **GREEN:** 48 of 48 itoa tests (118.93 s), 125 + 17 syntax crate tests, format, lint on
+  the two touched crates. Four older itoa expectations changed to the new totals.
+- **Second RED/GREEN:** the named format argument (`n = C`) was read as a path; the
+  fixture case failed, then passed. Found by the second opinion.
+- **Measured (3 release runs, executable `66a74fde41ed76755d2e262530f2e14fe0dbe1d28f13127ce96401fac82cb0c2`):**
+
+```text
+nodes=103 containment=88 generates=45 expands=15 calls=197 resolved_calls=43 type_uses=106
+implements=32 reads=98 reads_in_expanded_bodies=76 imports=4 edges=585 completeness=incomplete
+run1 wall=16.20s maxrss=343184kB
+run2 wall=17.29s maxrss=375944kB
+run3 wall=18.69s maxrss=380104kB
+store_bytes=18608128
+```
+
+- **New rows (20), as predicted before the code:** `iN::MIN`, `uN::MIN`, `iN::BITS`,
+  `uN::BITS` in each of the 5 generated `const _` blocks. None has a target (`core`).
+  Read back from the stored edge table.
+- **Decision (PRD):** arguments of the six assertion macros are parsed again as
+  expressions; the macro is not expanded. Rejected: reading every macro's arguments
+  (their grammar is not known), and refusing all message arguments (positional ones are
+  evaluated expressions).
+- **Weak evidence:** `test_macro_argument_site_gate` and `test_macro_argument_read_edge`
+  were written after the code and passed on first run.
+- **Deliberate breaks:** 26. 24 failed a test at once; one was an equivalent break of a
+  check written twice (the copy was removed); one needed a new assertion on the site rows.
+- **Second opinion on 10a, 10b, 10c:** GLM-5.3 found no wrong target. Its one claimed
+  miss (a const block in a function hiding an item read behind an outer `let`) does not
+  compile on rustc 1.99.1 (`E0005`: the `let` name is a constant pattern), so it cannot
+  occur. Its test gaps are Q54; the alias anchor is Q53.
+- **Slips:** no codebase-memory trace before the change.
+- **Workspace gates:** not run; they run next, at the end of part 5d.
+- **Next:** 5d workspace gates, then part 6.
 
 ### 2026-11-16 02:05 IST — Part 5d step 10b: the impl member for `<T as Trait>::NAME` (REQ-RUST-052.0 G14)
 
