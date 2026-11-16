@@ -66,9 +66,6 @@ S4  determinism, time, memory          PASS   six runs identical; 11 ms samples
 Run report: the last entry below. Executable sha256
 `43d999e173241c4b9a8011aade1871916a5c92cc9c86157dd8e92f6d1e0d1b88`.
 
-```text
-```
-
 ### The code, from the codebase-memory index of this commit
 
 Index: 26,725 nodes, 62,052 edges; 1,628 functions, 619 methods, 7,186 call edges.
