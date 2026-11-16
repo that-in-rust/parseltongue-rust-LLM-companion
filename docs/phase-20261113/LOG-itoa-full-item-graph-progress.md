@@ -496,3 +496,128 @@ NEXT   8.3b-1 (ii-b): core-member-target-records.rs, the lookup for a parameter 
             supertrait could declare the name); naming buf.len() (P5 stands)
  next       STUB: find_alias_receiver_type, check_trait_supertrait_reach
 ```
+
+
+## 2026-11-16 Part 8 step 8.3b-2b: STUB
+
+```text
+ phase      STUB, REQ-RUST-057.0 A2 to A8
+ added      core-member-target-records.rs      AliasReceiverTypeValue, find_alias_receiver_type  (todo!)
+            original-call-resolution-records.rs BoundMethodLookupIndex::check_trait_supertrait_reach (todo!)
+ not wired  neither is called yet, so production behaviour is unchanged
+ command    cargo check --release -p parseltongue-syntax-span-extractor
+ output        --> crates/parseltongue-syntax-span-extractor/src/core-member-target-records.rs:423:19
+            warning: function `find_alias_receiver_type` is never used
+               --> crates/parseltongue-syntax-span-extractor/src/core-member-target-records.rs:430:15
+            warning: method `check_trait_supertrait_reach` is never used
+                --> crates/parseltongue-syntax-span-extractor/src/original-call-resolution-records.rs:1079:19
+            EXIT=0
+ next       RED: test_alias_parameter_core_member (fixture), test_itoa_core_member_targets (real source)
+```
+
+
+## 2026-11-16 Part 8 step 8.3b-2b: RED
+
+```text
+ phase      RED, REQ-RUST-057.0 A2 to A9
+ tests      test_alias_parameter_core_member (fixture, new)          FAILED
+              command  cargo test --release -p parseltongue-syntax-span-extractor test_alias_parameter_core_member
+              output   left: Extracted { .. "MaybeUninit<T>::write" }  right: Unresolved { reason: TraitSolverNeeded }
+                       stored reason on the row: receiver_type_name_unproven
+                       test result: FAILED. 0 passed; 1 failed; 159 filtered out
+            test_itoa_core_member_targets (real source, one assertion added: a call is named
+            through an associated type)                               FAILED
+              command  cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests test_itoa_core_member_targets
+              output   thread 'test_itoa_core_member_targets' (1168062) panicked at crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs:5955:5:
+                       no call is named through an associated type
+                       test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 59 filtered out; finished in 19.88s
+                       error: test failed, to rerun pass `-p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`
+                       EXIT=101
+ fixture    read_core_fixture_rows(.., impls = true): stores a path lookup for each trait name,
+            each u8 and each Buffer<..>, then stores the impl headers again over them
+ cases      2 named (own impl; impl of a supertrait two bounds away), 4 withheld (A4, A5, A6, A7)
+ next       GREEN: find_alias_receiver_type, check_trait_supertrait_reach, call from find_core_member_target
+```
+
+
+## 2026-11-16 19:53 IST STOPPED by user instruction: state of part 8 (method calls into core)
+
+Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry was run.
+
+```text
+ WHAT IS PUSHED (branch research/tiny-rust-code-mapper, head 221b64ade)
+   bbbe0d2f6  acceptance report: all four itoa SOP steps PASS on one frozen binary
+              (151 nodes, 682 edge rows, 133 calls without a target; graph marked incomplete)
+   91acad84c  part 8 design: syntax-only read of core (288 files, 0.27 s, 22 MB)
+   3f2f20840  core declaration extractor
+   bd35ace75  8.1   production stage, scope value "declarations"
+   2e900024e  spec  REQ-RUST-055.0 (receiver type), REQ-RUST-056.0 (target)
+   81e57e87b  8.2a  parameter receiver carries its written type
+   06105de4d  8.2b  receiver recorded as a place (parameter, self, path, field, index)
+   c701bb2e2  8.3a  lookup rule over the core table
+   39d0ed696  8.3b-1(i)    type path ranges on a written type
+   ffcdc6061  8.3b-1(ii-a) prelude re-export rows
+   07b95dfbc  8.3b-1(ii-b) first targets: 9 calls named
+   7ed552478  8.3b-2a      impl "type NAME = T" stores its written type
+   221b64ade  spec  REQ-RUST-057.0 (the type behind Self::NAME)
+
+ MEASURED ON THE PUSHED HEAD, pinned itoa, scope "declarations"
+   nodes 153, edge rows 682
+   calls with a target      73 of 197   (64 before part 8)
+   calls without a target  124
+   edge rows with a target 558 of 682   (549 before part 8)
+   default scope: 151 nodes, 682 edge rows, equal to the frozen expected graph
+   checks run on 7ed552478: 60 of 60 real-source itoa tests, 176 extractor tests, format,
+   workspace lint
+
+ NOT PUSHED: working tree, step 8.3b-2b (parameters typed "&mut Self::Buffer")
+   phase reached   STUB done, RED done (both entries above), GREEN code written, GREEN not closed
+   files           core-member-target-records.rs       find_alias_receiver_type, read_self_alias_parts,
+                                                       find_core_member_target takes the bound index
+                   original-call-resolution-records.rs BoundMethodLookupIndex::check_trait_supertrait_reach
+                   core-member-target-tests.rs         read_core_fixture_rows, test_alias_parameter_core_member
+                   itoa-source-acceptance-tests.rs     one added assertion in test_itoa_core_member_targets
+   saved as        ~/phase7-work/83b2-b-stopped-working-tree.patch (git diff of crates/, not in the repository)
+
+ RESULTS OF THE UNPUSHED CODE (each run once)
+   cargo test --release -p parseltongue-syntax-span-extractor
+       160 passed, 17 passed, 0 failed; test_alias_parameter_core_member passes
+       (2 cases named, 4 cases withheld: clauses A4, A5, A6, A7)
+   cargo test --release ... test_itoa_core_member_targets
+       FAILED, as expected at this point: the test still lists the 9 old targets.
+       the run names 17 calls: 16 MaybeUninit<T>::write and 1 [T]::get_unchecked,
+       that is 8 more than the pushed head (81 of 197 calls, 566 of 682 edge rows)
+   a temporary grouping of the calls that reached the new rule (removed from the test file again)
+       8  write  named, alias text "[MaybeUninit <u8 >; Self ::MAX_STR_LEN ]"
+       1  len    withheld, scope_trait_may_fit (a prelude trait also declares len; clause P5)
+
+ NOT KNOWN
+   - which 8 source sites the new targets are; none is checked against the source yet,
+     so the count 17 is not fixed in the test
+   - why only 9 calls reached the new rule when 46 calls were counted as typed
+     "&mut Self::Buffer". Not investigated. One guess, unverified: text from a macro
+     expansion is stored with spaces ("Self ::Buffer"), and the new rule matches "Self::" only.
+
+ NOT DONE FOR 8.3b-2b
+   - GREEN journal entry and commit
+   - three deliberate breaks (drop the supertrait check, the self-type check, the path proof)
+   - REFACTOR, lint, the 60 real-source tests, workspace tests, release build
+   - SPEC section 8 matrix has no row for clause A6; the fixture test has one
+   - codebase-memory index is from 10:34 UTC and does not hold the unpushed code
+
+ NOT STARTED
+   8.3b-3  receivers that are a field or a static (part of the 78 calls with no receiver type)
+   8.4     try_into, expect, unwrap (26 calls; need return types from core)
+   8.5     ilog10 (10 calls; written by a macro in core)
+   8.6     re-freeze the expected graph and repeat the acceptance run
+   The acceptance run of bbbe0d2f6 covers no commit after it: production changed.
+
+ OPEN DEFECTS, unchanged
+   - rows depend on the absolute source directory (cause found, not fixed)
+   - a run with the whole sysroot read stops with a store copy mismatch (test_lang_items_in_sysroot)
+   - the run id does not hash the core source, only the compiler version
+
+ TO RESUME
+   git apply ~/phase7-work/83b2-b-stopped-working-tree.patch if the working tree is lost;
+   then find why 37 of the 46 calls do not reach find_alias_receiver_type, before fixing any count.
+```
