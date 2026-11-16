@@ -482,3 +482,17 @@ NEXT   8.3b-1 (ii-b): core-member-target-records.rs, the lookup for a parameter 
             impl of the enclosing impl's self type that writes "type Buffer", when that impl's
             trait is the enclosing impl's trait or one of its supertraits
 ```
+
+
+## 2026-11-16 Part 8 step 8.3b-2b: spec packet (no code)
+
+```text
+ phase      SPEC, REQ-RUST-057.0 A1 to A10 (new), part-8 file section 8
+ why        the rule "follow Self::NAME only through the impl's trait and its supertraits"
+            was not written down; step 8.3b-2a also had no STUB phase (one stored field)
+ decisions  A5 supertrait reach; A6 same self-type target and text; A7 alias paths proven as a
+            parameter's; reasons associated_type_impl_unproven, associated_type_trait_unproven
+ rejected   reading "type Buffer" from any impl of the self type without A5 (an unread
+            supertrait could declare the name); naming buf.len() (P5 stands)
+ next       STUB: find_alias_receiver_type, check_trait_supertrait_reach
+```

@@ -209,3 +209,120 @@ req  test                                     type         assertion
   (`ExactSizeIterator::len`), so only the 5 `buf.len()` calls meet this limit.
 - Q2 stands: either those 5 rows stay without a target, or they are named `[T]::len` with
   the assumption recorded. I build P5 (no target) and leave the assumption variant to you.
+
+## 8. Step 8.3b-2 — a parameter typed `Self::NAME` (spec first, added 2026-11-16)
+
+Work mode: Spec + Delivery + Reliability. Component: the L2 lookup of a library crate.
+The main risk is a wrong target, so every rule below ends in "otherwise no target".
+
+### Measured before writing (commit `07b95dfbc`, scope `declarations`)
+
+```text
+ 124 calls without a target
+  46 of them: the receiver is a parameter whose written type is "&mut Self::Buffer"
+     reason stored today: receiver_type_name_unproven
+ where itoa writes the type:
+   trait Unsigned: Integer            fn fmt(self, buf: &mut Self::Buffer)
+   trait Integer: private::Sealed
+   trait Sealed: Copy                 type Buffer: 'static;  fn write(self, buf: &mut Self::Buffer)
+   impl private::Sealed for uN / iN   type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];
+   impl private::Sealed for usize     type Buffer = <u64 as private::Sealed>::Buffer;
+   impl Unsigned for uN               fn fmt(self, buf: &mut Self::Buffer)   (no "type Buffer" here)
+```
+
+### The Rust rule this follows
+
+In an impl of a trait, `Self::NAME` in type position names the associated type `NAME` of
+the impl's trait or of one of its supertraits, for the impl's self type. Two traits of
+that set declaring `NAME` is error E0221. In an inherent impl it is error E0223. So in
+source that compiles, one trait of that set declares `NAME`, and the type is what that
+trait's impl for the self type writes after `type NAME =`.
+
+### REQ-RUST-057.0 — the type behind `Self::NAME` in an impl
+
+- A1. WHEN an impl writes `type NAME = T;` THEN its stored member row SHALL carry the text
+  of `T`, its byte range, and the byte range of each type path in `T` (paths under an
+  expression, such as an array length, excluded). Built in step 8.3b-2a.
+- A2. WHEN the receiver is a parameter whose written type, less its reference layers, is
+  exactly `Self::NAME` THEN the receiver type SHALL be those reference layers around the
+  type of A1, and only when A3 to A7 all hold.
+- A3. The function is a member of a stored impl that is not inside a function body, and
+  that impl's trait and self type both have a stored target.
+- A4. Among the stored impls of that self type, and the stored impls whose self type has
+  no stored target, exactly one member is named `NAME`; it is a `type` member of a trait
+  impl with a stored trait, no generic parameter and no negation.
+- A5. That impl is the function's own impl, or its trait is reached from the function's
+  impl's trait through stored supertrait bounds. A supertrait bound that is not stored as
+  resolved is not followed.
+- A6. That impl's self type has the same stored target and the same written text as the
+  function's impl's self type.
+- A7. Every type path in the text of A1 is proven as REQ-RUST-056.0 proves a parameter's:
+  a builtin, or a name of `core`. A path through `Self`, a qualified path
+  (`<u64 as Sealed>::Buffer`) and a workspace type are not proven.
+- A8. WHEN any of A3 to A7 fails THEN the row SHALL stay without a target, with the reason
+  `associated_type_impl_unproven` (A3, A4, A6), `associated_type_trait_unproven` (A5) or
+  `receiver_type_name_unproven` (A7).
+- A9. A named target SHALL carry, besides the proof of REQ-RUST-056.0 P7: the proof kind
+  `parameter_associated_type_alias`, the text of A1, the stored occurrence of the
+  `type NAME` member and of its impl, and the assumption `source_compiles_one_associated_type`.
+- A10. REQ-RUST-056.0 P2 to P6 apply unchanged to the receiver type of A2.
+
+Not in this requirement: `Self::NAME` in a trait's own default body (the self type is not
+known there), `Self::NAME<..>`, `T::NAME`, and a `type NAME` written by a macro call
+inside the impl body.
+
+### Design, by layer
+
+```text
+L1  no change: parse_written_type_shape and probe_core_member_declaration
+    (receiver-type-probe-records.rs) take the alias text as they take a parameter's text
+L2  core-member-target-records.rs
+      find_alias_receiver_type      A2 to A8 over the stored impl header rows
+      find_core_member_target       calls it when the written type is Self::NAME
+    original-call-resolution-records.rs
+      BoundMethodLookupIndex::check_trait_supertrait_reach   A5, over stored bound rows
+    type-relative-member-records.rs
+      ImplMemberLookupIndex::find_type_member_target         A4, used as it is
+L3  no new effect and no new stored table
+errors  a withheld target is a reason value on the row, not an error; store and decode
+        failures stay OriginalCallResolutionError
+```
+
+### Verification matrix
+
+```text
+req     test                                 type         assertion
+057 A1  test_alias_member_type_evidence      fixture      "type Buffer = [MaybeUninit<u8>; Self::LEN]" row: text, range, 2 paths
+057 A2  test_alias_parameter_core_member     fixture      impl Sealed for u8 with type Store = [MaybeUninit<u8>; 3]:
+        A9                                                buf[0].write(1) -> MaybeUninit<T>::write, proof kind and alias text
+057 A5  test_alias_parameter_core_member     fixture      fn in impl Unsigned for u8, Unsigned: Sealed -> same target;
+                                                          trait with no supertrait bound to Sealed -> associated_type_trait_unproven
+057 A4  test_alias_parameter_core_member     fixture      two impls writing "type Store" -> associated_type_impl_unproven
+057 A7  test_alias_parameter_core_member     fixture      type Store = <u8 as Other>::Store -> receiver_type_name_unproven
+057     test_itoa_core_member_targets        real source  counts of named and unnamed calls on pinned itoa, by method
+057     test_core_member_rows_published      real source  default scope still 151 nodes, 682 rows
+```
+
+Deliberate breaks after GREEN, each must fail a test: drop A5, drop A6, drop A7.
+
+### Plan
+
+```text
+STUB      find_alias_receiver_type and check_trait_supertrait_reach with todo!(); cargo check
+RED       test_alias_parameter_core_member fails; test_itoa_core_member_targets fails on new counts
+GREEN     minimum code; both pass; commit
+REFACTOR  combinators, shared helpers, or a "no refactor needed" note; fmt, clippy, tests; commit
+gates     extractor crate tests, 60 real-source itoa tests, workspace tests, release build
+```
+
+### Open questions
+
+- Q1. The real-source counts are not known before the run. The RED run of the real-source
+  test records what production gives today (9 named); the GREEN run gives the new counts,
+  and each newly named call is checked against the source before the counts are fixed.
+- Q2. `buf.len()` on `&mut [MaybeUninit<u8>; N]` (5 calls): the prelude trait
+  `ExactSizeIterator` declares `len`; REQ-RUST-056.0 P5 keeps those without a target.
+- Q3. Inside `impl Sealed for iN`, `buf[offset].write(b'-')` (5 calls): the trait `Sealed`
+  is in scope and declares `write`. P5 names the target only if the stored impls show
+  `Sealed` is not implemented for `MaybeUninit<u8>`.
+
