@@ -46,6 +46,8 @@ pub use original_call_resolution_records::{
 mod impl_header_implements_records;
 #[path = "legacy-macro-scope-records.rs"]
 mod legacy_macro_scope_records;
+#[path = "macro-argument-path-records.rs"]
+mod macro_argument_path_records;
 pub use impl_header_implements_records::{
     ImplHeaderEdgeError, ImplHeaderEdgeSet, resolve_impl_header_edges,
 };
@@ -730,6 +732,49 @@ fn extract_macro_context_syntax(
                     payload["site_resolution_status_kind"] = json!("unresolved");
                 }
             }
+        }
+        if let Some(call) = ast::MacroCall::cast(node.clone()) {
+            let restore =
+                |offset: usize| offset + removed.partition_point(|position| *position < offset);
+            let path = call.path().map(|path| path.syntax().text_range());
+            rows.extend(
+                macro_argument_path_records::read_macro_argument_paths(&call)
+                    .iter()
+                    .filter(|argument| argument.argument_path_context_kind == "body_value_path")
+                    .map(|argument| {
+                        let start = restore(argument.argument_path_start_offset);
+                        let end = restore(argument.argument_path_end_offset);
+                        let mut site = payload.clone();
+                        site["span_byte_start_offset"] = json!(start);
+                        site["span_byte_end_offset"] = json!(end);
+                        site["site_syntax_kind_value"] = json!("PATH_EXPR");
+                        site["site_syntax_source_text"] = json!(&source[start..end]);
+                        site["site_macro_argument_record"] = json!({
+                            "macro_call_occurrence_key":key,
+                            "macro_path_source_text":call.path().map(|path| path.syntax().text().to_string()),
+                            "macro_path_byte_start_offset":path.map(|range| restore_source_byte_offset(range.start(), &removed)),
+                            "macro_path_byte_end_offset":path.map(|range| restore_source_byte_offset(range.end(), &removed))
+                        });
+                        build_syntax_output_record(
+                            "body-site-reference-table",
+                            blake3::hash(
+                                json!([
+                                    input.unit_compilation_identity_key,
+                                    input.file_source_absolute_path,
+                                    start,
+                                    end,
+                                    "PATH_EXPR",
+                                    input.file_expansion_provenance_chain
+                                ])
+                                .to_string()
+                                .as_bytes(),
+                            )
+                            .to_hex()
+                            .to_string(),
+                            site,
+                        )
+                    }),
+            );
         }
         rows.push(build_syntax_output_record(
             if body {

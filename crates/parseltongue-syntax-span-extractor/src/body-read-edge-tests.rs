@@ -322,3 +322,146 @@ fn test_unresolved_read_keeps_reason() {
         "a path that names no one value keeps one row and one reason"
     );
 }
+
+/// REQ-RUST-052.0 G15: a path in the arguments of an assertion macro call is read only
+/// when the latest stored textual-scope lookup of the macro's name at that call finds no
+/// `macro_rules!` definition.
+#[test]
+fn test_macro_argument_site_gate() {
+    let site = json!({
+        "file_source_absolute_path":"/w/itoa/src/lib.rs",
+        "span_expansion_provenance_chain":["aa"],
+        "site_macro_argument_record":{
+            "macro_path_source_text":"assert",
+            "macro_path_byte_start_offset":16,
+            "macro_path_byte_end_offset":22
+        }
+    });
+    let lookup = |name: &str, range: [u64; 2], revision: u64, target: Value| {
+        json!({
+            "legacy_macro_name_text":name,
+            "legacy_scope_revision_value":revision,
+            "legacy_target_identity_key":target,
+            "legacy_source_site_key":{
+                "span_source_file_path":"src/lib.rs",
+                "span_byte_range_value":range,
+                "span_expansion_provenance_chain":["aa"]
+            }
+        })
+    };
+    let local = || json!({"definition":"macro_rules! assert"});
+    assert!(check_macro_argument_site(&json!({}), &[]));
+    assert!(!check_macro_argument_site(&site, &[]));
+    assert!(check_macro_argument_site(
+        &site,
+        &[lookup("assert", [16, 22], 1, Value::Null)]
+    ));
+    assert!(!check_macro_argument_site(
+        &site,
+        &[lookup("assert", [16, 22], 1, local())]
+    ));
+    // The latest revision decides.
+    assert!(check_macro_argument_site(
+        &site,
+        &[
+            lookup("assert", [16, 22], 1, local()),
+            lookup("assert", [16, 22], 2, Value::Null)
+        ]
+    ));
+    assert!(!check_macro_argument_site(
+        &site,
+        &[
+            lookup("assert", [16, 22], 1, Value::Null),
+            lookup("assert", [16, 22], 2, local())
+        ]
+    ));
+    // A lookup of another call, another name, another expansion or another file is not this call's.
+    assert!(!check_macro_argument_site(
+        &site,
+        &[lookup("assert", [40, 46], 1, Value::Null)]
+    ));
+    assert!(!check_macro_argument_site(
+        &site,
+        &[lookup("debug_assert", [16, 22], 1, Value::Null)]
+    ));
+    let mut other = lookup("assert", [16, 22], 1, Value::Null);
+    other["legacy_source_site_key"]["span_expansion_provenance_chain"] = json!(["bb"]);
+    assert!(!check_macro_argument_site(&site, &[other]));
+    let mut other = lookup("assert", [16, 22], 1, Value::Null);
+    other["legacy_source_site_key"]["span_source_file_path"] = json!("src/udiv128.rs");
+    assert!(!check_macro_argument_site(&site, &[other]));
+}
+
+/// REQ-RUST-052.0 G15: a static named in the arguments of `assert!` is a `reads` row of
+/// the function the call is written in, once the stored lookup of `assert` at that call
+/// finds no `macro_rules!` definition. Without that lookup, or when it finds one, there
+/// is no row.
+#[test]
+fn test_macro_argument_read_edge() {
+    let source =
+        "struct Buffer; static TABLE: u8 = 1; fn pick() { assert!(TABLE > u8::MIN, \"m\"); }";
+    let (store, input) = make_read_fixture_graph(source, &[("TABLE", 1, "TABLE", "Static")]);
+    // Each whole path in the arguments is a site of its own; a type prefix is not.
+    let mut sites = store
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "body-site-reference-table")
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .filter(|site| !site["site_macro_argument_record"].is_null())
+        .map(|site| {
+            assert_eq!(site["site_syntax_kind_value"], "PATH_EXPR");
+            site["site_syntax_source_text"].as_str().unwrap().to_owned()
+        })
+        .collect::<Vec<_>>();
+    sites.sort();
+    assert_eq!(sites, ["TABLE", "u8::MIN"]);
+    let start = source.find("assert").unwrap();
+    let lookup = |revision: u64, target: Value| {
+        make_call_fixture_row(
+            "legacy-macro-scope-records",
+            json!({"legacy_macro_name_text":"assert",
+                "legacy_scope_revision_value":revision,
+                "legacy_target_identity_key":target,
+                "legacy_source_site_key":{"span_source_file_path":"src/lib.rs",
+                    "span_byte_range_value":[start, start + "assert".len()],
+                    "span_expansion_provenance_chain":[]}}),
+        )
+    };
+    assert_eq!(read_body_fixture_edges(source, &store, &input), vec![]);
+    store.rows.lock().unwrap().push(lookup(1, Value::Null));
+    assert_eq!(
+        read_body_fixture_edges(source, &store, &input),
+        vec![edge(
+            "pick",
+            "TABLE",
+            &format!("{}:TABLE", source.match_indices("TABLE").nth(1).unwrap().0)
+        )]
+    );
+    let edges = resolve_body_read_edges(
+        &store,
+        &make_call_fixture_scope(),
+        &input,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    let metadata: Value = serde_json::from_str(
+        edges.read_edge_input_records[0]
+            .edge_dispatch_metadata_text
+            .as_deref()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(metadata["read_kind"], "macro_argument_value_path");
+    assert_eq!(
+        metadata["macro_argument_read_evidence"]["macro_path_source_text"],
+        "assert"
+    );
+    store
+        .rows
+        .lock()
+        .unwrap()
+        .push(lookup(2, json!({"definition":"macro_rules! assert"})));
+    assert_eq!(read_body_fixture_edges(source, &store, &input), vec![]);
+}

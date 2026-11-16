@@ -2188,17 +2188,18 @@ fn test_sysroot_reached_names_reasoned() {
             kind("I", "TypeParam", 1),
             // G7: one `uN::MAX` or `iN::MAX` in each generated `MAX_STR_LEN` initializer,
             // and `i128::MAX_STR_LEN` in the array length of `Buffer`'s field.
-            kind("i128", "Builtin", 3),
-            kind("i16", "Builtin", 1),
-            kind("i32", "Builtin", 1),
-            kind("i64", "Builtin", 1),
-            kind("i8", "Builtin", 1),
+            // G15: two more for each type, `MIN` and `BITS` in the generated `assert!` arguments.
+            kind("i128", "Builtin", 5),
+            kind("i16", "Builtin", 3),
+            kind("i32", "Builtin", 3),
+            kind("i64", "Builtin", 3),
+            kind("i8", "Builtin", 3),
             // 5 in the source-written `fmt` for u128, 1 in the generated `write` for i128
-            kind("u128", "Builtin", 7),
-            kind("u16", "Builtin", 2),
-            kind("u32", "Builtin", 2),
-            kind("u64", "Builtin", 2),
-            kind("u8", "Builtin", 2),
+            kind("u128", "Builtin", 9),
+            kind("u16", "Builtin", 4),
+            kind("u32", "Builtin", 4),
+            kind("u64", "Builtin", 4),
+            kind("u8", "Builtin", 4),
         ])
     );
     // REQ-RUST-052.0 G9: the whole callee path of a call is its own request kind.
@@ -2542,7 +2543,7 @@ fn check_relation_rows_twice(relation: HldRelationKindValue, expected: usize) {
 /// REQ-RUST-048.0 R8
 #[test]
 fn test_reads_rows_read_twice() {
-    check_relation_rows_twice(HldRelationKindValue::Reads, 78);
+    check_relation_rows_twice(HldRelationKindValue::Reads, 98);
 }
 
 /// REQ-RUST-049.0 R12
@@ -2878,7 +2879,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 565);
+    assert_eq!(input.input_edge_records.len(), 585);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3184,14 +3185,15 @@ fn test_generated_fmt_static_reads() {
     };
     assert_eq!(
         stored(HldRelationKindValue::Reads),
-        78,
-        "22 original and 56 generated"
+        98,
+        "22 original and 76 generated"
     );
     // The other 10 generated rows are `Self::MAX_STR_LEN` and `uN::MAX_STR_LEN` in generated
     // `write` bodies. Name lookup alone does not find a trait const through a builtin type;
     // G5 gives each its target (`test_type_relative_member_targets`). G7: the 10 left are
     // `uN::MAX` and `iN::MAX` in generated `MAX_STR_LEN` initializers: no stored impl of the
-    // builtin type declares `MAX`, and its inherent items in `core` were not read.
+    // builtin type declares `MAX`, and its inherent items in `core` were not read. G15: so
+    // are the 20 `MIN` and `BITS` in the generated `assert!` arguments.
     let pending = input
         .input_edge_records
         .iter()
@@ -3232,7 +3234,7 @@ fn test_generated_fmt_static_reads() {
             "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128"
         ]
         .iter()
-        .map(|name| format!("{name}::MAX"))
+        .flat_map(|name| ["MAX", "MIN", "BITS"].map(|member| format!("{name}::{member}")))
         .collect()
     );
 }
@@ -3295,7 +3297,7 @@ fn test_generated_read_source_origins() {
             .sum::<usize>()
     };
     assert_eq!(count("definition DECIMAL_PAIRS", "DECIMAL_PAIRS"), 24);
-    assert_eq!(shapes.values().sum::<usize>(), 56);
+    assert_eq!(shapes.values().sum::<usize>(), 76);
     // `Self::MAX_STR_LEN` is written in the macro definition; in `$Unsigned::MAX_STR_LEN` the
     // type name is copied from the call and the const name from the definition.
     let from_call = shapes
@@ -4299,4 +4301,85 @@ fn test_callee_path_function_targets() {
         ]),
         "27 calls: (callee, target, written in an expansion)"
     );
+}
+
+/// REQ-RUST-052.0 G15: a value path in the arguments of `assert!` is a `reads` row of the
+/// item the call is written in. The five generated `const _` blocks each read `iN::MIN`,
+/// `uN::MIN`, `iN::BITS` and `uN::BITS`; all four are in `core` and have no target.
+#[test]
+fn test_macro_argument_read_rows() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| {
+                node.node_qualified_path_text
+                    .trim_start_matches("itoa::src/lib.rs::")
+                    .to_owned()
+            })
+            .unwrap()
+    };
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Reads)
+        .filter_map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            (metadata["read_kind"] == "macro_argument_value_path").then(|| {
+                let evidence = &metadata["macro_argument_read_evidence"];
+                assert_eq!(evidence["macro_path_source_text"], "assert");
+                assert_eq!(
+                    evidence["macro_textual_scope_outcome_kind"],
+                    "no_local_macro_definition"
+                );
+                assert_eq!(evidence["sources_not_read"].as_array().unwrap().len(), 2);
+                assert!(
+                    metadata["expansion_source_origin"].is_object(),
+                    "{metadata}"
+                );
+                assert_eq!(
+                    metadata["type_relative_member_evidence"]["member_lookup_outcome_kind"],
+                    "no_stored_impl_member"
+                );
+                assert!(matches!(
+                    edge.edge_resolution_value,
+                    HldEdgeResolutionValue::Unresolved {
+                        reason: HldUnresolvedReasonKind::TraitSolverNeeded
+                    }
+                ));
+                (
+                    label(&edge.edge_source_reference),
+                    metadata["read_source_text"]
+                        .as_str()
+                        .unwrap()
+                        .replace(' ', ""),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let mut expected = [
+        ("i8", "u8"),
+        ("i16", "u16"),
+        ("i32", "u32"),
+        ("i64", "u64"),
+        ("i128", "u128"),
+    ]
+    .iter()
+    .flat_map(|(signed, unsigned)| {
+        let source = format!("const _ #impl_Integer!({signed}, {unsigned})");
+        [
+            format!("{signed}::MIN"),
+            format!("{unsigned}::MIN"),
+            format!("{signed}::BITS"),
+            format!("{unsigned}::BITS"),
+        ]
+        .map(|text| (source.clone(), text))
+    })
+    .collect::<Vec<_>>();
+    expected.sort();
+    assert_eq!(rows, expected);
 }

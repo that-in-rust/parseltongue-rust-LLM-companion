@@ -84,6 +84,7 @@ pub fn resolve_body_read_edges(
     let lookup = build_bound_method_index(store, source_scope, &context, input)?;
     let origins = read_expanded_token_origins(store, source_scope)?;
     let members = read_impl_member_index(store, source_scope)?;
+    let macros = read_impl_stage_values(store, source_scope, "legacy-macro-scope-records")?;
     let endpoints = input
         .input_node_records
         .iter()
@@ -101,6 +102,9 @@ pub fn resolve_body_read_edges(
         let Some(request) = read_value_path_request(&site, &context)? else {
             continue;
         };
+        if !check_macro_argument_site(&site, &macros) {
+            continue;
+        }
         if let Some(edge) = build_body_read_edge(
             &site,
             request,
@@ -123,6 +127,45 @@ pub fn resolve_body_read_edges(
     edges.read_edge_input_records.sort();
     edges.read_edge_input_records.dedup();
     Ok(edges)
+}
+
+/// Whether `site` may be read as a value path. A path in the arguments of an
+/// assertion macro call may only when the stored textual-scope lookups of the
+/// macro's name at that call exist and the latest finds no `macro_rules!`
+/// definition: the arguments of a macro of this crate are not known to be
+/// expressions (REQ-RUST-052.0 G15). Any other site may.
+fn check_macro_argument_site(site: &Value, lookups: &[Value]) -> bool {
+    let argument = &site["site_macro_argument_record"];
+    if argument.is_null() {
+        return true;
+    }
+    let range = json!([
+        argument["macro_path_byte_start_offset"],
+        argument["macro_path_byte_end_offset"]
+    ]);
+    let stored = lookups
+        .iter()
+        .filter(|row| {
+            let key = &row["legacy_source_site_key"];
+            row["legacy_macro_name_text"] == argument["macro_path_source_text"]
+                && key["span_byte_range_value"] == range
+                && key["span_expansion_provenance_chain"] == site["span_expansion_provenance_chain"]
+                && key["span_source_file_path"].as_str().is_some_and(|path| {
+                    site["file_source_absolute_path"]
+                        .as_str()
+                        .is_some_and(|file| Path::new(file).ends_with(path))
+                })
+        })
+        .collect::<Vec<_>>();
+    let latest = stored
+        .iter()
+        .filter_map(|row| row["legacy_scope_revision_value"].as_u64())
+        .max();
+    latest.is_some()
+        && stored
+            .iter()
+            .filter(|row| row["legacy_scope_revision_value"].as_u64() == latest)
+            .all(|row| row["legacy_target_identity_key"].is_null())
 }
 
 /// A stored field of a body site row that must be text.
@@ -412,6 +455,19 @@ fn build_body_read_edge(
     if !origin.is_null() {
         metadata["expansion_source_origin"] = origin;
     }
+    let argument = &site["site_macro_argument_record"];
+    if !argument.is_null() {
+        metadata["read_kind"] = json!("macro_argument_value_path");
+        metadata["macro_argument_read_evidence"] = json!({
+            "macro_path_source_text":argument["macro_path_source_text"],
+            "macro_call_occurrence_key":argument["macro_call_occurrence_key"],
+            "macro_textual_scope_outcome_kind":"no_local_macro_definition",
+            "sources_not_read":[
+                "the definition of the macro in the standard library",
+                "a macro of this name brought into scope by a use item or by #[macro_use] extern crate"
+            ]
+        });
+    }
     let evidence = build_site_evidence_value(site)?;
     let occurrence = decode_occurrence_identity_value(&context.occurrence(&evidence)?)?;
     let target = match &resolution {
@@ -478,12 +534,17 @@ pub(super) fn check_body_value_prefix(path: &ast::Path) -> bool {
 /// scope covers the path. A pattern outside the nearest item the path is
 /// written in, such as one of another function, never covers it.
 pub(super) fn check_local_value_binding(path: &ast::Path) -> bool {
-    let name = match (path.qualifier(), path.segment()) {
-        (None, Some(segment)) => segment.syntax().text().to_string(),
-        _ => return false,
-    };
+    match (path.qualifier(), path.segment()) {
+        (None, Some(segment)) => {
+            check_value_name_bound(&segment.syntax().text().to_string(), path.syntax())
+        }
+        _ => false,
+    }
+}
+
+/// Whether `name` is `self` or is bound by a pattern whose scope covers `site`.
+pub(super) fn check_value_name_bound(name: &str, site: &SyntaxNode) -> bool {
     let name = name.trim_start_matches("r#");
-    let site = path.syntax();
     // An item written in a function sees none of the function's locals.
     let function = site
         .ancestors()

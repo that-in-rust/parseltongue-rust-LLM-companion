@@ -471,8 +471,19 @@ impl<'a> CrateSyntaxProjectionState<'a> {
         node: &SyntaxNode,
     ) -> Result<SemanticOccurrenceKeyValue, StoreBackendFailureError> {
         let range = node.text_range();
-        let start = restore_source_byte_offset(range.start(), &file.source_crlf_removed_offsets);
-        let end = restore_source_byte_offset(range.end(), &file.source_crlf_removed_offsets);
+        self.build_range_occurrence_key(
+            file,
+            restore_source_byte_offset(range.start(), &file.source_crlf_removed_offsets),
+            restore_source_byte_offset(range.end(), &file.source_crlf_removed_offsets),
+        )
+    }
+
+    fn build_range_occurrence_key(
+        &self,
+        file: &NamespaceSourceFileContext,
+        start: usize,
+        end: usize,
+    ) -> Result<SemanticOccurrenceKeyValue, StoreBackendFailureError> {
         let absolute = Path::new(&file.source_file_absolute_path);
         let package = Path::new(read_record_string_value(
             &self.projection_unit_record_value,
@@ -1535,6 +1546,45 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                     },
                     path_unavailable_reason_kind: None,
                 });
+        }
+        // Paths in the arguments of an assertion macro call (REQ-RUST-052.0 G15).
+        if let Some(call) = ast::MacroCall::cast(node.clone()) {
+            let removed = &file.source_crlf_removed_offsets;
+            let restore =
+                |offset: usize| offset + removed.partition_point(|position| *position < offset);
+            for argument in super::macro_argument_path_records::read_macro_argument_paths(&call) {
+                let start = restore(argument.argument_path_start_offset);
+                let end = restore(argument.argument_path_end_offset);
+                let occurrence = self.build_range_occurrence_key(file, start, end)?;
+                self.projection_path_metadata_rows.insert(occurrence.clone(),json!({
+                    "unit_source_root_path":self.projection_unit_record_value["unit_source_root_path"],
+                    "site_source_absolute_path":file.source_file_absolute_path,
+                    "site_source_range_start":start,
+                    "site_source_range_end":end,
+                    "path_site_source_text":&file.source_file_original_text[start..end],
+                    "site_path_context_kind":argument.argument_path_context_kind,
+                    "site_expansion_provenance_chain":file.source_expansion_provenance_rows.iter().map(encode_digest_hex_value).collect::<Vec<_>>(),
+                    "site_compilation_scope_record":self.build_compilation_scope_record(scope),
+                }));
+                self.projection_resolution_input_rows
+                    .name_signature_path_rows
+                    .push(NamePathRequestRow {
+                        path_site_occurrence_key: occurrence,
+                        path_lexical_scope_key: scope.clone(),
+                        path_source_segment_rows: read_ast_path_segments(
+                            &argument.argument_path_syntax_node,
+                        ),
+                        path_requested_namespace_kind: if argument.argument_path_context_kind
+                            == "body_value_path"
+                        {
+                            NameNamespaceFilterKind::Value
+                        } else {
+                            NameNamespaceFilterKind::Type
+                        },
+                        path_resolution_source_kind: NameResolutionPathKind::Signature,
+                        path_unavailable_reason_kind: None,
+                    });
+            }
         }
         if let Some(call) = ast::MacroCall::cast(node.clone())
             && let Some(fragment_kind) = classify_macro_expansion_fragment(node)
