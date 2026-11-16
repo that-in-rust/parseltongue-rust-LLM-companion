@@ -2303,12 +2303,19 @@ fn test_core_member_rows_published() {
         .map(String::as_str)
         .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(
-        std::collections::BTreeSet::from(["MaybeUninit<T>::write", "[T]::get_unchecked"]),
+        std::collections::BTreeSet::from([
+            "Iterator::rev",
+            "MaybeUninit<T>::write",
+            "TryInto::try_into",
+            "[T]::as_mut_ptr",
+            "[T]::get_unchecked",
+            "[T]::len"
+        ]),
         added
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
     assert_eq!((151, 682), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((153, 682), (nodes.len(), edges));
+    assert_eq!((157, 682), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -6046,6 +6053,7 @@ fn derive_stored_core_target(
                 target_crate_name: named.external_crate_name_value.clone().unwrap_or_default(),
                 target_owner_kind: match metadata["dispatch_kind"].as_str().unwrap() {
                     "core_inherent_member" => "inherent_impl".to_owned(),
+                    "core_trait_declared_member" => "trait_declaration_impl_not_named".to_owned(),
                     other => other.to_owned(),
                 },
                 declaration_file_path: file.to_owned(),
@@ -6173,6 +6181,7 @@ fn test_itoa_core_member_targets() {
     assert_eq!(
         [
             "core_macro_expansions_import_no_trait",
+            "source_compiles_method_resolves",
             "source_compiles_one_associated_type"
         ]
         .map(str::to_owned)
@@ -6180,17 +6189,24 @@ fn test_itoa_core_member_targets() {
         .collect::<CoreTargetAssumptionSet>(),
         proof_assumptions
     );
-    // Equal to their expected rows: 88 of 133. Without a stored target: 45.
+    // Equal to their expected rows: 108 of 133. Without a stored target: 25.
     assert_eq!(
-        (88, 49, 39),
+        (108, [49, 39, 5, 13, 1, 1]),
         (
             stored.len(),
-            count_stored_label("MaybeUninit<T>::write"),
-            count_stored_label("[T]::get_unchecked")
+            [
+                "MaybeUninit<T>::write",
+                "[T]::get_unchecked",
+                "[T]::len",
+                "TryInto::try_into",
+                "Iterator::rev",
+                "[T]::as_mut_ptr"
+            ]
+            .map(count_stored_label)
         )
     );
     assert_eq!(
-        (153, 682, 197, 45),
+        (157, 682, 197, 25),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),

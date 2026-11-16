@@ -1,7 +1,7 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-16: **steps 8.1 to 8.3b-2b built: 50 of the 133 calls are named and equal
-their frozen rows, 83 have no target. The order changed by user decision: the expected target of all 133 calls is written
+Status on 2026-11-16: **108 of the 133 calls are named and equal their frozen rows, 25 have
+no target (sections 10 to 12 built). The order changed by user decision: the expected target of all 133 calls is written
 from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
 it.** Counts are on the log's "Where we are" page.
 
@@ -517,6 +517,19 @@ S6  The probe, the scope rules and the withheld reasons of REQ-RUST-056.0 then a
     path as written, and for each field step its name, its stored text and its type.
 ```
 
+```text
+S7  (added after S1 to S6 were built) WHEN the first step is `self` and a field step
+    follows
+    THEN the type of the place SHALL start as the self type of the stored impl that
+    holds the function, only if: the function's `self` parameter is written `self`,
+    `mut self`, `&self` or `&mut self`; the impl is not inside a function body; and its
+    self type is one plain name, without generic arguments, resolved to a definition.
+    The first field is found among the stored fields of that definition; S3 to S6 then
+    apply. A `self` with a written type, a method a trait declares, or `self` with no
+    field step: the lookup does not apply.
+    receiver_type_proof_kind is self_declared_type_field.
+```
+
 A field that `cfg` removes has no stored row (the extractor skips inactive nodes), so the
 position among stored fields is the position after `cfg`. An attribute on a stored field is
 not read by this lookup, so S3 withholds: a missed target is preferable to a wrong one.
@@ -548,9 +561,149 @@ No new stage, table or dependency. Typed errors are the existing
 | S3 | same (gated, nested) | unit, fixture | attribute on a stored field; tuple type | receiver_field_type_unproven |
 | S4 | same (indexed) | unit, fixture | field then index | `MaybeUninit<T>::write` |
 | S5 | same (unproven) | unit, fixture | field type names a workspace struct | receiver_type_name_unproven |
-| S1 to S6 | test_itoa_core_member_targets | real source | each named call equals its frozen row | wrong 0 |
+| S7 | test_self_field_receiver_member | unit, fixture | `self`, `&self`, `&mut self` then a field; `self: &Self`; a trait's own method | `[T]::get_unchecked`; no target; no target |
+| S1 to S7 | test_itoa_core_member_targets | real source | each named call equals its frozen row | wrong 0 |
 
 ### Open questions
 
-- A receiver rooted at `self` (`self.bytes.as_mut_ptr()`, 1 call) and at a parameter with
-  a field step are not built.
+- A receiver rooted at a parameter with a field step is not built.
+
+## 11. A prelude trait that declares the same name (spec first, added 2026-11-16)
+
+### Rust work mode
+
+Delivery Mode and Reliability Mode. This builds decision Q2 of section 5. The risk is a
+target that rests on something not proven, so the row must say so.
+
+### Measured before writing (commit `3a4827d01`, scope `declarations`)
+
+```text
+  5  len   receiver buf, typed &mut Self::Buffer = &mut [MaybeUninit<u8>; N]
+           reason scope_trait_may_fit
+```
+
+`ExactSizeIterator` is exported by the prelude of `core` and declares `len(&self)`. The
+probe reaches `&mut [T; N]` taken by `&` and `[T; N]` taken by `&` before the slice. The
+impls of a trait of `core` are not read, so the probe cannot show that neither type
+implements it. Expected for the 5 (frozen rows): `[T]::len`, with the assumption
+`prelude_trait_impl_unrefuted`.
+
+### Executable requirements: REQ-RUST-060.0
+
+```text
+U1  WHEN at one receiver form no inherent member fits, and every trait in scope that may
+    fit is a trait of core that is in scope through the prelude only
+    THEN the probe SHALL go on to the next form and remember the names of those traits.
+U2  "Through the prelude only" SHALL mean: the trait's name, or a name core renames it
+    to, is exported by a prelude file of core, and none of those names is written in the
+    workspace's read source.
+U3  WHEN the probe then names a declaration
+    THEN the lookup record SHALL carry the assumption prelude_trait_impl_unrefuted and
+    the remembered trait names.
+U4  WHEN the probe then names nothing, or withholds for any reason
+    THEN the reason SHALL be scope_trait_may_fit, as before.
+U5  A trait of the workspace, a trait of core whose name is written in the workspace,
+    and a trait whose name is not known SHALL withhold at once, as before
+    (REQ-RUST-056.0 P4, P5).
+U6  A row that names its target at a form where an inherent member fits SHALL NOT carry
+    the assumption.
+```
+
+This replaces "no target" in REQ-RUST-056.0 P5 for the case of U1 only. The assumption is
+that the trait is not implemented for the types of the earlier forms; nothing in the run
+proves it.
+
+### Design (L1 / L2 / L3)
+
+```text
+L1  receiver-type-probe-records.rs
+      ScopeTraitMethodValue        gains the prelude trait's name
+      decide_probe_form_outcome    returns decided, assumed (names) or passed
+      probe_core_member_declaration  folds the forms, carrying the assumed names
+    core-member-target-records.rs
+      list_core_trait_names, check_prelude_only_scope   U2
+      find_core_member_target      writes U3 into the lookup record
+L2, L3  nothing added
+```
+
+### Verification matrix
+
+| req_id | test_id | test_type | assertion | metric |
+| --- | --- | --- | --- | --- |
+| U1, U3 | test_scope_trait_blocks_target | unit | a prelude trait before the slice | `[T]::len`, names the trait |
+| U4 | same | unit | prelude trait, no later member | scope_trait_may_fit |
+| U5 | same | unit | prelude trait and an unread other trait | scope_trait_may_fit |
+| U1 to U3 | test_parameter_receiver_core_member (length) | unit, fixture | an array parameter | `[T]::len` with the assumption |
+| U2, U5 | same (imported) | unit, fixture | the trait's name written in the workspace | scope_trait_may_fit |
+| U6 | same (direct) | unit, fixture | a slice parameter | no assumption |
+| U1 to U6 | test_itoa_core_member_targets | real source | 5 `[T]::len` equal their frozen rows; no other row carries the assumption | wrong 0 |
+
+## 12. A method name that one trait of `core` declares (spec first, added 2026-11-16)
+
+### Rust work mode
+
+Delivery Mode and Reliability Mode. The risk is a second declaration of the name that the
+run did not see.
+
+### Measured before writing (commit `3a4827d01`, scope `declarations`)
+
+```text
+ 13  try_into   receivers: a literal (8), `(&mut buf[offset..])` (5)   receiver_type_not_determined
+  1  rev        receiver `(1..4)`                                      receiver_type_not_determined
+ stored declarations of core (6,528 rows):
+   try_into   1 trait declaration (TryInto, `self` by value), 1 impl of that trait
+   rev        1 trait declaration (Iterator)
+```
+
+Expected (frozen rows): `TryInto::try_into` and `Iterator::rev`, owner kind
+`trait_declaration_impl_not_named`, no assumption. The receiver's type is written nowhere
+in itoa for these calls, and the label does not depend on it.
+
+### The Rust rule this follows
+
+A method call that compiles resolves to a method of that name. The methods that exist for
+a `no_std` unit without dependencies are those of `core` and of the workspace. When
+exactly one method of the name is declared in both, the call is a call of it, whatever the
+receiver's type. The row names the trait's declaration, not the impl that runs.
+
+### Executable requirements: REQ-RUST-061.0
+
+```text
+M1  WHEN no reason withholds every call of the run (REQ-RUST-056.0 P1: no_std, no
+    dependency, no alloc or std, no glob import, the prelude read)
+    AND exactly one trait declaration of core declares the method name, with a `self`
+    parameter, and that trait is in scope (through the prelude, or its name is written in
+    the workspace)
+    AND no inherent impl of core declares the name
+    AND no macro of core may declare an inherent member or a trait member of the name
+    AND every impl member of the name in core is in an impl of that trait
+    AND no item of the workspace has the name
+    THEN the call SHALL be named `<Trait>::<method>`, crate core, with the file and
+    offsets of the trait's declaration of the method.
+M2  The row SHALL say that it names a trait's declaration and no impl:
+    dispatch_kind core_trait_declared_member, target_owner_kind_value trait_declaration,
+    receiver_type_proof_kind method_name_sole_declaration.
+M3  The row SHALL carry the assumption source_compiles_method_resolves.
+M4  WHEN any condition of M1 does not hold THEN this rule SHALL name nothing, and the
+    lookup by receiver type applies as before.
+```
+
+### Design (L1 / L2 / L3)
+
+```text
+L1  core-member-target-records.rs
+      CoreMemberLookupIndex.workspace_item_leaf_names   the last name of every graph node
+      find_sole_trait_member                            M1 to M3
+      find_core_member_target                           asks it first (M4)
+    original-call-resolution-records.rs                 dispatch_kind (M2)
+L2, L3  nothing added
+```
+
+### Verification matrix
+
+| req_id | test_id | test_type | assertion | metric |
+| --- | --- | --- | --- | --- |
+| M1 to M3 | test_sole_trait_method_name | unit, fixture | a literal receiver | `TryInto::try_into`, offsets of the declaration |
+| M1, M4 | same | unit, fixture | a workspace fn of the name; a name an inherent impl also declares; a trait out of scope; a unit that is not no_std | no target |
+| M1 | same | unit, fixture | the trait's name written in the workspace | `Lone::lone_call` |
+| M1 to M4 | test_itoa_core_member_targets | real source | 13 `TryInto::try_into`, 1 `Iterator::rev` equal their frozen rows | wrong 0 |

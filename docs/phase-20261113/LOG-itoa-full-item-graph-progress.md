@@ -4,13 +4,13 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-16, production code of commit `3a4827d01`)
+## Where we are (2026-11-16, production code of the commit that adds REQ-RUST-060.0 and 061.0)
 
 **Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
 1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
 passed SOP steps S1 to S4 on one frozen executable. That graph is marked `incomplete`: 133
 method calls into `core` have no target, and the expected graph was written and checked by
-one author. Not accepted: the branch head, where part 8 names 88 of those 133 calls. Each
+one author. Not accepted: the branch head, where part 8 names 108 of those 133 calls. Each
 named call equals its frozen expected row, checked once against the compiler. No SOP step
 has been run on the head.**
 
@@ -18,19 +18,20 @@ has been run on the head.**
 
 ```text
                               accepted run   head
-                              822da80cf      3a4827d01
-nodes                         151            153
+                              822da80cf
+nodes                         151            157
 edge rows                     682            682
-calls with a target            64 of 197     152 of 197
-edge rows with a target       549 of 682     637 of 682
-method calls into core named    0 of 133      88 of 133   equal to the frozen rows: 88, wrong: 0
+calls with a target            64 of 197     172 of 197
+edge rows with a target       549 of 682     657 of 682
+method calls into core named    0 of 133     108 of 133   equal to the frozen rows: 108, wrong: 0
 ```
 
 - **Expected targets:** all 133 are written from source and frozen
   (`itoa-target-dataset/itoa-expected-core-member-targets.json`).
-- **Named at the head:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`.
-- **Without a target (45):** 13 `try_into`, 8 `expect`, 5 `unwrap`, 10 `ilog10`, 5 slice
-  `len`, 1 each of `str::len`, `as_mut_ptr`, `cast`, `rev`.
+- **Named at the head:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`, 13
+  `TryInto::try_into`, 5 `[T]::len`, 1 `Iterator::rev`, 1 `[T]::as_mut_ptr`.
+- **Without a target (25):** 8 `expect`, 5 `unwrap`, 10 `ilog10`, 1 each of `str::len` and
+  `cast`.
 - **Real-source tests:** 60 of 60 pass on the executable built from the head.
 - **Not done:** the `core` files are not in the run id; the targets are not merged into the
   expected graph; S1 to S4 are NOT STARTED for the head.
@@ -827,7 +828,7 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
 ```
 
 
-## 2026-11-16 22:00 IST Part 8 step 9.5: the real-source test compares a run with the frozen rows
+## 2026-11-16 21:55 IST Part 8 step 9.5: the real-source test compares a run with the frozen rows
 
 ```text
  what        test_itoa_core_member_targets no longer holds a list of its own. It runs the
@@ -858,7 +859,7 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
 ```
 
 
-## 2026-11-16 22:50 IST Part 8 step 8.3b-2b closed: a type written by a macro expansion
+## 2026-11-16 22:28 IST Part 8 step 8.3b-2b closed: a type written by a macro expansion
 
 ```text
  cause       a macro expansion writes the parameter type as `&mut Self ::Buffer`, with a
@@ -888,7 +889,7 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
 ```
 
 
-## 2026-11-16 23:55 IST Part 8: a receiver that is a `static`, then fields (REQ-RUST-059.0)
+## 2026-11-16 22:56 IST Part 8: a receiver that is a `static`, then fields (REQ-RUST-059.0)
 
 ```text
  spec        SPEC part 8 section 10, written before the code: S1 to S6
@@ -912,5 +913,49 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
              not run: the workspace clippy, test and build gates
  not built   a receiver rooted at `self` or at a parameter followed by a field
  not done    S1 to S4 for this head: NOT STARTED. 45 calls into core have no target.
+```
+
+
+## 2026-11-16 23:19 IST Part 8: a prelude trait, a sole trait method name, and `self` then a field
+
+```text
+ specs       SPEC part 8 sections 11 and 12 and S7 of section 10, each written before its code
+ REQ-060.0   Q2 as decided: when no inherent member fits at a receiver form and only traits
+             of core that are in scope through the prelude alone may fit, the probe goes on.
+             A name found later carries the assumption prelude_trait_impl_unrefuted and the
+             trait names. Nothing found later: scope_trait_may_fit, as before.
+ REQ-061.0   a method name that exactly one trait of core declares, and nothing else in
+             core or the workspace, names that trait's declaration whatever the receiver is.
+             dispatch_kind core_trait_declared_member; assumption
+             source_compiles_method_resolves.
+ REQ-059.0   S7: `self` then a field starts from the self type of the stored impl.
+ fixtures    test_scope_trait_blocks_target (4 new cases), test_parameter_receiver_core_member
+             (2 new), test_sole_trait_method_name (6 cases), test_self_field_receiver_member
+             (5 cases; failed without the production change)
+ real source test_itoa_core_member_targets, against the frozen expected rows
+               before   stored  88   equal  88   wrong 0   without a target 45
+               after    stored 108   equal 108   wrong 0   without a target 25
+               5 [T]::len (REQ-060.0), each with the assumption its expected row asks for;
+               no other row carries that assumption
+               13 TryInto::try_into, 1 Iterator::rev (REQ-061.0)
+               1 [T]::as_mut_ptr (S7)
+             nodes 157 (6 names of core members), edge rows 682, calls 197;
+             edge rows with a target 657 of 682
+ a gate run  failed first and was stopped: test_core_member_rows_published pinned the two
+ that failed names a `declarations` run adds and 153 nodes. The run now adds six. The pins of
+             both tests that use `declarations` were changed to the measured values, both
+             tests were run alone and passed, then the gates below were run.
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, extractor and cli crates             ok
+             extractor tests                                          180 passed, 0 failed
+             real-source tests, frozen executable                     60 passed, 0 failed, 910 s
+             executable sha256 7e742a5376defd69..., same before and after the run
+             not run: the workspace clippy, test and build gates
+ corrected   the times in the headings of the last three entries were wrong by up to an
+             hour; they now show the commit times (21:55, 22:28, 22:56)
+ not built   a receiver that is itself a method call (8 expect, 5 unwrap, 1 cast: needs the
+             return type core declares), a local bound to a call's result (str::len), and
+             members core writes inside a macro (10 ilog10)
+ not done    S1 to S4 for this head: NOT STARTED. 25 calls into core have no target.
 ```
 

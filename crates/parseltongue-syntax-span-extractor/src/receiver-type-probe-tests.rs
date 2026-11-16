@@ -43,14 +43,20 @@ fn probe(receiver: &str, name: &str, traits: &[ScopeTraitMethodValue]) -> String
         CoreMemberProbeOutcome::Named {
             declaration_row_index,
             probe_step_text,
+            prelude_trait_assumed_names,
         } => format!(
-            "{}::{} at {probe_step_text}",
+            "{}::{} at {probe_step_text}{}",
             rows[declaration_row_index]["impl_self_type_text"]
                 .as_str()
                 .unwrap(),
             rows[declaration_row_index]["member_declared_name_value"]
                 .as_str()
-                .unwrap()
+                .unwrap(),
+            if prelude_trait_assumed_names.is_empty() {
+                String::new()
+            } else {
+                format!(" assuming {}", prelude_trait_assumed_names.join(", "))
+            }
         ),
         CoreMemberProbeOutcome::Withheld(detail) => format!("withheld {detail}"),
     }
@@ -226,11 +232,53 @@ fn test_scope_trait_blocks_target() {
     let unread = |kind: &str| ScopeTraitMethodValue {
         member_self_parameter_kind: kind.to_owned(),
         trait_impl_self_shapes: None,
+        prelude_trait_name_value: None,
     };
     let stored = |kind: &str, types: &[&str]| ScopeTraitMethodValue {
         member_self_parameter_kind: kind.to_owned(),
         trait_impl_self_shapes: Some(types.iter().map(|text| shape(text)).collect()),
+        prelude_trait_name_value: None,
     };
+    let prelude = |kind: &str, name: &str| ScopeTraitMethodValue {
+        prelude_trait_name_value: Some(name.to_owned()),
+        ..unread(kind)
+    };
+    // REQ-RUST-060.0 U1, U3: a trait of `core` in scope through the prelude only does
+    // not end the probe; the name it then finds carries the trait's name.
+    assert_eq!(
+        "[T]::len at step 2 by reference assuming ExactSizeIterator",
+        probe(
+            "&mut [u8; 4]",
+            "len",
+            &[prelude("reference", "ExactSizeIterator")]
+        )
+    );
+    // U4: nothing named after it: the trait's method may be the call's.
+    assert_eq!(
+        "withheld scope_trait_may_fit",
+        probe(
+            "&mut [u8; 4]",
+            "absent",
+            &[prelude("reference", "ExactSizeIterator")]
+        )
+    );
+    // U5: any other trait that may fit still ends the probe.
+    assert_eq!(
+        "withheld scope_trait_may_fit",
+        probe(
+            "&mut [u8; 4]",
+            "len",
+            &[
+                prelude("reference", "ExactSizeIterator"),
+                unread("reference")
+            ]
+        )
+    );
+    // U6: an inherent member at the first form carries no assumption.
+    assert_eq!(
+        "[T]::len at step 0 by value",
+        probe("&[u8]", "len", &[prelude("reference", "ExactSizeIterator")])
+    );
     // `ExactSizeIterator::len(&self)` could fit `&mut [u8; 4]` taken by reference, which
     // comes before the slice.
     assert_eq!(

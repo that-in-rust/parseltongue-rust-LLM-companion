@@ -398,6 +398,13 @@ fn build_original_call_edge(
     let mut dispatch = json!({
         "dispatch_kind":match (&target, &bound_evidence) {
             (None, _) => "undetermined",
+            // REQ-RUST-061.0 M2: the trait's declaration is named, not the impl that runs.
+            (Some(_), _)
+                if matches!(&core_member, Some((Ok(_), lookup))
+                    if lookup["target_owner_kind_value"] == "trait_declaration") =>
+            {
+                "core_trait_declared_member"
+            }
             (Some(_), _) if matches!(core_member, Some((Ok(_), _))) => "core_inherent_member",
             (Some(_), _) if callee.callee_path_row_decision.is_some() => {
                 callee.callee_path_dispatch_kind

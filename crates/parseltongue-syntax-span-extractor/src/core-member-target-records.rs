@@ -11,8 +11,8 @@ use crate::original_call_resolution_records::{
     BoundMethodLookupIndex, OriginalCallResolutionError,
 };
 use crate::receiver_type_probe_records::{
-    CoreMemberProbeOutcome, ScopeTraitMethodValue, WrittenTypeShapeValue, parse_written_type_shape,
-    probe_core_member_declaration,
+    CoreMemberProbeOutcome, ScopeTraitMethodValue, WrittenTypeShapeValue,
+    check_macro_member_candidate, parse_written_type_shape, probe_core_member_declaration,
 };
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
@@ -23,7 +23,7 @@ use parseltongue_table_store_traits::StageTableStorePort;
 use ra_ap_syntax::ast::{self, HasAttrs, HasName};
 use ra_ap_syntax::{AstNode, Edition, SourceFile, SyntaxKind};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[cfg(test)]
 #[path = "core-member-target-tests.rs"]
@@ -45,6 +45,11 @@ pub(crate) struct CoreMemberLookupIndex {
     workspace_token_name_values: BTreeSet<String>,
     /// `(trait name, member name)` for each member a workspace trait declares.
     workspace_trait_member_names: BTreeSet<(String, String)>,
+    /// REQ-RUST-059.0 S7: the text of the `self` parameter of each function, by the
+    /// stored occurrence key of the function.
+    self_parameter_source_texts: BTreeMap<String, String>,
+    /// REQ-RUST-061.0: the last name of the path of every graph node of the workspace.
+    workspace_item_leaf_names: BTreeSet<String>,
     /// REQ-RUST-059.0: `(owner, row)` for the stored declared type of each `static` and
     /// each stored field; the owner is the graph identity of the `static`, or of the item
     /// that declares the field.
@@ -196,7 +201,18 @@ pub(crate) fn read_core_member_index(
             ))
         })
         .collect();
-    let owned = read_impl_stage_values(store, scope, "field-signature-detail-table")?
+    let signatures = read_impl_stage_values(store, scope, "field-signature-detail-table")?;
+    let receivers = signatures
+        .iter()
+        .filter(|row| row["site_syntax_kind_value"] == "SELF_PARAM")
+        .filter_map(|row| {
+            Some((
+                row["site_owner_occurrence_key"].as_str()?.to_owned(),
+                row["site_syntax_source_text"].as_str()?.to_owned(),
+            ))
+        })
+        .collect();
+    let owned = signatures
         .into_iter()
         .filter(check_declared_type_row)
         .filter_map(|row| {
@@ -206,12 +222,18 @@ pub(crate) fn read_core_member_index(
         })
         .collect();
     Ok(CoreMemberLookupIndex {
+        self_parameter_source_texts: receivers,
         owner_declared_type_rows: owned,
         core_rename_name_pairs: renames,
         core_declaration_value_rows: declarations,
         scope_proof_withheld_reason: reason,
         scope_prelude_leaf_names: prelude,
         workspace_token_name_values: tokens,
+        workspace_item_leaf_names: nodes
+            .iter()
+            .filter_map(|node| node.node_qualified_path_text.rsplit("::").next())
+            .map(|name| name.trim_start_matches("r#").to_owned())
+            .collect(),
         workspace_trait_member_names: nodes
             .iter()
             .filter(|node| node.node_owner_kind_value == Some(HldOwnerKindValue::Trait))
@@ -307,10 +329,27 @@ impl CoreMemberLookupIndex {
     /// workspace: `name`, or a name `core` renames it to, is re-exported by the prelude or
     /// written in the workspace. A rename of `self` may rename any trait.
     fn check_core_trait_scope(&self, name: &str) -> bool {
-        let written = |name: &str| {
+        self.list_core_trait_names(name).into_iter().any(|name| {
             self.scope_prelude_leaf_names.contains(name)
                 || self.workspace_token_name_values.contains(name)
-        };
+        })
+    }
+
+    /// REQ-RUST-060.0 U2: whether the trait `name` of `core` is in scope through the
+    /// prelude only: a prelude file exports one of its names, and the workspace writes
+    /// none of them.
+    fn check_prelude_only_scope(&self, name: &str) -> bool {
+        let names = self.list_core_trait_names(name);
+        names
+            .iter()
+            .any(|name| self.scope_prelude_leaf_names.contains(*name))
+            && !names
+                .iter()
+                .any(|name| self.workspace_token_name_values.contains(*name))
+    }
+
+    /// `name` and every name that `core` renames it to, directly or through another.
+    fn list_core_trait_names<'index>(&'index self, name: &'index str) -> BTreeSet<&'index str> {
         let mut names = BTreeSet::from([name]);
         loop {
             let found = self
@@ -325,10 +364,66 @@ impl CoreMemberLookupIndex {
                 .filter(|alias| !names.contains(alias))
                 .collect::<Vec<_>>();
             if found.is_empty() {
-                return names.into_iter().any(written);
+                return names;
             }
             names.extend(found);
         }
+    }
+
+    /// REQ-RUST-061.0 M1 to M3: the one trait declaration of `core` that declares the
+    /// method `method`, when nothing else in `core` or the workspace has that name.
+    fn find_sole_trait_member(&self, method: &str) -> Option<(BuiltinMemberNameOutcome, Value)> {
+        let rows = self.core_declaration_value_rows.as_slice();
+        let named = |row: &Value| row["member_declared_name_value"] == method;
+        let of_kind = |row: &Value, kind: &str| row["declaration_owner_kind_value"] == kind;
+        let mut declared = rows
+            .iter()
+            .filter(|row| of_kind(row, "trait_declaration") && named(row));
+        let row = declared.next().filter(|_| declared.next().is_none())?;
+        let name = row["owner_trait_path_text"]
+            .as_str()
+            .map(read_path_last_name)
+            .filter(|name| !name.is_empty())?;
+        let method_form = row["member_self_parameter_kind"]
+            .as_str()
+            .is_some_and(|kind| kind != "none");
+        let other = rows.iter().any(|found| {
+            let tokens =
+                of_kind(found, "macro_definition_body") || of_kind(found, "macro_call_argument");
+            (of_kind(found, "inherent_impl") && named(found))
+                || check_macro_member_candidate(found, method, rows)
+                || (tokens
+                    && (named(found) || found["member_name_parameter_flag"] == true)
+                    && found["macro_owner_shape_kind"] == "trait_declaration")
+                || (of_kind(found, "trait_impl")
+                    && named(found)
+                    && found["owner_trait_path_text"]
+                        .as_str()
+                        .map(read_path_last_name)
+                        != Some(name))
+        });
+        if self.scope_proof_withheld_reason.is_some()
+            || self.workspace_item_leaf_names.contains(method)
+            || !method_form
+            || other
+            || !self.check_core_trait_scope(name)
+        {
+            return None;
+        }
+        let evidence = json!({
+            "receiver_type_proof_kind":"method_name_sole_declaration",
+            "target_owner_kind_value":"trait_declaration",
+            "owner_trait_name_value":name,
+            "method_probe_unread_source":["alloc", "std"],
+            "lookup_assumption_values":["source_compiles_method_resolves"],
+            "declaration_source_relative_path":row["declaration_source_relative_path"],
+            "member_name_start_offset":row["member_name_start_offset"],
+            "member_name_end_offset":row["member_name_end_offset"]
+        });
+        Some((
+            Ok(build_core_member_proof(format!("{name}::{method}"))),
+            evidence,
+        ))
     }
 
     /// P4, P5: the traits that may be in scope of a call and declare `method`. A trait of
@@ -373,6 +468,11 @@ impl CoreMemberLookupIndex {
                     .unwrap_or("unknown")
                     .to_owned(),
                 trait_impl_self_shapes: None,
+                prelude_trait_name_value: row["owner_trait_path_text"]
+                    .as_str()
+                    .map(read_path_last_name)
+                    .filter(|name| !name.is_empty() && self.check_prelude_only_scope(name))
+                    .map(str::to_owned),
             })
             .collect::<Vec<_>>();
         for header in &members.impl_header_value_rows {
@@ -431,6 +531,7 @@ impl CoreMemberLookupIndex {
             found.extend(kinds.into_iter().map(|kind| ScopeTraitMethodValue {
                 member_self_parameter_kind: kind.to_owned(),
                 trait_impl_self_shapes: shapes.clone(),
+                prelude_trait_name_value: None,
             }));
         }
         Ok(found)
@@ -809,6 +910,73 @@ fn find_field_step_type<'index>(
         .and_then(|owner| index.find_struct_field_type(&owner, name)))
 }
 
+/// The stored field row a place has reached, the type it writes, and the record of each
+/// field step walked.
+type FieldPlaceWalkValue<'index> = (Vec<Value>, &'index Value, String);
+
+fn build_field_step_record(name: &str, field: &Value, written: &str) -> Value {
+    json!({
+        "field_declared_name_value":name,
+        "field_source_text":field["site_syntax_source_text"],
+        "field_type_source_text":written
+    })
+}
+
+/// REQ-RUST-059.0 S3: each field step of `fields`, from the struct the type so far
+/// names. `None` when a step is not proven.
+fn walk_field_step_types<'index>(
+    start: Option<FieldPlaceWalkValue<'index>>,
+    fields: &[Value],
+    context: &ImplHeaderSourceContext<'_>,
+    index: &'index CoreMemberLookupIndex,
+) -> Result<Option<FieldPlaceWalkValue<'index>>, OriginalCallResolutionError> {
+    fields.iter().try_fold(start, |state, step| {
+        let (Some((rows, row, written)), Some(name)) =
+            (state, step["field_declared_name_value"].as_str())
+        else {
+            return Ok(None);
+        };
+        Ok(
+            find_field_step_type(row, &written, name, context, index)?.map(|(field, written)| {
+                let walked = build_field_step_record(name, field, &written);
+                (
+                    rows.into_iter().chain([walked]).collect::<Vec<_>>(),
+                    field,
+                    written,
+                )
+            }),
+        )
+    })
+}
+
+/// REQ-RUST-059.0 S3, S5: the outcome of a walk over field steps: the type the last
+/// stored row writes, when every step is proven and every type path of that type is.
+fn decide_field_place_type(
+    walked: Option<FieldPlaceWalkValue<'_>>,
+    mut evidence: Value,
+    context: &ImplHeaderSourceContext<'_>,
+) -> Result<ReceiverPlaceTypeOutcome, OriginalCallResolutionError> {
+    let Some((rows, row, written)) = walked else {
+        return Ok((Err("receiver_field_type_unproven"), evidence));
+    };
+    if !rows.is_empty() {
+        evidence["receiver_field_step_rows"] = json!(rows);
+    }
+    let Some(paths) = row["type_path_source_rows"].as_array() else {
+        return Ok((Err("receiver_type_name_unproven"), evidence));
+    };
+    for path in paths {
+        let proven = match build_row_path_evidence(row, path) {
+            Some(site) => check_written_path_proven(&site, path, context)?,
+            None => false,
+        };
+        if !proven {
+            return Ok((Err("receiver_type_name_unproven"), evidence));
+        }
+    }
+    Ok((Ok(written), evidence))
+}
+
 /// REQ-RUST-059.0 S1 to S5: the type written for the place `first` then `fields`, when
 /// `first` is a value path that the stored lookup resolved to one `static` of the
 /// workspace. `None` when it names no such `static`.
@@ -837,7 +1005,7 @@ fn find_static_place_type(
     else {
         return Ok(None);
     };
-    let mut evidence = json!({
+    let evidence = json!({
         "receiver_type_proof_kind":if fields.is_empty() {
             "static_declared_type"
         } else {
@@ -848,63 +1016,99 @@ fn find_static_place_type(
         "method_probe_unread_source":["alloc", "std"],
         "lookup_assumption_values":["core_macro_expansions_import_no_trait"]
     });
-    let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
     if let Some(reason) = index.scope_proof_withheld_reason {
-        return withheld(reason, evidence);
+        return Ok(Some((Err(reason), evidence)));
     }
-    // S3: each field step, from the struct the type so far names.
-    let walked = fields.iter().try_fold(
-        Some((Vec::new(), declared, text.to_owned())),
-        |state, step| -> Result<_, OriginalCallResolutionError> {
-            let (Some((rows, row, written)), Some(name)) =
-                (state, step["field_declared_name_value"].as_str())
-            else {
-                return Ok(None);
-            };
-            Ok(
-                find_field_step_type(row, &written, name, context, index)?.map(
-                    |(field, written)| {
-                        let walked = json!({
-                            "field_declared_name_value":name,
-                            "field_source_text":field["site_syntax_source_text"],
-                            "field_type_source_text":written
-                        });
-                        (
-                            rows.into_iter().chain([walked]).collect::<Vec<_>>(),
-                            field,
-                            written,
-                        )
-                    },
-                ),
+    let start = Some((Vec::new(), declared, text.to_owned()));
+    let walked = walk_field_step_types(start, fields, context, index)?;
+    decide_field_place_type(walked, evidence, context).map(Some)
+}
+
+/// REQ-RUST-059.0 S7: the type written for `self` then `fields` in the function `span`
+/// is in. `None` when the function has no plain `self`, `&self` or `&mut self`, when it
+/// is in no stored impl whose self type is one plain name resolved to a definition, or
+/// when no field step follows.
+fn find_self_place_type(
+    span: &Value,
+    fields: &[Value],
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+    index: &CoreMemberLookupIndex,
+) -> Result<Option<ReceiverPlaceTypeOutcome>, OriginalCallResolutionError> {
+    let (Some(owner), Some((step, rest))) = (
+        span["site_owner_occurrence_key"].as_str(),
+        fields.split_first(),
+    ) else {
+        return Ok(None);
+    };
+    let Some(parameter) = index.self_parameter_source_texts.get(owner) else {
+        return Ok(None);
+    };
+    let layers = match parameter.split_whitespace().collect::<String>().as_str() {
+        "self" | "mutself" => "",
+        "&self" => "&",
+        "&mutself" => "&mut ",
+        _ => return Ok(None),
+    };
+    let Some((header, written)) = members
+        .impl_header_value_rows
+        .iter()
+        .find(|header| {
+            header["impl_member_occurrence_rows"]
+                .as_array()
+                .is_some_and(|rows| {
+                    rows.iter()
+                        .any(|member| member["member_source_occurrence_key"] == owner)
+                })
+        })
+        .filter(|header| {
+            header["impl_function_body_ancestry_flag"] == false
+                && check_header_definition_target(&header["impl_self_type_resolution"])
+        })
+        .and_then(|header| {
+            let written =
+                header["impl_self_type_resolution"]["type_source_evidence"]["type_source_text"]
+                    .as_str()?;
+            matches!(
+                parse_written_type_shape(written, &[]),
+                WrittenTypeShapeValue::Named { arguments, .. } if arguments.is_empty()
             )
-        },
-    )?;
-    let Some((rows, row, written)) = walked else {
-        return withheld("receiver_field_type_unproven", evidence);
+            .then_some((header, written))
+        })
+    else {
+        return Ok(None);
     };
-    if !rows.is_empty() {
-        evidence["receiver_field_step_rows"] = json!(rows);
+    let identity: HldTargetIdentityValue =
+        decode_symbol_target_value(&header["impl_self_type_resolution"]["target_identity"])?.into();
+    let evidence = json!({
+        "receiver_type_proof_kind":"self_declared_type_field",
+        "receiver_written_type_text":format!("{layers}{written}"),
+        "receiver_self_parameter_text":parameter,
+        "enclosing_impl_header_occurrence":header["impl_semantic_occurrence_key"],
+        "method_probe_unread_source":["alloc", "std"],
+        "lookup_assumption_values":["core_macro_expansions_import_no_trait"]
+    });
+    if let Some(reason) = index.scope_proof_withheld_reason {
+        return Ok(Some((Err(reason), evidence)));
     }
-    // S5: every type path of the type the place has is proven.
-    let Some(paths) = row["type_path_source_rows"].as_array() else {
-        return withheld("receiver_type_name_unproven", evidence);
-    };
-    for path in paths {
-        let proven = match build_row_path_evidence(row, path) {
-            Some(site) => check_written_path_proven(&site, path, context)?,
-            None => false,
-        };
-        if !proven {
-            return withheld("receiver_type_name_unproven", evidence);
-        }
-    }
-    Ok(Some((Ok(written), evidence)))
+    // The first field is of the impl's self type; the rest are walked as for a `static`.
+    let start = step["field_declared_name_value"].as_str().and_then(|name| {
+        let (field, written) = index.find_struct_field_type(&identity, name)?;
+        Some((
+            vec![build_field_step_record(name, field, &written)],
+            field,
+            written,
+        ))
+    });
+    let walked = walk_field_step_types(start, rest, context, index)?;
+    decide_field_place_type(walked, evidence, context).map(Some)
 }
 
 /// The `core` member that the method call at `span` names, with the record of its
 /// lookup, or the reason the name is withheld. `None` when the lookup does not apply:
-/// no declarations stored, or a receiver that is neither a parameter with a written type
-/// nor a `static` of the workspace followed by fields (REQ-RUST-059.0).
+/// no declarations stored, or a name that more than one declaration may answer
+/// (REQ-RUST-061.0) on a receiver that is neither a parameter with a written type nor a
+/// `static` of the workspace or `self`, followed by fields (REQ-RUST-059.0).
 pub(crate) fn find_core_member_target(
     span: &Value,
     receiver: &Value,
@@ -914,12 +1118,20 @@ pub(crate) fn find_core_member_target(
     bounds: &BoundMethodLookupIndex,
 ) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
     let declarations = index.core_declaration_value_rows.as_slice();
-    let (Some(method), Some([first, places @ ..])) = (
-        receiver["method_declared_name_value"].as_str(),
-        receiver["receiver_place_step_rows"]
-            .as_array()
-            .map(Vec::as_slice),
-    ) else {
+    let Some(method) = receiver["method_declared_name_value"]
+        .as_str()
+        .filter(|_| !declarations.is_empty())
+    else {
+        return Ok(None);
+    };
+    // REQ-RUST-061.0: a name that one trait of `core` declares needs no receiver type.
+    if let Some(found) = index.find_sole_trait_member(method) {
+        return Ok(Some(found));
+    }
+    let Some([first, places @ ..]) = receiver["receiver_place_step_rows"]
+        .as_array()
+        .map(Vec::as_slice)
+    else {
         return Ok(None);
     };
     // REQ-RUST-059.0 S4: field steps first, then index steps only.
@@ -929,10 +1141,9 @@ pub(crate) fn find_core_member_target(
             .take_while(|step| step["place_step_kind"] == "field_access")
             .count(),
     );
-    if declarations.is_empty()
-        || !steps
-            .iter()
-            .all(|step| step["place_step_kind"] == "index_access")
+    if !steps
+        .iter()
+        .all(|step| step["place_step_kind"] == "index_access")
     {
         return Ok(None);
     }
@@ -941,6 +1152,7 @@ pub(crate) fn find_core_member_target(
             find_parameter_place_type(span, first, context, members, index, bounds)?
         }
         Some("value_path") => find_static_place_type(span, first, fields, context, index)?,
+        Some("self_value") => find_self_place_type(span, fields, context, members, index)?,
         _ => None,
     };
     let Some((written, mut evidence)) = place else {
@@ -1017,7 +1229,17 @@ pub(crate) fn find_core_member_target(
         CoreMemberProbeOutcome::Named {
             declaration_row_index,
             probe_step_text,
-        } => (&declarations[*declaration_row_index], probe_step_text),
+            prelude_trait_assumed_names,
+        } => {
+            // REQ-RUST-060.0 U3: the row says which prelude traits it assumes away.
+            if !prelude_trait_assumed_names.is_empty() {
+                evidence["prelude_trait_assumed_names"] = json!(prelude_trait_assumed_names);
+                if let Some(assumed) = evidence["lookup_assumption_values"].as_array_mut() {
+                    assumed.push(json!("prelude_trait_impl_unrefuted"));
+                }
+            }
+            (&declarations[*declaration_row_index], probe_step_text)
+        }
         CoreMemberProbeOutcome::Withheld(reason) => return withheld(reason, evidence),
     };
     let Some(owner) = row["impl_self_type_text"].as_str() else {
@@ -1032,20 +1254,25 @@ pub(crate) fn find_core_member_target(
         evidence[key] = row[key].clone();
     }
     Ok(Some((
-        Ok(ExternalNameProofRecord {
-            external_target_identity_value: HldTargetIdentityValue::ExternalNamed(
-                HldExternalNamedKey {
-                    external_name_kind_value: HldExternalNameKind::CoreDeclaredMember,
-                    external_crate_name_value: Some("core".to_owned()),
-                    external_item_path_text: format!("{owner}::{method}"),
-                },
-            ),
-            external_proof_metadata_value: build_external_proof_value(
-                "core_declared_member",
-                "core_declaration_probe",
-                Value::Null,
-            ),
-        }),
+        Ok(build_core_member_proof(format!("{owner}::{method}"))),
         evidence,
     )))
+}
+
+/// The stored name of a member that a declaration of `core` proves.
+fn build_core_member_proof(path: String) -> ExternalNameProofRecord {
+    ExternalNameProofRecord {
+        external_target_identity_value: HldTargetIdentityValue::ExternalNamed(
+            HldExternalNamedKey {
+                external_name_kind_value: HldExternalNameKind::CoreDeclaredMember,
+                external_crate_name_value: Some("core".to_owned()),
+                external_item_path_text: path,
+            },
+        ),
+        external_proof_metadata_value: build_external_proof_value(
+            "core_declared_member",
+            "core_declaration_probe",
+            Value::Null,
+        ),
+    }
 }

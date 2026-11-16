@@ -11,6 +11,7 @@ use ra_ap_syntax::{
 };
 use serde_json::Value;
 use std::collections::BTreeSet;
+use std::ops::ControlFlow;
 
 #[cfg(test)]
 #[path = "receiver-type-probe-tests.rs"]
@@ -47,6 +48,9 @@ pub(crate) struct ScopeTraitMethodValue {
     pub(crate) member_self_parameter_kind: String,
     /// The self type of every impl of the trait, or `None` when not all can be read.
     pub(crate) trait_impl_self_shapes: Option<Vec<WrittenTypeShapeValue>>,
+    /// REQ-RUST-060.0 U2: the trait's name, when it is a trait of `core` that is in
+    /// scope through the prelude only.
+    pub(crate) prelude_trait_name_value: Option<String>,
 }
 
 /// What the probe decided for one call.
@@ -56,9 +60,22 @@ pub(crate) enum CoreMemberProbeOutcome {
     Named {
         declaration_row_index: usize,
         probe_step_text: String,
+        /// REQ-RUST-060.0 U3: the prelude traits assumed not to be implemented for the
+        /// types of the earlier forms.
+        prelude_trait_assumed_names: Vec<String>,
     },
     /// No name: the detail says what could not be proven.
     Withheld(&'static str),
+}
+
+/// What one receiver form decides for the probe.
+enum ProbeFormDecisionValue {
+    /// The probe ends with this outcome.
+    Decided(CoreMemberProbeOutcome),
+    /// REQ-RUST-060.0 U1: no inherent member fits, and only these prelude traits may.
+    Assumed(Vec<String>),
+    /// Nothing fits.
+    Passed,
 }
 
 /// P1: the shape of the type `text` writes. `parameters` are the generic parameter names
@@ -354,7 +371,11 @@ fn check_macro_name_reach(row: &Value, method_name: &str, declarations: &[Value]
 }
 
 /// A `fn` written as tokens that may be an inherent method named `method_name`.
-fn check_macro_member_candidate(row: &Value, method_name: &str, declarations: &[Value]) -> bool {
+pub(crate) fn check_macro_member_candidate(
+    row: &Value,
+    method_name: &str,
+    declarations: &[Value],
+) -> bool {
     matches!(
         row["declaration_owner_kind_value"].as_str(),
         Some("macro_definition_body" | "macro_call_argument")
@@ -426,13 +447,13 @@ fn list_receiver_probe_steps(receiver: &WrittenTypeShapeValue) -> Vec<WrittenTyp
 }
 
 /// P3 to P5 for one receiver form: inherent members first, then the traits in scope.
-/// `None` when nothing fits and the probe goes on.
 fn decide_probe_form_outcome(
     form: &WrittenTypeShapeValue,
     probe_step_text: String,
     candidates: &[InherentMemberCandidateValue<'_>],
     scope_traits: &[ScopeTraitMethodValue],
-) -> Option<CoreMemberProbeOutcome> {
+) -> ProbeFormDecisionValue {
+    use ProbeFormDecisionValue::{Assumed, Decided, Passed};
     let fits = candidates
         .iter()
         .map(|candidate| {
@@ -449,28 +470,37 @@ fn decide_probe_form_outcome(
         .filter(|(_, fit)| *fit != ShapeFitKind::Differs)
         .collect::<Vec<_>>();
     if fits.iter().any(|(_, fit)| *fit == ShapeFitKind::Unknown) {
-        return Some(CoreMemberProbeOutcome::Withheld("inherent_member_unproven"));
+        return Decided(CoreMemberProbeOutcome::Withheld("inherent_member_unproven"));
     }
+    let may_fit = |found: &&ScopeTraitMethodValue| {
+        found
+            .trait_impl_self_shapes
+            .clone()
+            .unwrap_or_else(|| vec![WrittenTypeShapeValue::Wildcard])
+            .iter()
+            .any(|owner| {
+                unify_member_receiver_shape(&found.member_self_parameter_kind, owner, form)
+                    != ShapeFitKind::Differs
+            })
+    };
     match fits.as_slice() {
-        [(candidate, _)] => Some(CoreMemberProbeOutcome::Named {
+        [(candidate, _)] => Decided(CoreMemberProbeOutcome::Named {
             declaration_row_index: candidate.declaration_row_index,
             probe_step_text,
+            prelude_trait_assumed_names: Vec::new(),
         }),
-        [] => scope_traits
+        // REQ-RUST-060.0 U1, U5: only prelude traits of `core` let the probe go on.
+        [] => match scope_traits
             .iter()
-            .any(|found| {
-                found
-                    .trait_impl_self_shapes
-                    .clone()
-                    .unwrap_or_else(|| vec![WrittenTypeShapeValue::Wildcard])
-                    .iter()
-                    .any(|owner| {
-                        unify_member_receiver_shape(&found.member_self_parameter_kind, owner, form)
-                            != ShapeFitKind::Differs
-                    })
-            })
-            .then_some(CoreMemberProbeOutcome::Withheld("scope_trait_may_fit")),
-        _ => Some(CoreMemberProbeOutcome::Withheld(
+            .filter(may_fit)
+            .map(|found| found.prelude_trait_name_value.clone())
+            .collect::<Option<Vec<_>>>()
+        {
+            Some(names) if names.is_empty() => Passed,
+            Some(names) => Assumed(names),
+            None => Decided(CoreMemberProbeOutcome::Withheld("scope_trait_may_fit")),
+        },
+        _ => Decided(CoreMemberProbeOutcome::Withheld(
             "inherent_member_ambiguous",
         )),
     }
@@ -507,7 +537,7 @@ pub(crate) fn probe_core_member_declaration(
         })
         .filter_map(|(index, row)| build_inherent_member_candidate(index, row))
         .collect::<Vec<_>>();
-    list_receiver_probe_steps(receiver)
+    let walked = list_receiver_probe_steps(receiver)
         .iter()
         .enumerate()
         .flat_map(|(step, shape)| {
@@ -521,6 +551,40 @@ pub(crate) fn probe_core_member_declaration(
                 (format!("step {step} by mutable reference"), reference(true)),
             ]
         })
-        .find_map(|(text, form)| decide_probe_form_outcome(&form, text, &candidates, scope_traits))
-        .unwrap_or(CoreMemberProbeOutcome::Withheld("no_member_declared"))
+        .try_fold(
+            BTreeSet::new(),
+            |assumed: BTreeSet<String>, (text, form)| match decide_probe_form_outcome(
+                &form,
+                text,
+                &candidates,
+                scope_traits,
+            ) {
+                ProbeFormDecisionValue::Decided(outcome) => ControlFlow::Break((outcome, assumed)),
+                ProbeFormDecisionValue::Assumed(names) => {
+                    ControlFlow::Continue(assumed.into_iter().chain(names).collect())
+                }
+                ProbeFormDecisionValue::Passed => ControlFlow::Continue(assumed),
+            },
+        );
+    // REQ-RUST-060.0 U3, U4: a name found after a prelude trait was passed carries the
+    // trait's name; anything else found after it keeps the trait's reason.
+    match walked {
+        ControlFlow::Break((
+            CoreMemberProbeOutcome::Named {
+                declaration_row_index,
+                probe_step_text,
+                ..
+            },
+            assumed,
+        )) => CoreMemberProbeOutcome::Named {
+            declaration_row_index,
+            probe_step_text,
+            prelude_trait_assumed_names: assumed.into_iter().collect(),
+        },
+        ControlFlow::Break((outcome, assumed)) if assumed.is_empty() => outcome,
+        ControlFlow::Continue(assumed) if assumed.is_empty() => {
+            CoreMemberProbeOutcome::Withheld("no_member_declared")
+        }
+        _ => CoreMemberProbeOutcome::Withheld("scope_trait_may_fit"),
+    }
 }

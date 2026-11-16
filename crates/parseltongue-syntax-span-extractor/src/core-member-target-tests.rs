@@ -11,7 +11,7 @@ use crate::syntax_namespace_record_codec::encode_symbol_target_value;
 use parseltongue_core_row_types::*;
 use serde_json::{Value, json};
 
-const CORE_FIXTURE_FILES: [(&str, &str); 3] = [
+const CORE_FIXTURE_FILES: [(&str, &str); 4] = [
     (
         "core/src/mem/maybe_uninit.rs",
         "pub union MaybeUninit<T> { value: T }\n\
@@ -29,7 +29,13 @@ const CORE_FIXTURE_FILES: [(&str, &str); 3] = [
     ),
     (
         "core/src/prelude/v1.rs",
-        "pub use crate::iter::ExactSizeIterator;\n",
+        "pub use crate::iter::ExactSizeIterator;\npub use crate::convert::TryInto;\n",
+    ),
+    (
+        "core/src/convert/mod.rs",
+        "pub trait TryInto<T>: Sized { type Error; fn try_into(self) -> Result<T, Self::Error>; }\n\
+         impl<T, U> TryInto<U> for T { type Error = (); fn try_into(self) -> Result<U, ()> { loop {} } }\n\
+         pub trait Lone { fn lone_call(self); }\n",
     ),
 ];
 
@@ -352,9 +358,35 @@ fn test_parameter_receiver_core_member() {
         edge.edge_resolution_value,
         "{metadata}"
     );
-    // On an array the slice's method is a later step: a prelude trait may fit before it.
+    assert_eq!(
+        json!(["core_macro_expansions_import_no_trait"]),
+        metadata["core_member_lookup_evidence"]["lookup_assumption_values"]
+    );
+    // REQ-RUST-060.0: on an array the slice's method is a later step, and a prelude trait
+    // of `core` declares the name. The target is named and the row says what it assumes.
     let length = "struct Buffer; fn f(buf: [MaybeUninit<u8>; 4], i: usize) { buf.len(); }";
-    assert_eq!("scope_trait_may_fit", withheld(length, true, true));
+    let (edge, metadata) = read_core_fixture_edge(length, true, true, "");
+    assert_eq!(
+        make_core_member_target("[T]::len"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+    let lookup = &metadata["core_member_lookup_evidence"];
+    assert_eq!(
+        json!([
+            "core_macro_expansions_import_no_trait",
+            "prelude_trait_impl_unrefuted"
+        ]),
+        lookup["lookup_assumption_values"]
+    );
+    assert_eq!(
+        json!(["ExactSizeIterator"]),
+        lookup["prelude_trait_assumed_names"]
+    );
+    // The trait's name written in the workspace: an impl of it may be in the workspace.
+    let imported = "struct Buffer; use core::iter::ExactSizeIterator; \
+        fn f(buf: [MaybeUninit<u8>; 4], i: usize) { buf.len(); }";
+    assert_eq!("scope_trait_may_fit", withheld(imported, true, true));
     // A range written as the index gives the slice.
     let ranged = "struct Buffer; fn f(buf: &[MaybeUninit<u8>], i: usize) { buf[i..].len(); }";
     let (edge, metadata) = read_core_fixture_edge(ranged, true, true, "");
@@ -601,4 +633,132 @@ fn test_static_field_receiver_member() {
         static PAIRS: Buffer = Buffer([Other; 4]); \
         fn f(i: usize) { PAIRS.0.get_unchecked(i); }";
     assert_eq!("receiver_type_name_unproven", detail(unproven));
+}
+
+/// REQ-RUST-061.0 M1 to M4: a method name that exactly one trait of `core` declares, and
+/// nothing else in `core` or the workspace, names that trait's declaration whatever the
+/// receiver is.
+#[test]
+fn test_sole_trait_method_name() {
+    let literal = "struct Buffer; fn f(i: usize) { 999.try_into(); }";
+    let (edge, metadata) = read_core_fixture_edge(literal, true, true, "");
+    assert_eq!(
+        make_core_member_target("TryInto::try_into"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+    assert_eq!("core_trait_declared_member", metadata["dispatch_kind"]);
+    let lookup = &metadata["core_member_lookup_evidence"];
+    assert_eq!(
+        json!([
+            "method_name_sole_declaration",
+            "trait_declaration",
+            "TryInto"
+        ]),
+        json!([
+            lookup["receiver_type_proof_kind"],
+            lookup["target_owner_kind_value"],
+            lookup["owner_trait_name_value"]
+        ])
+    );
+    assert_eq!(
+        json!(["source_compiles_method_resolves"]),
+        lookup["lookup_assumption_values"]
+    );
+    assert_eq!(
+        "core/src/convert/mod.rs",
+        lookup["declaration_source_relative_path"]
+    );
+    let (start, end) = (
+        lookup["member_name_start_offset"].as_u64().unwrap() as usize,
+        lookup["member_name_end_offset"].as_u64().unwrap() as usize,
+    );
+    let declared = CORE_FIXTURE_FILES[3].1;
+    assert_eq!("try_into", &declared[start..end]);
+    assert_eq!(declared.find("try_into"), Some(start));
+
+    let unnamed = |source: &str, no_std: bool| {
+        let (edge, metadata) = read_core_fixture_edge(source, no_std, true, "");
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+    };
+    // A function of the workspace has the name.
+    unnamed(
+        "struct Buffer; fn try_into(i: usize) {} fn f(i: usize) { 999.try_into(); }",
+        true,
+    );
+    // An inherent impl of `core` declares the name too.
+    unnamed("struct Buffer; fn f(i: usize) { 999.len(); }", true);
+    // The one trait that declares the name is not in scope.
+    unnamed("struct Buffer; fn f(i: usize) { 999.lone_call(); }", true);
+    // The std prelude is not read.
+    unnamed(literal, false);
+    // Its name written in the workspace brings it into scope.
+    let imported = "struct Buffer; use core::convert::Lone; fn f(i: usize) { 999.lone_call(); }";
+    let (edge, metadata) = read_core_fixture_edge(imported, true, true, "");
+    assert_eq!(
+        make_core_member_target("Lone::lone_call"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+}
+
+/// REQ-RUST-059.0 S7: `self` then a field has the type the field of the impl's self type
+/// declares. A `self` with a written type, and a trait's own method, give no target.
+#[test]
+fn test_self_field_receiver_member() {
+    let method = |receiver: &str| {
+        format!(
+            "struct Buffer {{ bytes: [MaybeUninit<u8>; 4] }} \
+             impl Buffer {{ fn f({receiver}, i: usize) {{ self.bytes.get_unchecked(i); }} }}"
+        )
+    };
+    for (receiver, written) in [
+        ("&mut self", "&mut Buffer"),
+        ("&self", "&Buffer"),
+        ("self", "Buffer"),
+    ] {
+        let (edge, metadata) = read_core_fixture_rows(&method(receiver), true, true, "", true);
+        assert_eq!(
+            make_core_member_target("[T]::get_unchecked"),
+            edge.edge_resolution_value,
+            "{metadata}"
+        );
+        let lookup = &metadata["core_member_lookup_evidence"];
+        assert_eq!(
+            json!(["self_declared_type_field", written, receiver]),
+            json!([
+                lookup["receiver_type_proof_kind"],
+                lookup["receiver_written_type_text"],
+                lookup["receiver_self_parameter_text"]
+            ]),
+            "{metadata}"
+        );
+        assert_eq!(
+            "bytes",
+            lookup["receiver_field_step_rows"][0]["field_declared_name_value"]
+        );
+    }
+    let unnamed = |source: &str| {
+        let (edge, metadata) = read_core_fixture_rows(source, true, true, "", true);
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+    };
+    // `self` with a written type may be a smart pointer: its field is not read.
+    unnamed(&method("self: &Self"));
+    // A method a trait declares has no one self type.
+    unnamed(
+        "struct Buffer { bytes: [MaybeUninit<u8>; 4] } \
+         trait Reader { fn f(&self, i: usize) { self.bytes.get_unchecked(i); } }",
+    );
 }
