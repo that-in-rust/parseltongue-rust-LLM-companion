@@ -1,34 +1,33 @@
 # BACKLOG — deferred work and open decisions
 
-Updated 2026-11-14.
+Updated 2026-11-16.
 
 ## The answer
 
-**This file holds two lists. List A is five decisions that must be made in this phase, because
-the expected itoa graph cannot be frozen without them. List B is work that waits until the
-itoa full item graph passes. Nothing in list B is built, extended or tested in this phase.**
+**This file holds two lists. List A is the decisions of this phase: four are open and the
+rest are made. The expected itoa graph was frozen on 2026-11-16 with the open ones left as
+they are, so deciding one needs a new freeze. List B is work that waits until the itoa full
+item graph passes. Nothing in list B is built, extended or tested in this phase.**
 
 - Deferred means not decided, not built and not passed.
 - A correctness blocker for the itoa full graph never goes into list B because it is hard.
 - Anything higher than the full graph is a later query over the stored graph. It needs no
   second source-analysis pipeline, and it cannot recover a fact the graph is missing.
 
-## A — Decisions that block this phase
+## A — Decisions of this phase
 
-Counts are rows of the draft expected graph that stay blocked until the decision is made
-([itoa-target-dataset](itoa-target-dataset/)). One row can wait on several decisions.
+Open:
 
 ```text
-id     decision                                                   blocks
-core   Targets in core: run with the sysroot source, or accept    119 edges
-       these edges as unresolved. The sysroot run did not
-       finish name resolution in 2,400 s (measured 2026-11-13).
-OD-8   May reads and uses_type start at a non-function item?      56 edges
-       itoa needs it for const MAX_STR_LEN and the array length
-       in Buffer. Lean: yes.
-OD-7   How a file's module node relates to its file-area node.    2 edges
-OD-4   Enum variants and struct fields: nodes, or evidence only.  not counted; itoa has
-                                                                  private fields only
+id      decision                                                    state in the frozen graph
+part 8  Method calls into core: the label of a method on a slice,   133 calls without a target
+        array or raw pointer (Q1), and whether a call is named
+        when a prelude trait declares the same name (Q2). Both
+        are in SPEC part 8, section 5 (Q2 again in section 8).
+OD-7    How a file's module node relates to its file-area node.     no edge between them
+OD-4    Enum variants and struct fields: nodes, or evidence only.   not nodes; itoa has private
+                                                                    fields only
+fields  Visibility, reachability and signature text on nodes.       not filled, not compared
 ```
 
 Decided by the user (2026-11-15), on the rule "choose what is most explicit for a coding agent
@@ -48,19 +47,17 @@ that reads the graph":
   the item. The generating call is named twice: a field on the node, and a `generates` edge
   from the call to the item (itoa: 45 rows). Part 5a, REQ-RUST-046.0 R2, R3, R5.
 
-Working decisions (2026-11-15). The user delegated these to best judgement; they are not yet
-confirmed. Each is used so work can continue and is reversed if the user rules otherwise.
-
-- **OD-8:** yes, `reads` and `uses_type` may start at a non-function item.
+- **OD-8 (decided 2026-11-16, built in part 5d steps 10a and 10c):** `reads` and
+  `uses_type` start at any item a path is written in, not only a function.
 - **Disagreement with the expected graph:** show the source lines, the user rules, and the
   wrong side is fixed.
-- **Order:** finish part 4c for original bodies, then part 5, then part 4d.
 
 Also open, in code rather than in the graph rules:
 
 - **Two unresolved-reason lists.** `SiteUnresolvedReasonKind` for sites and
-  `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges are compared.
-- **No comparator for full-graph rows.** SOP S3 has nothing to run yet.
+  `HldUnresolvedReasonKind` for graph edges both still exist.
+- **Rows depend on the source directory** and **`test_lang_items_in_sysroot` fails**: both
+  are described in the PRD ("Open") and the SOP.
 
 Already decided, so not open: one lexical source container per item; impl blocks are records;
 items inside function bodies are evidence; calls are resolved in Rust; nodes are projected in
