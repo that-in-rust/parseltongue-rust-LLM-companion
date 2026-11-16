@@ -469,3 +469,201 @@ fn test_trait_method_candidate_rows() {
     assert_eq!(evidence["receiver_type_stored_flag"], false);
     assert_eq!(evidence["sources_not_read"].as_array().unwrap().len(), 1);
 }
+
+/// REQ-RUST-053.0 N1, N4, N5: a callee path whose stored lookup proves an external name
+/// targets that name and keeps how the site reached it. No name: without a stored proof,
+/// or when the path is qualified and a trait in read source declares its last name.
+#[test]
+fn test_external_callee_names_target() {
+    let missing = "external_source_missing";
+    let import = json!({"span_byte_range_value":[0, 9]});
+    let outcome_stored = |source: &str, callee: &str, record: Value, stored: &str| {
+        let qualified = callee.contains("::");
+        let prefix = [("m", "body_call_type_prefix", "unresolved", missing)];
+        let mut paths = vec![(callee, CALLEE, "unresolved", stored)];
+        paths.extend(prefix.iter().filter(|_| qualified));
+        let (store, mut input) = make_callee_fixture_graph(source, &paths);
+        // The fixture graph holds no trait member; a source that declares one gets its node.
+        if source.contains("trait Shape") {
+            let member = HldNodeInputRecord {
+                node_owner_kind_value: Some(HldOwnerKindValue::Trait),
+                node_qualified_path_text: "Shape::r#size_of".into(),
+                ..input.input_node_records[0].clone()
+            };
+            input.input_node_records.push(member);
+        }
+        for row in store.rows.lock().unwrap().iter_mut() {
+            let mut path: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            if path["path_site_source_text"] == callee {
+                path["path_external_name_record"] = record.clone();
+                row.stage_row_payload_text = path.to_string();
+            }
+        }
+        let edges = resolve_original_call_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+        let [edge] = edges.as_slice() else {
+            panic!("one call expected, found {}", edges.len());
+        };
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        (edge.edge_resolution_value.clone(), metadata)
+    };
+    let outcome =
+        |source: &str, callee: &str, record: Value| outcome_stored(source, callee, record, missing);
+    let record = |kind: &str, crate_name: Value, path: &str, proof: &str| {
+        json!({"external_name_kind":kind, "external_crate_name":crate_name,
+            "external_item_path_text":path, "external_site_proof_kind":proof,
+            "external_import_site_key":import})
+    };
+    let named = |kind, crate_name: Option<&str>, path: &str| HldEdgeResolutionValue::Extracted {
+        target: HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+            external_name_kind_value: kind,
+            external_crate_name_value: crate_name.map(str::to_owned),
+            external_item_path_text: path.to_owned(),
+        }),
+    };
+    let unresolved = HldEdgeResolutionValue::Unresolved {
+        reason: HldUnresolvedReasonKind::ExternalSourceMissing,
+    };
+    let plain = "struct Buffer; fn helper() {} fn caller() { m::size_of(); }";
+    let composed = record(
+        "crate_rooted_path",
+        json!("core"),
+        "core::mem::size_of",
+        "use_import_names_path",
+    );
+
+    // The qualified path, composed through a use item.
+    let (resolution, metadata) = outcome(plain, "m::size_of", composed.clone());
+    assert_eq!(
+        resolution,
+        named(
+            HldExternalNameKind::CrateRootedPath,
+            Some("core"),
+            "core::mem::size_of"
+        )
+    );
+    assert_eq!(metadata["dispatch_kind"], "external_written_path");
+    assert_eq!(
+        metadata["callee_path_lookup_evidence"]["callee_path_outcome_kind"],
+        "external_name_proved"
+    );
+    assert!(metadata.get("unresolved_detail_kind").is_none());
+    assert_eq!(
+        metadata["external_target_proof_record"],
+        json!({"external_name_kind":"crate_rooted_path",
+            "external_site_proof_kind":"use_import_names_path",
+            "external_import_site_key":import,
+            "external_source_read_flag":false,
+            "external_definition_path_claimed_flag":false})
+    );
+
+    // No stored proof: the row is as before.
+    let (resolution, metadata) = outcome(plain, "m::size_of", Value::Null);
+    assert_eq!(resolution, unresolved);
+    assert_eq!(metadata["dispatch_kind"], "undetermined");
+    assert!(metadata.get("external_target_proof_record").is_none());
+
+    // A proof beside any other stored reason is not used.
+    let (resolution, metadata) =
+        outcome_stored(plain, "m::size_of", composed.clone(), "private_item");
+    assert!(
+        matches!(resolution, HldEdgeResolutionValue::Unresolved { .. }),
+        "{resolution:?}"
+    );
+    assert!(metadata.get("external_target_proof_record").is_none());
+
+    // A parameter named as the qualifier shadows it: no name, whatever is stored.
+    let shadowed = "struct Buffer; fn helper() {} fn caller(m: u8) { m::size_of(); }";
+    let (resolution, metadata) = outcome(shadowed, "m::size_of", composed.clone());
+    assert!(
+        matches!(resolution, HldEdgeResolutionValue::Unresolved { .. }),
+        "{resolution:?}"
+    );
+    assert_eq!(
+        metadata["unresolved_detail_kind"],
+        "callee_prefix_lexically_shadowed"
+    );
+    assert!(metadata.get("external_target_proof_record").is_none());
+
+    // A trait in read source declares `size_of`: a qualified path gets no name ...
+    let local = "struct Buffer; fn helper() {} trait Shape { fn size_of(); } \
+        fn caller() { m::size_of(); }";
+    let (resolution, metadata) = outcome(local, "m::size_of", composed.clone());
+    assert_eq!(resolution, unresolved);
+    assert_eq!(
+        metadata["unresolved_detail_kind"],
+        "external_member_name_in_local_trait"
+    );
+    assert!(metadata.get("external_target_proof_record").is_none());
+
+    // ... and a bare name does: a trait's member is never named by one segment.
+    let bare = "struct Buffer; fn helper() {} trait Shape { fn size_of(); } \
+        fn caller() { size_of(); }";
+    let (resolution, _) = outcome(bare, "size_of", composed.clone());
+    assert_eq!(
+        resolution,
+        named(
+            HldExternalNameKind::CrateRootedPath,
+            Some("core"),
+            "core::mem::size_of"
+        )
+    );
+
+    // An inherent member of that name is of a type of this crate, which the proved
+    // qualifier is not: the path keeps its name.
+    let inherent = "struct Buffer; impl Buffer { fn size_of() {} } fn helper() {} \
+        fn caller() { m::size_of(); }";
+    let (resolution, _) = outcome(inherent, "m::size_of", composed.clone());
+    assert_eq!(
+        resolution,
+        named(
+            HldExternalNameKind::CrateRootedPath,
+            Some("core"),
+            "core::mem::size_of"
+        )
+    );
+
+    // A prelude name.
+    let prelude = "struct Buffer; fn helper() {} fn caller() { drop(); }";
+    let (resolution, metadata) = outcome(
+        prelude,
+        "drop",
+        record("prelude_name", Value::Null, "drop", "implicit_prelude_name"),
+    );
+    assert_eq!(
+        resolution,
+        named(HldExternalNameKind::PreludeName, None, "drop")
+    );
+    assert_eq!(
+        metadata["external_target_proof_record"]["external_site_proof_kind"],
+        "implicit_prelude_name"
+    );
+
+    // A stored record that cannot be read is a typed error, not a guess.
+    let (store, input) =
+        make_callee_fixture_graph(plain, &[("m::size_of", CALLEE, "unresolved", missing)]);
+    for row in store.rows.lock().unwrap().iter_mut() {
+        let mut path: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+        if path["path_site_source_text"] == "m::size_of" {
+            path["path_external_name_record"] = json!({"external_name_kind":"guess"});
+            row.stage_row_payload_text = path.to_string();
+        }
+    }
+    assert!(matches!(
+        resolve_original_call_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default()
+        ),
+        Err(OriginalCallResolutionError::InvalidEvidence {
+            field: "external_name_kind"
+        })
+    ));
+}

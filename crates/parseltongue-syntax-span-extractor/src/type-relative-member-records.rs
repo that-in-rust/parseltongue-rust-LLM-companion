@@ -14,6 +14,8 @@ mod type_relative_member_tests;
 #[derive(Default)]
 pub(super) struct ImplMemberLookupIndex {
     pub(super) impl_header_value_rows: Vec<Value>,
+    /// REQ-RUST-053.0 N5: member names declared by traits in read source.
+    pub(super) trait_declared_member_names: std::collections::BTreeSet<String>,
 }
 
 pub(super) fn read_impl_member_index(
@@ -22,6 +24,7 @@ pub(super) fn read_impl_member_index(
 ) -> Result<ImplMemberLookupIndex, ImplHeaderSourceError> {
     Ok(ImplMemberLookupIndex {
         impl_header_value_rows: read_impl_stage_values(store, scope, "impl-header-index-table")?,
+        ..Default::default()
     })
 }
 

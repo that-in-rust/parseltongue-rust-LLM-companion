@@ -42,6 +42,7 @@ fn impl_header_fixture(
 fn find_fixture_const_target(headers: Vec<Value>) -> Option<(Value, Value)> {
     let index = ImplMemberLookupIndex {
         impl_header_value_rows: headers,
+        ..Default::default()
     };
     index
         .find_type_member_target("u8", &resolved_builtin_type("u8"), "N", "CONST")
@@ -57,6 +58,7 @@ fn find_fixture_const_target(headers: Vec<Value>) -> Option<(Value, Value)> {
 fn read_fixture_lookup_outcome(headers: Vec<Value>) -> (String, usize) {
     let index = ImplMemberLookupIndex {
         impl_header_value_rows: headers,
+        ..Default::default()
     };
     let found = index
         .find_type_member_target("u8", &resolved_builtin_type("u8"), "N", "CONST")
@@ -112,6 +114,7 @@ fn test_blocked_lookup_keeps_candidates() {
             Some("A"),
             &[("N", "CONST")],
         )],
+        ..Default::default()
     };
     let found = index
         .find_type_member_target(
@@ -235,6 +238,7 @@ fn test_unproven_impl_shapes_untargeted() {
     );
     let index = ImplMemberLookupIndex {
         impl_header_value_rows: vec![plain()],
+        ..Default::default()
     };
     assert_eq!(
         index.find_type_member_target(
@@ -256,6 +260,7 @@ fn test_owner_impl_self_type() {
             impl_header_fixture(resolved_builtin_type("u8"), Some("A"), &[("N", "CONST")]),
             impl_header_fixture(resolved_builtin_type("u16"), Some("B"), &[("f", "FN")]),
         ],
+        ..Default::default()
     };
     assert_eq!(
         index.read_owner_self_type("source Some(\"B\") f"),
@@ -342,6 +347,7 @@ fn test_qualified_member_trait_match() {
     let lookup = |headers: Vec<Value>, anchor: Value, named: Value| {
         let index = ImplMemberLookupIndex {
             impl_header_value_rows: headers,
+            ..Default::default()
         };
         let found = index.find_qualified_member_target(&parts, &anchor, &named, "CONST");
         assert_eq!(

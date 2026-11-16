@@ -178,6 +178,10 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   - **No name is given** when a nearer scope could bind the first name differently, when a
     trait in read source declares a member of the same name, or for a method call. The row
     stays unresolved with its reason.
+  - **A call by a written path (2026-11-16).** The row says `external_written_path` as how
+    its target was chosen, so an agent can tell it from a call to a node of read source.
+    `MaybeUninit::<u8>::uninit` targets `core::mem::MaybeUninit::uninit`: the written path
+    with generic arguments dropped. Whether that is an inherent function is not claimed.
 - **Macro definitions and calls (2026-11-15).** Both are nodes, for the same reason.
 - **Design rule (user, 2026-11-15).** "Our intention should be to provide maximum
   information which helps the coding agent code better." When a graph design choice is

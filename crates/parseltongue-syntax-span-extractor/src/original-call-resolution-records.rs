@@ -1,4 +1,7 @@
 use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
+use crate::external_named_target_records::{
+    collect_trait_member_names, decode_external_name_record,
+};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -81,6 +84,7 @@ pub fn resolve_original_call_edges(
             source_scope,
             "impl-header-index-table",
         )?,
+        trait_declared_member_names: collect_trait_member_names(&input.input_node_records),
     };
     let endpoints = input
         .input_node_records
@@ -216,7 +220,7 @@ fn build_original_call_edge(
         )?)
     };
     let callee = if receiver_evidence.is_null() {
-        resolve_callee_path_target(&evidence, syntax, context, endpoints, headers)?
+        resolve_callee_path_target(&evidence, syntax, context, endpoints, members)?
     } else {
         CalleePathLookupValue::default()
     };
@@ -368,6 +372,9 @@ fn build_original_call_edge(
     }
     if let Some(evidence) = callee.callee_path_lookup_evidence {
         dispatch["callee_path_lookup_evidence"] = evidence;
+    }
+    if let Some(proof) = callee.external_target_proof_record {
+        dispatch["external_target_proof_record"] = proof;
     }
     if let Some(evidence) = callee.trait_method_lookup_evidence {
         dispatch["trait_method_lookup_evidence"] = evidence;
@@ -567,6 +574,8 @@ struct CalleePathLookupValue {
     /// For a trait's method named through the trait: the stored impl members
     /// that could run.
     trait_method_lookup_evidence: Option<Value>,
+    /// REQ-RUST-053.0 N4: how the site reached the external name the row targets.
+    external_target_proof_record: Option<Value>,
 }
 
 /// The stored impls of `trait_identity` that declare a function `name`: what a
@@ -708,8 +717,9 @@ fn resolve_callee_path_target(
     syntax: &Value,
     context: &ImplHeaderSourceContext<'_>,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
-    headers: &[Value],
+    members: &ImplMemberLookupIndex,
 ) -> Result<CalleePathLookupValue, OriginalCallResolutionError> {
+    let headers = members.impl_header_value_rows.as_slice();
     let source = &syntax["callee_path_evidence"];
     if source.is_null() || syntax["call_lexical_shadowing_flag"] == true {
         return Ok(CalleePathLookupValue::default());
@@ -748,6 +758,7 @@ fn resolve_callee_path_target(
             callee_path_row_decision: decision,
             callee_path_dispatch_kind: "",
             trait_method_lookup_evidence: None,
+            external_target_proof_record: None,
             callee_path_lookup_evidence: Some(json!({
                 "callee_path_state_kind":path["path_resolution_state_kind"],
                 "callee_path_unresolved_reason":path["path_unresolved_reason_kind"],
@@ -774,6 +785,44 @@ fn resolve_callee_path_target(
         }
         _ => {
             let stored = &path["path_unresolved_reason_kind"];
+            // REQ-RUST-053.0 N1, N5: the callee's source was not read; the path the call
+            // writes is proved. A qualified path whose last name a local trait declares may
+            // name a local impl's member, so it gets no name.
+            let named = (stored == "external_source_missing")
+                .then(|| decode_external_name_record(&path["path_external_name_record"]))
+                .transpose()
+                .map_err(|error| OriginalCallResolutionError::InvalidEvidence { field: error.0 })?
+                .flatten();
+            if let Some(named) = named {
+                let local_trait_member = qualified
+                    && syntax["member_declared_name_value"]
+                        .as_str()
+                        .is_none_or(|name| {
+                            members
+                                .trait_declared_member_names
+                                .contains(name.trim_start_matches("r#"))
+                        });
+                if local_trait_member {
+                    return Ok(stop(
+                        HldUnresolvedReasonKind::ExternalSourceMissing,
+                        "external_member_name_in_local_trait",
+                        true,
+                    ));
+                }
+                return Ok(CalleePathLookupValue {
+                    callee_path_dispatch_kind: "external_written_path",
+                    external_target_proof_record: Some(named.external_proof_metadata_value),
+                    ..finish(
+                        Some((
+                            HldEdgeResolutionValue::Extracted {
+                                target: named.external_target_identity_value,
+                            },
+                            "",
+                        )),
+                        "external_name_proved",
+                    )
+                });
+            }
             return Ok(stop(
                 read_stored_reason_kind(stored),
                 "callee_path_unresolved",
@@ -858,6 +907,7 @@ fn resolve_callee_path_target(
     Ok(CalleePathLookupValue {
         callee_path_dispatch_kind: dispatch,
         trait_method_lookup_evidence: evidence,
+        external_target_proof_record: None,
         ..finish(
             Some((HldEdgeResolutionValue::Extracted { target }, "")),
             outcome,

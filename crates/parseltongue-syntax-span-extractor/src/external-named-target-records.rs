@@ -1,7 +1,7 @@
 //! REQ-RUST-053.0: named external targets, shared by every edge producer.
 use parseltongue_core_row_types::*;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The external name one stored lookup proved: the node identity it gives, and what the
 /// edge row records about how its site reached the name.
@@ -79,6 +79,17 @@ pub(crate) fn decode_external_name_record(
             record["external_import_site_key"].clone(),
         ),
     }))
+}
+
+/// REQ-RUST-053.0 N5: the names of the members that traits in read source declare. A path
+/// of two or more segments ending in one of them may name a local impl's member.
+pub(crate) fn collect_trait_member_names(nodes: &[HldNodeInputRecord]) -> BTreeSet<String> {
+    nodes
+        .iter()
+        .filter(|node| node.node_owner_kind_value == Some(HldOwnerKindValue::Trait))
+        .filter_map(|node| node.node_qualified_path_text.rsplit("::").next())
+        .map(|name| name.trim_start_matches("r#").to_owned())
+        .collect()
 }
 
 /// REQ-RUST-053.0 N1: one external node per named external target the edges end at, in

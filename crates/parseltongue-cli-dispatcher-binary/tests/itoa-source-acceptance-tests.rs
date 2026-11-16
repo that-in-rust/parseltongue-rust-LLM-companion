@@ -552,8 +552,9 @@ fn test_format_sealed_write_call() {
             edge.edge_source_reference == format.node_target_reference
                 && edge.edge_relation_kind_value == HldRelationKindValue::Calls
                 && matches!(
-                    edge.edge_resolution_value,
-                    HldEdgeResolutionValue::Extracted { .. }
+                    &edge.edge_resolution_value,
+                    HldEdgeResolutionValue::Extracted { target }
+                        if !matches!(target, HldTargetIdentityValue::ExternalNamed(_))
                 )
         })
         .count();
@@ -2528,10 +2529,16 @@ fn test_itoa_imports_row_counts() {
     .map(|(site, path)| (site.to_owned(), path.to_owned()));
     assert_eq!(rows, expected);
     // One external node per written path, with no file, kind or signature.
+    // The nodes of paths that calls write are pinned by test_itoa_external_path_calls.
     let externals = input
         .input_node_records
         .iter()
-        .filter(|node| node.node_input_category == HldNodeInputCategory::ExternalDefinition)
+        .filter(|node| {
+            node.node_input_category == HldNodeInputCategory::ExternalDefinition
+                && rows
+                    .iter()
+                    .any(|(_, path)| path == &node.node_qualified_path_text)
+        })
         .collect::<Vec<_>>();
     assert!(externals.iter().all(|node| {
         node.node_item_kind_value.is_none()
@@ -2550,7 +2557,7 @@ fn test_itoa_imports_row_counts() {
             "core::str"
         ]
     );
-    assert_eq!(input.input_node_records.len(), 107);
+    assert_eq!(input.input_node_records.len(), 111);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -2760,7 +2767,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 107);
+    assert_eq!(input.input_node_records.len(), 111);
     let area = input
         .input_node_records
         .iter()
@@ -3050,8 +3057,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 107);
-    assert_eq!(labels.len(), 107, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 111);
+    assert_eq!(labels.len(), 111, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"
@@ -3537,6 +3544,7 @@ fn test_generated_body_call_rows() {
                     [
                         "generic_bound_trait_method",
                         "type_path_associated_function",
+                        "external_written_path",
                         "callee_path_function",
                         "trait_path_method",
                         "trait_path_impl_method",
@@ -3583,10 +3591,8 @@ fn test_generated_body_call_rows() {
             ),
             // Rule G10: the trait's method declaration, named through the trait.
             ("qualified_path_call fmt -".to_owned(), 10),
-            (
-                "qualified_path_call size_of type_prefix_unresolved".to_owned(),
-                4
-            ),
+            // REQ-RUST-053.0 N1: the written path core::mem::size_of.
+            ("qualified_path_call size_of -".to_owned(), 4),
         ])
     );
     assert_eq!(calls.len(), 197, "61 in original bodies, 136 in generated");
@@ -4240,7 +4246,7 @@ fn test_callee_path_function_targets() {
                 "DecimalPairs single_struct_node [\"Struct\"] null".to_owned(),
                 1
             ),
-            ("MaybeUninit callee_path_unresolved [] null".to_owned(), 1),
+            ("MaybeUninit external_name_proved [] null".to_owned(), 1),
             (
                 "Unsigned::fmt single_trait_method [\"Function\"] \"Trait\"".to_owned(),
                 10
@@ -4258,16 +4264,16 @@ fn test_callee_path_function_targets() {
                 2
             ),
             (
-                "hint::unreachable_unchecked callee_path_unresolved [] null".to_owned(),
+                "hint::unreachable_unchecked external_name_proved [] null".to_owned(),
                 1
             ),
-            ("mem::size_of callee_path_unresolved [] null".to_owned(), 4),
+            ("mem::size_of external_name_proved [] null".to_owned(), 4),
             (
                 "slice_buffer_to_str single_function_node [\"Function\"] null".to_owned(),
                 10
             ),
             (
-                "str::from_utf8_unchecked callee_path_unresolved [] \"Builtin\"".to_owned(),
+                "str::from_utf8_unchecked external_name_proved [] \"Builtin\"".to_owned(),
                 1
             ),
             (
@@ -4423,4 +4429,117 @@ fn test_macro_argument_read_rows() {
     .collect::<Vec<_>>();
     expected.sort();
     assert_eq!(rows, expected);
+}
+
+/// REQ-RUST-053.0 N1, N3, N4: a call by a written path into `core` targets the node of
+/// that path, composed through the use item that brings its first name into scope.
+#[test]
+fn test_itoa_external_path_calls() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let calls = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+        .collect::<Vec<_>>();
+    let mut rows = calls
+        .iter()
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted {
+                target: HldTargetIdentityValue::ExternalNamed(key),
+            } => {
+                let metadata: Value =
+                    serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap())
+                        .unwrap();
+                assert_eq!(
+                    key.external_name_kind_value,
+                    HldExternalNameKind::CrateRootedPath
+                );
+                assert_eq!(key.external_crate_name_value.as_deref(), Some("core"));
+                assert_eq!(metadata["dispatch_kind"], "external_written_path");
+                let proof = &metadata["external_target_proof_record"];
+                assert_eq!(proof["external_site_proof_kind"], "use_import_names_path");
+                assert_eq!(proof["external_source_read_flag"], false);
+                assert_eq!(proof["external_definition_path_claimed_flag"], false);
+                assert!(proof["external_import_site_key"].is_object(), "{proof}");
+                Some((
+                    metadata["callee_source_text"]
+                        .as_str()
+                        .unwrap()
+                        .split_whitespace()
+                        .collect::<String>(),
+                    key.external_item_path_text.clone(),
+                ))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let size_of = ("mem::size_of::<Self>", "core::mem::size_of");
+    assert_eq!(
+        rows,
+        [
+            (
+                "MaybeUninit::<u8>::uninit",
+                "core::mem::MaybeUninit::uninit"
+            ),
+            (
+                "hint::unreachable_unchecked",
+                "core::hint::unreachable_unchecked"
+            ),
+            size_of,
+            size_of,
+            size_of,
+            size_of,
+            ("str::from_utf8_unchecked", "core::str::from_utf8_unchecked"),
+        ]
+        .map(|(callee, path)| (callee.to_owned(), path.to_owned()))
+    );
+    // 43 calls end at a node of itoa, 7 at a node of a written path.
+    assert_eq!(calls.len(), 197);
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|edge| matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Extracted { .. }
+            ))
+            .count(),
+        50
+    );
+    // No method call gains a name: its receiver's type is not proven (N6).
+    assert!(calls.iter().all(|edge| {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        metadata["call_shape_kind"] != "method_call"
+            || metadata.get("external_target_proof_record").is_none()
+    }));
+    // One node per written path, with no file, kind or signature: 4 imports, 4 callees.
+    let mut externals = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_input_category == HldNodeInputCategory::ExternalDefinition)
+        .map(|node| {
+            assert!(
+                node.node_item_kind_value.is_none()
+                    && node.node_source_relative_path.is_none()
+                    && node.node_signature_text.is_none()
+            );
+            node.node_qualified_path_text.as_str()
+        })
+        .collect::<Vec<_>>();
+    externals.sort_unstable();
+    assert_eq!(
+        externals,
+        [
+            "core::hint",
+            "core::hint::unreachable_unchecked",
+            "core::mem",
+            "core::mem::MaybeUninit",
+            "core::mem::MaybeUninit::uninit",
+            "core::mem::size_of",
+            "core::str",
+            "core::str::from_utf8_unchecked",
+        ]
+    );
+    assert_eq!(input.input_node_records.len(), 111);
 }

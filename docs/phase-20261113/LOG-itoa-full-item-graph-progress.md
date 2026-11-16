@@ -15,7 +15,12 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Next target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
+- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1 and 6.2 are built. The
+  graph is 111 nodes and 585 edges; 8 nodes are written paths into `core` with no file, kind
+  or signature. All 4 `imports` rows and 50 of 197 calls have a target; 194 rows have none.
+  Next is step 6.3 (`uses_type` of `MaybeUninit<u8>`). Numbers above this line that say 103
+  nodes or 43 calls are from before part 6.
+- **Earlier target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
   10b, 10c and 11 are built (40 new `uses_type` rows; 4 qualified-path rows on the impl
   member; 20 `reads` rows from `assert!` arguments).
   Part 5d step 9 is built: the two cast-receiver calls have a target (part 5 Q34 closed).
@@ -121,6 +126,63 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 08:59 IST — Part 6 step 2: calls by a written path target named external nodes
+
+- **Milestone:** itoa full item graph, part 6 step 6.2. No SOP step has passed. The graph is
+  still marked incomplete.
+- **REQ:** REQ-RUST-053.0 N1, N3, N4, N5, N6.
+- **Clock:** the machine reads 08:59 IST now; the entry below is stamped 10:10 in error.
+- **Measured on pinned itoa (release run, `/home/ubuntu/phase6-work/s62`):** 111 nodes (was
+  107), 50 of 197 calls with a target (was 43), 585 edges (unchanged), 194 rows without a
+  target (was 201). All four numbers are the ones predicted in the part file.
+
+```text
+rows  callee as written              target node (the written path)
+4     mem::size_of::<Self>           core::mem::size_of
+1     MaybeUninit::<u8>::uninit      core::mem::MaybeUninit::uninit
+1     hint::unreachable_unchecked    core::hint::unreachable_unchecked
+1     str::from_utf8_unchecked       core::str::from_utf8_unchecked
+```
+
+- **What changed:**
+  - `original-call-resolution-records.rs`: a callee path stored unresolved with
+    `external_source_missing` and a proved name gives an `Extracted` row to that name.
+    The row says `dispatch_kind: external_written_path`, outcome `external_name_proved`,
+    and carries `external_target_proof_record` (here: `use_import_names_path` and the
+    `use` item the first name went through).
+  - N5: a path of two or more segments whose last name a trait in read source declares
+    gets no name; the row stays unresolved with `external_member_name_in_local_trait`.
+    A one-segment callee is not blocked (a trait's member is never named by one segment).
+  - `external-named-target-records.rs`: `collect_trait_member_names`, from the node rows.
+  - No SQL change: the name lookup already stored the record on callee-path rows (step 1b).
+- **Nothing is claimed about** which item the path ends at. `core::mem::MaybeUninit::uninit`
+  is the written path; the row does not say it is an inherent function.
+- **STUB:** `collect_trait_member_names` as `todo!()`; compiled.
+- **RED:** `cargo test --release -p parseltongue-syntax-span-extractor --lib`:
+  `FAILED. 94 passed; 34 failed` (`not yet implemented: REQ-RUST-053.0 N5`); the new
+  `test_external_callee_names_target` among them.
+- **GREEN:** syntax crate library suite `128 passed; 0 failed`, 17 in the second target;
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  `49 passed; 0 failed` (173.27 s), with the new `test_itoa_external_path_calls`.
+- **Existing real-source tests that pinned the old values (5 assertions changed):** the four
+  callee outcomes and `size_of` detail; the dispatch kind list; `Buffer::format` has one
+  call to a node of itoa (its `size_of`-free count now excludes external targets); the
+  import test lists only the nodes its rows target.
+- **Deliberate breaks (10), each fails a test:** N5 gate off; a one-segment callee blocked
+  too; stored reason not checked; proof record dropped; dispatch kind renamed; outcome
+  renamed; proof not written on the row; raw `r#` prefix kept; shadow check off; trait
+  member names taken from impl-owned nodes. The last one passed at first: the fixture graph
+  marks every node impl-owned. A case with an inherent member of the same name now fails it.
+- **Weak evidence:** `test_itoa_external_path_calls` was written after the code and passed
+  on first run. The cases "other stored reason", "shadowed qualifier" and "inherent member"
+  of the fixture test were added after GREEN.
+- **Known defect, unchanged:** on `str::from_utf8_unchecked` the row's
+  `callee_qualifier_symbol_kind` still says `Builtin` beside the proved module path
+  (found in part 5d step 6). The target is right; the qualifier field is not.
+- **Checked:** format; `cargo clippy --release --all-targets -D warnings` on the syntax and CLI crates: clean.
+- **Not done:** three timed release runs and workspace gates (end of part 6); second opinion on this step.
+- **Next:** step 6.3, `uses_type` of `MaybeUninit<u8>` (13 rows, no new node predicted).
 
 ### 2026-11-16 10:10 IST — Part 6 step 1c: the four imports target named external nodes
 

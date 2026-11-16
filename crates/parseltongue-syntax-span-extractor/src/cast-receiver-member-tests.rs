@@ -140,6 +140,7 @@ fn test_cast_receiver_member_rules() {
     let found = |headers: Vec<Value>, site: &Value, receiver: &Value, cast_type: Value| {
         let index = ImplMemberLookupIndex {
             impl_header_value_rows: headers,
+            ..Default::default()
         };
         let (member, stopped, evidence) =
             find_cast_receiver_member(site, receiver, &cast_type, &index);
