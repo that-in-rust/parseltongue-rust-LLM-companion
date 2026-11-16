@@ -752,3 +752,36 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
              author of the mapper
 ```
 
+
+## 2026-11-16 22:20 IST Part 8 steps 9.3 and 9.4: self-review of the 133 rows, then frozen
+
+```text
+ asked       the user: review the rows as a coding agent would read them, then take the call
+ found       1  the label did not say which crate; an agent sees `core::mem::MaybeUninit::uninit`
+                and `MaybeUninit<T>::write` and cannot tell they are one crate
+             2  a trait label (14 rows) did not say that the impl that runs is not named
+             3  type fields held prose ("an integer literal (its type is inferred)")
+             4  one type text was invented by me: `Result<T, <T as TryFrom<_>>::Error>`
+             5  three claims were prose only: "core declares no write for a slice",
+                "no len / get_unchecked / as_mut_ptr for an array", "the index is not a range"
+             6  `core_macro_body_declaration` was listed as an assumption; it is a proven fact,
+                so an agent would have read doubt into 10 rows that have none
+ changed     1  target_crate_name on every row
+             2  target_owner_kind = trait_declaration_impl_not_named
+             3  type absent + receiver_type_source_kind = inferred_not_written (14 rows; a test
+                allows it only for try_into and rev, where the name alone decides the target)
+             4  the text core writes: `Result<T, Self::Error>`
+             5  the file lists every `fn NAME` of core with its enclosing header; tests check
+                the three claims against that list and against the receiver text
+             6  declaration_form_kind = core_macro_body; assumptions now hold only the unproven:
+                5 rows, all `buf.len()`
+             also: compared_fields names what a stored row must equal (T8)
+ call        frozen. A later change needs a source citation and a new freeze.
+ result      133 rows, 133 with a target; itoa-expected-core-target-freeze.json written
+             test_itoa_expected_core_targets: 11 of 11 pass
+ not known   whether any label is wrong in a way the same author repeats in the mapper: no
+             compiler and no second reader checked one. A compile check of the 11 label
+             groups is possible on this VM; the PRD says "No oracle", so it was not run.
+ next        9.5: the Rust test that compares a `declarations` run with these rows
+```
+

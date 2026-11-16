@@ -25,11 +25,14 @@ itoa-expected-unresolved-sites.json   10 sites of the source expected to store n
 itoa-expected-graph-summary.json/.md  counts
 itoa-expected-graph-freeze.json       the freeze record: sha256 of the five files above, of the
                                       builder and rules files, and of the two source files
-itoa-expected-core-member-targets.json  DRAFT, not frozen: the expected target of each of
-                                      the 133 method calls into core (REQ-RUST-058.0)
+itoa-expected-core-member-targets.json  frozen: the expected target of each of the 133
+                                      method calls into core (REQ-RUST-058.0); not yet
+                                      merged into the graph files above
+itoa-expected-core-target-freeze.json its freeze record: sha256 of the file, of the builder,
+                                      and of the core source it was read from
 itoa-expected-core-target-builder.py  writes that file from the pinned source and the core
                                       source of the installed compiler; checks every citation
-test_itoa_expected_core_targets.py    9 tests
+test_itoa_expected_core_targets.py    11 tests
 itoa-expected-graph-builder.py        writes the files from the pinned source
 itoa-expected-graph-rules.py          shared vocabulary and serialisation
 test_itoa_expected_graph_rules.py     9 tests

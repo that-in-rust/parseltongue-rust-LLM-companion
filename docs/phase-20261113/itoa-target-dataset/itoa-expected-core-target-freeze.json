@@ -1,0 +1,38 @@
+{
+  "builder_file_sha256": {
+    "itoa-expected-core-target-builder.py": "736f6ab4773458042475d237c236c1c9e258ed8f16dc09f52d895798392a8e78",
+    "itoa-expected-graph-rules.py": "2d9dfb6bb80be27291a8fa06e50bb0622937b7b75b1e157f299512b2e22637d4"
+  },
+  "core_source": {
+    "byte_count": 6419461,
+    "compiler_version_lines": [
+      "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "binary: rustc",
+      "commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "commit-date: 2026-10-13",
+      "host: x86_64-unknown-linux-gnu",
+      "release: 1.99.1",
+      "LLVM version: 23.1.1"
+    ],
+    "directory": "<sysroot>/lib/rustlib/src/rust/library/core/src",
+    "file_count": 288,
+    "listing_command": "cd <sysroot>/lib/rustlib/src/rust/library && find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum",
+    "listing_sha256": "39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780"
+  },
+  "expected_graph_edges_sha256": "a51f7d6e499d8340e1d37b6b809366a307a3c903b14758482e6cba69ad06b156",
+  "frozen_file_sha256": {
+    "itoa-expected-core-member-targets.json": "b914c8956075c73fdab1c51888e2f6c6988557e523c906637c6015e57cd84368"
+  },
+  "provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_AND_CORE_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NONE",
+    "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
+  },
+  "row_count": 133,
+  "source_commit": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+  "source_file_sha256": {
+    "src/lib.rs": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+    "src/u128_ext.rs": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+  }
+}

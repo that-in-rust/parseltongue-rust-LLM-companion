@@ -355,10 +355,16 @@ author of the expected rows is also the author of the mapper.
   tool: the receiver's type; the itoa line that proves that type; the `core` file (relative
   to `library`), line and text of the declaration; the lookup step that reaches it (the
   type itself, a dereference, the slice of an array; by value, `&`, `&mut`).
-- T5. Each row SHALL list its assumptions; an empty list means none. A call that a prelude
-  trait could also answer SHALL carry `prelude_trait_impl_unrefuted` (decided, Q2). A
-  declaration written inside a `macro_rules!` body of `core` SHALL carry
-  `core_macro_body_declaration` and name the macro.
+- T5. Each row SHALL list its assumptions; an empty list means none. An assumption is
+  something the row rests on that was not proven. A call that a prelude trait could also
+  answer SHALL carry `prelude_trait_impl_unrefuted` (decided, Q2).
+- T5a. A field SHALL have one meaning, so that an agent need not read prose (review of
+  2026-11-16). A fact is not an assumption: a declaration written inside a `macro_rules!`
+  body of `core` is `declaration_form_kind = core_macro_body`, with the macro and the impl
+  that calls it cited. The crate is its own field (`core`). A trait label says
+  `trait_declaration_impl_not_named`. A receiver type that no source writes is absent, with
+  `receiver_type_source_kind = inferred_not_written`; this is allowed only where the name
+  alone decides the target, and a test holds the list of such methods.
 - T6. The file SHALL record the compiler version (`rustc -vV`) and one sha256 over the
   `sha256sum` listing of every `.rs` file under `library/core/src`, in path order. WHEN a cited
   declaration line does not hold the cited text in those files THEN the data-set test SHALL
@@ -366,8 +372,10 @@ author of the expected rows is also the author of the mapper.
 - T7. The file is frozen like the expected graph: its sha256 is in a freeze record, and a
   change needs a source citation and a new freeze. It is never a production input.
 - T8. WHEN a run with scope `declarations` stores a target for one of the 133 sites THEN
-  the real-source test SHALL fail unless label and assumptions equal the row. A site the
-  run leaves without a target is counted, not failed, until step 8.6.
+  the real-source test SHALL fail unless the fields the file lists as `compared_fields`
+  equal the row: the label, the crate, the owner kind, the declaration's file and line, and
+  the assumption kinds. A site the run leaves without a target is counted, not failed,
+  until step 8.6.
 - T9. Part 8 is DONE when the count of T8 is 133 of 133 equal (rows with `no_target`
   equal when the run stores no target and the same reason). Then the rows are merged into
   the expected graph, it is re-frozen, and S1 to S4 run with `declarations` (step 8.6).
@@ -411,9 +419,11 @@ req      test                                  type         assertion           
 9.1  this section; decisions in PRD, SOP, ARCH, AGENTS.md           done (documents)
 9.2  read each of the 55 rows' sites in the pinned source and the declaration in core;
      write the builder and the 133 rows; data-set tests T1 to T6 pass    done 2026-11-16:
-     133 rows, 9 tests pass, the file says DRAFT_NOT_FROZEN
-9.3  the user reads the rows by method group (11 groups) and rules on any I marked open
-9.4  freeze (T7)
+     133 rows
+9.3  review. The user asked for a self-review from the point of view of a coding agent
+     that reads the row, and for the call to be taken. Six changes followed (T5a, T8 and
+     three checks that replace prose claims); the log entry of 22:20 lists them    done
+9.4  freeze (T7): itoa-expected-core-target-freeze.json, 11 tests pass               done
 9.5  test_itoa_core_member_targets compares with the file (T8): STUB, RED, GREEN, REFACTOR
 9.6  close step 8.3b-2b against the frozen rows, then 8.3b-3, 8.4, 8.5 in the order the
      missing count falls fastest
@@ -421,7 +431,7 @@ req      test                                  type         assertion           
 
 ### Quality gate results
 
-9.2, 2026-11-16: `python3 -m unittest test_itoa_expected_core_targets` runs 9 tests, all
+9.4, 2026-11-16: `python3 -m unittest test_itoa_expected_core_targets` runs 11 tests, all
 pass, against rustc 1.99.1 and the vendored copy of the pinned source (same sha256 as the
 pin). No Rust was written, so no cargo gate ran.
 

@@ -22,19 +22,38 @@ RULES = importlib.util.module_from_spec(RULE_SPEC)
 RULE_SPEC.loader.exec_module(RULES)
 VENDORED_SOURCE = ROOT / "crates/parseltongue-cli-dispatcher-binary/tests/pinned-itoa-source-tree"
 OUTPUT_NAME = "itoa-expected-core-member-targets.json"
+FREEZE_NAME = "itoa-expected-core-target-freeze.json"
+# T8: what a stored row must equal. The rest of a row is the proof a reader checks.
+COMPARED_FIELDS = ("target_label", "target_crate_name", "target_owner_kind", "core.declaration.file",
+                   "core.declaration.line", "assumptions[].assumption_kind")
 LIB = "src/lib.rs"
 
-# T5: the only assumptions a row may carry.
+# T5: an assumption is something the row rests on that was not proven. A row may carry only these.
 ASSUMPTION_KINDS = {
     "prelude_trait_impl_unrefuted": "a trait of the core prelude declares a method of the same name; that it is not "
                                     "implemented for the types of the earlier lookup steps was not proven by a trait solver",
-    "core_macro_body_declaration": "core writes the declaration inside a macro_rules! body; the impl that holds it is "
-                                   "the one whose body calls that macro",
+}
+# What the target names. A trait label names the trait's declaration; the impl that runs is not named.
+OWNER_KINDS = {
+    "inherent_impl": "the method is declared in an inherent impl of core; the label names that declaration",
+    "trait_declaration_impl_not_named": "the method is declared by a trait of core; the label names the trait's "
+                                        "declaration, and the impl that runs for this receiver is not named",
+}
+# Where the receiver's type comes from. `inferred_not_written` rows carry no type text.
+RECEIVER_TYPE_SOURCE_KINDS = {
+    "written_in_itoa": "a parameter, field, static, associated type or return type written in the pinned source",
+    "declared_by_cited_core_item": "the type a cited core declaration gives: a return type or a constant's type",
+    "inferred_not_written": "no source text states the type; the label does not depend on it (see name_scope_note)",
+}
+# How core writes the declaration. A fact, not a doubt.
+DECLARATION_FORM_KINDS = {
+    "plain": "the declaration is written inside the impl or trait that owns it",
+    "core_macro_body": "the declaration is written in a macro_rules! body; the owner is the impl whose body calls "
+                       "that macro (both lines are cited)",
 }
 # T4: how the fitting lookup step relates to the receiver's type, and how `self` is taken there.
 STEP_KINDS = ("receiver_type", "array_unsized_to_slice")
 SELF_ADJUSTMENTS = ("by_value", "shared_reference", "mutable_reference")
-OWNER_KINDS = ("inherent_impl", "trait")
 
 
 def parse_arguments():
@@ -42,6 +61,8 @@ def parse_arguments():
     parser.add_argument("--source-root", help="pinned itoa checkout; default: the vendored copy in the test tree")
     parser.add_argument("--core-source-root", help="<sysroot>/lib/rustlib/src/rust/library; default: asks rustc")
     parser.add_argument("--output-directory", default=str(HERE))
+    parser.add_argument("--write-freeze-manifest", action="store_true",
+                        help="write the freeze record (T7); a later change then needs a source citation and a new freeze")
     return parser.parse_args()
 
 
@@ -140,15 +161,22 @@ def find_impl_line(read, path, text, total):
     return found[0]
 
 
-def list_name_declarations(files, name):
-    """Every `fn NAME` in the core source that is not in a comment: the checkable part of a name-scope claim."""
+def list_name_declarations(files, read, name):
+    """Every `fn NAME` in the core source that is not in a comment, with the header that encloses it:
+    the checkable part of a name-scope claim."""
     pattern = re.compile(rf"\bfn {name}\b")
-    return [f"{path}:{number}" for path, data in files.items()
+
+    def enclosing(path, number):
+        header = find_enclosing_header(read, path, number)
+        return read(path, header).strip() if header else None
+    return [{"at": f"{path}:{number}", "enclosing_header": enclosing(path, number)}
+            for path, data in files.items()
             for number, line in enumerate(data.decode().split("\n"), 1)
             if pattern.search(line) and not line.lstrip().startswith("//")]
 
 
 def step(kind, step_type, adjustment):
+    """`step_type` is None when the receiver's type is not written."""
     assert kind in STEP_KINDS and adjustment in SELF_ADJUSTMENTS
     return {"step_kind": kind, "step_type": step_type, "self_adjustment": adjustment}
 
@@ -196,20 +224,30 @@ def build_rules(itoa, core, core_files):
     def buffer_alias(line):
         return lib(line, "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];", "Self::Buffer is an array of MaybeUninit<u8>")
 
-    def target(found, receiver_type, proven_by, lookup, scope, assumptions=()):
-        return {"expected": "target", "target_label": None, "target_owner_kind": "trait" if "trait " in found["owner"]["text"] else "inherent_impl",
-                "receiver_type_text": receiver_type, "receiver_type_proven_by": proven_by, "core": found,
+    def target(found, receiver, proven_by, lookup, scope, assumptions=()):
+        source_kind, receiver_type = receiver
+        assert source_kind in RECEIVER_TYPE_SOURCE_KINDS and (receiver_type is None) == (source_kind == "inferred_not_written")
+        owner_is_trait = "trait" in found["owner"]["text"].split()
+        return {"expected": "target", "target_label": None, "target_crate_name": "core",
+                "target_owner_kind": "trait_declaration_impl_not_named" if owner_is_trait else "inherent_impl",
+                "declaration_form_kind": "core_macro_body" if "declared_in_macro" in found else "plain",
+                "receiver_type_source_kind": source_kind, "receiver_type_text": receiver_type,
+                "receiver_type_proven_by": proven_by, "core": found,
                 "lookup_step": lookup, "name_scope_note": scope, "assumptions": list(assumptions)}
+
+    written = lambda text: ("written_in_itoa", text)
+    from_core = lambda text: ("declared_by_cited_core_item", text)
+    not_written = ("inferred_not_written", None)
 
     def write_on_element(parameter, alias):
         return lambda site: target(
-            maybe_write, "MaybeUninit<u8>", [parameter] + ([alias] if alias else []),
+            maybe_write, written("MaybeUninit<u8>"), [parameter] + ([alias] if alias else []),
             step("receiver_type", "MaybeUninit<u8>", "mutable_reference"),
             element_note + " " + no_other_trait + " `private::Sealed::write` is not in scope outside `mod private`.")
 
     def lookup_table(site):
         return target(
-            slice_get, "[u8; 200]",
+            slice_get, written("[u8; 200]"),
             [lib(222, "static DECIMAL_PAIRS: DecimalPairs", "the static's type"),
              lib(219, "struct DecimalPairs([u8; 200]);", "field 0 is an array of u8")],
             step("array_unsized_to_slice", "[u8]", "shared_reference"),
@@ -217,7 +255,7 @@ def build_rules(itoa, core, core_files):
 
     def buffer_len(parameter):
         return lambda site: target(
-            slice_len, "&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]", [parameter, buffer_alias(148)],
+            slice_len, written("&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]"), [parameter, buffer_alias(148)],
             step("array_unsized_to_slice", "[MaybeUninit<u8>]", "shared_reference"),
             "core declares no `len` for an array. Earlier steps where the prelude trait could answer: "
             "`&mut [T; N]` taken by `&`, and `[T; N]` taken by `&`. By Rust's rules neither type implements "
@@ -227,15 +265,15 @@ def build_rules(itoa, core, core_files):
 
     def literal_try_into(site):
         return target(
-            try_into, "an integer literal (its type is inferred)", [],
-            step("receiver_type", "the literal's type", "by_value"),
-            "The label does not depend on the literal's type: `try_into` is declared in core only by the trait "
+            try_into, not_written, [],
+            step("receiver_type", None, "by_value"),
+            "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait "
             "TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.")
 
     def result_of_try_into(found):
         return lambda site: target(
-            found, "Result<T, <T as TryFrom<_>>::Error>", [try_into_return],
-            step("receiver_type", "Result<T, E>", "by_value"),
+            found, from_core("Result<T, Self::Error>"), [try_into_return],
+            step("receiver_type", "Result<T, Self::Error>", "by_value"),
             "The receiver is the value `try_into` returns. " + no_other_trait)
 
     def integer_ilog10(signed):
@@ -250,11 +288,10 @@ def build_rules(itoa, core, core_files):
                             macro_caller={"macro": macro, "file": P + "num/mod.rs", "call_line": owner_line + 1})
             invocation = site["generated_by"]["invocation_line"]
             return target(
-                found, name,
+                found, from_core(name),
                 [lib(invocation, name, f"the macro argument is the builtin type {name}"),
                  cite(core, file, max_line, max_text, f"{name}::MAX has the type {name}")],
-                step("receiver_type", name, "by_value"), no_other_trait,
-                [{"assumption_kind": "core_macro_body_declaration", "macro_name": macro}])
+                step("receiver_type", name, "by_value"), no_other_trait)
         return rule
 
     signed_write = lib(168, "fn write(self, buf: &mut Self::Buffer) -> &str {", "buf is &mut Self::Buffer")
@@ -265,28 +302,28 @@ def build_rules(itoa, core, core_files):
 
     return {
         "as_mut_ptr": {107: lambda site: target(
-            slice_ptr, "[MaybeUninit<u8>; i128::MAX_STR_LEN]",
+            slice_ptr, written("[MaybeUninit<u8>; i128::MAX_STR_LEN]"),
             [lib(106, "&mut self", "self is &mut Buffer"),
              lib(73, "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN],", "the field is an array")],
             step("array_unsized_to_slice", "[MaybeUninit<u8>]", "mutable_reference"),
             "core declares no `as_mut_ptr` for an array; `MaybeUninit<T>::as_mut_ptr` is for one MaybeUninit, not an "
             "array of them. " + no_other_trait)},
         "cast": {107: lambda site: target(
-            ptr_cast, "*mut MaybeUninit<u8>",
+            ptr_cast, from_core("*mut T"),
             [cite(core, P + "slice/mod.rs", 760, "-> *mut T", "[T]::as_mut_ptr returns *mut T")],
-            step("receiver_type", "*mut MaybeUninit<u8>", "by_value"),
+            step("receiver_type", "*mut T", "by_value"),
             "The receiver is the value `as_mut_ptr` returns. " + no_other_trait)},
         "expect": lines((275, 282), result_of_try_into(result_expect)),
         "unwrap": lines((172,), result_of_try_into(result_unwrap)),
         "get_unchecked": {
             249: lambda site: target(
-                slice_get, "&[MaybeUninit<u8>]", [lib(247, "buf: &[MaybeUninit<u8>]", "buf is a shared slice")],
+                slice_get, written("&[MaybeUninit<u8>]"), [lib(247, "buf: &[MaybeUninit<u8>]", "buf is a shared slice")],
                 step("receiver_type", "&[MaybeUninit<u8>]", "by_value"), no_other_trait),
             **lines((288, 290, 292, 294, 306, 308, 373, 374, 375, 376, 387, 388, 420, 422, 424, 426, 433, 434, 435, 436), lookup_table)},
         "ilog10": {144: integer_ilog10(False), 160: integer_ilog10(True)},
         "len": {
             109: lambda site: target(
-                str_len, "&str",
+                str_len, written("&str"),
                 [lib(108, "let string = i.write(", "string is the value Sealed::write returns"),
                  lib(131, "fn write(self, buf: &mut Self::Buffer) -> &str;", "Sealed::write returns &str")],
                 step("receiver_type", "&str", "by_value"),
@@ -294,16 +331,15 @@ def build_rules(itoa, core, core_files):
                 "trait ExactSizeIterator is not consulted."),
             265: buffer_len(unsigned_fmt), 340: buffer_len(u128_fmt)},
         "rev": {413: lambda site: target(
-            iterator_rev, "a range expression `1..4`", [prelude_iterator],
-            step("receiver_type", "core::ops::Range<_>", "by_value"),
-            "`rev` is declared exactly once in core, by the trait Iterator; itoa declares no `rev` and has no "
+            iterator_rev, not_written, [prelude_iterator],
+            step("receiver_type", None, "by_value"),
+            "The receiver is a range expression; its type is not written. `rev` is declared exactly once in core, by the trait Iterator; itoa declares no `rev` and has no "
             "other dependency.")},
         "try_into": {
             172: lambda site: target(
-                try_into, "&mut [MaybeUninit<u8>]",
-                [signed_write, buffer_alias(164), prelude_try_into, try_into_blanket],
-                step("receiver_type", "&mut [MaybeUninit<u8>]", "by_value"),
-                "`try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no "
+                try_into, not_written, [prelude_try_into, try_into_blanket],
+                step("receiver_type", None, "by_value"),
+                "The receiver is a reference to a range index of `buf`; its type is not written. `try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no "
                 "`try_into` and has no other dependency."),
             **lines((274, 281), lambda site: {**literal_try_into(site), "receiver_type_proven_by": [prelude_try_into, try_into_blanket]})},
         "write": {
@@ -352,7 +388,8 @@ def main():
     edges = json.loads((HERE / "itoa-expected-graph-edges.json").read_text())
     try:
         sites = list_untargeted_call_sites(edges)
-        rules = build_rules(make_line_reader(itoa_files), make_line_reader(core_files), core_files)
+        read_core = make_line_reader(core_files)
+        rules = build_rules(make_line_reader(itoa_files), read_core, core_files)
         rows = build_rows(sites, rules)
         used = {(row["site"]["method_name"], row["site"]["line"]) for row in rows}
         unused = sorted({(name, line) for name, by_line in rules.items() for line in by_line} - used)
@@ -362,9 +399,10 @@ def main():
         raise SystemExit(f"REQ-RUST-058.0 citation check failed: {error}")
     names = sorted({row["site"]["method_name"] for row in rows})
     document = {
-        "artifact_status": "DRAFT_NOT_FROZEN",
+        "artifact_status": "FROZEN_EXPECTED_CORE_TARGETS",
         "meaning": "the expected target of each calls site that the frozen expected graph lists without a target",
         "requirement": "REQ-RUST-058.0",
+        "compared_fields": list(COMPARED_FIELDS),
         "production_input": False,
         "provenance": {"author": "Devin", "basis": "PINNED_SOURCE_AND_CORE_SOURCE_READING",
                        "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER", "independent_compiler_oracle_verification": "NONE"},
@@ -373,13 +411,26 @@ def main():
                         "file_count": len(core_files), "byte_count": sum(map(len, core_files.values())),
                         "listing_sha256": digest_core_files(core_files),
                         "listing_command": "cd <sysroot>/lib/rustlib/src/rust/library && find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum"},
-        "assumption_kinds": ASSUMPTION_KINDS,
-        "name_declarations_in_core": {name: list_name_declarations(core_files, name) for name in names},
+        "vocabulary": {"assumption_kinds": ASSUMPTION_KINDS, "target_owner_kinds": OWNER_KINDS,
+                       "receiver_type_source_kinds": RECEIVER_TYPE_SOURCE_KINDS,
+                       "declaration_form_kinds": DECLARATION_FORM_KINDS},
+        "name_declarations_in_core": {name: list_name_declarations(core_files, read_core, name) for name in names},
         "row_count": len(rows), "rows": rows,
     }
     output = pathlib.Path(args.output_directory) / OUTPUT_NAME
     output.write_text(RULES.serialize_dataset(document))
     print(f"wrote {output.name}: {len(rows)} rows")
+    if args.write_freeze_manifest:
+        digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+        builders = (pathlib.Path(__file__).resolve(), HERE / "itoa-expected-graph-rules.py")
+        (output.parent / FREEZE_NAME).write_text(RULES.serialize_dataset({
+            "frozen_file_sha256": {OUTPUT_NAME: digest(output)},
+            "builder_file_sha256": {path.name: digest(path) for path in builders},
+            "expected_graph_edges_sha256": digest(HERE / "itoa-expected-graph-edges.json"),
+            "source_commit": freeze["source_commit"], "source_file_sha256": freeze["source_file_sha256"],
+            "core_source": document["core_source"], "row_count": len(rows),
+            "provenance": document["provenance"]}))
+        print(f"wrote {FREEZE_NAME}")
 
 
 if __name__ == "__main__":

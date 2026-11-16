@@ -1,9 +1,13 @@
 {
-  "artifact_status": "DRAFT_NOT_FROZEN",
-  "assumption_kinds": {
-    "core_macro_body_declaration": "core writes the declaration inside a macro_rules! body; the impl that holds it is the one whose body calls that macro",
-    "prelude_trait_impl_unrefuted": "a trait of the core prelude declares a method of the same name; that it is not implemented for the types of the earlier lookup steps was not proven by a trait solver"
-  },
+  "artifact_status": "FROZEN_EXPECTED_CORE_TARGETS",
+  "compared_fields": [
+    "target_label",
+    "target_crate_name",
+    "target_owner_kind",
+    "core.declaration.file",
+    "core.declaration.line",
+    "assumptions[].assumption_kind"
+  ],
   "core_source": {
     "byte_count": 6419461,
     "compiler_version_lines": [
@@ -23,159 +27,564 @@
   "meaning": "the expected target of each calls site that the frozen expected graph lists without a target",
   "name_declarations_in_core": {
     "as_mut_ptr": [
-      "core/src/mem/maybe_uninit.rs:659",
-      "core/src/ptr/mut_ptr.rs:1872",
-      "core/src/ptr/mut_ptr.rs:2006",
-      "core/src/ptr/non_null.rs:1472",
-      "core/src/slice/mod.rs:760",
-      "core/src/str/mod.rs:609"
+      {
+        "at": "core/src/mem/maybe_uninit.rs:659",
+        "enclosing_header": "impl<T> MaybeUninit<T> {"
+      },
+      {
+        "at": "core/src/ptr/mut_ptr.rs:1872",
+        "enclosing_header": "impl<T> *mut [T] {"
+      },
+      {
+        "at": "core/src/ptr/mut_ptr.rs:2006",
+        "enclosing_header": "impl<T, const N: usize> *mut [T; N] {"
+      },
+      {
+        "at": "core/src/ptr/non_null.rs:1472",
+        "enclosing_header": "impl<T> NonNull<[T]> {"
+      },
+      {
+        "at": "core/src/slice/mod.rs:760",
+        "enclosing_header": "impl<T> [T] {"
+      },
+      {
+        "at": "core/src/str/mod.rs:609",
+        "enclosing_header": "impl str {"
+      }
     ],
     "cast": [
-      "core/src/num/imp/traits.rs:15",
-      "core/src/num/imp/traits.rs:39",
-      "core/src/ptr/const_ptr.rs:48",
-      "core/src/ptr/mut_ptr.rs:31",
-      "core/src/ptr/non_null.rs:512",
-      "core/src/ptr/unique.rs:150"
+      {
+        "at": "core/src/num/imp/traits.rs:15",
+        "enclosing_header": "pub trait CastInto<T: Copy>: Copy {"
+      },
+      {
+        "at": "core/src/num/imp/traits.rs:39",
+        "enclosing_header": "impl CastInto<i16> for $ty {"
+      },
+      {
+        "at": "core/src/ptr/const_ptr.rs:48",
+        "enclosing_header": "impl<T: PointeeSized> *const T {"
+      },
+      {
+        "at": "core/src/ptr/mut_ptr.rs:31",
+        "enclosing_header": "impl<T: PointeeSized> *mut T {"
+      },
+      {
+        "at": "core/src/ptr/non_null.rs:512",
+        "enclosing_header": "impl<T: PointeeSized> NonNull<T> {"
+      },
+      {
+        "at": "core/src/ptr/unique.rs:150",
+        "enclosing_header": "impl<T: PointeeSized> Unique<T> {"
+      }
     ],
     "expect": [
-      "core/src/option.rs:966",
-      "core/src/result.rs:1178"
+      {
+        "at": "core/src/option.rs:966",
+        "enclosing_header": "impl<T> Option<T> {"
+      },
+      {
+        "at": "core/src/result.rs:1178",
+        "enclosing_header": "impl<T, E> Result<T, E> {"
+      }
     ],
     "get_unchecked": [
-      "core/src/bstr/traits.rs:179",
-      "core/src/bstr/traits.rs:208",
-      "core/src/bstr/traits.rs:241",
-      "core/src/index.rs:64",
-      "core/src/index.rs:99",
-      "core/src/index.rs:142",
-      "core/src/index.rs:185",
-      "core/src/index.rs:228",
-      "core/src/index.rs:267",
-      "core/src/index.rs:298",
-      "core/src/index.rs:329",
-      "core/src/index.rs:360",
-      "core/src/index.rs:391",
-      "core/src/index.rs:422",
-      "core/src/index.rs:453",
-      "core/src/iter/adapters/zip.rs:142",
-      "core/src/iter/adapters/zip.rs:232",
-      "core/src/iter/adapters/zip.rs:262",
-      "core/src/ptr/const_ptr.rs:1521",
-      "core/src/slice/index.rs:149",
-      "core/src/slice/index.rs:205",
-      "core/src/slice/index.rs:278",
-      "core/src/slice/index.rs:362",
-      "core/src/slice/index.rs:449",
-      "core/src/slice/index.rs:490",
-      "core/src/slice/index.rs:531",
-      "core/src/slice/index.rs:585",
-      "core/src/slice/index.rs:625",
-      "core/src/slice/index.rs:666",
-      "core/src/slice/index.rs:726",
-      "core/src/slice/index.rs:767",
-      "core/src/slice/index.rs:808",
-      "core/src/slice/index.rs:1045",
-      "core/src/slice/mod.rs:640",
-      "core/src/str/mod.rs:700",
-      "core/src/str/traits.rs:104",
-      "core/src/str/traits.rs:199",
-      "core/src/str/traits.rs:283",
-      "core/src/str/traits.rs:379",
-      "core/src/str/traits.rs:443",
-      "core/src/str/traits.rs:512",
-      "core/src/str/traits.rs:568",
-      "core/src/str/traits.rs:628",
-      "core/src/str/traits.rs:686",
-      "core/src/str/traits.rs:732",
-      "core/src/str/traits.rs:778"
+      {
+        "at": "core/src/bstr/traits.rs:179",
+        "enclosing_header": "unsafe impl SliceIndex<ByteStr> for ops::RangeFull {"
+      },
+      {
+        "at": "core/src/bstr/traits.rs:208",
+        "enclosing_header": "unsafe impl SliceIndex<ByteStr> for usize {"
+      },
+      {
+        "at": "core/src/bstr/traits.rs:241",
+        "enclosing_header": "unsafe impl SliceIndex<ByteStr> for $index {"
+      },
+      {
+        "at": "core/src/index.rs:64",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<usize> {"
+      },
+      {
+        "at": "core/src/index.rs:99",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<range::Range<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:142",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<ops::Range<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:185",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<range::RangeInclusive<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:228",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<ops::RangeInclusive<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:267",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<range::RangeFrom<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:298",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<ops::RangeFrom<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:329",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<ops::RangeTo<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:360",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<range::RangeToInclusive<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:391",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<ops::RangeToInclusive<usize>> {"
+      },
+      {
+        "at": "core/src/index.rs:422",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Clamp<ops::RangeFull> {"
+      },
+      {
+        "at": "core/src/index.rs:453",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for Last {"
+      },
+      {
+        "at": "core/src/iter/adapters/zip.rs:142",
+        "enclosing_header": "trait ZipImpl<A, B> {"
+      },
+      {
+        "at": "core/src/iter/adapters/zip.rs:232",
+        "enclosing_header": "impl<A, B> ZipImpl<A, B> for Zip<A, B>"
+      },
+      {
+        "at": "core/src/iter/adapters/zip.rs:262",
+        "enclosing_header": "impl<A, B> ZipImpl<A, B> for Zip<A, B>"
+      },
+      {
+        "at": "core/src/ptr/const_ptr.rs:1521",
+        "enclosing_header": "impl<T> *const [T] {"
+      },
+      {
+        "at": "core/src/slice/index.rs:149",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:205",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:278",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:362",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:449",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:490",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:531",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:585",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:625",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:666",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:726",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:767",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:808",
+        "enclosing_header": "pub impl(crate) const unsafe trait SliceIndex<T: ?Sized> {"
+      },
+      {
+        "at": "core/src/slice/index.rs:1045",
+        "enclosing_header": "unsafe impl<T> SliceIndex<[T]> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/slice/mod.rs:640",
+        "enclosing_header": "impl<T> [T] {"
+      },
+      {
+        "at": "core/src/str/mod.rs:700",
+        "enclosing_header": "impl str {"
+      },
+      {
+        "at": "core/src/str/traits.rs:104",
+        "enclosing_header": "const impl<I> ops::IndexMut<I> for str"
+      },
+      {
+        "at": "core/src/str/traits.rs:199",
+        "enclosing_header": "const impl<I> ops::IndexMut<I> for str"
+      },
+      {
+        "at": "core/src/str/traits.rs:283",
+        "enclosing_header": "const impl<I> ops::IndexMut<I> for str"
+      },
+      {
+        "at": "core/src/str/traits.rs:379",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:443",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:512",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:568",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:628",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:686",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:732",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      },
+      {
+        "at": "core/src/str/traits.rs:778",
+        "enclosing_header": "unsafe impl SliceIndex<str> for (ops::Bound<usize>, ops::Bound<usize>) {"
+      }
     ],
     "ilog10": [
-      "core/src/num/int_macros.rs:3520",
-      "core/src/num/nonzero.rs:1830",
-      "core/src/num/uint_macros.rs:1833"
+      {
+        "at": "core/src/num/int_macros.rs:3520",
+        "enclosing_header": "macro_rules! int_impl {"
+      },
+      {
+        "at": "core/src/num/nonzero.rs:1830",
+        "enclosing_header": "macro_rules! nonzero_integer_signedness_dependent_methods {"
+      },
+      {
+        "at": "core/src/num/uint_macros.rs:1833",
+        "enclosing_header": "macro_rules! uint_impl {"
+      }
     ],
     "len": [
-      "core/src/array/iter.rs:349",
-      "core/src/array/iter/iter_inner.rs:68",
-      "core/src/ascii.rs:157",
-      "core/src/char/mod.rs:210",
-      "core/src/char/mod.rs:286",
-      "core/src/char/mod.rs:352",
-      "core/src/char/mod.rs:442",
-      "core/src/char/mod.rs:611",
-      "core/src/escape.rs:237",
-      "core/src/io/borrowed_buf.rs:91",
-      "core/src/iter/adapters/array_chunks.rs:182",
-      "core/src/iter/adapters/cloned.rs:107",
-      "core/src/iter/adapters/copied.rs:149",
-      "core/src/iter/adapters/enumerate.rs:254",
-      "core/src/iter/adapters/fuse.rs:181",
-      "core/src/iter/adapters/inspect.rs:141",
-      "core/src/iter/adapters/map.rs:174",
-      "core/src/iter/adapters/rev.rs:144",
-      "core/src/iter/adapters/take.rs:379",
-      "core/src/iter/adapters/take.rs:386",
-      "core/src/iter/sources/empty.rs:61",
-      "core/src/iter/sources/once.rs:92",
-      "core/src/iter/sources/once_with.rs:112",
-      "core/src/iter/sources/repeat_n.rs:169",
-      "core/src/iter/traits/exact_size.rs:116",
-      "core/src/iter/traits/exact_size.rs:155",
-      "core/src/num/imp/fmt.rs:22",
-      "core/src/num/imp/fmt.rs:77",
-      "core/src/ops/index_range.rs:49",
-      "core/src/ops/index_range.rs:220",
-      "core/src/option.rs:808",
-      "core/src/option.rs:2513",
-      "core/src/ptr/const_ptr.rs:1442",
-      "core/src/ptr/mut_ptr.rs:1722",
-      "core/src/ptr/non_null.rs:1417",
-      "core/src/slice/iter/macros.rs:142",
-      "core/src/slice/mod.rs:116",
-      "core/src/slice/sort/stable/drift.rs:295",
-      "core/src/str/iter.rs:387",
-      "core/src/str/mod.rs:155",
-      "core/src/wtf8.rs:233"
+      {
+        "at": "core/src/array/iter.rs:349",
+        "enclosing_header": "impl<T, const N: usize> ExactSizeIterator for IntoIter<T, N> {"
+      },
+      {
+        "at": "core/src/array/iter/iter_inner.rs:68",
+        "enclosing_header": "impl<DATA: ?Sized> PolymorphicIter<DATA>"
+      },
+      {
+        "at": "core/src/ascii.rs:157",
+        "enclosing_header": "impl ExactSizeIterator for EscapeDefault {"
+      },
+      {
+        "at": "core/src/char/mod.rs:210",
+        "enclosing_header": "impl ExactSizeIterator for EscapeUnicode {"
+      },
+      {
+        "at": "core/src/char/mod.rs:286",
+        "enclosing_header": "impl ExactSizeIterator for EscapeDefault {"
+      },
+      {
+        "at": "core/src/char/mod.rs:352",
+        "enclosing_header": "impl ExactSizeIterator for EscapeDebug {"
+      },
+      {
+        "at": "core/src/char/mod.rs:442",
+        "enclosing_header": "impl ExactSizeIterator for $ITER_NAME {"
+      },
+      {
+        "at": "core/src/char/mod.rs:611",
+        "enclosing_header": "impl ExactSizeIterator for CaseMappingIter {"
+      },
+      {
+        "at": "core/src/escape.rs:237",
+        "enclosing_header": "impl<const N: usize, ESCAPING> EscapeIterInner<N, ESCAPING> {"
+      },
+      {
+        "at": "core/src/io/borrowed_buf.rs:91",
+        "enclosing_header": "impl<'data, T> BorrowedBuf<'data, T> {"
+      },
+      {
+        "at": "core/src/iter/adapters/array_chunks.rs:182",
+        "enclosing_header": "impl<I, const N: usize> ExactSizeIterator for ArrayChunks<I, N>"
+      },
+      {
+        "at": "core/src/iter/adapters/cloned.rs:107",
+        "enclosing_header": "impl<'a, I, T: 'a> ExactSizeIterator for Cloned<I>"
+      },
+      {
+        "at": "core/src/iter/adapters/copied.rs:149",
+        "enclosing_header": "impl<'a, I, T: 'a> ExactSizeIterator for Copied<I>"
+      },
+      {
+        "at": "core/src/iter/adapters/enumerate.rs:254",
+        "enclosing_header": "impl<I> ExactSizeIterator for Enumerate<I>"
+      },
+      {
+        "at": "core/src/iter/adapters/fuse.rs:181",
+        "enclosing_header": "impl<I> ExactSizeIterator for Fuse<I>"
+      },
+      {
+        "at": "core/src/iter/adapters/inspect.rs:141",
+        "enclosing_header": "impl<I: ExactSizeIterator, F> ExactSizeIterator for Inspect<I, F>"
+      },
+      {
+        "at": "core/src/iter/adapters/map.rs:174",
+        "enclosing_header": "impl<B, I: ExactSizeIterator, F> ExactSizeIterator for Map<I, F>"
+      },
+      {
+        "at": "core/src/iter/adapters/rev.rs:144",
+        "enclosing_header": "impl<I> ExactSizeIterator for Rev<I>"
+      },
+      {
+        "at": "core/src/iter/adapters/take.rs:379",
+        "enclosing_header": "impl<T: Clone> ExactSizeIterator for Take<crate::iter::Repeat<T>> {"
+      },
+      {
+        "at": "core/src/iter/adapters/take.rs:386",
+        "enclosing_header": "impl<F: FnMut() -> A, A> ExactSizeIterator for Take<crate::iter::RepeatWith<F>> {"
+      },
+      {
+        "at": "core/src/iter/sources/empty.rs:61",
+        "enclosing_header": "impl<T> ExactSizeIterator for Empty<T> {"
+      },
+      {
+        "at": "core/src/iter/sources/once.rs:92",
+        "enclosing_header": "impl<T> ExactSizeIterator for Once<T> {"
+      },
+      {
+        "at": "core/src/iter/sources/once_with.rs:112",
+        "enclosing_header": "impl<A, F: FnOnce() -> A> ExactSizeIterator for OnceWith<F> {"
+      },
+      {
+        "at": "core/src/iter/sources/repeat_n.rs:169",
+        "enclosing_header": "impl<A: Clone> ExactSizeIterator for RepeatN<A> {"
+      },
+      {
+        "at": "core/src/iter/traits/exact_size.rs:116",
+        "enclosing_header": "pub trait ExactSizeIterator: Iterator {"
+      },
+      {
+        "at": "core/src/iter/traits/exact_size.rs:155",
+        "enclosing_header": "impl<I: ExactSizeIterator + ?Sized> ExactSizeIterator for &mut I {"
+      },
+      {
+        "at": "core/src/num/imp/fmt.rs:22",
+        "enclosing_header": "impl<'a> Part<'a> {"
+      },
+      {
+        "at": "core/src/num/imp/fmt.rs:77",
+        "enclosing_header": "impl<'a> Formatted<'a> {"
+      },
+      {
+        "at": "core/src/ops/index_range.rs:49",
+        "enclosing_header": "impl IndexRange {"
+      },
+      {
+        "at": "core/src/ops/index_range.rs:220",
+        "enclosing_header": "impl ExactSizeIterator for IndexRange {"
+      },
+      {
+        "at": "core/src/option.rs:808",
+        "enclosing_header": "impl<T> Option<T> {"
+      },
+      {
+        "at": "core/src/option.rs:2513",
+        "enclosing_header": "impl<A> ExactSizeIterator for Item<A> {"
+      },
+      {
+        "at": "core/src/ptr/const_ptr.rs:1442",
+        "enclosing_header": "impl<T> *const [T] {"
+      },
+      {
+        "at": "core/src/ptr/mut_ptr.rs:1722",
+        "enclosing_header": "impl<T> *mut [T] {"
+      },
+      {
+        "at": "core/src/ptr/non_null.rs:1417",
+        "enclosing_header": "impl<T> NonNull<[T]> {"
+      },
+      {
+        "at": "core/src/slice/iter/macros.rs:142",
+        "enclosing_header": "impl<T> ExactSizeIterator for $name<'_, T> {"
+      },
+      {
+        "at": "core/src/slice/mod.rs:116",
+        "enclosing_header": "impl<T> [T] {"
+      },
+      {
+        "at": "core/src/slice/sort/stable/drift.rs:295",
+        "enclosing_header": "impl DriftsortRun {"
+      },
+      {
+        "at": "core/src/str/iter.rs:387",
+        "enclosing_header": "impl ExactSizeIterator for Bytes<'_> {"
+      },
+      {
+        "at": "core/src/str/mod.rs:155",
+        "enclosing_header": "impl str {"
+      },
+      {
+        "at": "core/src/wtf8.rs:233",
+        "enclosing_header": "impl Wtf8 {"
+      }
     ],
     "rev": [
-      "core/src/iter/traits/iterator.rs:3439"
+      {
+        "at": "core/src/iter/traits/iterator.rs:3439",
+        "enclosing_header": "pub const trait Iterator {"
+      }
     ],
     "try_into": [
-      "core/src/convert/mod.rs:625",
-      "core/src/convert/mod.rs:821"
+      {
+        "at": "core/src/convert/mod.rs:625",
+        "enclosing_header": "pub const trait TryInto<T>: Sized {"
+      },
+      {
+        "at": "core/src/convert/mod.rs:821",
+        "enclosing_header": "const impl<T, U> TryInto<U> for T"
+      }
     ],
     "unwrap": [
-      "core/src/option.rs:1011",
-      "core/src/result.rs:1226"
+      {
+        "at": "core/src/option.rs:1011",
+        "enclosing_header": "impl<T> Option<T> {"
+      },
+      {
+        "at": "core/src/result.rs:1226",
+        "enclosing_header": "impl<T, E> Result<T, E> {"
+      }
     ],
     "write": [
-      "core/src/array/mod.rs:1083",
-      "core/src/fmt/mod.rs:1631",
-      "core/src/fmt/mod.rs:1755",
-      "core/src/hash/mod.rs:357",
-      "core/src/hash/mod.rs:561",
-      "core/src/hash/sip.rs:214",
-      "core/src/hash/sip.rs:232",
-      "core/src/hash/sip.rs:256",
-      "core/src/io/cursor.rs:365",
-      "core/src/io/cursor.rs:402",
-      "core/src/io/cursor.rs:480",
-      "core/src/io/cursor.rs:492",
-      "core/src/io/impls.rs:24",
-      "core/src/io/impls.rs:115",
-      "core/src/io/impls.rs:165",
-      "core/src/io/util.rs:29",
-      "core/src/io/util.rs:68",
-      "core/src/io/util.rs:226",
-      "core/src/io/util.rs:265",
-      "core/src/io/write.rs:101",
-      "core/src/mem/maybe_uninit.rs:574",
-      "core/src/num/imp/fmt.rs:33",
-      "core/src/num/imp/fmt.rs:84",
-      "core/src/ptr/mod.rs:1940",
-      "core/src/ptr/mut_ptr.rs:1397",
-      "core/src/ptr/non_null.rs:1085"
+      {
+        "at": "core/src/array/mod.rs:1083",
+        "enclosing_header": null
+      },
+      {
+        "at": "core/src/fmt/mod.rs:1631",
+        "enclosing_header": null
+      },
+      {
+        "at": "core/src/fmt/mod.rs:1755",
+        "enclosing_header": "impl PostPadding {"
+      },
+      {
+        "at": "core/src/hash/mod.rs:357",
+        "enclosing_header": "pub trait Hasher {"
+      },
+      {
+        "at": "core/src/hash/mod.rs:561",
+        "enclosing_header": "impl<H: Hasher + ?Sized> Hasher for &mut H {"
+      },
+      {
+        "at": "core/src/hash/sip.rs:214",
+        "enclosing_header": "impl super::Hasher for SipHasher {"
+      },
+      {
+        "at": "core/src/hash/sip.rs:232",
+        "enclosing_header": "impl super::Hasher for SipHasher13 {"
+      },
+      {
+        "at": "core/src/hash/sip.rs:256",
+        "enclosing_header": "impl<S: Sip> super::Hasher for Hasher<S> {"
+      },
+      {
+        "at": "core/src/io/cursor.rs:365",
+        "enclosing_header": "impl Write for Cursor<&mut [u8]> {"
+      },
+      {
+        "at": "core/src/io/cursor.rs:402",
+        "enclosing_header": "impl<const N: usize> Write for Cursor<[u8; N]> {"
+      },
+      {
+        "at": "core/src/io/cursor.rs:480",
+        "enclosing_header": "pub trait WriteThroughCursor: Sized {"
+      },
+      {
+        "at": "core/src/io/cursor.rs:492",
+        "enclosing_header": "impl<W: WriteThroughCursor> Write for Cursor<W> {"
+      },
+      {
+        "at": "core/src/io/impls.rs:24",
+        "enclosing_header": "impl<W: Write + ?Sized> Write for &mut W {"
+      },
+      {
+        "at": "core/src/io/impls.rs:115",
+        "enclosing_header": "impl Write for &mut [u8] {"
+      },
+      {
+        "at": "core/src/io/impls.rs:165",
+        "enclosing_header": "impl<'a> io::Write for core::io::BorrowedCursor<'a, u8> {"
+      },
+      {
+        "at": "core/src/io/util.rs:29",
+        "enclosing_header": "impl Write for Empty {"
+      },
+      {
+        "at": "core/src/io/util.rs:68",
+        "enclosing_header": "impl Write for &Empty {"
+      },
+      {
+        "at": "core/src/io/util.rs:226",
+        "enclosing_header": "impl Write for Sink {"
+      },
+      {
+        "at": "core/src/io/util.rs:265",
+        "enclosing_header": "impl Write for &Sink {"
+      },
+      {
+        "at": "core/src/io/write.rs:101",
+        "enclosing_header": "pub trait Write {"
+      },
+      {
+        "at": "core/src/mem/maybe_uninit.rs:574",
+        "enclosing_header": "impl<T> MaybeUninit<T> {"
+      },
+      {
+        "at": "core/src/num/imp/fmt.rs:33",
+        "enclosing_header": "impl<'a> Part<'a> {"
+      },
+      {
+        "at": "core/src/num/imp/fmt.rs:84",
+        "enclosing_header": "impl<'a> Formatted<'a> {"
+      },
+      {
+        "at": "core/src/ptr/mod.rs:1940",
+        "enclosing_header": null
+      },
+      {
+        "at": "core/src/ptr/mut_ptr.rs:1397",
+        "enclosing_header": "impl<T: PointeeSized> *mut T {"
+      },
+      {
+        "at": "core/src/ptr/non_null.rs:1085",
+        "enclosing_header": "impl<T: PointeeSized> NonNull<T> {"
+      }
     ]
   },
   "production_input": false,
@@ -203,6 +612,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -225,6 +635,7 @@
           "text": "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN],"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[MaybeUninit<u8>; i128::MAX_STR_LEN]",
       "site": {
         "anchor_text": ".as_mut_ptr()",
@@ -239,6 +650,7 @@
         "method_name": "as_mut_ptr",
         "source": "Buffer::format"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::as_mut_ptr",
       "target_owner_kind": "inherent_impl"
     },
@@ -257,11 +669,12 @@
         },
         "owner_label": "*mut T"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "*mut MaybeUninit<u8>"
+        "step_type": "*mut T"
       },
       "name_scope_note": "The receiver is the value `as_mut_ptr` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "self.bytes.as_mut_ptr()",
@@ -273,7 +686,8 @@
           "text": "-> *mut T"
         }
       ],
-      "receiver_type_text": "*mut MaybeUninit<u8>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "*mut T",
       "site": {
         "anchor_text": ".cast::<",
         "byte_range": [
@@ -287,6 +701,7 @@
         "method_name": "cast",
         "source": "Buffer::format"
       },
+      "target_crate_name": "core",
       "target_label": "*mut T::cast",
       "target_owner_kind": "inherent_impl"
     },
@@ -305,6 +720,7 @@
         },
         "owner_label": "str"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -327,6 +743,7 @@
           "text": "fn write(self, buf: &mut Self::Buffer) -> &str;"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&str",
       "site": {
         "anchor_text": "string.len()",
@@ -341,16 +758,12 @@
         "method_name": "len",
         "source": "Buffer::format"
       },
+      "target_crate_name": "core",
       "target_label": "str::len",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "uint_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/uint_macros.rs",
@@ -374,6 +787,7 @@
         },
         "owner_label": "u128"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -396,6 +810,7 @@
           "text": "pub const MAX: Self = !0;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "u128",
       "site": {
         "anchor_text": "$Unsigned::MAX.ilog10()",
@@ -414,16 +829,12 @@
         "method_name": "ilog10",
         "source": "<u128 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "u128::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "uint_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/uint_macros.rs",
@@ -447,6 +858,7 @@
         },
         "owner_label": "u16"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -469,6 +881,7 @@
           "text": "pub const MAX: Self = !0;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "u16",
       "site": {
         "anchor_text": "$Unsigned::MAX.ilog10()",
@@ -487,16 +900,12 @@
         "method_name": "ilog10",
         "source": "<u16 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "u16::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "uint_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/uint_macros.rs",
@@ -520,6 +929,7 @@
         },
         "owner_label": "u32"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -542,6 +952,7 @@
           "text": "pub const MAX: Self = !0;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "u32",
       "site": {
         "anchor_text": "$Unsigned::MAX.ilog10()",
@@ -560,16 +971,12 @@
         "method_name": "ilog10",
         "source": "<u32 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "u32::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "uint_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/uint_macros.rs",
@@ -593,6 +1000,7 @@
         },
         "owner_label": "u64"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -615,6 +1023,7 @@
           "text": "pub const MAX: Self = !0;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "u64",
       "site": {
         "anchor_text": "$Unsigned::MAX.ilog10()",
@@ -633,16 +1042,12 @@
         "method_name": "ilog10",
         "source": "<u64 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "u64::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "uint_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/uint_macros.rs",
@@ -666,6 +1071,7 @@
         },
         "owner_label": "u8"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -688,6 +1094,7 @@
           "text": "pub const MAX: Self = !0;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "u8",
       "site": {
         "anchor_text": "$Unsigned::MAX.ilog10()",
@@ -706,16 +1113,12 @@
         "method_name": "ilog10",
         "source": "<u8 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "u8::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "int_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/int_macros.rs",
@@ -739,6 +1142,7 @@
         },
         "owner_label": "i128"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -761,6 +1165,7 @@
           "text": "pub const MAX: Self = (<$UnsignedT>::MAX >> 1) as Self;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "i128",
       "site": {
         "anchor_text": "$Signed::MAX.ilog10()",
@@ -779,16 +1184,12 @@
         "method_name": "ilog10",
         "source": "<i128 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "i128::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "int_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/int_macros.rs",
@@ -812,6 +1213,7 @@
         },
         "owner_label": "i16"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -834,6 +1236,7 @@
           "text": "pub const MAX: Self = (<$UnsignedT>::MAX >> 1) as Self;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "i16",
       "site": {
         "anchor_text": "$Signed::MAX.ilog10()",
@@ -852,16 +1255,12 @@
         "method_name": "ilog10",
         "source": "<i16 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "i16::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "int_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/int_macros.rs",
@@ -885,6 +1284,7 @@
         },
         "owner_label": "i32"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -907,6 +1307,7 @@
           "text": "pub const MAX: Self = (<$UnsignedT>::MAX >> 1) as Self;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "i32",
       "site": {
         "anchor_text": "$Signed::MAX.ilog10()",
@@ -925,16 +1326,12 @@
         "method_name": "ilog10",
         "source": "<i32 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "i32::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "int_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/int_macros.rs",
@@ -958,6 +1355,7 @@
         },
         "owner_label": "i64"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -980,6 +1378,7 @@
           "text": "pub const MAX: Self = (<$UnsignedT>::MAX >> 1) as Self;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "i64",
       "site": {
         "anchor_text": "$Signed::MAX.ilog10()",
@@ -998,16 +1397,12 @@
         "method_name": "ilog10",
         "source": "<i64 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "i64::ilog10",
       "target_owner_kind": "inherent_impl"
     },
     {
-      "assumptions": [
-        {
-          "assumption_kind": "core_macro_body_declaration",
-          "macro_name": "int_impl"
-        }
-      ],
+      "assumptions": [],
       "core": {
         "declaration": {
           "file": "core/src/num/int_macros.rs",
@@ -1031,6 +1426,7 @@
         },
         "owner_label": "i8"
       },
+      "declaration_form_kind": "core_macro_body",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -1053,6 +1449,7 @@
           "text": "pub const MAX: Self = (<$UnsignedT>::MAX >> 1) as Self;"
         }
       ],
+      "receiver_type_source_kind": "declared_by_cited_core_item",
       "receiver_type_text": "i8",
       "site": {
         "anchor_text": "$Signed::MAX.ilog10()",
@@ -1071,6 +1468,7 @@
         "method_name": "ilog10",
         "source": "<i8 as Integer>::MAX_STR_LEN"
       },
+      "target_crate_name": "core",
       "target_label": "i8::ilog10",
       "target_owner_kind": "inherent_impl"
     },
@@ -1089,27 +1487,16 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "&mut [MaybeUninit<u8>]"
+        "step_type": null
       },
-      "name_scope_note": "`try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
+      "name_scope_note": "The receiver is a reference to a range index of `buf`; its type is not written. `try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
       "receiver_text": "(&mut buf[offset..])",
       "receiver_type_proven_by": [
-        {
-          "file": "src/lib.rs",
-          "line": 168,
-          "says": "buf is &mut Self::Buffer",
-          "text": "fn write(self, buf: &mut Self::Buffer) -> &str {"
-        },
-        {
-          "file": "src/lib.rs",
-          "line": 164,
-          "says": "Self::Buffer is an array of MaybeUninit<u8>",
-          "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
-        },
         {
           "file": "core/src/prelude/mod.rs",
           "line": 67,
@@ -1123,7 +1510,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "&mut [MaybeUninit<u8>]",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -1141,8 +1529,9 @@
         "method_name": "try_into",
         "source": "<i128 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -1159,27 +1548,16 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "&mut [MaybeUninit<u8>]"
+        "step_type": null
       },
-      "name_scope_note": "`try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
+      "name_scope_note": "The receiver is a reference to a range index of `buf`; its type is not written. `try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
       "receiver_text": "(&mut buf[offset..])",
       "receiver_type_proven_by": [
-        {
-          "file": "src/lib.rs",
-          "line": 168,
-          "says": "buf is &mut Self::Buffer",
-          "text": "fn write(self, buf: &mut Self::Buffer) -> &str {"
-        },
-        {
-          "file": "src/lib.rs",
-          "line": 164,
-          "says": "Self::Buffer is an array of MaybeUninit<u8>",
-          "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
-        },
         {
           "file": "core/src/prelude/mod.rs",
           "line": 67,
@@ -1193,7 +1571,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "&mut [MaybeUninit<u8>]",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -1211,8 +1590,9 @@
         "method_name": "try_into",
         "source": "<i16 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -1229,27 +1609,16 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "&mut [MaybeUninit<u8>]"
+        "step_type": null
       },
-      "name_scope_note": "`try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
+      "name_scope_note": "The receiver is a reference to a range index of `buf`; its type is not written. `try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
       "receiver_text": "(&mut buf[offset..])",
       "receiver_type_proven_by": [
-        {
-          "file": "src/lib.rs",
-          "line": 168,
-          "says": "buf is &mut Self::Buffer",
-          "text": "fn write(self, buf: &mut Self::Buffer) -> &str {"
-        },
-        {
-          "file": "src/lib.rs",
-          "line": 164,
-          "says": "Self::Buffer is an array of MaybeUninit<u8>",
-          "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
-        },
         {
           "file": "core/src/prelude/mod.rs",
           "line": 67,
@@ -1263,7 +1632,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "&mut [MaybeUninit<u8>]",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -1281,8 +1651,9 @@
         "method_name": "try_into",
         "source": "<i32 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -1299,27 +1670,16 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "&mut [MaybeUninit<u8>]"
+        "step_type": null
       },
-      "name_scope_note": "`try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
+      "name_scope_note": "The receiver is a reference to a range index of `buf`; its type is not written. `try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
       "receiver_text": "(&mut buf[offset..])",
       "receiver_type_proven_by": [
-        {
-          "file": "src/lib.rs",
-          "line": 168,
-          "says": "buf is &mut Self::Buffer",
-          "text": "fn write(self, buf: &mut Self::Buffer) -> &str {"
-        },
-        {
-          "file": "src/lib.rs",
-          "line": 164,
-          "says": "Self::Buffer is an array of MaybeUninit<u8>",
-          "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
-        },
         {
           "file": "core/src/prelude/mod.rs",
           "line": 67,
@@ -1333,7 +1693,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "&mut [MaybeUninit<u8>]",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -1351,8 +1712,9 @@
         "method_name": "try_into",
         "source": "<i64 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -1369,27 +1731,16 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "&mut [MaybeUninit<u8>]"
+        "step_type": null
       },
-      "name_scope_note": "`try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
+      "name_scope_note": "The receiver is a reference to a range index of `buf`; its type is not written. `try_into` is declared in core only by the trait TryInto and its one blanket impl; itoa declares no `try_into` and has no other dependency.",
       "receiver_text": "(&mut buf[offset..])",
       "receiver_type_proven_by": [
-        {
-          "file": "src/lib.rs",
-          "line": 168,
-          "says": "buf is &mut Self::Buffer",
-          "text": "fn write(self, buf: &mut Self::Buffer) -> &str {"
-        },
-        {
-          "file": "src/lib.rs",
-          "line": 164,
-          "says": "Self::Buffer is an array of MaybeUninit<u8>",
-          "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
-        },
         {
           "file": "core/src/prelude/mod.rs",
           "line": 67,
@@ -1403,7 +1754,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "&mut [MaybeUninit<u8>]",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -1421,8 +1773,9 @@
         "method_name": "try_into",
         "source": "<i8 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -1439,11 +1792,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "(&mut buf[offset..]).try_into()",
@@ -1455,7 +1809,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".unwrap()",
         "byte_range": [
@@ -1473,6 +1828,7 @@
         "method_name": "unwrap",
         "source": "<i128 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::unwrap",
       "target_owner_kind": "inherent_impl"
     },
@@ -1491,11 +1847,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "(&mut buf[offset..]).try_into()",
@@ -1507,7 +1864,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".unwrap()",
         "byte_range": [
@@ -1525,6 +1883,7 @@
         "method_name": "unwrap",
         "source": "<i16 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::unwrap",
       "target_owner_kind": "inherent_impl"
     },
@@ -1543,11 +1902,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "(&mut buf[offset..]).try_into()",
@@ -1559,7 +1919,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".unwrap()",
         "byte_range": [
@@ -1577,6 +1938,7 @@
         "method_name": "unwrap",
         "source": "<i32 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::unwrap",
       "target_owner_kind": "inherent_impl"
     },
@@ -1595,11 +1957,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "(&mut buf[offset..]).try_into()",
@@ -1611,7 +1974,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".unwrap()",
         "byte_range": [
@@ -1629,6 +1993,7 @@
         "method_name": "unwrap",
         "source": "<i64 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::unwrap",
       "target_owner_kind": "inherent_impl"
     },
@@ -1647,11 +2012,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "(&mut buf[offset..]).try_into()",
@@ -1663,7 +2029,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".unwrap()",
         "byte_range": [
@@ -1681,6 +2048,7 @@
         "method_name": "unwrap",
         "source": "<i8 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::unwrap",
       "target_owner_kind": "inherent_impl"
     },
@@ -1699,6 +2067,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -1721,6 +2090,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(b'-')",
@@ -1739,6 +2109,7 @@
         "method_name": "write",
         "source": "<i128 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -1757,6 +2128,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -1779,6 +2151,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(b'-')",
@@ -1797,6 +2170,7 @@
         "method_name": "write",
         "source": "<i16 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -1815,6 +2189,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -1837,6 +2212,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(b'-')",
@@ -1855,6 +2231,7 @@
         "method_name": "write",
         "source": "<i32 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -1873,6 +2250,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -1895,6 +2273,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(b'-')",
@@ -1913,6 +2292,7 @@
         "method_name": "write",
         "source": "<i64 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -1931,6 +2311,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -1953,6 +2334,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(b'-')",
@@ -1971,6 +2353,7 @@
         "method_name": "write",
         "source": "<i8 as private::Sealed>::write"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -1989,6 +2372,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
@@ -2005,6 +2389,7 @@
           "text": "buf: &[MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&[MaybeUninit<u8>]",
       "site": {
         "anchor_text": "buf.get_unchecked(",
@@ -2019,6 +2404,7 @@
         "method_name": "get_unchecked",
         "source": "slice_buffer_to_str"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -2054,6 +2440,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -2076,6 +2463,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "site": {
         "anchor_text": "buf.len()",
@@ -2094,6 +2482,7 @@
         "method_name": "len",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::len",
       "target_owner_kind": "inherent_impl"
     },
@@ -2129,6 +2518,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -2151,6 +2541,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "site": {
         "anchor_text": "buf.len()",
@@ -2169,6 +2560,7 @@
         "method_name": "len",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::len",
       "target_owner_kind": "inherent_impl"
     },
@@ -2204,6 +2596,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -2226,6 +2619,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "site": {
         "anchor_text": "buf.len()",
@@ -2244,6 +2638,7 @@
         "method_name": "len",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::len",
       "target_owner_kind": "inherent_impl"
     },
@@ -2279,6 +2674,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -2301,6 +2697,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "site": {
         "anchor_text": "buf.len()",
@@ -2319,6 +2716,7 @@
         "method_name": "len",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::len",
       "target_owner_kind": "inherent_impl"
     },
@@ -2337,13 +2735,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "999",
       "receiver_type_proven_by": [
         {
@@ -2359,7 +2758,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2377,8 +2777,9 @@
         "method_name": "try_into",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2395,13 +2796,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "999",
       "receiver_type_proven_by": [
         {
@@ -2417,7 +2819,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2435,8 +2838,9 @@
         "method_name": "try_into",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2453,13 +2857,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "999",
       "receiver_type_proven_by": [
         {
@@ -2475,7 +2880,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2493,8 +2899,9 @@
         "method_name": "try_into",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2511,13 +2918,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "999",
       "receiver_type_proven_by": [
         {
@@ -2533,7 +2941,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2551,8 +2960,9 @@
         "method_name": "try_into",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2569,11 +2979,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "999 .try_into()",
@@ -2585,7 +2996,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -2603,6 +3015,7 @@
         "method_name": "expect",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -2621,11 +3034,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "999 .try_into()",
@@ -2637,7 +3051,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -2655,6 +3070,7 @@
         "method_name": "expect",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -2673,11 +3089,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "999 .try_into()",
@@ -2689,7 +3106,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -2707,6 +3125,7 @@
         "method_name": "expect",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -2725,11 +3144,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "999 .try_into()",
@@ -2741,7 +3161,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -2759,6 +3180,7 @@
         "method_name": "expect",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -2777,13 +3199,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "1_00_00",
       "receiver_type_proven_by": [
         {
@@ -2799,7 +3222,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2817,8 +3241,9 @@
         "method_name": "try_into",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2835,13 +3260,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "1_00_00",
       "receiver_type_proven_by": [
         {
@@ -2857,7 +3283,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2875,8 +3302,9 @@
         "method_name": "try_into",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2893,13 +3321,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "1_00_00",
       "receiver_type_proven_by": [
         {
@@ -2915,7 +3344,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2933,8 +3363,9 @@
         "method_name": "try_into",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -2951,13 +3382,14 @@
         },
         "owner_label": "TryInto"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "the literal's type"
+        "step_type": null
       },
-      "name_scope_note": "The label does not depend on the literal's type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
+      "name_scope_note": "The receiver is an integer literal; its type is inferred. The label does not depend on that type: `try_into` is declared in core only by the trait TryInto and its one blanket impl, itoa declares no `try_into`, and itoa has no other dependency.",
       "receiver_text": "1_00_00",
       "receiver_type_proven_by": [
         {
@@ -2973,7 +3405,8 @@
           "text": "fn try_into(self) -> Result<U, U::Error> {"
         }
       ],
-      "receiver_type_text": "an integer literal (its type is inferred)",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".try_into()",
         "byte_range": [
@@ -2991,8 +3424,9 @@
         "method_name": "try_into",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "TryInto::try_into",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -3009,11 +3443,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "1_00_00 .try_into()",
@@ -3025,7 +3460,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -3043,6 +3479,7 @@
         "method_name": "expect",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -3061,11 +3498,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "1_00_00 .try_into()",
@@ -3077,7 +3515,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -3095,6 +3534,7 @@
         "method_name": "expect",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -3113,11 +3553,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "1_00_00 .try_into()",
@@ -3129,7 +3570,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -3147,6 +3589,7 @@
         "method_name": "expect",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -3165,11 +3608,12 @@
         },
         "owner_label": "Result<T, E>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "Result<T, E>"
+        "step_type": "Result<T, Self::Error>"
       },
       "name_scope_note": "The receiver is the value `try_into` returns. No trait in scope declares this name: itoa imports no trait (src/lib.rs lines 56 to 60), its own traits in scope declare only `fmt`, and no trait of the core prelude declares it.",
       "receiver_text": "1_00_00 .try_into()",
@@ -3181,7 +3625,8 @@
           "text": "-> Result<T, Self::Error>"
         }
       ],
-      "receiver_type_text": "Result<T, <T as TryFrom<_>>::Error>",
+      "receiver_type_source_kind": "declared_by_cited_core_item",
+      "receiver_type_text": "Result<T, Self::Error>",
       "site": {
         "anchor_text": ".expect(",
         "byte_range": [
@@ -3199,6 +3644,7 @@
         "method_name": "expect",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "Result<T, E>::expect",
       "target_owner_kind": "inherent_impl"
     },
@@ -3217,6 +3663,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3239,6 +3686,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3257,6 +3705,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3275,6 +3724,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3297,6 +3747,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3315,6 +3766,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3333,6 +3785,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3355,6 +3808,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3373,6 +3827,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3391,6 +3846,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3413,6 +3869,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3431,6 +3888,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3449,6 +3907,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -3471,6 +3930,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -3489,6 +3949,7 @@
         "method_name": "get_unchecked",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -3507,6 +3968,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -3529,6 +3991,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -3547,6 +4010,7 @@
         "method_name": "get_unchecked",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -3565,6 +4029,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -3587,6 +4052,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -3605,6 +4071,7 @@
         "method_name": "get_unchecked",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -3623,6 +4090,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -3645,6 +4113,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -3663,6 +4132,7 @@
         "method_name": "get_unchecked",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -3681,6 +4151,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3703,6 +4174,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3721,6 +4193,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3739,6 +4212,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3761,6 +4235,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3779,6 +4254,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3797,6 +4273,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3819,6 +4296,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3837,6 +4315,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3855,6 +4334,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -3877,6 +4357,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -3895,6 +4376,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -3913,6 +4395,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -3935,6 +4418,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -3953,6 +4437,7 @@
         "method_name": "get_unchecked",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -3971,6 +4456,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -3993,6 +4479,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4011,6 +4498,7 @@
         "method_name": "get_unchecked",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4029,6 +4517,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4051,6 +4540,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4069,6 +4559,7 @@
         "method_name": "get_unchecked",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4087,6 +4578,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4109,6 +4601,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4127,6 +4620,7 @@
         "method_name": "get_unchecked",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4145,6 +4639,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4167,6 +4662,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4185,6 +4681,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4203,6 +4700,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4225,6 +4723,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4243,6 +4742,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4261,6 +4761,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4283,6 +4784,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4301,6 +4803,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4319,6 +4822,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4341,6 +4845,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4359,6 +4864,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4377,6 +4883,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4399,6 +4906,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4417,6 +4925,7 @@
         "method_name": "get_unchecked",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4435,6 +4944,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4457,6 +4967,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4475,6 +4986,7 @@
         "method_name": "get_unchecked",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4493,6 +5005,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4515,6 +5028,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4533,6 +5047,7 @@
         "method_name": "get_unchecked",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4551,6 +5066,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4573,6 +5089,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4591,6 +5108,7 @@
         "method_name": "get_unchecked",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4609,6 +5127,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4631,6 +5150,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4649,6 +5169,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4667,6 +5188,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4689,6 +5211,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4707,6 +5230,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4725,6 +5249,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4747,6 +5272,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4765,6 +5291,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4783,6 +5310,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -4805,6 +5333,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -4823,6 +5352,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -4841,6 +5371,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4863,6 +5394,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4881,6 +5413,7 @@
         "method_name": "get_unchecked",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4899,6 +5432,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4921,6 +5455,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4939,6 +5474,7 @@
         "method_name": "get_unchecked",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -4957,6 +5493,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -4979,6 +5516,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -4997,6 +5535,7 @@
         "method_name": "get_unchecked",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5015,6 +5554,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5037,6 +5577,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5055,6 +5596,7 @@
         "method_name": "get_unchecked",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5073,6 +5615,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5095,6 +5638,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5113,6 +5657,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5131,6 +5676,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5153,6 +5699,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5171,6 +5718,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5189,6 +5737,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5211,6 +5760,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5229,6 +5779,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5247,6 +5798,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5269,6 +5821,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5287,6 +5840,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5305,6 +5859,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5327,6 +5882,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5345,6 +5901,7 @@
         "method_name": "get_unchecked",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5363,6 +5920,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5385,6 +5943,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5403,6 +5962,7 @@
         "method_name": "get_unchecked",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5421,6 +5981,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5443,6 +6004,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5461,6 +6023,7 @@
         "method_name": "get_unchecked",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5479,6 +6042,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5501,6 +6065,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5519,6 +6084,7 @@
         "method_name": "get_unchecked",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5537,6 +6103,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5559,6 +6126,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5577,6 +6145,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5595,6 +6164,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5617,6 +6187,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5635,6 +6206,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5653,6 +6225,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5675,6 +6248,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5693,6 +6267,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5711,6 +6286,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -5733,6 +6309,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -5751,6 +6328,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -5769,6 +6347,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5791,6 +6370,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5809,6 +6389,7 @@
         "method_name": "get_unchecked",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5827,6 +6408,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5849,6 +6431,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5867,6 +6450,7 @@
         "method_name": "get_unchecked",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5885,6 +6469,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5907,6 +6492,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5925,6 +6511,7 @@
         "method_name": "get_unchecked",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -5943,6 +6530,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -5965,6 +6553,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -5983,6 +6572,7 @@
         "method_name": "get_unchecked",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -6001,6 +6591,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6023,6 +6614,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6041,6 +6633,7 @@
         "method_name": "write",
         "source": "<u16 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6059,6 +6652,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6081,6 +6675,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6099,6 +6694,7 @@
         "method_name": "write",
         "source": "<u32 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6117,6 +6713,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6139,6 +6736,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6157,6 +6755,7 @@
         "method_name": "write",
         "source": "<u64 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6175,6 +6774,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6197,6 +6797,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6215,6 +6816,7 @@
         "method_name": "write",
         "source": "<u8 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6250,6 +6852,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6272,6 +6875,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "&mut [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "site": {
         "anchor_text": "buf.len()",
@@ -6286,6 +6890,7 @@
         "method_name": "len",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::len",
       "target_owner_kind": "inherent_impl"
     },
@@ -6304,6 +6909,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6326,6 +6932,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6340,6 +6947,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6358,6 +6966,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6380,6 +6989,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6394,6 +7004,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6412,6 +7023,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6434,6 +7046,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -6448,6 +7061,7 @@
         "method_name": "get_unchecked",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -6466,6 +7080,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6488,6 +7103,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6502,6 +7118,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6520,6 +7137,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6542,6 +7160,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -6556,6 +7175,7 @@
         "method_name": "get_unchecked",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -6574,6 +7194,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6596,6 +7217,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6610,6 +7232,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6628,6 +7251,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6650,6 +7274,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -6664,6 +7289,7 @@
         "method_name": "get_unchecked",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -6682,6 +7308,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6704,6 +7331,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6718,6 +7346,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6736,6 +7365,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6758,6 +7388,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -6772,6 +7403,7 @@
         "method_name": "get_unchecked",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -6790,6 +7422,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6812,6 +7445,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6826,6 +7460,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6844,6 +7479,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6866,6 +7502,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -6880,6 +7517,7 @@
         "method_name": "get_unchecked",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -6898,6 +7536,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -6920,6 +7559,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -6934,6 +7574,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -6952,6 +7593,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -6974,6 +7616,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -6988,6 +7631,7 @@
         "method_name": "get_unchecked",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7006,6 +7650,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7028,6 +7673,7 @@
           "text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7042,6 +7688,7 @@
         "method_name": "write",
         "source": "<u128 as Unsigned>::fmt"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7060,13 +7707,14 @@
         },
         "owner_label": "Iterator"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "by_value",
         "step_kind": "receiver_type",
-        "step_type": "core::ops::Range<_>"
+        "step_type": null
       },
-      "name_scope_note": "`rev` is declared exactly once in core, by the trait Iterator; itoa declares no `rev` and has no other dependency.",
+      "name_scope_note": "The receiver is a range expression; its type is not written. `rev` is declared exactly once in core, by the trait Iterator; itoa declares no `rev` and has no other dependency.",
       "receiver_text": "(1..4)",
       "receiver_type_proven_by": [
         {
@@ -7076,7 +7724,8 @@
           "text": "Iterator}"
         }
       ],
-      "receiver_type_text": "a range expression `1..4`",
+      "receiver_type_source_kind": "inferred_not_written",
+      "receiver_type_text": null,
       "site": {
         "anchor_text": ".rev()",
         "byte_range": [
@@ -7090,8 +7739,9 @@
         "method_name": "rev",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "Iterator::rev",
-      "target_owner_kind": "trait"
+      "target_owner_kind": "trait_declaration_impl_not_named"
     },
     {
       "assumptions": [],
@@ -7108,6 +7758,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7124,6 +7775,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7138,6 +7790,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7156,6 +7809,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7178,6 +7832,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7192,6 +7847,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7210,6 +7866,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7226,6 +7883,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7240,6 +7898,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7258,6 +7917,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7280,6 +7940,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7294,6 +7955,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7312,6 +7974,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7328,6 +7991,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7342,6 +8006,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7360,6 +8025,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7382,6 +8048,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7396,6 +8063,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7414,6 +8082,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7430,6 +8099,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7444,6 +8114,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7462,6 +8133,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7484,6 +8156,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7498,6 +8171,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7516,6 +8190,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7532,6 +8207,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7546,6 +8222,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7564,6 +8241,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7586,6 +8264,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7600,6 +8279,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7618,6 +8298,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7634,6 +8315,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7648,6 +8330,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7666,6 +8349,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7688,6 +8372,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7702,6 +8387,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7720,6 +8406,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7736,6 +8423,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7750,6 +8438,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7768,6 +8457,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7790,6 +8480,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7804,6 +8495,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     },
@@ -7822,6 +8514,7 @@
         },
         "owner_label": "MaybeUninit<T>"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "mutable_reference",
@@ -7838,6 +8531,7 @@
           "text": "buf: &mut [MaybeUninit<u8>]"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "MaybeUninit<u8>",
       "site": {
         "anchor_text": ".write(",
@@ -7852,6 +8546,7 @@
         "method_name": "write",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "MaybeUninit<T>::write",
       "target_owner_kind": "inherent_impl"
     },
@@ -7870,6 +8565,7 @@
         },
         "owner_label": "[T]"
       },
+      "declaration_form_kind": "plain",
       "expected": "target",
       "lookup_step": {
         "self_adjustment": "shared_reference",
@@ -7892,6 +8588,7 @@
           "text": "struct DecimalPairs([u8; 200]);"
         }
       ],
+      "receiver_type_source_kind": "written_in_itoa",
       "receiver_type_text": "[u8; 200]",
       "site": {
         "anchor_text": ".get_unchecked(",
@@ -7906,6 +8603,7 @@
         "method_name": "get_unchecked",
         "source": "enc_16lsd"
       },
+      "target_crate_name": "core",
       "target_label": "[T]::get_unchecked",
       "target_owner_kind": "inherent_impl"
     }
@@ -7914,5 +8612,23 @@
   "source_file_sha256": {
     "src/lib.rs": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
     "src/u128_ext.rs": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+  },
+  "vocabulary": {
+    "assumption_kinds": {
+      "prelude_trait_impl_unrefuted": "a trait of the core prelude declares a method of the same name; that it is not implemented for the types of the earlier lookup steps was not proven by a trait solver"
+    },
+    "declaration_form_kinds": {
+      "core_macro_body": "the declaration is written in a macro_rules! body; the owner is the impl whose body calls that macro (both lines are cited)",
+      "plain": "the declaration is written inside the impl or trait that owns it"
+    },
+    "receiver_type_source_kinds": {
+      "declared_by_cited_core_item": "the type a cited core declaration gives: a return type or a constant's type",
+      "inferred_not_written": "no source text states the type; the label does not depend on it (see name_scope_note)",
+      "written_in_itoa": "a parameter, field, static, associated type or return type written in the pinned source"
+    },
+    "target_owner_kinds": {
+      "inherent_impl": "the method is declared in an inherent impl of core; the label names that declaration",
+      "trait_declaration_impl_not_named": "the method is declared by a trait of core; the label names the trait's declaration, and the impl that runs for this receiver is not named"
+    }
   }
 }

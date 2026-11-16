@@ -65,7 +65,11 @@ class ExpectedCoreTargetTests(unittest.TestCase):
             owner = BUILDER.read_owner_label(row["core"]["owner"]["text"])
             self.assertEqual(f"{owner}::{row['site']['method_name']}", row["target_label"])
             self.assertIn(f"fn {row['site']['method_name']}", row["core"]["declaration"]["text"])
-            self.assertEqual("trait" in row["core"]["owner"]["text"].split(), row["target_owner_kind"] == "trait")
+            self.assertIn(row["target_owner_kind"], BUILDER.OWNER_KINDS)
+            self.assertEqual("trait" in row["core"]["owner"]["text"].split(),
+                             row["target_owner_kind"] == "trait_declaration_impl_not_named")
+            self.assertEqual("core", row["target_crate_name"])
+            self.assertTrue(row["core"]["declaration"]["file"].startswith("core/src/"))
             self.assertIn(row["lookup_step"]["step_kind"], BUILDER.STEP_KINDS)
             self.assertIn(row["lookup_step"]["self_adjustment"], BUILDER.SELF_ADJUSTMENTS)
 
@@ -92,20 +96,45 @@ class ExpectedCoreTargetTests(unittest.TestCase):
         for row in buffer_len:
             self.assertEqual(["prelude_trait_impl_unrefuted"], kinds(row))
             self.assertEqual("[T]::len", row["target_label"])
-        in_macro = [row for row in self.rows if "declared_in_macro" in row["core"]]
+        self.assertEqual(5, len([row for row in self.rows if row["assumptions"]]))
+
+    def test_core_target_fact_fields(self):
+        """A field has one meaning: a fact about the declaration is not an assumption, and a type field holds a
+        type or nothing."""
+        in_macro = [row for row in self.rows if row["declaration_form_kind"] == "core_macro_body"]
         self.assertEqual(10, len(in_macro))
-        for row in in_macro:
-            self.assertEqual(["core_macro_body_declaration"], kinds(row))
-        carrying = [row for row in self.rows if row["assumptions"]]
-        self.assertEqual(15, len(carrying))
+        for row in self.rows:
+            self.assertIn(row["declaration_form_kind"], BUILDER.DECLARATION_FORM_KINDS)
+            self.assertEqual("declared_in_macro" in row["core"], row["declaration_form_kind"] == "core_macro_body")
+            self.assertIn(row["receiver_type_source_kind"], BUILDER.RECEIVER_TYPE_SOURCE_KINDS)
+            unwritten = row["receiver_type_source_kind"] == "inferred_not_written"
+            self.assertEqual(unwritten, row["receiver_type_text"] is None, row["site"])
+            self.assertEqual(unwritten, row["lookup_step"]["step_type"] is None, row["site"])
+            for text in filter(None, (row["receiver_type_text"], row["lookup_step"]["step_type"])):
+                self.assertIsNone(re.search(r"\b(a|an|the|its|is|of)\b", text), text)
+        # A row without a written receiver type is allowed only where the name alone decides the target.
+        unwritten = {row["site"]["method_name"] for row in self.rows if row["receiver_type_text"] is None}
+        self.assertEqual({"try_into", "rev"}, unwritten)
 
     def test_core_name_scope_counts(self):
         """T4: the name-scope notes that say 'declared only by' rest on these counts of `fn NAME` in core."""
-        counts = {name: len(found) for name, found in self.document["name_declarations_in_core"].items()}
+        declared = self.document["name_declarations_in_core"]
+        counts = {name: len(found) for name, found in declared.items()}
         self.assertEqual({"try_into": 2, "rev": 1, "expect": 2, "unwrap": 2, "ilog10": 3},
                          {name: counts[name] for name in ("try_into", "rev", "expect", "unwrap", "ilog10")})
-        for name, found in self.document["name_declarations_in_core"].items():
-            self.assertEqual(found, BUILDER.list_name_declarations(self.core_files, name))
+        read = BUILDER.make_line_reader(self.core_files)
+        for name, found in declared.items():
+            self.assertEqual(found, BUILDER.list_name_declarations(self.core_files, read, name))
+        headers = lambda name: [entry["enclosing_header"] or "" for entry in declared[name]]
+        # "core declares no `write` for a slice": no inherent impl of a slice type holds one.
+        self.assertEqual([], [header for header in headers("write") if re.match(r"impl(<[^>]*>)? \[", header)])
+        # "core declares no len / get_unchecked / as_mut_ptr for an array".
+        for name in ("len", "get_unchecked", "as_mut_ptr"):
+            self.assertEqual([], [header for header in headers(name) if re.match(r"impl(<[^>]*>)? \[[^\]]*;", header)], name)
+        # The receiver of every `write` is one index expression, and the index is not a range.
+        for row in (row for row in self.rows if row["site"]["method_name"] == "write"):
+            self.assertRegex(row["receiver_text"], r"^buf\[[^\[\]]+\]$")
+            self.assertNotIn("..", row["receiver_text"])
 
     def test_core_source_digest_recorded(self):
         """T6: the recorded compiler version and core digest are those of the files read."""
@@ -116,6 +145,17 @@ class ExpectedCoreTargetTests(unittest.TestCase):
         shell = subprocess.run("find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum",
                                shell=True, cwd=self.library, check=True, capture_output=True, text=True)
         self.assertEqual(recorded["listing_sha256"], shell.stdout.split()[0])
+
+    def test_core_target_freeze_digest(self):
+        """T7: the file, its builder and the inputs are those of the freeze record."""
+        record = read_json(HERE / BUILDER.FREEZE_NAME)
+        digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual("FROZEN_EXPECTED_CORE_TARGETS", self.document["artifact_status"])
+        self.assertEqual({TARGET_PATH.name: digest(TARGET_PATH)}, record["frozen_file_sha256"])
+        self.assertEqual({name: digest(HERE / name) for name in record["builder_file_sha256"]}, record["builder_file_sha256"])
+        self.assertEqual(digest(HERE / "itoa-expected-graph-edges.json"), record["expected_graph_edges_sha256"])
+        self.assertEqual(self.document["core_source"], record["core_source"])
+        self.assertEqual(list(BUILDER.COMPARED_FIELDS), self.document["compared_fields"])
 
     def test_core_target_builder_reproduces(self):
         """The builder writes the same bytes again, and the file is not a production input."""

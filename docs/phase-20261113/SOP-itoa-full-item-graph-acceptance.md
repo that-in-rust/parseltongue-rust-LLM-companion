@@ -223,7 +223,7 @@ No run with `declarations` has been judged. Before one is:
 
 ```text
 needed                                                        state on 2026-11-16
-expected target of each of the 133 calls, from source          drafted, not frozen:
+expected target of each of the 133 calls, from source          frozen, one author:
                                                                itoa-expected-core-member-targets.json
 expected graph re-frozen with those targets                    not done
 S1 record of the compiler version and the core digest          no command writes it yet
