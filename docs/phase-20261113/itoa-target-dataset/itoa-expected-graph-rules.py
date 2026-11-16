@@ -14,7 +14,7 @@ def _node_blockers(row):
     flags = set(row.get("flags", []))
     blockers = []
     visibility = row.get("effective_visibility")
-    if visibility not in {"public", "restricted_non_private", "private"} and row.get("item_kind") != "macro_call" and row.get("node_category") not in {"external_name", "builtin_type"}:
+    if visibility not in {"public", "restricted_non_private", "private"} and row.get("item_kind") != "macro_call" and row.get("node_category") not in {"external_name", "builtin_type", "crate_root"}:
         blockers.append("UNKNOWN_VISIBILITY")
     if row.get("generated_by"):
         blockers.extend(("OD-2_MACRO_OWNERSHIP_UNDECIDED", "MACRO_FILE_ASSIGNMENT_UNRESOLVED"))

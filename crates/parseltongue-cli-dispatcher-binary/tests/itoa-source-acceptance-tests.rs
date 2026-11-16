@@ -5300,6 +5300,70 @@ fn derive_expected_graph_label(node: &HldNodeInputRecord) -> String {
     }
 }
 
+/// One text row per expected node: label, category, item kind, kind of owner, file,
+/// the macro call that generates it, and whether it is declared in a function body
+/// (REQ-RUST-044.1 N1).
+fn collect_expected_node_rows() -> std::collections::BTreeSet<String> {
+    let read_optional_text = |value: &Value| {
+        value
+            .as_str()
+            .filter(|text| !text.is_empty())
+            .unwrap_or("none")
+            .to_string()
+    };
+    read_expected_graph_rows("itoa-expected-graph-nodes.json")
+        .iter()
+        .map(|node| {
+            format!(
+                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={}",
+                node["label"].as_str().unwrap(),
+                node["node_category"].as_str().unwrap(),
+                read_optional_text(&node["item_kind"]),
+                read_optional_text(&node["owner_kind"]),
+                read_optional_text(&node["file"]),
+                read_optional_text(&node["generated_by_label"]),
+                node["in_function_body"].as_bool().unwrap()
+            )
+        })
+        .collect()
+}
+
+/// The same text row for each production node.
+fn collect_production_node_rows(
+    input: &HldMaterializationInputRecord,
+    labels: &std::collections::BTreeMap<&HldTargetIdentityValue, String>,
+) -> std::collections::BTreeSet<String> {
+    let name_debug_value = |text: String| match convert_camel_snake_text(&text).as_str() {
+        "external_definition" => "external_name".to_string(),
+        "builtin" => "builtin_type".to_string(),
+        "macro_invocation" => "macro_call".to_string(),
+        other => other.to_string(),
+    };
+    input
+        .input_node_records
+        .iter()
+        .map(|node| {
+            format!(
+                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={}",
+                derive_expected_graph_label(node),
+                name_debug_value(format!("{:?}", node.node_input_category)),
+                node.node_item_kind_value
+                    .map(|kind| name_debug_value(format!("{kind:?}")))
+                    .unwrap_or_else(|| "none".to_string()),
+                node.node_owner_kind_value
+                    .map(|kind| name_debug_value(format!("{kind:?}")))
+                    .unwrap_or_else(|| "none".to_string()),
+                node.node_source_relative_path.as_deref().unwrap_or("none"),
+                node.node_generating_call_reference
+                    .as_ref()
+                    .map(|call| labels[call].as_str())
+                    .unwrap_or("none"),
+                node.node_function_body_ancestry_flag
+            )
+        })
+        .collect()
+}
+
 fn convert_camel_snake_text(name: &str) -> String {
     name.chars()
         .enumerate()
@@ -5534,7 +5598,8 @@ fn test_itoa_crate_root_node() {
 
 /// REQ-RUST-044.0: every node and every edge row production stores for pinned itoa is
 /// a row of the expected graph files, and every expected row is stored. A site is
-/// compared by its byte range in the original source (E1 to E7).
+/// compared by its byte range in the original source (E1 to E7), a node by the fields
+/// production stores for it (N1).
 #[test]
 fn test_itoa_whole_graph_equality() {
     let (_directory, _root, _database, input) = run_original_graph_fixture();
@@ -5548,19 +5613,26 @@ fn test_itoa_whole_graph_equality() {
             )
         })
         .collect::<std::collections::BTreeMap<_, _>>();
-    let stored_nodes = labels
-        .values()
-        .cloned()
-        .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(
-        stored_nodes.len(),
+        labels
+            .values()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
         input.input_node_records.len(),
         "two production nodes share one expected label"
     );
-    let expected_nodes = read_expected_graph_rows("itoa-expected-graph-nodes.json")
-        .iter()
-        .map(|node| node["label"].as_str().unwrap().to_string())
-        .collect::<std::collections::BTreeSet<_>>();
+    let stored_nodes = collect_production_node_rows(&input, &labels);
+    let expected_nodes = collect_expected_node_rows();
+    // Visibility, reachability and signature text are not stored on a node yet (PRD:
+    // "unknown visibility and unknown reachability are stored as unknown"). When one is
+    // stored, it joins the compared row.
+    assert!(input.input_node_records.iter().all(|node| {
+        matches!(
+            node.node_effective_visibility_kind,
+            None | Some(HldEffectiveVisibilityKind::Unknown)
+        ) && node.node_reachable_outside_crate_flag.is_none()
+            && node.node_signature_text.is_none()
+    }));
     let expected_rows = collect_expected_graph_rows();
     let stored_rows = collect_production_graph_rows(&input, &labels);
     let count_row_copies = |rows: &[String]| {

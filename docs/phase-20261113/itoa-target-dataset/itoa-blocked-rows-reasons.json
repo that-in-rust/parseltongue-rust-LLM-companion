@@ -29060,9 +29060,13 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<Buffer as Default>::default",
+      "node_category": "local_item",
       "owner": "impl@76",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "fn default()",
       "source_evidence": {
@@ -29090,9 +29094,13 @@
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
       "flags": [],
       "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<Buffer as Clone>::clone",
+      "node_category": "local_item",
       "owner": "impl@86",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "fn clone(&self)",
       "source_evidence": {
@@ -29128,9 +29136,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i128,u128)",
+      "node_category": "local_item",
       "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
       "reachable_outside_crate": false,
       "source_anchor": "const _: () = {",
       "source_evidence": {
@@ -29166,9 +29178,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i16,u16)",
+      "node_category": "local_item",
       "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
       "reachable_outside_crate": false,
       "source_anchor": "const _: () = {",
       "source_evidence": {
@@ -29204,9 +29220,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i32,u32)",
+      "node_category": "local_item",
       "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
       "reachable_outside_crate": false,
       "source_anchor": "const _: () = {",
       "source_evidence": {
@@ -29242,9 +29262,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i64,u64)",
+      "node_category": "local_item",
       "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
       "reachable_outside_crate": false,
       "source_anchor": "const _: () = {",
       "source_evidence": {
@@ -29280,9 +29304,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "constant",
       "label": "const _ #impl_Integer(i8,u8)",
+      "node_category": "local_item",
       "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
       "reachable_outside_crate": false,
       "source_anchor": "const _: () = {",
       "source_evidence": {
@@ -29317,9 +29345,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<u128 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@143",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29354,9 +29386,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<u16 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@143",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29391,9 +29427,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<u32 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@143",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29428,9 +29468,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<u64 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@143",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29465,9 +29509,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<u8 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@143",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29503,9 +29551,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<u128 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -29541,9 +29593,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<u16 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -29579,9 +29635,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<u32 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -29617,9 +29677,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<u64 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -29655,9 +29719,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<u8 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -29693,9 +29761,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u128 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -29731,9 +29803,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u16 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -29769,9 +29845,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u32 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -29807,9 +29887,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u64 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -29845,9 +29929,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u8 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@147",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -29882,9 +29970,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<i128 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@159",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29919,9 +30011,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<i16 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@159",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29956,9 +30052,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<i32 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@159",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -29993,9 +30093,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<i64 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@159",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -30030,9 +30134,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<i8 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@159",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
@@ -30068,9 +30176,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<i128 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -30106,9 +30218,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<i16 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -30144,9 +30260,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<i32 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -30182,9 +30302,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<i64 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -30220,9 +30344,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<i8 as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
@@ -30258,9 +30386,13 @@
         "invocation_line": 189,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<i128 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30296,9 +30428,13 @@
         "invocation_line": 186,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<i16 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30334,9 +30470,13 @@
         "invocation_line": 187,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<i32 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30372,9 +30512,13 @@
         "invocation_line": 188,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<i64 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30410,9 +30554,13 @@
         "invocation_line": 185,
         "macro": "impl_Integer"
       },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<i8 as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@163",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30447,9 +30595,13 @@
         "invocation_line": 215,
         "macro": "impl_Integer_size"
       },
+      "generated_by_label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<isize as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@194",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
       "source_evidence": {
@@ -30484,9 +30636,13 @@
         "invocation_line": 216,
         "macro": "impl_Integer_size"
       },
+      "generated_by_label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
       "item_kind": "associated_constant",
       "label": "<usize as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
       "owner": "impl@194",
+      "owner_kind": "impl",
       "reachable_outside_crate": true,
       "source_anchor": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
       "source_evidence": {
@@ -30522,9 +30678,13 @@
         "invocation_line": 215,
         "macro": "impl_Integer_size"
       },
+      "generated_by_label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<isize as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@199",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = <$primitive as private::Sealed>::Buffer;",
       "source_evidence": {
@@ -30560,9 +30720,13 @@
         "invocation_line": 216,
         "macro": "impl_Integer_size"
       },
+      "generated_by_label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
       "item_kind": "associated_type",
       "label": "<usize as private::Sealed>::Buffer",
+      "node_category": "local_item",
       "owner": "impl@199",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "type Buffer = <$primitive as private::Sealed>::Buffer;",
       "source_evidence": {
@@ -30598,9 +30762,13 @@
         "invocation_line": 215,
         "macro": "impl_Integer_size"
       },
+      "generated_by_label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<isize as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@199",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30636,9 +30804,13 @@
         "invocation_line": 216,
         "macro": "impl_Integer_size"
       },
+      "generated_by_label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<usize as private::Sealed>::write",
+      "node_category": "local_item",
       "owner": "impl@199",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
@@ -30673,9 +30845,13 @@
         "invocation_line": 330,
         "macro": "impl_Unsigned"
       },
+      "generated_by_label": "impl_Unsigned!(u16)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u16 as Unsigned>::fmt",
+      "node_category": "local_item",
       "owner": "impl@261",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
@@ -30710,9 +30886,13 @@
         "invocation_line": 331,
         "macro": "impl_Unsigned"
       },
+      "generated_by_label": "impl_Unsigned!(u32)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u32 as Unsigned>::fmt",
+      "node_category": "local_item",
       "owner": "impl@261",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
@@ -30747,9 +30927,13 @@
         "invocation_line": 332,
         "macro": "impl_Unsigned"
       },
+      "generated_by_label": "impl_Unsigned!(u64)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u64 as Unsigned>::fmt",
+      "node_category": "local_item",
       "owner": "impl@261",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
@@ -30784,9 +30968,13 @@
         "invocation_line": 329,
         "macro": "impl_Unsigned"
       },
+      "generated_by_label": "impl_Unsigned!(u8)",
+      "in_function_body": false,
       "item_kind": "associated_function",
       "label": "<u8 as Unsigned>::fmt",
+      "node_category": "local_item",
       "owner": "impl@261",
+      "owner_kind": "impl",
       "reachable_outside_crate": false,
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {

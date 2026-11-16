@@ -151,3 +151,17 @@ It is never copied from a production run.
   call when the token is an argument substituted for a macro parameter.
 - **E7 `contains`, `implements`.** Not compared by range: the row is identified by its
   source, relation and target (one row each).
+
+## 7. REQ-RUST-044.1 — which node fields are compared (step 7.6, added 2026-11-16)
+
+- **N1.** A node is compared by its label, its category (crate root, file area, local
+  item, external name, builtin type), its item kind, the kind of its owner (crate root,
+  module, impl, trait), its file, the macro call that generates it, and whether it is
+  declared inside a function body. A node without a value has none on both sides.
+- **N2.** Not compared, because production stores no value: effective visibility,
+  reachability from outside the crate, and signature text. The expected graph keeps the
+  visibility and reachability it reads from the source. The test fails when production
+  starts to store one of the three, so that it joins the comparison then.
+- **N3.** The owner of a top-level item of the root file is the crate root; of another
+  file, the module that file is the body of (`mod u128_ext;`). A file area and the crate
+  root have no owner (OD-7).

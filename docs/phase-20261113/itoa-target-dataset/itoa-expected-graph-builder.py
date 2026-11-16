@@ -497,9 +497,29 @@ def exact_site_range(rel, site, gen, callee):
     return dict(first_token_kind="invocation" if first else "definition", first_token_start=first[0] if first else a,
                 last_token_kind="invocation" if last else "definition", last_token_end=last[1] if last else b, text=text)
 
+def owner_kind(owner):
+    """What kind of item owns the node: the top level of the root file is the crate root's body, the top level of
+    another file is a module's body (mod u128_ext;), an impl, or the owning trait or module."""
+    if owner in (None, "crate_root"): return None
+    if owner.startswith("impl@"): return "impl"
+    return {AL: "crate_root", AX: "module"}.get(owner) or nodes[owner]["item_kind"]
+
+MACRO_CALL_AT = {row["start_line"]: row["label"] for row in nodes.values() if row["item_kind"] == "macro_call"}
 node_rows = []
 for row in nodes.values():
+    if "crate_root" in row["flags"]:
+        # REQ-RUST-043.1 C1: the root module has no declaration of its own, so no file, kind, owner or visibility.
+        node_rows.append(dict(label=row["label"], item_kind=None, node_category="crate_root", external_name_kind=None,
+            source_read=True, effective_visibility=None, reachable_outside_crate=None, file="", start_line=0, end_line=0,
+            owner=None, owner_kind=None, in_function_body=False, generated_by=None, generated_by_label=None,
+            source_anchor=None, flags=row["flags"], source_evidence=None,
+            file_assignment_status="NO_SOURCE_FILE_ROOT_MODULE_NOT_DECLARED"))
+        continue
     candidate = dict(row)
+    candidate["node_category"] = "file_public_area" if row["item_kind"] == "file_public_area" else "local_item"
+    candidate["owner_kind"] = owner_kind(row["owner"])
+    candidate["in_function_body"] = candidate["owner_kind"] in ("function", "associated_function")
+    candidate["generated_by_label"] = MACRO_CALL_AT[row["generated_by"]["invocation_line"]] if row["generated_by"] else None
     candidate["source_evidence"] = source_evidence(row["file"], row["start_line"], row["source_anchor"])
     candidate["file_assignment_status"] = "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP" if row.get("generated_by") else "SOURCE_FILE_CANDIDATE"
     node_rows.append(candidate)
@@ -529,7 +549,7 @@ for label, kind in sorted(endpoints.items()):
     node_rows.append(dict(label=label, item_kind=None, node_category="external_name" if kind == "external" else "builtin_type",
         external_name_kind=external_name_kind(label) if kind == "external" else None, source_read=False,
         effective_visibility=None, reachable_outside_crate=None, file="", start_line=0, end_line=0, owner=None,
-        generated_by=None, source_anchor=None, flags=[], source_evidence=None, file_assignment_status="NO_SOURCE_FILE_NOT_READ"))
+        owner_kind=None, in_function_body=False, generated_by=None, generated_by_label=None, source_anchor=None, flags=[], source_evidence=None, file_assignment_status="NO_SOURCE_FILE_NOT_READ"))
 node_rows.sort(key=lambda row: (row["file"], row["start_line"], row["label"]))
 edge_rows.sort(key=lambda row: (row["source"], row["relation"], row["target"]))
 for row in impls:

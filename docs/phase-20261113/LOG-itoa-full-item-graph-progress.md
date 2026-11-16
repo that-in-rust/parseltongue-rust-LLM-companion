@@ -2551,3 +2551,80 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out;
   runs, workspace gates, timed release runs.
 - **Refactor:** none needed in production; the throwaway dump test is deleted.
 - **Next:** node fields in the comparison, then the worker runs.
+
+
+## Part 7 step 7.6 — nodes compared by their stored fields (2026-11-16)
+
+- **REQ:** REQ-RUST-044.1 N1 to N3 (new, part 7 section 7). Test and expected data only;
+  no production code changed, so no STUB.
+- **What changed:**
+  - Every expected node row now states its category, the kind of its owner, whether it
+    is declared in a function body, and the label of the macro call that generates it.
+  - The expected crate-root row `itoa` no longer claims a file, a kind, lines or a
+    visibility (REQ-RUST-043.1 C1); it was module-shaped before.
+  - `test_itoa_whole_graph_equality` compares, for all 151 nodes, label, category, item
+    kind, owner kind, file, generating call and the function-body flag.
+- **Measured before the test was changed (throwaway script on a production dump):** item
+  kind, file and generated-or-not agreed for all 151 nodes. The only expected row that
+  disagreed with a production value was the crate root's module shape, which C1 had
+  already decided against.
+- **Production stores no value for three fields, so they are not compared (N2):**
+  effective visibility is `Unknown` on all 88 local items, reachability and signature
+  text are absent on all 151 nodes. This is the PRD's stated scope ("unknown visibility
+  and unknown reachability are stored as unknown"). The expected graph keeps the
+  visibility it reads from the source. The test asserts production stores none of the
+  three, so a later change has to extend the comparison.
+- **Commands and results:**
+
+```text
+python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py
+  --source-root /home/ubuntu/repos/rust-tools/itoa
+  --output-directory docs/phase-20261113/itoa-target-dataset               exit 0
+python3 -m unittest docs/phase-20261113/itoa-target-dataset/test_itoa_expected_graph_rules.py
+                                                                           Ran 16 tests, OK
+cargo fmt --all --check                                                    exit 0
+cargo clippy --release -p parseltongue-cli-dispatcher-binary --all-targets -- -D warnings
+                                                                           exit 0
+CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 135.73s
+```
+
+- **Weak evidence:** the test's first failure was only the expected file lacking the new
+  fields; with the regenerated file it passed on its first run. Six changes to the
+  expected nodes file were then made one at a time; each failed the test, and the file
+  was restored by the builder:
+
+```text
+## owner kind of Buffer::new impl -> trait
+stored, not expected: Buffer::new | local_item | kind=associated_function | owner=impl | file=src/lib.rs | generated_by=none | in_function_body=false
+expected, not stored: Buffer::new | local_item | kind=associated_function | owner=trait | file=src/lib.rs | generated_by=none | in_function_body=false
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.84s
+## file of u128_ext::mulhi -> src/lib.rs
+expected, not stored: u128_ext::mulhi | local_item | kind=function | owner=module | file=src/lib.rs | generated_by=none | in_function_body=false
+stored, not expected: u128_ext::mulhi | local_item | kind=function | owner=module | file=src/u128_ext.rs | generated_by=none | in_function_body=false
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.44s
+## generating call of <u8 as Unsigned>::fmt -> impl_Unsigned!(u16)
+expected, not stored: <u8 as Unsigned>::fmt | local_item | kind=associated_function | owner=impl | file=src/lib.rs | generated_by=impl_Unsigned!(u16) | in_function_body=f
+stored, not expected: <u8 as Unsigned>::fmt | local_item | kind=associated_function | owner=impl | file=src/lib.rs | generated_by=impl_Unsigned!(u8) | in_function_body=fa
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.42s
+## category of itoa -> local_item
+stored, not expected: itoa | crate_root | kind=none | owner=none | file=none | generated_by=none | in_function_body=false
+expected, not stored: itoa | local_item | kind=none | owner=none | file=none | generated_by=none | in_function_body=false
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.23s
+## kind of DECIMAL_PAIRS static -> constant
+expected, not stored: DECIMAL_PAIRS | local_item | kind=constant | owner=crate_root | file=src/lib.rs | generated_by=none | in_function_body=false
+stored, not expected: DECIMAL_PAIRS | local_item | kind=static | owner=crate_root | file=src/lib.rs | generated_by=none | in_function_body=false
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.96s
+## in_function_body of divmod100 -> true
+stored, not expected: divmod100 | local_item | kind=function | owner=crate_root | file=src/lib.rs | generated_by=none | in_function_body=false
+expected, not stored: divmod100 | local_item | kind=function | owner=crate_root | file=src/lib.rs | generated_by=none | in_function_body=true
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 15.60s
+```
+
+- **Not compared yet:** the per-row record of an edge (how its target was chosen, the
+  text of an unresolved reason), and the range of `contains` and `implements` rows.
+- **Not done:** review by anyone but the author, the freeze, the 1, 4 and 16 worker
+  runs, workspace gates, timed release runs.
+- **Refactor:** none needed.
+- **Next:** the 1, 4 and 16 worker runs with digests, time, peak memory and store size.
