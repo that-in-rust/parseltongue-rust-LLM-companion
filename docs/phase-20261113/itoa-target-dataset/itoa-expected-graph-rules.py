@@ -3,7 +3,7 @@ import json
 from collections import Counter
 
 
-RELATION_KINDS = ("calls", "uses_type", "implements", "reexports", "contains", "derives", "imports", "reads")
+RELATION_KINDS = ("calls", "uses_type", "implements", "reexports", "contains", "derives", "imports", "reads", "generates", "expands")
 ELIGIBLE_LOCAL_ONLY = "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC"
 CANDIDATE_STATUS = "LLM_PARSED_DRAFT"
 BUILTIN_PRIMITIVES = {"bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize",
@@ -14,7 +14,7 @@ def _node_blockers(row):
     flags = set(row.get("flags", []))
     blockers = []
     visibility = row.get("effective_visibility")
-    if visibility not in {"public", "restricted_non_private", "private"}:
+    if visibility not in {"public", "restricted_non_private", "private"} and row.get("item_kind") != "macro_call":
         blockers.append("UNKNOWN_VISIBILITY")
     if row.get("generated_by"):
         blockers.extend(("OD-2_MACRO_OWNERSHIP_UNDECIDED", "MACRO_FILE_ASSIGNMENT_UNRESOLVED"))

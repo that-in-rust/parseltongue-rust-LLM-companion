@@ -137,6 +137,25 @@ for u, inv in UNS:
     impl(261, 325, "Unsigned", u, "impl Unsigned for $Unsigned", g)
     node(uf(u), "associated_function", "private", L, 263, 324, "fn fmt(self, buf: &mut Self::Buffer) -> usize {", "impl@261", gen=g, flags=[GEN])
 
+# ---------------- macro definitions and macro calls (PRD: both are nodes; a call expands its definition and generates items) ----------------
+MACRO_DEFS = (("impl_Integer", 135, 183), ("impl_Integer_size", 191, 209), ("impl_Unsigned", 259, 327))
+for name, a, b in MACRO_DEFS:
+    check(L, b, "}")
+    node(f"macro_rules! {name}", "macro_definition", "private", L, a, b, f"macro_rules! {name} {{", AL)
+# All six impl_Integer_size! calls are active: the cfg is an argument and applies to the generated impls.
+SIZE_CALLS = [(t, p, w, 211 + i) for i, (t, p, w) in enumerate(
+    (("isize", "i16", 16), ("usize", "u16", 16), ("isize", "i32", 32), ("usize", "u32", 32), ("isize", "i64", 64), ("usize", "u64", 64)))]
+MACRO_CALLS = ([("impl_Integer", f"impl_Integer!({s}, {u})", inv) for s, u, inv in PAIRS]
+    + [("impl_Integer_size", f'impl_Integer_size!({t} as {p} #[cfg(target_pointer_width = "{w}")])', inv) for t, p, w, inv in SIZE_CALLS]
+    + [("impl_Unsigned", f"impl_Unsigned!({u})", inv) for u, inv in UNS])
+generated_nodes = [n for n in nodes.values() if n["generated_by"]]
+for macro, call, inv in MACRO_CALLS:
+    node(call, "macro_call", "not_applicable", L, inv, inv, call + ";", AL)
+    edge(call, "expands", f"macro_rules! {macro}", L, inv, macro + "!(")
+    for n in generated_nodes:
+        if n["generated_by"]["invocation_line"] == inv:
+            edge(call, "generates", n["label"], L, inv, macro + "!(")
+
 # ---------------- contains: decided file areas; inherent impl ownership stays flagged ----------------
 inherent_impl_owners = {f"impl@{row['start_line']}" for row in impls if row["trait"] is None}
 for n in list(nodes.values()):
@@ -277,7 +296,7 @@ def site(f, line, anchor, kind, reason, count=1):
 for ln in (138, 139, 140): site(L, ln, "assert!(", "body_macro", "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot", 5)
 site(L, 232, "debug_assert!(", "body_macro", "depends_on_AD-1: core macro; unresolved(external_source_missing) without sysroot")
 site(L, 60, "use no_panic::no_panic;", "use", "cfg_inactive(feature no-panic off)"); site(X, 2, "use no_panic::no_panic;", "use", "cfg_inactive(feature no-panic off)")
-for ln in (211, 212, 213, 214): site(L, ln, "impl_Integer_size!(", "item_macro", "cfg_inactive(target_pointer_width is 64)")
+for ln in (211, 212, 213, 214): site(L, ln, "impl_Integer_size!(", "generated_impls", "the call is active; the two impls it generates are cfg_inactive(target_pointer_width is 64) and are not nodes")
 
 # ---------------- source evidence and candidate classifications ----------------
 for edge_row in edges.values():

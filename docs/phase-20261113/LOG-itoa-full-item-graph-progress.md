@@ -137,6 +137,42 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 15:10 IST — Part 7 step 7.2b: macro definitions, macro calls, generates and expands in the expected graph
+
+- **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed; the
+  expected graph is still an unreviewed draft.
+- **Changed:** the dataset builder, its rules file (two relation kinds added; a macro call
+  has no visibility), one unit test, and the files the builder writes. No production code.
+- **Added from the pinned source:** 3 macro definition nodes (lib.rs 135-183, 191-209,
+  259-327), 15 macro call nodes (lib.rs 185-189, 211-216, 329-332), 15 `expands` rows, 45
+  `generates` rows (one per generated item) and 18 `contains` rows. The four unresolved
+  sites at lib.rs 211-214 now say the call is active and its generated impls are inactive.
+- **Command:** the builder as in the entry below, then the unit tests: `Ran 16 tests`, `OK`.
+  Builder output: `candidate_nodes: 91`, `candidate_edges: 451`.
+- **Measured against production rows** (throwaway script, one row per distinct source,
+  relation and target):
+
+```text
+NODES expected 91 production 145 both 90
+ expected only: ['itoa']
+ production only: 55 Counter({'ExternalDefinition/None': 42, 'Builtin/None': 13})
+EDGES expected rows 451 distinct 451 | production rows 585 distinct 413
+ calls       expected  103 production   66 both   38 expected-only   65 production-only   28 (production-only unresolved 23)
+ contains    expected   88 production   88 both   88 expected-only    0 production-only    0 (production-only unresolved 0)
+ expands     expected   15 production   15 both   15 expected-only    0 production-only    0 (production-only unresolved 0)
+ generates   expected   45 production   45 both   45 expected-only    0 production-only    0 (production-only unresolved 0)
+ implements  expected   32 production   32 both   32 expected-only    0 production-only    0 (production-only unresolved 0)
+ imports     expected    4 production    4 both    4 expected-only    0 production-only    0 (production-only unresolved 0)
+ reads       expected   62 production   62 both   62 expected-only    0 production-only    0 (production-only unresolved 0)
+ uses_type   expected  102 production  101 both  101 expected-only    1 production-only    0 (production-only unresolved 0)
+```
+
+- **Open:** `calls` (65 expected rows without a production match: 60 method calls into
+  `core` and 5 `Unsigned::fmt(self.unsigned_abs(), ..)`; wait on part 7 Q1); one
+  `uses_type` row per body type (2 sites); the crate-root node `itoa` (Q2); the external and
+  builtin nodes are not yet rows of the nodes file.
+- **Next:** external and builtin node rows, then the comparison test in Rust.
+
 ### 2026-11-16 14:40 IST — Part 7 step 7.2a: expected graph re-cut for names, repeated sites and site starts
 
 - **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed; the

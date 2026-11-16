@@ -7,10 +7,10 @@
     "status": "LLM_PARSED_DRAFT"
   },
   "counts": {
-    "candidate_edges": 373,
-    "candidate_nodes": 73,
-    "eligible_edges": 30,
-    "eligible_nodes": 26
+    "candidate_edges": 451,
+    "candidate_nodes": 91,
+    "eligible_edges": 45,
+    "eligible_nodes": 44
   },
   "edges": [
     {
@@ -1429,6 +1429,621 @@
       "blockers": [],
       "candidate_status": "LLM_PARSED_DRAFT",
       "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:189:[6005, 6019]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 189
+          },
+          "line": 189,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer!(i128, u128)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer!(",
+          "byte_range": [
+            6005,
+            6019
+          ],
+          "line": 189,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:186:[5930, 5944]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 186
+          },
+          "line": 186,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer!(i16, u16)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer!(",
+          "byte_range": [
+            5930,
+            5944
+          ],
+          "line": 186,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:187:[5955, 5969]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 187
+          },
+          "line": 187,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer!(i32, u32)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer!(",
+          "byte_range": [
+            5955,
+            5969
+          ],
+          "line": 187,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:188:[5980, 5994]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 188
+          },
+          "line": 188,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer!(i64, u64)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer!(",
+          "byte_range": [
+            5980,
+            5994
+          ],
+          "line": 188,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:185:[5907, 5921]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 185
+          },
+          "line": 185,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer!(i8, u8)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer!(",
+          "byte_range": [
+            5907,
+            5921
+          ],
+          "line": 185,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:211:[6686, 6705]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer_size!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 211
+          },
+          "line": 211,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer_size!(",
+          "byte_range": [
+            6686,
+            6705
+          ],
+          "line": 211,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer_size",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:213:[6826, 6845]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer_size!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 213
+          },
+          "line": 213,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer_size!(",
+          "byte_range": [
+            6826,
+            6845
+          ],
+          "line": 213,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer_size",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:215:[6966, 6985]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer_size!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 215
+          },
+          "line": 215,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer_size!(",
+          "byte_range": [
+            6966,
+            6985
+          ],
+          "line": 215,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer_size",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:212:[6756, 6775]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer_size!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 212
+          },
+          "line": 212,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer_size!(",
+          "byte_range": [
+            6756,
+            6775
+          ],
+          "line": 212,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer_size",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:214:[6896, 6915]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer_size!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 214
+          },
+          "line": 214,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer_size!(",
+          "byte_range": [
+            6896,
+            6915
+          ],
+          "line": 214,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer_size",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:216:[7036, 7055]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Integer_size!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 216
+          },
+          "line": 216,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Integer_size!(",
+          "byte_range": [
+            7036,
+            7055
+          ],
+          "line": 216,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Integer_size",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:330:[11626, 11641]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Unsigned!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 330
+          },
+          "line": 330,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Unsigned!(u16)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Unsigned!(",
+          "byte_range": [
+            11626,
+            11641
+          ],
+          "line": 330,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Unsigned",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:331:[11647, 11662]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Unsigned!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 331
+          },
+          "line": 331,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Unsigned!(u32)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Unsigned!(",
+          "byte_range": [
+            11647,
+            11662
+          ],
+          "line": 331,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Unsigned",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:332:[11668, 11683]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Unsigned!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 332
+          },
+          "line": 332,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Unsigned!(u64)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Unsigned!(",
+          "byte_range": [
+            11668,
+            11683
+          ],
+          "line": 332,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Unsigned",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:329:[11606, 11621]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "expands",
+      "sites": [
+        {
+          "anchor": "impl_Unsigned!(",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 329
+          },
+          "line": 329,
+          "occurrence": 0
+        }
+      ],
+      "source": "impl_Unsigned!(u8)",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "impl_Unsigned!(",
+          "byte_range": [
+            11606,
+            11621
+          ],
+          "line": 329,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "macro_rules! impl_Unsigned",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
       "evidence_key": "src/lib.rs:131:[4054, 4066]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
@@ -2018,6 +2633,370 @@
       "candidate_status": "LLM_PARSED_DRAFT",
       "effective_visibility": "private",
       "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 183,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Integer",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Integer {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Integer {",
+        "byte_range": [
+          4086,
+          4113
+        ],
+        "line": 135,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 135
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 185,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i8, u8)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i8, u8);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i8, u8);",
+        "byte_range": [
+          5907,
+          5929
+        ],
+        "line": 185,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 185
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 186,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i16, u16)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i16, u16);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i16, u16);",
+        "byte_range": [
+          5930,
+          5954
+        ],
+        "line": 186,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 186
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 187,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i32, u32)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i32, u32);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i32, u32);",
+        "byte_range": [
+          5955,
+          5979
+        ],
+        "line": 187,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 187
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 188,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i64, u64)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i64, u64);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i64, u64);",
+        "byte_range": [
+          5980,
+          6004
+        ],
+        "line": 188,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 188
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 189,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i128, u128)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i128, u128);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i128, u128);",
+        "byte_range": [
+          6005,
+          6031
+        ],
+        "line": 189,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 189
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "private",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 209,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Integer_size",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Integer_size {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Integer_size {",
+        "byte_range": [
+          6033,
+          6065
+        ],
+        "line": 191,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 191
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 211,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
+        "byte_range": [
+          6686,
+          6755
+        ],
+        "line": 211,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 211
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 212,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
+        "byte_range": [
+          6756,
+          6825
+        ],
+        "line": 212,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 212
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 213,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
+        "byte_range": [
+          6826,
+          6895
+        ],
+        "line": 213,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 213
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 214,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
+        "byte_range": [
+          6896,
+          6965
+        ],
+        "line": 214,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 214
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 215,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
+        "byte_range": [
+          6966,
+          7035
+        ],
+        "line": 215,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 215
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 216,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
+        "byte_range": [
+          7036,
+          7105
+        ],
+        "line": 216,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 216
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "private",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
       "end_line": 219,
       "file": "src/lib.rs",
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
@@ -2180,6 +3159,146 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 256
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "private",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 327,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Unsigned",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Unsigned {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Unsigned {",
+        "byte_range": [
+          8713,
+          8741
+        ],
+        "line": 259,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 259
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 329,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u8)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u8);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u8);",
+        "byte_range": [
+          11606,
+          11625
+        ],
+        "line": 329,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 329
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 330,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u16)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u16);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u16);",
+        "byte_range": [
+          11626,
+          11646
+        ],
+        "line": 330,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 330
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 331,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u32)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u32);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u32);",
+        "byte_range": [
+          11647,
+          11667
+        ],
+        "line": 331,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 331
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "effective_visibility": "not_applicable",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "end_line": 332,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u64)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u64);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u64);",
+        "byte_range": [
+          11668,
+          11688
+        ],
+        "line": 332,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 332
     },
     {
       "blockers": [],

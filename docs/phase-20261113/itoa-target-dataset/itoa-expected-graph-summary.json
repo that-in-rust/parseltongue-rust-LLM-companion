@@ -4,12 +4,12 @@
     "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 119,
     "EXTERNAL_TRAIT_VISIBILITY_UNVERIFIED": 8,
     "INFERRED_CORE_DEPENDENT_CALL_UNDECIDED": 12,
-    "MACRO_FILE_ASSIGNMENT_UNRESOLVED": 328,
-    "OD-2_MACRO_OWNERSHIP_UNDECIDED": 328,
+    "MACRO_FILE_ASSIGNMENT_UNRESOLVED": 373,
+    "OD-2_MACRO_OWNERSHIP_UNDECIDED": 373,
     "OD-7_OWNERSHIP_UNDECIDED": 2,
     "OD-8_NON_FUNCTION_RULE_UNDECIDED": 58,
     "SOURCE_ITEM_IDENTITY_UNVERIFIED": 29,
-    "SOURCE_SITE_RANGE_UNVERIFIED": 75
+    "SOURCE_SITE_RANGE_UNVERIFIED": 93
   },
   "candidate_provenance": {
     "author": "Devin",
@@ -18,12 +18,12 @@
     "status": "LLM_PARSED_DRAFT"
   },
   "counts": {
-    "blocked_edges": 343,
+    "blocked_edges": 406,
     "blocked_nodes": 47,
-    "candidate_edges": 373,
-    "candidate_nodes": 73,
-    "eligible_edges": 30,
-    "eligible_nodes": 26,
+    "candidate_edges": 451,
+    "candidate_nodes": 91,
+    "eligible_edges": 45,
+    "eligible_nodes": 44,
     "impl_block_records": 33,
     "unresolved_or_inactive_sites": 10
   },
@@ -35,8 +35,10 @@
   "production_comparison_status": "NOT_RUN",
   "relation_kind_counts": {
     "calls": 103,
-    "contains": 70,
+    "contains": 88,
     "derives": 0,
+    "expands": 15,
+    "generates": 45,
     "implements": 32,
     "imports": 4,
     "reads": 62,
@@ -55,6 +57,6 @@
   "target_kind_counts": {
     "builtin": 57,
     "external": 119,
-    "node": 197
+    "node": 275
   }
 }

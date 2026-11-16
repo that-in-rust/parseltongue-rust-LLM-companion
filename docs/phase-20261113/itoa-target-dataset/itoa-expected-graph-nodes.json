@@ -9,7 +9,7 @@
   "candidate_rows_preserved": true,
   "canonical_identity_status": "SYMBOLIC_NONCANONICAL",
   "production_input": false,
-  "row_count": 73,
+  "row_count": 91,
   "rows": [
     {
       "effective_visibility": "public",
@@ -437,6 +437,31 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 131
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 183,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Integer",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Integer {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Integer {",
+        "byte_range": [
+          4086,
+          4113
+        ],
+        "line": 135,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 135
     },
     {
       "effective_visibility": "private",
@@ -1549,6 +1574,156 @@
       "start_line": 168
     },
     {
+      "effective_visibility": "not_applicable",
+      "end_line": 185,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i8, u8)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i8, u8);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i8, u8);",
+        "byte_range": [
+          5907,
+          5929
+        ],
+        "line": 185,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 185
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 186,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i16, u16)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i16, u16);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i16, u16);",
+        "byte_range": [
+          5930,
+          5954
+        ],
+        "line": 186,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 186
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 187,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i32, u32)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i32, u32);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i32, u32);",
+        "byte_range": [
+          5955,
+          5979
+        ],
+        "line": 187,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 187
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 188,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i64, u64)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i64, u64);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i64, u64);",
+        "byte_range": [
+          5980,
+          6004
+        ],
+        "line": 188,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 188
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 189,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i128, u128)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i128, u128);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i128, u128);",
+        "byte_range": [
+          6005,
+          6031
+        ],
+        "line": 189,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 189
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 209,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Integer_size",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Integer_size {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Integer_size {",
+        "byte_range": [
+          6033,
+          6065
+        ],
+        "line": 191,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 191
+    },
+    {
       "effective_visibility": "public",
       "end_line": 195,
       "file": "src/lib.rs",
@@ -1739,6 +1914,156 @@
       "start_line": 204
     },
     {
+      "effective_visibility": "not_applicable",
+      "end_line": 211,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
+        "byte_range": [
+          6686,
+          6755
+        ],
+        "line": 211,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 211
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 212,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
+        "byte_range": [
+          6756,
+          6825
+        ],
+        "line": 212,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 212
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 213,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
+        "byte_range": [
+          6826,
+          6895
+        ],
+        "line": 213,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 213
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 214,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
+        "byte_range": [
+          6896,
+          6965
+        ],
+        "line": 214,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 214
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 215,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
+        "byte_range": [
+          6966,
+          7035
+        ],
+        "line": 215,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 215
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 216,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
+        "byte_range": [
+          7036,
+          7105
+        ],
+        "line": 216,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 216
+    },
+    {
       "effective_visibility": "private",
       "end_line": 219,
       "file": "src/lib.rs",
@@ -1890,6 +2215,31 @@
     },
     {
       "effective_visibility": "private",
+      "end_line": 327,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Unsigned",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Unsigned {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Unsigned {",
+        "byte_range": [
+          8713,
+          8741
+        ],
+        "line": 259,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 259
+    },
+    {
+      "effective_visibility": "private",
       "end_line": 324,
       "file": "src/lib.rs",
       "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
@@ -2011,6 +2361,106 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 263
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 329,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u8)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u8);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u8);",
+        "byte_range": [
+          11606,
+          11625
+        ],
+        "line": 329,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 329
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 330,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u16)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u16);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u16);",
+        "byte_range": [
+          11626,
+          11646
+        ],
+        "line": 330,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 330
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 331,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u32)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u32);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u32);",
+        "byte_range": [
+          11647,
+          11667
+        ],
+        "line": 331,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 331
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 332,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u64)",
+      "owner": "area:src/lib.rs",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u64);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u64);",
+        "byte_range": [
+          11668,
+          11688
+        ],
+        "line": 332,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 332
     },
     {
       "effective_visibility": "private",

@@ -47,7 +47,7 @@ class ReferenceGraphRulesTests(unittest.TestCase):
 
     def test_relation_kinds_include_zeroes(self):
         counts = RULES.relation_counts([make_edge("a", "calls", "b", "e1")])
-        self.assertEqual({"calls", "uses_type", "implements", "reexports", "contains", "derives", "imports", "reads"}, set(counts))
+        self.assertEqual({"calls", "uses_type", "implements", "reexports", "contains", "derives", "imports", "reads", "generates", "expands"}, set(counts))
         self.assertEqual(0, counts["reexports"])
         self.assertEqual(0, counts["derives"])
 
