@@ -4,32 +4,36 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-16, production code of commit `37ea1755d`)
+## Where we are (2026-11-16, production code of commit `3a4827d01`)
 
 **Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
 1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
 passed SOP steps S1 to S4 on one frozen executable. That graph is marked `incomplete`: 133
 method calls into `core` have no target, and the expected graph was written and checked by
-one author. Not accepted: the branch head, where part 8 has changed production to name those
-calls. No SOP step has been run on it and one real-source test fails.**
+one author. Not accepted: the branch head, where part 8 names 88 of those 133 calls. Each
+named call equals its frozen expected row, checked once against the compiler. No SOP step
+has been run on the head.**
 
 ### The branch head (part 8, scope `declarations`; no SOP run)
 
 ```text
-                              accepted run   part 8 pushed   head (WIP, run once,
-                              822da80cf      7ed552478       targets not checked)
-nodes                         151            153             not counted
-edge rows                     682            682             682
-calls with a target            64 of 197      73 of 197       81 of 197
-edge rows with a target       549 of 682     558 of 682      566 of 682
-method calls into core named    0 of 133       9 of 133       17 of 133
+                              accepted run   head
+                              822da80cf      3a4827d01
+nodes                         151            153
+edge rows                     682            682
+calls with a target            64 of 197     152 of 197
+edge rows with a target       549 of 682     637 of 682
+method calls into core named    0 of 133      88 of 133   equal to the frozen rows: 88, wrong: 0
 ```
 
-- **Failing at the head:** `test_itoa_core_member_targets`. The run names 17 calls, the test
-  lists 9, and the 8 new targets are not checked against the source.
-- **Default scope at `7ed552478`:** 151 nodes and 682 edge rows, equal to the expected graph;
-  60 of 60 real-source tests passed. Not run again since.
-- **Step open:** 8.3b-2b, GREEN not closed (last two entries below).
+- **Expected targets:** all 133 are written from source and frozen
+  (`itoa-target-dataset/itoa-expected-core-member-targets.json`).
+- **Named at the head:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`.
+- **Without a target (45):** 13 `try_into`, 8 `expect`, 5 `unwrap`, 10 `ilog10`, 5 slice
+  `len`, 1 each of `str::len`, `as_mut_ptr`, `cast`, `rev`.
+- **Real-source tests:** 60 of 60 pass on the executable built from the head.
+- **Not done:** the `core` files are not in the run id; the targets are not merged into the
+  expected graph; S1 to S4 are NOT STARTED for the head.
 
 Everything from here to "What is left" describes the accepted run at `822da80cf`.
 
@@ -881,5 +885,32 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  not done    S1 to S4 for this head: NOT STARTED. 83 calls into core have no target.
              The "Where we are" page above still shows 81 of 197; it is updated with the
              next step.
+```
+
+
+## 2026-11-16 23:55 IST Part 8: a receiver that is a `static`, then fields (REQ-RUST-059.0)
+
+```text
+ spec        SPEC part 8 section 10, written before the code: S1 to S6
+ rule        a value path that the stored lookup resolved to one static of the workspace has
+             the type the static declares; each field step takes the stored field of the one
+             struct that type names (a tuple field by position, a record field by name)
+ RED         test_static_field_receiver_member failed without the production change
+ GREEN       7 fixture cases: tuple field, record field behind `&`, no field step, field then
+             index, a field removed by cfg (not stored, takes no position), a stored field
+             with an attribute (withheld), a tuple type (withheld), an unproven name (withheld)
+ real source test_itoa_core_member_targets, against the frozen expected rows
+               before   stored 50   equal 50   wrong 0   without a target 83
+               after    stored 88   equal 88   wrong 0   without a target 45
+               49 MaybeUninit<T>::write, 39 [T]::get_unchecked (all of both)
+             nodes 153, edge rows 682, calls 197; edge rows with a target 637 of 682
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, extractor and cli crates             ok
+             extractor tests                                          178 passed, 0 failed
+             real-source tests, frozen executable                     60 passed, 0 failed, 956 s
+             executable sha256 f7fc48388bdf2c49..., same before and after the run
+             not run: the workspace clippy, test and build gates
+ not built   a receiver rooted at `self` or at a parameter followed by a field
+ not done    S1 to S4 for this head: NOT STARTED. 45 calls into core have no target.
 ```
 
