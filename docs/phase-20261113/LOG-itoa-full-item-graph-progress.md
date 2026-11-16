@@ -122,6 +122,42 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 10:10 IST — Part 6 step 1c: the four imports target named external nodes
+
+- **Milestone:** itoa full item graph, part 6 step 6.1. No SOP step has passed. The graph is
+  still marked incomplete.
+- **REQ:** REQ-RUST-053.0 N1, N2, N3, N4.
+- **Measured on pinned itoa (real-source suite):** 107 nodes (was 103, as predicted), 4 of 4
+  `imports` rows with a target (was 0). The four new nodes are `core::hint`, `core::mem`,
+  `core::mem::MaybeUninit`, `core::str`; each has no file, kind or signature.
+- **What changed:**
+  - new `external-named-target-records.rs`: reads a stored external name record, builds the
+    proof record of an edge row, and gives one external node per target (`collect_external_endpoint_nodes`);
+  - `use-import-edge-records.rs`: an outcome left unresolved with `external_source_missing`
+    that carries a proved name gives an `Extracted` row to that name; without one it stays unresolved;
+  - `full-graph-checkpoint-facade.rs`: external nodes are collected from every relation, calls included.
+- **Each row carries** `external_target_proof_record`: kind of name, how the site reached it,
+  the `use` item it went through (none here), `external_source_read_flag: false`, and
+  `external_definition_path_claimed_flag: false` (the path is the written one; `core::str`
+  may be a re-export for all the read source shows).
+- **STUB:** both functions `todo!()`; `cargo test` compiled.
+- **RED:** `cargo test --release -p parseltongue-syntax-span-extractor --lib use_import`:
+  `FAILED. 1 passed; 6 failed` (`not yet implemented: REQ-RUST-053.0 N3` / `N1`).
+- **GREEN:** syntax crate library suite `127 passed; 0 failed` (was 125);
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  `48 passed; 0 failed` (211.67 s).
+- **Deliberate breaks, each failed a test at once (6):** any site proof kind accepted;
+  `builtin_member` accepted from a stored record; source-read flag true; no external nodes
+  collected; proof record dropped; proved name ignored.
+- **Weak evidence:** the real-source assertions (`test_itoa_imports_row_counts`, node count
+  107) were changed after the code and not seen failing on the old code.
+- **Dropped from the fixture test:** whole-graph validation. The import fixture graph fails
+  validation on its own (its `use` nodes have no owner kind). Node validity is covered by
+  `test_external_node_row_validation` and by the itoa run, which validates on write.
+- **Checked:** format; `cargo clippy --release` with `-D warnings` on the syntax and CLI crates: clean.
+- **Not done:** three timed release runs (taken at the end of part 6).
+- **Next:** step 6.2, calls by a written path (7 rows, 4 new nodes predicted).
+
 ### 2026-11-16 09:05 IST — Part 6 step 1b: name lookup stores the external name it proved
 
 - **Milestone:** itoa full item graph, part 6. No SOP step has passed. No itoa number changed;

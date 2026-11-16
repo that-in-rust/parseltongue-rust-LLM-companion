@@ -51,10 +51,13 @@ mod macro_argument_path_records;
 pub use impl_header_implements_records::{
     ImplHeaderEdgeError, ImplHeaderEdgeSet, resolve_impl_header_edges,
 };
+#[path = "external-named-target-records.rs"]
+mod external_named_target_records;
 #[path = "signature-type-edge-records.rs"]
 mod signature_type_edge_records;
 #[path = "use-import-edge-records.rs"]
 mod use_import_edge_records;
+pub use external_named_target_records::collect_external_endpoint_nodes;
 pub use legacy_macro_scope_records::visit_legacy_macro_scope_records;
 pub use signature_type_edge_records::{
     SignatureTypeEdgeError, collect_builtin_endpoint_nodes, resolve_signature_type_edges,

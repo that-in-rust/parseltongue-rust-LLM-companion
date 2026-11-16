@@ -5,8 +5,8 @@
 #![allow(clippy::unwrap_used)]
 
 use parseltongue_core_row_types::{
-    HldEdgeInputRecord, HldEdgeResolutionValue, HldEffectiveVisibilityKind,
-    HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
+    HldEdgeInputRecord, HldEdgeResolutionValue, HldEffectiveVisibilityKind, HldExternalNameKind,
+    HldExternalNamedKey, HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
     HldNodeInputCategory, HldNodeInputRecord, HldOwnerKindValue, HldRelationKindValue,
     HldTargetIdentityValue, HldUnresolvedReasonKind, NameSymbolTargetKey, RunCancelFlagValue,
     validate_hld_materialization_input,
@@ -2458,9 +2458,14 @@ fn test_itoa_imports_row_counts() {
         4,
         "R1: one stored outcome per use import; the 4 bound imports get none"
     );
+    // REQ-RUST-053.0 N3: name lookup still has no target, and stores the path each import writes.
     assert!(outcomes.iter().all(|row| {
         row["import_resolution_state_kind"] == "unresolved"
             && row["import_unresolved_reason_kind"] == "external_source_missing"
+            && row["import_external_name_record"]["external_name_kind"] == "crate_rooted_path"
+            && row["import_external_name_record"]["external_crate_name"] == "core"
+            && row["import_external_name_record"]["external_site_proof_kind"]
+                == "path_root_names_crate"
     }));
     let use_nodes = input
         .input_node_records
@@ -2485,20 +2490,32 @@ fn test_itoa_imports_row_counts() {
                 .and_then(|text| serde_json::from_str::<Value>(text).ok())
                 .unwrap_or(Value::Null);
             assert!(use_nodes.contains(&&edge.edge_source_reference));
+            // REQ-RUST-053.0 N1, N2, N4: the core source is not read in this run; the row
+            // targets the path the import writes and says how the site reached it.
+            let path = metadata["import_path_text"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
             assert_eq!(
                 edge.edge_resolution_value,
-                HldEdgeResolutionValue::Unresolved {
-                    reason: HldUnresolvedReasonKind::ExternalSourceMissing
-                },
-                "the core source is not read in this run"
+                HldEdgeResolutionValue::Extracted {
+                    target: HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+                        external_name_kind_value: HldExternalNameKind::CrateRootedPath,
+                        external_crate_name_value: Some("core".into()),
+                        external_item_path_text: path.clone(),
+                    })
+                }
             );
-            (
-                source[start as usize..end as usize].to_owned(),
-                metadata["import_path_text"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_owned(),
-            )
+            assert_eq!(
+                metadata["external_target_proof_record"],
+                json!({
+                    "external_name_kind":"crate_rooted_path",
+                    "external_site_proof_kind":"path_root_names_crate",
+                    "external_import_site_key":null,
+                    "external_source_read_flag":false,
+                    "external_definition_path_claimed_flag":false})
+            );
+            (source[start as usize..end as usize].to_owned(), path)
         })
         .collect::<Vec<_>>();
     rows.sort();
@@ -2510,6 +2527,30 @@ fn test_itoa_imports_row_counts() {
     ]
     .map(|(site, path)| (site.to_owned(), path.to_owned()));
     assert_eq!(rows, expected);
+    // One external node per written path, with no file, kind or signature.
+    let externals = input
+        .input_node_records
+        .iter()
+        .filter(|node| node.node_input_category == HldNodeInputCategory::ExternalDefinition)
+        .collect::<Vec<_>>();
+    assert!(externals.iter().all(|node| {
+        node.node_item_kind_value.is_none()
+            && node.node_source_relative_path.is_none()
+            && node.node_signature_text.is_none()
+    }));
+    assert_eq!(
+        externals
+            .iter()
+            .map(|node| node.node_qualified_path_text.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "core::hint",
+            "core::mem",
+            "core::mem::MaybeUninit",
+            "core::str"
+        ]
+    );
+    assert_eq!(input.input_node_records.len(), 107);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -2719,7 +2760,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 103);
+    assert_eq!(input.input_node_records.len(), 107);
     let area = input
         .input_node_records
         .iter()
@@ -3009,8 +3050,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 103);
-    assert_eq!(labels.len(), 103, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 107);
+    assert_eq!(labels.len(), 107, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"

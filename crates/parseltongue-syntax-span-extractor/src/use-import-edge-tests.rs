@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use super::*;
+use crate::collect_external_endpoint_nodes;
 use crate::original_call_resolution_records::original_call_resolution_tests::{
     OriginalCallFixtureStore, make_call_fixture_graph, make_call_fixture_occurrence,
     make_call_fixture_row, make_call_fixture_scope, make_call_fixture_unit,
@@ -24,6 +25,8 @@ struct ImportFixtureRequest {
     kind: &'static str,
     state: &'static str,
     chain: &'static [u8],
+    /// The external name record stored on the outcome row, as (crate, path, site proof).
+    external: Option<(&'static str, &'static str, &'static str)>,
 }
 
 const PLAIN: ImportFixtureRequest = ImportFixtureRequest {
@@ -35,6 +38,7 @@ const PLAIN: ImportFixtureRequest = ImportFixtureRequest {
     kind: "Import",
     state: "resolved",
     chain: &[],
+    external: None,
 };
 
 /// A call fixture graph of `source` (which must declare `struct Buffer`) with
@@ -116,13 +120,22 @@ fn make_import_fixture_graph(
         if request.state == "no-outcome" {
             continue;
         }
+        let mut outcome = json!({"import_site_occurrence_key":site,
+            "import_resolution_state_kind":state,
+            "import_unresolved_reason_kind":reason,
+            "import_target_symbol_rows":targets,
+            "import_candidate_target_rows":[]});
+        if let Some((crate_name, path, proof)) = request.external {
+            outcome["import_external_name_record"] = json!({
+                "external_name_kind":"crate_rooted_path",
+                "external_crate_name":crate_name,
+                "external_item_path_text":path,
+                "external_site_proof_kind":proof,
+                "external_import_site_key":null});
+        }
         extra.push(make_call_fixture_row(
             "import-resolution-site-records",
-            json!({"import_site_occurrence_key":site,
-                "import_resolution_state_kind":state,
-                "import_unresolved_reason_kind":reason,
-                "import_target_symbol_rows":targets,
-                "import_candidate_target_rows":[]}),
+            outcome,
         ));
     }
     store.rows.lock().unwrap().extend(extra);
@@ -156,10 +169,12 @@ fn read_import_fixture_edges(
         run(),
         "REQ-RUST-049.0 R12: the same rows give the same edges"
     );
+    let externals = collect_external_endpoint_nodes(&set.import_edge_input_records);
     let name = |target: &HldTargetIdentityValue| {
         input
             .input_node_records
             .iter()
+            .chain(&externals)
             .find(|node| &node.node_target_reference == target)
             .unwrap()
             .node_qualified_path_text
@@ -224,6 +239,174 @@ fn row(
         path.into(),
         alias.map(str::to_owned),
     )
+}
+
+/// REQ-RUST-053.0 N1, N2, N4: an import whose stored outcome proves an external name targets
+/// one external node per written path; the row keeps how the site reached the name. An
+/// outcome with the same reason and no proved name stays unresolved.
+#[test]
+fn test_external_import_names_target() {
+    let source = "struct Buffer; use core::mem::{self, MaybeUninit}; use core::mem as m; use core::str; fn caller() { loop {} }";
+    let proof = "path_root_names_crate";
+    let (store, input) = make_import_fixture_graph(
+        source,
+        &[
+            ImportFixtureRequest {
+                site: "self",
+                segments: &["core", "mem", "self"],
+                state: "external_source_missing",
+                external: Some(("core", "core::mem", proof)),
+                ..PLAIN
+            },
+            ImportFixtureRequest {
+                site: "MaybeUninit",
+                segments: &["core", "mem", "MaybeUninit"],
+                state: "external_source_missing",
+                external: Some(("core", "core::mem::MaybeUninit", proof)),
+                ..PLAIN
+            },
+            ImportFixtureRequest {
+                site: "core::mem as m",
+                segments: &["core", "mem"],
+                alias: Some("m"),
+                state: "external_source_missing",
+                external: Some(("core", "core::mem", proof)),
+                ..PLAIN
+            },
+            ImportFixtureRequest {
+                site: "core::str",
+                segments: &["core", "str"],
+                state: "external_source_missing",
+                ..PLAIN
+            },
+        ],
+    );
+    let (edges, skipped) = read_import_fixture_edges(source, &store, &input);
+    assert_eq!(
+        edges,
+        [
+            row(
+                "use core::mem::{self, MaybeUninit};",
+                "core::mem",
+                "self",
+                "core::mem",
+                None
+            ),
+            row(
+                "use core::mem::{self, MaybeUninit};",
+                "core::mem::MaybeUninit",
+                "MaybeUninit",
+                "core::mem::MaybeUninit",
+                None
+            ),
+            row(
+                "use core::mem as m;",
+                "core::mem",
+                "core::mem as m",
+                "core::mem",
+                Some("m")
+            ),
+            row(
+                "use core::str;",
+                "unresolved:ExternalSourceMissing",
+                "core::str",
+                "core::str",
+                None
+            ),
+        ]
+    );
+    assert_eq!(skipped, [0, 0, 0]);
+    let set = resolve_use_import_edges(
+        &store,
+        &make_call_fixture_scope(),
+        &input,
+        &RunCancelFlagValue::default(),
+    )
+    .unwrap();
+    let key = |path: &str| {
+        HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+            external_name_kind_value: HldExternalNameKind::CrateRootedPath,
+            external_crate_name_value: Some("core".into()),
+            external_item_path_text: path.into(),
+        })
+    };
+    // Two sites that write `core::mem` share one node.
+    let nodes = collect_external_endpoint_nodes(&set.import_edge_input_records);
+    assert_eq!(
+        nodes
+            .iter()
+            .map(|node| node.node_target_reference.clone())
+            .collect::<Vec<_>>(),
+        [key("core::mem"), key("core::mem::MaybeUninit")]
+    );
+    assert!(nodes.iter().all(|node| {
+        node.node_input_category == HldNodeInputCategory::ExternalDefinition
+            && node.node_item_kind_value.is_none()
+            && node.node_source_relative_path.is_none()
+            && node.node_signature_text.is_none()
+    }));
+    for edge in &set.import_edge_input_records {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        let extracted = matches!(
+            edge.edge_resolution_value,
+            HldEdgeResolutionValue::Extracted { .. }
+        );
+        assert_eq!(
+            metadata.get("external_target_proof_record"),
+            extracted
+                .then(|| json!({
+                    "external_name_kind":"crate_rooted_path",
+                    "external_site_proof_kind":proof,
+                    "external_import_site_key":null,
+                    "external_source_read_flag":false,
+                    "external_definition_path_claimed_flag":false}))
+                .as_ref()
+        );
+    }
+}
+
+/// REQ-RUST-053.0 N3: a stored external name record that cannot be read is a typed error.
+#[test]
+fn test_external_record_fields_checked() {
+    let source = "struct Buffer; use core::str; fn caller() { loop {} }";
+    for (field, value) in [
+        ("external_name_kind", json!("builtin_member")),
+        ("external_name_kind", json!(null)),
+        ("external_item_path_text", json!(7)),
+        ("external_crate_name", json!(7)),
+        ("external_site_proof_kind", json!("guess")),
+    ] {
+        let (store, input) = make_import_fixture_graph(
+            source,
+            &[ImportFixtureRequest {
+                site: "core::str",
+                segments: &["core", "str"],
+                state: "external_source_missing",
+                external: Some(("core", "core::str", "path_root_names_crate")),
+                ..PLAIN
+            }],
+        );
+        for row in store.rows.lock().unwrap().iter_mut() {
+            if row.stage_owned_table_name == "import-resolution-site-records" {
+                let mut outcome: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+                outcome["import_external_name_record"][field] = value.clone();
+                row.stage_row_payload_text = outcome.to_string();
+            }
+        }
+        assert!(
+            matches!(
+                resolve_use_import_edges(
+                    &store,
+                    &make_call_fixture_scope(),
+                    &input,
+                    &RunCancelFlagValue::default()
+                ),
+                Err(UseImportEdgeError::InvalidEvidence { field: found }) if found == field
+            ),
+            "{field} {value}"
+        );
+    }
 }
 
 /// REQ-RUST-049.0 R2 R3 R6 R7

@@ -1,3 +1,4 @@
+use crate::external_named_target_records::decode_external_name_record;
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -119,13 +120,24 @@ pub fn resolve_use_import_edges(
             "import_kind":"use_path",
             "import_path_text":read_import_path_text(&request)?,
             "import_alias_text":request["import_binding_alias_text"]
-        })
-        .to_string();
+        });
         set.import_edge_input_records.extend(
             resolve_import_outcome_targets(outcome, &context, &endpoints)?
                 .into_iter()
-                .map(|resolution| {
-                    build_import_edge_record(input, source, &site, resolution, &metadata)
+                .map(|(resolution, proof)| {
+                    // REQ-RUST-053.0 N4: a row to a named external target says how its
+                    // site reached the name.
+                    let mut metadata = metadata.clone();
+                    if let Some(proof) = proof {
+                        metadata["external_target_proof_record"] = proof;
+                    }
+                    build_import_edge_record(
+                        input,
+                        source,
+                        &site,
+                        resolution,
+                        &metadata.to_string(),
+                    )
                 }),
         );
     }
@@ -240,21 +252,38 @@ fn read_import_path_text(request: &Value) -> Result<String, UseImportEdgeError> 
 }
 
 /// What one stored import outcome gives: one extracted resolution per
-/// distinct target that is a graph node, or one unresolved resolution with
-/// one reason.
+/// distinct target that is a graph node, or one extracted resolution to the
+/// external name the outcome proved (with its proof record), or one
+/// unresolved resolution with one reason.
 fn resolve_import_outcome_targets(
     outcome: &Value,
     context: &ImplHeaderSourceContext<'_>,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
-) -> Result<Vec<HldEdgeResolutionValue>, UseImportEdgeError> {
-    let unresolved = |reason| Ok(vec![HldEdgeResolutionValue::Unresolved { reason }]);
+) -> Result<Vec<(HldEdgeResolutionValue, Option<Value>)>, UseImportEdgeError> {
+    let unresolved = |reason| Ok(vec![(HldEdgeResolutionValue::Unresolved { reason }, None)]);
     match outcome["import_resolution_state_kind"].as_str() {
         Some("resolved") => {}
         Some("ambiguous") => return unresolved(HldUnresolvedReasonKind::AmbiguousTarget),
         Some("unresolved") => {
             return unresolved(match outcome["import_unresolved_reason_kind"].as_str() {
                 None => HldUnresolvedReasonKind::MissingTarget,
-                Some("external_source_missing") => HldUnresolvedReasonKind::ExternalSourceMissing,
+                Some("external_source_missing") => {
+                    // REQ-RUST-053.0 N1: the source is absent, and the name is proved.
+                    if let Some(named) =
+                        decode_external_name_record(&outcome["import_external_name_record"])
+                            .map_err(|error| UseImportEdgeError::InvalidEvidence {
+                                field: error.0,
+                            })?
+                    {
+                        return Ok(vec![(
+                            HldEdgeResolutionValue::Extracted {
+                                target: named.external_target_identity_value,
+                            },
+                            Some(named.external_proof_metadata_value),
+                        )]);
+                    }
+                    HldUnresolvedReasonKind::ExternalSourceMissing
+                }
                 Some("cfg_inactive") => HldUnresolvedReasonKind::CfgInactive,
                 Some("trait_solver_needed") => HldUnresolvedReasonKind::TraitSolverNeeded,
                 Some(_) => HldUnresolvedReasonKind::Other,
@@ -284,6 +313,6 @@ fn resolve_import_outcome_targets(
     }
     Ok(targets
         .into_iter()
-        .map(|target| HldEdgeResolutionValue::Extracted { target })
+        .map(|target| (HldEdgeResolutionValue::Extracted { target }, None))
         .collect())
 }

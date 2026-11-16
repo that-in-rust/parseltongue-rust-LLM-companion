@@ -70,6 +70,7 @@ pub(crate) fn publish_full_graph_checkpoint(
         cancel,
     )
     .map_err(map_full_graph_error)?;
+    let call_count = calls.len();
     let (type_use_count, implements_count) =
         (type_uses.len(), implements.implements_edge_records.len());
     let read_count = reads.read_edge_input_records.len();
@@ -81,6 +82,11 @@ pub(crate) fn publish_full_graph_checkpoint(
     input
         .input_node_records
         .extend(parseltongue_syntax_span_extractor::collect_builtin_endpoint_nodes(&semantic));
+    // REQ-RUST-053.0 N1: one node per named external target, shared by every relation.
+    semantic.extend(calls);
+    input
+        .input_node_records
+        .extend(parseltongue_syntax_span_extractor::collect_external_endpoint_nodes(&semantic));
     input.input_node_records.sort();
     let count_structural_relation_rows = |relation| {
         input
@@ -97,7 +103,7 @@ pub(crate) fn publish_full_graph_checkpoint(
             parseltongue_core_row_types::HldRelationKindValue::Generates
         ),
         count_structural_relation_rows(parseltongue_core_row_types::HldRelationKindValue::Expands),
-        calls.len(),
+        call_count,
         resolved,
         type_use_count,
         implements_count,
@@ -109,7 +115,6 @@ pub(crate) fn publish_full_graph_checkpoint(
         imports.imports_in_expanded_items,
         imports.imports_without_source
     );
-    input.input_edge_records.extend(calls);
     input.input_edge_records.extend(semantic);
     input.input_edge_records.sort();
     input.input_edge_records.dedup();
