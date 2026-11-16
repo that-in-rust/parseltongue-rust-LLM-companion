@@ -322,8 +322,9 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   `--sysroot-source-scope-kind excluded`. Paths into `core` that itoa's source proves are
   built as named external targets (47 nodes).
 - **Rows depend on the source directory.** Two copies of the pinned source in different
-  directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause
-  not found.
+  directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause:
+  the store's file identity is the absolute path, and the run id hashes those rows. Not
+  fixed.
 - **Enum variants and struct fields:** nodes, or evidence only.
 - **File module and file area:** how a file's module node relates to its file-area node.
 - **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for

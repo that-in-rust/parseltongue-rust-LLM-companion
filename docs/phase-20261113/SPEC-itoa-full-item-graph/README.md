@@ -26,6 +26,7 @@ part  file                                       requirements                   
 5     part-5-macro-generated-items.md            046.0                          5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
 7     part-7-whole-graph-acceptance.md           044.0 to 044.3                 acceptance run passed S1 to S4 on 2026-11-16 (log)
+8     part-8-method-calls-into-core.md           054.0 to 056.0 (reserved)      measured and designed; nothing built
 ```
 
 MET means the part's real-source tests pass on pinned itoa (11 of 11 at commit `15643ec4f`).

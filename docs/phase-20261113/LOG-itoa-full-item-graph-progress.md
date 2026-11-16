@@ -96,7 +96,8 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 - **Struct fields and enum variants are not nodes** (open in the PRD).
 - **Reading the sysroot** did not finish in 2,400 s on 2026-11-13; itoa runs exclude it.
 - **Rows depend on the source directory.** Two copies of the pinned source in different
-  directories store different run ids and macro-expansion ids. Cause not found.
+  directories store different run ids and macro-expansion ids. Cause: the store's file
+  identity is the absolute path, and the run id hashes those rows. Not fixed.
 - **Only itoa has been run** in this phase. Other repositories and higher-level tables are
   out of scope.
 
@@ -234,3 +235,18 @@ workers  wall s  peak MB  store bytes  nodes  edges
   `run-s4.sh` (not in the repository); they run the SOP commands with
   `--sysroot-source-scope-kind excluded`.
 - **codebase-memory:** re-indexed after this entry; no query was needed for the run.
+
+### Part 8 step 8.0 — measurement for the 133 method calls (2026-11-16)
+
+- **Asked by the user:** resolve the 133 method calls without a target.
+- **Measured, no production change:** the table, the failing sysroot run (170.94 s,
+  1,555.9 MB, store copy mismatch) and the syntax-only scan of `core` (0.27 s, 22 MB) are in
+  [part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md), sections 1 to 3.
+- **Decision:** build a syntax-only list of the methods `core` declares, the receiver's
+  type from itoa's source, and Rust's lookup order over both (steps 8.1 to 8.6). Rejected:
+  fixing the full sysroot run first; it would still need type inference, which is not
+  built.
+- **Source-directory dependence:** cause found (absolute path in the file identity); not
+  fixed.
+- **Acceptance:** the run of 2026-11-16 stays valid until the first production change of
+  step 8.1.
