@@ -615,6 +615,16 @@ fn test_capture_generic_receiver_evidence() {
                 "span_byte_end_offset":42,
                 "type_source_text":"I",
             },
+            // REQ-RUST-055.0 R2
+            "receiver_place_step_rows":[{
+                "place_step_kind":"parameter_identifier",
+                "receiver_declared_name_value":"i",
+                "receiver_written_type_evidence":{
+                    "span_byte_start_offset":41,
+                    "span_byte_end_offset":42,
+                    "type_source_text":"I",
+                },
+            }],
         })
     );
 }

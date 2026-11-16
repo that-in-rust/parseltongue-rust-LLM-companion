@@ -348,3 +348,24 @@ REFACTOR none needed: one function of five lines
 NOT RUN the real-source itoa tests and the workspace tests
 NEXT   8.2b: fields, statics and index expressions (R2)
 ```
+
+## TDD entry — step 8.2b, the receiver as a place (REQ-RUST-055.0 R2, R3, R4)
+
+```text
+STUB   read_receiver_place_steps(receiver, call, input, removed) -> Option<Vec<Value>>, body todo!();
+       new key receiver_place_step_rows on the method receiver record
+RED    cargo test --release -p parseltongue-syntax-span-extractor test_field_and_static_receivers
+       1 selected: FAILED, "not yet implemented: REQ-RUST-055.0 R2"
+GREEN  steps, base first: parameter_identifier (with its written type), self_value, value_path
+       (text and range), then field_access (name) and index_access (is the index a range).
+       Any other expression, a local, a closure parameter, a rebound name: no rows.
+       test_field_and_static_receivers ok; crate 143 passed, 0 failed
+BREAKS rebinding ignored            -> FAILED (left None, right Some([parameter.., index_access:false]))
+       range index not flagged      -> FAILED (index_access:true expected, false stored)
+       any expression is a base     -> FAILED (make().f.len(): left None, right Some([self_value, field_access:f]))
+GATES  cargo fmt --check and clippy --all-targets -D warnings pass on the crate
+REFACTOR none
+WEAK   the RED run failed on the stub only; no run with an empty result was made
+NOT RUN the real-source itoa tests and the workspace tests
+NEXT   8.3a: the probe over the declaration table
+```

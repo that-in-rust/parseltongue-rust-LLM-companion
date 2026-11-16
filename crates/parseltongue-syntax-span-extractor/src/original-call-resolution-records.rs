@@ -1532,7 +1532,99 @@ fn extract_method_receiver_syntax(
         "receiver_generic_owner_kind":owner,
         "receiver_rebinding_flag":rebound,
         "receiver_written_type_evidence":if rebound { None } else { written },
+        "receiver_place_step_rows":call
+            .receiver()
+            .and_then(|receiver| read_receiver_place_steps(&receiver, call, input, removed)),
     })
+}
+
+/// REQ-RUST-055.0 R2: the receiver as a place, base first: a parameter, `self` or a value
+/// path, then each field and index taken of it. `None` for any other expression, and for
+/// a base name the body may rebind (R4).
+fn read_receiver_place_steps(
+    receiver: &ast::Expr,
+    call: &ast::MethodCallExpr,
+    input: &SyntaxFileInputData,
+    removed: &[usize],
+) -> Option<Vec<Value>> {
+    match receiver {
+        ast::Expr::ParenExpr(inner) => {
+            read_receiver_place_steps(&inner.expr()?, call, input, removed)
+        }
+        ast::Expr::FieldExpr(field) => {
+            let name = field.name_ref()?.text().trim_start_matches("r#").to_owned();
+            let mut steps = read_receiver_place_steps(&field.expr()?, call, input, removed)?;
+            steps.push(json!({"place_step_kind":"field_access", "field_declared_name_value":name}));
+            Some(steps)
+        }
+        ast::Expr::IndexExpr(index) => {
+            let mut written = index.index()?;
+            while let ast::Expr::ParenExpr(inner) = &written {
+                written = inner.expr()?;
+            }
+            let mut steps = read_receiver_place_steps(&index.base()?, call, input, removed)?;
+            steps.push(json!({"place_step_kind":"index_access",
+                "index_range_expression_flag":matches!(written, ast::Expr::RangeExpr(_))}));
+            Some(steps)
+        }
+        ast::Expr::PathExpr(expr) => {
+            let path = expr.path()?;
+            let function = call.syntax().ancestors().find_map(ast::Fn::cast);
+            let own_self = path.qualifier().is_none()
+                && path.segment()?.self_token().is_some()
+                && function
+                    .as_ref()
+                    .and_then(|function| function.param_list()?.self_param())
+                    .is_some();
+            if own_self {
+                return Some(vec![json!({"place_step_kind":"self_value"})]);
+            }
+            let name = read_single_segment_name(&path);
+            let parameter = name
+                .as_deref()
+                .zip(function.as_ref())
+                .and_then(|(name, function)| find_named_function_parameter(function, name));
+            // R4: a name the body binds, or one bound by a parameter pattern, is not read.
+            let bound = name
+                .as_deref()
+                .zip(function.as_ref())
+                .is_some_and(|(name, function)| {
+                    check_receiver_name_rebound(function, call, name)
+                        || (parameter.is_none()
+                            && function.param_list().is_some_and(|list| {
+                                list.syntax().descendants().any(|node| {
+                                    node.kind() == SyntaxKind::IDENT_PAT
+                                        && node.children().filter_map(ast::Name::cast).any(
+                                            |found| found.text().trim_start_matches("r#") == name,
+                                        )
+                                })
+                            }))
+                });
+            if bound || path.segment()?.self_token().is_some() {
+                return None;
+            }
+            match (parameter, name) {
+                (Some(parameter), Some(name)) => Some(vec![json!({
+                    "place_step_kind":"parameter_identifier",
+                    "receiver_declared_name_value":name,
+                    "receiver_written_type_evidence":
+                        read_parameter_written_type(&parameter, input, removed)?,
+                })]),
+                _ => {
+                    let range = path.syntax().text_range();
+                    let start = restore_source_byte_offset(range.start(), removed);
+                    let end = restore_source_byte_offset(range.end(), removed);
+                    let text =
+                        std::str::from_utf8(input.file_source_content_bytes.get(start..end)?)
+                            .ok()?;
+                    Some(vec![json!({"place_step_kind":"value_path",
+                        "span_byte_start_offset":start, "span_byte_end_offset":end,
+                        "path_source_text":text})])
+                }
+            }
+        }
+        _ => None,
+    }
 }
 
 /// REQ-RUST-055.0 R1: the type a parameter declares, as written, with its range in the
