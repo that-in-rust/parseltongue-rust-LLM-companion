@@ -5052,3 +5052,254 @@ fn test_external_name_shadow_cases() {
         ]
     );
 }
+
+/// What the expected graph files call a production node.
+fn derive_expected_graph_label(node: &HldNodeInputRecord) -> String {
+    let path = node.node_qualified_path_text.as_str();
+    match node.node_input_category {
+        HldNodeInputCategory::FilePublicArea => format!(
+            "area:{}",
+            node.node_source_relative_path
+                .as_deref()
+                .unwrap_or_default()
+        ),
+        HldNodeInputCategory::Builtin | HldNodeInputCategory::ExternalDefinition => {
+            path.to_string()
+        }
+        _ => {
+            let local = path
+                .strip_prefix("itoa::src/u128_ext.rs::")
+                .map(|rest| format!("u128_ext::{rest}"))
+                .or_else(|| path.strip_prefix("itoa::src/lib.rs::").map(str::to_string))
+                .unwrap_or_else(|| path.to_string());
+            if local.starts_with("const _ #") {
+                local.replace("!(", "(").replace(", ", ",")
+            } else if node.node_item_kind_value == Some(HldItemKindValue::MacroDefinition) {
+                format!("macro_rules! {local}")
+            } else {
+                local
+            }
+        }
+    }
+}
+
+fn convert_camel_snake_text(name: &str) -> String {
+    name.chars()
+        .enumerate()
+        .fold(String::new(), |mut text, (index, letter)| {
+            if letter.is_uppercase() && index > 0 {
+                text.push('_');
+            }
+            text.extend(letter.to_lowercase());
+            text
+        })
+}
+
+fn read_expected_graph_rows(name: &str) -> Vec<Value> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/phase-20261113/itoa-target-dataset")
+        .join(name);
+    let value: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    value["rows"].as_array().unwrap().clone()
+}
+
+/// `contains` and `implements` rows are one row per source, relation and target: most
+/// of their production rows carry no source line.
+fn check_relation_site_compared(relation: &str) -> bool {
+    !matches!(relation, "contains" | "implements")
+}
+
+/// One text row per expected site: source, relation, target, and for a compared site
+/// the file, the line of its first token and whether that token is written in the
+/// macro definition or in the macro call.
+fn collect_expected_graph_rows() -> Vec<String> {
+    let mut rows = read_expected_graph_rows("itoa-expected-graph-edges.json")
+        .iter()
+        .flat_map(|edge| {
+            let relation = edge["relation"].as_str().unwrap().to_string();
+            let target = match edge["target_kind"].as_str() {
+                Some("unresolved") => format!(
+                    "{} [{}]",
+                    edge["target"].as_str().unwrap(),
+                    edge["unresolved_reason"].as_str().unwrap()
+                ),
+                _ => edge["target"].as_str().unwrap().to_string(),
+            };
+            let head = format!(
+                "{} --{relation}--> {target}",
+                edge["source"].as_str().unwrap()
+            );
+            if !check_relation_site_compared(&relation) {
+                return vec![head];
+            }
+            edge["sites"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|site| {
+                    format!(
+                        "{head} @ {}:{} {}",
+                        site["file"].as_str().unwrap(),
+                        site["first_token"]["line"].as_u64().unwrap(),
+                        site["first_token"]["kind"].as_str().unwrap()
+                    )
+                })
+                .collect()
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    rows
+}
+
+/// The same text rows from what production stores.
+fn collect_production_graph_rows(
+    root: &Path,
+    input: &HldMaterializationInputRecord,
+    labels: &std::collections::BTreeMap<&HldTargetIdentityValue, String>,
+) -> Vec<String> {
+    let read_line_number = |file: &str, start: u64| {
+        fs::read_to_string(root.join(file))
+            .map(|text| 1 + text[..start as usize].matches('\n').count())
+            .unwrap_or(0)
+    };
+    let read_node_label = |identity: &HldTargetIdentityValue| {
+        labels
+            .get(identity)
+            .cloned()
+            .unwrap_or_else(|| format!("no node for {identity:?}"))
+    };
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .map(|edge| {
+            let metadata: Value = edge
+                .edge_dispatch_metadata_text
+                .as_deref()
+                .map(|text| serde_json::from_str(text).unwrap())
+                .unwrap_or(Value::Null);
+            let relation =
+                convert_camel_snake_text(&format!("{:?}", edge.edge_relation_kind_value));
+            let target = match &edge.edge_resolution_value {
+                HldEdgeResolutionValue::Extracted { target } => read_node_label(target),
+                HldEdgeResolutionValue::Unresolved { reason } => format!(
+                    "unresolved .{} [{}]",
+                    metadata["callee_source_text"].as_str().unwrap_or("?"),
+                    convert_camel_snake_text(&format!("{reason:?}"))
+                ),
+                other => format!("not extracted: {other:?}"),
+            };
+            let head = format!(
+                "{} --{relation}--> {target}",
+                read_node_label(&edge.edge_source_reference)
+            );
+            if !check_relation_site_compared(&relation) {
+                return head;
+            }
+            let origin = &metadata["expansion_source_origin"]["site_first_token_origin"];
+            let (file, start, kind) = if origin.is_object() {
+                (
+                    origin["token_source_relative_path"]
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                    origin["token_source_byte_range"][0].as_u64().unwrap(),
+                    origin["token_source_origin_kind"]
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                )
+            } else {
+                let site = edge
+                    .edge_evidence_row_key
+                    .evidence_site_occurrence_key
+                    .read_semantic_occurrence_parts();
+                (
+                    site.span_source_file_path.to_string(),
+                    site.span_byte_range_value.read_source_range_pair().0,
+                    "definition".to_string(),
+                )
+            };
+            format!("{head} @ {file}:{} {kind}", read_line_number(&file, start))
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    rows
+}
+
+/// REQ-RUST-044.0: every node and every edge row production stores for pinned itoa is
+/// a row of the expected graph files, and every expected row is stored. A site is
+/// compared by the line of its first token, not yet by byte range.
+#[test]
+fn test_itoa_whole_graph_equality() {
+    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let labels = input
+        .input_node_records
+        .iter()
+        .map(|node| {
+            (
+                &node.node_target_reference,
+                derive_expected_graph_label(node),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let stored_nodes = labels
+        .values()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        stored_nodes.len(),
+        input.input_node_records.len(),
+        "two production nodes share one expected label"
+    );
+    let expected_nodes = read_expected_graph_rows("itoa-expected-graph-nodes.json")
+        .iter()
+        .map(|node| node["label"].as_str().unwrap().to_string())
+        .collect::<std::collections::BTreeSet<_>>();
+    let expected_rows = collect_expected_graph_rows();
+    let stored_rows = collect_production_graph_rows(&root, &input, &labels);
+    let count_row_copies = |rows: &[String]| {
+        rows.iter()
+            .fold(std::collections::BTreeMap::new(), |mut counts, row| {
+                *counts.entry(row.clone()).or_insert(0_i64) += 1;
+                counts
+            })
+    };
+    let (expected_counts, stored_counts) = (
+        count_row_copies(&expected_rows),
+        count_row_copies(&stored_rows),
+    );
+    let differing_rows = expected_counts
+        .keys()
+        .chain(stored_counts.keys())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|row| {
+            let expected = expected_counts.get(row).copied().unwrap_or(0);
+            let stored = stored_counts.get(row).copied().unwrap_or(0);
+            (expected != stored).then(|| format!("expected {expected} stored {stored}: {row}"))
+        })
+        .collect::<Vec<_>>();
+    let differing_nodes = expected_nodes
+        .symmetric_difference(&stored_nodes)
+        .map(|label| {
+            let side = if expected_nodes.contains(label) {
+                "expected, not stored"
+            } else {
+                "stored, not expected"
+            };
+            format!("{side}: {label}")
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        differing_nodes.is_empty() && differing_rows.is_empty(),
+        "nodes expected {} stored {}; edge rows expected {} stored {}\n{} differing nodes:\n{}\n{} differing edge rows:\n{}",
+        expected_nodes.len(),
+        stored_nodes.len(),
+        expected_rows.len(),
+        stored_rows.len(),
+        differing_nodes.len(),
+        differing_nodes.join("\n"),
+        differing_rows.len(),
+        differing_rows.join("\n")
+    );
+}

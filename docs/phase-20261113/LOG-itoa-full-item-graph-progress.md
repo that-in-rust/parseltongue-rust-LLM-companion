@@ -137,6 +137,56 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 16:40 IST — Part 7 step 7.1 RED: `test_itoa_whole_graph_equality`
+
+- **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed.
+- **Phase:** RED. The test is committed failing; it is the acceptance loop for the rest of
+  part 7. The workspace test gate is red until the rows below are built.
+- **Test:** `test_itoa_whole_graph_equality` in
+  `crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs`. It runs
+  the pipeline on pinned itoa, reads the expected graph files, and lists every node and
+  every edge row that is on one side only.
+- **What it compares:** node labels; `contains` and `implements` by source, relation and
+  target; every other relation per site by file, line of the first token, and whether
+  that token is written in the macro definition or the macro call; an unresolved row by
+  callee name and reason.
+- **What it does not compare yet:** byte ranges, node kinds and visibility, the fields of
+  an unresolved row beyond its reason.
+- **Command:** `CARGO_BUILD_JOBS=2 cargo test -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests test_itoa_whole_graph_equality`
+
+```text
+nodes expected 152 stored 145; edge rows expected 587 stored 585
+7 differing nodes:
+expected, not stored: i128::unsigned_abs
+expected, not stored: i16::unsigned_abs
+expected, not stored: i32::unsigned_abs
+expected, not stored: i64::unsigned_abs
+expected, not stored: i8::unsigned_abs
+expected, not stored: itoa
+expected, not stored: str::len
+14 differing edge rows:
+expected 1 stored 0: <i128 as private::Sealed>::write --calls--> i128::unsigned_abs @ src/lib.rs:171 definition
+expected 0 stored 1: <i128 as private::Sealed>::write --calls--> unresolved .unsigned_abs [trait_solver_needed] @ src/lib.rs:171 definition
+expected 1 stored 0: <i16 as private::Sealed>::write --calls--> i16::unsigned_abs @ src/lib.rs:171 definition
+expected 0 stored 1: <i16 as private::Sealed>::write --calls--> unresolved .unsigned_abs [trait_solver_needed] @ src/lib.rs:171 definition
+expected 1 stored 0: <i32 as private::Sealed>::write --calls--> i32::unsigned_abs @ src/lib.rs:171 definition
+expected 0 stored 1: <i32 as private::Sealed>::write --calls--> unresolved .unsigned_abs [trait_solver_needed] @ src/lib.rs:171 definition
+expected 1 stored 0: <i64 as private::Sealed>::write --calls--> i64::unsigned_abs @ src/lib.rs:171 definition
+expected 0 stored 1: <i64 as private::Sealed>::write --calls--> unresolved .unsigned_abs [trait_solver_needed] @ src/lib.rs:171 definition
+expected 1 stored 0: <i8 as private::Sealed>::write --calls--> i8::unsigned_abs @ src/lib.rs:171 definition
+expected 0 stored 1: <i8 as private::Sealed>::write --calls--> unresolved .unsigned_abs [trait_solver_needed] @ src/lib.rs:171 definition
+expected 1 stored 0: Buffer::format --calls--> str::len @ src/lib.rs:109 definition
+expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_needed] @ src/lib.rs:109 definition
+expected 1 stored 0: Buffer::format --uses_type--> private::Sealed::Buffer @ src/lib.rs:107 definition
+expected 1 stored 0: slice_buffer_to_str --uses_type--> core::mem::MaybeUninit @ src/lib.rs:252 definition
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 53 filtered out; finished in 323.18s
+```
+
+- **Reading:** the failure is the eight rows and seven nodes the throwaway script found
+  (16:05 entry); a retargeted row shows as two lines. No other row differs.
+- **Next:** build the rows, one step each: `self.unsigned_abs()`, the crate-root node, types
+  written in a function body (part 7 Q3), `string.len()`.
+
 ### 2026-11-16 16:05 IST — Part 7 step 7.2c: method calls, external and builtin nodes in the expected graph
 
 - **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed; the
