@@ -1,7 +1,5 @@
 use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
-use crate::external_named_target_records::{
-    check_local_trait_member, collect_trait_member_names, decode_external_name_record,
-};
+use crate::external_named_target_records::{check_local_trait_member, decode_external_name_record};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -157,10 +155,7 @@ pub fn resolve_signature_type_edges(
         context: &context,
         endpoints: &endpoints,
         self_types: &read_member_self_types(store, source_scope)?,
-        members: &ImplMemberLookupIndex {
-            trait_declared_member_names: collect_trait_member_names(&input.input_node_records),
-            ..read_impl_member_index(store, source_scope)?
-        },
+        members: &read_impl_member_index(store, source_scope, &input.input_node_records)?,
         origins: &read_expanded_token_origins(store, source_scope)?,
         generation: input.run_generation_digest_value,
     };

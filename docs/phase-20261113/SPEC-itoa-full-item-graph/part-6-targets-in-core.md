@@ -115,7 +115,7 @@ store the crate or the path it proved. That is the first producer gap.
 
 ## 4 — Verification matrix
 
-Each step adds its tests and its row here. Built so far: steps 6.1 to 6.4.
+Each step adds its tests and its row here. Built so far: steps 6.1 to 6.5.
 
 ```text
 rule       test (exists)                                              where
@@ -133,6 +133,10 @@ N1 N3 N4   test_itoa_prelude_name_targets (4 rows, 3 new nodes)       itoa-sourc
 N1         test_buffer_prelude_traits_named                           itoa-source-acceptance-tests.rs
 N1 N4      test_external_trait_names_target                           impl-header-implements-tests.rs
 N3 N5      test_external_name_proof_rows (a bound is not a glob import or a binder)   published-generation-copy-tests.rs
+N3 N4 N6   test_itoa_builtin_member_targets (39 rows, 31 new nodes; the 138 rows left are method calls)   itoa-source-acceptance-tests.rs
+N3 N4 N5   test_builtin_member_external_name                          type-relative-member-tests.rs
+N3 N4 N5   test_builtin_member_call_target                            callee-path-call-tests.rs
+N3 N4 N5   test_builtin_member_read_target                            body-read-edge-tests.rs
 ```
 
 Planned at the start of the part:
@@ -167,7 +171,21 @@ step  rows gaining a target   new nodes   nodes after   unresolved after   as pr
 6.2   7                       4           111           194                yes
 6.3   13                      0           111           181                yes
 6.4   4                       3           114           177                yes
+6.5   39                      31          145           138                yes
 ```
+
+Step 6.5 as built: a call `T::name(..)` or a read `T::NAME` whose prefix is a builtin type
+takes the name `T::name` when the member lookup over the stored impl headers finds no
+candidate (`no_stored_impl_member`: no stored impl of that type, and no stored impl whose
+self type has no stored target, declares the name) and no trait in read source declares a
+member of that name. `T` is the builtin the prefix resolves to, so `Self::NAME` inside
+`impl Tr for u8` is named `u8::NAME`. The name is made by the producer from that lookup,
+not read from a stored name-lookup record. The row keeps the lookup as
+`type_relative_member_evidence` (with what was not read) beside the proof record. A call
+row's `dispatch_kind` is `external_builtin_member`. A row withheld by a local trait member
+says `external_member_name_in_local_trait`: a call in `unresolved_detail_kind`, a read in
+`external_name_withheld_kind`. A read row does not say its target is a const; the
+declaration was not read. After this step every row without a target is a method call (N6).
 
 Step 6.4 as built: an `implements` row whose trait is left unresolved with
 `ExternalSourceMissing` takes the name its stored lookup proved; the impl header row carries
@@ -188,7 +206,8 @@ not blocked by it. A blocked row says `external_member_name_in_local_trait`.
 ## 6 — Quality gate results
 
 Per step: syntax crate tests, the real-source itoa suite, format and clippy on the touched
-crates (see the log). Workspace gates and timed runs: not run yet, taken at the end of the part.
+crates (see the log). Timed release runs after step 6.5 (three, pinned itoa): 14.8 to 15.2 s
+wall, 339 to 351 MB peak resident set, 18.3 MB store. Workspace gates: not run yet.
 
 ## 7 — Open questions
 

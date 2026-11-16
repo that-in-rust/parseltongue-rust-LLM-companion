@@ -1110,7 +1110,8 @@ fn validate_hld_target_key(
     }
 }
 
-fn is_hld_builtin_type(name: &str) -> bool {
+/// Whether `name` is a builtin type the graph has a node for.
+pub fn is_hld_builtin_type(name: &str) -> bool {
     HLD_BUILTIN_TYPE_NAMES.contains(&name)
 }
 

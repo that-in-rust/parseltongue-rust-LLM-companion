@@ -83,7 +83,7 @@ pub fn resolve_body_read_edges(
     let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
     let lookup = build_bound_method_index(store, source_scope, &context, input)?;
     let origins = read_expanded_token_origins(store, source_scope)?;
-    let members = read_impl_member_index(store, source_scope)?;
+    let members = read_impl_member_index(store, source_scope, &input.input_node_records)?;
     let macros = read_impl_stage_values(store, source_scope, "legacy-macro-scope-records")?;
     let endpoints = input
         .input_node_records
@@ -311,8 +311,25 @@ fn resolve_read_path_target(
                 return unresolved(reason);
             };
             let target = target.filter(|target| endpoints.contains(target));
+            // REQ-RUST-053.0 N3: no stored impl declares the member of a builtin type.
+            let named = match &target {
+                Some(_) => None,
+                None => read_type_relative_parts(text)
+                    .and_then(|(_, name)| members.find_builtin_member_name(&proof, name)),
+            };
             let mut metadata = describe(target.as_ref().map(|_| "Const"), Value::Null);
             metadata["type_relative_member_evidence"] = proof;
+            let target = match named {
+                Some(Ok(named)) => {
+                    metadata["external_target_proof_record"] = named.external_proof_metadata_value;
+                    Some(named.external_target_identity_value)
+                }
+                Some(Err(withheld)) => {
+                    metadata["external_name_withheld_kind"] = json!(withheld);
+                    None
+                }
+                None => target,
+            };
             return Ok(Some((
                 match target {
                     Some(target) => HldEdgeResolutionValue::Extracted { target },

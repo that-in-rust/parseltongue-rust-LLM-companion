@@ -182,6 +182,11 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
     its target was chosen, so an agent can tell it from a call to a node of read source.
     `MaybeUninit::<u8>::uninit` targets `core::mem::MaybeUninit::uninit`: the written path
     with generic arguments dropped. Whether that is an inherent function is not claimed.
+  - **A member of a builtin type (2026-11-16).** `u128::from(..)` and `u8::MAX` target the
+    node of the written name (`u128::from`, `u8::MAX`) when no impl and no trait in read
+    source declares that member. A call row says `external_builtin_member`. The row keeps
+    the member lookup and names what was not read (the type's inherent items and its trait
+    impls in unread crates). Which `From` impl runs is not claimed.
 - **Macro definitions and calls (2026-11-15).** Both are nodes, for the same reason.
 - **Design rule (user, 2026-11-15).** "Our intention should be to provide maximum
   information which helps the coding agent code better." When a graph design choice is

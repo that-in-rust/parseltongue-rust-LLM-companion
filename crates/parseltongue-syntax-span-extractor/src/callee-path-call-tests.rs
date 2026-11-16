@@ -105,6 +105,9 @@ fn read_callee_fixture_row(
     let metadata: Value =
         serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
     let target = match &edge.edge_resolution_value {
+        HldEdgeResolutionValue::Extracted {
+            target: HldTargetIdentityValue::ExternalNamed(key),
+        } => format!("external:{}", key.external_item_path_text),
         HldEdgeResolutionValue::Extracted { target } => input
             .input_node_records
             .iter()
@@ -325,13 +328,15 @@ fn test_qualified_callee_needs_module() {
             NONE,
             "callee_path_unresolved callee_path_unresolved",
         ),
-        // A builtin qualifier whose whole path has no stored reason goes to member lookup.
+        // A builtin qualifier whose whole path has no stored reason goes to member lookup,
+        // which names the member of the builtin type (REQ-RUST-053.0 N3). The fixture
+        // stores the qualifier `m` as the builtin `str`.
         (
             ("resolved", "Builtin"),
             ("unresolved", ""),
-            "unresolved:MissingTarget",
-            NONE,
-            "member_lookup_unproven callee_path_unresolved",
+            "external:str::helper",
+            "external_builtin_member",
+            "- callee_path_unresolved",
         ),
         // A qualifier without a target keeps its own outcome.
         (
@@ -666,4 +671,93 @@ fn test_external_callee_names_target() {
             field: "external_name_kind"
         })
     ));
+}
+
+/// REQ-RUST-053.0 N3, N4, N5: a call `T::name(..)` through a builtin type that no stored
+/// impl declares targets the written name. A trait in read source that declares the name
+/// withholds it.
+#[test]
+fn test_builtin_member_call_target() {
+    let outcome = |source: &str| {
+        let (store, mut input) = make_callee_fixture_graph(
+            source,
+            &[
+                ("str", "body_call_type_prefix", "resolved", "Builtin"),
+                ("str::make", CALLEE, "unresolved", ""),
+            ],
+        );
+        if source.contains("trait Shape") {
+            let member = HldNodeInputRecord {
+                node_owner_kind_value: Some(HldOwnerKindValue::Trait),
+                node_qualified_path_text: "Shape::make".into(),
+                ..input.input_node_records[0].clone()
+            };
+            input.input_node_records.push(member);
+        }
+        let edges = resolve_original_call_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+        let [edge] = edges.as_slice() else {
+            panic!("one call expected, found {}", edges.len());
+        };
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        (edge.clone(), metadata)
+    };
+    let (edge, metadata) = outcome("struct Buffer; fn helper() {} fn caller() { str::make(); }");
+    let target = HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+        external_name_kind_value: HldExternalNameKind::BuiltinMember,
+        external_crate_name_value: None,
+        external_item_path_text: "str::make".to_owned(),
+    });
+    assert_eq!(
+        edge.edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: target.clone()
+        }
+    );
+    assert_eq!(
+        edge.edge_evidence_row_key.evidence_target_reference_value,
+        Some(target)
+    );
+    assert_eq!(metadata["dispatch_kind"], "external_builtin_member");
+    assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
+    assert_eq!(
+        metadata["external_target_proof_record"],
+        json!({"external_name_kind":"builtin_member",
+            "external_site_proof_kind":"builtin_type_member",
+            "external_import_site_key":null,
+            "external_source_read_flag":false,
+            "external_definition_path_claimed_flag":false})
+    );
+    let lookup = &metadata["type_relative_member_evidence"];
+    assert_eq!(
+        lookup["member_lookup_outcome_kind"],
+        "no_stored_impl_member"
+    );
+    assert_eq!(lookup["self_type_builtin_name"], "str");
+
+    let (edge, metadata) = outcome(
+        "struct Buffer; trait Shape { fn make(); } fn helper() {} fn caller() { str::make(); }",
+    );
+    assert_eq!(
+        edge.edge_resolution_value,
+        HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::MissingTarget
+        }
+    );
+    assert_eq!(metadata["dispatch_kind"], NONE);
+    assert_eq!(
+        metadata["unresolved_detail_kind"],
+        "external_member_name_in_local_trait"
+    );
+    assert!(metadata["external_target_proof_record"].is_null());
+    assert_eq!(
+        metadata["type_relative_member_evidence"]["member_lookup_outcome_kind"],
+        "no_stored_impl_member"
+    );
 }

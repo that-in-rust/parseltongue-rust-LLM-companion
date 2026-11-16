@@ -1,7 +1,5 @@
 use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
-use crate::external_named_target_records::{
-    collect_trait_member_names, decode_external_name_record,
-};
+use crate::external_named_target_records::decode_external_name_record;
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
@@ -10,7 +8,9 @@ use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
-use crate::type_relative_member_records::ImplMemberLookupIndex;
+use crate::type_relative_member_records::{
+    BuiltinMemberNameOutcome, ImplMemberLookupIndex, read_impl_member_index,
+};
 use crate::{SyntaxFileInputData, restore_source_byte_offset};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
@@ -78,14 +78,7 @@ pub fn resolve_original_call_edges(
         .and_then(|row| row["workspace_source_root_path"].as_str())
         .unwrap_or("");
     let context = read_impl_source_context(store, source_scope, Path::new(workspace))?;
-    let members = ImplMemberLookupIndex {
-        impl_header_value_rows: read_impl_stage_values(
-            store,
-            source_scope,
-            "impl-header-index-table",
-        )?,
-        trait_declared_member_names: collect_trait_member_names(&input.input_node_records),
-    };
+    let members = read_impl_member_index(store, source_scope, &input.input_node_records)?;
     let endpoints = input
         .input_node_records
         .iter()
@@ -330,6 +323,23 @@ fn build_original_call_edge(
             )
         }
     };
+    // REQ-RUST-053.0 N3: a member reached through a builtin type that no stored impl and no
+    // trait in read source declares is named as the call writes it; its source was not read.
+    let builtin_member = (stopped == "member_lookup_unproven"
+        && resolution == unresolved_call_target_value(HldUnresolvedReasonKind::MissingTarget))
+    .then(|| find_builtin_call_member(&evidence, syntax, context, members))
+    .transpose()?
+    .flatten();
+    let (resolution, stopped) = match &builtin_member {
+        Some((Ok(named), _)) => (
+            HldEdgeResolutionValue::Extracted {
+                target: named.external_target_identity_value.clone(),
+            },
+            "",
+        ),
+        Some((Err(withheld), _)) => (resolution, *withheld),
+        None => (resolution, stopped),
+    };
     let target = match &resolution {
         HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
         _ => None,
@@ -346,6 +356,7 @@ fn build_original_call_edge(
             }
             (Some(_), _) if cast.is_some() => "cast_receiver_impl_method",
             (Some(_), Some(_)) => "generic_bound_trait_method",
+            (Some(_), _) if matches!(builtin_member, Some((Ok(_), _))) => "external_builtin_member",
             (Some(_), None) => "type_path_associated_function",
         },
         "call_shape_kind":if !receiver_evidence.is_null() {
@@ -376,6 +387,12 @@ fn build_original_call_edge(
     if let Some(proof) = callee.external_target_proof_record {
         dispatch["external_target_proof_record"] = proof;
     }
+    if let Some((named, lookup)) = builtin_member {
+        dispatch["type_relative_member_evidence"] = lookup;
+        if let Ok(named) = named {
+            dispatch["external_target_proof_record"] = named.external_proof_metadata_value;
+        }
+    }
     if let Some(evidence) = callee.trait_method_lookup_evidence {
         dispatch["trait_method_lookup_evidence"] = evidence;
     }
@@ -396,6 +413,31 @@ fn build_original_call_edge(
         },
         edge_dispatch_metadata_text: Some(dispatch.to_string()),
     }))
+}
+
+/// REQ-RUST-053.0 N3: the member lookup of a call `T::name(..)` whose prefix is a stored
+/// type, and the external name it gives when `T` is a builtin type. `None` when the lookup
+/// gives no name and no reason to withhold one.
+fn find_builtin_call_member(
+    span: &Value,
+    syntax: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
+    let receiver = context.resolve_type(span, &syntax["type_source_evidence"], false)?;
+    let (Some(prefix), Some(name)) = (
+        syntax["type_source_evidence"]["type_source_text"].as_str(),
+        syntax["member_declared_name_value"].as_str(),
+    ) else {
+        return Ok(None);
+    };
+    Ok(members
+        .find_type_member_target(prefix, &receiver, name, "FN")
+        .and_then(|found| {
+            members
+                .find_builtin_member_name(&found.member_lookup_evidence, name)
+                .map(|named| (named, found.member_lookup_evidence))
+        }))
 }
 
 /// What the stored rows say about `(x as T).method(..)`: the row's resolution, what

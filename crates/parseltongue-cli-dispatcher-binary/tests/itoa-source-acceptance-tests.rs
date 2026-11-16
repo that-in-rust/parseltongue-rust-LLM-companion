@@ -2565,7 +2565,7 @@ fn test_itoa_imports_row_counts() {
             "core::str"
         ]
     );
-    assert_eq!(input.input_node_records.len(), 114);
+    assert_eq!(input.input_node_records.len(), 145);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -2775,7 +2775,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 114);
+    assert_eq!(input.input_node_records.len(), 145);
     let area = input
         .input_node_records
         .iter()
@@ -3065,8 +3065,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 114);
-    assert_eq!(labels.len(), 114, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(labels.len(), 145, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"
@@ -3246,11 +3246,19 @@ fn test_generated_fmt_static_reads() {
     );
     // The other 10 generated rows are `Self::MAX_STR_LEN` and `uN::MAX_STR_LEN` in generated
     // `write` bodies. Name lookup alone does not find a trait const through a builtin type;
-    // G5 gives each its target (`test_type_relative_member_targets`). G7: the 10 left are
+    // G5 gives each its target (`test_type_relative_member_targets`). G7: 10 more are
     // `uN::MAX` and `iN::MAX` in generated `MAX_STR_LEN` initializers: no stored impl of the
     // builtin type declares `MAX`, and its inherent items in `core` were not read. G15: so
-    // are the 20 `MIN` and `BITS` in the generated `assert!` arguments.
-    let pending = input
+    // are the 20 `MIN` and `BITS` in the generated `assert!` arguments. REQ-RUST-053.0 N3:
+    // each of the 30 targets the node of its written name and keeps that lookup record.
+    assert!(input.input_edge_records.iter().all(|edge| {
+        edge.edge_relation_kind_value != HldRelationKindValue::Reads
+            || matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Extracted { .. }
+            )
+    }));
+    let builtin = input
         .input_edge_records
         .iter()
         .filter(|edge| {
@@ -3261,10 +3269,12 @@ fn test_generated_fmt_static_reads() {
                     .read_semantic_occurrence_parts()
                     .span_expansion_provenance_chain
                     .is_empty()
-                && edge.edge_resolution_value
-                    == HldEdgeResolutionValue::Unresolved {
-                        reason: HldUnresolvedReasonKind::TraitSolverNeeded,
-                    }
+                && matches!(
+                    &edge.edge_resolution_value,
+                    HldEdgeResolutionValue::Extracted {
+                        target: HldTargetIdentityValue::ExternalNamed(key),
+                    } if key.external_name_kind_value == HldExternalNameKind::BuiltinMember
+                )
         })
         .map(|edge| {
             let metadata: Value =
@@ -3285,7 +3295,7 @@ fn test_generated_fmt_static_reads() {
         })
         .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(
-        pending,
+        builtin,
         [
             "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128"
         ]
@@ -3553,6 +3563,7 @@ fn test_generated_body_call_rows() {
                         "generic_bound_trait_method",
                         "type_path_associated_function",
                         "external_written_path",
+                        "external_builtin_member",
                         "callee_path_function",
                         "trait_path_method",
                         "trait_path_impl_method",
@@ -3886,7 +3897,8 @@ fn test_item_initializer_read_rows() {
             row(
                 format!("<{name} as Integer>::MAX_STR_LEN"),
                 format!("{name}::MAX"),
-                "-".to_owned(),
+                // REQ-RUST-053.0 N3: the node of the written name; `core` was not read.
+                format!("{name}::MAX"),
             ),
             row(
                 format!("<{name} as private::Sealed>::Buffer"),
@@ -4360,7 +4372,8 @@ fn test_callee_path_function_targets() {
 
 /// REQ-RUST-052.0 G15: a value path in the arguments of `assert!` is a `reads` row of the
 /// item the call is written in. The five generated `const _` blocks each read `iN::MIN`,
-/// `uN::MIN`, `iN::BITS` and `uN::BITS`; all four are in `core` and have no target.
+/// `uN::MIN`, `iN::BITS` and `uN::BITS`; all four are in `core`, which was not read, and
+/// each targets the node of its written name (REQ-RUST-053.0 N3).
 #[test]
 fn test_macro_argument_read_rows() {
     let (_directory, _root, _database, input) = run_original_graph_fixture();
@@ -4399,19 +4412,16 @@ fn test_macro_argument_read_rows() {
                     metadata["type_relative_member_evidence"]["member_lookup_outcome_kind"],
                     "no_stored_impl_member"
                 );
-                assert!(matches!(
-                    edge.edge_resolution_value,
-                    HldEdgeResolutionValue::Unresolved {
-                        reason: HldUnresolvedReasonKind::TraitSolverNeeded
-                    }
-                ));
-                (
-                    label(&edge.edge_source_reference),
-                    metadata["read_source_text"]
-                        .as_str()
-                        .unwrap()
-                        .replace(' ', ""),
-                )
+                let text = metadata["read_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .replace(' ', "");
+                let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value
+                else {
+                    panic!("no target: {metadata}");
+                };
+                assert_eq!(label(target), text);
+                (label(&edge.edge_source_reference), text)
             })
         })
         .collect::<Vec<_>>();
@@ -4452,16 +4462,13 @@ fn test_itoa_external_path_calls() {
     let mut rows = calls
         .iter()
         .filter_map(|edge| match &edge.edge_resolution_value {
+            // A member of a builtin type is `test_itoa_builtin_member_targets`.
             HldEdgeResolutionValue::Extracted {
                 target: HldTargetIdentityValue::ExternalNamed(key),
-            } => {
+            } if key.external_name_kind_value == HldExternalNameKind::CrateRootedPath => {
                 let metadata: Value =
                     serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap())
                         .unwrap();
-                assert_eq!(
-                    key.external_name_kind_value,
-                    HldExternalNameKind::CrateRootedPath
-                );
                 assert_eq!(key.external_crate_name_value.as_deref(), Some("core"));
                 assert_eq!(metadata["dispatch_kind"], "external_written_path");
                 let proof = &metadata["external_target_proof_record"];
@@ -4502,7 +4509,7 @@ fn test_itoa_external_path_calls() {
         ]
         .map(|(callee, path)| (callee.to_owned(), path.to_owned()))
     );
-    // 43 calls end at a node of itoa, 7 at a node of a written path.
+    // 43 calls end at a node of itoa, 7 at a node of a written path, 9 at a builtin member.
     assert_eq!(calls.len(), 197);
     assert_eq!(
         calls
@@ -4512,7 +4519,7 @@ fn test_itoa_external_path_calls() {
                 HldEdgeResolutionValue::Extracted { .. }
             ))
             .count(),
-        50
+        59
     );
     // No method call gains a name: its receiver's type is not proven (N6).
     assert!(calls.iter().all(|edge| {
@@ -4522,11 +4529,31 @@ fn test_itoa_external_path_calls() {
             || metadata.get("external_target_proof_record").is_none()
     }));
     // One node per written path, with no file, kind or signature: 4 imports, 4 callees,
-    // 3 prelude names.
-    let mut externals = input
+    // 3 prelude names. The 31 members of builtin types are
+    // `test_itoa_builtin_member_targets`.
+    let is_builtin_member = |node: &&HldNodeInputRecord| {
+        matches!(
+            &node.node_target_reference,
+            HldTargetIdentityValue::ExternalNamed(key)
+                if key.external_name_kind_value == HldExternalNameKind::BuiltinMember
+        )
+    };
+    let all_externals = input
         .input_node_records
         .iter()
         .filter(|node| node.node_input_category == HldNodeInputCategory::ExternalDefinition)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        all_externals
+            .iter()
+            .copied()
+            .filter(is_builtin_member)
+            .count(),
+        31
+    );
+    let mut externals = all_externals
+        .into_iter()
+        .filter(|node| !is_builtin_member(node))
         .map(|node| {
             assert!(
                 node.node_item_kind_value.is_none()
@@ -4553,7 +4580,7 @@ fn test_itoa_external_path_calls() {
             "core::str::from_utf8_unchecked",
         ]
     );
-    assert_eq!(input.input_node_records.len(), 114);
+    assert_eq!(input.input_node_records.len(), 145);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: each of the 13 `MaybeUninit<u8>` type uses targets the node
@@ -4646,7 +4673,7 @@ fn test_itoa_external_type_uses() {
         })
         .collect::<Vec<_>>();
     assert_eq!(open, Vec::<String>::new());
-    assert_eq!(input.input_node_records.len(), 114);
+    assert_eq!(input.input_node_records.len(), 145);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: the three traits `Buffer` implements and the supertrait bound
@@ -4718,7 +4745,7 @@ fn test_itoa_prelude_name_targets() {
             source.to_owned()
         ))
     );
-    // Every `implements` and `uses_type` row has a target; 177 rows of the graph have none.
+    // Every `implements` and `uses_type` row has a target; 138 rows of the graph have none.
     let open = |relation: Option<HldRelationKindValue>| {
         input
             .input_edge_records
@@ -4734,6 +4761,119 @@ fn test_itoa_prelude_name_targets() {
     };
     assert_eq!(open(Some(HldRelationKindValue::Implements)), 0);
     assert_eq!(open(Some(HldRelationKindValue::UsesType)), 0);
-    assert_eq!(open(None), 177);
-    assert_eq!(input.input_node_records.len(), 114);
+    assert_eq!(open(None), 138);
+    assert_eq!(input.input_node_records.len(), 145);
+}
+
+/// REQ-RUST-053.0 N3, N4, N6: a member reached through a builtin type that no impl in itoa
+/// declares targets the node of the written name: 9 `u128::from(..)` calls and 30 reads of
+/// `MAX`, `MIN` and `BITS`. The 138 rows left without a target are all method calls.
+#[test]
+fn test_itoa_builtin_member_targets() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let mut rows = std::collections::BTreeMap::<(String, String), usize>::new();
+    let mut names = std::collections::BTreeSet::new();
+    for edge in &input.input_edge_records {
+        let HldEdgeResolutionValue::Extracted {
+            target: target @ HldTargetIdentityValue::ExternalNamed(key),
+        } = &edge.edge_resolution_value
+        else {
+            continue;
+        };
+        if key.external_name_kind_value != HldExternalNameKind::BuiltinMember {
+            continue;
+        }
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        assert_eq!(key.external_crate_name_value, None);
+        assert_eq!(
+            metadata["external_target_proof_record"],
+            json!({"external_name_kind":"builtin_member",
+                "external_site_proof_kind":"builtin_type_member",
+                "external_import_site_key":null,
+                "external_source_read_flag":false,
+                "external_definition_path_claimed_flag":false}),
+            "{metadata}"
+        );
+        // The row keeps the member lookup that found no impl in itoa, and what it did not read.
+        let lookup = &metadata["type_relative_member_evidence"];
+        let (builtin, member) = key.external_item_path_text.split_once("::").unwrap();
+        assert_eq!(
+            lookup["member_lookup_outcome_kind"],
+            "no_stored_impl_member"
+        );
+        assert_eq!(lookup["self_type_builtin_name"], builtin);
+        assert_eq!(lookup["member_candidate_impl_rows"], json!([]));
+        assert_eq!(
+            lookup["sources_not_read"][0],
+            format!("inherent items of builtin type {builtin}")
+        );
+        assert_eq!(
+            edge.edge_evidence_row_key.evidence_target_reference_value,
+            Some(target.clone())
+        );
+        let node = input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == target)
+            .unwrap();
+        assert_eq!(
+            node.node_input_category,
+            HldNodeInputCategory::ExternalDefinition
+        );
+        assert_eq!(node.node_qualified_path_text, key.external_item_path_text);
+        assert!(
+            node.node_item_kind_value.is_none()
+                && node.node_source_relative_path.is_none()
+                && node.node_signature_text.is_none()
+        );
+        let shape = match edge.edge_relation_kind_value {
+            HldRelationKindValue::Calls => {
+                assert_eq!(metadata["dispatch_kind"], "external_builtin_member");
+                assert_eq!(metadata["call_shape_kind"], "qualified_path_call");
+                assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
+                "calls".to_owned()
+            }
+            HldRelationKindValue::Reads => {
+                assert!(metadata["read_target_symbol_kind"].is_null(), "{metadata}");
+                format!("reads {}", metadata["read_kind"].as_str().unwrap())
+            }
+            other => panic!("unexpected relation {other:?}"),
+        };
+        *rows.entry((shape, member.to_owned())).or_default() += 1;
+        names.insert(key.external_item_path_text.clone());
+    }
+    assert_eq!(
+        rows.into_iter().collect::<Vec<_>>(),
+        [
+            ("calls", "from", 9),
+            ("reads body_value_path", "MAX", 10),
+            ("reads macro_argument_value_path", "BITS", 10),
+            ("reads macro_argument_value_path", "MIN", 10),
+        ]
+        .map(|(shape, member, count)| ((shape.to_owned(), member.to_owned()), count))
+    );
+    // One node per written name: three consts for each of ten integer types, and `u128::from`.
+    assert_eq!(names.len(), 31);
+    assert!(names.contains("u128::from") && names.contains("i8::BITS"));
+    // Every row left without a target is a method call (N6); none carries a proof record.
+    let open = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| {
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(open.len(), 138);
+    for edge in open {
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        assert_eq!(edge.edge_relation_kind_value, HldRelationKindValue::Calls);
+        assert_eq!(metadata["call_shape_kind"], "method_call");
+        assert!(metadata["external_target_proof_record"].is_null());
+    }
+    assert_eq!(input.input_node_records.len(), 145);
 }

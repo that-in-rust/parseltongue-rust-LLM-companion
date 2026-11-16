@@ -465,3 +465,106 @@ fn test_macro_argument_read_edge() {
         .push(lookup(2, json!({"definition":"macro_rules! assert"})));
     assert_eq!(read_body_fixture_edges(source, &store, &input), vec![]);
 }
+
+/// REQ-RUST-053.0 N3, N4, N5: a read `T::NAME` through a builtin type that no stored impl
+/// declares targets the written name and keeps the member lookup. A trait in read source
+/// that declares the name withholds the target, and the row says so.
+#[test]
+fn test_builtin_member_read_target() {
+    let source = "struct Buffer; fn pick() -> u8 { u8::MAX }";
+    let outcome = |trait_member: Option<&str>| {
+        let (store, mut input) = make_read_fixture_graph(source, &[("u8::MAX", 0, "", "")]);
+        let start = source.find("u8::MAX").unwrap();
+        let unit = encode_compilation_unit_value(&make_call_fixture_unit());
+        store.rows.lock().unwrap().push(make_call_fixture_row(
+            "path-resolution-site-records",
+            json!({"site_compilation_scope_record":{"unit_semantic_identity_record":unit},
+                "site_source_absolute_path":"/fixture/src/lib.rs",
+                "site_source_range_start":start, "site_source_range_end":start + 2,
+                "site_expansion_provenance_chain":[],
+                "site_path_context_kind":"body_value_type_prefix",
+                "path_site_source_text":"u8",
+                "path_resolution_state_kind":"resolved",
+                "path_unresolved_reason_kind":Value::Null,
+                "path_target_symbol_rows":[{"target_symbol_kind_value":"Builtin",
+                    "target_builtin_name_value":"u8"}]}),
+        ));
+        if let Some(name) = trait_member {
+            let member = HldNodeInputRecord {
+                node_owner_kind_value: Some(HldOwnerKindValue::Trait),
+                node_qualified_path_text: format!("Shape::{name}"),
+                ..input.input_node_records[0].clone()
+            };
+            input.input_node_records.push(member);
+        }
+        let edges = resolve_body_read_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+        let [edge] = edges.read_edge_input_records.as_slice() else {
+            panic!("one read expected: {:?}", edges.read_edge_input_records);
+        };
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        (edge.clone(), metadata)
+    };
+    let target = HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+        external_name_kind_value: HldExternalNameKind::BuiltinMember,
+        external_crate_name_value: None,
+        external_item_path_text: "u8::MAX".to_owned(),
+    });
+    for other in [None, Some("LEN")] {
+        let (edge, metadata) = outcome(other);
+        assert_eq!(
+            edge.edge_resolution_value,
+            HldEdgeResolutionValue::Extracted {
+                target: target.clone()
+            }
+        );
+        assert_eq!(
+            edge.edge_evidence_row_key.evidence_target_reference_value,
+            Some(target.clone())
+        );
+        assert_eq!(
+            metadata["external_target_proof_record"],
+            json!({"external_name_kind":"builtin_member",
+                "external_site_proof_kind":"builtin_type_member",
+                "external_import_site_key":null,
+                "external_source_read_flag":false,
+                "external_definition_path_claimed_flag":false})
+        );
+        assert!(metadata["external_name_withheld_kind"].is_null());
+        // The row does not say the target is a const: its declaration was not read.
+        assert!(metadata["read_target_symbol_kind"].is_null(), "{metadata}");
+        let lookup = &metadata["type_relative_member_evidence"];
+        assert_eq!(
+            lookup["member_lookup_outcome_kind"],
+            "no_stored_impl_member"
+        );
+        assert_eq!(lookup["self_type_builtin_name"], "u8");
+    }
+
+    let (edge, metadata) = outcome(Some("MAX"));
+    assert_eq!(
+        edge.edge_resolution_value,
+        HldEdgeResolutionValue::Unresolved {
+            reason: HldUnresolvedReasonKind::TraitSolverNeeded
+        }
+    );
+    assert_eq!(
+        edge.edge_evidence_row_key.evidence_target_reference_value,
+        None
+    );
+    assert_eq!(
+        metadata["external_name_withheld_kind"],
+        "external_member_name_in_local_trait"
+    );
+    assert!(metadata["external_target_proof_record"].is_null());
+    assert_eq!(
+        metadata["type_relative_member_evidence"]["member_lookup_outcome_kind"],
+        "no_stored_impl_member"
+    );
+}

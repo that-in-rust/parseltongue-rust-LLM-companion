@@ -15,13 +15,15 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
 `u128 --implements--> Unsigned` and `enc_16lsd --reads--> DECIMAL_PAIRS`. No SOP step has passed and the graph is marked
 `incomplete`.**
 
-- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1 to 6.4 are built.
-  The graph is 114 nodes and 585 edges; 11 nodes are written names outside itoa with no file,
-  kind or signature (8 paths into `core`, 3 prelude names). All 4 `imports` rows, all 32
-  `implements` rows, all 106 `uses_type` rows and 50 of 197 calls have a target; 177 rows
-  have none (147 calls, 30 reads).
-  Next is step 6.5 (builtin members). Numbers above this line that say 103
-  nodes, 43 calls or 3 unresolved `implements` are from before part 6.
+- **Part 6 (named `core` targets), measured 2026-11-16:** steps 6.1 to 6.5 are built.
+  The graph is 145 nodes and 585 edges; 42 nodes are written names outside itoa with no file,
+  kind or signature (8 paths into `core`, 3 prelude names, 31 members of builtin types). All
+  4 `imports` rows, all 32 `implements` rows, all 106 `uses_type` rows, all 98 `reads` rows
+  and 59 of 197 calls have a target; 138 rows have none, all of them method calls whose
+  receiver type is not proven.
+  Next are the part 6 workspace gates and the review of steps 6.2 to 6.5. Numbers above
+  this line that say 103 nodes, 43 calls, 68 reads with a target or 3 unresolved
+  `implements` are from before part 6.
 - **Earlier target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
   10b, 10c and 11 are built (40 new `uses_type` rows; 4 qualified-path rows on the impl
   member; 20 `reads` rows from `assert!` arguments).
@@ -128,6 +130,70 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 10:18 IST — Part 6 step 5: members of builtin types (`u128::from`, `uN::MAX`, `MIN`, `BITS`) target named external nodes
+
+- **Milestone:** itoa full item graph, part 6 step 6.5. No SOP step has passed. The graph is
+  still marked incomplete.
+- **REQ:** REQ-RUST-053.0 N3, N4, N5, N6.
+- **Measured on pinned itoa (release run, `/home/ubuntu/phase6-work/s65` and three timed runs
+  `t65-1..3`, executable sha256
+  `44e44693e66978ffbc2c1e14559e199da2c8410514dacc849e7721a4280888a8`):** 145 nodes (was 114),
+  585 edges (unchanged), 59 of 197 calls with a target (was 50), 98 of 98 `reads` with a
+  target (was 68), 138 rows without a target (was 177), all `calls` rows of shape
+  `method_call`. As predicted in the part file. Stage line:
+  `stage=full-item-dependency-graph nodes=145 containment=88 generates=45 expands=15 calls=197 resolved_calls=59 type_uses=106 implements=32 implements_without_source=0 reads=98 reads_in_expanded_bodies=76 imports=4 ... completeness=incomplete`.
+- **The 39 rows (read back from the stored edge table):** 9 `calls` `u128::from(..)`
+  (`dispatch_kind` `external_builtin_member`, all to the one node `u128::from`); 10 `reads`
+  of `uN::MAX` / `iN::MAX` (`body_value_path`); 20 `reads` of `MIN` and `BITS`
+  (`macro_argument_value_path`). 31 distinct names, one node each.
+- **Rule as built:** in the part file, "Step 6.5 as built". The name is produced from the
+  member lookup over stored impl headers (`find_builtin_member_name` on
+  `ImplMemberLookupIndex`), gated on the 19 builtin names the graph has nodes for
+  (`is_hld_builtin_type`, now public in the core crate).
+- **Also changed:** `read_impl_member_index` now takes the node rows and fills the names
+  local traits declare, so its three callers (reads, calls, signatures) build the index the
+  same way. Before, the reads producer had an empty set.
+- **STUB:** `find_builtin_member_name` as `todo!("REQ-RUST-053.0 N3")`, wired into both
+  producers; `cargo check --release -p parseltongue-syntax-span-extractor --all-targets`
+  finished with one unused-import warning.
+- **RED:** `cargo test --release -p parseltongue-syntax-span-extractor --lib`:
+  `test result: FAILED. 128 passed; 5 failed`, each `not yet implemented: REQ-RUST-053.0 N3`:
+  the new `test_builtin_member_external_name` and `test_builtin_member_call_target`, and
+  three existing tests that reach the stub (`test_qualified_callee_needs_module`,
+  `test_preserve_absent_target_reason`, `test_preserve_missing_member_reason`).
+- **GREEN:** same command: `test result: ok. 134 passed; 0 failed` (+17 contract tests).
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests`:
+  `test result: ok. 52 passed; 0 failed` (136.94 s) on the final code.
+- **REFACTOR:** one type alias (`BuiltinMemberNameOutcome`) for a clippy
+  `type_complexity` error; nothing else.
+- **Existing tests changed (they pinned the old values):** fixture
+  `test_qualified_callee_needs_module` (a builtin qualifier with no stored reason now gives
+  `external:str::helper`); real source `test_generated_fmt_static_reads`,
+  `test_generated_body_call_rows`, `test_item_initializer_read_rows`,
+  `test_macro_argument_read_rows`, `test_itoa_external_path_calls`, and the node count (114
+  to 145) and open-row count (177 to 138) in six tests.
+- **Weak evidence:** `test_itoa_builtin_member_targets` and `test_builtin_member_read_target`
+  were written after the code and passed on first run.
+- **Deliberate breaks:** 18, log `/home/ubuntu/phase6-work/mut65.log`. 14 failed a fixture
+  test at once. Four changed no outcome and no test: the two extra guards on the call
+  (`stopped == "member_lookup_unproven"`, reason `MissingTarget`), the lookup kind `FN`
+  against `CONST`, and the guard "a stored target wins" on the read. Read from
+  `find_admitted_member_target`: the outcome `no_stored_impl_member` means zero candidates,
+  and the kind only chooses a target among candidates, so none of the four can change a
+  row. The guards stay as written intent.
+- **Not covered on real source:** a local trait that declares `MAX`, `MIN`, `BITS` or
+  `from`, a stored impl of a builtin that declares one, and `Self::NAME` in an impl for a
+  builtin with no stored member. itoa has none; fixtures cover the first two.
+- **Known limits, stated on each row:** the name is the written one. `u128::from` does not
+  say which `From` impl runs, and `u8::MAX` does not say it is the inherent const in `core`.
+- **Gates:** `cargo fmt --all --check`; clippy `-D warnings` on core-row-types,
+  syntax-span-extractor and cli-dispatcher-binary (all targets). Three timed runs:
+  15.22 / 14.77 / 14.79 s wall, 342 / 339 / 351 MB peak resident set, 18.3 MB store.
+  Workspace gates: not run yet.
+- **Slip:** the real-source test and the read fixture were written after the code.
+- **Next:** part 6 workspace gates (all tests, clippy on the workspace, release build),
+  codebase-memory re-index, and the GLM-5.3 review of steps 6.2 to 6.5.
 
 ### 2026-11-16 09:43 IST — Part 6 step 4: prelude names `Clone`, `Copy`, `Default` target named external nodes
 

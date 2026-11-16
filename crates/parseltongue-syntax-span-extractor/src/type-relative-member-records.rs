@@ -1,3 +1,6 @@
+use crate::external_named_target_records::{
+    ExternalNameProofRecord, build_external_proof_value, collect_trait_member_names,
+};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_stage_values,
 };
@@ -18,13 +21,15 @@ pub(super) struct ImplMemberLookupIndex {
     pub(super) trait_declared_member_names: std::collections::BTreeSet<String>,
 }
 
+/// The stored impl headers of `scope` and the member names the traits among `nodes` declare.
 pub(super) fn read_impl_member_index(
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
+    nodes: &[HldNodeInputRecord],
 ) -> Result<ImplMemberLookupIndex, ImplHeaderSourceError> {
     Ok(ImplMemberLookupIndex {
         impl_header_value_rows: read_impl_stage_values(store, scope, "impl-header-index-table")?,
-        ..Default::default()
+        trait_declared_member_names: collect_trait_member_names(nodes),
     })
 }
 
@@ -148,7 +153,44 @@ fn find_named_impl_member<'a>(header: &'a Value, name: &str) -> Option<&'a Value
         })
 }
 
+/// The external name of a builtin type's member, or why it is withheld.
+pub(super) type BuiltinMemberNameOutcome = Result<ExternalNameProofRecord, &'static str>;
+
 impl ImplMemberLookupIndex {
+    /// REQ-RUST-053.0 N3, N5: the external name of a member reached through a builtin
+    /// type, from the record `evidence` of its member lookup. `None` when the type is not
+    /// a builtin or a stored impl declares the name; the withholding reason when a trait
+    /// in read source declares it, since an impl of that trait may be the target.
+    pub(super) fn find_builtin_member_name(
+        &self,
+        evidence: &Value,
+        name: &str,
+    ) -> Option<BuiltinMemberNameOutcome> {
+        let builtin = evidence["self_type_builtin_name"]
+            .as_str()
+            .filter(|builtin| is_hld_builtin_type(builtin))?;
+        let name = name.trim_start_matches("r#");
+        (evidence["member_lookup_outcome_kind"] == "no_stored_impl_member").then(|| {
+            if self.trait_declared_member_names.contains(name) {
+                return Err("external_member_name_in_local_trait");
+            }
+            Ok(ExternalNameProofRecord {
+                external_target_identity_value: HldTargetIdentityValue::ExternalNamed(
+                    HldExternalNamedKey {
+                        external_name_kind_value: HldExternalNameKind::BuiltinMember,
+                        external_crate_name_value: None,
+                        external_item_path_text: format!("{builtin}::{name}"),
+                    },
+                ),
+                external_proof_metadata_value: build_external_proof_value(
+                    "builtin_member",
+                    "builtin_type_member",
+                    Value::Null,
+                ),
+            })
+        })
+    }
+
     /// The stored self type of the impl whose member list holds `owner_key`.
     pub(super) fn read_owner_self_type(&self, owner_key: &str) -> Option<&Value> {
         self.impl_header_value_rows

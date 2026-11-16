@@ -463,3 +463,78 @@ fn test_qualified_member_trait_match() {
         (None, "impl_member_not_proven".to_owned())
     );
 }
+
+/// REQ-RUST-053.0 N3, N4, N5: a member reached through a builtin type that no stored impl
+/// declares is named as written. No name: a stored impl declares it, the type is not a
+/// builtin the graph knows, or a trait in read source declares the member's name.
+#[test]
+fn test_builtin_member_external_name() {
+    let named = |headers: Vec<Value>, traits: &[&str], self_type: &Value, name: &str| {
+        let index = ImplMemberLookupIndex {
+            impl_header_value_rows: headers,
+            trait_declared_member_names: traits.iter().map(|name| (*name).to_owned()).collect(),
+        };
+        let prefix = self_type["type_source_evidence"]["type_source_text"]
+            .as_str()
+            .unwrap_or("S");
+        let found = index
+            .find_type_member_target(prefix, self_type, name, "CONST")
+            .unwrap();
+        index.find_builtin_member_name(&found.member_lookup_evidence, name)
+    };
+    let u8_type = resolved_builtin_type("u8");
+    let header = |self_type: Value, trait_name, members: &[(&str, &str)]| {
+        impl_header_fixture(self_type, trait_name, members)
+    };
+
+    let record = named(vec![], &[], &u8_type, "MAX").unwrap().unwrap();
+    assert_eq!(
+        record.external_target_identity_value,
+        HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+            external_name_kind_value: HldExternalNameKind::BuiltinMember,
+            external_crate_name_value: None,
+            external_item_path_text: "u8::MAX".to_owned(),
+        })
+    );
+    assert_eq!(
+        record.external_proof_metadata_value,
+        json!({"external_name_kind":"builtin_member",
+            "external_site_proof_kind":"builtin_type_member",
+            "external_import_site_key":null,
+            "external_source_read_flag":false,
+            "external_definition_path_claimed_flag":false})
+    );
+    // A stored impl that declares another name, and a local trait that declares another
+    // name, change nothing; a raw identifier is the same name.
+    let other = header(u8_type.clone(), Some("A"), &[("other", "CONST")]);
+    assert_eq!(
+        named(vec![other], &["LEN"], &u8_type, "r#MAX"),
+        Some(Ok(record))
+    );
+
+    // A trait in read source declares the name: an impl of it may be the target.
+    let withheld = Some(Err("external_member_name_in_local_trait"));
+    assert_eq!(named(vec![], &["MAX"], &u8_type, "MAX"), withheld);
+    assert_eq!(named(vec![], &["MAX"], &u8_type, "r#MAX"), withheld);
+
+    // A stored impl declares the name, for this type or for a type that was not resolved.
+    let own = header(u8_type.clone(), Some("A"), &[("MAX", "CONST")]);
+    let function = header(u8_type.clone(), Some("A"), &[("MAX", "FN")]);
+    let unknown = header(
+        json!({"resolution_state_kind":"unresolved"}),
+        Some("A"),
+        &[("MAX", "CONST")],
+    );
+    for stored in [own, function, unknown] {
+        assert_eq!(named(vec![stored], &[], &u8_type, "MAX"), None);
+    }
+
+    // Not a builtin type, and a builtin name the graph has no node for.
+    let struct_type = json!({"resolution_state_kind":"resolved",
+        "target_identity":{"target_symbol_kind_value":"Struct"}});
+    assert_eq!(named(vec![], &[], &struct_type, "MAX"), None);
+    assert_eq!(
+        named(vec![], &[], &resolved_builtin_type("never"), "MAX"),
+        None
+    );
+}
