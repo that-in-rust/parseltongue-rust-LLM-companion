@@ -433,3 +433,34 @@ REFACTOR none
 NOT RUN the real-source tests (the row count of the table on pinned itoa is not re-measured)
 NEXT   8.3b-1 (ii-b): core-member-target-records.rs, the lookup for a parameter receiver
 ```
+
+
+## 2026-11-16 Part 8 step 8.3b-1(ii-b): first targets for method calls into core (GREEN)
+
+```text
+ phase      STUB -> RED -> GREEN, REQ-RUST-054.0 D11 D12, REQ-RUST-055.0, REQ-RUST-056.0
+ result     pinned itoa, scope "declarations": 9 of the 133 calls have a target
+              8  MaybeUninit<T>::write   receiver MaybeUninit<u8>, step 0 by mutable reference
+              1  [T]::get_unchecked      receiver &[MaybeUninit<u8>], step 0 by value
+            nodes 153 (151 + the two members), edge rows 682, calls without a target 124
+            default scope "excluded": unchanged, 151 nodes, 682 rows, frozen graph still equal
+ withheld   78 receiver_type_not_determined (field, static, call result, local receivers)
+            46 receiver_type_name_unproven  (parameter typed "&mut Self::Buffer")
+ new rows   use_rename keeps rename_source_name_value; extern_crate_rename is its own kind;
+            macro_call_name_tokens: per file and macro name, the names written in its calls
+            core declaration rows 6,528 (5,336 before)
+ new kind   external name kind core_declared_member, dispatch kind core_inherent_member
+ tests      test_parameter_receiver_core_member, test_rename_source_name_rows,
+            test_macro_call_token_rows, test_macro_name_parameter_calls (each seen failing first),
+            test_itoa_core_member_targets (real source), test_core_member_rows_published (amended)
+ gates      extractor crate 158 + 17 pass; cargo fmt --check pass; workspace clippy -D warnings pass
+            60 real-source itoa tests: 59 passed before the amendment of
+            test_core_member_rows_published, which then passed alone; full rerun not repeated
+ found      1 benches/bench.rs is stored but belongs to no mapped unit: only files with a
+              stored span are read for names; an "extern crate" in another file withholds
+            2 "extern crate self as core" was read as a rename of any trait
+            3 macro impl_fold_via_try_fold takes its member's name from its caller; proven
+              from every call of it in core that no call writes the probed name
+ not done   deliberate breaks; workspace tests; release build; re-freeze; acceptance run
+ next       receivers typed "&mut Self::Buffer" (46), then fields and statics (78 group)
+```

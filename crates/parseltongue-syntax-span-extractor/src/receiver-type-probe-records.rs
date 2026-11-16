@@ -306,13 +306,61 @@ fn check_type_name_declared(name: &str, declarations: &[Value]) -> bool {
         )
 }
 
+/// REQ-RUST-054.0 D12: whether a macro that takes its member's name from its caller may
+/// be given `method_name`. It may not when the macro has one name, no `use` renames
+/// it, it is called in `core`, and every call that may be of it writes other names and
+/// passes no macro variable on.
+fn check_macro_name_reach(row: &Value, method_name: &str, declarations: &[Value]) -> bool {
+    let Some(name) = row["owner_macro_name_value"]
+        .as_str()
+        .filter(|_| row["declaration_owner_kind_value"] == "macro_definition_body")
+    else {
+        return true;
+    };
+    let renamed = declarations.iter().any(|found| {
+        found["type_declaration_kind_value"] == "use_rename"
+            && found["rename_source_name_value"]
+                .as_str()
+                .is_none_or(|source| source == name)
+    });
+    let call_rows = || {
+        declarations
+            .iter()
+            .filter(|found| found["declaration_owner_kind_value"] == "macro_call_name_tokens")
+    };
+    // `$m!(..)` calls this macro only when a call somewhere passes this macro's name.
+    let passed = call_rows().any(|call| {
+        call["macro_call_identifier_values"]
+            .as_array()
+            .is_none_or(|names| names.iter().any(|found| found == name))
+    });
+    let calls = call_rows()
+        .filter(|call| match call["owner_macro_name_value"].as_str() {
+            Some(called) => called == name,
+            None => passed,
+        })
+        .collect::<Vec<_>>();
+    renamed
+        || !calls
+            .iter()
+            .any(|call| call["owner_macro_name_value"] == name)
+        || calls.iter().any(|call| {
+            call["owner_macro_name_value"].is_null()
+                || call["macro_call_metavariable_flag"] == true
+                || call["macro_call_identifier_values"]
+                    .as_array()
+                    .is_none_or(|names| names.iter().any(|found| found == method_name))
+        })
+}
+
 /// A `fn` written as tokens that may be an inherent method named `method_name`.
-fn check_macro_member_candidate(row: &Value, method_name: &str) -> bool {
+fn check_macro_member_candidate(row: &Value, method_name: &str, declarations: &[Value]) -> bool {
     matches!(
         row["declaration_owner_kind_value"].as_str(),
         Some("macro_definition_body" | "macro_call_argument")
     ) && (row["member_declared_name_value"] == method_name
-        || row["member_name_parameter_flag"] == true)
+        || (row["member_name_parameter_flag"] == true
+            && check_macro_name_reach(row, method_name, declarations)))
         && row["macro_self_parameter_flag"] == true
         && !matches!(
             row["macro_owner_shape_kind"].as_str(),
@@ -446,7 +494,7 @@ pub(crate) fn probe_core_member_declaration(
     }
     if declarations
         .iter()
-        .any(|row| check_macro_member_candidate(row, method_name))
+        .any(|row| check_macro_member_candidate(row, method_name, declarations))
     {
         return CoreMemberProbeOutcome::Withheld("macro_member_owner_unknown");
     }

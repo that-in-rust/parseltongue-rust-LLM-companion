@@ -1,3 +1,6 @@
+use crate::core_member_target_records::{
+    CoreMemberLookupIndex, find_core_member_target, read_core_member_index,
+};
 use crate::expanded_site_origin_records::{ExpandedTokenOriginIndex, read_expanded_token_origins};
 use crate::external_named_target_records::decode_external_name_record;
 use crate::impl_header_source_records::{
@@ -91,7 +94,15 @@ pub fn resolve_original_call_edges(
         })
         .map(|node| &node.node_target_reference)
         .collect::<BTreeSet<_>>();
-    let lookup = build_bound_method_index(store, source_scope, &context, input)?;
+    let lookups = CallMethodLookupSet {
+        bound_method_lookup_index: build_bound_method_index(store, source_scope, &context, input)?,
+        core_member_lookup_index: read_core_member_index(
+            store,
+            source_scope,
+            &context,
+            &input.input_node_records,
+        )?,
+    };
     let origins = read_expanded_token_origins(store, source_scope)?;
     let mut edges = Vec::new();
     for site in read_impl_stage_values(store, source_scope, "body-site-reference-table")? {
@@ -103,7 +114,7 @@ pub fn resolve_original_call_edges(
             &context,
             &members,
             &endpoints,
-            &lookup,
+            &lookups,
             &origins,
             input.run_generation_digest_value,
         )? {
@@ -115,15 +126,25 @@ pub fn resolve_original_call_edges(
     Ok(edges)
 }
 
+/// The method lookups of one run that do not go through a stored impl header.
+struct CallMethodLookupSet {
+    bound_method_lookup_index: BoundMethodLookupIndex,
+    core_member_lookup_index: CoreMemberLookupIndex,
+}
+
 fn build_original_call_edge(
     site: &Value,
     context: &ImplHeaderSourceContext<'_>,
     members: &ImplMemberLookupIndex,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
-    lookup: &BoundMethodLookupIndex,
+    lookups: &CallMethodLookupSet,
     origins: &ExpandedTokenOriginIndex,
     generation: RunGenerationDigestValue,
 ) -> Result<Option<HldEdgeInputRecord>, OriginalCallResolutionError> {
+    let (lookup, core) = (
+        &lookups.bound_method_lookup_index,
+        &lookups.core_member_lookup_index,
+    );
     if !matches!(
         site["site_syntax_kind_value"].as_str(),
         Some("CALL_EXPR" | "METHOD_CALL_EXPR")
@@ -350,6 +371,22 @@ fn build_original_call_edge(
         Some((Err(withheld), _)) => (resolution, *withheld),
         None => (resolution, stopped),
     };
+    // REQ-RUST-056.0: a method of `core` on a receiver whose written type is proven.
+    let core_member = (builtin_member.is_none()
+        && matches!(resolution, HldEdgeResolutionValue::Unresolved { .. }))
+    .then(|| find_core_member_target(&evidence, receiver_evidence, context, members, core))
+    .transpose()?
+    .flatten();
+    let (resolution, stopped) = match &core_member {
+        Some((Ok(named), _)) => (
+            HldEdgeResolutionValue::Extracted {
+                target: named.external_target_identity_value.clone(),
+            },
+            "",
+        ),
+        Some((Err(withheld), _)) => (resolution, *withheld),
+        None => (resolution, stopped),
+    };
     let target = match &resolution {
         HldEdgeResolutionValue::Extracted { target } => Some(target.clone()),
         _ => None,
@@ -361,6 +398,7 @@ fn build_original_call_edge(
     let mut dispatch = json!({
         "dispatch_kind":match (&target, &bound_evidence) {
             (None, _) => "undetermined",
+            (Some(_), _) if matches!(core_member, Some((Ok(_), _))) => "core_inherent_member",
             (Some(_), _) if callee.callee_path_row_decision.is_some() => {
                 callee.callee_path_dispatch_kind
             }
@@ -399,6 +437,12 @@ fn build_original_call_edge(
     }
     if let Some((named, lookup)) = builtin_member {
         dispatch["type_relative_member_evidence"] = lookup;
+        if let Ok(named) = named {
+            dispatch["external_target_proof_record"] = named.external_proof_metadata_value;
+        }
+    }
+    if let Some((named, lookup)) = core_member {
+        dispatch["core_member_lookup_evidence"] = lookup;
         if let Ok(named) = named {
             dispatch["external_target_proof_record"] = named.external_proof_metadata_value;
         }

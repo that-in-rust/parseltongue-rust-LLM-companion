@@ -1155,6 +1155,7 @@ fn encode_hld_target_value(target: &HldTargetIdentityValue) -> JsonValue {
                 HldExternalNameKind::CrateRootedPath => "crate_rooted_path",
                 HldExternalNameKind::PreludeName => "prelude_name",
                 HldExternalNameKind::BuiltinMember => "builtin_member",
+                HldExternalNameKind::CoreDeclaredMember => "core_declared_member",
             },
             external.external_crate_name_value,
             external.external_item_path_text

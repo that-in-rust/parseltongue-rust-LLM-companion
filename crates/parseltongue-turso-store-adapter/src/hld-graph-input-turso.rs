@@ -1112,6 +1112,7 @@ fn decode_target_identity_value(
                 "crate_rooted_path" => HldExternalNameKind::CrateRootedPath,
                 "prelude_name" => HldExternalNameKind::PreludeName,
                 "builtin_member" => HldExternalNameKind::BuiltinMember,
+                "core_declared_member" => HldExternalNameKind::CoreDeclaredMember,
                 _ => return Err(malformed("unknown external name kind".into())),
             };
             let crate_name = match &value["external_crate_name"] {

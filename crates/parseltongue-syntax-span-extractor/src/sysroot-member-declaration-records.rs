@@ -4,6 +4,7 @@ use ra_ap_syntax::{
     ast::{self, HasAttrs, HasGenericParams, HasName, HasTypeBounds, HasVisibility},
 };
 use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[cfg(test)]
 #[path = "sysroot-member-declaration-tests.rs"]
@@ -54,6 +55,7 @@ pub fn extract_member_declaration_rows(
             }
             _ => Vec::new(),
         })
+        .chain(list_macro_call_rows(source_relative_path, tree.syntax()))
         .collect::<Vec<_>>();
     rows.sort_by_key(|row| row["member_name_start_offset"].as_u64());
     rows
@@ -284,6 +286,85 @@ fn read_macro_owner_shape(function: &SyntaxToken) -> &'static str {
     found
 }
 
+/// The last name of the path a use tree writes. `prefix::{self}` writes the last name of
+/// the prefix; `super`, `crate` and a bare `self` write none.
+fn read_use_tree_name(tree: &ast::UseTree) -> Option<String> {
+    let written = |tree: &ast::UseTree| {
+        tree.path()?
+            .segment()?
+            .name_ref()
+            .map(|name| name.text().to_string())
+            .filter(|name| !matches!(name.as_str(), "self" | "super" | "crate"))
+    };
+    written(tree).or_else(|| {
+        let list = tree.syntax().parent().and_then(ast::UseTreeList::cast)?;
+        written(&list.syntax().parent().and_then(ast::UseTree::cast)?)
+    })
+}
+
+fn read_previous_code_token(token: &SyntaxToken) -> Option<SyntaxToken> {
+    std::iter::successors(token.prev_token(), SyntaxToken::prev_token)
+        .find(|token| !token.kind().is_trivia())
+}
+
+/// REQ-RUST-054.0 D12: per macro name the file calls, in an item or inside tokens, the
+/// names written in those calls and whether one passes a macro variable on. A call of a
+/// macro variable (`$m!(..)`) is a row with no macro name.
+fn list_macro_call_rows(path: &str, root: &SyntaxNode) -> Vec<Value> {
+    root.descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+        .filter(|token| token.kind() == SyntaxKind::BANG)
+        .filter_map(|bang| {
+            let arguments = bang
+                .siblings_with_tokens(Direction::Next)
+                .skip(1)
+                .find(|element| !element.kind().is_trivia())?
+                .into_node()
+                .filter(|node| node.kind() == SyntaxKind::TOKEN_TREE)?;
+            let name = read_previous_code_token(&bang)
+                .filter(|token| token.kind() == SyntaxKind::IDENT)?;
+            let known = read_previous_code_token(&name)
+                .is_none_or(|token| token.kind() != SyntaxKind::DOLLAR);
+            Some((name, known, arguments))
+        })
+        .fold(
+            BTreeMap::<Option<String>, (SyntaxToken, BTreeSet<String>, bool)>::new(),
+            |mut found, (name, known, arguments)| {
+                let key = known.then(|| name.text().to_owned());
+                let (_, names, passed) = found
+                    .entry(key)
+                    .or_insert_with(|| (name, BTreeSet::new(), false));
+                arguments
+                    .descendants_with_tokens()
+                    .filter_map(|element| element.into_token())
+                    .for_each(|token| match token.kind() {
+                        SyntaxKind::IDENT => {
+                            names.insert(token.text().to_owned());
+                        }
+                        SyntaxKind::DOLLAR => *passed = true,
+                        _ => {}
+                    });
+                found
+            },
+        )
+        .into_iter()
+        .map(|(name, (first, names, passed))| {
+            let range = first.text_range();
+            json!({
+                "declaration_source_relative_path":path,
+                "member_name_start_offset":usize::from(range.start()),
+                "member_name_end_offset":usize::from(range.end()),
+                "member_declared_name_value":null,
+                "member_name_parameter_flag":false,
+                "declaration_owner_kind_value":"macro_call_name_tokens",
+                "owner_macro_name_value":name,
+                "macro_call_identifier_values":names,
+                "macro_call_metavariable_flag":passed,
+            })
+        })
+        .collect()
+}
+
 /// REQ-RUST-054.0 D9: the name a struct, enum, union, type alias outside an impl or
 /// trait, or `use .. as NAME` gives to a type. The alias and the rename are rows because
 /// either gives a second name to a type.
@@ -299,12 +380,24 @@ fn build_type_name_row(path: &str, node: &SyntaxNode) -> Option<Value> {
         {
             "type_alias"
         }
+        SyntaxKind::RENAME
+            if node
+                .parent()
+                .is_some_and(|parent| parent.kind() == SyntaxKind::EXTERN_CRATE) =>
+        {
+            "extern_crate_rename"
+        }
         SyntaxKind::RENAME => "use_rename",
         _ => return None,
     };
     let name = node.children().find_map(ast::Name::cast)?;
     let range = name.syntax().text_range();
+    let renamed = (kind == "use_rename")
+        .then(|| node.parent().and_then(ast::UseTree::cast))
+        .flatten()
+        .and_then(|tree| read_use_tree_name(&tree));
     Some(json!({
+        "rename_source_name_value":renamed,
         "declaration_source_relative_path":path,
         "member_name_start_offset":usize::from(range.start()),
         "member_name_end_offset":usize::from(range.end()),

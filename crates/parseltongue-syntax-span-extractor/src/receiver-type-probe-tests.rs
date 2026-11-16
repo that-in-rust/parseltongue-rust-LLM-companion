@@ -266,3 +266,41 @@ fn test_scope_trait_blocks_target() {
         probe("&[u8]", "get_unchecked", &[unread("reference")])
     );
 }
+
+/// REQ-RUST-056.0 P1, REQ-RUST-054.0 D12: a macro that takes its member's name from its
+/// caller may declare the probed name unless every call of it in `core` is read and
+/// none writes that name.
+#[test]
+fn test_macro_name_parameter_calls() {
+    let outcome = |extra: &str| {
+        let source = format!(
+            "impl<T> [T] {{ pub const fn len(&self) -> usize {{ 0 }} }}\n\
+             macro_rules! member {{ ($name:ident) => {{ fn $name(self) {{}} }} }}\n{extra}"
+        );
+        let rows = extract_member_declaration_rows("core/src/fixture.rs", &source);
+        match probe_core_member_declaration(&shape("&[u8]"), "len", &rows, &[]) {
+            CoreMemberProbeOutcome::Named { .. } => "named",
+            CoreMemberProbeOutcome::Withheld(detail) => detail,
+        }
+    };
+    let unknown = "macro_member_owner_unknown";
+    assert_eq!(unknown, outcome(""));
+    assert_eq!("named", outcome("impl Iter { member! { fold } }"));
+    assert_eq!(
+        unknown,
+        outcome("impl Iter { member! { fold } member!(len); }")
+    );
+    let passed = "impl Iter { member! { fold } }\n\
+        macro_rules! outer { ($n:ident) => { member!($n); } }";
+    assert_eq!(unknown, outcome(passed));
+    let called = "impl Iter { member! { fold } }\n\
+        macro_rules! outer { ($m:ident) => { $m!(fold); } }";
+    // A call of a macro variable is a call of `member` only when a call in `core`
+    // writes the name `member` in its arguments.
+    assert_eq!("named", outcome(called));
+    assert_eq!(unknown, outcome(&format!("{called}\nouter!(member);")));
+    assert_eq!(
+        unknown,
+        outcome("impl Iter { member! { fold } } use member as other;")
+    );
+}

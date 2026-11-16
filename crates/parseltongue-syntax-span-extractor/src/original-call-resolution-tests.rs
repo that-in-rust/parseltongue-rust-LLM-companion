@@ -60,8 +60,19 @@ impl StageTableStorePort for OriginalCallFixtureStore {
     ) -> Result<bool, StoreBackendFailureError> {
         unreachable!()
     }
-    fn read_file_content_bytes(&self, _: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
-        unreachable!()
+    // A fixture stores a file's text as the payload of a row keyed by its digest.
+    fn read_file_content_bytes(&self, digest: &str) -> Result<Vec<u8>, StoreBackendFailureError> {
+        Ok(self
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|row| {
+                row.stage_owned_table_name == "fixture-file-content-bytes"
+                    && row.stage_row_record_key == digest
+            })
+            .map(|row| row.stage_row_payload_text.clone().into_bytes())
+            .unwrap_or_default())
     }
     fn publish_workspace_generation_manifest(
         &self,

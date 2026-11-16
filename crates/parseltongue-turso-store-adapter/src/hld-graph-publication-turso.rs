@@ -477,6 +477,7 @@ pub(super) fn encode_external_name_kind(kind: HldExternalNameKind) -> &'static s
         HldExternalNameKind::CrateRootedPath => "crate_rooted_path",
         HldExternalNameKind::PreludeName => "prelude_name",
         HldExternalNameKind::BuiltinMember => "builtin_member",
+        HldExternalNameKind::CoreDeclaredMember => "core_declared_member",
     }
 }
 

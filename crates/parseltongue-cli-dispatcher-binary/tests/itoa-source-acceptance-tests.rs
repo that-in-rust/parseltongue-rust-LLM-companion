@@ -2293,9 +2293,22 @@ fn test_core_member_rows_published() {
             input.input_edge_records.len(),
         )
     };
-    assert_eq!(labels(&excluded), labels(&input));
-    assert_eq!(151, input.input_node_records.len());
-    assert_eq!(682, input.input_edge_records.len());
+    // REQ-RUST-056.0: reading the declarations adds the members of `core` a call is
+    // proven to reach, and no other node or edge row.
+    let (excluded_nodes, excluded_edges) = labels(&excluded);
+    let (nodes, edges) = labels(&input);
+    let added = nodes
+        .iter()
+        .filter(|node| !excluded_nodes.contains(node))
+        .map(String::as_str)
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        std::collections::BTreeSet::from(["MaybeUninit<T>::write", "[T]::get_unchecked"]),
+        added
+    );
+    assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
+    assert_eq!((151, 682), (excluded_nodes.len(), excluded_edges));
+    assert_eq!((153, 682), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -5862,5 +5875,96 @@ fn test_itoa_whole_graph_equality() {
         differing_nodes.join("\n"),
         differing_rows.len(),
         differing_rows.join("\n")
+    );
+}
+
+/// REQ-RUST-056.0 I1: with the declarations of `core` read, a method call on a
+/// parameter whose written type names the receiver has the member `core` declares as
+/// its target. Every other method call into `core` stays without one.
+#[test]
+fn test_itoa_core_member_targets() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = prepare_pinned_itoa_workspace(directory.path());
+    let database = directory.path().join("d.db");
+    let output = run_itoa_mapping_command(
+        &root,
+        &database,
+        &[
+            "--sysroot-source-scope-kind",
+            "declarations",
+            "--mapping-final-stage-kind",
+            "full-item-dependency-graph",
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let store =
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap()).unwrap();
+    let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+    let input = store
+        .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
+        .unwrap();
+    let calls = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Calls)
+        .collect::<Vec<_>>();
+    let mut found = calls
+        .iter()
+        .filter_map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref()?).unwrap();
+            let HldEdgeResolutionValue::Extracted { target } = &edge.edge_resolution_value else {
+                return None;
+            };
+            let target = format!("{target:?}");
+            let path = target
+                .split("external_item_path_text: \"")
+                .nth(1)?
+                .split('"')
+                .next()?
+                .to_owned();
+            let evidence = &metadata["core_member_lookup_evidence"];
+            (metadata["dispatch_kind"] == "core_inherent_member").then(|| {
+                format!(
+                    "{path} on {} at {} in {}",
+                    evidence["receiver_type_text"].as_str().unwrap(),
+                    evidence["method_probe_step_text"].as_str().unwrap(),
+                    evidence["declaration_source_relative_path"]
+                        .as_str()
+                        .unwrap()
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    found.sort();
+    let write = "MaybeUninit<T>::write on MaybeUninit<u8> at step 0 by mutable reference \
+        in core/src/mem/maybe_uninit.rs";
+    let mut expected = vec![write.to_owned(); 8];
+    expected.push(
+        "[T]::get_unchecked on &[MaybeUninit<u8>] at step 0 by value in core/src/slice/mod.rs"
+            .to_owned(),
+    );
+    assert_eq!(expected, found);
+    let unresolved = calls
+        .iter()
+        .filter(|edge| {
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            )
+        })
+        .count();
+    assert_eq!(
+        (153, 682, 197, 124),
+        (
+            input.input_node_records.len(),
+            input.input_edge_records.len(),
+            calls.len(),
+            unresolved
+        )
     );
 }

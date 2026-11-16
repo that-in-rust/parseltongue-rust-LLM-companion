@@ -94,7 +94,10 @@ fn test_trait_member_row_fields() {
 #[test]
 fn test_macro_body_member_rows() {
     let source = "macro_rules! uint_impl {\n    (Self = $SelfT:ty, $name:ident) => {\n        impl $SelfT {\n            pub const fn ilog10(self) -> u32 { self.checked_ilog10().unwrap() }\n            pub fn $name(self) {}\n        }\n    };\n}\nuint_impl! { Self = u8, extra }\n";
-    let rows = extract_member_declaration_rows("num/uint_macros.rs", source);
+    let rows = extract_member_declaration_rows("num/uint_macros.rs", source)
+        .into_iter()
+        .filter(|row| row["declaration_owner_kind_value"] != "macro_call_name_tokens")
+        .collect::<Vec<_>>();
     assert_eq!(2, rows.len(), "{rows:#?}");
     let ilog10 = find_member_row_named(&rows, "macro_definition_body", "ilog10");
     assert_eq!(json!("uint_impl"), ilog10["owner_macro_name_value"]);
@@ -290,4 +293,66 @@ fn test_prelude_use_leaf_rows() {
         read("core/src/prelude/v1.rs")
     );
     assert!(read("core/src/iter/mod.rs").is_empty());
+}
+
+/// REQ-RUST-054.0 D11: a `use .. as NAME` row keeps the last name of the path it
+/// renames, which for `self` is the last name before the braces. An
+/// `extern crate .. as NAME` names a crate and is a row of its own kind.
+#[test]
+fn test_rename_source_name_rows() {
+    let source = "pub use crate::iter::Hidden as Shown;\n\
+        pub use crate::fmt::{self as text, Write as Emit};\n\
+        extern crate self as inner;\npub use super as up;\n";
+    let found = extract_member_declaration_rows("core/src/slice/mod.rs", source)
+        .into_iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "type_name_declaration")
+        .map(|row| {
+            format!(
+                "{} {} from {}",
+                row["type_declaration_kind_value"].as_str().unwrap(),
+                row["member_declared_name_value"].as_str().unwrap(),
+                row["rename_source_name_value"].as_str().unwrap_or("-")
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            "use_rename Shown from Hidden",
+            "use_rename text from fmt",
+            "use_rename Emit from Write",
+            "extern_crate_rename inner from -",
+            "use_rename up from -"
+        ],
+        found
+    );
+}
+
+/// REQ-RUST-054.0 D12: per macro name a file calls, the names written in those calls and
+/// whether a call passes a macro variable on. A call of a macro variable has no name.
+#[test]
+fn test_macro_call_token_rows() {
+    let source = "macro_rules! member { ($name:ident) => { fn $name(self) {} } }\n\
+        impl A { member! { first } crate::member!(second); }\n\
+        macro_rules! outer { ($n:ident, $m:ident) => { impl B { member!($n); $m!(third); } } }\n\
+        fn f() { assert!(!(a != b)); }\n";
+    let found = extract_member_declaration_rows("core/src/slice/mod.rs", source)
+        .into_iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "macro_call_name_tokens")
+        .map(|row| {
+            format!(
+                "{} {} {}",
+                row["owner_macro_name_value"].as_str().unwrap_or("-"),
+                row["macro_call_identifier_values"],
+                row["macro_call_metavariable_flag"]
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            r#"member ["first","n","second"] true"#,
+            r#"- ["third"] false"#,
+            r#"assert ["a","b"] false"#
+        ],
+        found
+    );
 }

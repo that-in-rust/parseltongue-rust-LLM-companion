@@ -96,6 +96,9 @@ pub enum HldExternalNameKind {
     PreludeName,
     /// A member reached through a builtin type that no read source declares.
     BuiltinMember,
+    /// REQ-RUST-056.0: a member that the read declarations of `core` prove: the self
+    /// type as `core` writes it, `::`, the member's name.
+    CoreDeclaredMember,
 }
 
 /// REQ-RUST-053.0 N1: an item outside the read source, known by the path the source writes.
@@ -1032,7 +1035,19 @@ fn validate_hld_external_key(
             && !segment.contains(|letter: char| letter.is_whitespace() || letter == ':')
     });
     let crate_name = external_key.external_crate_name_value.as_deref();
+    // The self type of a `core` member is written text and may hold spaces: `*mut T`.
+    let well_formed = well_formed
+        || (external_key.external_name_kind_value == HldExternalNameKind::CoreDeclaredMember
+            && external_key
+                .external_item_path_text
+                .rsplit_once("::")
+                .is_some_and(|(owner, member)| {
+                    !owner.trim().is_empty()
+                        && !member.is_empty()
+                        && !member.contains(|letter: char| letter.is_whitespace() || letter == ':')
+                }));
     let shape_holds = match external_key.external_name_kind_value {
+        HldExternalNameKind::CoreDeclaredMember => crate_name == Some("core"),
         HldExternalNameKind::CrateRootedPath => crate_name == segments.first().copied(),
         HldExternalNameKind::PreludeName => crate_name.is_none() && segments.len() == 1,
         HldExternalNameKind::BuiltinMember => {

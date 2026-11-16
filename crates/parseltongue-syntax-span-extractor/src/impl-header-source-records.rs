@@ -197,6 +197,14 @@ pub(super) struct ImplHeaderSourceContext<'a> {
 }
 
 impl ImplHeaderSourceContext<'_> {
+    /// The path of every file that holds a stored span of the run.
+    pub(super) fn list_span_file_paths(&self) -> BTreeSet<&str> {
+        self.spans
+            .values()
+            .filter_map(|span| span["file_source_absolute_path"].as_str())
+            .collect()
+    }
+
     pub(super) fn span(&self, key: &str) -> Result<&Value, ImplHeaderSourceError> {
         self.spans
             .get(key)
