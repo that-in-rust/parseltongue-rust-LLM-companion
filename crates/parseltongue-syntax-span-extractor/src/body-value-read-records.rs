@@ -12,7 +12,8 @@ use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
 use crate::type_relative_member_records::{
-    ImplMemberLookupIndex, read_impl_member_index, read_type_relative_parts,
+    ImplMemberLookupIndex, find_qualified_path_member, read_impl_member_index,
+    read_type_relative_parts,
 };
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
@@ -291,6 +292,34 @@ fn resolve_read_path_target(
     else {
         return Ok(None);
     };
+    // `<A as T>::NAME`: name lookup gives the trait's declaration. The member of the one
+    // stored impl of `T` for `A` is the more exact target (REQ-RUST-052.0 G14); the row
+    // keeps the declaration and the lookup record either way.
+    if kind == Some("Const")
+        && let Some(found) = find_qualified_path_member(
+            &build_site_evidence_value(site)?,
+            text,
+            context,
+            members,
+            "CONST",
+        )?
+    {
+        let member = found
+            .member_target_occurrence
+            .map(decode_occurrence_identity_value)
+            .transpose()?
+            .map(|key| HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(key)))
+            .filter(|member| endpoints.contains(member));
+        let mut metadata = describe(kind, Value::Null);
+        metadata["type_relative_member_evidence"] = found.member_lookup_evidence;
+        metadata["trait_declaration_symbol_row"] = symbol.clone();
+        return Ok(Some((
+            HldEdgeResolutionValue::Extracted {
+                target: member.unwrap_or(target),
+            },
+            metadata,
+        )));
+    }
     let walk = read_type_relative_prefix(text)
         .map(|prefix| {
             walk_parameter_bound_traits(

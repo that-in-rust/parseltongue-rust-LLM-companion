@@ -3780,8 +3780,8 @@ fn test_trait_path_call_targets() {
 
 /// REQ-RUST-052.0 G7: a const, a type alias and a struct are `reads` sources too. A path
 /// expression in a const's initializer or in an array length of a type is one row, from the
-/// item it is written in. `<T as Trait>::NAME` has the trait's declaration of `NAME` as
-/// target: the impl member for `T` is not chosen yet. `uN::MAX` is in `core` and has none.
+/// item it is written in. `<T as Trait>::NAME` has the impl member for `T` as target
+/// (G14). `uN::MAX` is in `core` and has none.
 #[test]
 fn test_item_initializer_read_rows() {
     let (_directory, _root, _database, input) = run_original_graph_fixture();
@@ -3845,7 +3845,8 @@ fn test_item_initializer_read_rows() {
                 row(
                     format!("<{size} as Integer>::MAX_STR_LEN"),
                     format!("<{fixed}asInteger>::MAX_STR_LEN"),
-                    "Integer::MAX_STR_LEN".to_owned(),
+                    // G14: the member of the one stored impl of `Integer` for the anchor type.
+                    format!("<{fixed} as Integer>::MAX_STR_LEN"),
                 )
             }),
     )
@@ -3857,6 +3858,85 @@ fn test_item_initializer_read_rows() {
     .collect::<Vec<_>>();
     expected.sort();
     assert_eq!(rows, expected);
+}
+
+/// REQ-RUST-052.0 G14: each of the four `<T as Trait>::NAME` rows (two `reads`, two
+/// `uses_type`) keeps what proved its impl member: the anchor type, the trait the path
+/// names, the one candidate impl, the trait's declaration that name lookup gave, and the
+/// sources that were not read.
+#[test]
+fn test_qualified_path_member_evidence() {
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
+    let mut rows = input
+        .input_edge_records
+        .iter()
+        .filter_map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref()?).ok()?;
+            let proof = &metadata["type_relative_member_evidence"];
+            let outcome = proof["qualified_path_outcome_kind"].as_str()?.to_owned();
+            assert!(matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Extracted { .. }
+            ));
+            assert_eq!(
+                proof["qualified_trait_resolution"]["resolution_state_kind"],
+                "resolved"
+            );
+            assert_eq!(
+                proof["member_candidate_impl_rows"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                1
+            );
+            let anchor = proof["self_type_source_text"].as_str().unwrap().to_owned();
+            assert_eq!(
+                proof["sources_not_read"],
+                json!([
+                    format!("inherent items of builtin type {anchor}"),
+                    format!("trait impls for {anchor} in crates whose source was not read")
+                ])
+            );
+            Some((
+                format!("{:?}", edge.edge_relation_kind_value),
+                anchor,
+                proof["qualified_trait_source_text"]
+                    .as_str()
+                    .unwrap()
+                    .replace(' ', ""),
+                outcome,
+                proof["member_lookup_outcome_kind"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+                metadata["trait_declaration_symbol_row"]["target_symbol_kind_value"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            ))
+        })
+        .collect::<Vec<_>>();
+    rows.sort();
+    let row = |relation: &str, anchor: &str, named: &str, kind: &str| {
+        (
+            relation.to_owned(),
+            anchor.to_owned(),
+            named.to_owned(),
+            "impl_member_of_named_trait".to_owned(),
+            "single_trait_impl_member".to_owned(),
+            kind.to_owned(),
+        )
+    };
+    assert_eq!(
+        rows,
+        [
+            row("Reads", "i64", "Integer", "Const"),
+            row("Reads", "u64", "Integer", "Const"),
+            row("UsesType", "i64", "private::Sealed", "TypeAlias"),
+            row("UsesType", "u64", "private::Sealed", "TypeAlias"),
+        ]
+    );
 }
 
 /// REQ-RUST-052.0 G7: the declared type of a const or static and the aliased type of a
@@ -3958,7 +4038,8 @@ fn test_declared_type_use_rows() {
                         "TYPE_ALIAS",
                         "definition",
                         &format!("<{fixed}asprivate::Sealed>::Buffer"),
-                        "private::Sealed::Buffer",
+                        // G14: the member of the one stored impl for the anchor type.
+                        &format!("<{fixed} as private::Sealed>::Buffer"),
                     ),
                     // The type name is copied from the macro call.
                     row(alias.clone(), "TYPE_ALIAS", "invocation", fixed, fixed),

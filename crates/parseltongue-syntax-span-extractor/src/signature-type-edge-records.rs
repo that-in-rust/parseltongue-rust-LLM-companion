@@ -7,7 +7,8 @@ use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
 };
 use crate::type_relative_member_records::{
-    ImplMemberLookupIndex, read_impl_member_index, read_type_relative_parts,
+    ImplMemberLookupIndex, find_qualified_path_member, read_impl_member_index,
+    read_type_relative_parts,
 };
 use crate::{SyntaxFileInputData, check_syntax_item_node, restore_source_byte_offset};
 use parseltongue_core_row_types::*;
@@ -347,8 +348,34 @@ fn build_type_path_edge(
         ))
     })
     .transpose()?;
+    // `<A as T>::NAME` that name lookup gave the trait's declaration: the type alias member
+    // of the one stored impl of `T` for `A` is the more exact target (REQ-RUST-052.0 G14).
+    let qualified = matches!(resolution, HldEdgeResolutionValue::Extracted { .. })
+        .then(|| find_qualified_path_member(&evidence, text, context, graph.members, "TYPE_ALIAS"))
+        .transpose()?
+        .flatten()
+        .map(|found| {
+            Ok::<_, SignatureTypeEdgeError>((
+                found
+                    .member_target_occurrence
+                    .map(decode_occurrence_identity_value)
+                    .transpose()?
+                    .map(|key| HldTargetIdentityValue::from(NameSymbolTargetKey::Definition(key)))
+                    .filter(|target| graph.endpoints.contains(target)),
+                found.member_lookup_evidence,
+            ))
+        })
+        .transpose()?;
+    // The stored lookup row of the trait's declaration stays on the row.
+    let declaration = match &qualified {
+        Some(_) => context
+            .read_type_path_records(&evidence, path)?
+            .first()
+            .map(|record| record["path_target_symbol_rows"][0].clone()),
+        None => None,
+    };
     // The member lookup's record stays on the row whether or not it proved a target.
-    let (resolution, proof) = match proven {
+    let (resolution, proof) = match proven.or(qualified) {
         Some((Some(target), proof)) => (HldEdgeResolutionValue::Extracted { target }, proof),
         Some((None, proof)) => (resolution, proof),
         None => (resolution, Value::Null),
@@ -368,6 +395,9 @@ fn build_type_path_edge(
     }
     if !proof.is_null() {
         metadata["type_relative_member_evidence"] = proof;
+    }
+    if let Some(declaration) = declaration {
+        metadata["trait_declaration_symbol_row"] = declaration;
     }
     let origin = graph.origins.build_site_origin_value(&evidence, context)?;
     if !origin.is_null() {

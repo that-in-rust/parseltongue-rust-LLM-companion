@@ -280,3 +280,180 @@ fn test_type_relative_path_parts() {
     assert_eq!(read_type_relative_parts("<T as A>::N"), None);
     assert_eq!(read_type_relative_parts("Vec<u8>::N"), None);
 }
+
+/// REQ-RUST-052.0 G14: `<A as T>::NAME` is read as its anchor type, its trait path and its
+/// member name, each part at its byte offset. Tokens of expanded text are apart by spaces.
+/// Generic arguments, a missing `as` or a longer tail give no parts.
+#[test]
+fn test_qualified_path_parts_read() {
+    let parts = |text| {
+        read_qualified_path_parts(text).map(|parts| {
+            assert_eq!(
+                &text[parts.anchor_type_text_offset..][..parts.anchor_type_source_text.len()],
+                parts.anchor_type_source_text
+            );
+            assert_eq!(
+                &text[parts.trait_path_text_offset..][..parts.trait_path_source_text.len()],
+                parts.trait_path_source_text
+            );
+            (
+                parts.anchor_type_source_text,
+                parts.anchor_type_text_offset,
+                parts.trait_path_source_text,
+                parts.trait_path_text_offset,
+                parts.member_declared_name_value,
+            )
+        })
+    };
+    assert_eq!(
+        parts("<u64 as Integer>::MAX_STR_LEN"),
+        Some(("u64", 1, "Integer", 8, "MAX_STR_LEN"))
+    );
+    assert_eq!(
+        parts("< i64 as private :: Sealed > :: Buffer"),
+        Some(("i64", 2, "private :: Sealed", 9, "Buffer"))
+    );
+    assert_eq!(parts("<m::A as T>::r#N"), Some(("m::A", 1, "T", 9, "r#N")));
+    for text in [
+        "u64::MAX",
+        "<u64>::MAX",
+        "<Vec<u8> as T>::N",
+        "<u64 as T<u8>>::N",
+        "<u64 as T>::N::M",
+        "<u64 as T>::N<u8>",
+        "<u64 as T>",
+        "<[u8] as T>::N",
+        "<&u8 as T>::N",
+        "<u64 as T as U>::N",
+        "<u64 asT>::N",
+    ] {
+        assert_eq!(parts(text), None, "{text}");
+    }
+}
+
+/// REQ-RUST-052.0 G14: the member of `<u8 as A>::N` is the member of the one stored impl
+/// of `A` for `u8` that declares `N`. An inherent impl or an impl of another stored trait
+/// is not a candidate. A second impl of `A`, an impl whose trait or self type has no stored
+/// target, a member of another kind, a trait without a stored target or an anchor without
+/// one give no member; the record says which.
+#[test]
+fn test_qualified_member_trait_match() {
+    let parts = read_qualified_path_parts("<u8 as A>::N").unwrap();
+    let lookup = |headers: Vec<Value>, anchor: Value, named: Value| {
+        let index = ImplMemberLookupIndex {
+            impl_header_value_rows: headers,
+        };
+        let found = index.find_qualified_member_target(&parts, &anchor, &named, "CONST");
+        assert_eq!(
+            found.member_lookup_evidence["qualified_trait_source_text"],
+            "A"
+        );
+        assert_eq!(
+            found.member_lookup_evidence["qualified_trait_resolution"],
+            named
+        );
+        (
+            found.member_target_occurrence.cloned(),
+            found.member_lookup_evidence["qualified_path_outcome_kind"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        )
+    };
+    let u8_type = || resolved_builtin_type("u8");
+    let of_a = || impl_header_fixture(u8_type(), Some("A"), &[("N", "CONST")]);
+    let of_b = || impl_header_fixture(u8_type(), Some("B"), &[("N", "CONST")]);
+    let unstored = json!({"resolution_state_kind":"unresolved","target_identity":null});
+    assert_eq!(
+        lookup(vec![of_a()], u8_type(), resolved_trait_type("A")),
+        (
+            Some(json!("semantic Some(\"A\") N")),
+            "impl_member_of_named_trait".to_owned()
+        )
+    );
+    let inherent = || impl_header_fixture(u8_type(), None, &[("N", "CONST")]);
+    let member_of_a = || {
+        (
+            Some(json!("semantic Some(\"A\") N")),
+            "impl_member_of_named_trait".to_owned(),
+        )
+    };
+    let unproven = || (None, "impl_member_not_proven".to_owned());
+    assert_eq!(
+        lookup(vec![of_b()], u8_type(), resolved_trait_type("A")),
+        unproven()
+    );
+    assert_eq!(
+        lookup(vec![inherent()], u8_type(), resolved_trait_type("A")),
+        unproven()
+    );
+    assert_eq!(
+        lookup(
+            vec![of_b(), of_a(), inherent()],
+            u8_type(),
+            resolved_trait_type("A")
+        ),
+        member_of_a()
+    );
+    // Two stored impls of `A` for `u8` (`impl A<u16> for u8` beside `impl A for u8`).
+    assert_eq!(
+        lookup(vec![of_a(), of_a()], u8_type(), resolved_trait_type("A")),
+        unproven()
+    );
+    // An impl whose trait has no stored target may be an impl of `A`.
+    let mut unknown_trait = of_b();
+    unknown_trait["impl_trait_type_resolution"] =
+        json!({"resolution_state_kind":"unresolved","target_identity":null});
+    assert_eq!(
+        lookup(
+            vec![of_a(), unknown_trait],
+            u8_type(),
+            resolved_trait_type("A")
+        ),
+        unproven()
+    );
+    // An impl whose self type has no stored target may be an impl for `u8`.
+    let blanket = |name| {
+        impl_header_fixture(
+            json!({"resolution_state_kind":"unresolved","target_identity":null}),
+            Some(name),
+            &[("N", "CONST")],
+        )
+    };
+    assert_eq!(
+        lookup(
+            vec![of_a(), blanket("A")],
+            u8_type(),
+            resolved_trait_type("A")
+        ),
+        unproven()
+    );
+    assert_eq!(
+        lookup(
+            vec![of_a(), blanket("B")],
+            u8_type(),
+            resolved_trait_type("A")
+        ),
+        member_of_a()
+    );
+    assert_eq!(
+        lookup(vec![blanket("A")], u8_type(), resolved_trait_type("A")),
+        unproven()
+    );
+    assert_eq!(
+        lookup(vec![of_a()], u8_type(), unstored.clone()),
+        (None, "qualified_trait_not_stored".to_owned())
+    );
+    assert_eq!(
+        lookup(vec![of_a()], unstored, resolved_trait_type("A")),
+        (None, "anchor_type_not_stored".to_owned())
+    );
+    assert_eq!(
+        lookup(
+            vec![impl_header_fixture(u8_type(), Some("A"), &[("N", "FN")])],
+            u8_type(),
+            resolved_trait_type("A")
+        ),
+        (None, "impl_member_not_proven".to_owned())
+    );
+}

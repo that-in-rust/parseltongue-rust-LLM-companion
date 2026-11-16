@@ -1,4 +1,6 @@
-use crate::impl_header_source_records::{ImplHeaderSourceError, read_impl_stage_values};
+use crate::impl_header_source_records::{
+    ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_stage_values,
+};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
 use serde_json::{Value, json};
@@ -35,6 +37,91 @@ pub(super) fn read_type_relative_parts(text: &str) -> Option<(&str, &str)> {
                 .all(|letter| letter.is_alphanumeric() || letter == '_')
     };
     (plain(prefix) && plain(member)).then_some((prefix, member))
+}
+
+/// The parts of a qualified path `<A as T>::NAME`: the anchor type `A` and the trait path
+/// `T`, each with its byte offset in the path's text, and the member's name
+/// (REQ-RUST-052.0 G14).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct QualifiedPathPartsValue<'a> {
+    pub(super) anchor_type_source_text: &'a str,
+    pub(super) anchor_type_text_offset: usize,
+    pub(super) trait_path_source_text: &'a str,
+    pub(super) trait_path_text_offset: usize,
+    pub(super) member_declared_name_value: &'a str,
+}
+
+/// `None` when `text` is not `<A as T>::NAME` with `A` and `T` plain paths without
+/// generic arguments and `NAME` one identifier.
+pub(super) fn read_qualified_path_parts(text: &str) -> Option<QualifiedPathPartsValue<'_>> {
+    let inner = text.strip_prefix('<')?;
+    let (inner, tail) = inner.split_once('>')?;
+    let (anchor, named) = inner.split_once(" as ")?;
+    let member = tail.trim_start().strip_prefix("::")?.trim();
+    // A path of identifiers: no generic arguments, reference, slice or second `as`.
+    let plain_path = |path: &str| {
+        !path.is_empty()
+            && path.split("::").all(|name| {
+                let name = name.trim();
+                !name.is_empty()
+                    && name
+                        .chars()
+                        .all(|letter| letter.is_alphanumeric() || letter == '_' || letter == '#')
+            })
+    };
+    let offset = |part: &str| part.as_ptr() as usize - text.as_ptr() as usize;
+    let (anchor, named) = (anchor.trim(), named.trim());
+    (plain_path(anchor) && plain_path(named) && plain_path(member) && !member.contains("::")).then(
+        || QualifiedPathPartsValue {
+            anchor_type_source_text: anchor,
+            anchor_type_text_offset: offset(anchor),
+            trait_path_source_text: named,
+            trait_path_text_offset: offset(named),
+            member_declared_name_value: member,
+        },
+    )
+}
+
+/// The impl member a qualified path `<A as T>::NAME` names, read from the stored lookups
+/// of `A` and `T` (REQ-RUST-052.0 G14). `None` when `text` is not such a path.
+pub(super) fn find_qualified_path_member<'a>(
+    evidence: &Value,
+    text: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &'a ImplMemberLookupIndex,
+    kind: &str,
+) -> Result<Option<TypeMemberLookupValue<'a>>, ImplHeaderSourceError> {
+    let Some(parts) = read_qualified_path_parts(text) else {
+        return Ok(None);
+    };
+    let start =
+        evidence["span_byte_start_offset"]
+            .as_u64()
+            .ok_or(ImplHeaderSourceError::InvalidField {
+                table: "path-resolution-site-records",
+                field: "span_byte_start_offset",
+            })?;
+    let part = |offset: usize, text: &str| {
+        json!({
+            "span_byte_start_offset":start + offset as u64,
+            "span_byte_end_offset":start + (offset + text.len()) as u64,
+            "type_simple_path_flag":true,
+            "type_source_text":text
+        })
+    };
+    let anchor = context.resolve_type(
+        evidence,
+        &part(parts.anchor_type_text_offset, parts.anchor_type_source_text),
+        false,
+    )?;
+    let named = context.resolve_type(
+        evidence,
+        &part(parts.trait_path_text_offset, parts.trait_path_source_text),
+        true,
+    )?;
+    Ok(Some(members.find_qualified_member_target(
+        &parts, &anchor, &named, kind,
+    )))
 }
 
 /// The outcome of looking a member up through a type: the stored occurrence
@@ -75,6 +162,63 @@ impl ImplMemberLookupIndex {
             .map(|header| &header["impl_self_type_resolution"])
     }
 
+    /// The member `name` of the impl of the trait `trait_type` for the type `anchor_type`
+    /// (both stored type resolutions) (REQ-RUST-052.0 G14).
+    ///
+    /// The candidates are those of `find_type_member_target`, less the impls the path
+    /// cannot name: an inherent impl, and an impl of another stored trait. An impl whose
+    /// trait has no stored target may be an impl of this trait and stays a candidate. No
+    /// member is given when the trait the path names has no stored target.
+    pub(super) fn find_qualified_member_target(
+        &self,
+        parts: &QualifiedPathPartsValue<'_>,
+        anchor_type: &Value,
+        trait_type: &Value,
+        kind: &str,
+    ) -> TypeMemberLookupValue<'_> {
+        let stored_trait = trait_type["resolution_state_kind"] == "resolved";
+        let found = self.find_admitted_member_target(
+            parts.anchor_type_source_text,
+            anchor_type,
+            parts.member_declared_name_value,
+            kind,
+            |header| {
+                let stored = &header["impl_trait_type_resolution"];
+                !stored.is_null()
+                    && (!stored_trait
+                        || stored["resolution_state_kind"] != "resolved"
+                        || stored["target_identity"] == trait_type["target_identity"])
+            },
+        );
+        let anchor_stored = found.is_some();
+        let (member, mut evidence) = match found {
+            Some(found) => (
+                found.member_target_occurrence.filter(|_| stored_trait),
+                found.member_lookup_evidence,
+            ),
+            None => (
+                None,
+                json!({
+                    "self_type_source_text":parts.anchor_type_source_text,
+                    "anchor_type_resolution":anchor_type
+                }),
+            ),
+        };
+        evidence["qualified_trait_source_text"] = json!(parts.trait_path_source_text);
+        evidence["qualified_trait_resolution"] = trait_type.clone();
+        evidence["qualified_path_outcome_kind"] =
+            json!(match (anchor_stored, stored_trait, member.is_some()) {
+                (false, _, _) => "anchor_type_not_stored",
+                (true, false, _) => "qualified_trait_not_stored",
+                (true, true, true) => "impl_member_of_named_trait",
+                (true, true, false) => "impl_member_not_proven",
+            });
+        TypeMemberLookupValue {
+            member_target_occurrence: member,
+            member_lookup_evidence: evidence,
+        }
+    }
+
     /// What the stored impl headers say about the member `name` of syntax kind
     /// `kind` reached through the type `self_type` (a stored self type
     /// resolution). `None` when the type itself has no stored target.
@@ -92,6 +236,18 @@ impl ImplMemberLookupIndex {
         self_type: &Value,
         name: &str,
         kind: &str,
+    ) -> Option<TypeMemberLookupValue<'_>> {
+        self.find_admitted_member_target(prefix_text, self_type, name, kind, |_| true)
+    }
+
+    /// `find_type_member_target` over the stored impls `admit` lets through.
+    fn find_admitted_member_target(
+        &self,
+        prefix_text: &str,
+        self_type: &Value,
+        name: &str,
+        kind: &str,
+        admit: impl Fn(&Value) -> bool,
     ) -> Option<TypeMemberLookupValue<'_>> {
         if self_type["resolution_state_kind"] != "resolved" {
             return None;
@@ -111,6 +267,7 @@ impl ImplMemberLookupIndex {
                 same(header)
                     || header["impl_self_type_resolution"]["resolution_state_kind"] != "resolved"
             })
+            .filter(|header| admit(header))
             .filter_map(|header| {
                 find_named_impl_member(header, name).map(|member| (header, member))
             })
