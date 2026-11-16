@@ -280,3 +280,51 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 137 filtered out
   each assertion can fail. No deliberate breaks yet.
 - **Not built:** nothing calls the function. No run reads `core`. Step 8.1b adds the stage.
 - **Decision:** the D3 text also covers a `macro` definition, not only `macro_rules!`.
+
+### Part 8 step 8.1b — the scan as a stage of the run (2026-11-16)
+
+- **REQ:** REQ-RUST-054.0 D6 to D9 (part 8, section 6).
+- **STUB:** `collect_sysroot_member_rows` and `persist_sysroot_member_rows` with `todo!`, in
+  `crates/parseltongue-cli-dispatcher-binary/src/sysroot-member-declaration-facade.rs`.
+- **RED:**
+
+```text
+cargo test --release -p parseltongue-cli-dispatcher-binary --bin parseltongue test_core_directory_member_rows
+  not yet implemented: REQ-RUST-054.0 D6
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out
+cargo test --release -p parseltongue-cli-dispatcher-binary --test itoa-source-acceptance-tests test_core_member_rows_published
+  Error: "unknown sysroot source scope declarations"
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 58 filtered out
+```
+
+- **GREEN:** same two commands
+
+```text
+test_core_directory_member_rows ... ok     1 passed; 0 failed
+test_core_member_rows_published ... ok     1 passed; 0 failed; finished in 31.22s
+```
+
+- **What changed:** a third value `declarations` for `--sysroot-source-scope-kind`; the
+  stage table `sysroot-member-declaration-records`, registered in the Turso adapter; the
+  stage runs after the impl header rows.
+- **Measured on pinned itoa, 4 workers, `declarations`:**
+
+```text
+rows written        5,336 in 0.500 s
+whole run           15.63 s
+main process peak   363.7 MB   (one process, not the whole tree)
+store               28,377,088 bytes   (21,046,310 with excluded)
+nodes, edges        151, 682, the same labels as an excluded run
+```
+
+- **Deliberate breaks, each fails a test:** `declarations` treated as `included` (the run
+  fails after 223 s with the store copy mismatch); the table written for `excluded`; the
+  key separator; non-`.rs` files read.
+- **REFACTOR:** none needed.
+- **Checked:** format on the workspace; lint on the two touched crates.
+- **Not run:** the other 58 real-source tests, the workspace tests, the process audit.
+- **Not built:** nothing reads the table yet. The acceptance runs still use `excluded`.
+- **Open:** the run id does not hash the `core` source. It hashes the compiler version
+  text and the scope value.
+- **Acceptance:** the run of 2026-11-16 is no longer valid for this commit; production
+  changed. A new one follows step 8.6.

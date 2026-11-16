@@ -39,6 +39,8 @@ mod namespace_pipeline_publication_facade;
 mod oracle_path_comparison_facade;
 #[path = "published-stage-export-facade.rs"]
 mod published_stage_export_facade;
+#[path = "sysroot-member-declaration-facade.rs"]
+mod sysroot_member_declaration_facade;
 
 fn build_pipeline_stage_error(message: impl std::fmt::Display) -> StoreBackendFailureError {
     StoreBackendFailureError {
@@ -198,16 +200,19 @@ enum MappingFinalStageKind {
 }
 
 /// REQ-RUST-038.0: whether sysroot crates are added to the mapped crate graph.
+/// REQ-RUST-054.0 D6: `Declarations` adds none and stores the methods `core` declares.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SysrootSourceScopeKind {
     Included,
     Excluded,
+    Declarations,
 }
 
 fn parse_sysroot_scope_flag(value: Option<&str>) -> Result<SysrootSourceScopeKind, String> {
     match value {
         None | Some("included") => Ok(SysrootSourceScopeKind::Included),
         Some("excluded") => Ok(SysrootSourceScopeKind::Excluded),
+        Some("declarations") => Ok(SysrootSourceScopeKind::Declarations),
         Some(other) => Err(format!("unknown sysroot source scope {other}")),
     }
 }
@@ -620,7 +625,7 @@ fn prepare_sysroot_staging_scope(
         })
         .collect::<Result<BTreeMap<_, _>, StoreBackendFailureError>>()?;
     let requests = read_stage_json_records(store, scope, "syntax-file-work-requests")?;
-    let excluded = sysroot_scope == SysrootSourceScopeKind::Excluded;
+    let excluded = sysroot_scope != SysrootSourceScopeKind::Included;
     let needed = requests.iter().try_fold(false, |needed, request| {
         if needed || excluded {
             return Ok(needed);
@@ -749,6 +754,7 @@ fn run_workspace_mapping_pipeline(
                 value["workspace_sysroot_scope_kind"] = json!(match sysroot_scope {
                     SysrootSourceScopeKind::Included => "included",
                     SysrootSourceScopeKind::Excluded => "excluded",
+                    SysrootSourceScopeKind::Declarations => "declarations",
                 });
                 value["workspace_required_stage_names"] =
                     if matches!(final_stage, MappingFinalStageKind::NameResolution) {
@@ -893,6 +899,16 @@ fn run_workspace_mapping_pipeline(
         )?;
         eprintln!(
             "stage=impl-header-source-records rows={header_count} coverage=header-paths-only"
+        );
+    }
+    if sysroot_scope == SysrootSourceScopeKind::Declarations {
+        let started = std::time::Instant::now();
+        let member_count =
+            sysroot_member_declaration_facade::persist_sysroot_member_rows(store, &scope, cancel)?;
+        eprintln!(
+            "stage={} rows={member_count} elapsed_seconds={:.3}",
+            sysroot_member_declaration_facade::SYSROOT_MEMBER_STAGE_NAME,
+            started.elapsed().as_secs_f64()
         );
     }
     let started = std::time::Instant::now();

@@ -72,6 +72,10 @@ const STAGE_OWNED_TABLE_NAMES: &[(&str, &str)] = &[
     ),
     ("impl-header-index-table", "signature-type-lowering-stage"),
     (
+        "sysroot-member-declaration-records",
+        "sysroot-member-declaration-stage",
+    ),
+    (
         "item-effective-visibility-records",
         "item-effective-visibility-stage",
     ),

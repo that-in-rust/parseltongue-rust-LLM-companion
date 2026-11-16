@@ -2208,6 +2208,96 @@ fn test_sysroot_scope_excluded_units() {
     );
 }
 
+/// REQ-RUST-054.0 D6, D7, D8
+#[test]
+fn test_core_member_rows_published() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = prepare_pinned_itoa_workspace(directory.path());
+    let run = |name: &str, scope_kind: &str| {
+        let database = directory.path().join(name);
+        let output = run_itoa_mapping_command(
+            &root,
+            &database,
+            &[
+                "--sysroot-source-scope-kind",
+                scope_kind,
+                "--mapping-final-stage-kind",
+                "full-item-dependency-graph",
+            ],
+        );
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let store =
+            TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap())
+                .unwrap();
+        let scope = store.read_workspace_publication_scope().unwrap().unwrap();
+        let input = store
+            .assemble_full_graph_input(&scope, &RunCancelFlagValue::default())
+            .unwrap();
+        (database, input)
+    };
+    let (database, input) = run("declarations.db", "declarations");
+    let config = read_published_stage_rows(&database, "workspace-config-state-records");
+    assert_eq!(config[0]["workspace_sysroot_scope_kind"], "declarations");
+    let units = read_published_stage_rows(&database, "crate-dependency-graph-table");
+    assert!(
+        units
+            .iter()
+            .all(|unit| unit["unit_sysroot_context_flag"] != true)
+    );
+    let rows = read_published_stage_rows(&database, "sysroot-member-declaration-records");
+    assert!(rows.len() > 4000, "{} rows", rows.len());
+    assert!(rows.iter().all(|row| {
+        row["declaration_source_relative_path"]
+            .as_str()
+            .is_some_and(|path| path.starts_with("core/src/") && path.ends_with(".rs"))
+    }));
+    let find = |path: &str, self_type: &str, name: &str| {
+        rows.iter()
+            .filter(|row| {
+                row["declaration_source_relative_path"] == path
+                    && row["impl_self_type_text"] == self_type
+                    && row["member_declared_name_value"] == name
+                    && row["declaration_owner_kind_value"] == "inherent_impl"
+            })
+            .collect::<Vec<_>>()
+    };
+    let write = find("core/src/mem/maybe_uninit.rs", "MaybeUninit<T>", "write");
+    assert_eq!(1, write.len(), "{write:#?}");
+    assert_eq!("mutable_reference", write[0]["member_self_parameter_kind"]);
+    assert_eq!("&mut T", write[0]["member_return_type_text"]);
+    let len = find("core/src/slice/mod.rs", "[T]", "len");
+    assert_eq!(1, len.len(), "{len:#?}");
+    assert_eq!("reference", len[0]["member_self_parameter_kind"]);
+    assert!(rows.iter().any(|row| {
+        row["declaration_owner_kind_value"] == "macro_definition_body"
+            && row["member_declared_name_value"] == "ilog10"
+            && row["owner_macro_name_value"] == "uint_impl"
+    }));
+
+    let (excluded_database, excluded) = run("excluded.db", "excluded");
+    assert!(
+        read_published_stage_rows(&excluded_database, "sysroot-member-declaration-records")
+            .is_empty()
+    );
+    let labels = |input: &HldMaterializationInputRecord| {
+        (
+            input
+                .input_node_records
+                .iter()
+                .map(|node| node.node_qualified_path_text.clone())
+                .collect::<Vec<_>>(),
+            input.input_edge_records.len(),
+        )
+    };
+    assert_eq!(labels(&excluded), labels(&input));
+    assert_eq!(151, input.input_node_records.len());
+    assert_eq!(682, input.input_edge_records.len());
+}
+
 /// REQ-RUST-038.1, REQ-RUST-045.0
 #[test]
 fn test_sysroot_reached_names_reasoned() {

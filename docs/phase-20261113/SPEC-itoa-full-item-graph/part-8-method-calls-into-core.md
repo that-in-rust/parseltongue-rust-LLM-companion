@@ -107,10 +107,21 @@ One row per method that a `core` source file declares, from syntax only.
 - D4. Rows are ordered by the byte offset of the name. The row key is the path and that
   offset.
 - D5. Nothing is resolved: no path, no `cfg`, no macro call.
+- D6. A run with `--sysroot-source-scope-kind declarations` writes those rows to the
+  stage table `sysroot-member-declaration-records` for every `.rs` file under
+  `<sysroot>/lib/rustlib/src/rust/library/core/src`. Files are taken in path order. The
+  path in a row is relative to `library` (`core/src/mem/maybe_uninit.rs`); the row key is
+  that path, `#`, and the name's byte offset.
+- D7. That run adds no crate to the crate graph: like `excluded`, no unit is a sysroot
+  unit, and the stored nodes and edges are those of an `excluded` run.
+- D8. A run with `excluded` or `included` writes no row to that table.
+- D9. A file that cannot be read as UTF-8 fails the run. Nothing is skipped silently.
 
 ```text
 test_inherent_member_row_fields      D1 D2   crates/parseltongue-syntax-span-extractor/src/sysroot-member-declaration-tests.rs
 test_trait_member_row_fields         D1 D2   same file
 test_macro_body_member_rows          D3 D5   same file
 test_member_rows_offset_order        D4      same file
+test_core_directory_member_rows      D6 D9   crates/parseltongue-cli-dispatcher-binary/src/sysroot-member-declaration-tests.rs
+test_core_member_rows_published      D6 D7 D8  crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs
 ```
