@@ -34,6 +34,9 @@ mod cast_receiver_member_tests;
 #[path = "original-call-resolution-tests.rs"]
 pub(crate) mod original_call_resolution_tests;
 #[cfg(test)]
+#[path = "receiver-written-type-tests.rs"]
+mod receiver_written_type_tests;
+#[cfg(test)]
 #[path = "self-argument-member-tests.rs"]
 mod self_argument_member_tests;
 
@@ -1499,6 +1502,9 @@ fn extract_method_receiver_syntax(
         .zip(function.as_ref())
         .and_then(|(name, function)| find_named_function_parameter(function, name));
     let declared = parameter.as_ref().and_then(read_simple_type_name);
+    let written = parameter
+        .as_ref()
+        .and_then(|parameter| read_parameter_written_type(parameter, input, removed));
     let owner = declared
         .as_deref()
         .zip(function.as_ref())
@@ -1525,7 +1531,22 @@ fn extract_method_receiver_syntax(
         "receiver_parameter_type_text":declared,
         "receiver_generic_owner_kind":owner,
         "receiver_rebinding_flag":rebound,
+        "receiver_written_type_evidence":if rebound { None } else { written },
     })
+}
+
+/// REQ-RUST-055.0 R1: the type a parameter declares, as written, with its range in the
+/// original source. Any shape of type; nothing in it is resolved.
+fn read_parameter_written_type(
+    parameter: &ast::Param,
+    input: &SyntaxFileInputData,
+    removed: &[usize],
+) -> Option<Value> {
+    let range = parameter.ty()?.syntax().text_range();
+    let start = restore_source_byte_offset(range.start(), removed);
+    let end = restore_source_byte_offset(range.end(), removed);
+    let text = std::str::from_utf8(input.file_source_content_bytes.get(start..end)?).ok()?;
+    Some(json!({"span_byte_start_offset":start,"span_byte_end_offset":end,"type_source_text":text}))
 }
 
 /// Syntax-only evidence for one bound: what it bounds (a type parameter, the

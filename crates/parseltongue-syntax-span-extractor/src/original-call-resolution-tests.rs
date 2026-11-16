@@ -609,6 +609,12 @@ fn test_capture_generic_receiver_evidence() {
             "receiver_rebinding_flag":false,
             "receiver_cast_type_evidence":null,
             "receiver_member_body_flag":true,
+            // REQ-RUST-055.0 R1
+            "receiver_written_type_evidence":{
+                "span_byte_start_offset":41,
+                "span_byte_end_offset":42,
+                "type_source_text":"I",
+            },
         })
     );
 }

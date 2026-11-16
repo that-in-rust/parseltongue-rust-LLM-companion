@@ -328,3 +328,23 @@ nodes, edges        151, 682, the same labels as an excluded run
   text and the scope value.
 - **Acceptance:** the run of 2026-11-16 is no longer valid for this commit; production
   changed. A new one follows step 8.6.
+
+## TDD entry — step 8.2a, a parameter's written type (REQ-RUST-055.0 R1, R3, R4)
+
+```text
+STUB   read_parameter_written_type(parameter, input, removed) -> Option<Value>, body todo!();
+       new key receiver_written_type_evidence on the method receiver record; cargo check passes
+RED    cargo test --release -p parseltongue-syntax-span-extractor test_parameter_written_type_rows
+       1 selected: FAILED, "not yet implemented: REQ-RUST-055.0 R1"
+       with the body returning None: FAILED at the first assertion,
+       left Some("&[MaybeUninit<u8>]"), right None
+GREEN  the type node's range mapped back to the original source, and its text
+       test_parameter_written_type_rows ok; crate 142 passed, 0 failed (lib), 17 passed (other target)
+       test_capture_generic_receiver_evidence compares the whole record, so it gained the new key
+BREAKS rebinding ignored      -> FAILED (rb.len(): left None, right Some("&[u8]"))
+       range starts one late  -> FAILED (left Some("&[MaybeUninit<u8>]"), right Some("[MaybeUninit<u8>]"))
+GATES  cargo fmt --check and clippy --all-targets -D warnings pass on the crate
+REFACTOR none needed: one function of five lines
+NOT RUN the real-source itoa tests and the workspace tests
+NEXT   8.2b: fields, statics and index expressions (R2)
+```
