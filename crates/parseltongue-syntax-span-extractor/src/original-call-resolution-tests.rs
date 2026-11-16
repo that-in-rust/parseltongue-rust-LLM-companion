@@ -617,7 +617,12 @@ fn test_capture_generic_receiver_evidence() {
 #[test]
 fn test_classify_other_receiver_shapes() {
     let source = "struct S { f: u8 }\nfn make() -> u8 { 0 }\nimpl S { fn run(self, n: u8) {\n self.go(); self.f.go(); make().go(); (n).go(); n.go(); } }\n";
-    for text in ["self.go()", "self.f.go()", "make().go()", "(n).go()"] {
+    // REQ-RUST-053.0 N6: `self` taken by value is its own shape.
+    assert_eq!(
+        read_method_receiver_evidence(source, "self.go()")["receiver_shape_kind"],
+        "own_self_value"
+    );
+    for text in ["self.f.go()", "make().go()", "(n).go()"] {
         let evidence = read_method_receiver_evidence(source, text);
         assert_eq!(evidence["receiver_shape_kind"], "other", "{text}");
         assert_eq!(

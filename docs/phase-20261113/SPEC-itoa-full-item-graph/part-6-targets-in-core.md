@@ -74,6 +74,13 @@ builtin_member      a member reached through a builtin type; no stored      none
   - the site is a method call (the receiver's type is not proven).
 - **N6 Method calls.** A method call whose receiver type is not determined stays unresolved,
   with the method name and the reason, as it is stored today.
+  One receiver's type is determined without inference (added 2026-11-16, part 7 step 7.4):
+  the receiver is `self`, the member it is written directly in takes `self` by value with
+  no written type, and that member's impl is stored with a builtin self type and is not
+  inside a function body. The receiver's type is that builtin, and the call is named
+  `T::method` as a builtin member (N3) under the conditions of N5. The row records that
+  the method is taken to be found at the receiver's own type, not after an automatic
+  reference; only unread `core` could say otherwise.
 - **N7 No rule names itoa, `core` items or a fixed list of members.** The crate names
   recognised without a unit are the five sysroot crates the name lookup already lists.
 - **N8 Completeness.** The published graph stays `incomplete` in this part.
@@ -125,7 +132,9 @@ Each step adds its tests and its row here. Built so far: steps 6.1 to 6.5.
 rule       test (exists)                                              where
 N1 N3 N4   test_itoa_imports_row_counts                               itoa-source-acceptance-tests.rs
 N1 N3 N4   test_itoa_external_path_calls (7 calls, 8 external nodes)  itoa-source-acceptance-tests.rs
-N6         same test: no method call row carries a proof record       itoa-source-acceptance-tests.rs
+N6         same test: the only method calls with a proof record are 5 self.unsigned_abs()   itoa-source-acceptance-tests.rs
+N6         test_self_receiver_builtin_member                          cast-receiver-member-tests.rs
+N6         test_self_receiver_shadow_cases (small crate, 9 rows)      itoa-source-acceptance-tests.rs
 N1 N3      test_external_import_names_target, test_external_record_fields_checked   use-import-edge-tests.rs
 N1 N4 N5   test_external_callee_names_target                          callee-path-call-tests.rs
 N1 N3 N4   test_itoa_external_type_uses (13 rows, no new node)        itoa-source-acceptance-tests.rs

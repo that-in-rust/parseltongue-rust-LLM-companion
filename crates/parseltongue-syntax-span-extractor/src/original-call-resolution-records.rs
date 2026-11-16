@@ -330,6 +330,13 @@ fn build_original_call_edge(
     .then(|| find_builtin_call_member(&evidence, syntax, context, members))
     .transpose()?
     .flatten();
+    let builtin_member = if receiver_evidence["receiver_shape_kind"] == "own_self_value"
+        && matches!(resolution, HldEdgeResolutionValue::Unresolved { .. })
+    {
+        find_self_receiver_member(owner, receiver_evidence, members)
+    } else {
+        builtin_member
+    };
     let (resolution, stopped) = match &builtin_member {
         Some((Ok(named), _)) => (
             HldEdgeResolutionValue::Extracted {
@@ -438,6 +445,41 @@ fn find_builtin_call_member(
                 .find_builtin_member_name(&found.member_lookup_evidence, name)
                 .map(|named| (named, found.member_lookup_evidence))
         }))
+}
+
+/// REQ-RUST-053.0 N6: the external name of `self.method(..)` when `self` is taken by
+/// value in a member of an impl whose stored self type is a builtin: the receiver's type
+/// is that builtin. `None` when the impl is not stored, is inside a function body, or
+/// its self type gives no name and no reason to withhold one.
+fn find_self_receiver_member(
+    owner: &str,
+    receiver: &Value,
+    members: &ImplMemberLookupIndex,
+) -> Option<(BuiltinMemberNameOutcome, Value)> {
+    let method = receiver["method_declared_name_value"].as_str()?;
+    let header = members.impl_header_value_rows.iter().find(|header| {
+        header["impl_member_occurrence_rows"]
+            .as_array()
+            .is_some_and(|rows| {
+                rows.iter()
+                    .any(|member| member["member_source_occurrence_key"] == owner)
+            })
+    })?;
+    if header["impl_function_body_ancestry_flag"] != false {
+        return None;
+    }
+    let self_type = &header["impl_self_type_resolution"];
+    let text = self_type["type_source_evidence"]["type_source_text"].as_str()?;
+    let found = members.find_type_member_target(text, self_type, method, "FN")?;
+    let named = members.find_builtin_member_name(&found.member_lookup_evidence, method)?;
+    let mut evidence = found.member_lookup_evidence;
+    evidence["receiver_type_proof_kind"] = json!("own_self_value_of_impl");
+    evidence["enclosing_impl_header_occurrence"] = header["impl_semantic_occurrence_key"].clone();
+    // The name holds when the method is found at the receiver's own type. A method found
+    // only after an automatic reference would be declared for `&T`; `core` was not read.
+    evidence["method_probe_step_assumed"] = json!("receiver_type_itself");
+    evidence["method_probe_unread_source"] = json!(["core"]);
+    Some((named, evidence))
 }
 
 /// What the stored rows say about `(x as T).method(..)`: the row's resolution, what
@@ -1468,6 +1510,8 @@ fn extract_method_receiver_syntax(
     json!({
         "receiver_shape_kind":if parameter.is_some() {
             "parameter_identifier"
+        } else if call.receiver().is_some_and(|expr| check_own_self_argument(&expr)) {
+            "own_self_value"
         } else if cast_type.is_some() {
             "cast_expression"
         } else {

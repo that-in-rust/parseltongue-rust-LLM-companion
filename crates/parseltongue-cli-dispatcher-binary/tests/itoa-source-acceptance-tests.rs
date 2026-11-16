@@ -2565,7 +2565,7 @@ fn test_itoa_imports_row_counts() {
             "core::str"
         ]
     );
-    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(input.input_node_records.len(), 150);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -2775,7 +2775,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(input.input_node_records.len(), 150);
     let area = input
         .input_node_records
         .iter()
@@ -3065,8 +3065,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 145);
-    assert_eq!(labels.len(), 145, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 150);
+    assert_eq!(labels.len(), 150, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"
@@ -3603,10 +3603,10 @@ fn test_generated_body_call_rows() {
             ("bare_name_call divmod100 -".to_owned(), 8),
             ("bare_name_call slice_buffer_to_str -".to_owned(), 10),
             // Rule G13: the receiver is a cast to a stored type.
-            ("method_call method call -".to_owned(), 2),
+            ("method_call method call -".to_owned(), 7),
             (
                 "method_call method call receiver_type_not_determined".to_owned(),
-                102
+                97
             ),
             // Rule G10: the trait's method declaration, named through the trait.
             ("qualified_path_call fmt -".to_owned(), 10),
@@ -4509,7 +4509,7 @@ fn test_itoa_external_path_calls() {
         ]
         .map(|(callee, path)| (callee.to_owned(), path.to_owned()))
     );
-    // 43 calls end at a node of itoa, 7 at a node of a written path, 9 at a builtin member.
+    // 43 calls end at a node of itoa, 7 at a node of a written path, 14 at a builtin member.
     assert_eq!(calls.len(), 197);
     assert_eq!(
         calls
@@ -4519,17 +4519,23 @@ fn test_itoa_external_path_calls() {
                 HldEdgeResolutionValue::Extracted { .. }
             ))
             .count(),
-        59
+        64
     );
-    // No method call gains a name: its receiver's type is not proven (N6).
-    assert!(calls.iter().all(|edge| {
-        let metadata: Value =
-            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
-        metadata["call_shape_kind"] != "method_call"
-            || metadata.get("external_target_proof_record").is_none()
-    }));
+    // A method call gains a name only when its receiver is `self` taken by value (N6):
+    // the five `self.unsigned_abs()` calls, here in the text of the expanded body.
+    let named_methods = calls
+        .iter()
+        .filter_map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            (metadata["call_shape_kind"] == "method_call"
+                && metadata.get("external_target_proof_record").is_some())
+            .then(|| metadata["call_source_text"].as_str().unwrap().to_owned())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(named_methods, ["self .unsigned_abs ()"; 5]);
     // One node per written path, with no file, kind or signature: 4 imports, 4 callees,
-    // 3 prelude names. The 31 members of builtin types are
+    // 3 prelude names. The 36 members of builtin types are
     // `test_itoa_builtin_member_targets`.
     let is_builtin_member = |node: &&HldNodeInputRecord| {
         matches!(
@@ -4549,7 +4555,7 @@ fn test_itoa_external_path_calls() {
             .copied()
             .filter(is_builtin_member)
             .count(),
-        31
+        36
     );
     let mut externals = all_externals
         .into_iter()
@@ -4580,7 +4586,7 @@ fn test_itoa_external_path_calls() {
             "core::str::from_utf8_unchecked",
         ]
     );
-    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(input.input_node_records.len(), 150);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: each of the 13 `MaybeUninit<u8>` type uses targets the node
@@ -4673,7 +4679,7 @@ fn test_itoa_external_type_uses() {
         })
         .collect::<Vec<_>>();
     assert_eq!(open, Vec::<String>::new());
-    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(input.input_node_records.len(), 150);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: the three traits `Buffer` implements and the supertrait bound
@@ -4745,7 +4751,7 @@ fn test_itoa_prelude_name_targets() {
             source.to_owned()
         ))
     );
-    // Every `implements` and `uses_type` row has a target; 138 rows of the graph have none.
+    // Every `implements` and `uses_type` row has a target; 133 rows of the graph have none.
     let open = |relation: Option<HldRelationKindValue>| {
         input
             .input_edge_records
@@ -4761,13 +4767,13 @@ fn test_itoa_prelude_name_targets() {
     };
     assert_eq!(open(Some(HldRelationKindValue::Implements)), 0);
     assert_eq!(open(Some(HldRelationKindValue::UsesType)), 0);
-    assert_eq!(open(None), 138);
-    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(open(None), 133);
+    assert_eq!(input.input_node_records.len(), 150);
 }
 
 /// REQ-RUST-053.0 N3, N4, N6: a member reached through a builtin type that no impl in itoa
 /// declares targets the node of the written name: 9 `u128::from(..)` calls and 30 reads of
-/// `MAX`, `MIN` and `BITS`. The 138 rows left without a target are all method calls.
+/// `MAX`, `MIN` and `BITS`. The 133 rows left without a target are all method calls.
 #[test]
 fn test_itoa_builtin_member_targets() {
     let (_directory, _root, _database, input) = run_original_graph_fixture();
@@ -4830,8 +4836,21 @@ fn test_itoa_builtin_member_targets() {
         let shape = match edge.edge_relation_kind_value {
             HldRelationKindValue::Calls => {
                 assert_eq!(metadata["dispatch_kind"], "external_builtin_member");
-                assert_eq!(metadata["call_shape_kind"], "qualified_path_call");
                 assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
+                // REQ-RUST-053.0 N6: `self.unsigned_abs()` in `impl .. for iN`, where the
+                // member takes `self` by value: the receiver's type is the impl's type.
+                if member == "unsigned_abs" {
+                    assert_eq!(metadata["call_shape_kind"], "method_call");
+                    // The text of the expanded body.
+                    assert_eq!(metadata["call_source_text"], "self .unsigned_abs ()");
+                    assert_eq!(lookup["receiver_type_proof_kind"], "own_self_value_of_impl");
+                    assert_eq!(lookup["method_probe_step_assumed"], "receiver_type_itself");
+                    assert_eq!(lookup["method_probe_unread_source"], json!(["core"]));
+                    assert_eq!(lookup["self_type_source_text"], builtin);
+                } else {
+                    assert_eq!(metadata["call_shape_kind"], "qualified_path_call");
+                    assert!(lookup["receiver_type_proof_kind"].is_null());
+                }
                 "calls".to_owned()
             }
             HldRelationKindValue::Reads => {
@@ -4847,14 +4866,17 @@ fn test_itoa_builtin_member_targets() {
         rows.into_iter().collect::<Vec<_>>(),
         [
             ("calls", "from", 9),
+            ("calls", "unsigned_abs", 5),
             ("reads body_value_path", "MAX", 10),
             ("reads macro_argument_value_path", "BITS", 10),
             ("reads macro_argument_value_path", "MIN", 10),
         ]
         .map(|(shape, member, count)| ((shape.to_owned(), member.to_owned()), count))
     );
-    // One node per written name: three consts for each of ten integer types, and `u128::from`.
-    assert_eq!(names.len(), 31);
+    // One node per written name: three consts for each of ten integer types, `u128::from`,
+    // and `unsigned_abs` for each of the five signed types of `impl_Integer!`.
+    assert_eq!(names.len(), 36);
+    assert!(names.contains("i8::unsigned_abs") && names.contains("i128::unsigned_abs"));
     assert!(names.contains("u128::from") && names.contains("i8::BITS"));
     // Every row left without a target is a method call (N6); none carries a proof record.
     let open = input
@@ -4867,7 +4889,7 @@ fn test_itoa_builtin_member_targets() {
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(open.len(), 138);
+    assert_eq!(open.len(), 133);
     for edge in open {
         let metadata: Value =
             serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
@@ -4875,7 +4897,7 @@ fn test_itoa_builtin_member_targets() {
         assert_eq!(metadata["call_shape_kind"], "method_call");
         assert!(metadata["external_target_proof_record"].is_null());
     }
-    assert_eq!(input.input_node_records.len(), 145);
+    assert_eq!(input.input_node_records.len(), 150);
 }
 
 /// The `calls` and `reads` rows of the full item graph of a one-file crate `source`,
@@ -5224,6 +5246,49 @@ fn collect_production_graph_rows(
         .collect::<Vec<_>>();
     rows.sort();
     rows
+}
+
+/// REQ-RUST-053.0 N6: `self.method(..)` run through the whole pipeline on a small crate that
+/// compiles. The call is named `T::method` when the member takes `self` by value in an impl
+/// for the builtin `T`, also inside a closure and for `mut self`. It is not named when the
+/// impl is for `&T` or an array, when `self` is a reference, or when a trait in the crate
+/// declares the method's name.
+#[test]
+fn test_self_receiver_shadow_cases() {
+    let source = concat!(
+        "#![no_std]\n#![allow(dead_code)]\n",
+        "pub trait A { fn a(self) -> u32; }\n",
+        "impl A for u8 { fn a(self) -> u32 { self.count_ones() } }\n",
+        "impl A for &u16 { fn a(self) -> u32 { self.count_zeros() } }\n",
+        "impl A for [i16; 1] { fn a(self) -> u32 { self.len() as u32 } }\n",
+        "impl A for i16 { fn a(self) -> u32 { let g = || self.swap_bytes(); g() as u32 } }\n",
+        "impl A for i32 { fn a(mut self) -> u32 { self += 1; self.unsigned_abs() } }\n",
+        "pub trait C { fn c(&self) -> u32; }\n",
+        "impl C for u32 { fn c(&self) -> u32 { self.leading_zeros() } }\n",
+        "pub trait D { fn d(self) -> u32; fn trailing_ones(self) -> u32; }\n",
+        "impl D for u64 { fn d(self) -> u32 { self.trailing_zeros() } ",
+        "fn trailing_ones(self) -> u32 { 7 } }\n",
+        "impl A for i8 { fn a(self) -> u32 { self.trailing_ones() } }\n",
+    );
+    let row = |text: &str, target: &str, detail: &str| {
+        (text.to_owned(), target.to_owned(), detail.to_owned())
+    };
+    let open = "none:TraitSolverNeeded";
+    assert_eq!(
+        read_shadow_case_rows(source),
+        vec![
+            row("count_ones", "external:u8::count_ones", ""),
+            row("count_zeros", open, "receiver_type_not_determined"),
+            // The call of the closure `g`, a local name.
+            row("g", open, "callee_path_not_requested"),
+            row("leading_zeros", open, "receiver_type_not_determined"),
+            row("len", open, "receiver_type_not_determined"),
+            row("swap_bytes", "external:i16::swap_bytes", ""),
+            row("trailing_ones", open, "external_member_name_in_local_trait"),
+            row("trailing_zeros", "external:u64::trailing_zeros", ""),
+            row("unsigned_abs", "external:i32::unsigned_abs", ""),
+        ]
+    );
 }
 
 /// REQ-RUST-044.0: every node and every edge row production stores for pinned itoa is

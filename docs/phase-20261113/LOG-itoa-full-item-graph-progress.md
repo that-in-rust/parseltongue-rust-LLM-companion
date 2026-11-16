@@ -2237,3 +2237,61 @@ macro-generated bodies, 34
   query (2026-11-13); one VM only, worker sessions archived (2026-11-14).
 - The run reports behind these numbers were removed from the tree; the last commit that has
   them is `a2e13a3bd`. Earlier entry-by-entry detail is in this file's git history.
+
+## Part 7 step 7.4a: `self.method(..)` in an impl for a builtin type (2026-11-16)
+
+- **REQ:** REQ-RUST-053.0 N6 (revised in the part 6 file before the code), REQ-RUST-044.0.
+- **Rule:** the receiver is `self`; the member the call is written directly in takes
+  `self` by value with no written type; that member's impl is stored with a builtin self
+  type and is not in a function body. The call is named `T::method` as a builtin member
+  under the conditions of N5. The row records `receiver_type_proof_kind =
+  own_self_value_of_impl`, `method_probe_step_assumed = receiver_type_itself` and
+  `method_probe_unread_source = ["core"]`.
+- **STUB:** `find_self_receiver_member` with `todo!("REQ-RUST-053.0 N6")`, its call in
+  `build_original_call_edge`, and the receiver shape `own_self_value`.
+- **RED:** `CARGO_BUILD_JOBS=2 cargo test -p parseltongue-syntax-span-extractor --lib
+  test_self_receiver_builtin_member`: `not yet implemented: REQ-RUST-053.0 N6`,
+  `test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 134 filtered out`.
+  The real-source RED is the step 7.1 entry: five `unsigned_abs` rows expected, not stored.
+- **GREEN:** `cargo test --release -p parseltongue-syntax-span-extractor`:
+  `test result: ok. 135 passed; 0 failed` and `ok. 17 passed`.
+  `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests`: `test result: FAILED. 54 passed; 1 failed` (144.50 s). The
+  one failure is `test_itoa_whole_graph_equality`, now on the rows not built yet:
+
+```text
+nodes expected 152 stored 150; edge rows expected 587 stored 585
+2 differing nodes:
+expected, not stored: itoa
+expected, not stored: str::len
+4 differing edge rows:
+expected 1 stored 0: Buffer::format --calls--> str::len @ src/lib.rs:109 definition
+expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_needed] @ src/lib.rs:109 definition
+expected 1 stored 0: Buffer::format --uses_type--> private::Sealed::Buffer @ src/lib.rs:107 definition
+expected 1 stored 0: slice_buffer_to_str --uses_type--> core::mem::MaybeUninit @ src/lib.rs:252 definition
+```
+
+- **Measured on pinned itoa:** 150 nodes (was 145), 64 of 197 calls with a target (was 59),
+  133 rows without a target (was 138), 585 edges (unchanged).
+- **Gates on the two touched crates:** `cargo fmt --all --check` exit 0; `cargo clippy
+  --release -p parseltongue-syntax-span-extractor -p parseltongue-cli-dispatcher-binary
+  --all-targets --all-features -- -D warnings` exit 0.
+- **Existing tests changed (pinned values):** node count 145 to 150 in seven tests; open
+  rows 138 to 133; calls with a target 59 to 64; builtin member nodes 31 to 36;
+  `test_generated_body_call_rows` (method calls with a target 2 to 7);
+  `test_classify_other_receiver_shapes` (`self.go()` is now `own_self_value`);
+  `test_itoa_external_path_calls` (the only named method calls are the five
+  `self .unsigned_abs ()`); `test_itoa_builtin_member_targets` (5 `unsigned_abs` rows and
+  their record).
+- **New pipeline test, written after the code:** `test_self_receiver_shadow_cases`, a small
+  crate that compiles. The eight rows I predicted were stored as predicted; the first run
+  failed on a ninth row I had not listed (the call of the closure `g` in my fixture).
+- **Deliberate breaks (5), each fails a test:** any `self` receiver counts (also `&self`);
+  no proof kind on the record; no unread source on the record; the shape never set; the
+  enclosing impl taken as any impl (caught only by the pipeline test, not the fixture).
+- **Not covered by a test:** the `impl_function_body_ancestry_flag` guard (such an impl's
+  self type is not resolved, so the lookup already gives no name).
+- **Slip:** the step 7.1 RED run and the first run of this step used `cargo test` without
+  `--release`: 323 s for one test and 2,531 s for the file, against about 145 s in release.
+  No result depended on it.
+- **No refactor needed.**

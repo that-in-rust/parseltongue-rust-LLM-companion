@@ -368,3 +368,152 @@ fn test_cast_receiver_call_member() {
         )
     );
 }
+
+/// REQ-RUST-053.0 N6: `self.method(..)` where `self` is taken by value in an impl of a
+/// builtin type targets the name `T::method`. A reference `self`, a self type that is not
+/// a builtin, and a trait in read source that declares the name each give no target.
+#[test]
+fn test_self_receiver_builtin_member() {
+    let outcome = |source: &str, builtin: bool, declared: bool| {
+        let (store, mut input) = make_call_fixture_graph(source);
+        let mut stored = 0;
+        for row in store
+            .rows
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .filter(|row| row.stage_owned_table_name == "impl-header-index-table")
+        {
+            let mut header: Value = serde_json::from_str(&row.stage_row_payload_text).unwrap();
+            // The impl header stage ran before the trait's lookup was stored: store its outcome.
+            let start = source.find("trait T").unwrap();
+            let end = start + source[start..].find('}').unwrap() + 1;
+            let named = &mut header["impl_trait_type_resolution"];
+            named["resolution_state_kind"] = json!("resolved");
+            named["target_identity"] = json!(encode_symbol_target_value(
+                &NameSymbolTargetKey::Definition(make_call_fixture_occurrence(
+                    start as u64,
+                    end as u64,
+                    &source[start..end],
+                ))
+            ));
+            if builtin {
+                let resolution = &mut header["impl_self_type_resolution"];
+                resolution["resolution_state_kind"] = json!("resolved");
+                resolution["target_identity"] = json!(encode_symbol_target_value(
+                    &NameSymbolTargetKey::Builtin("u8".to_owned())
+                ));
+            }
+            row.stage_row_payload_text = header.to_string();
+            stored += 1;
+        }
+        assert_eq!(stored, 1, "one impl in the fixture");
+        if declared {
+            let member = HldNodeInputRecord {
+                node_owner_kind_value: Some(HldOwnerKindValue::Trait),
+                node_qualified_path_text: "T::count_ones".into(),
+                ..input.input_node_records[0].clone()
+            };
+            input.input_node_records.push(member);
+        }
+        let edges = resolve_original_call_edges(
+            &store,
+            &make_call_fixture_scope(),
+            &input,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+        let [edge] = edges.as_slice() else {
+            panic!("one call expected, found {}", edges.len());
+        };
+        let metadata: Value =
+            serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+        (edge.clone(), metadata)
+    };
+    let by_value = "struct Buffer; trait T { fn caller(self); } \
+        impl T for u8 { fn caller(self) { self.count_ones(); } }";
+    let (edge, metadata) = outcome(by_value, true, false);
+    let target = HldTargetIdentityValue::ExternalNamed(HldExternalNamedKey {
+        external_name_kind_value: HldExternalNameKind::BuiltinMember,
+        external_crate_name_value: None,
+        external_item_path_text: "u8::count_ones".to_owned(),
+    });
+    assert_eq!(
+        edge.edge_resolution_value,
+        HldEdgeResolutionValue::Extracted {
+            target: target.clone()
+        },
+        "{metadata}"
+    );
+    assert_eq!(
+        edge.edge_evidence_row_key.evidence_target_reference_value,
+        Some(target)
+    );
+    assert_eq!(metadata["dispatch_kind"], "external_builtin_member");
+    assert_eq!(metadata["call_shape_kind"], "method_call");
+    assert!(metadata["unresolved_detail_kind"].is_null(), "{metadata}");
+    assert_eq!(
+        metadata["external_target_proof_record"],
+        json!({"external_name_kind":"builtin_member",
+            "external_site_proof_kind":"builtin_type_member",
+            "external_import_site_key":null,
+            "external_source_read_flag":false,
+            "external_definition_path_claimed_flag":false})
+    );
+    let lookup = &metadata["type_relative_member_evidence"];
+    assert_eq!(
+        lookup["member_lookup_outcome_kind"],
+        "no_stored_impl_member"
+    );
+    assert_eq!(lookup["self_type_builtin_name"], "u8");
+    assert_eq!(lookup["receiver_type_proof_kind"], "own_self_value_of_impl");
+    assert_eq!(lookup["method_probe_step_assumed"], "receiver_type_itself");
+    assert_eq!(lookup["method_probe_unread_source"], json!(["core"]));
+
+    let none = |source: &str, builtin: bool, declared: bool, detail: &str| {
+        let (edge, metadata) = outcome(source, builtin, declared);
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{source}: {metadata}"
+        );
+        assert_eq!(metadata["dispatch_kind"], "undetermined", "{source}");
+        assert_eq!(metadata["unresolved_detail_kind"], detail, "{source}");
+        assert!(
+            metadata["external_target_proof_record"].is_null(),
+            "{source}"
+        );
+    };
+    // A trait in read source declares the name: an impl of it may be the target.
+    none(by_value, true, true, "external_member_name_in_local_trait");
+    // The self type is not a builtin.
+    none(
+        "struct Buffer; trait T { fn caller(self); } \
+            impl T for Buffer { fn caller(self) { self.count_ones(); } }",
+        false,
+        false,
+        "receiver_type_not_determined",
+    );
+    // `self` is a reference, or has a written type: its type is not the impl's type.
+    for parameter in ["&self", "&mut self", "self: Box<Self>"] {
+        none(
+            &format!(
+                "struct Buffer; trait T {{ fn caller({parameter}); }} \
+                    impl T for u8 {{ fn caller({parameter}) {{ self.count_ones(); }} }}"
+            ),
+            true,
+            false,
+            "receiver_type_not_determined",
+        );
+    }
+    // The receiver is not `self` itself.
+    none(
+        "struct Buffer; trait T { fn caller(self); } \
+            impl T for u8 { fn caller(self) { (self).count_ones(); } }",
+        true,
+        false,
+        "receiver_type_not_determined",
+    );
+}
