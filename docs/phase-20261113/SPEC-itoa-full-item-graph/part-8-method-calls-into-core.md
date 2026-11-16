@@ -125,3 +125,87 @@ test_member_rows_offset_order        D4      same file
 test_core_directory_member_rows      D6 D9   crates/parseltongue-cli-dispatcher-binary/src/sysroot-member-declaration-tests.rs
 test_core_member_rows_published      D6 D7 D8  crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs
 ```
+
+## 7. Steps 8.2 and 8.3 — the work packet (spec first)
+
+**Rust work mode:** spec and delivery. The risk is a wrong target, not speed.
+
+### REQ-RUST-055.0 — the receiver's type, from written source only
+
+- R1. WHEN the receiver of a method call is a name bound by a parameter whose type is
+  written in the source THEN the site record SHALL carry that type's text and byte range,
+  whatever its shape (`&mut [MaybeUninit<u8>]`, `&mut Self::Buffer`, `[u8; 200]`).
+- R2. WHEN the receiver is `self.FIELD`, a path to a `static` or `const`, a tuple or
+  named field of one of those, or an index of one of those THEN the record SHALL say which
+  shape it is and name the field, item or indexed base.
+- R3. WHEN the receiver is anything else (a call's result, a local without an annotation,
+  a name a macro bound) THEN the record SHALL say `other` and carry no type. Nothing is
+  inferred.
+- R4. WHEN the receiver name may be rebound in the body THEN R1 and R2 SHALL not apply.
+- R5. The extractor SHALL stay syntax-only: no path resolution, no `cfg`, no projection of
+  `Self::Buffer`.
+
+### REQ-RUST-056.0 — a target only when the declaration is proven
+
+- P1. The receiver type is read from R1/R2 evidence: a parameter's written type, a field's
+  declared type, a `static`'s declared type, the element type of an indexed array or slice.
+  A projection (`Self::Buffer`) is followed only through an associated type written in a
+  stored impl of this workspace.
+- P2. The probe is Rust's: for the receiver type `T` the steps are `T`, each dereference of
+  `T`, then the slice an array unsizes to. At each step the candidate receiver types are
+  `S`, `&S`, `&mut S`, in that order.
+- P3. A declaration fits a step when it is an inherent member of a `core` impl whose
+  written self type unifies with `S` (the impl's own generic parameters are wildcards) and
+  its `self` parameter kind gives that step's receiver type.
+- P4. A target is named only when exactly one declaration fits at the first fitting step,
+  and no method of that name declared by a trait in scope can fit earlier. Traits in scope
+  are the traits this workspace declares or imports, plus the 2021 `core` prelude.
+- P5. A trait method is refuted only from impls that are stored: this workspace's impls,
+  and the `core` impls the declaration table holds. WHEN a trait in scope declares the
+  name and its impls cannot all be read THEN the row SHALL stay without a target, with the
+  reason `trait_solver_needed`.
+- P6. The name of a named target is the impl's self type as `core` writes it, then `::`,
+  then the method name (`MaybeUninit<T>::write`, `[T]::len`).
+- P7. Every named target SHALL carry its proof: the receiver type, how it was proven, the
+  step that fitted, the declaration's file and byte range, and every assumption.
+
+### Design, by layer
+
+```text
+L1  the written-type model and the probe: pure functions over text and rows
+    crates/parseltongue-syntax-span-extractor/src/receiver-type-probe-records.rs (new)
+L2  the lookup over stored rows, through the existing store port
+    original-call-resolution-records.rs, type-relative-member-records.rs
+L3  no new effect; the rows come from the stage table built in 8.1
+```
+
+### Verification matrix
+
+```text
+req  test                                     type         assertion
+055  test_parameter_written_type_rows         fixture      a written type of any shape is recorded
+055  test_field_and_static_receivers          fixture      self.bytes, DECIMAL_PAIRS.0, buf[i]
+055  test_unwritten_receiver_stays_other      fixture      a call's result carries no type
+056  test_slice_member_probe_steps            fixture      &[T] finds [T]::get_unchecked at step 1
+056  test_array_unsize_probe_order            fixture      [T; N] reaches [T]::len after the array
+056  test_scope_trait_blocks_target           fixture      a trait in scope that may fit earlier wins
+056  test_core_member_call_targets            real source  the itoa calls this slice names
+```
+
+### Plan
+
+```text
+8.2a  parameters with any written type (REQ 055 R1, R3, R4)
+8.2b  fields, statics and index expressions (R2)
+8.3a  the probe and the proof on slices and MaybeUninit (REQ 056 P1 to P7)
+8.3b  Self::Buffer through this workspace's impls
+```
+
+### Open, and the limit I cannot pass
+
+- The declaration table holds methods, not impl headers. A `core` impl that overrides no
+  method (`impl ExactSizeIterator for X {}`) leaves no row, so P5 cannot refute it. Of the
+  five names in this slice only `len` is declared by a prelude trait
+  (`ExactSizeIterator::len`), so only the 5 `buf.len()` calls meet this limit.
+- Q2 stands: either those 5 rows stay without a target, or they are named `[T]::len` with
+  the assumption recorded. I build P5 (no target) and leave the assumption variant to you.
