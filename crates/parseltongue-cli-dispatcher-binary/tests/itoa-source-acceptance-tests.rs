@@ -5327,8 +5327,9 @@ fn check_relation_site_compared(relation: &str) -> bool {
 }
 
 /// One text row per expected site: source, relation, target, and for a compared site
-/// the file, the line of its first token and whether that token is written in the
-/// macro definition or in the macro call.
+/// the file, the byte where its first token starts, the byte where its last token ends,
+/// and for each whether it is written in the macro definition or in the macro call
+/// (REQ-RUST-044.0 E1 to E7).
 fn collect_expected_graph_rows() -> Vec<String> {
     let mut rows = read_expected_graph_rows("itoa-expected-graph-edges.json")
         .iter()
@@ -5353,12 +5354,15 @@ fn collect_expected_graph_rows() -> Vec<String> {
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|site| {
+                .zip(edge["site_exact_ranges"].as_array().unwrap())
+                .map(|(site, range)| {
                     format!(
-                        "{head} @ {}:{} {}",
+                        "{head} @ {} {}:{}..{}:{}",
                         site["file"].as_str().unwrap(),
-                        site["first_token"]["line"].as_u64().unwrap(),
-                        site["first_token"]["kind"].as_str().unwrap()
+                        range["first_token_kind"].as_str().unwrap(),
+                        range["first_token_start"].as_u64().unwrap(),
+                        range["last_token_kind"].as_str().unwrap(),
+                        range["last_token_end"].as_u64().unwrap()
                     )
                 })
                 .collect()
@@ -5370,15 +5374,9 @@ fn collect_expected_graph_rows() -> Vec<String> {
 
 /// The same text rows from what production stores.
 fn collect_production_graph_rows(
-    root: &Path,
     input: &HldMaterializationInputRecord,
     labels: &std::collections::BTreeMap<&HldTargetIdentityValue, String>,
 ) -> Vec<String> {
-    let read_line_number = |file: &str, start: u64| {
-        fs::read_to_string(root.join(file))
-            .map(|text| 1 + text[..start as usize].matches('\n').count())
-            .unwrap_or(0)
-    };
     let read_node_label = |identity: &HldTargetIdentityValue| {
         labels
             .get(identity)
@@ -5412,31 +5410,39 @@ fn collect_production_graph_rows(
             if !check_relation_site_compared(&relation) {
                 return head;
             }
-            let origin = &metadata["expansion_source_origin"]["site_first_token_origin"];
-            let (file, start, kind) = if origin.is_object() {
-                (
-                    origin["token_source_relative_path"]
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
-                    origin["token_source_byte_range"][0].as_u64().unwrap(),
-                    origin["token_source_origin_kind"]
-                        .as_str()
-                        .unwrap()
-                        .to_string(),
-                )
-            } else {
-                let site = edge
-                    .edge_evidence_row_key
-                    .evidence_site_occurrence_key
-                    .read_semantic_occurrence_parts();
-                (
-                    site.span_source_file_path.to_string(),
-                    site.span_byte_range_value.read_source_range_pair().0,
-                    "definition".to_string(),
+            let origin = &metadata["expansion_source_origin"];
+            let read_token_origin = |token: &Value, bound: usize| {
+                format!(
+                    "{}:{}",
+                    token["token_source_origin_kind"].as_str().unwrap(),
+                    token["token_source_byte_range"][bound].as_u64().unwrap()
                 )
             };
-            format!("{head} @ {file}:{} {kind}", read_line_number(&file, start))
+            if origin.is_object() {
+                let (first, last) = (
+                    &origin["site_first_token_origin"],
+                    &origin["site_last_token_origin"],
+                );
+                assert_eq!(
+                    first["token_source_relative_path"],
+                    last["token_source_relative_path"]
+                );
+                return format!(
+                    "{head} @ {} {}..{}",
+                    first["token_source_relative_path"].as_str().unwrap(),
+                    read_token_origin(first, 0),
+                    read_token_origin(last, 1)
+                );
+            }
+            let site = edge
+                .edge_evidence_row_key
+                .evidence_site_occurrence_key
+                .read_semantic_occurrence_parts();
+            let (start, end) = site.span_byte_range_value.read_source_range_pair();
+            format!(
+                "{head} @ {} definition:{start}..definition:{end}",
+                site.span_source_file_path
+            )
         })
         .collect::<Vec<_>>();
     rows.sort();
@@ -5528,10 +5534,10 @@ fn test_itoa_crate_root_node() {
 
 /// REQ-RUST-044.0: every node and every edge row production stores for pinned itoa is
 /// a row of the expected graph files, and every expected row is stored. A site is
-/// compared by the line of its first token, not yet by byte range.
+/// compared by its byte range in the original source (E1 to E7).
 #[test]
 fn test_itoa_whole_graph_equality() {
-    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let (_directory, _root, _database, input) = run_original_graph_fixture();
     let labels = input
         .input_node_records
         .iter()
@@ -5556,7 +5562,7 @@ fn test_itoa_whole_graph_equality() {
         .map(|node| node["label"].as_str().unwrap().to_string())
         .collect::<std::collections::BTreeSet<_>>();
     let expected_rows = collect_expected_graph_rows();
-    let stored_rows = collect_production_graph_rows(&root, &input, &labels);
+    let stored_rows = collect_production_graph_rows(&input, &labels);
     let count_row_copies = |rows: &[String]| {
         rows.iter()
             .fold(std::collections::BTreeMap::new(), |mut counts, row| {

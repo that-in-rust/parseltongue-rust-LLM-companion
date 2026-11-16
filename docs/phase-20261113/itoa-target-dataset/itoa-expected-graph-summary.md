@@ -9,8 +9,8 @@ candidate_nodes: 151
 eligible_nodes: 104
 blocked_nodes: 47
 candidate_edges: 473
-eligible_edges: 50
-blocked_edges: 423
+eligible_edges: 51
+blocked_edges: 422
 impl_block_records: 33
 unresolved_or_inactive_sites: 10
 relation calls: 103

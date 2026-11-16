@@ -129,3 +129,25 @@ expansions (part 5). One rule is added.
 - **R10b.** A struct literal (`Buffer { bytes }`), a pattern and the qualifier of a value
   path (`u128::from`, `MaybeUninit::<u8>::uninit`) are not types in the grammar and give
   no `uses_type` row. The call or read row of the value path already names its target.
+
+## 6. REQ-RUST-044.0 — what the byte range of a site is (step 7.5, added 2026-11-16)
+
+The expected graph states each site's range from the Rust grammar and the pinned bytes.
+It is never copied from a production run.
+
+- **E1 `calls`.** The call expression: from the first token of the callee, or of the
+  receiver of a method call, to the closing parenthesis of its arguments.
+- **E2 `reads`.** The path expression that names the const or static
+  (`DECIMAL_PAIRS`, not `DECIMAL_PAIRS.0`).
+- **E3 `uses_type`.** The type path with its generic arguments (`MaybeUninit<u8>`), and
+  nothing around it: no `->`, `:`, `as`, `&` or brackets. A qualified path
+  `<T as Trait>::NAME` is one site for `NAME`; `T` and `Trait` inside it are sites of
+  their own.
+- **E4 `imports`.** The leaf of the use tree that brings the name in
+  (`core::hint`; `self` and `MaybeUninit` in `core::mem::{self, MaybeUninit}`).
+- **E5 `generates`, `expands`.** The macro call item with its closing `;`.
+- **E6 a site written in a macro definition.** The range is given by its first and its
+  last token, each with where it is written: in the macro definition, or in the macro
+  call when the token is an argument substituted for a macro parameter.
+- **E7 `contains`, `implements`.** Not compared by range: the row is identified by its
+  source, relation and target (one row each).

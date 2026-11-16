@@ -9,7 +9,7 @@
   "counts": {
     "candidate_edges": 473,
     "candidate_nodes": 151,
-    "eligible_edges": 50,
+    "eligible_edges": 51,
     "eligible_nodes": 104
   },
   "edges": [
@@ -22,6 +22,22 @@
       "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 12155,
+          "last_token_end": 12173,
+          "last_token_kind": "definition",
+          "text": "div_rem_1e16(self)"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 12479,
+          "last_token_end": 12502,
+          "last_token_kind": "definition",
+          "text": "div_rem_1e16(quot_1e16)"
+        }
+      ],
       "sites": [
         {
           "anchor": "div_rem_1e16(",
@@ -31,7 +47,9 @@
             "line": 345
           },
           "line": 345,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         },
         {
           "anchor": "div_rem_1e16(",
@@ -41,7 +59,9 @@
             "line": 353
           },
           "line": 353,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -84,6 +104,22 @@
       "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13127,
+          "last_token_end": 13149,
+          "last_token_kind": "definition",
+          "text": "divmod100(quad as u32)"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13714,
+          "last_token_end": 13738,
+          "last_token_kind": "definition",
+          "text": "divmod100(remain as u32)"
+        }
+      ],
       "sites": [
         {
           "anchor": "divmod100(",
@@ -93,7 +129,9 @@
             "line": 371
           },
           "line": 371,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         },
         {
           "anchor": "divmod100(",
@@ -103,7 +141,9 @@
             "line": 384
           },
           "line": 384,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -146,6 +186,22 @@
       "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 12349,
+          "last_token_end": 12403,
+          "last_token_kind": "definition",
+          "text": "enc_16lsd::<{ u128::MAX_STR_LEN - 16 }>(buf, mod_1e16)"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 12663,
+          "last_token_end": 12713,
+          "last_token_kind": "definition",
+          "text": "enc_16lsd::<{ u128::MAX_STR_LEN - 32 }>(buf, mod2)"
+        }
+      ],
       "sites": [
         {
           "anchor": "enc_16lsd::<",
@@ -155,7 +211,9 @@
             "line": 350
           },
           "line": 350,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         },
         {
           "anchor": "enc_16lsd::<",
@@ -165,7 +223,9 @@
             "line": 358
           },
           "line": 358,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -208,6 +268,50 @@
       "flags": [],
       "generated_by": null,
       "relation": "reads",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13211,
+          "last_token_end": 13224,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13306,
+          "last_token_end": 13319,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13401,
+          "last_token_end": 13414,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13496,
+          "last_token_end": 13509,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13834,
+          "last_token_end": 13847,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13928,
+          "last_token_end": 13941,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        }
+      ],
       "sites": [
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -217,7 +321,9 @@
             "line": 373
           },
           "line": 373,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -227,7 +333,9 @@
             "line": 374
           },
           "line": 374,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -237,7 +345,9 @@
             "line": 375
           },
           "line": 375,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -247,7 +357,9 @@
             "line": 376
           },
           "line": 376,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -257,7 +369,9 @@
             "line": 387
           },
           "line": 387,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -267,7 +381,9 @@
             "line": 388
           },
           "line": 388,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -356,6 +472,22 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13145,
+          "last_token_end": 13148,
+          "last_token_kind": "definition",
+          "text": "u32"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13734,
+          "last_token_end": 13737,
+          "last_token_kind": "definition",
+          "text": "u32"
+        }
+      ],
       "sites": [
         {
           "anchor": "as u32",
@@ -365,7 +497,9 @@
             "line": 371
           },
           "line": 371,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u32",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u32",
@@ -375,7 +509,9 @@
             "line": 384
           },
           "line": 384,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u32",
+          "site_text_offset": 3
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -420,6 +556,22 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 12825,
+          "last_token_end": 12828,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13769,
+          "last_token_end": 13772,
+          "last_token_kind": "definition",
+          "text": "u64"
+        }
+      ],
       "sites": [
         {
           "anchor": "as u64",
@@ -429,7 +581,9 @@
             "line": 360
           },
           "line": 360,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u64",
@@ -439,7 +593,9 @@
             "line": 385
           },
           "line": 385,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -484,6 +640,15 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14258,
+          "last_token_end": 14260,
+          "last_token_kind": "definition",
+          "text": "u8"
+        }
+      ],
       "sites": [
         {
           "anchor": "as u8",
@@ -493,7 +658,9 @@
             "line": 398
           },
           "line": 398,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u8",
+          "site_text_offset": 3
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -527,6 +694,57 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13250,
+          "last_token_end": 13255,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13345,
+          "last_token_end": 13350,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13440,
+          "last_token_end": 13445,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13535,
+          "last_token_end": 13540,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13872,
+          "last_token_end": 13877,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 13966,
+          "last_token_end": 13971,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 11807,
+          "last_token_end": 11812,
+          "last_token_kind": "definition",
+          "text": "usize"
+        }
+      ],
       "sites": [
         {
           "anchor": "as usize",
@@ -536,7 +754,9 @@
             "line": 373
           },
           "line": 373,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -546,7 +766,9 @@
             "line": 374
           },
           "line": 374,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -556,7 +778,9 @@
             "line": 375
           },
           "line": 375,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -566,7 +790,9 @@
             "line": 376
           },
           "line": 376,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -576,7 +802,9 @@
             "line": 387
           },
           "line": 387,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -586,7 +814,9 @@
             "line": 388
           },
           "line": 388,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "-> usize",
@@ -596,7 +826,9 @@
             "line": 336
           },
           "line": 336,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         }
       ],
       "source": "<u128 as Unsigned>::fmt",
@@ -694,6 +926,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 2401,
+          "last_token_end": 2403,
+          "last_token_kind": "definition",
+          "text": "u8"
+        }
+      ],
       "sites": [
         {
           "anchor": "<u8>",
@@ -703,7 +944,9 @@
             "line": 73
           },
           "line": 73,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u8",
+          "site_text_offset": 1
         }
       ],
       "source": "Buffer",
@@ -737,6 +980,15 @@
       ],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3322,
+          "last_token_end": 3355,
+          "last_token_kind": "definition",
+          "text": "i.write(unsafe { &mut *buf_ptr })"
+        }
+      ],
       "sites": [
         {
           "anchor": "i.write(",
@@ -746,7 +998,9 @@
             "line": 108
           },
           "line": 108,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "Buffer::format",
@@ -780,6 +1034,15 @@
       ],
       "generated_by": null,
       "relation": "reads",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3383,
+          "last_token_end": 3397,
+          "last_token_kind": "definition",
+          "text": "I::MAX_STR_LEN"
+        }
+      ],
       "sites": [
         {
           "anchor": "I::MAX_STR_LEN",
@@ -789,7 +1052,9 @@
             "line": 109
           },
           "line": 109,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "Buffer::format",
@@ -821,6 +1086,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3198,
+          "last_token_end": 3205,
+          "last_token_kind": "definition",
+          "text": "Integer"
+        }
+      ],
       "sites": [
         {
           "anchor": "<I: Integer>",
@@ -830,7 +1104,9 @@
             "line": 106
           },
           "line": 106,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "Integer",
+          "site_text_offset": 4
         }
       ],
       "source": "Buffer::format",
@@ -864,6 +1140,15 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3287,
+          "last_token_end": 3296,
+          "last_token_kind": "definition",
+          "text": "I::Buffer"
+        }
+      ],
       "sites": [
         {
           "anchor": "cast::<I::Buffer>()",
@@ -873,7 +1158,9 @@
             "line": 107
           },
           "line": 107,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "I::Buffer",
+          "site_text_offset": 7
         }
       ],
       "source": "Buffer::format",
@@ -905,6 +1192,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3228,
+          "last_token_end": 3231,
+          "last_token_kind": "definition",
+          "text": "str"
+        }
+      ],
       "sites": [
         {
           "anchor": "-> &str",
@@ -914,7 +1210,9 @@
             "line": 106
           },
           "line": 106,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "str",
+          "site_text_offset": 4
         }
       ],
       "source": "Buffer::format",
@@ -946,6 +1244,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 2897,
+          "last_token_end": 2903,
+          "last_token_kind": "definition",
+          "text": "Buffer"
+        }
+      ],
       "sites": [
         {
           "anchor": "-> Buffer",
@@ -955,7 +1262,9 @@
             "line": 98
           },
           "line": 98,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "Buffer",
+          "site_text_offset": 3
         }
       ],
       "source": "Buffer::new",
@@ -989,6 +1298,15 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 2941,
+          "last_token_end": 2943,
+          "last_token_kind": "definition",
+          "text": "u8"
+        }
+      ],
       "sites": [
         {
           "anchor": "::<u8>",
@@ -998,7 +1316,9 @@
             "line": 99
           },
           "line": 99,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u8",
+          "site_text_offset": 3
         }
       ],
       "source": "Buffer::new",
@@ -1032,6 +1352,15 @@
       ],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 7280,
+          "last_token_end": 7541,
+          "last_token_kind": "definition",
+          "text": "DecimalPairs(\n    *b\"0001020304050607080910111213141516171819\\\n       2021222324252627282930313233343536373839\\\n       4041424344454647484950515253545556575859\\\n       6061626364656667686970717273747576777879\\\n       8081828384858687888990919293949596979899\",\n)"
+        }
+      ],
       "sites": [
         {
           "anchor": "= DecimalPairs(",
@@ -1041,7 +1370,9 @@
             "line": 222
           },
           "line": 222,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "DECIMAL_PAIRS",
@@ -1073,6 +1404,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 7149,
+          "last_token_end": 7151,
+          "last_token_kind": "definition",
+          "text": "u8"
+        }
+      ],
       "sites": [
         {
           "anchor": "[u8; 200]",
@@ -1082,7 +1422,9 @@
             "line": 219
           },
           "line": 219,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u8",
+          "site_text_offset": 1
         }
       ],
       "source": "DecimalPairs",
@@ -1114,6 +1456,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3658,
+          "last_token_end": 3673,
+          "last_token_kind": "definition",
+          "text": "private::Sealed"
+        }
+      ],
       "sites": [
         {
           "anchor": ": private::Sealed",
@@ -1123,7 +1474,9 @@
             "line": 119
           },
           "line": 119,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "private::Sealed",
+          "site_text_offset": 2
         }
       ],
       "source": "Integer",
@@ -1155,6 +1508,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3828,
+          "last_token_end": 3833,
+          "last_token_kind": "definition",
+          "text": "usize"
+        }
+      ],
       "sites": [
         {
           "anchor": ": usize",
@@ -1164,7 +1526,9 @@
             "line": 122
           },
           "line": 122,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 2
         }
       ],
       "source": "Integer::MAX_STR_LEN",
@@ -1196,6 +1560,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 8649,
+          "last_token_end": 8656,
+          "last_token_kind": "definition",
+          "text": "Integer"
+        }
+      ],
       "sites": [
         {
           "anchor": ": Integer",
@@ -1205,7 +1578,9 @@
             "line": 255
           },
           "line": 255,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "Integer",
+          "site_text_offset": 2
         }
       ],
       "source": "Unsigned",
@@ -1239,6 +1614,15 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 8686,
+          "last_token_end": 8698,
+          "last_token_kind": "definition",
+          "text": "Self::Buffer"
+        }
+      ],
       "sites": [
         {
           "anchor": "Self::Buffer",
@@ -1248,7 +1632,9 @@
             "line": 256
           },
           "line": 256,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "Unsigned::fmt",
@@ -1280,6 +1666,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 8703,
+          "last_token_end": 8708,
+          "last_token_kind": "definition",
+          "text": "usize"
+        }
+      ],
       "sites": [
         {
           "anchor": "-> usize",
@@ -1289,7 +1684,9 @@
             "line": 256
           },
           "line": 256,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         }
       ],
       "source": "Unsigned::fmt",
@@ -1321,6 +1718,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 16812,
+          "last_token_end": 16838,
+          "last_token_kind": "definition",
+          "text": "u128_ext::mulhi(n, M_HIGH)"
+        }
+      ],
       "sites": [
         {
           "anchor": "u128_ext::mulhi(n, M_HIGH)",
@@ -1330,7 +1736,9 @@
             "line": 463
           },
           "line": 463,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "div_rem_1e16",
@@ -1364,6 +1772,29 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 16489,
+          "last_token_end": 16492,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 16897,
+          "last_token_end": 16900,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 16348,
+          "last_token_end": 16351,
+          "last_token_kind": "definition",
+          "text": "u64"
+        }
+      ],
       "sites": [
         {
           "anchor": "as u64",
@@ -1373,7 +1804,9 @@
             "line": 454
           },
           "line": 454,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u64",
@@ -1383,7 +1816,9 @@
             "line": 465
           },
           "line": 465,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "u64",
@@ -1393,7 +1828,9 @@
             "line": 450
           },
           "line": 450,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "div_rem_1e16",
@@ -1447,6 +1884,22 @@
       "flags": [],
       "generated_by": null,
       "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14883,
+          "last_token_end": 14905,
+          "last_token_kind": "definition",
+          "text": "divmod100(quad as u32)"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15489,
+          "last_token_end": 15513,
+          "last_token_kind": "definition",
+          "text": "divmod100(remain as u32)"
+        }
+      ],
       "sites": [
         {
           "anchor": "divmod100(",
@@ -1456,7 +1909,9 @@
             "line": 417
           },
           "line": 417,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         },
         {
           "anchor": "divmod100(",
@@ -1466,7 +1921,9 @@
             "line": 431
           },
           "line": 431,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1509,6 +1966,64 @@
       "flags": [],
       "generated_by": null,
       "relation": "reads",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14993,
+          "last_token_end": 15006,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15118,
+          "last_token_end": 15131,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15243,
+          "last_token_end": 15256,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15368,
+          "last_token_end": 15381,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15559,
+          "last_token_end": 15572,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15646,
+          "last_token_end": 15659,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15733,
+          "last_token_end": 15746,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15820,
+          "last_token_end": 15833,
+          "last_token_kind": "definition",
+          "text": "DECIMAL_PAIRS"
+        }
+      ],
       "sites": [
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1518,7 +2033,9 @@
             "line": 420
           },
           "line": 420,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1528,7 +2045,9 @@
             "line": 422
           },
           "line": 422,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1538,7 +2057,9 @@
             "line": 424
           },
           "line": 424,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1548,7 +2069,9 @@
             "line": 426
           },
           "line": 426,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1558,7 +2081,9 @@
             "line": 433
           },
           "line": 433,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1568,7 +2093,9 @@
             "line": 434
           },
           "line": 434,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1578,7 +2105,9 @@
             "line": 435
           },
           "line": 435,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         },
         {
           "anchor": "DECIMAL_PAIRS.0",
@@ -1588,7 +2117,9 @@
             "line": 436
           },
           "line": 436,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "DECIMAL_PAIRS",
+          "site_text_offset": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1699,6 +2230,22 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14901,
+          "last_token_end": 14904,
+          "last_token_kind": "definition",
+          "text": "u32"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15509,
+          "last_token_end": 15512,
+          "last_token_kind": "definition",
+          "text": "u32"
+        }
+      ],
       "sites": [
         {
           "anchor": "as u32",
@@ -1708,7 +2255,9 @@
             "line": 417
           },
           "line": 417,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u32",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u32",
@@ -1718,7 +2267,9 @@
             "line": 431
           },
           "line": 431,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u32",
+          "site_text_offset": 3
         }
       ],
       "source": "enc_16lsd",
@@ -1761,6 +2312,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14575,
+          "last_token_end": 14578,
+          "last_token_kind": "definition",
+          "text": "u64"
+        }
+      ],
       "sites": [
         {
           "anchor": "u64",
@@ -1770,7 +2330,9 @@
             "line": 408
           },
           "line": 408,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1802,6 +2364,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14566,
+          "last_token_end": 14568,
+          "last_token_kind": "definition",
+          "text": "u8"
+        }
+      ],
       "sites": [
         {
           "anchor": "u8",
@@ -1811,7 +2382,9 @@
             "line": 408
           },
           "line": 408,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "enc_16lsd",
@@ -1845,6 +2418,71 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15032,
+          "last_token_end": 15037,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15157,
+          "last_token_end": 15162,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15282,
+          "last_token_end": 15287,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15407,
+          "last_token_end": 15412,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15598,
+          "last_token_end": 15603,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15685,
+          "last_token_end": 15690,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15772,
+          "last_token_end": 15777,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 15859,
+          "last_token_end": 15864,
+          "last_token_kind": "definition",
+          "text": "usize"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 14536,
+          "last_token_end": 14541,
+          "last_token_kind": "definition",
+          "text": "usize"
+        }
+      ],
       "sites": [
         {
           "anchor": "as usize",
@@ -1854,7 +2492,9 @@
             "line": 420
           },
           "line": 420,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1864,7 +2504,9 @@
             "line": 422
           },
           "line": 422,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1874,7 +2516,9 @@
             "line": 424
           },
           "line": 424,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1884,7 +2528,9 @@
             "line": 426
           },
           "line": 426,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1894,7 +2540,9 @@
             "line": 433
           },
           "line": 433,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1904,7 +2552,9 @@
             "line": 434
           },
           "line": 434,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1914,7 +2564,9 @@
             "line": 435
           },
           "line": 435,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "as usize",
@@ -1924,7 +2576,9 @@
             "line": 436
           },
           "line": 436,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 3
         },
         {
           "anchor": "usize",
@@ -1934,7 +2588,9 @@
             "line": 408
           },
           "line": 408,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "enc_16lsd",
@@ -2054,6 +2710,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 6005,
+          "last_token_end": 6031,
+          "last_token_kind": "definition",
+          "text": "impl_Integer!(i128, u128);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer!(",
@@ -2063,7 +2728,9 @@
             "line": 189
           },
           "line": 189,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer!(i128, u128)",
@@ -2095,6 +2762,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 5930,
+          "last_token_end": 5954,
+          "last_token_kind": "definition",
+          "text": "impl_Integer!(i16, u16);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer!(",
@@ -2104,7 +2780,9 @@
             "line": 186
           },
           "line": 186,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer!(i16, u16)",
@@ -2136,6 +2814,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 5955,
+          "last_token_end": 5979,
+          "last_token_kind": "definition",
+          "text": "impl_Integer!(i32, u32);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer!(",
@@ -2145,7 +2832,9 @@
             "line": 187
           },
           "line": 187,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer!(i32, u32)",
@@ -2177,6 +2866,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 5980,
+          "last_token_end": 6004,
+          "last_token_kind": "definition",
+          "text": "impl_Integer!(i64, u64);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer!(",
@@ -2186,7 +2884,9 @@
             "line": 188
           },
           "line": 188,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer!(i64, u64)",
@@ -2218,6 +2918,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 5907,
+          "last_token_end": 5929,
+          "last_token_kind": "definition",
+          "text": "impl_Integer!(i8, u8);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer!(",
@@ -2227,7 +2936,9 @@
             "line": 185
           },
           "line": 185,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer!(i8, u8)",
@@ -2259,6 +2970,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 6686,
+          "last_token_end": 6755,
+          "last_token_kind": "definition",
+          "text": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer_size!(",
@@ -2268,7 +2988,9 @@
             "line": 211
           },
           "line": 211,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
@@ -2300,6 +3022,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 6826,
+          "last_token_end": 6895,
+          "last_token_kind": "definition",
+          "text": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer_size!(",
@@ -2309,7 +3040,9 @@
             "line": 213
           },
           "line": 213,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
@@ -2341,6 +3074,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 6966,
+          "last_token_end": 7035,
+          "last_token_kind": "definition",
+          "text": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer_size!(",
@@ -2350,7 +3092,9 @@
             "line": 215
           },
           "line": 215,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
@@ -2382,6 +3126,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 6756,
+          "last_token_end": 6825,
+          "last_token_kind": "definition",
+          "text": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer_size!(",
@@ -2391,7 +3144,9 @@
             "line": 212
           },
           "line": 212,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
@@ -2423,6 +3178,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 6896,
+          "last_token_end": 6965,
+          "last_token_kind": "definition",
+          "text": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer_size!(",
@@ -2432,7 +3196,9 @@
             "line": 214
           },
           "line": 214,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
@@ -2464,6 +3230,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 7036,
+          "last_token_end": 7105,
+          "last_token_kind": "definition",
+          "text": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Integer_size!(",
@@ -2473,7 +3248,9 @@
             "line": 216
           },
           "line": 216,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
@@ -2505,6 +3282,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 11626,
+          "last_token_end": 11646,
+          "last_token_kind": "definition",
+          "text": "impl_Unsigned!(u16);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Unsigned!(",
@@ -2514,7 +3300,9 @@
             "line": 330
           },
           "line": 330,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Unsigned!(u16)",
@@ -2546,6 +3334,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 11647,
+          "last_token_end": 11667,
+          "last_token_kind": "definition",
+          "text": "impl_Unsigned!(u32);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Unsigned!(",
@@ -2555,7 +3352,9 @@
             "line": 331
           },
           "line": 331,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Unsigned!(u32)",
@@ -2587,6 +3386,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 11668,
+          "last_token_end": 11688,
+          "last_token_kind": "definition",
+          "text": "impl_Unsigned!(u64);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Unsigned!(",
@@ -2596,7 +3404,9 @@
             "line": 332
           },
           "line": 332,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Unsigned!(u64)",
@@ -2628,6 +3438,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "expands",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 11606,
+          "last_token_end": 11625,
+          "last_token_kind": "definition",
+          "text": "impl_Unsigned!(u8);"
+        }
+      ],
       "sites": [
         {
           "anchor": "impl_Unsigned!(",
@@ -2637,7 +3456,9 @@
             "line": 329
           },
           "line": 329,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "impl_Unsigned!(u8)",
@@ -2669,6 +3490,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 4054,
+          "last_token_end": 4066,
+          "last_token_kind": "definition",
+          "text": "Self::Buffer"
+        }
+      ],
       "sites": [
         {
           "anchor": "Self::Buffer",
@@ -2678,7 +3508,9 @@
             "line": 131
           },
           "line": 131,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": null,
+          "site_text_offset": 0
         }
       ],
       "source": "private::Sealed::write",
@@ -2710,6 +3542,15 @@
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 4072,
+          "last_token_end": 4075,
+          "last_token_kind": "definition",
+          "text": "str"
+        }
+      ],
       "sites": [
         {
           "anchor": "-> &str",
@@ -2719,7 +3560,9 @@
             "line": 131
           },
           "line": 131,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "str",
+          "site_text_offset": 4
         }
       ],
       "source": "private::Sealed::write",
@@ -2746,29 +3589,92 @@
       "blockers": [],
       "candidate_status": "LLM_PARSED_DRAFT",
       "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
-      "evidence_key": "src/lib.rs:247:[8223, 8228]",
+      "evidence_key": "src/lib.rs:247:[8230, 8237]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 8234,
+          "last_token_end": 8237,
+          "last_token_kind": "definition",
+          "text": "str"
+        }
+      ],
       "sites": [
         {
-          "anchor": "usize",
+          "anchor": "-> &str",
           "file": "src/lib.rs",
           "first_token": {
             "kind": "definition",
             "line": 247
           },
           "line": 247,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "str",
+          "site_text_offset": 4
         }
       ],
       "source": "slice_buffer_to_str",
       "source_evidence_sites": [
         {
-          "anchor_text": "usize",
+          "anchor_text": "-> &str",
           "byte_range": [
-            8223,
+            8230,
+            8237
+          ],
+          "line": 247,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "str",
+      "target_kind": "builtin",
+      "via_use_node": null
+    },
+    {
+      "blockers": [],
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
+      "evidence_key": "src/lib.rs:247:[8221, 8228]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 8223,
+          "last_token_end": 8228,
+          "last_token_kind": "definition",
+          "text": "usize"
+        }
+      ],
+      "sites": [
+        {
+          "anchor": ": usize",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 247
+          },
+          "line": 247,
+          "occurrence": 0,
+          "site_text": "usize",
+          "site_text_offset": 2
+        }
+      ],
+      "source": "slice_buffer_to_str",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ": usize",
+          "byte_range": [
+            8221,
             8228
           ],
           "line": 247,
@@ -2794,6 +3700,43 @@
       ],
       "generated_by": null,
       "relation": "uses_type",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 252,
+          "last_token_end": 255,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 285,
+          "last_token_end": 288,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 310,
+          "last_token_end": 313,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 343,
+          "last_token_end": 346,
+          "last_token_kind": "definition",
+          "text": "u64"
+        },
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 551,
+          "last_token_end": 554,
+          "last_token_kind": "definition",
+          "text": "u64"
+        }
+      ],
       "sites": [
         {
           "anchor": "as u64",
@@ -2803,7 +3746,9 @@
             "line": 8
           },
           "line": 8,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u64",
@@ -2813,7 +3758,9 @@
             "line": 9
           },
           "line": 9,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u64",
@@ -2823,7 +3770,9 @@
             "line": 10
           },
           "line": 10,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u64",
@@ -2833,7 +3782,9 @@
             "line": 11
           },
           "line": 11,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         },
         {
           "anchor": "as u64",
@@ -2843,7 +3794,9 @@
             "line": 18
           },
           "line": 18,
-          "occurrence": 0
+          "occurrence": 0,
+          "site_text": "u64",
+          "site_text_offset": 3
         }
       ],
       "source": "u128_ext::mulhi",

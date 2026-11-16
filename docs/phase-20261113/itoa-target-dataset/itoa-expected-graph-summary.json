@@ -10,7 +10,7 @@
     "OD-8_NON_FUNCTION_RULE_UNDECIDED": 48,
     "RESOLUTION_NOT_EXTRACTED": 55,
     "SOURCE_ITEM_IDENTITY_UNVERIFIED": 29,
-    "SOURCE_SITE_RANGE_UNVERIFIED": 94
+    "SOURCE_SITE_RANGE_UNVERIFIED": 93
   },
   "candidate_provenance": {
     "author": "Devin",
@@ -19,11 +19,11 @@
     "status": "LLM_PARSED_DRAFT"
   },
   "counts": {
-    "blocked_edges": 423,
+    "blocked_edges": 422,
     "blocked_nodes": 47,
     "candidate_edges": 473,
     "candidate_nodes": 151,
-    "eligible_edges": 50,
+    "eligible_edges": 51,
     "eligible_nodes": 104,
     "impl_block_records": 33,
     "unresolved_or_inactive_sites": 10

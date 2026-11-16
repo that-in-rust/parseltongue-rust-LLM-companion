@@ -2474,3 +2474,80 @@ test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
   16 worker runs are not done, and the graph is marked incomplete (Q1 is unanswered).
 - **Not built (BL-10):** the row does not record the proven receiver type `&str`.
 - **Next:** step 7.5, byte ranges and metadata in the comparison.
+
+
+## Part 7 step 7.5 — sites compared by byte range (2026-11-16)
+
+- **REQ:** REQ-RUST-044.0 E1 to E7 (new, part 7 section 6). Test and expected data only;
+  no production code changed, so no STUB.
+- **What changed:**
+  - Part 7 section 6 states what the range of a site is for each relation, from the
+    Rust grammar.
+  - `itoa-expected-graph-builder.py` writes `site_exact_ranges` for every site of
+    `calls`, `reads`, `uses_type`, `imports`, `generates` and `expands`: where the first
+    token starts, where the last token ends, and for each whether it is written in the
+    macro definition or in the macro call. An anchor may mark the exact text
+    (`"-> ⟦Buffer⟧"`). A call's start is found by reading back from the callee name over
+    the receiver or the path. A range that cannot be determined stops the builder.
+  - `test_itoa_whole_graph_equality` compares that range instead of the first token's
+    line. `contains` and `implements` stay one row per source, relation and target (E7).
+- **Independence:** the ranges are computed from the pinned bytes and the E rules. I read
+  all 127 distinct site texts the builder produced against the rules. A throwaway dump
+  of production ranges was used to measure agreement, not to write any expected value;
+  the dump test is removed.
+- **Measured before the test was changed (throwaway script):** with the old anchors as
+  ranges, 104 of 562 sites agreed. After the E rules: 562 of 562.
+- **Two builder errors found by the comparison, production right both times:** the call
+  start for `enc_16lsd::<..>(..)` at lines 350 and 358 crossed a comment ending in a
+  full stop; and the anchor `str` on line 247 matched inside `slice_buffer_to_str`.
+  The second fix makes one more expected row unambiguous (eligible edges 50 to 51).
+- **Commands and results:**
+
+```text
+python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py
+  --source-root /home/ubuntu/repos/rust-tools/itoa
+  --output-directory docs/phase-20261113/itoa-target-dataset               exit 0
+python3 -m unittest docs/phase-20261113/itoa-target-dataset/test_itoa_expected_graph_rules.py
+                                                                           Ran 16 tests, OK
+cargo fmt --all --check                                                    exit 0
+cargo clippy --release -p parseltongue-cli-dispatcher-binary --all-targets -- -D warnings
+                                                                           exit 0
+CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 152.77s
+```
+
+- **Weak evidence:** the changed test passed on its first run. Five changes to the
+  expected file were then made one at a time; each failed the test, and the file was
+  restored by the builder:
+
+```text
+## calls string.len() start+1
+expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_needed] @ src/lib.rs definition:3368..definition:3380
+expected 1 stored 0: Buffer::format --calls--> unresolved .len [trait_solver_needed] @ src/lib.rs definition:3369..definition:3380
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 16.39s
+## uses_type end-1 (Buffer::new -> Buffer)
+expected 1 stored 0: Buffer::new --uses_type--> Buffer @ src/lib.rs definition:2897..definition:2902
+expected 0 stored 1: Buffer::new --uses_type--> Buffer @ src/lib.rs definition:2897..definition:2903
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 19.13s
+## reads first kind invocation->definition ($Signed::MAX)
+expected 1 stored 0: <i8 as Integer>::MAX_STR_LEN --reads--> i8::MAX @ src/lib.rs definition:5921..definition:5073
+expected 0 stored 1: <i8 as Integer>::MAX_STR_LEN --reads--> i8::MAX @ src/lib.rs invocation:5921..definition:5073
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 18.35s
+## imports self end+1
+expected 0 stored 1: use core::mem::{self, MaybeUninit} --imports--> core::mem @ src/lib.rs definition:2027..definition:2031
+expected 1 stored 0: use core::mem::{self, MaybeUninit} --imports--> core::mem @ src/lib.rs definition:2027..definition:2032
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 17.37s
+## expands end-1 (without ;)
+expected 1 stored 0: impl_Integer!(i128, u128) --expands--> macro_rules! impl_Integer @ src/lib.rs definition:6005..definition:6030
+expected 0 stored 1: impl_Integer!(i128, u128) --expands--> macro_rules! impl_Integer @ src/lib.rs definition:6005..definition:6031
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out; finished in 18.08s
+```
+
+- **Not compared yet:** node fields (kind, owner, visibility, file, generating call), the
+  per-row record (how a target was chosen, unresolved reason text), and the range of
+  `contains` and `implements` rows.
+- **Not done:** review by anyone but the author, the freeze, the 1, 4 and 16 worker
+  runs, workspace gates, timed release runs.
+- **Refactor:** none needed in production; the throwaway dump test is deleted.
+- **Next:** node fields in the comparison, then the worker runs.

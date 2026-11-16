@@ -6,7 +6,7 @@ pinned source and writes the candidate nodes, edges and unresolved sites. It wri
 production rows.
 Usage: itoa-expected-graph-builder.py --source-root PATH --pin-file PATH --output-directory PATH
 """
-import argparse, collections, hashlib, importlib.util, json, pathlib, subprocess
+import argparse, collections, hashlib, importlib.util, json, pathlib, re, subprocess
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -45,6 +45,10 @@ def node(label, kind, vis, f, a, b, anchor, owner, reach=False, gen=None, flags=
         generated_by=gen, source_anchor=anchor, flags=sorted(flags))
 
 def edge(src, rel, dst, f, line, anchor, dkind="node", skind="node", via=None, gen=None, flags=(), n=1, start=None):
+    # "-> ⟦Buffer⟧": the anchor is "-> ⟦Buffer⟧"; the site's exact text (part 7 section 6) is the marked part.
+    offset, text = anchor.find("⟦"), None
+    if offset >= 0:
+        text = anchor[offset + 1:anchor.index("⟧")]; anchor = anchor.replace("⟦", "").replace("⟧", "")
     check(f, line, anchor)
     if n != 1 and TEXT[f][line - 1].count(anchor) != n:
         errors.append(f"{f}:{line} has {TEXT[f][line - 1].count(anchor)} of {anchor!r}, not {n}")
@@ -55,7 +59,8 @@ def edge(src, rel, dst, f, line, anchor, dkind="node", skind="node", via=None, g
     # 'start' is the line of the receiver's first token when a method call chain is written over several lines.
     if start is not None and not (start < line and TEXT[f][start - 1].strip() and not TEXT[f][start - 1].strip().startswith(".")):
         errors.append(f"{f}:{line} start line {start} is not an earlier receiver line")
-    e["sites"].extend(dict(file=f, line=line, anchor=anchor, occurrence=i, first_token=first) for i in range(n))
+    e["sites"].extend(dict(file=f, line=line, anchor=anchor, occurrence=i, first_token=first, site_text=text, site_text_offset=max(offset, 0))
+                      for i in range(n))
     e["flags"].update(flags)
 
 EXT, BI, OD7, OD8 = "external_identity_unverified", "builtin", "OD-7_containment", "OD-8_non_function_source"
@@ -81,7 +86,7 @@ WHY = {
     "expect": "the receiver is the result of try_into, which has no target",
 }
 def unres(src, method, f, line, anchor, gen=None, n=1, flags=(), start=None, why=None):
-    if "." + method not in anchor:
+    if "." + method not in anchor.replace("⟦", "").replace("⟧", ""):
         errors.append(f"{f}:{line} anchor {anchor!r} does not call .{method}")
     edge(src, "calls", f"unresolved .{method}", f, line, anchor, dkind="unresolved", gen=gen, n=n, start=start)
     row = edges[(src, "calls", f"unresolved .{method}")]
@@ -191,8 +196,8 @@ for n in list(nodes.values()):
 
 # ---------------- imports ----------------
 ext(USE_HINT, "imports", "core::hint", L, 56, "core::hint")
-ext(USE_MEM, "imports", "core::mem", L, 57, "mem::{self")
-ext(USE_MEM, "imports", MU, L, 57, "MaybeUninit}")
+ext(USE_MEM, "imports", "core::mem", L, 57, "mem::{⟦self⟧")
+ext(USE_MEM, "imports", MU, L, 57, "⟦MaybeUninit⟧}")
 ext(USE_STR, "imports", "core::str", L, 58, "core::str")
 
 # ---------------- implements ----------------
@@ -204,56 +209,56 @@ for i in impls:
         edge(i["self_type"], "implements", i["trait"], L, i["start_line"], "impl ", skind=BI, gen=i["generated_by"], flags=["builtin_source_never_seeds_interface_edge"])
 
 # ---------------- uses_type: signatures, fields, bounds, supertraits ----------------
-edge("Buffer", "uses_type", MU, L, 73, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT]); prim("Buffer", "u8", L, 73, "<u8>")
+edge("Buffer", "uses_type", MU, L, 73, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT]); prim("Buffer", "u8", L, 73, "<⟦u8⟧>")
 edge("Buffer", "reads", mx("i128"), L, 73, "i128::MAX_STR_LEN", flags=[OD8])
-edge("<Buffer as Default>::default", "uses_type", "Buffer", L, 78, "-> Buffer")
-edge("<Buffer as Clone>::clone", "uses_type", "Buffer", L, 88, "-> Self", flags=["Self_resolved_to_impl_self_type"])
-edge("Buffer::new", "uses_type", "Buffer", L, 98, "-> Buffer")
-edge("Buffer::format", "uses_type", "Integer", L, 106, "<I: Integer>"); prim("Buffer::format", "str", L, 106, "-> &str")
-edge("Buffer::format", "uses_type", "private::Sealed::Buffer", L, 107, "cast::<I::Buffer>()", flags=["body_type_mention"])
-edge("Integer", "uses_type", "private::Sealed", L, 119, ": private::Sealed"); prim("Integer::MAX_STR_LEN", "usize", L, 122, ": usize")
-ext("private::Sealed", "uses_type", "Copy", L, 128, ": Copy", flags=["via_prelude"])
-edge("private::Sealed::write", "uses_type", "private::Sealed::Buffer", L, 131, "Self::Buffer"); prim("private::Sealed::write", "str", L, 131, "-> &str")
-prim("DecimalPairs", "u8", L, 219, "[u8; 200]"); edge("DECIMAL_PAIRS", "uses_type", "DecimalPairs", L, 222, ": DecimalPairs", flags=[OD8])
+edge("<Buffer as Default>::default", "uses_type", "Buffer", L, 78, "-> ⟦Buffer⟧")
+edge("<Buffer as Clone>::clone", "uses_type", "Buffer", L, 88, "-> ⟦Self⟧", flags=["Self_resolved_to_impl_self_type"])
+edge("Buffer::new", "uses_type", "Buffer", L, 98, "-> ⟦Buffer⟧")
+edge("Buffer::format", "uses_type", "Integer", L, 106, "<I: ⟦Integer⟧>"); prim("Buffer::format", "str", L, 106, "-> &⟦str⟧")
+edge("Buffer::format", "uses_type", "private::Sealed::Buffer", L, 107, "cast::<⟦I::Buffer⟧>()", flags=["body_type_mention"])
+edge("Integer", "uses_type", "private::Sealed", L, 119, ": ⟦private::Sealed⟧"); prim("Integer::MAX_STR_LEN", "usize", L, 122, ": ⟦usize⟧")
+ext("private::Sealed", "uses_type", "Copy", L, 128, ": ⟦Copy⟧", flags=["via_prelude"])
+edge("private::Sealed::write", "uses_type", "private::Sealed::Buffer", L, 131, "Self::Buffer"); prim("private::Sealed::write", "str", L, 131, "-> &⟦str⟧")
+prim("DecimalPairs", "u8", L, 219, "[⟦u8⟧; 200]"); edge("DECIMAL_PAIRS", "uses_type", "DecimalPairs", L, 222, ": ⟦DecimalPairs⟧", flags=[OD8])
 edge("DECIMAL_PAIRS", "calls", "DecimalPairs", L, 222, "= DecimalPairs(", flags=["tuple_struct_constructor"])
 prim("divmod100", "u32", L, 231, "u32", n=3)
 edge("slice_buffer_to_str", "uses_type", MU, L, 247, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
-edge("slice_buffer_to_str", "uses_type", MU, L, 252, "*const [MaybeUninit<u8>]", dkind="external", via=USE_MEM, flags=[EXT, "body_type_mention"])
-for p in ("u8", "usize", "str"): prim("slice_buffer_to_str", p, L, 247, p)
+edge("slice_buffer_to_str", "uses_type", MU, L, 252, "*const [⟦MaybeUninit<u8>⟧]", dkind="external", via=USE_MEM, flags=[EXT, "body_type_mention"])
+prim("slice_buffer_to_str", "u8", L, 247, "<⟦u8⟧>"); prim("slice_buffer_to_str", "usize", L, 247, ": ⟦usize⟧"); prim("slice_buffer_to_str", "str", L, 247, "-> &⟦str⟧")
 # ---------------- uses_type: types written in an expression (REQ-RUST-018.3 R10) ----------------
 BT = ["body_type_mention"]
 SELF_BT = BT + ["Self_resolved_to_impl_self_type"]
-for ln in (8, 9, 10, 11, 18): prim("u128_ext::mulhi", "u64", X, ln, "as u64", flags=BT)
-prim("Buffer::new", "u8", L, 99, "::<u8>", flags=BT)
+for ln in (8, 9, 10, 11, 18): prim("u128_ext::mulhi", "u64", X, ln, "as ⟦u64⟧", flags=BT)
+prim("Buffer::new", "u8", L, 99, "::<⟦u8⟧>", flags=BT)
 prim("slice_buffer_to_str", "u8", L, 252, "u8", n=2, flags=BT)
 for s, u, inv in PAIRS:
     g = G("impl_Integer", inv)
-    prim(mx(u), "usize", L, 144, "as usize", gen=g, flags=BT); prim(mx(s), "usize", L, 160, "as usize", gen=g, flags=BT)
+    prim(mx(u), "usize", L, 144, "as ⟦usize⟧", gen=g, flags=BT); prim(mx(s), "usize", L, 160, "as ⟦usize⟧", gen=g, flags=BT)
 for t, p, inv in SIZES:
     g = G("impl_Integer_size", inv)
-    prim(mx(t), p, L, 195, "$primitive as Integer", gen=g, flags=BT)
-    edge(mx(t), "uses_type", "Integer", L, 195, "as Integer>", gen=g, flags=BT)
-    prim(sw(t), p, L, 205, "$primitive).write(buf)", gen=g, flags=BT)
+    prim(mx(t), p, L, 195, "⟦$primitive⟧ as Integer", gen=g, flags=BT)
+    edge(mx(t), "uses_type", "Integer", L, 195, "as ⟦Integer⟧>", gen=g, flags=BT)
+    prim(sw(t), p, L, 205, "⟦$primitive⟧).write(buf)", gen=g, flags=BT)
 for u, inv in UNS:
     g = G("impl_Unsigned", inv); f = uf(u)
-    prim(f, u, L, 271, "::<Self>", gen=g, flags=SELF_BT); prim(f, u, L, 280, ": Self", gen=g, flags=SELF_BT); prim(f, u, L, 303, "as Self", gen=g, flags=SELF_BT)
-    for ln in (285, 302): prim(f, "u32", L, ln, "as u32", gen=g, flags=BT)
-    for ln in (288, 290, 292, 294, 306, 308): prim(f, "usize", L, ln, "as usize", gen=g, flags=BT)
-    prim(f, "u8", L, 318, "as u8", gen=g, flags=BT)
+    prim(f, u, L, 271, "::<⟦Self⟧>", gen=g, flags=SELF_BT); prim(f, u, L, 280, ": ⟦Self⟧", gen=g, flags=SELF_BT); prim(f, u, L, 303, "as ⟦Self⟧", gen=g, flags=SELF_BT)
+    for ln in (285, 302): prim(f, "u32", L, ln, "as ⟦u32⟧", gen=g, flags=BT)
+    for ln in (288, 290, 292, 294, 306, 308): prim(f, "usize", L, ln, "as ⟦usize⟧", gen=g, flags=BT)
+    prim(f, "u8", L, 318, "as ⟦u8⟧", gen=g, flags=BT)
 FU = "<u128 as Unsigned>::fmt"
-for ln, p in ((360, "u64"), (371, "u32"), (384, "u32"), (385, "u64"), (398, "u8")): prim(FU, p, L, ln, "as " + p, flags=BT)
-for ln in (373, 374, 375, 376, 387, 388): prim(FU, "usize", L, ln, "as usize", flags=BT)
-for ln in (417, 431): prim("enc_16lsd", "u32", L, ln, "as u32", flags=BT)
-for ln in (420, 422, 424, 426, 433, 434, 435, 436): prim("enc_16lsd", "usize", L, ln, "as usize", flags=BT)
-for ln in (454, 465): prim("div_rem_1e16", "u64", L, ln, "as u64", flags=BT)
+for ln, p in ((360, "u64"), (371, "u32"), (384, "u32"), (385, "u64"), (398, "u8")): prim(FU, p, L, ln, "as ⟦" + p + "⟧", flags=BT)
+for ln in (373, 374, 375, 376, 387, 388): prim(FU, "usize", L, ln, "as ⟦usize⟧", flags=BT)
+for ln in (417, 431): prim("enc_16lsd", "u32", L, ln, "as ⟦u32⟧", flags=BT)
+for ln in (420, 422, 424, 426, 433, 434, 435, 436): prim("enc_16lsd", "usize", L, ln, "as ⟦usize⟧", flags=BT)
+for ln in (454, 465): prim("div_rem_1e16", "u64", L, ln, "as ⟦u64⟧", flags=BT)
 
-edge("Unsigned", "uses_type", "Integer", L, 255, ": Integer")
-edge("Unsigned::fmt", "uses_type", "private::Sealed::Buffer", L, 256, "Self::Buffer", flags=["through_supertraits_Integer_Sealed"]); prim("Unsigned::fmt", "usize", L, 256, "-> usize")
+edge("Unsigned", "uses_type", "Integer", L, 255, ": ⟦Integer⟧")
+edge("Unsigned::fmt", "uses_type", "private::Sealed::Buffer", L, 256, "Self::Buffer", flags=["through_supertraits_Integer_Sealed"]); prim("Unsigned::fmt", "usize", L, 256, "-> ⟦usize⟧")
 edge("enc_16lsd", "uses_type", MU, L, 408, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
 for p in ("usize", "u8", "u64"): prim("enc_16lsd", p, L, 408, p)
 prim("div_rem_1e16", "u128", L, 450, "u128", n=2); prim("div_rem_1e16", "u64", L, 450, "u64")
 prim("u128_ext::mulhi", "u128", X, 7, "u128", n=3)
-edge("<u128 as Unsigned>::fmt", "uses_type", sb("u128"), L, 336, "Self::Buffer"); prim("<u128 as Unsigned>::fmt", "usize", L, 336, "-> usize")
+edge("<u128 as Unsigned>::fmt", "uses_type", sb("u128"), L, 336, "Self::Buffer"); prim("<u128 as Unsigned>::fmt", "usize", L, 336, "-> ⟦usize⟧")
 
 # ---------------- calls and reads in hand-written bodies ----------------
 edge("<Buffer as Default>::default", "calls", "Buffer::new", L, 79, "Buffer::new()")
@@ -281,7 +286,7 @@ def table_sites(src, lines, f=L, chained=()):
         unres(src, "write", f, ln, ".write(", start=ln - 1 if ln in chained else None)
 def pairs_sites(src, lines):
     for ln in lines:
-        edge(src, "reads", "DECIMAL_PAIRS", L, ln, "DECIMAL_PAIRS.0")
+        edge(src, "reads", "DECIMAL_PAIRS", L, ln, "⟦DECIMAL_PAIRS⟧.0")
         unres(src, "get_unchecked", L, ln, ".get_unchecked(")
 
 F = "<u128 as Unsigned>::fmt"
@@ -302,14 +307,14 @@ for s, u, inv in PAIRS:
     for ln, t, p, k in ((138, s, "$Signed", "MIN"), (139, u, "$Unsigned", "MIN"), (140, s, "$Signed", "BITS"), (140, u, "$Unsigned", "BITS")):
         ext(c, "reads", f"{t}::{k}", L, ln, f"{p}::{k}", gen=g, flags=[OD8])
     for t, ln, sgn in ((u, 144, "$Unsigned"), (s, 160, "$Signed")):
-        prim(mx(t), "usize", L, ln, ": usize", gen=g)
+        prim(mx(t), "usize", L, ln, ": ⟦usize⟧", gen=g)
         ext(mx(t), "reads", f"{t}::MAX", L, ln, f"{sgn}::MAX", gen=g, flags=[OD8])
         unres(mx(t), "ilog10", L, ln, f"{sgn}::MAX.ilog10()", gen=g, flags=[OD8])
         bl = 148 if t == u else 164
-        edge(sb(t), "uses_type", MU, L, bl, "MaybeUninit<u8>", dkind="external", via=USE_MEM, gen=g, flags=[EXT]); prim(sb(t), "u8", L, bl, "<u8>", gen=g)
+        edge(sb(t), "uses_type", MU, L, bl, "MaybeUninit<u8>", dkind="external", via=USE_MEM, gen=g, flags=[EXT]); prim(sb(t), "u8", L, bl, "<⟦u8⟧>", gen=g)
         edge(sb(t), "reads", mx(t), L, bl, "Self::MAX_STR_LEN", gen=g, flags=[OD8])
         wl = 152 if t == u else 168
-        edge(sw(t), "uses_type", sb(t), L, wl, "Self::Buffer", gen=g); prim(sw(t), "str", L, wl, "-> &str", gen=g)
+        edge(sw(t), "uses_type", sb(t), L, wl, "Self::Buffer", gen=g); prim(sw(t), "str", L, wl, "-> &⟦str⟧", gen=g)
     edge(sw(u), "calls", uf(u), L, 153, "Unsigned::fmt(self, buf)", gen=g, flags=["concrete_impl_chosen_from_argument_type"])
     edge(sw(u), "calls", "slice_buffer_to_str", L, 155, "slice_buffer_to_str(buf, offset)", gen=g)
     edge(sw(s), "reads", mx(s), L, 169, "Self::MAX_STR_LEN", gen=g)
@@ -324,17 +329,17 @@ for s, u, inv in PAIRS:
     edge(sw(s), "calls", "slice_buffer_to_str", L, 179, "slice_buffer_to_str(buf, offset)", gen=g)
 for t, p, inv in SIZES:
     g = G("impl_Integer_size", inv)
-    prim(mx(t), "usize", L, 195, ": usize", gen=g)
+    prim(mx(t), "usize", L, 195, ": ⟦usize⟧", gen=g)
     edge(mx(t), "reads", mx(p), L, 195, "<$primitive as Integer>::MAX_STR_LEN", gen=g, flags=[OD8])
     edge(sb(t), "uses_type", sb(p), L, 200, "<$primitive as private::Sealed>::Buffer", gen=g, flags=[OD8])
     # The same path names the type $primitive (written in the macro call) and the trait private::Sealed.
-    prim(sb(t), p, L, 200, "$primitive as private::Sealed", gen=g)
-    edge(sb(t), "uses_type", "private::Sealed", L, 200, "private::Sealed>::Buffer", gen=g, flags=[OD8])
-    edge(sw(t), "uses_type", sb(t), L, 204, "Self::Buffer", gen=g); prim(sw(t), "str", L, 204, "-> &str", gen=g)
+    prim(sb(t), p, L, 200, "⟦$primitive⟧ as private::Sealed", gen=g)
+    edge(sb(t), "uses_type", "private::Sealed", L, 200, "⟦private::Sealed⟧>::Buffer", gen=g, flags=[OD8])
+    edge(sw(t), "uses_type", sb(t), L, 204, "Self::Buffer", gen=g); prim(sw(t), "str", L, 204, "-> &⟦str⟧", gen=g)
     edge(sw(t), "calls", sw(p), L, 205, "(self as $primitive).write(buf)", gen=g, flags=["concrete_receiver_from_cast"])
 for u, inv in UNS:
     g = G("impl_Unsigned", inv); f = uf(u)
-    edge(f, "uses_type", sb(u), L, 263, "Self::Buffer", gen=g); prim(f, "usize", L, 263, "-> usize", gen=g)
+    edge(f, "uses_type", sb(u), L, 263, "Self::Buffer", gen=g); prim(f, "usize", L, 263, "-> ⟦usize⟧", gen=g)
     unres(f, "len", L, 265, "buf.len()", gen=g)
     ext(f, "calls", "core::mem::size_of", L, 271, "mem::size_of::<Self>()", via=USE_MEM, gen=g)
     for ln in (274, 281): unres(f, "try_into", L, ln, ".try_into()", gen=g, flags=["trait_method"], start=ln - 1)
@@ -342,7 +347,7 @@ for u, inv in UNS:
     for ln in (285, 302): edge(f, "calls", "divmod100", L, ln, "divmod100(", gen=g)
     for ln in (288, 290, 292, 294, 306, 308, 319): unres(f, "write", L, ln, ".write(", gen=g, start=None if ln == 319 else ln - 1)
     for ln in (288, 290, 292, 294, 306, 308):
-        edge(f, "reads", "DECIMAL_PAIRS", L, ln, "DECIMAL_PAIRS.0", gen=g)
+        edge(f, "reads", "DECIMAL_PAIRS", L, ln, "⟦DECIMAL_PAIRS⟧.0", gen=g)
         unres(f, "get_unchecked", L, ln, ".get_unchecked(", gen=g)
 
 # ---------------- sites expected to stay unresolved or inactive ----------------
@@ -380,6 +385,118 @@ def source_evidence(file, line, anchor):
             "byte_range": [start + hit, start + hit + len(needle)] if exact else None,
             "anchor_text": anchor, "range_status": "EXACT_ANCHOR" if exact else "AMBIGUOUS_OR_EMPTY"}
 
+RAW = {f: (SRC / f).read_bytes() for f in (L, X)}
+MACRO_PARAMS = {"impl_Integer": ("$Signed", "$Unsigned"), "impl_Integer_size": ("$t", "$primitive"), "impl_Unsigned": ("$Unsigned",)}
+range_errors = []
+
+def line_span(f, line):
+    lines = RAW[f].splitlines(keepends=True)
+    start = sum(len(v) for v in lines[:line - 1])
+    return start, start + len(lines[line - 1])
+
+def find_all(f, needle, lo, hi):
+    out, at = [], RAW[f].find(needle.encode(), lo)
+    while 0 <= at < hi:
+        out.append(at); at = RAW[f].find(needle.encode(), at + 1)
+    return out
+
+ID = set(b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$")
+WS = set(b" \n\t\r")
+
+def ident_back(f, p):
+    while p > 0 and RAW[f][p - 1] in ID: p -= 1
+    return p
+
+def group_back(f, p):
+    """RAW[f][p-1] closes a group; the index of the token that opens it."""
+    close = RAW[f][p - 1]; opener = {41: 40, 93: 91, 62: 60}[close]; depth, i = 0, p - 1
+    while True:
+        c = RAW[f][i]
+        if c == close and not (close == 62 and RAW[f][i - 1] == 45): depth += 1
+        elif c == opener: depth -= 1
+        if depth == 0: return i
+        i -= 1
+
+def atom_back(f, p):
+    """The start of the postfix operand that ends at p: a name, a literal, or a group with what it is applied to."""
+    c = RAW[f][p - 1]
+    if c in b")]":
+        p = group_back(f, p)
+        if RAW[f][p - 1] in ID or RAW[f][p - 1] in b")]": return atom_back(f, p)
+        if RAW[f][p - 1] == 62:
+            lt = group_back(f, p)
+            if RAW[f][lt - 2:lt] != b"::": raise ValueError("generic arguments without a turbofish")
+            return ident_back(f, lt - 2)
+        return p
+    if c in ID: return ident_back(f, p)
+    raise ValueError(f"no operand ends at byte {p}")
+
+def call_start(f, p):
+    """E1: the first token of the call expression whose callee name starts at p. A method call starts at its receiver;
+    a prefix operator before the receiver is not part of the call. A path call starts at the first segment of its path."""
+    while True:
+        if RAW[f][p - 2:p] == b"::":
+            q = p - 2
+            if RAW[f][q - 1] == 62:
+                lt = group_back(f, q)
+                if RAW[f][lt - 2:lt] != b"::": return lt
+                p = ident_back(f, lt - 2)
+            else:
+                p = ident_back(f, q)
+            continue
+        # The dot is written directly before the name; a receiver may end on an earlier line.
+        if RAW[f][p - 1] == 46 and RAW[f][p - 2] != 46:
+            q = p - 1
+            while RAW[f][q - 1] in WS: q -= 1
+            p = atom_back(f, q)
+            continue
+        return p
+
+def macro_argument(f, gen, name):
+    """The byte range, in the macro call, of the argument substituted for the macro parameter 'name'."""
+    lo, hi = line_span(f, gen["invocation_line"])
+    line = RAW[f][lo:hi].decode(); inside = line.index("(") + 1
+    words = list(re.finditer(r"[A-Za-z0-9_]+", line[inside:]))
+    index = MACRO_PARAMS[gen["macro"]].index(name)
+    word = words[index * 2 if gen["macro"] == "impl_Integer_size" else index]
+    return [lo + inside + word.start(), lo + inside + word.end()]
+
+def exact_site_range(rel, site, gen, callee):
+    """The site's byte range by part 7 section 6 (E1 to E6), from the pinned bytes; None with an error when not determined."""
+    f = site["file"]; lo, hi = line_span(f, site["line"])
+    hits = find_all(f, site["anchor"], lo, hi)
+    where = f"{f}:{site['line']} {rel} {site['anchor']!r}"
+    if site["occurrence"] >= len(hits):
+        range_errors.append(f"{where}: anchor occurrence {site['occurrence']} not on the line"); return None
+    at = hits[site["occurrence"]]; a, b = at, at + len(site["anchor"].encode())
+    if rel in ("expands", "generates"):
+        b = RAW[f].index(b";", a) + 1
+    elif rel == "calls":
+        found = re.search(r"(?<![A-Za-z0-9_$])" + re.escape(callee) + r"(?![A-Za-z0-9_])", site["anchor"])
+        if not found:
+            range_errors.append(f"{where}: callee name {callee!r} not in the anchor"); return None
+        name_at = at + len(site["anchor"][:found.start()].encode())
+        try:
+            a = call_start(f, name_at)
+        except ValueError as error:
+            range_errors.append(f"{where}: {error}"); return None
+        depth, i = 0, RAW[f].index(b"(", name_at)
+        while True:
+            depth += {40: 1, 41: -1}.get(RAW[f][i], 0)
+            if depth == 0: break
+            i += 1
+        b = i + 1
+    elif site["site_text"] is not None:
+        a = at + len(site["anchor"][:site["site_text_offset"]].encode()); b = a + len(site["site_text"].encode())
+    text = RAW[f][a:b].decode()
+    params = sorted(MACRO_PARAMS[gen["macro"]], key=len, reverse=True) if gen else ()
+    first_param = next((p for p in params if re.match(re.escape(p) + r"(?![A-Za-z0-9_])", text)), None)
+    last_param = next((p for p in params if text.endswith(p)), None)
+    first = macro_argument(f, gen, first_param) if first_param else None
+    last = macro_argument(f, gen, last_param) if last_param else None
+    return dict(first_token_kind="invocation" if first else "definition", first_token_start=first[0] if first else a,
+                last_token_kind="invocation" if last else "definition", last_token_end=last[1] if last else b, text=text)
+
 node_rows = []
 for row in nodes.values():
     candidate = dict(row)
@@ -391,6 +508,9 @@ for row in edges.values():
     candidate = dict(row)
     candidate["source_evidence_sites"] = [source_evidence(site["file"], site["line"], site["anchor"])
                                          for site in row["sites"]]
+    callee = row.get("callee_name") or row["target"].rsplit("::", 1)[-1]
+    candidate["site_exact_ranges"] = [exact_site_range(row["relation"], site, row["generated_by"], callee) for site in row["sites"]] \
+        if row["relation"] not in ("contains", "implements") else None
     candidate["source_site_evidence_status"] = "EXACT" if candidate["source_evidence_sites"] and all(
         site["range_status"] == "EXACT_ANCHOR" for site in candidate["source_evidence_sites"]) else "AMBIGUOUS_OR_EMPTY"
     candidate["evidence_key"] = "|".join(f"{site['source_path']}:{site['line']}:{site['byte_range']}" for site in candidate["source_evidence_sites"])
@@ -418,6 +538,8 @@ for row in unresolved:
     row["source_evidence"] = source_evidence(row["file"], row["line"], row["anchor"])
     row.update(RULES.classify_diagnostic_site({"reason_candidate": row["reason"], "reason_verified": False}))
 
+if range_errors:
+    raise SystemExit("\n".join(range_errors))
 classified = RULES.classify_candidates(node_rows, edge_rows)
 eligible_nodes = classified["eligible_nodes"]
 
