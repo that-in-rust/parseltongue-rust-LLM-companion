@@ -137,6 +137,39 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 13:20 IST — Part 7 started: first comparison of the draft expected graph with production rows
+
+- **Milestone:** itoa full item graph, part 7 (REQ-RUST-044.0). No SOP step has passed.
+  The expected graph is an unreviewed draft; this is a measurement, not a comparison that
+  can pass.
+- **Command:** `python3 /home/ubuntu/phase7-work/compare.py` (a throwaway script outside the
+  repository) on the node and edge exports of the release run `tfix-3` (executable sha256
+  `82eab262…`, commit `a8fd18503`). Rows are keyed by source label, relation and target label.
+- **Output:**
+
+```text
+NODES expected 73 production 145 both 72
+ expected only: ['itoa']
+ production only: 73 Counter({'ExternalDefinition/None': 42, 'LocalItem/MacroInvocation': 15, 'Builtin/None': 13, 'LocalItem/MacroDefinition': 3})
+EDGES expected rows 368 distinct 368 | production rows 585 distinct 413
+ calls       expected  102 production   66 both   36 expected-only   66 production-only   30 (production-only unresolved 23)
+ contains    expected   70 production   88 both   70 expected-only    0 production-only   18 (production-only unresolved 0)
+ expands     expected    0 production   15 both    0 expected-only    0 production-only   15 (production-only unresolved 0)
+ generates   expected    0 production   45 both    0 expected-only    0 production-only   45 (production-only unresolved 0)
+ implements  expected   32 production   32 both   29 expected-only    3 production-only    3 (production-only unresolved 0)
+ imports     expected    4 production    4 both    4 expected-only    0 production-only    0 (production-only unresolved 0)
+ reads       expected   62 production   62 both   32 expected-only   30 production-only   30 (production-only unresolved 0)
+ uses_type   expected   98 production  101 both   96 expected-only    2 production-only    5 (production-only unresolved 0)
+```
+
+- **Reading of the 101 unmatched expected rows** is in the part 7 file, section 1: 35 differ
+  in the name of a `core` target, 60 are method calls into `core`, 5 are
+  `Unsigned::fmt(self.unsigned_abs(), ..)`, 1 is a production miss (a type written in a
+  function body).
+- **Decision asked of the user, not answered:** part 7 Q1 (a run marked incomplete cannot
+  pass, against expected unresolved rows).
+- **Next:** step 7.1, the comparison test.
+
 ### 2026-11-16 12:40 IST — Part 6 workspace gates
 
 - **Milestone:** itoa full item graph, part 6. No SOP step has passed. The graph is still
