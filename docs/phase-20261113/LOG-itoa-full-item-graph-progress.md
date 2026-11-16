@@ -122,6 +122,33 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 07:56 IST — Part 5d workspace gates at `41567d710`
+
+- **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.
+- **Result: not a full PASS.** `test_lang_items_in_sysroot` is skipped, as the standing
+  command says; it is an open defect, not a waiver.
+- **Commands (the standing four) and results:**
+
+```text
+cargo fmt --all -- --check                                                        ok
+cargo clippy --release --workspace --all-targets --all-features -- -D warnings    ok
+cargo test --release --workspace --all-targets --all-features
+      -- --skip test_lang_items_in_sysroot --test-threads=1                       574 passed, 0 failed, 4 ignored
+                                                                                  (21 test binaries; itoa 48 of 48, 1040.61 s
+                                                                                  on one thread)
+cargo build --release --workspace --all-targets --all-features                    ok
+```
+
+- **The skipped test, run once without the skip (debug profile):** it failed after
+  2067 s at its first assertion, the mapping run's exit status. That run used
+  `cargo test` without the standing flags, which was my mistake; it stopped at this
+  test binary, so I ran the standing command afterwards.
+- **Two executables, measured:** the `--all-features` build is
+  `97045d7f74b060da416ae9892c2b618a944c2387d2fab54377c1da980458833d`; the default
+  build used for the step 11 measurements is
+  `66a74fde41ed76755d2e262530f2e14fe0dbe1d28f13127ce96401fac82cb0c2`, and building it again after the gates gave the same digest.
+- **Next:** part 6.
+
 ### 2026-11-16 06:20 IST — Part 5d step 11: value paths in the arguments of `assert!` (REQ-RUST-052.0 G15)
 
 - **Milestone:** itoa full item graph, part 5d. No SOP step has passed. `completeness=incomplete`.
