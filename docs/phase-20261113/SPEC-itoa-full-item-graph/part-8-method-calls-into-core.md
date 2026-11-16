@@ -1,7 +1,9 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-16: **step 8.1 in progress.** REQ-RUST-055.0 and REQ-RUST-056.0 are
-reserved and get their test rows when their steps start.
+Status on 2026-11-16: **steps 8.1 to 8.3b-2a built; 8.3b-2b open (one real-source test
+fails). The order changed by user decision: the expected target of all 133 calls is written
+from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
+it.** Counts are on the log's "Where we are" page.
 
 ## Requirement
 
@@ -328,3 +330,108 @@ gates     extractor crate tests, 60 real-source itoa tests, workspace tests, rel
   is in scope and declares `write`. P5 names the target only if the stored impls show
   `Sealed` is not implemented for `MaybeUninit<u8>`.
 
+## 9. The expected target of every method call into `core` (spec first, added 2026-11-16)
+
+### Rust work mode
+
+Spec + Reliability. Component: the expected data set (Python, test side) and one
+real-source test (Rust). No production code. The risk is a wrong expected target: the
+author of the expected rows is also the author of the mapper.
+
+### Executable requirements: REQ-RUST-058.0
+
+- T1. WHEN the frozen expected graph lists a `calls` site without a target (133 sites, 55
+  rows) THEN the file `itoa-expected-core-member-targets.json` SHALL hold exactly one row
+  for that site, keyed by file and byte range. No other site has a row.
+- T2. Each row SHALL give either a target label, or `no_target` with a reason. `no_target`
+  is allowed only when Rust's lookup rules and the two read sources (pinned itoa, the
+  frozen `core` files) cannot prove one declaration.
+- T3. A target label SHALL be the owner as `core` writes it, `::`, the method name
+  (decided, Q1): an inherent method takes the impl's self type (`MaybeUninit<T>::write`,
+  `[T]::get_unchecked`, `*mut T::cast`, `str::len`); a trait's method takes the trait's name
+  (`TryInto::try_into`, `Iterator::rev`).
+- T4. Each row with a target SHALL cite its proof, so a reader can check it without a
+  tool: the receiver's type; the itoa line that proves that type; the `core` file (relative
+  to `library`), line and text of the declaration; the lookup step that reaches it (the
+  type itself, a dereference, the slice of an array; by value, `&`, `&mut`).
+- T5. Each row SHALL list its assumptions; an empty list means none. A call that a prelude
+  trait could also answer SHALL carry `prelude_trait_impl_unrefuted` (decided, Q2). A
+  declaration written inside a `macro_rules!` body of `core` SHALL carry
+  `core_macro_body_declaration` and name the macro.
+- T6. The file SHALL record the compiler version (`rustc -vV`) and one sha256 over the path
+  and bytes of every `.rs` file under `library/core/src`, in path order. WHEN a cited
+  declaration line does not hold the cited text in those files THEN the data-set test SHALL
+  fail.
+- T7. The file is frozen like the expected graph: its sha256 is in a freeze record, and a
+  change needs a source citation and a new freeze. It is never a production input.
+- T8. WHEN a run with scope `declarations` stores a target for one of the 133 sites THEN
+  the real-source test SHALL fail unless label and assumptions equal the row. A site the
+  run leaves without a target is counted, not failed, until step 8.6.
+- T9. Part 8 is DONE when the count of T8 is 133 of 133 equal (rows with `no_target`
+  equal when the run stores no target and the same reason). Then the rows are merged into
+  the expected graph, it is re-frozen, and S1 to S4 run with `declarations` (step 8.6).
+
+### Design (L1 / L2 / L3)
+
+```text
+L1  itoa-expected-core-member-targets.json   the 133 rows: data, no logic
+    itoa-expected-graph-rules.py             the vocabulary: labels, steps, assumptions
+L2  itoa-expected-core-target-builder.py     reads the pinned source, the frozen graph and
+                                             the core files; checks T1, T4, T6; writes L1
+L3  none. Production never opens these files (SOP Rule 2).
+test side (Rust, later step)
+    itoa-source-acceptance-tests.rs          test_itoa_core_member_targets reads L1 and
+                                             compares as T8; pure functions over two row
+                                             lists, iterator pipelines, no mutable state
+errors  a row that fails T1, T4 or T6 stops the builder with the row named; nothing is
+        skipped
+```
+
+### Verification matrix
+
+```text
+req      test                                  type         assertion                                metric
+058 T1   test_core_target_site_coverage        data set     rows == unresolved call sites of the     133 of 133
+                                                            frozen graph, by file and byte range
+058 T2   test_core_target_label_or_reason      data set     each row has a label xor a reason        133 rows
+058 T3   test_core_target_label_shape          data set     label == cited owner text + "::" + name  rows with a label
+058 T4   test_core_declaration_citation_text   data set     cited core line holds the cited text     rows with a label
+058 T5   test_core_target_assumption_names     data set     assumptions are from the vocabulary;     133 rows
+                                                            the 5 buf.len() rows carry the Q2 value
+058 T6   test_core_source_digest_recorded      data set     version and digest equal the files read  1
+058 T7   test_core_target_freeze_digest        data set     file sha256 == freeze record             1
+058 T8   test_itoa_core_member_targets         real source  no stored target differs from its row;   equal of 133
+                                                            prints equal, missing, wrong
+```
+
+### Implementation plan
+
+```text
+9.1  this section; decisions in PRD, SOP, ARCH, AGENTS.md           done (documents)
+9.2  read each of the 55 rows' sites in the pinned source and the declaration in core;
+     write the builder and the 133 rows; data-set tests T1 to T6 pass
+9.3  the user reads the rows by method group (11 groups) and rules on any I marked open
+9.4  freeze (T7)
+9.5  test_itoa_core_member_targets compares with the file (T8): STUB, RED, GREEN, REFACTOR
+9.6  close step 8.3b-2b against the frozen rows, then 8.3b-3, 8.4, 8.5 in the order the
+     missing count falls fastest
+```
+
+### Quality gate results
+
+Not run. This section is a specification; 9.2 runs the data-set tests.
+
+### Open questions
+
+- Q1. **Trait methods** (`try_into` 13, `rev` 1): the label `TryInto::try_into` names the
+  trait's declaration, as the PRD does for itoa's own traits. The impl that runs (`impl<T,
+  U> TryInto<U> for T where U: TryFrom<T>`) is not named. Proposed: keep the trait label
+  and cite the blanket impl in the proof.
+- Q2. **`ilog10`** (10): `core` writes it inside `uint_impl!` and `int_impl!`, called from
+  `impl u64 { .. }`. Proposed label: the builtin type, as the PRD does for `u8::MAX`
+  (`u64::ilog10`), with `core_macro_body_declaration`.
+- Q3. **`expect` and `unwrap`** (13): the receiver is the result of `try_into`, so its type
+  comes from a `core` return type (`Result<U, U::Error>`). Proposed label
+  `Result<T, E>::expect`, with the return type cited as a proof step.
+- Q4. **Which compiler.** No file pins the compiler. T6 records the one read; the SOP run
+  must use the same one or the freeze fails.
