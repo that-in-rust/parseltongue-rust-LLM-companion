@@ -80,12 +80,12 @@ WHY = {
     "unwrap": "the receiver is the result of try_into, which has no target",
     "expect": "the receiver is the result of try_into, which has no target",
 }
-def unres(src, method, f, line, anchor, gen=None, n=1, flags=(), start=None):
+def unres(src, method, f, line, anchor, gen=None, n=1, flags=(), start=None, why=None):
     if "." + method not in anchor:
         errors.append(f"{f}:{line} anchor {anchor!r} does not call .{method}")
     edge(src, "calls", f"unresolved .{method}", f, line, anchor, dkind="unresolved", gen=gen, n=n, start=start)
     row = edges[(src, "calls", f"unresolved .{method}")]
-    row.update(resolution_status="unresolved", unresolved_reason="trait_solver_needed", unresolved_why=WHY[method], callee_name=method)
+    row.update(resolution_status="unresolved", unresolved_reason="trait_solver_needed", unresolved_why=why or WHY[method], callee_name=method)
 
 # ---------------- hand-written nodes ----------------
 AL, AX = "area:src/lib.rs", "area:src/u128_ext.rs"
@@ -263,8 +263,11 @@ edge("Buffer::new", "reads", mx("i128"), L, 99, "i128::MAX_STR_LEN")
 unres("Buffer::format", "as_mut_ptr", L, 107, ".as_mut_ptr()")
 unres("Buffer::format", "cast", L, 107, ".cast::<")
 edge("Buffer::format", "calls", "private::Sealed::write", L, 108, "i.write(", flags=["generic_dispatch_one_edge_through_bound_I:Integer:Sealed"])
-# 'string' is the value of i.write(..); private::Sealed::write is declared '-> &str', so the receiver is a str.
-ext("Buffer::format", "calls", "str::len", L, 109, "string.len()", flags=["receiver_type_from_declared_return_type_of_private::Sealed::write"])
+# 'string' is the value of i.write(..); private::Sealed::write is declared '-> &str', so the receiver is a '&str'.
+# No target (part 7 Q4): a method on a '&str' value is either a '&self' method of 'str' or a by-value method declared
+# for '&str' (as 'clone' and 'into' are). Which one 'len' is, is declared in core. Same as 'buf.len()' on a '&[T]' parameter.
+unres("Buffer::format", "len", L, 109, "string.len()",
+      why="the receiver is a '&str' (declared return type of private::Sealed::write); whether 'len' is declared for 'str' or for '&str' is in core")
 edge("Buffer::format", "reads", "Integer::MAX_STR_LEN", L, 109, "I::MAX_STR_LEN", flags=["generic_trait_const"])
 ext("Buffer::format", "calls", "core::hint::unreachable_unchecked", L, 110, "hint::unreachable_unchecked()", via=USE_HINT)
 unres("slice_buffer_to_str", "get_unchecked", L, 249, "buf.get_unchecked(")

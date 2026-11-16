@@ -1,14 +1,14 @@
 {
   "artifact_status": "LLM_PARSED_DRAFT_NOT_FROZEN",
   "blocker_counts": {
-    "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 65,
+    "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 64,
     "EXTERNAL_TRAIT_VISIBILITY_UNVERIFIED": 8,
     "INFERRED_CORE_DEPENDENT_CALL_UNDECIDED": 12,
     "MACRO_FILE_ASSIGNMENT_UNRESOLVED": 389,
     "OD-2_MACRO_OWNERSHIP_UNDECIDED": 389,
     "OD-7_OWNERSHIP_UNDECIDED": 2,
     "OD-8_NON_FUNCTION_RULE_UNDECIDED": 48,
-    "RESOLUTION_NOT_EXTRACTED": 54,
+    "RESOLUTION_NOT_EXTRACTED": 55,
     "SOURCE_ITEM_IDENTITY_UNVERIFIED": 29,
     "SOURCE_SITE_RANGE_UNVERIFIED": 94
   },
@@ -22,9 +22,9 @@
     "blocked_edges": 423,
     "blocked_nodes": 47,
     "candidate_edges": 473,
-    "candidate_nodes": 152,
+    "candidate_nodes": 151,
     "eligible_edges": 50,
-    "eligible_nodes": 105,
+    "eligible_nodes": 104,
     "impl_block_records": 33,
     "unresolved_or_inactive_sites": 10
   },
@@ -56,8 +56,8 @@
   },
   "target_kind_counts": {
     "builtin": 77,
-    "external": 65,
+    "external": 64,
     "node": 277,
-    "unresolved": 54
+    "unresolved": 55
   }
 }

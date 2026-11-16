@@ -8,9 +8,9 @@
   },
   "counts": {
     "candidate_edges": 473,
-    "candidate_nodes": 152,
+    "candidate_nodes": 151,
     "eligible_edges": 50,
-    "eligible_nodes": 105
+    "eligible_nodes": 104
   },
   "edges": [
     {
@@ -3703,27 +3703,6 @@
       "item_kind": null,
       "label": "str",
       "node_category": "builtin_type",
-      "owner": null,
-      "reachable_outside_crate": null,
-      "source_anchor": null,
-      "source_evidence": null,
-      "source_read": false,
-      "start_line": 0
-    },
-    {
-      "blockers": [],
-      "candidate_status": "LLM_PARSED_DRAFT",
-      "effective_visibility": null,
-      "eligibility_status": "ELIGIBLE_LOCAL_ONLY_DIAGNOSTIC",
-      "end_line": 0,
-      "external_name_kind": "builtin_member",
-      "file": "",
-      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
-      "flags": [],
-      "generated_by": null,
-      "item_kind": null,
-      "label": "str::len",
-      "node_category": "external_name",
       "owner": null,
       "reachable_outside_crate": null,
       "source_anchor": null,

@@ -5,8 +5,8 @@
 Every cited source anchor is checked against the pinned bytes. Whole-source coverage is not claimed: operators, literals and repeated same-line sites are not covered. A type written in an expression is covered (REQ-RUST-018.3 R10). Rows that depend on OD-2, OD-7 or OD-8 are marked blocked.
 
 ```text
-candidate_nodes: 152
-eligible_nodes: 105
+candidate_nodes: 151
+eligible_nodes: 104
 blocked_nodes: 47
 candidate_edges: 473
 eligible_edges: 50
@@ -24,8 +24,8 @@ relation reads: 62
 relation generates: 45
 relation expands: 15
 target builtin: 77
-target external: 65
+target external: 64
 target node: 277
-target unresolved: 54
+target unresolved: 55
 source commit: af77385d0daf4d0e949e81f2588be2e44f69f086
 ```

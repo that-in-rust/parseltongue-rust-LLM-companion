@@ -91,6 +91,9 @@ BF-03   Performance tuning, incremental remapping, new CLI
 BF-06   Any rust-analyzer export or oracle comparison
 BL-09   A node field naming the impl header of an impl     today only the label names it
         member (`node_impl_header_reference`)               (part 5, section 8, Q8)
+BL-10   The proven receiver type on a method call row       `string.len()` at lib.rs 109: source
+        without a target (a local bound once to a call      proves `&str`, the row does not say
+        whose stored target declares its return type)       so (part 7, Q4)
 ```
 
 Ids are kept from the earlier backlog so old references still resolve. BL-05, BD-01 to BD-04,

@@ -1,13 +1,13 @@
 {
   "blocker_counts": {
-    "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 65,
+    "EXTERNAL_TARGET_IDENTITY_UNVERIFIED": 64,
     "EXTERNAL_TRAIT_VISIBILITY_UNVERIFIED": 8,
     "INFERRED_CORE_DEPENDENT_CALL_UNDECIDED": 12,
     "MACRO_FILE_ASSIGNMENT_UNRESOLVED": 389,
     "OD-2_MACRO_OWNERSHIP_UNDECIDED": 389,
     "OD-7_OWNERSHIP_UNDECIDED": 2,
     "OD-8_NON_FUNCTION_RULE_UNDECIDED": 48,
-    "RESOLUTION_NOT_EXTRACTED": 54,
+    "RESOLUTION_NOT_EXTRACTED": 55,
     "SOURCE_ITEM_IDENTITY_UNVERIFIED": 29,
     "SOURCE_SITE_RANGE_UNVERIFIED": 94
   },
@@ -13816,52 +13816,6 @@
     },
     {
       "blockers": [
-        "EXTERNAL_TARGET_IDENTITY_UNVERIFIED"
-      ],
-      "candidate_status": "LLM_PARSED_DRAFT",
-      "eligibility_status": "BLOCKED",
-      "evidence_key": "src/lib.rs:109:[3368, 3380]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [
-        "external_identity_unverified",
-        "receiver_type_from_declared_return_type_of_private::Sealed::write"
-      ],
-      "generated_by": null,
-      "relation": "calls",
-      "sites": [
-        {
-          "anchor": "string.len()",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 109
-          },
-          "line": 109,
-          "occurrence": 0
-        }
-      ],
-      "source": "Buffer::format",
-      "source_evidence_sites": [
-        {
-          "anchor_text": "string.len()",
-          "byte_range": [
-            3368,
-            3380
-          ],
-          "line": 109,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "str::len",
-      "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "blockers": [
         "RESOLUTION_NOT_EXTRACTED"
       ],
       "callee_name": "as_mut_ptr",
@@ -13952,6 +13906,53 @@
       "target_kind": "unresolved",
       "unresolved_reason": "trait_solver_needed",
       "unresolved_why": "the receiver is the result of as_mut_ptr, which has no target",
+      "via_use_node": null
+    },
+    {
+      "blockers": [
+        "RESOLUTION_NOT_EXTRACTED"
+      ],
+      "callee_name": "len",
+      "candidate_status": "LLM_PARSED_DRAFT",
+      "eligibility_status": "BLOCKED",
+      "evidence_key": "src/lib.rs:109:[3368, 3380]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "resolution_status": "unresolved",
+      "sites": [
+        {
+          "anchor": "string.len()",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 109
+          },
+          "line": 109,
+          "occurrence": 0
+        }
+      ],
+      "source": "Buffer::format",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "string.len()",
+          "byte_range": [
+            3368,
+            3380
+          ],
+          "line": 109,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "unresolved .len",
+      "target_kind": "unresolved",
+      "unresolved_reason": "trait_solver_needed",
+      "unresolved_why": "the receiver is a '&str' (declared return type of private::Sealed::write); whether 'len' is declared for 'str' or for '&str' is in core",
       "via_use_node": null
     },
     {

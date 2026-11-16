@@ -9,7 +9,7 @@
   "candidate_rows_preserved": true,
   "canonical_identity_status": "SYMBOLIC_NONCANONICAL",
   "production_input": false,
-  "row_count": 152,
+  "row_count": 151,
   "rows": [
     {
       "effective_visibility": null,
@@ -688,24 +688,6 @@
       "item_kind": null,
       "label": "str",
       "node_category": "builtin_type",
-      "owner": null,
-      "reachable_outside_crate": null,
-      "source_anchor": null,
-      "source_evidence": null,
-      "source_read": false,
-      "start_line": 0
-    },
-    {
-      "effective_visibility": null,
-      "end_line": 0,
-      "external_name_kind": "builtin_member",
-      "file": "",
-      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
-      "flags": [],
-      "generated_by": null,
-      "item_kind": null,
-      "label": "str::len",
-      "node_category": "external_name",
       "owner": null,
       "reachable_outside_crate": null,
       "source_anchor": null,

@@ -82,6 +82,15 @@ The dataset is never edited to match production: each change cites the source li
   is. It has no edge until OD-7 (file module and file area) is decided.
 - **Q3 (decided 2026-11-16 from the maximum-information rule).** Every type written in
   an expression is a `uses_type` site. Rule: REQ-RUST-018.3 R10 below.
+- **Q4 (decided 2026-11-16 from "a missed target is better than a wrong one").**
+  `string.len()` at `src/lib.rs:109` is an expected row without a target; the draft's
+  `str::len` is withdrawn. Source proves the receiver is a `&str` (the declared return
+  type of `private::Sealed::write`). It does not prove where `len` is declared: a method
+  called on a `&str` value is either a `&self` method of `str` or a by-value method
+  declared for `&str`, as `clone` and `into` are. A rule that named `str::NAME` would
+  name `str::clone` wrongly; telling the two apart needs `core`. `buf.len()` on a
+  `&[T]` parameter was already expected without a target for the same reason. Not built:
+  the row does not record the proven receiver type (backlog).
 
 ## 5. REQ-RUST-043.1 — the crate-root node (step 7.3c, added 2026-11-16)
 

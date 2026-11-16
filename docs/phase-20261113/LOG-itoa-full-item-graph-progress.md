@@ -2438,3 +2438,39 @@ expected 0 stored 1: Buffer::format --calls--> unresolved .len [trait_solver_nee
   `itoa` nor `u128_ext` leads to its contents by an edge.
 - **Not run:** workspace gates and timed release runs (end of part 7).
 - **No refactor needed.**
+
+
+## Part 7 step 7.4b — `string.len()` stays without a target (2026-11-16)
+
+- **REQ:** REQ-RUST-044.0; decision Q4 in the part 7 file. No production code changed, so
+  no STUB or RED.
+- **Decision:** the expected row `Buffer::format --calls--> str::len` at `src/lib.rs:109`
+  is withdrawn and replaced by an expected row without a target (`trait_solver_needed`).
+  The expected node `str::len` goes with it (152 to 151 expected nodes).
+- **Why:** source proves the receiver is a `&str`. A method called on a `&str` value is
+  either a `&self` method of `str` or a by-value method declared for `&str` (`clone`,
+  `into`). Which one `len` is, is declared in `core`, which the run does not read.
+- **Rejected:** naming `str::NAME` for any method on a proven `&T` receiver. It would
+  store `str::clone` for `string.clone()`, which is wrong.
+- **Changed:** `itoa-expected-graph-builder.py` (one row, and `unres` takes a per-row
+  reason) and the files it writes.
+- **Commands and results:**
+
+```text
+python3 docs/phase-20261113/itoa-target-dataset/itoa-expected-graph-builder.py
+  --source-root /home/ubuntu/repos/rust-tools/itoa
+  --output-directory docs/phase-20261113/itoa-target-dataset               exit 0
+python3 -m unittest docs/phase-20261113/itoa-target-dataset/test_itoa_expected_graph_rules.py
+                                                                           Ran 16 tests, OK
+CARGO_BUILD_JOBS=2 CXXFLAGS=-g0 cargo test --release -p parseltongue-cli-dispatcher-binary
+  --test itoa-source-acceptance-tests
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 155.30s
+```
+
+- **What this is:** `test_itoa_whole_graph_equality` passes for the first time: 151 nodes
+  by label, 682 edge rows by source, relation, target and the line of the first token.
+- **What this is not:** an SOP PASS. Byte ranges and metadata are not compared, the
+  expected graph is not reviewed by anyone but its author and not frozen, the 1, 4 and
+  16 worker runs are not done, and the graph is marked incomplete (Q1 is unanswered).
+- **Not built (BL-10):** the row does not record the proven receiver type `&str`.
+- **Next:** step 7.5, byte ranges and metadata in the comparison.
