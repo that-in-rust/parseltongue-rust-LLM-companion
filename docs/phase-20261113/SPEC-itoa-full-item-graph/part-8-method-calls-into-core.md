@@ -707,3 +707,86 @@ L2, L3  nothing added
 | M1, M4 | same | unit, fixture | a workspace fn of the name; a name an inherent impl also declares; a trait out of scope; a unit that is not no_std | no target |
 | M1 | same | unit, fixture | the trait's name written in the workspace | `Lone::lone_call` |
 | M1 to M4 | test_itoa_core_member_targets | real source | 13 `TryInto::try_into`, 1 `Iterator::rev` equal their frozen rows | wrong 0 |
+
+## 13. A receiver that is itself a method call (spec first, added 2026-11-16)
+
+### Rust work mode
+
+Delivery Mode and Reliability Mode. This is step 8.4 of section 4: the receiver's type is
+the return type that `core` declares for the inner call. The risk is reading a return type
+whose names are generic parameters as if they were types of `core`.
+
+### Measured before writing (commit `4ea40b960`, scope `declarations`)
+
+```text
+  8  expect   receiver `LITERAL.try_into()`               receiver_type_not_determined
+  5  unwrap   receiver `(&mut buf[offset..]).try_into()`  receiver_type_not_determined
+  1  cast     receiver `self.bytes.as_mut_ptr()`          receiver_type_not_determined
+ stored declarations of core:
+   TryInto::try_into   trait declaration, returns `Result<T, Self::Error>`
+   expect, unwrap      2 inherent rows each: `Option<T>`, `Result<T, E>`; no bound on the impl
+   [T]::as_mut_ptr     returns `*mut T`
+   cast                4 inherent rows; `impl<T: PointeeSized> *mut T` has a bound on the impl
+```
+
+Expected (frozen rows): `Result<T, E>::expect` (`core/src/result.rs`), `Result<T, E>::unwrap`,
+`*mut T::cast` (`core/src/ptr/mut_ptr.rs`); owner kind `inherent_impl`; no assumption.
+
+### What is missing today
+
+- The call's stored evidence says nothing about a receiver that is a call.
+- `T` in `Result<T, Self::Error>` is a generic parameter of the trait `TryInto<T>`. A trait
+  declaration's row stores no generic names, so `T` reads as an unproven type name.
+- `Self::Error` is a path through `Self`; the shape model does not read it.
+- An impl's own `T` is implicitly `Sized`, so the probe does not let it fit a type it cannot
+  read. Here both arguments are `Sized` by declaration: a generic parameter of the trait
+  without `?Sized`, and an associated type the trait declares without `?Sized`.
+
+### Executable requirements: REQ-RUST-062.0
+
+```text
+C1  The stored evidence of a method call whose receiver is a method call (through
+    parentheses only) SHALL hold the evidence of that inner call: its method name and its
+    own receiver evidence, read by the same rules.
+C2  WHEN the inner call is named by a declaration of core (REQ-RUST-056.0 to 061.0)
+    AND that declaration's row stores a return type
+    THEN the receiver's type SHALL be that return type, read by C3 to C5. Otherwise the
+    lookup does not apply, or keeps the inner call's withheld reason.
+C3  The row of a trait declaration's member SHALL store the names of the trait's generic
+    parameters, the names of the associated types the trait declares, and for each
+    whether `?Sized` is written for it. The row of any member SHALL store the names of
+    the member's own generic parameters.
+C4  In the return type, a name that is a generic parameter of the declaring trait or
+    impl, and a path `Self::NAME` where NAME is an associated type the trait declares,
+    SHALL be read as "a type not named, proven Sized" when no `?Sized` is written for it
+    and it stands as a generic argument of a named type. Anywhere else, or with `?Sized`,
+    or a generic parameter of the member itself, it SHALL be read as a type the model
+    does not read.
+C5  "A type not named, proven Sized" SHALL fit a generic parameter of an impl and
+    nothing else.
+C6  The probe, the scope rules and the withheld reasons then apply unchanged. The lookup
+    record SHALL carry receiver_type_proof_kind call_result_declared_type, the inner
+    call's target label, its declaration file and offsets, and the return type text.
+C7  `cast` on `*mut T` stays without a target in this step: the impl has a bound
+    (`T: PointeeSized`) and nothing stored proves that the bound restricts no type.
+```
+
+### Design (L1 / L2 / L3)
+
+```text
+L1  sysroot-member-declaration-records.rs   C3: three new fields on member rows
+    original-call-resolution-records.rs     C1: extract_method_receiver_syntax
+    receiver-type-probe-records.rs          C4, C5: a new shape variant and its unification
+    core-member-target-records.rs           C2, C6: a third kind of receiver base
+L2, L3  nothing added
+```
+
+### Verification matrix
+
+| req_id | test_id | test_type | assertion | metric |
+| --- | --- | --- | --- | --- |
+| C3 | sysroot declaration row test | unit | a trait with a generic, an associated type and `?Sized` | the three fields |
+| C4, C5 | probe test | unit | `Result<T, Self::Error>` with T and Error proven Sized; with `?Sized` | `Result<T, E>::expect`; inherent_member_unproven |
+| C1, C2, C6 | fixture | unit | `999.try_into().expect("x")`; inner call not named | `Result<T, E>::expect`; no target |
+| C7 | test_itoa_core_member_targets | real source | `cast` stays without a target | reason stored |
+| C1 to C6 | test_itoa_core_member_targets | real source | 8 expect and 5 unwrap equal their frozen rows | wrong 0 |
