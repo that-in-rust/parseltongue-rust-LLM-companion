@@ -453,6 +453,148 @@ fn final_namespace_products_contract() {
     );
 }
 
+/// The import outcome rows of one fixture run, by site name.
+fn read_import_name_fixture(
+    imports: &[(&str, Vec<serde_json::Value>, Option<&str>, bool)],
+) -> BTreeMap<String, serde_json::Value> {
+    let directory = tempfile::tempdir().unwrap();
+    let store = DuckdbAnalysisStoreAdapter::open_bounded_analysis_store(
+        &directory.path().join("analysis.duckdb"),
+        directory.path(),
+        1_288_490_188,
+    )
+    .unwrap();
+    let mut source = namespace_source_fixture();
+    let graph = &mut source
+        .records
+        .get_mut("crate-dependency-graph-table")
+        .unwrap()[0];
+    let mut value: serde_json::Value = serde_json::from_str(&graph.stage_row_payload_text).unwrap();
+    value[parseltongue_core_row_types::MAPPED_TARGET_FLAG_FIELD] = json!(true);
+    graph.stage_row_payload_text = value.to_string();
+    let scope_row: serde_json::Value = serde_json::from_str(
+        &source.records["syntax-namespace-input-scopes"][0].stage_row_payload_text,
+    )
+    .unwrap();
+    let mut import_rows = imports
+        .iter()
+        .map(|(site, segments, alias, glob)| {
+            let text = json!({
+                "import_site_occurrence_key": {"site": site},
+                "import_lexical_scope_key": scope_row["scope_module_identity_key"],
+                "import_path_segment_rows": segments,
+                "import_binding_alias_text": alias,
+                "import_glob_expansion_flag": glob,
+                "import_visibility_scope_kind": {"visibility_scope_kind_value": "public"},
+                "import_resolution_source_kind": "Import",
+            })
+            .to_string();
+            StageTableRowRecord {
+                stage_owned_table_name: "syntax-namespace-input-imports".into(),
+                stage_row_record_key: blake3::hash(text.as_bytes()).to_hex().to_string(),
+                stage_row_payload_text: text,
+            }
+        })
+        .collect::<Vec<_>>();
+    import_rows.sort_by(|left, right| left.stage_row_record_key.cmp(&right.stage_row_record_key));
+    source
+        .records
+        .insert("syntax-namespace-input-imports".into(), import_rows);
+    store
+        .copy_published_stage_rows(
+            &source,
+            &scope(),
+            NAMESPACE_SOURCE_TABLE_NAMES,
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
+    store
+        .normalize_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    store
+        .resolve_frozen_namespace_rows(&scope(), &RunCancelFlagValue::default())
+        .unwrap();
+    let mut rows = BTreeMap::new();
+    store
+        .visit_frozen_namespace_products(&scope(), &mut |row| {
+            if row.stage_owned_table_name == "import-resolution-site-records" {
+                let value: serde_json::Value =
+                    serde_json::from_str(&row.stage_row_payload_text).unwrap();
+                rows.insert(
+                    value["import_site_occurrence_key"]["site"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned(),
+                    value,
+                );
+            }
+            Ok(())
+        })
+        .unwrap();
+    rows
+}
+
+/// REQ-RUST-053.0 N2, N3, N5: an import whose path starts at a sysroot crate with no unit
+/// stores the path it writes; one that another binder or a glob import could redirect does not.
+#[test]
+fn test_external_name_proof_rows() {
+    let names = |segments: &[&str]| {
+        segments
+            .iter()
+            .map(|name| json!({"kind": "name", "name": name}))
+            .collect::<Vec<_>>()
+    };
+    let rooted = |path: &str| {
+        json!({
+            "external_name_kind": "crate_rooted_path",
+            "external_crate_name": "core",
+            "external_item_path_text": path,
+            "external_site_proof_kind": "path_root_names_crate",
+            "external_import_site_key": null,
+        })
+    };
+    let rows = read_import_name_fixture(&[
+        ("plain", names(&["core", "mem", "MaybeUninit"]), None, false),
+        ("alias", names(&["core", "hint"]), Some("h"), false),
+        ("local", names(&["Item"]), None, false),
+        ("absent", names(&["missing", "Thing"]), None, false),
+    ]);
+    assert_eq!(
+        rows["plain"]["import_external_name_record"],
+        rooted("core::mem::MaybeUninit")
+    );
+    assert_eq!(
+        rows["plain"]["import_unresolved_reason_kind"],
+        json!("external_source_missing")
+    );
+    assert_eq!(
+        rows["alias"]["import_external_name_record"],
+        rooted("core::hint")
+    );
+    for site in ["local", "absent"] {
+        assert!(
+            rows[site].get("import_external_name_record").is_none(),
+            "{site}"
+        );
+    }
+    // A glob import in the same scope may bring in a module named `core`.
+    let rows = read_import_name_fixture(&[
+        ("plain", names(&["core", "mem"]), None, false),
+        ("glob", names(&["Item"]), None, true),
+    ]);
+    assert!(rows["plain"].get("import_external_name_record").is_none());
+    assert_eq!(
+        rows["plain"]["import_unresolved_reason_kind"],
+        json!("external_source_missing")
+    );
+    // Another import in the same scope binds the name `core`.
+    let rows = read_import_name_fixture(&[
+        ("plain", names(&["core", "mem"]), None, false),
+        ("rebind", names(&["missing", "Thing"]), Some("core"), false),
+    ]);
+    assert!(rows["plain"].get("import_external_name_record").is_none());
+}
+
 /// REQ-RUST-049.0 R1
 #[test]
 fn test_import_outcome_rows_written() {

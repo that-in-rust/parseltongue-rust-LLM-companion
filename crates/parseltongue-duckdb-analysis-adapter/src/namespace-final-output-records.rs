@@ -45,6 +45,33 @@ struct PathNamespaceProduct {
     absent_sysroot_reason: Option<String>,
     /// REQ-RUST-049.0 R1: the request key is an import request; its outcome is also an import row.
     import: Option<Value>,
+    /// REQ-RUST-053.0 N3: the external name the read source proves for this path.
+    external_name: Option<Value>,
+}
+
+/// REQ-RUST-053.0 N3: the external name columns of one path product row, as one record.
+fn read_external_name_record(
+    row: &duckdb::Row<'_>,
+) -> Result<Option<Value>, StoreBackendFailureError> {
+    let kind: Option<String> = row.get(8).map_err(build_analysis_error)?;
+    let crate_name: Option<String> = row.get(9).map_err(build_analysis_error)?;
+    let path: Option<String> = row.get(10).map_err(build_analysis_error)?;
+    let proof: Option<String> = row.get(11).map_err(build_analysis_error)?;
+    let import_key = row
+        .get::<_, Option<String>>(12)
+        .map_err(build_analysis_error)?
+        .as_deref()
+        .map(parse)
+        .transpose()?;
+    Ok(kind.zip(path).zip(proof).map(|((kind, path), proof)| {
+        json!({
+            "external_name_kind": kind,
+            "external_crate_name": crate_name,
+            "external_item_path_text": path,
+            "external_site_proof_kind": proof,
+            "external_import_site_key": import_key,
+        })
+    }))
 }
 
 fn grouped_targets(groups: TargetNamespaceGroups) -> Vec<Value> {
@@ -70,10 +97,30 @@ fn build_outcome_row_value(
     value
 }
 
+/// REQ-RUST-053.0 N4: the row with its external name record, when it has one.
+fn build_external_row_value(
+    mut value: Value,
+    prefix: &str,
+    external_name: &Option<Value>,
+) -> Value {
+    if let Some(record) = external_name {
+        value[format!("{prefix}_external_name_record")] = record.clone();
+    }
+    value
+}
+
 impl PathNamespaceProduct {
     /// The rows of this request: its path row when it has path metadata, and its import row
     /// when the request key is an import request (REQ-RUST-049.0 R1).
     fn finish(self) -> Vec<(&'static str, Value)> {
+        // REQ-RUST-053.0 N4: the name is stored only on a row left unresolved because the
+        // source of a sysroot crate is absent, never beside a target or another reason.
+        let external_name = self.external_name.filter(|_| {
+            self.reason.is_none()
+                && self.absent_sysroot_reason.is_some()
+                && !self.ambiguous
+                && self.resolved.is_empty()
+        });
         let reason = self.reason.or_else(|| {
             self.absent_sysroot_reason
                 .filter(|_| !self.ambiguous && self.resolved.is_empty())
@@ -94,16 +141,24 @@ impl PathNamespaceProduct {
         let path = self.value.map(|value| {
             (
                 "path-resolution-site-records",
-                build_outcome_row_value(value, "path", &outcome),
+                build_external_row_value(
+                    build_outcome_row_value(value, "path", &outcome),
+                    "path",
+                    &external_name,
+                ),
             )
         });
         let import = self.import.map(|site| {
             (
                 "import-resolution-site-records",
-                build_outcome_row_value(
-                    json!({ "import_site_occurrence_key": site }),
+                build_external_row_value(
+                    build_outcome_row_value(
+                        json!({ "import_site_occurrence_key": site }),
+                        "import",
+                        &outcome,
+                    ),
                     "import",
-                    &outcome,
+                    &external_name,
                 ),
             )
         });
@@ -237,6 +292,7 @@ impl DuckdbAnalysisStoreAdapter {
                         reason: row.get(2).map_err(build_analysis_error)?,
                         absent_sysroot_reason: row.get(6).map_err(build_analysis_error)?,
                         import,
+                        external_name: read_external_name_record(row)?,
                         ..Default::default()
                     };
                 }

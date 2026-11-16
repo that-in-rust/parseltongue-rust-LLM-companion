@@ -122,6 +122,33 @@ Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
 
+### 2026-11-16 09:05 IST — Part 6 step 1b: name lookup stores the external name it proved
+
+- **Milestone:** itoa full item graph, part 6. No SOP step has passed. No itoa number changed;
+  no producer reads the new field yet.
+- **REQ:** REQ-RUST-053.0 N2, N3, N5.
+- **What changed:** `namespace-final-path-products.sql` gives five new columns per path
+  request (kind of name, crate, written path, how the site reached it, the `use` item it
+  went through). `path-resolution-site-records` and `import-resolution-site-records` carry
+  them as `path_external_name_record` / `import_external_name_record`, only on a row left
+  unresolved with `external_source_missing`.
+- **Three proofs in the SQL:** crate name at the path root; first name bound by exactly one
+  `use` item with the first proof; one name that only the prelude can bind. Each is refused
+  when a scope on the lexical chain binds the name another way or holds a glob import.
+- **Slip:** the SQL was written before the stub and the test.
+- **RED:** `cargo test --release -p parseltongue-duckdb-analysis-adapter --lib
+  test_external_name_proof_rows`: `FAILED. 0 passed; 1 failed`; the row had no record
+  (`left: Null`), so the SQL ran and the reader did not store the result.
+- **GREEN:** the adapter library suite: `185 passed; 0 failed` (was 184).
+- **Deliberate breaks, each failed the test:** glob gate off, binder gate off, the check that
+  the crate has no unit inverted.
+- **Tested on fixture rows only, imports only:** the plain path, an alias, a resolved import,
+  an unknown crate, a glob in the scope, another import binding `core`.
+- **Not tested yet:** the second and third proof (they need non-import sites; steps 6.2 and
+  6.4), a leading `::`, a trailing `self`, a nearer scope on the chain.
+- **Checked:** format; `cargo clippy --release` with `-D warnings` on the adapter: clean.
+- **Next:** the import producer reads the record and returns external node rows.
+
 ### 2026-11-16 08:20 IST — Part 6 step 1a: the named external identity (row types and codecs)
 
 - **Milestone:** itoa full item graph, part 6. No SOP step has passed. No itoa number changed.
