@@ -621,3 +621,21 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
    git apply ~/phase7-work/83b2-b-stopped-working-tree.patch if the working tree is lost;
    then find why 37 of the 46 calls do not reach find_alias_receiver_type, before fixing any count.
 ```
+
+
+## 2026-11-16 19:56 IST Part 8 step 8.3b-2b: work in progress committed by user instruction
+
+```text
+ phase      GREEN not closed; the working tree of the stop entry above is committed as it was
+ contents   find_alias_receiver_type, read_self_alias_parts, check_trait_supertrait_reach,
+            read_core_fixture_rows, test_alias_parameter_core_member, one added assertion in
+            test_itoa_core_member_targets
+ no run     nothing was built or run after the stop entry; results are the ones recorded there
+ FAILING    test_itoa_core_member_targets (real source): the run names 17 calls, the test lists 9.
+            The 8 new targets are not checked against the source, so the list is not updated.
+ passing    extractor crate, one run before the stop: 160 and 17 passed, 0 failed
+ not run    format check, lint, the other 59 real-source tests, workspace tests, release build,
+            deliberate breaks
+ next       find why 37 of the 46 "&mut Self::Buffer" calls do not reach the new rule; check the
+            8 new targets against the source; then close GREEN
+```

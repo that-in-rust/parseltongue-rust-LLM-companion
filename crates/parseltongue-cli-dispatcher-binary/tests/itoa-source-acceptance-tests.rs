@@ -5943,6 +5943,16 @@ fn test_itoa_core_member_targets() {
     found.sort();
     let write = "MaybeUninit<T>::write on MaybeUninit<u8> at step 0 by mutable reference \
         in core/src/mem/maybe_uninit.rs";
+    // REQ-RUST-057.0: calls on a parameter typed `&mut Self::Buffer`.
+    let alias = calls
+        .iter()
+        .filter(|edge| {
+            edge.edge_dispatch_metadata_text
+                .as_deref()
+                .is_some_and(|text| text.contains("parameter_associated_type_alias"))
+        })
+        .count();
+    assert!(alias > 0, "no call is named through an associated type");
     let mut expected = vec![write.to_owned(); 8];
     expected.push(
         "[T]::get_unchecked on &[MaybeUninit<u8>] at step 0 by value in core/src/slice/mod.rs"

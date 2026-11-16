@@ -374,7 +374,7 @@ fn build_original_call_edge(
     // REQ-RUST-056.0: a method of `core` on a receiver whose written type is proven.
     let core_member = (builtin_member.is_none()
         && matches!(resolution, HldEdgeResolutionValue::Unresolved { .. }))
-    .then(|| find_core_member_target(&evidence, receiver_evidence, context, members, core))
+    .then(|| find_core_member_target(&evidence, receiver_evidence, context, members, core, lookup))
     .transpose()?
     .flatten();
     let (resolution, stopped) = match &core_member {
@@ -1070,6 +1070,45 @@ impl BoundTraitWalkValue {
     /// The record an edge carries to say which bounds chose its target.
     pub(super) fn build_walk_evidence_value(&self) -> Value {
         json!({"bound_chain":self.bound_chain_texts,"missing_source_traits":self.missing_source_traits})
+    }
+}
+
+impl BoundMethodLookupIndex {
+    /// REQ-RUST-057.0 A5: whether `wanted` is the trait `start` or is reached from it
+    /// through supertrait bounds that are stored as resolved.
+    pub(super) fn check_trait_supertrait_reach(
+        &self,
+        start: &HldTargetIdentityValue,
+        wanted: &HldTargetIdentityValue,
+        context: &ImplHeaderSourceContext<'_>,
+    ) -> Result<bool, OriginalCallResolutionError> {
+        let mut visited = BTreeSet::new();
+        let mut pending = vec![start.clone()];
+        while let Some(found) = pending.pop() {
+            if found == *wanted {
+                return Ok(true);
+            }
+            let Some(key) = self.trait_owner_keys.get(&found) else {
+                continue;
+            };
+            if !visited.insert(found) {
+                continue;
+            }
+            let span = context.span(key)?;
+            for row in self.owner_bound_rows.get(key).into_iter().flatten() {
+                let bound = &row["bound_syntax_evidence"];
+                if bound["bound_subject_kind"] != "supertrait"
+                    || bound["bound_form_kind"] != "trait"
+                {
+                    continue;
+                }
+                let resolved = context.resolve_type(span, &bound["trait_type_source"], true)?;
+                if resolved["resolution_state_kind"] == "resolved" {
+                    pending.push(decode_symbol_target_value(&resolved["target_identity"])?.into());
+                }
+            }
+        }
+        Ok(false)
     }
 }
 

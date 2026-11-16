@@ -7,11 +7,14 @@ use crate::external_named_target_records::{ExternalNameProofRecord, build_extern
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_stage_values,
 };
-use crate::original_call_resolution_records::OriginalCallResolutionError;
+use crate::original_call_resolution_records::{
+    BoundMethodLookupIndex, OriginalCallResolutionError,
+};
 use crate::receiver_type_probe_records::{
     CoreMemberProbeOutcome, ScopeTraitMethodValue, WrittenTypeShapeValue, parse_written_type_shape,
     probe_core_member_declaration,
 };
+use crate::syntax_namespace_record_codec::decode_symbol_target_value;
 use crate::type_relative_member_records::{BuiltinMemberNameOutcome, ImplMemberLookupIndex};
 use parseltongue_core_row_types::*;
 use parseltongue_table_store_traits::StageTableStorePort;
@@ -415,6 +418,136 @@ fn list_index_result_shapes(
     })
 }
 
+/// REQ-RUST-057.0 A2: the type a stored impl writes after `type NAME =`, for a parameter
+/// typed `Self::NAME`, with the record of how the impl was found.
+#[derive(Debug)]
+pub(crate) struct AliasReceiverTypeValue {
+    pub(crate) alias_type_source_text: String,
+    pub(crate) alias_lookup_evidence_value: Value,
+}
+
+/// REQ-RUST-057.0 A3 to A8: the type behind `Self::NAME` in the function `owner`, or the
+/// reason it is not proven.
+pub(crate) fn find_alias_receiver_type(
+    owner: &str,
+    name: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+    bounds: &BoundMethodLookupIndex,
+) -> Result<Result<AliasReceiverTypeValue, &'static str>, OriginalCallResolutionError> {
+    let unproven = Ok(Err("associated_type_impl_unproven"));
+    // A3: the function's impl, with a stored trait and self type.
+    let Some(enclosing) = members
+        .impl_header_value_rows
+        .iter()
+        .find(|header| {
+            header["impl_member_occurrence_rows"]
+                .as_array()
+                .is_some_and(|rows| {
+                    rows.iter()
+                        .any(|member| member["member_source_occurrence_key"] == owner)
+                })
+        })
+        .filter(|header| {
+            header["impl_function_body_ancestry_flag"] == false
+                && check_header_definition_target(&header["impl_trait_type_resolution"])
+        })
+    else {
+        return unproven;
+    };
+    // A4: the one stored `type NAME` of the self type.
+    let self_type = &enclosing["impl_self_type_resolution"];
+    let Some(found) = members
+        .find_type_member_target("Self", self_type, name, "TYPE_ALIAS")
+        .filter(|found| found.member_target_occurrence.is_some())
+    else {
+        return unproven;
+    };
+    let Some(declaring) = members.impl_header_value_rows.iter().find(|header| {
+        header["impl_semantic_occurrence_key"]
+            == found.member_lookup_evidence["impl_header_occurrence"]
+    }) else {
+        return unproven;
+    };
+    // A6: the same self type, as stored and as written.
+    let written_self = |header: &Value| {
+        header["impl_self_type_resolution"]["type_source_evidence"]["type_source_text"].clone()
+    };
+    if !check_header_definition_target(&declaring["impl_trait_type_resolution"])
+        || written_self(declaring).is_null()
+        || written_self(declaring) != written_self(enclosing)
+    {
+        return unproven;
+    }
+    // A5: the function's own impl, or an impl of a supertrait of its trait.
+    if declaring["impl_semantic_occurrence_key"] != enclosing["impl_semantic_occurrence_key"] {
+        let identity =
+            |header: &Value| -> Result<HldTargetIdentityValue, OriginalCallResolutionError> {
+                Ok(decode_symbol_target_value(
+                    &header["impl_trait_type_resolution"]["target_identity"],
+                )?
+                .into())
+            };
+        if !bounds.check_trait_supertrait_reach(
+            &identity(enclosing)?,
+            &identity(declaring)?,
+            context,
+        )? {
+            return Ok(Err("associated_type_trait_unproven"));
+        }
+    }
+    // A7: every type path of the written type is proven.
+    let member = declaring["impl_member_occurrence_rows"]
+        .as_array()
+        .and_then(|rows| {
+            rows.iter()
+                .find(|member| member["member_declared_name_value"] == name)
+        });
+    let written = member.map(|member| &member["member_alias_type_evidence"]);
+    let (Some(member), Some(alias), Some(paths)) = (
+        member,
+        written.and_then(|written| written["type_source_text"].as_str()),
+        written.and_then(|written| written["type_path_range_rows"].as_array()),
+    ) else {
+        return Ok(Err("receiver_type_name_unproven"));
+    };
+    let Some(key) = member["member_source_occurrence_key"].as_str() else {
+        return Ok(Err("receiver_type_name_unproven"));
+    };
+    let span = context.span(key)?;
+    for path in paths {
+        if !check_written_path_proven(span, path, context)? {
+            return Ok(Err("receiver_type_name_unproven"));
+        }
+    }
+    Ok(Ok(AliasReceiverTypeValue {
+        alias_type_source_text: alias.to_owned(),
+        alias_lookup_evidence_value: json!({
+            "associated_type_alias_text":alias,
+            "associated_type_member_occurrence":member["member_semantic_occurrence_key"],
+            "associated_type_impl_occurrence":declaring["impl_semantic_occurrence_key"],
+            "enclosing_impl_header_occurrence":enclosing["impl_semantic_occurrence_key"]
+        }),
+    }))
+}
+
+/// REQ-RUST-057.0 A2: the reference layers and `NAME` of a written type that is
+/// `Self::NAME` behind `&` and `&mut` only.
+fn read_self_alias_parts(text: &str) -> Option<(&str, &str)> {
+    let text = text.trim();
+    let mut rest = text;
+    while let Some(next) = rest.strip_prefix('&') {
+        rest = next.trim_start();
+        rest = rest.strip_prefix("mut ").map_or(rest, str::trim_start);
+    }
+    let name = rest.strip_prefix("Self::")?;
+    (!name.is_empty()
+        && name
+            .chars()
+            .all(|found| found.is_alphanumeric() || found == '_'))
+    .then(|| (&text[..text.len() - rest.len()], name))
+}
+
 /// The `core` member that the method call at `span` names, with the record of its
 /// lookup, or the reason the name is withheld. `None` when the lookup does not apply:
 /// no declarations stored, or a receiver that is not a parameter with a written type.
@@ -424,6 +557,7 @@ pub(crate) fn find_core_member_target(
     context: &ImplHeaderSourceContext<'_>,
     members: &ImplMemberLookupIndex,
     index: &CoreMemberLookupIndex,
+    bounds: &BoundMethodLookupIndex,
 ) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
     let declarations = index.core_declaration_value_rows.as_slice();
     let (Some(method), Some([first, steps @ ..])) = (
@@ -454,12 +588,38 @@ pub(crate) fn find_core_member_target(
     if let Some(reason) = index.scope_proof_withheld_reason {
         return withheld(reason, evidence);
     }
-    let Some(paths) = written["type_path_range_rows"].as_array() else {
-        return withheld("receiver_type_name_unproven", evidence);
-    };
-    for path in paths {
-        if !check_written_path_proven(span, path, context)? {
+    let mut shape_text = text.to_owned();
+    if let Some((layers, name)) = read_self_alias_parts(text) {
+        // REQ-RUST-057.0: the type is what a stored impl writes for `NAME`.
+        evidence["receiver_type_proof_kind"] = json!("parameter_associated_type_alias");
+        let Some(owner) = span["site_owner_occurrence_key"].as_str() else {
+            return withheld("associated_type_impl_unproven", evidence);
+        };
+        match find_alias_receiver_type(owner, name, context, members, bounds)? {
+            Ok(found) => {
+                shape_text = format!("{layers}{}", found.alias_type_source_text);
+                for (key, value) in found
+                    .alias_lookup_evidence_value
+                    .as_object()
+                    .into_iter()
+                    .flatten()
+                {
+                    evidence[key.as_str()] = value.clone();
+                }
+                if let Some(assumed) = evidence["lookup_assumption_values"].as_array_mut() {
+                    assumed.push(json!("source_compiles_one_associated_type"));
+                }
+            }
+            Err(reason) => return withheld(reason, evidence),
+        }
+    } else {
+        let Some(paths) = written["type_path_range_rows"].as_array() else {
             return withheld("receiver_type_name_unproven", evidence);
+        };
+        for path in paths {
+            if !check_written_path_proven(span, path, context)? {
+                return withheld("receiver_type_name_unproven", evidence);
+            }
         }
     }
     // A workspace impl of a trait from outside for a type from outside may give an index
@@ -473,7 +633,7 @@ pub(crate) fn find_core_member_target(
     {
         return withheld("workspace_foreign_impl_present", evidence);
     }
-    let mut shapes = vec![parse_written_type_shape(text, &[])];
+    let mut shapes = vec![parse_written_type_shape(&shape_text, &[])];
     for step in steps {
         let range = step["index_range_expression_flag"] == true;
         let Some(next) = shapes

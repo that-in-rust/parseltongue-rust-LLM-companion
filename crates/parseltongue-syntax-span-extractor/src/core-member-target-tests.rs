@@ -1,10 +1,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use crate::extract_member_declaration_rows;
 use crate::original_call_resolution_records::original_call_resolution_tests::{
-    make_call_fixture_graph, make_call_fixture_row, make_call_fixture_scope, make_call_fixture_unit,
+    make_call_fixture_graph, make_call_fixture_occurrence, make_call_fixture_row,
+    make_call_fixture_scope, make_call_fixture_unit,
 };
 use crate::original_call_resolution_records::resolve_original_call_edges;
+use crate::persist_impl_header_rows;
 use crate::syntax_namespace_record_codec::encode_compilation_unit_value;
+use crate::syntax_namespace_record_codec::encode_symbol_target_value;
 use parseltongue_core_row_types::*;
 use serde_json::{Value, json};
 
@@ -39,6 +42,19 @@ fn read_core_fixture_edge(
     no_std: bool,
     core_name: bool,
     stray: &str,
+) -> (HldEdgeInputRecord, Value) {
+    read_core_fixture_rows(source, no_std, core_name, stray, false)
+}
+
+/// `read_core_fixture_edge`; with `impls`, every trait name, every `u8` and every
+/// `Buffer<..>` also has a stored path lookup, and the impl headers are stored again
+/// over those lookups.
+fn read_core_fixture_rows(
+    source: &str,
+    no_std: bool,
+    core_name: bool,
+    stray: &str,
+    impls: bool,
 ) -> (HldEdgeInputRecord, Value) {
     let (store, input) = make_call_fixture_graph(source);
     let unit = encode_compilation_unit_value(&make_call_fixture_unit());
@@ -103,6 +119,69 @@ fn read_core_fixture_edge(
         stage_row_record_key: "fixture-stray-digest".into(),
         stage_row_payload_text: stray.to_owned(),
     });
+    if impls {
+        let read = |table: &str| {
+            store
+                .rows
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|row| row.stage_owned_table_name == table)
+                .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+                .collect::<Vec<_>>()
+        };
+        for found in read("span-reference-text-table")
+            .iter()
+            .filter(|span| span["span_syntax_kind_value"] == "TRAIT")
+        {
+            let name = found["span_declared_name_value"].as_str().unwrap();
+            let (start, end) = (
+                found["span_byte_start_offset"].as_u64().unwrap(),
+                found["span_byte_end_offset"].as_u64().unwrap(),
+            );
+            let occurrence = make_call_fixture_occurrence(
+                start,
+                end,
+                found["span_source_code_text"].as_str().unwrap(),
+            );
+            let metadata = json!({"target_symbol_kind_value":"Trait",
+                "target_source_file_path":"/fixture/src/lib.rs",
+                "target_source_range_start":start, "target_source_range_end":end,
+                "target_compilation_scope_record":{"unit_semantic_identity_record":unit}});
+            extra.push(make_call_fixture_row(
+                "syntax-namespace-input-items",
+                json!({"binding_target_identity_key":encode_symbol_target_value(
+                    &NameSymbolTargetKey::Definition(occurrence)),
+                    "binding_target_metadata_value":metadata}),
+            ));
+            for (at, _) in source.match_indices(name) {
+                extra.push(path_row(
+                    name,
+                    at,
+                    json!({"path_resolution_state_kind":"resolved",
+                        "path_target_symbol_rows":[metadata]}),
+                ));
+            }
+        }
+        for (at, _) in source.match_indices("u8") {
+            if !source[..at].ends_with("MaybeUninit<") {
+                extra.push(path_row("u8", at, builtin("u8")));
+            }
+        }
+        let buffer = read("path-resolution-site-records")
+            .into_iter()
+            .find(|row| row["path_target_symbol_rows"][0]["target_symbol_kind_value"] == "Struct")
+            .unwrap();
+        for (at, _) in source.match_indices("Buffer<") {
+            let end = at + source[at..].find('>').unwrap() + 1;
+            extra.push(path_row(
+                &source[at..end],
+                at,
+                json!({"path_resolution_state_kind":"resolved",
+                    "path_target_symbol_rows":buffer["path_target_symbol_rows"]}),
+            ));
+        }
+    }
     for (path, text) in CORE_FIXTURE_FILES {
         extra.extend(
             extract_member_declaration_rows(path, text)
@@ -122,6 +201,18 @@ fn read_core_fixture_edge(
             row.stage_row_payload_text = stored.to_string();
         }
         rows.extend(extra);
+        if impls {
+            rows.retain(|row| row.stage_owned_table_name != "impl-header-index-table");
+        }
+    }
+    if impls {
+        persist_impl_header_rows(
+            &store,
+            &make_call_fixture_scope(),
+            std::path::Path::new("/fixture"),
+            &RunCancelFlagValue::default(),
+        )
+        .unwrap();
     }
     let edges = resolve_original_call_edges(
         &store,
@@ -267,5 +358,106 @@ fn test_parameter_receiver_core_member() {
     assert_eq!(
         "receiver_type_name_unproven",
         withheld(element, true, false)
+    );
+}
+
+/// REQ-RUST-057.0 A2 to A9: a parameter typed `Self::NAME` takes the type the one stored
+/// impl of the self type writes for `NAME`, when that impl is the function's own or of a
+/// supertrait of its trait; every other case keeps the call without a target.
+#[test]
+fn test_alias_parameter_core_member() {
+    let named = |source: &str| {
+        let (edge, metadata) = read_core_fixture_rows(source, true, true, "", true);
+        assert_eq!(
+            make_core_member_target("MaybeUninit<T>::write"),
+            edge.edge_resolution_value,
+            "{metadata}"
+        );
+        let lookup = &metadata["core_member_lookup_evidence"];
+        assert_eq!(
+            "parameter_associated_type_alias",
+            lookup["receiver_type_proof_kind"]
+        );
+        assert_eq!("[MaybeUninit<u8>; 3]", lookup["associated_type_alias_text"]);
+        assert_eq!("&mut Self::Store", lookup["receiver_written_type_text"]);
+        assert_eq!("MaybeUninit<u8>", lookup["receiver_type_text"]);
+        assert!(
+            lookup["lookup_assumption_values"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("source_compiles_one_associated_type"))
+        );
+        for key in [
+            "associated_type_member_occurrence",
+            "associated_type_impl_occurrence",
+        ] {
+            assert!(lookup[key].is_object(), "{key}: {lookup}");
+        }
+    };
+    let withheld = |source: &str| {
+        let (edge, metadata) = read_core_fixture_rows(source, true, true, "", true);
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+        metadata["unresolved_detail_kind"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    // A2: the function's own impl writes the type.
+    named(
+        "struct Buffer; trait Sealed { type Store; fn put(self, buf: &mut Self::Store); } \
+         impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; \
+         fn put(self, buf: &mut Self::Store) { buf[0].write(1); } }",
+    );
+    // A5: an impl of a supertrait of the function's impl's trait writes it.
+    named(
+        "struct Buffer; trait Sealed { type Store; } trait Middle: Sealed {} \
+         trait Unsigned: Middle { fn fmt(self, buf: &mut Self::Store); } \
+         impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; } \
+         impl Unsigned for u8 { fn fmt(self, buf: &mut Self::Store) { buf[0].write(1); } }",
+    );
+    // A5: no stored supertrait bound leads from the function's trait to the type's trait.
+    assert_eq!(
+        "associated_type_trait_unproven",
+        withheld(
+            "struct Buffer; trait Sealed { type Store; } \
+             trait Unsigned { fn fmt(self, buf: &mut Self::Store); } \
+             impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; } \
+             impl Unsigned for u8 { fn fmt(self, buf: &mut Self::Store) { buf[0].write(1); } }"
+        )
+    );
+    // A4: two stored impls of the self type write a type of that name.
+    assert_eq!(
+        "associated_type_impl_unproven",
+        withheld(
+            "struct Buffer; trait Sealed { type Store; fn put(self, buf: &mut Self::Store); } \
+             trait Other { type Store; } impl Other for u8 { type Store = [u8; 2]; } \
+             impl Sealed for u8 { type Store = [MaybeUninit<u8>; 3]; \
+             fn put(self, buf: &mut Self::Store) { buf[0].write(1); } }"
+        )
+    );
+    // A6: the impl that writes the type has another written self type.
+    assert_eq!(
+        "associated_type_impl_unproven",
+        withheld(
+            "struct Buffer; trait Sealed { type Store; } \
+             trait Unsigned: Sealed { fn fmt(self, buf: &mut Self::Store); } \
+             impl Sealed for Buffer<u8> { type Store = [MaybeUninit<u8>; 3]; } \
+             impl Unsigned for Buffer<i8> { fn fmt(self, buf: &mut Self::Store) { buf[0].write(1); } }"
+        )
+    );
+    // A7: the written type is a path through another impl.
+    assert_eq!(
+        "receiver_type_name_unproven",
+        withheld(
+            "struct Buffer; trait Sealed { type Store; fn put(self, buf: &mut Self::Store); } \
+             impl Sealed for u8 { type Store = <u8 as Sealed>::Store; \
+             fn put(self, buf: &mut Self::Store) { buf[0].write(1); } }"
+        )
     );
 }
