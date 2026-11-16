@@ -21,7 +21,13 @@ are proven from source by name: `<Buffer as Default>::default --calls--> Buffer:
   4 `imports` rows, all 32 `implements` rows, all 106 `uses_type` rows, all 98 `reads` rows
   and 59 of 197 calls have a target; 138 rows have none, all of them method calls whose
   receiver type is not proven.
-  Next are the part 6 workspace gates and the review of steps 6.2 to 6.5. Numbers above
+  The review of steps 6.2 to 6.5 is done; running its untested cases found one wrong-name
+  case (a default member of a trait declared in a function body), now withheld. No itoa row
+  changed.
+  Workspace gates at commit `1044be117`: format, lint and release build pass; 591 tests
+  pass, 0 fail, 4 ignored, with `test_lang_items_in_sysroot` skipped. That test failed when
+  last run (at `f600a7954`), so the gate is not a full PASS.
+  Next is part 7 (review and freeze the expected graph). Numbers above
   this line that say 103 nodes, 43 calls, 68 reads with a target or 3 unresolved
   `implements` are from before part 6.
 - **Earlier target:** the 5d workspace gates, then part 6 (named `core` targets). Steps
@@ -68,7 +74,7 @@ step                                   state         measured or missing
 3  generic call                        DONE (1 shape) format -> Sealed::write; gap on Copy recorded
 4  remaining edge kinds                BUILT (original text)  uses_type 34, implements 32, reads 21 (+34 in part 5d), imports 4
 5  macro-generated items and bodies    5a-5c BUILT, 5d 4 of 6  45 generated nodes, 45 generates, 15 expands; generated fn bodies give 34 reads, 136 calls
-6  targets in core                     BLOCKED       119 expected edges; sysroot run did not finish
+6  targets in core                     6.1-6.5 BUILT 42 named external nodes; 138 method calls have no target
 7  expected graph reviewed and frozen  NOT STARTED   339 of 368 expected edges are blocked
 8  exact comparison (SOP S3)           NOT STARTED   no comparator for full-graph rows
 9  determinism, time, memory (SOP S4)  NOT STARTED
@@ -130,6 +136,32 @@ core  DECIDED 2026-11-15: named external target             119 expected rows to
 Detail and deferred work: [backlog](BACKLOG-deferred-work-open-decisions.md).
 
 ## Entries — newest first
+
+### 2026-11-16 12:40 IST — Part 6 workspace gates
+
+- **Milestone:** itoa full item graph, part 6. No SOP step has passed. The graph is still
+  marked incomplete. This is not a full workspace PASS (one test is skipped and fails when
+  run).
+- **Code under test:** commit `1044be117` (the review fix). Log: `/home/ubuntu/phase6-work/ws-gates-4.log`.
+- **Commands and results** (`CARGO_BUILD_JOBS=2`):
+  - `cargo fmt --all -- --check`: exit 0.
+  - `cargo clippy --release --workspace --all-targets --all-features -- -D warnings`: exit 0.
+  - `cargo test --release --workspace --all-targets --all-features -- --skip test_lang_items_in_sysroot --test-threads=1`:
+    exit 0; 21 test binaries, 591 passed, 0 failed, 4 ignored. The itoa real-source
+    binary: `test result: ok. 53 passed; 0 failed` in 824.20 s (single-threaded).
+  - `cargo build --release --workspace --all-targets --all-features`: exit 0.
+- **Skipped test:** `test_lang_items_in_sysroot`. Run without the skip at `f600a7954`
+  (before the review fix) it failed with `StoreBackendFailureError`, "Turso/DuckDB
+  row-count or content-digest mismatch". Not rerun on this commit; not fixed. It reads the
+  native sysroot, which itoa runs exclude.
+- **Executable digests:** the all-features build is
+  `0addedfc8e454b913ba4170ce853f5eb5601d4b621fe48c6f1d76915e6fa3756`; the default build
+  (`cargo build --release -p parseltongue-cli-dispatcher-binary`), used for the timed
+  runs, is `82eab2623b928d9a1a5abd673d99c7440752ae3fda091a673d1026663cae7182`.
+- **Earlier gate run at `f600a7954`** (`ws-test-2.log`, `ws-gates-3.log`): the same
+  commands, 590 passed, 0 failed, 4 ignored; lint and build exit 0.
+- **Not done in part 6:** the 138 method calls (N6), and part 6 Q1 to Q10.
+- **Next:** part 7, review and freeze the expected graph against the stored rows.
 
 ### 2026-11-16 12:05 IST — Part 6 review fix: a body-declared trait's default member no longer gets an external name
 
