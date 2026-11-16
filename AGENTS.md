@@ -245,9 +245,11 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
   `parseltongue-table-store-traits`.
 - Errors are typed enums. No free-text-only variant.
 - No `unwrap`/`expect` outside tests, no `unsafe`, no global mutable state.
-- Prefer pure functions, immutable data and iterator combinators. Optimise only after a
-  measured miss.
-- Repo skills: `.agents/skills/{rust-coder-02,idiomatic-rust-coder-01,rust-executable-specs-01}`.
+- Write idiomatic functional Rust wherever possible: pure functions, immutable data and
+  iterator pipelines, not loops that push into accumulators. Keep a loop only where a chain
+  would be less clear. Optimise only after a measured miss.
+- Repo skills: `.agents/skills/{rust-coder-02,idiomatic-rust-coder-01,rust-executable-specs-01}`,
+  and `.agents/skills/rust-agent-mega-01` (the one-file Rust guide; read its section 1 first).
 
 ### Names
 
