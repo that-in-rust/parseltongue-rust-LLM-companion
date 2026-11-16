@@ -2628,3 +2628,58 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 57 filtered out;
   runs, workspace gates, timed release runs.
 - **Refactor:** none needed.
 - **Next:** the 1, 4 and 16 worker runs with digests, time, peak memory and store size.
+
+
+## Part 7 step 7.7 — runs with 1, 4 and 16 workers (2026-11-16)
+
+- **REQ:** SOP worker-count determinism for pinned itoa. Measurement only; no code changed.
+- **Inputs:**
+
+```text
+commit              ae487de2db45c49faa71114de03d13a7fc6a73b4 (clean tree)
+binary sha256       43d999e173241c4b9a8011aade1871916a5c92cc9c86157dd8e92f6d1e0d1b88
+                    (cargo build --release -p parseltongue-cli-dispatcher-binary)
+source              dtolnay/itoa 1.0.18, af77385d0daf4d0e949e81f2588be2e44f69f086
+  Cargo.toml        44ca1ae5d9b48743305b57f3367051289512037e7836b8b3693b68d48dec0483
+  Cargo.lock        965fa758128c03489e02550fbf8f7fb0e2b36e6e82163c3cf482900cfa8d019d
+  src/lib.rs        e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f
+  src/u128_ext.rs   498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c
+  benches/bench.rs  29a0bdb973848007d681e571c57487e21e1bfb7aed5980c2190dba354498b154
+run generation      4a6e988dfd7c0fc5a0bda24798f0acd888fa4e83877b723308f768a83fd56ebe (same in every run)
+machine             Linux 6.8.0-1060-aws x86_64, 8 cores, 32 GB; rustc 1.99.1
+```
+
+- **Command, per run** (the source is copied to one fixed path first, because the path is
+  part of the unit's identity):
+
+```text
+parseltongue map-workspace-full-run --workspace-root-path-value <fixed>/itoa
+  --workspace-store-file-path <run>/graph.db --worker-thread-count-value N
+  --sysroot-source-scope-kind excluded --mapping-final-stage-kind full-item-dependency-graph
+parseltongue export-published-stage-rows --workspace-store-file-path <run>/graph.db
+  --stage-owned-table-name item-effective-visibility-records | edge-evidence-record-table
+```
+
+- **Results:**
+
+```text
+workers  exit  wall s  peak MB  processes  store bytes  nodes  edges  completeness
+1        0     16.21   369.3    2          20,943,910   151    682    incomplete
+1 again  0     17.18   380.4    2          20,943,910   151    682    incomplete
+4        0     18.93   364.6    2          20,943,910   151    682    incomplete
+16       0     16.07   385.5    2          20,943,910   151    682    incomplete
+
+node rows  151, sha256 f4ef9f7c4226b77e92d980739e64d388f0b329a6d8bcb89cfa6cca56ea9c68f7 in all four runs
+edge rows  682, sha256 eb1f86aca93683e05e9846793dab595f8a0131dc1dca00e9dc5da5e26838773c in all four runs
+```
+
+  Peak is resident memory summed over the process tree, sampled about every 19 ms (869
+  to 981 samples per run), not the SOP's 10 ms. Store bytes are `graph.db` with its log
+  and WAL files.
+- **What differs between runs:** only the first line of each export, a header that carries
+  the attempt id of that run. Every node row and every edge row is byte-identical, in the
+  same order. The digests above are over the rows without that header line.
+- **Not measured:** more than one run for 4 and 16 workers; DuckDB engine limits.
+- **Not an SOP PASS:** the expected graph is reviewed only by its author and not frozen,
+  and the graph is marked incomplete.
+- **Next:** workspace gates, codebase-memory re-index.
