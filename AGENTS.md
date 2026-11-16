@@ -15,9 +15,9 @@ Out of scope for this phase: every other repository, any rust-analyzer export or
 every higher-abstraction table (interface level, HLD, roll-ups). Do not build, extend or test
 against them.
 
-Where we are (2026-11-14): a bounded checkpoint on pinned itoa, marked `incomplete` by the
-code itself. Current numbers and the next target are the top entry of
-[the log](docs/phase-20261113/LOG-itoa-full-item-graph-progress.md). Read it before answering "how far".
+Where we are: status is kept in one place, the "Where we are" page at the top of
+[the log](docs/phase-20261113/LOG-itoa-full-item-graph-progress.md). Read it before answering
+"how far". Do not copy numbers from it into this file.
 
 ## Rule 1 — Only source-backed facts count
 
@@ -51,7 +51,7 @@ Graph rules in force:
 - Every item outside a function body is a node, private items included.
 - Each source file has one file-area node. Each `use` is a node.
 - Edges are stored uncollapsed. Relation kinds: `contains`, `calls`, `imports`, `uses_type`,
-  `reads`, `implements`, `reexports`, `derives`.
+  `reads`, `implements`, `reexports`, `derives`, and for macros `generates` and `expands`.
 - One edge row per source site. Two sites with the same source, relation and target are two
   rows, each with its own range. The expected graph lists one row per source, relation and
   target with its sites, so group stored rows the same way before comparing.
@@ -77,8 +77,12 @@ Scope:
   undecided choice; ask, or backlog it.
 - If most of a part's expected rows wait on an open decision, ask for that decision before
   starting the part.
-- `--sysroot-source-scope-kind excluded` is how runs work today. How edges into `core` are
-  judged is an open decision in the PRD; until decided, such a run cannot pass.
+- An acceptance run passes `--sysroot-source-scope-kind excluded`. A target in `core` is
+  then a named external target, or a row without a target that the frozen expected graph
+  lists (PRD, decided 2026-11-15).
+- The value `declarations` (SPEC part 8) also reads the `core` source of the sysroot, syntax
+  only, to name method calls into `core`. No SOP run covers it: the SOP's S1 does not freeze
+  those files, and the expected graph has no target for those calls.
 
 ## Rule 3 — One VM, one branch, test first, measure
 
@@ -216,7 +220,8 @@ parseltongue map-workspace-full-run \
   --workspace-root-path-value /home/ubuntu/repos/rust-tools/itoa \
   --workspace-store-file-path <store.db> \
   --worker-thread-count-value 2 \
-  --mapping-final-stage-kind full-item-dependency-graph
+  --mapping-final-stage-kind full-item-dependency-graph \
+  --sysroot-source-scope-kind excluded
 
 # read it back; use this to study stored rows, not a temporary test
 parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \
