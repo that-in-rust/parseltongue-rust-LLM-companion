@@ -5436,6 +5436,7 @@
       "item_kind": "file_public_area",
       "label": "area:src/lib.rs",
       "node_category": "file_public_area",
+      "node_exact_range": null,
       "owner": "crate_root",
       "owner_kind": null,
       "reachable_outside_crate": false,
@@ -5468,6 +5469,10 @@
       "item_kind": "module",
       "label": "u128_ext",
       "node_category": "local_item",
+      "node_exact_range": [
+        1980,
+        1993
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5500,6 +5505,10 @@
       "item_kind": "use_statement",
       "label": "use core::hint",
       "node_category": "local_item",
+      "node_exact_range": [
+        1995,
+        2010
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5532,6 +5541,10 @@
       "item_kind": "use_statement",
       "label": "use core::mem::{self, MaybeUninit}",
       "node_category": "local_item",
+      "node_exact_range": [
+        2011,
+        2046
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5564,6 +5577,10 @@
       "item_kind": "use_statement",
       "label": "use core::str",
       "node_category": "local_item",
+      "node_exact_range": [
+        2047,
+        2061
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5596,6 +5613,10 @@
       "item_kind": "struct",
       "label": "Buffer",
       "node_category": "local_item",
+      "node_exact_range": [
+        2116,
+        2427
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": true,
@@ -5628,6 +5649,10 @@
       "item_kind": "associated_function",
       "label": "Buffer::new",
       "node_category": "local_item",
+      "node_exact_range": [
+        2714,
+        3006
+      ],
       "owner": "impl@93",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
@@ -5660,6 +5685,10 @@
       "item_kind": "associated_function",
       "label": "Buffer::format",
       "node_category": "local_item",
+      "node_exact_range": [
+        3012,
+        3484
+      ],
       "owner": "impl@93",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
@@ -5692,6 +5721,10 @@
       "item_kind": "trait",
       "label": "Integer",
       "node_category": "local_item",
+      "node_exact_range": [
+        3488,
+        3836
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": true,
@@ -5724,6 +5757,10 @@
       "item_kind": "associated_constant",
       "label": "Integer::MAX_STR_LEN",
       "node_category": "local_item",
+      "node_exact_range": [
+        3680,
+        3834
+      ],
       "owner": "Integer",
       "owner_kind": "trait",
       "reachable_outside_crate": true,
@@ -5756,6 +5793,10 @@
       "item_kind": "module",
       "label": "private",
       "node_category": "local_item",
+      "node_exact_range": [
+        3838,
+        4084
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5788,6 +5829,10 @@
       "item_kind": "trait",
       "label": "private::Sealed",
       "node_category": "local_item",
+      "node_exact_range": [
+        3924,
+        4082
+      ],
       "owner": "private",
       "owner_kind": "module",
       "reachable_outside_crate": false,
@@ -5820,6 +5865,10 @@
       "item_kind": "associated_type",
       "label": "private::Sealed::Buffer",
       "node_category": "local_item",
+      "node_exact_range": [
+        3976,
+        4020
+      ],
       "owner": "private::Sealed",
       "owner_kind": "trait",
       "reachable_outside_crate": false,
@@ -5852,6 +5901,10 @@
       "item_kind": "associated_function",
       "label": "private::Sealed::write",
       "node_category": "local_item",
+      "node_exact_range": [
+        4029,
+        4076
+      ],
       "owner": "private::Sealed",
       "owner_kind": "trait",
       "reachable_outside_crate": false,
@@ -5884,6 +5937,10 @@
       "item_kind": "macro_definition",
       "label": "macro_rules! impl_Integer",
       "node_category": "local_item",
+      "node_exact_range": [
+        4086,
+        5905
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5916,6 +5973,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer!(i8, u8)",
       "node_category": "local_item",
+      "node_exact_range": [
+        5907,
+        5929
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5948,6 +6009,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer!(i16, u16)",
       "node_category": "local_item",
+      "node_exact_range": [
+        5930,
+        5954
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -5980,6 +6045,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer!(i32, u32)",
       "node_category": "local_item",
+      "node_exact_range": [
+        5955,
+        5979
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6012,6 +6081,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer!(i64, u64)",
       "node_category": "local_item",
+      "node_exact_range": [
+        5980,
+        6004
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6044,6 +6117,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer!(i128, u128)",
       "node_category": "local_item",
+      "node_exact_range": [
+        6005,
+        6031
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6076,6 +6153,10 @@
       "item_kind": "macro_definition",
       "label": "macro_rules! impl_Integer_size",
       "node_category": "local_item",
+      "node_exact_range": [
+        6033,
+        6684
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6108,6 +6189,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
       "node_category": "local_item",
+      "node_exact_range": [
+        6686,
+        6755
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6140,6 +6225,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
       "node_category": "local_item",
+      "node_exact_range": [
+        6756,
+        6825
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6172,6 +6261,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
       "node_category": "local_item",
+      "node_exact_range": [
+        6826,
+        6895
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6204,6 +6297,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
       "node_category": "local_item",
+      "node_exact_range": [
+        6896,
+        6965
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6236,6 +6333,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
       "node_category": "local_item",
+      "node_exact_range": [
+        6966,
+        7035
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6268,6 +6369,10 @@
       "item_kind": "macro_call",
       "label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
       "node_category": "local_item",
+      "node_exact_range": [
+        7036,
+        7105
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6300,6 +6405,10 @@
       "item_kind": "struct",
       "label": "DecimalPairs",
       "node_category": "local_item",
+      "node_exact_range": [
+        7107,
+        7159
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6332,6 +6441,10 @@
       "item_kind": "static",
       "label": "DECIMAL_PAIRS",
       "node_category": "local_item",
+      "node_exact_range": [
+        7161,
+        7542
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6364,6 +6477,10 @@
       "item_kind": "function",
       "label": "divmod100",
       "node_category": "local_item",
+      "node_exact_range": [
+        7544,
+        7895
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6396,6 +6513,10 @@
       "item_kind": "function",
       "label": "slice_buffer_to_str",
       "node_category": "local_item",
+      "node_exact_range": [
+        7897,
+        8631
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6428,6 +6549,10 @@
       "item_kind": "trait",
       "label": "Unsigned",
       "node_category": "local_item",
+      "node_exact_range": [
+        8633,
+        8711
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6460,6 +6585,10 @@
       "item_kind": "associated_function",
       "label": "Unsigned::fmt",
       "node_category": "local_item",
+      "node_exact_range": [
+        8663,
+        8709
+      ],
       "owner": "Unsigned",
       "owner_kind": "trait",
       "reachable_outside_crate": false,
@@ -6492,6 +6621,10 @@
       "item_kind": "macro_definition",
       "label": "macro_rules! impl_Unsigned",
       "node_category": "local_item",
+      "node_exact_range": [
+        8713,
+        11604
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6524,6 +6657,10 @@
       "item_kind": "macro_call",
       "label": "impl_Unsigned!(u8)",
       "node_category": "local_item",
+      "node_exact_range": [
+        11606,
+        11625
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6556,6 +6693,10 @@
       "item_kind": "macro_call",
       "label": "impl_Unsigned!(u16)",
       "node_category": "local_item",
+      "node_exact_range": [
+        11626,
+        11646
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6588,6 +6729,10 @@
       "item_kind": "macro_call",
       "label": "impl_Unsigned!(u32)",
       "node_category": "local_item",
+      "node_exact_range": [
+        11647,
+        11667
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6620,6 +6765,10 @@
       "item_kind": "macro_call",
       "label": "impl_Unsigned!(u64)",
       "node_category": "local_item",
+      "node_exact_range": [
+        11668,
+        11688
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6652,6 +6801,10 @@
       "item_kind": "associated_function",
       "label": "<u128 as Unsigned>::fmt",
       "node_category": "local_item",
+      "node_exact_range": [
+        11719,
+        14378
+      ],
       "owner": "impl@334",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
@@ -6684,6 +6837,10 @@
       "item_kind": "function",
       "label": "enc_16lsd",
       "node_category": "local_item",
+      "node_exact_range": [
+        14382,
+        15883
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6716,6 +6873,10 @@
       "item_kind": "function",
       "label": "div_rem_1e16",
       "node_category": "local_item",
+      "node_exact_range": [
+        15885,
+        16903
+      ],
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
@@ -6748,6 +6909,7 @@
       "item_kind": "file_public_area",
       "label": "area:src/u128_ext.rs",
       "node_category": "file_public_area",
+      "node_exact_range": null,
       "owner": "crate_root",
       "owner_kind": null,
       "reachable_outside_crate": false,
@@ -6780,6 +6942,10 @@
       "item_kind": "function",
       "label": "u128_ext::mulhi",
       "node_category": "local_item",
+      "node_exact_range": [
+        54,
+        694
+      ],
       "owner": "area:src/u128_ext.rs",
       "owner_kind": "module",
       "reachable_outside_crate": false,

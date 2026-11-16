@@ -5315,17 +5315,49 @@ fn collect_expected_node_rows() -> std::collections::BTreeSet<String> {
         .iter()
         .map(|node| {
             format!(
-                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={}",
+                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={} | at={} | external={}",
                 node["label"].as_str().unwrap(),
                 node["node_category"].as_str().unwrap(),
                 read_optional_text(&node["item_kind"]),
                 read_optional_text(&node["owner_kind"]),
                 read_optional_text(&node["file"]),
                 read_optional_text(&node["generated_by_label"]),
-                node["in_function_body"].as_bool().unwrap()
+                node["in_function_body"].as_bool().unwrap(),
+                node["node_exact_range"]
+                    .as_array()
+                    .map(|range| format!("{}..{}", range[0], range[1]))
+                    .unwrap_or_else(|| "none".to_string()),
+                read_optional_text(&node["external_name_kind"])
             )
         })
         .collect()
+}
+
+/// REQ-RUST-044.1 N4: the byte range of a node written directly in a source file. A node
+/// written by a macro expansion has a range in the expanded text only, so it has none here.
+fn derive_stored_node_position(identity: &HldTargetIdentityValue) -> String {
+    match identity {
+        HldTargetIdentityValue::Symbol(NameSymbolTargetKey::Definition(occurrence)) => {
+            let site = occurrence.read_semantic_occurrence_parts();
+            let (start, end) = site.span_byte_range_value.read_source_range_pair();
+            if site.span_expansion_provenance_chain.is_empty() {
+                format!("{start}..{end}")
+            } else {
+                "none".to_string()
+            }
+        }
+        _ => "none".to_string(),
+    }
+}
+
+/// REQ-RUST-044.1 N5: which of the three kinds of name outside the read source a node is.
+fn derive_stored_external_kind(identity: &HldTargetIdentityValue) -> String {
+    match identity {
+        HldTargetIdentityValue::ExternalNamed(name) => {
+            convert_camel_snake_text(&format!("{:?}", name.external_name_kind_value))
+        }
+        _ => "none".to_string(),
+    }
 }
 
 /// The same text row for each production node.
@@ -5344,7 +5376,7 @@ fn collect_production_node_rows(
         .iter()
         .map(|node| {
             format!(
-                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={}",
+                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={} | at={} | external={}",
                 derive_expected_graph_label(node),
                 name_debug_value(format!("{:?}", node.node_input_category)),
                 node.node_item_kind_value
@@ -5358,7 +5390,9 @@ fn collect_production_node_rows(
                     .as_ref()
                     .map(|call| labels[call].as_str())
                     .unwrap_or("none"),
-                node.node_function_body_ancestry_flag
+                node.node_function_body_ancestry_flag,
+                derive_stored_node_position(&node.node_target_reference),
+                derive_stored_external_kind(&node.node_target_reference)
             )
         })
         .collect()
@@ -5414,11 +5448,14 @@ fn collect_expected_graph_rows() -> Vec<String> {
             if !check_relation_site_compared(&relation) {
                 return vec![head];
             }
-            edge["sites"]
-                .as_array()
-                .unwrap()
+            let (sites, ranges) = (
+                edge["sites"].as_array().unwrap(),
+                edge["site_exact_ranges"].as_array().unwrap(),
+            );
+            assert_eq!(sites.len(), ranges.len(), "{head}: one range per site");
+            sites
                 .iter()
-                .zip(edge["site_exact_ranges"].as_array().unwrap())
+                .zip(ranges)
                 .map(|(site, range)| {
                     format!(
                         "{head} @ {} {}:{}..{}:{} by {}",

@@ -166,6 +166,17 @@ It is never copied from a production run.
   file, the module that file is the body of (`mod u128_ext;`). A file area and the crate
   root have no owner (OD-7).
 
+- **N4 (step 7.9).** A node written directly in a source file is also compared by its byte
+  range in that file. It starts at the first comment or attribute line written directly
+  above the item with no blank line between, and ends after the item's last token. A node
+  written by a macro expansion, a file area, the crate root, a builtin type and a name
+  outside itoa have no such range; the expected value is `none`. On pinned itoa 43 nodes
+  have a range.
+- **N5 (step 7.9).** A name outside itoa is also compared by its kind: `crate_rooted_path`
+  (8), `prelude_name` (3) or `builtin_member` (36).
+- **N6 (step 7.9).** An expected row with a different number of sites and ranges fails the
+  test before any comparison.
+
 ## 8. REQ-RUST-044.2 — which record of a site is compared (step 7.8, added 2026-11-16)
 
 - **H1.** A `calls` site is compared by how its target was chosen:

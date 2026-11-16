@@ -510,6 +510,15 @@ def owner_kind(owner):
     if owner.startswith("impl@"): return "impl"
     return {AL: "crate_root", AX: "module"}.get(owner) or nodes[owner]["item_kind"]
 
+def node_exact_range(f, a, b):
+    """REQ-RUST-044.1 N4: a node starts at the first of the comment and attribute lines written directly above its
+    item, with no blank line between, and ends after the last token of its last line."""
+    raw = RAW[f].split(b"\n")
+    while a > 1 and raw[a - 2].strip().startswith((b"//", b"#[")):
+        a -= 1
+    offset = lambda line: sum(len(value) + 1 for value in raw[:line - 1])
+    return [offset(a) + len(raw[a - 1]) - len(raw[a - 1].lstrip()), offset(b) + len(raw[b - 1].rstrip())]
+
 MACRO_CALL_AT = {row["start_line"]: row["label"] for row in nodes.values() if row["item_kind"] == "macro_call"}
 node_rows = []
 for row in nodes.values():
@@ -527,6 +536,9 @@ for row in nodes.values():
     candidate["in_function_body"] = candidate["owner_kind"] in ("function", "associated_function")
     candidate["generated_by_label"] = MACRO_CALL_AT[row["generated_by"]["invocation_line"]] if row["generated_by"] else None
     candidate["source_evidence"] = source_evidence(row["file"], row["start_line"], row["source_anchor"])
+    # A node written by a macro expansion has no range of its own in the file; it is placed by its generating call.
+    candidate["node_exact_range"] = None if row["generated_by"] or candidate["node_category"] != "local_item" \
+        else node_exact_range(row["file"], row["start_line"], row["end_line"])
     candidate["file_assignment_status"] = "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP" if row.get("generated_by") else "SOURCE_FILE_CANDIDATE"
     node_rows.append(candidate)
 edge_rows = []

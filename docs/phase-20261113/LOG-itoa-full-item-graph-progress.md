@@ -32,13 +32,14 @@ workers      1, 4 and 16 store byte-identical node and edge rows
 ### What the whole-graph test compares (`test_itoa_whole_graph_equality`, passes)
 
 - **Nodes, all 151:** label, category, item kind, owner kind, file, generating macro call,
-  declared in a function body or not.
+  declared in a function body or not, byte range in the file (the 43 nodes written directly
+  in source), and the kind of a name outside itoa.
 - **Sites of calls, type uses, reads, imports and macro rows, all 562:** source, relation,
   target, exact byte range, and the record (how a call's target was chosen; signature or
   expression; body or macro argument).
 - **`contains` and `implements`, 120 rows:** source, relation and target only.
-- **Not compared:** where a node is in its file, the kind of an external name, and the
-  lookup evidence kept on a row.
+- **Not compared:** the lookup evidence kept on a row, and the range of a node written by
+  a macro expansion.
 
 ### Checks at the last full run
 
@@ -96,7 +97,7 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 ### What is left to finish the PRD
 
-1. Compare node position and external-name kind.
+1. Done (step 7.9): node position and external-name kind are compared.
 2. Fix two SOP lines that make PASS impossible as written ("incomplete cannot pass";
    `cmp` on exports whose header carries a run id).
 3. S1: freeze the expected graph and record its digests.
@@ -104,3 +105,24 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 5. The run report as an entry below.
 
 ## Entries — add new ones at the bottom
+
+### Part 7 step 7.9 — node position and external-name kind compared (2026-11-16)
+
+- **REQ:** REQ-RUST-044.1 N4 to N6 (part 7 file, section 7).
+- **STUB / RED:** `derive_stored_node_position` and `derive_stored_external_kind` as
+  `todo!()`. `test_itoa_whole_graph_equality`: `0 passed; 1 failed; 57 filtered out`,
+  `not yet implemented: REQ-RUST-044.1 N4: Symbol(Builtin("i128"))`. This shows the test
+  reaches the helper, nothing more.
+- **GREEN:** `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 57 filtered out`.
+  All 151 nodes match, 43 of them with a range.
+- **Five changes to the expected files, each fails the test:** a node start +1, a node end
+  -1, a range given to a macro-generated node, `builtin_member` changed to
+  `prelude_name`, one site range dropped from a calls row.
+- **Weak evidence:** the range rule (leading comments and attributes belong to the node) was
+  written after I had seen that production's ranges start there.
+- **Command:** `cargo test --release -p parseltongue-cli-dispatcher-binary --test
+  itoa-source-acceptance-tests test_itoa_whole_graph_equality`. Expected-data tests: 16 pass.
+  Format and lint on the touched crate pass. No production code changed. No refactor needed.
+- **codebase-memory:** re-indexed before this step (26,725 nodes, 62,052 edges);
+  `search_graph` for the full-run entry functions returned no rows, so the files were read
+  directly.
