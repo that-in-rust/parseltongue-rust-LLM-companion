@@ -252,3 +252,42 @@ fn test_type_name_declaration_rows() {
         found
     );
 }
+
+/// REQ-RUST-054.0 D10: the names a prelude file re-exports, one row per `use` leaf. A
+/// `use` in a private inline module is not a re-export of the prelude; a glob keeps its path.
+#[test]
+fn test_prelude_use_leaf_rows() {
+    let source = "pub use crate::iter::{ExactSizeIterator, Iterator as _};\n\
+        pub use crate::convert::TryInto;\n\
+        mod hidden { pub use crate::*; pub use crate::Secret; }\n\
+        pub mod rust_2021 { pub use super::v1::*; pub use crate::future::Future; }\n";
+    let read = |path: &str| {
+        extract_member_declaration_rows(path, source)
+            .iter()
+            .filter(|row| row["declaration_owner_kind_value"] == "prelude_use_leaf")
+            .map(|row| {
+                let start = row["member_name_start_offset"].as_u64().unwrap() as usize;
+                let end = row["member_name_end_offset"].as_u64().unwrap() as usize;
+                assert_eq!(
+                    json!(&source[start..end]),
+                    row["member_declared_name_value"]
+                );
+                match row["impl_self_type_text"].as_str() {
+                    Some(path) => format!("{} of {path}", &source[start..end]),
+                    None => source[start..end].to_owned(),
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        vec![
+            "ExactSizeIterator",
+            "Iterator",
+            "TryInto",
+            "* of super::v1",
+            "Future"
+        ],
+        read("core/src/prelude/v1.rs")
+    );
+    assert!(read("core/src/iter/mod.rs").is_empty());
+}

@@ -1,7 +1,7 @@
 //! REQ-RUST-054.0: the methods a sysroot source file declares, from syntax only.
 use ra_ap_syntax::{
     AstNode, Direction, Edition, NodeOrToken, SourceFile, SyntaxKind, SyntaxNode, SyntaxToken,
-    ast::{self, HasAttrs, HasGenericParams, HasName, HasTypeBounds},
+    ast::{self, HasAttrs, HasGenericParams, HasName, HasTypeBounds, HasVisibility},
 };
 use serde_json::{Value, json};
 
@@ -47,6 +47,11 @@ pub fn extract_member_declaration_rows(
             | SyntaxKind::RENAME => build_type_name_row(source_relative_path, &node)
                 .into_iter()
                 .collect(),
+            SyntaxKind::USE_TREE if source_relative_path.starts_with("core/src/prelude/") => {
+                build_prelude_leaf_row(source_relative_path, &node)
+                    .into_iter()
+                    .collect()
+            }
             _ => Vec::new(),
         })
         .collect::<Vec<_>>();
@@ -313,6 +318,60 @@ fn build_type_name_row(path: &str, node: &SyntaxNode) -> Option<Value> {
         "macro_self_parameter_flag":null,
         "macro_owner_shape_kind":null,
         "type_declaration_kind_value":kind,
+        "owner_trait_path_text":null,
+        "owner_macro_name_value":null,
+        "member_self_parameter_kind":null,
+        "member_self_parameter_text":null,
+        "member_return_type_text":null,
+        "member_attribute_text_values":[],
+        "owner_attribute_text_values":[],
+        "owner_function_body_flag":check_function_body_ancestry(node),
+    }))
+}
+
+/// REQ-RUST-054.0 D10: one name a prelude file re-exports. A glob is a row named `*`
+/// that keeps the path it globs. A `use` inside a private inline module re-exports
+/// nothing from the prelude, so it gives no row.
+fn build_prelude_leaf_row(path: &str, node: &SyntaxNode) -> Option<Value> {
+    let tree = ast::UseTree::cast(node.clone())?;
+    if tree.use_tree_list().is_some()
+        || node
+            .ancestors()
+            .filter_map(ast::Module::cast)
+            .any(|module| module.visibility().is_none())
+    {
+        return None;
+    }
+    let (range, name, glob_path) = match tree.star_token() {
+        Some(star) => {
+            let mut prefixes = node
+                .ancestors()
+                .filter_map(ast::UseTree::cast)
+                .filter_map(|holder| holder.path())
+                .map(|prefix| read_syntax_node_text(prefix.syntax()))
+                .collect::<Vec<_>>();
+            prefixes.reverse();
+            (star.text_range(), "*".to_owned(), Some(prefixes.join("::")))
+        }
+        None => {
+            let name = tree.path()?.segment()?.name_ref()?;
+            (name.syntax().text_range(), name.text().to_string(), None)
+        }
+    };
+    Some(json!({
+        "declaration_source_relative_path":path,
+        "member_name_start_offset":usize::from(range.start()),
+        "member_name_end_offset":usize::from(range.end()),
+        "member_declared_name_value":name,
+        "member_name_parameter_flag":false,
+        "declaration_owner_kind_value":"prelude_use_leaf",
+        "impl_self_type_text":glob_path,
+        "impl_generic_parameter_text":null,
+        "impl_generic_parameter_names":null,
+        "impl_bound_restriction_flag":null,
+        "macro_self_parameter_flag":null,
+        "macro_owner_shape_kind":null,
+        "type_declaration_kind_value":null,
         "owner_trait_path_text":null,
         "owner_macro_name_value":null,
         "member_self_parameter_kind":null,

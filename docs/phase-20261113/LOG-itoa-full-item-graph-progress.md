@@ -416,3 +416,20 @@ GATES  cargo fmt --check and clippy --all-targets -D warnings pass on the crate
 REFACTOR none
 NEXT   8.3b-1 (ii): the L2 lookup for parameter receivers with a plain written type (9 itoa sites)
 ```
+
+## TDD entry — step 8.3b-1 (ii-a), prelude re-export rows in the core declaration table (REQ-RUST-054.0 D10)
+
+```text
+WHY    the lookup must know which core traits are in scope without an import; that is the set
+       the prelude files re-export
+RED    cargo test --release -p parseltongue-syntax-span-extractor test_prelude_use_leaf_rows
+       0 passed, 1 failed: left [ExactSizeIterator, Iterator, TryInto, "* of super::v1", Future], right []
+GREEN  build_prelude_leaf_row: one "prelude_use_leaf" row per use leaf in core/src/prelude/ files;
+       a glob is a row named * that keeps its path; a use in a private inline module gives no row
+       crate 154 passed
+BREAK  private-module leaves counted -> test fails (right gains "* of crate", "Secret")
+GATES  cargo fmt --check and clippy --all-targets -D warnings pass on the crate
+REFACTOR none
+NOT RUN the real-source tests (the row count of the table on pinned itoa is not re-measured)
+NEXT   8.3b-1 (ii-b): core-member-target-records.rs, the lookup for a parameter receiver
+```
