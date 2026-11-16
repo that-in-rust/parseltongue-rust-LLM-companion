@@ -13,7 +13,10 @@ comparison, and every higher-abstraction table (interface level, HLD, file and f
 roll-ups). Those are later queries over this graph, not part of it.
 
 Status on 2026-11-16: **the acceptance run passed all four SOP steps on one frozen
-executable. The graph is marked incomplete: 133 method calls into `core` have no target.**
+executable (commit `822da80cf`). The graph is marked incomplete: 133 method calls into
+`core` have no target. Part 8 has changed production since, so that PASS does not cover the
+branch head; the head's state is on the [log](LOG-itoa-full-item-graph-progress.md)'s
+"Where we are" page.**
 
 ```text
 itoa run, sysroot excluded, equal to the frozen expected graph
@@ -76,17 +79,25 @@ stage                                writes                                    s
 2/3 syntax walker                    span, signature-detail, body-site rows    built
 4+5 name resolution + item macros    bindings, path-resolution sites,          built
                                      macro-expanded items
-6   signature-type-lowering-stage    lowered signatures, impl-header-index     impl headers only
-7   semantic-edge-evidence-stage     edge-evidence-record-table                contains and calls only
--   item-effective-visibility-stage  item-effective-visibility-records         visibility stored unknown
+6   signature-type-lowering-stage    impl-header-index-table                   built
+7   semantic-edge-evidence-stage     edge-evidence-record-table                eight relation kinds
+-   item-effective-visibility-stage  item-effective-visibility-records         all nodes
+-   sysroot-member-declaration-stage sysroot-member-declaration-records        part 8, not accepted
 ```
+
+- Stage 6 is `persist_impl_header_rows`. `lowered-signature-type-table` is registered under
+  it and nothing writes it.
+- Stage 7 and the node stage are one function, `publish_full_graph_checkpoint`.
+- Nodes carry no visibility, reachability or signature text yet.
+- The sysroot stage runs only with `--sysroot-source-scope-kind declarations`.
 
 The run for this phase is
 `parseltongue map-workspace-full-run --mapping-final-stage-kind full-item-dependency-graph`.
 
 Process boundary: production may start only `cargo metadata --offline`, `rustc --print cfg`
 and `rustc --print sysroot`. It never compiles, never runs build scripts or proc macros, never
-reads `target/`, and never uses the network.
+reads `target/`, and never uses the network. With scope `declarations` it also reads the
+files under `<sysroot>/lib/rustlib/src/rust/library` (part 8, not accepted).
 
 ## 3 — How it is proven
 
@@ -113,26 +124,25 @@ The expected graph is written from the pinned source and frozen before compariso
 frozen on 2026-11-16, checked against the source by its author alone. It is comparison data
 only, never production input.
 
-Build order, one real-source test per relationship:
+Build order, one real-source test per relationship. Every row below is in the frozen expected
+graph and was equal in the accepted run:
 
 ```text
 done  <Buffer as Default>::default --calls--> Buffer::new
-next  Buffer::format --calls--> private::Sealed::write          one generic edge, not twelve
-      <Buffer as Clone>::clone --calls--> Buffer::new
-      Integer --uses_type--> private::Sealed
-      <u128 as Sealed>::write --> <u128 as Unsigned>::fmt --> div_rem_1e16 --> u128_ext::mulhi
-      Buffer::new --reads--> <i128 as Integer>::MAX_STR_LEN
-      Buffer::format --calls--> core::hint::unreachable_unchecked   the use node is evidence
-      use nodes of lib.rs --imports--> core::hint, core::mem, core::mem::MaybeUninit, core::str
-      file-area nodes --contains--> their top-level nodes
-last  whole library equal to the frozen expected graph (A1–A6)
+done  Buffer::format --calls--> private::Sealed::write          one generic edge, not twelve
+done  <Buffer as Clone>::clone --calls--> Buffer::new
+done  Integer --uses_type--> private::Sealed
+done  <u128 as Sealed>::write --> <u128 as Unsigned>::fmt --> div_rem_1e16 --> u128_ext::mulhi
+done  Buffer::new --reads--> <i128 as Integer>::MAX_STR_LEN
+done  Buffer::format --calls--> core::hint::unreachable_unchecked   the use node is evidence
+done  use nodes of lib.rs --imports--> core::hint, core::mem, core::mem::MaybeUninit, core::str
+done  file-area nodes --contains--> their top-level nodes
+done  whole library equal to the frozen expected graph (A1–A6), at `822da80cf`
+next  part 8: a target for the 133 method calls into `core`; needs a new freeze and a new run
 ```
 
 Method: expected rows live only in the test; fix the earliest missing producer; add only
 general behaviour, nothing keyed on itoa names.
-
-The next target must prove `i: I -> Integer -> private::Sealed -> write` and emit exactly one
-generic target, with distractor, shadowing, ambiguity and rename checks.
 
 ## Reference
 
@@ -141,7 +151,9 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
 - itoa: [phase-one-benchmark-pin.json](../phase-20261111/phase-one-benchmark-pin.json).
 - Turso `=0.9.0-pre.5`, concurrent writes. A busy publication is tried up to 6 times, waiting
   10, 20, 40, 80, then 160 ms.
-- DuckDB `=1.20000.1`, bundled, no extensions, no external access, run-local temp directory.
+- DuckDB `=1.20000.1`, bundled, run-local temp directory. No extension is installed or
+  auto-loaded. The graph projection loads the bundled `json` extension and then turns
+  external access off; name resolution opens with external access off.
 
 ### Decisions in force
 
@@ -318,9 +330,17 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
 
 - **Method calls into `core`, 133 without a target.** Naming them needs the sysroot source
   in the run or a trait solver; measured on 2026-11-13, a run with the sysroot did not
-  finish name resolution in 2,400 s (the run report is deleted). Runs use
+  finish name resolution in 2,400 s (the run report is deleted). Accepted runs use
   `--sysroot-source-scope-kind excluded`. Paths into `core` that itoa's source proves are
   built as named external targets (47 nodes).
+  - **Part 8, in progress, not accepted.** A third scope value, `declarations`, reads the
+    `core` source by syntax only and names a method call when the receiver's written type
+    and the declaration are both proven
+    ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)). It changes
+    "no name for a method call" above, reads files S1 does not freeze, and needs the
+    expected graph re-frozen. None of that is decided here yet.
+- **Node fields.** Visibility, reachability outside the crate and signature text are not
+  filled on any node, and the whole-graph test does not compare them.
 - **Rows depend on the source directory.** Two copies of the pinned source in different
   directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause:
   the store's file identity is the absolute path, and the run id hashes those rows. Not
@@ -331,8 +351,8 @@ generic target, with distractor, shadowing, ambiguity and rename checks.
   sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
   are compared (A4).
 
-The enum-variant, file-module and non-function-source points block the affected expected
-rows from being frozen.
+The expected graph was frozen without variant or field nodes and without an edge from a
+file's module to its file area. Deciding either point needs a new freeze.
 
 ### Out of scope
 
