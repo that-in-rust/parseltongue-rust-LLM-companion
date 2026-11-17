@@ -6,6 +6,8 @@
 //! `write_graph_dataset_file`, `read_graph_dataset_file` and `load_graph_export_files`
 //! touch DuckDB and the file system.
 
+#[path = "graph-dataset-file-writer.rs"]
+mod graph_dataset_file_writer;
 #[path = "graph-dataset-load-error.rs"]
 mod graph_dataset_load_error;
 #[path = "graph-export-row-checks.rs"]
@@ -13,6 +15,9 @@ mod graph_export_row_checks;
 #[path = "graph-export-row-parser.rs"]
 mod graph_export_row_parser;
 
+pub use graph_dataset_file_writer::{
+    load_graph_export_files, read_graph_dataset_file, write_graph_dataset_file,
+};
 pub use graph_dataset_load_error::{GraphDatasetLoadError, GraphExportFileKind};
 pub use graph_export_row_checks::{
     GraphDatasetEdgeRecord, GraphDatasetInfoRecord, GraphDatasetNodeRecord, GraphDatasetRowTables,
