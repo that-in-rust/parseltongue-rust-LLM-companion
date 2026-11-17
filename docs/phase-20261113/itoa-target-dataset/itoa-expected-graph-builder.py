@@ -201,6 +201,10 @@ for n in list(nodes.values()):
     fl = [OD7] if o in inherent_impl_owners else []
     if n["generated_by"]: fl.append(GEN)
     edge(container, "contains", n["label"], n["file"], n["start_line"], "", gen=n["generated_by"], flags=fl)
+# A module contains the file area of its file (REQ-RUST-070.0): the crate root that of the root file, whose site
+# is the whole file; a `mod name;` declaration that of the file it names, whose site is the declaration.
+edge("itoa", "contains", AL, L, 1, "")
+edge("u128_ext", "contains", AX, L, 54, "mod u128_ext;")
 
 # ---------------- imports ----------------
 ext(USE_HINT, "imports", "core::hint", L, 56, "core::hint")

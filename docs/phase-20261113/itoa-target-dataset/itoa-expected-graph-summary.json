@@ -1,8 +1,8 @@
 {
   "artifact_status": "FROZEN_EXPECTED_GRAPH",
   "counts": {
-    "edge_rows_grouped": 473,
-    "edge_sites": 682,
+    "edge_rows_grouped": 475,
+    "edge_sites": 684,
     "edge_sites_without_target": 133,
     "impl_block_records": 33,
     "nodes": 151,
@@ -18,7 +18,7 @@
   },
   "relation_kind_counts": {
     "calls": 103,
-    "contains": 88,
+    "contains": 90,
     "derives": 0,
     "expands": 15,
     "generates": 45,
@@ -40,7 +40,7 @@
   "target_kind_counts": {
     "builtin": 77,
     "external": 64,
-    "node": 277,
+    "node": 279,
     "unresolved": 55
   }
 }

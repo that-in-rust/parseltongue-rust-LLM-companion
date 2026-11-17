@@ -4,8 +4,8 @@
     "itoa-expected-graph-rules.py": "2d9dfb6bb80be27291a8fa06e50bb0622937b7b75b1e157f299512b2e22637d4"
   },
   "counts": {
-    "edge_rows_grouped": 473,
-    "edge_sites": 682,
+    "edge_rows_grouped": 475,
+    "edge_sites": 684,
     "edge_sites_known_not_merged": 1,
     "edge_sites_merged": 132,
     "edge_sites_without_target": 1,
@@ -13,13 +13,13 @@
     "nodes_added": 19
   },
   "frozen_file_sha256": {
-    "itoa-expected-declarations-graph-edges.json": "c40f8b0c581a9f84a13d1d883ae37b9ed196921e70a3687e17c853d26e001bb3",
+    "itoa-expected-declarations-graph-edges.json": "f4eefe209090094f80924bc9aae4ae5d2a504d49783e1033c7bbd0a4c4955101",
     "itoa-expected-declarations-graph-nodes.json": "f597b26379ba575119c885134ffe32fe50d770c33317be10dbaa856ab616b5df",
-    "itoa-expected-declarations-graph-summary.json": "fe1291f3ce4b5190f7f505deac79a82a8b641322a0d0f20cf531c446c7d453cd"
+    "itoa-expected-declarations-graph-summary.json": "b1aca2956f73bd77ccdab82c365c634b41eb9bb2762d32e3935691481585ad88"
   },
   "input_file_sha256": {
     "itoa-expected-core-member-targets.json": "acf9a04a47c60a0f0dcfdd9e22e7ae9bd7999819dd5d8ed5466ae3e1dbda7b9c",
-    "itoa-expected-graph-edges.json": "a51f7d6e499d8340e1d37b6b809366a307a3c903b14758482e6cba69ad06b156",
+    "itoa-expected-graph-edges.json": "16957e055311199cadff6107f84a55163fa3f52e37fbb17428f8238abe90464a",
     "itoa-expected-graph-nodes.json": "29aed6efdaef15ad4564b787ee381d6fec16ac23cdc726bc9460db824f7954e7"
   },
   "unmerged_labels": {

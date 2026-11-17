@@ -56,9 +56,9 @@ class ExpectedDeclarationsGraphTests(unittest.TestCase):
             BUILDER.merge_edge_rows(edges, targets + targets[:1])
 
     def test_merged_site_record_counts(self):
-        """M3, M4, M6: 682 sites; 132 merged by the owner kind of their row; the cast is not."""
+        """M3, M4, M6: 684 sites; 132 merged by the owner kind of their row; the cast is not."""
         sites = [(row, site) for row in self.edges for site in row["sites"]]
-        self.assertEqual(682, len(sites))
+        self.assertEqual(684, len(sites))
         records = collections.Counter(site["record"] for row, site in sites if "core_target" in row)
         self.assertEqual({"core_inherent_member": 118, "core_trait_declared_member": 14}, dict(records))
         open_rows = [row for row in self.edges if row["target_kind"] == "unresolved"]

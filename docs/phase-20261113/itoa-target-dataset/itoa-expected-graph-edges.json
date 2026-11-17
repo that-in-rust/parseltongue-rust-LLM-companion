@@ -10,7 +10,7 @@
   },
   "relation_kind_counts": {
     "calls": 103,
-    "contains": 88,
+    "contains": 90,
     "derives": 0,
     "expands": 15,
     "generates": 45,
@@ -20,7 +20,7 @@
     "reexports": 0,
     "uses_type": 124
   },
-  "row_count": 473,
+  "row_count": 475,
   "rows": [
     {
       "evidence_key": "src/lib.rs:89:[2673, 2686]",
@@ -28504,6 +28504,45 @@
       "via_use_node": null
     },
     {
+      "evidence_key": "src/lib.rs:1:None",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "contains",
+      "site_exact_ranges": null,
+      "sites": [
+        {
+          "anchor": "",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 1
+          },
+          "line": 1,
+          "occurrence": 0,
+          "record": null,
+          "site_text": null,
+          "site_text_offset": 0
+        }
+      ],
+      "source": "itoa",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "",
+          "byte_range": null,
+          "line": 1,
+          "range_status": "AMBIGUOUS_OR_EMPTY",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "AMBIGUOUS_OR_EMPTY",
+      "target": "area:src/lib.rs",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
       "evidence_key": "src/lib.rs:128:None",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
@@ -29308,6 +29347,48 @@
       "source_kind": "builtin",
       "source_site_evidence_status": "EXACT",
       "target": "private::Sealed",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
+      "evidence_key": "src/lib.rs:54:[1980, 1993]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "contains",
+      "site_exact_ranges": null,
+      "sites": [
+        {
+          "anchor": "mod u128_ext;",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 54
+          },
+          "line": 54,
+          "occurrence": 0,
+          "record": null,
+          "site_text": null,
+          "site_text_offset": 0
+        }
+      ],
+      "source": "u128_ext",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "mod u128_ext;",
+          "byte_range": [
+            1980,
+            1993
+          ],
+          "line": 54,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "area:src/u128_ext.rs",
       "target_kind": "node",
       "via_use_node": null
     },
