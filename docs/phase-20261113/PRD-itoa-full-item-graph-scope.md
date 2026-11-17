@@ -13,15 +13,15 @@ comparison, and every higher-abstraction table (interface level, HLD, file and f
 roll-ups). Those are later queries over this graph, not part of it.
 
 Status on 2026-11-17: **the acceptance run passed all four SOP steps on one frozen
-executable (commit `822da80cf`). The graph is marked incomplete: 133 method calls into
-`core` have no target. Part 8 has changed production since, so that PASS does not cover the
-branch head; the head's state is on the [log](LOG-itoa-full-item-graph-progress.md)'s
-"Where we are" page.**
+executable (commit `753665eb9`, scope `declarations`). 132 of the 133 method calls into
+`core` are named. The graph is marked incomplete: one call, `cast`, has no target. The
+run report is in the [log](LOG-itoa-full-item-graph-progress.md).**
 
 ```text
-itoa run, sysroot excluded, equal to the frozen expected graph
-nodes  151    88 items of itoa, 47 names outside itoa, 13 builtin types, 2 file areas, 1 crate root
-edges  682    calls 197 (64 with a target), uses_type 203, reads 98, contains 88,
+itoa run, scope declarations, equal to the frozen expected graph
+nodes  170    88 items of itoa, 66 names outside itoa (19 of them methods declared in core),
+              13 builtin types, 2 file areas, 1 crate root
+edges  682    calls 197 (196 with a target), uses_type 203, reads 98, contains 88,
               generates 45, expands 15, implements 32, imports 4
 open          the items under "Open" below; the expected graph was checked by its author alone
 ```
@@ -69,6 +69,11 @@ Ownership:
 - **Turso** holds durable rows, generations, frozen snapshots and atomic publication.
 - No third database. No memory crosses a stage boundary; every stage reads and writes declared
   tables.
+- **A DuckDB file of the finished graph** (user decision, 2026-11-17) is written by a
+  separate crate from the JSON a run exports, after the run and outside it. It is a copy
+  for SQL queries. Turso stays the store the run publishes to, and the comparison with the
+  expected graph reads Turso
+  ([part 9](SPEC-itoa-full-item-graph/part-9-graph-export-into-duckdb.md), not built).
 
 Stages:
 
@@ -82,7 +87,7 @@ stage                                writes                                    s
 6   signature-type-lowering-stage    impl-header-index-table                   built
 7   semantic-edge-evidence-stage     edge-evidence-record-table                eight relation kinds
 -   item-effective-visibility-stage  item-effective-visibility-records         all nodes
--   sysroot-member-declaration-stage sysroot-member-declaration-records        part 8, not accepted
+-   sysroot-member-declaration-stage sysroot-member-declaration-records        part 8, scope declarations
 ```
 
 - Stage 6 is `persist_impl_header_rows`. `lowered-signature-type-table` is registered under
@@ -97,7 +102,7 @@ The run for this phase is
 Process boundary: production may start only `cargo metadata --offline`, `rustc --print cfg`
 and `rustc --print sysroot`. It never compiles, never runs build scripts or proc macros, never
 reads `target/`, and never uses the network. With scope `declarations` it also reads the
-`core` source files of the sysroot (decided 2026-11-16, below; no accepted run yet).
+`core` source files of the sysroot (decided 2026-11-16, below; accepted run of 2026-11-17).
 
 ## 3 — How it is proven
 
@@ -138,8 +143,9 @@ done  Buffer::format --calls--> core::hint::unreachable_unchecked   the use node
 done  use nodes of lib.rs --imports--> core::hint, core::mem, core::mem::MaybeUninit, core::str
 done  file-area nodes --contains--> their top-level nodes
 done  whole library equal to the frozen expected graph (A1–A6), at `822da80cf`
-next  part 8: a target for the 133 method calls into `core` (most are named at the head, see
-      the log); needs a new freeze and a new run
+done  part 8: a target for 132 of the 133 method calls into `core`; a `declarations` run
+      equal to its frozen expected graph, at `753665eb9`
+open  `cast`, the one call without a target
 ```
 
 Method: expected rows live only in the test; fix the earliest missing producer; add only
@@ -357,22 +363,16 @@ general behaviour, nothing keyed on itoa names.
 
 ### Open
 
-- **Method calls into `core`, 133 without a target.** Naming them needs the sysroot source
-  in the run or a trait solver; measured on 2026-11-13, a run with the sysroot did not
-  finish name resolution in 2,400 s (the run report is deleted). Accepted runs use
-  `--sysroot-source-scope-kind excluded`. Paths into `core` that itoa's source proves are
-  built as named external targets (47 nodes).
-  - **Part 8, in progress, no accepted run.** The scope value `declarations` reads the
-    `core` source and names a method call when the receiver's written type and the
-    declaration are both proven
-    ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)). The rules are
-    decided ("Method calls into `core`" above). Done: the expected targets of the 133
-    calls are written from source and frozen; the S1 command for the digest of the `core`
-    files exists; the code names most of the calls, each equal to its frozen row (counts
-    on the log's "Where we are" page); the targets are merged into a frozen expected graph
-    of a `declarations` run (170 nodes, 682 edge rows), and a test compares a run with it
-    row by row. `cast` is the one call that graph lists without a target (its impl has a
-    bound the run cannot prove harmless). Not done: an acceptance run.
+- **One method call into `core` without a target: `cast`.** Its impl has the bound
+  `T: PointeeSized`, which the run cannot prove harmless (immediate backlog, entry 7). The
+  other 132 are named in the accepted run of 2026-11-17 at `753665eb9`, scope
+  `declarations` ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)),
+  each equal to its frozen expected row. The graph stays marked incomplete while `cast`
+  has no target.
+- **DuckDB's `json` extension is outside the frozen inputs.** The run loads it from
+  `~/.duckdb/extensions` (immediate backlog, entry 6).
+- **Reading the whole sysroot.** A run with scope `included` did not finish name
+  resolution in 2,400 s on 2026-11-13 (the run report is deleted). No itoa run uses it.
 - **Node fields.** Visibility, reachability outside the crate and signature text are not
   filled on any node, and the whole-graph test does not compare them.
 - **Rows depend on the source directory.** Two copies of the pinned source in different

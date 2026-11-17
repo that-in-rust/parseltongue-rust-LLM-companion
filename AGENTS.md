@@ -66,6 +66,9 @@ Ownership:
 - DuckDB: name resolution, node projection, relational analysis.
 - Turso: durable storage, frozen snapshots, atomic publication, serving.
 - No third database.
+- A DuckDB file of the finished graph is a copy written after the run by a separate crate
+  from the exported JSON (user decision, 2026-11-17; SPEC part 9). It is not a store of
+  the run.
 
 Scope:
 
@@ -82,7 +85,7 @@ Scope:
 - A method call into `core` is named from the `core` source (PRD, decided 2026-11-16): the
   run passes `--sysroot-source-scope-kind declarations` and reads the declarations of
   `core`, which the SOP freezes by digest like the pinned source. The accepted run of
-  2026-11-16 passed `excluded`; no run with `declarations` is accepted yet.
+  2026-11-17 passed `declarations`; the earlier one, of 2026-11-16, passed `excluded`.
 - The expected target of a call is written from source and frozen before the code that
   names it. A target the run names and the expected graph does not list is a FAIL.
 
@@ -166,7 +169,9 @@ Two limits:
 ## Rule 5 — retired 2026-11-16 (user decision)
 
 No GLM-5.3 or other second-opinion review is run. The check for pinned itoa is the expected
-graph in `docs/phase-20261113/itoa-target-dataset/` and `test_itoa_whole_graph_equality`.
+graph in `docs/phase-20261113/itoa-target-dataset/`, compared by
+`test_itoa_declarations_graph_equality` (scope `declarations`) and
+`test_itoa_whole_graph_equality` (scope `excluded`).
 Earlier part files cite reviews made under this rule; those records stay as history.
 
 ## Rule 6 — An open graph design choice goes to the form with the most information
@@ -223,7 +228,7 @@ parseltongue map-workspace-full-run \
   --workspace-store-file-path <store.db> \
   --worker-thread-count-value 2 \
   --mapping-final-stage-kind full-item-dependency-graph \
-  --sysroot-source-scope-kind excluded
+  --sysroot-source-scope-kind declarations
 
 # read it back; use this to study stored rows, not a temporary test
 parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \

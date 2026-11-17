@@ -1,9 +1,11 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-17: **132 of the 133 calls are named and equal their frozen rows, 1 has
-no target, the `cast` (sections 10 to 12, REQ-RUST-062.0 to REQ-RUST-065.0 built). The order changed by user decision: the expected target of all 133 calls is written
-from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
-it.** Counts are on the log's "Where we are" page.
+Status on 2026-11-17: **closed by the acceptance run at commit `753665eb9` (S1 to S4 PASS,
+scope `declarations`). 132 of the 133 calls are named and equal their frozen rows; 1 has
+no target, the `cast`, and the expected graph lists it so (REQ-RUST-054.0 to
+REQ-RUST-066.0 built). The order changed by user decision: the expected target of all 133
+calls is written from source and frozen first (section 9, REQ-RUST-058.0), then the lookup
+is built to equal it.** Counts are on the log's "Where we are" page.
 
 ## Requirement
 

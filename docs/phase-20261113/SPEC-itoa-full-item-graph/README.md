@@ -5,10 +5,12 @@ full item dependency graph only.
 
 ## The answer
 
-**Eight parts, in build order. Parts 1 to 7 were closed by the acceptance run at commit
+**Nine parts, in build order. Parts 1 to 7 were closed by the acceptance run at commit
 `822da80cf`: the whole stored graph equalled the frozen expected graph. Part 8 (a target for the
-133 method calls into `core`) is in progress behind the scope value `declarations`: 121 of
-the 133 calls are named and equal their frozen expected rows. It is in no accepted run.**
+133 method calls into `core`) was closed by the acceptance run at commit `753665eb9`, with
+the scope value `declarations`: 132 of the 133 calls are named and equal their frozen
+expected rows, and `cast` is listed without a target. Part 9 (the exported graph as a
+DuckDB file, in a separate crate) is specified and not built.**
 
 Counts and the current step are on the [log](../LOG-itoa-full-item-graph-progress.md)'s
 "Where we are" page.
@@ -26,7 +28,8 @@ part  file                                       requirements                   
 5     part-5-macro-generated-items.md            046.0 050.0 051.0 052.0        5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
 7     part-7-whole-graph-acceptance.md           043.1, 044.0 to 044.3          acceptance run passed S1 to S4 on 2026-11-16 (log)
-8     part-8-method-calls-into-core.md           054.0 to 066.0                 132 of 133 calls named; a `declarations` run equals its frozen expected graph in a test; 1 listed without a target (cast); no SOP run
+8     part-8-method-calls-into-core.md           054.0 to 066.0                 132 of 133 calls named; a `declarations` run equals its frozen expected graph in a test; 1 listed without a target (cast); S1 to S4 passed at `753665eb9`
+9     part-9-graph-export-into-duckdb.md         067.0                          specified, not built (a separate crate; the mapper is not changed)
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of
