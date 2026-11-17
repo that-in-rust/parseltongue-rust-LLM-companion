@@ -30,6 +30,8 @@ pub(super) struct CrateSyntaxProjectionState<'a> {
     projection_macro_failure_rows: BTreeMap<SemanticOccurrenceKeyValue, String>,
     pub(super) projection_unit_record_value: Value,
     projection_workspace_root_path: PathBuf,
+    /// The real root behind the stored paths; `None` when stored paths are disk paths.
+    pub(super) projection_root_relocation_value: Option<WorkspaceRootRelocationValue>,
     projection_source_file_rows: BTreeMap<String, String>,
     projection_active_file_paths: BTreeSet<String>,
     projection_target_cfg_values: BTreeSet<String>,
@@ -177,11 +179,22 @@ trait SourcePathCanonicalPort {
     fn read_canonical_source_path(&self, path: &Path) -> Option<PathBuf>;
 }
 
-struct NativeCanonicalSourcePort;
+/// REQ-RUST-072.0 D5: asks the disk under the real workspace root and answers in the
+/// stored form. Without a relocation a stored path is a disk path.
+struct NativeCanonicalSourcePort<'a>(Option<&'a WorkspaceRootRelocationValue>);
 
-impl SourcePathCanonicalPort for NativeCanonicalSourcePort {
+impl SourcePathCanonicalPort for NativeCanonicalSourcePort<'_> {
     fn read_canonical_source_path(&self, path: &Path) -> Option<PathBuf> {
-        path.canonicalize().ok()
+        let Some(relocation) = self.0 else {
+            return path.canonicalize().ok();
+        };
+        let canonical = Path::new(&relocation.restore_workspace_disk_path(&path.to_string_lossy()))
+            .canonicalize()
+            .ok()?;
+        relocation
+            .relocate_workspace_path_text(&canonical.to_string_lossy())
+            .ok()
+            .map(PathBuf::from)
     }
 }
 
@@ -370,6 +383,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 "workspace_source_root_path",
             )?),
             projection_unit_record_value: unit,
+            projection_root_relocation_value: None,
             projection_source_file_rows: files,
             projection_active_file_paths: BTreeSet::new(),
             projection_target_metadata_rows: BTreeMap::new(),
@@ -855,7 +869,7 @@ impl<'a> CrateSyntaxProjectionState<'a> {
                 "include source in target/ is forbidden".into(),
             ));
         }
-        let path = NativeCanonicalSourcePort
+        let path = NativeCanonicalSourcePort(self.projection_root_relocation_value.as_ref())
             .read_canonical_source_path(&candidate)
             .map(|path| path.to_string_lossy().into_owned());
         let Some((path, digest)) = path.as_ref().and_then(|path| {
@@ -1355,7 +1369,10 @@ impl<'a> CrateSyntaxProjectionState<'a> {
             let selected = candidates
                 .into_iter()
                 .filter(|path| !path.components().any(|part| part.as_os_str() == "target"))
-                .filter_map(|path| NativeCanonicalSourcePort.read_canonical_source_path(&path))
+                .filter_map(|path| {
+                    NativeCanonicalSourcePort(self.projection_root_relocation_value.as_ref())
+                        .read_canonical_source_path(&path)
+                })
                 .map(|path| path.to_string_lossy().into_owned())
                 .find(|path| self.projection_source_file_rows.contains_key(path));
             return self.visit_namespace_source_file(

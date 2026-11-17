@@ -6,7 +6,8 @@
 
 use parseltongue_core_row_types::{
     MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord,
-    StageUnitWriteRequest, StoreBackendFailureError,
+    StageUnitWriteRequest, StoreBackendFailureError, WORKSPACE_FIXED_ROOT_PATH,
+    WorkspaceRootRelocationValue,
 };
 use parseltongue_crate_graph_loader::{
     OfflineWorkspaceCommandRunner, extend_sysroot_crate_graph, ingest_requested_source_file,
@@ -216,6 +217,21 @@ fn parse_sysroot_scope_flag(value: Option<&str>) -> Result<SysrootSourceScopeKin
         Some(other) => Err(format!("unknown sysroot source scope {other}")),
     }
 }
+/// REQ-RUST-072.0 D3, D5: the canonical path of the file a stored path names, in its
+/// stored form. The disk is asked under the real root.
+fn read_stored_canonical_path(
+    relocation: &WorkspaceRootRelocationValue,
+    stored: &str,
+) -> Result<PathBuf, StoreBackendFailureError> {
+    let canonical = Path::new(&relocation.restore_workspace_disk_path(stored))
+        .canonicalize()
+        .map_err(build_pipeline_stage_error)?;
+    relocation
+        .relocate_workspace_path_text(&canonical.to_string_lossy())
+        .map(PathBuf::from)
+        .map_err(build_pipeline_stage_error)
+}
+
 fn run_persisted_syntax_stage(
     store: &dyn StageTableStorePort,
     scope: &StageRunScopeValue,
@@ -223,6 +239,7 @@ fn run_persisted_syntax_stage(
     workers: usize,
     mode: SyntaxStageOperationKind,
     mapping_final_stage_kind: MappingFinalStageKind,
+    relocation: &WorkspaceRootRelocationValue,
 ) -> Result<(), StoreBackendFailureError> {
     let units: BTreeMap<String, Value> = store
         .read_stage_table_rows(scope, "crate-dependency-graph-table")?
@@ -239,9 +256,10 @@ fn run_persisted_syntax_stage(
         if unit[MAPPED_TARGET_FLAG_FIELD] != true && unit["unit_sysroot_context_flag"] != true {
             continue;
         }
-        let path = Path::new(read_required_json_string(unit, "unit_source_root_path")?)
-            .canonicalize()
-            .map_err(build_pipeline_stage_error)?;
+        let path = read_stored_canonical_path(
+            relocation,
+            read_required_json_string(unit, "unit_source_root_path")?,
+        )?;
         let parent = path
             .parent()
             .ok_or_else(|| build_pipeline_stage_error("root source parent absent"))?;
@@ -372,7 +390,7 @@ fn run_persisted_syntax_stage(
                     .map_err(build_pipeline_stage_error)?;
             let existing: Vec<_> = candidates
                 .iter()
-                .filter(|p| Path::new(p).is_file())
+                .filter(|p| Path::new(&relocation.restore_workspace_disk_path(p)).is_file())
                 .collect();
             if existing.len() != 1 {
                 return Err(build_pipeline_stage_error(format!(
@@ -380,9 +398,7 @@ fn run_persisted_syntax_stage(
                     existing.len()
                 )));
             }
-            let path = Path::new(existing[0])
-                .canonicalize()
-                .map_err(build_pipeline_stage_error)?;
+            let path = read_stored_canonical_path(relocation, existing[0])?;
             let context = read_required_json_string(&request, "source_request_context_kind")?;
             let base = if context == "items" {
                 read_file_module_directory(&path)?
@@ -403,7 +419,7 @@ fn run_persisted_syntax_stage(
                 continue;
             }
             if !files.contains_key(path.to_string_lossy().as_ref()) {
-                ingest_requested_source_file(scope, store, cancel, &path)?;
+                ingest_requested_source_file(scope, store, cancel, &path, relocation)?;
             }
             write_pipeline_stage_unit(
                 store,
@@ -614,6 +630,7 @@ fn prepare_sysroot_staging_scope(
     workers: usize,
     sysroot_scope: SysrootSourceScopeKind,
     mapping_final_stage_kind: MappingFinalStageKind,
+    relocation: &WorkspaceRootRelocationValue,
 ) -> Result<StageRunScopeValue, StoreBackendFailureError> {
     let files = read_stage_json_records(store, scope, "file-source-text-table")?
         .into_iter()
@@ -695,7 +712,7 @@ fn prepare_sysroot_staging_scope(
     };
     write_pipeline_stage_unit(store, &next, "crate-graph", "workspace", &graph, cancel)?;
     write_pipeline_stage_unit(store, &next, "crate-graph", "__complete__", &[], cancel)?;
-    ingest_workspace_source_files(&next, store, cancel)?;
+    ingest_workspace_source_files(&next, store, cancel, relocation)?;
     write_pipeline_stage_unit(store, &next, "source-ingest", "__complete__", &[], cancel)?;
     run_persisted_syntax_stage(
         store,
@@ -704,6 +721,7 @@ fn prepare_sysroot_staging_scope(
         workers,
         SyntaxStageOperationKind::Discovery,
         mapping_final_stage_kind,
+        relocation,
     )?;
     Ok(next)
 }
@@ -740,7 +758,12 @@ fn run_workspace_mapping_pipeline(
         graph_publication: graph_publication_store,
     } = stores;
     let started = std::time::Instant::now();
-    let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner)?
+    // REQ-RUST-072.0: `root` is canonical (D6). Only the loader and the file reads below
+    // see it; every stored row and every later stage sees the fixed root.
+    let relocation =
+        &WorkspaceRootRelocationValue::build_workspace_root_relocation(&root.to_string_lossy())
+            .map_err(build_pipeline_stage_error)?;
+    let graph = load_workspace_crate_graph(root, &OfflineWorkspaceCommandRunner, relocation)?
         .into_iter()
         .map(|mut row| {
             if row.stage_owned_table_name == "workspace-config-state-records" {
@@ -829,7 +852,8 @@ fn run_workspace_mapping_pipeline(
     write_pipeline_stage_unit(store, &scope, "crate-graph", "__complete__", &[], cancel)?;
     drop(graph);
     let started = std::time::Instant::now();
-    ingest_workspace_source_files(&scope, store, cancel)?;
+    let root = Path::new(WORKSPACE_FIXED_ROOT_PATH);
+    ingest_workspace_source_files(&scope, store, cancel, relocation)?;
     eprintln!(
         "stage=source-ingest elapsed_seconds={:.3}",
         started.elapsed().as_secs_f64()
@@ -843,6 +867,7 @@ fn run_workspace_mapping_pipeline(
         workers,
         SyntaxStageOperationKind::Discovery,
         final_stage,
+        relocation,
     )?;
     eprintln!(
         "stage=source-closure elapsed_seconds={:.3}",
@@ -854,7 +879,15 @@ fn run_workspace_mapping_pipeline(
             | MappingFinalStageKind::OriginalTopLevelContainment
             | MappingFinalStageKind::FullItemDependencyGraph
     ) {
-        prepare_sysroot_staging_scope(store, &scope, cancel, workers, sysroot_scope, final_stage)?
+        prepare_sysroot_staging_scope(
+            store,
+            &scope,
+            cancel,
+            workers,
+            sysroot_scope,
+            final_stage,
+            relocation,
+        )?
     } else {
         scope
     };
@@ -873,6 +906,7 @@ fn run_workspace_mapping_pipeline(
         workers,
         SyntaxStageOperationKind::Extraction,
         final_stage,
+        relocation,
     )?;
     eprintln!(
         "stage=syntax-spans elapsed_seconds={:.3}",
@@ -885,12 +919,13 @@ fn run_workspace_mapping_pipeline(
             | MappingFinalStageKind::OriginalTopLevelContainment
             | MappingFinalStageKind::FullItemDependencyGraph
     ) {
-        persist_namespace_syntax_inputs(&scope, store, cancel)?;
+        persist_namespace_syntax_inputs(&scope, store, cancel, Some(relocation))?;
         namespace_pipeline_publication_facade::run_namespace_analysis_pipeline(
             &scope,
             store,
             cancel,
             &store_path.with_extension("duckdb-analysis-run-files"),
+            relocation,
         )?;
     }
     eprintln!(

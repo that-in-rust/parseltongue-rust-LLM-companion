@@ -223,6 +223,7 @@ pub fn persist_namespace_syntax_inputs(
     scope: &StageRunScopeValue,
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
+    relocation: Option<&WorkspaceRootRelocationValue>,
 ) -> Result<usize, StoreBackendFailureError> {
     let workspace = read_namespace_input_values(store, scope, "workspace-config-state-records")?
         .into_iter()
@@ -237,6 +238,7 @@ pub fn persist_namespace_syntax_inputs(
             let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
                 unit, &workspace, store, scope, cancel,
             )?;
+            projection.projection_root_relocation_value = relocation.cloned();
             projection.project_unit_source_root()?;
             persist_projection_input_rows(&mut projection, scope, store, cancel)
                 .map(|rows| count + rows)

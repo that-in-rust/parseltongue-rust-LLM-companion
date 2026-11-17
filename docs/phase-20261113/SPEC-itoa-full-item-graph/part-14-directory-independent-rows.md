@@ -56,7 +56,8 @@ source:
 ```text
 D1  WHEN the same source tree is mapped from two directories with the same executable and
     toolchain THEN the exported rows of item-effective-visibility-records and of
-    edge-evidence-record-table SHALL be byte-equal, their header and run id included
+    edge-evidence-record-table SHALL be byte-equal, and the run id in their header SHALL
+    be equal. The attempt value in the header names one run and differs between any two
 
 D2  WHEN a run is published THEN no row of those two tables SHALL contain the text of the
     real workspace root
@@ -105,8 +106,8 @@ the root, so it does not change (A1).
 | req_id | test_id | test_type | assertion | metric |
 | --- | --- | --- | --- | --- |
 | D3 D4 D5 D7 | `test_workspace_root_path_relocation` | unit, core | stored form and restore for a file, the root itself, a package id, a name-prefix sibling, an outside path, and the fixed root inside the tree | 0 wrong |
-| D6 | `test_symlinked_root_rows_equal` | real source | a run through a symbolic link stores the rows of a run on the directory | 0 differing rows |
-| D1 D2 | `test_itoa_rows_directory_independent` | real source | two copies of pinned itoa in two directories export equal node and edge rows; neither directory's text is in them | 0 differing rows |
+| D3 | `test_loaded_rows_hold_fixed_root` | fixture, loader | no row built from `cargo metadata` holds the real root; package id, source root, package root and workspace root hold the fixed one | 0 wrong |
+| D1 D2 D6 | `test_itoa_rows_directory_independent` | real source | two copies of pinned itoa in two directories, the second mapped through a symbolic link, export equal node and edge rows and one run id; neither directory's text nor the link's is in them | 0 differing rows |
 | A1 | `test_itoa_declarations_graph_equality`, `test_itoa_whole_graph_equality` | real source | stored graph equals the frozen expected graph | 0 differing rows |
 
 ## 5. Implementation plan

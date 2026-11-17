@@ -2,7 +2,7 @@ use super::{build_pipeline_stage_error, read_required_json_string, write_pipelin
 use parseltongue_core_row_types::{
     CompilationUnitRoleKind, MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue,
     SemanticOccurrenceKeyValue, StageRunScopeValue, StageTableRowRecord, StageUnitWriteRequest,
-    StoreBackendFailureError,
+    StoreBackendFailureError, WorkspaceRootRelocationValue,
 };
 use parseltongue_duckdb_analysis_adapter::{
     DuckdbAnalysisStoreAdapter, NAMESPACE_SOURCE_TABLE_NAMES, NamespaceAnalysisPhaseError,
@@ -314,6 +314,7 @@ pub(crate) fn run_namespace_analysis_pipeline(
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
     directory: &Path,
+    relocation: &WorkspaceRootRelocationValue,
 ) -> Result<(), NamespaceAnalysisPhaseError> {
     let started = std::time::Instant::now();
     let directory = directory
@@ -353,8 +354,16 @@ pub(crate) fn run_namespace_analysis_pipeline(
     units.into_iter().try_for_each(|unit| {
         let unit_key =
             read_required_json_string(&unit, "unit_compilation_identity_key")?.to_owned();
-        let port = prepare_macro_expansion_port(unit, workspace, store, scope, cancel, &lookup)
-            .map_err(build_pipeline_stage_error)?;
+        let port = prepare_macro_expansion_port(
+            unit,
+            workspace,
+            store,
+            scope,
+            cancel,
+            &lookup,
+            Some(relocation),
+        )
+        .map_err(build_pipeline_stage_error)?;
         loop {
             let next_round = port
                 .expand_next_resolved_macro_items()

@@ -1,9 +1,14 @@
 #![allow(clippy::unwrap_used)]
 
-use parseltongue_core_row_types::StoreBackendFailureError;
+use parseltongue_core_row_types::{StoreBackendFailureError, WorkspaceRootRelocationValue};
 use parseltongue_crate_graph_loader::*;
 use serde_json::json;
 use std::{cell::RefCell, path::Path};
+
+/// REQ-RUST-072.0: the relocation of a fixture workspace at `root`.
+fn make_fixture_root_relocation(root: &Path) -> WorkspaceRootRelocationValue {
+    WorkspaceRootRelocationValue::build_workspace_root_relocation(&root.to_string_lossy()).unwrap()
+}
 
 struct FixtureWorkspaceCommandRunner {
     command_argument_capture_rows: RefCell<Vec<Vec<String>>>,
@@ -87,7 +92,12 @@ impl WorkspaceCommandRunPort for PackageMetadataCommandRunner {
 fn test_package_metadata_environment() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
-    let rows = load_workspace_crate_graph(directory.path(), &PackageMetadataCommandRunner).unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &PackageMetadataCommandRunner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
     let row = rows
         .iter()
         .filter(|row| row.stage_owned_table_name == "crate-dependency-graph-table")
@@ -152,8 +162,12 @@ impl WorkspaceCommandRunPort for UnmappedWorkspaceCommandRunner {
 fn test_testonly_workspace_stays_unmapped() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
-    let rows =
-        load_workspace_crate_graph(directory.path(), &UnmappedWorkspaceCommandRunner).unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &UnmappedWorkspaceCommandRunner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
     assert!(
         !rows
             .iter()
@@ -199,10 +213,22 @@ fn test_source_targets_stay_excluded() {
 fn test_crate_graph_offline_only() {
     let directory = tempfile::tempdir().unwrap();
     let runner = make_fixture_command_runner();
-    assert!(load_workspace_crate_graph(directory.path(), &runner).is_err());
+    assert!(
+        load_workspace_crate_graph(
+            directory.path(),
+            &runner,
+            &make_fixture_root_relocation(directory.path())
+        )
+        .is_err()
+    );
     assert!(runner.command_argument_capture_rows.borrow().is_empty());
     std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
-    let rows = load_workspace_crate_graph(directory.path(), &runner).unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &runner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
     let units: Vec<serde_json::Value> = rows
         .iter()
         .filter(|r| r.stage_owned_table_name == "crate-dependency-graph-table")
@@ -233,7 +259,12 @@ fn test_lockfile_guard_preserves_bytes() {
     std::fs::write(directory.path().join("Cargo.lock"), original).unwrap();
     let mut runner = make_fixture_command_runner();
     runner.metadata_mutates_lock_bytes = true;
-    let error = load_workspace_crate_graph(directory.path(), &runner).unwrap_err();
+    let error = load_workspace_crate_graph(
+        directory.path(),
+        &runner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap_err();
     assert!(error.to_string().contains("CrateGraphLoadError"));
     assert_eq!(
         std::fs::read(directory.path().join("Cargo.lock")).unwrap(),
@@ -247,7 +278,12 @@ fn test_metadata_failure_writes_nothing() {
     std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
     let mut runner = make_fixture_command_runner();
     runner.metadata_failure_message_text = Some("offline stderr: uncached dependency".into());
-    let error = load_workspace_crate_graph(directory.path(), &runner).unwrap_err();
+    let error = load_workspace_crate_graph(
+        directory.path(),
+        &runner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap_err();
     assert!(error.to_string().contains("uncached dependency"));
 }
 
@@ -256,7 +292,12 @@ fn test_cfg_from_rustc_print() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
     let runner = make_fixture_command_runner();
-    let rows = load_workspace_crate_graph(directory.path(), &runner).unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &runner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
     let row = rows
         .iter()
         .find(|r| r.stage_owned_table_name == "crate-dependency-graph-table")
@@ -292,7 +333,12 @@ fn test_build_script_never_executed() {
     )
     .unwrap();
     let runner = make_fixture_command_runner();
-    let rows = load_workspace_crate_graph(directory.path(), &runner).unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &runner,
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
     assert!(rows.iter().any(|r| {
         r.stage_row_payload_text
             .contains("unit_build_script_present")
@@ -310,8 +356,12 @@ fn test_build_script_never_executed() {
 fn test_cargo_env_from_metadata() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
-    let rows =
-        load_workspace_crate_graph(directory.path(), &make_fixture_command_runner()).unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &make_fixture_command_runner(),
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
     let unit: serde_json::Value = rows
         .iter()
         .find_map(|r| {
@@ -331,5 +381,52 @@ fn test_cargo_env_from_metadata() {
         unit["unit_metadata_environment_values"]
             .get("OUT_DIR")
             .is_none()
+    );
+}
+
+/// REQ-RUST-072.0 D3: every row the loader builds from `cargo metadata` holds the fixed
+/// root in place of the real one, in its key and in its payload.
+#[test]
+fn test_loaded_rows_hold_fixed_root() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("Cargo.lock"), b"lock").unwrap();
+    let rows = load_workspace_crate_graph(
+        directory.path(),
+        &make_fixture_command_runner(),
+        &make_fixture_root_relocation(directory.path()),
+    )
+    .unwrap();
+    let real = directory.path().to_string_lossy();
+    let held = rows
+        .iter()
+        .filter(|row| {
+            row.stage_row_payload_text.contains(real.as_ref())
+                || row.stage_row_record_key.contains(real.as_ref())
+        })
+        .count();
+    assert_eq!((rows.is_empty(), held), (false, 0));
+    let read = |table: &str, kind: Option<&str>| {
+        rows.iter()
+            .filter(|row| row.stage_owned_table_name == table)
+            .map(|row| {
+                serde_json::from_str::<serde_json::Value>(&row.stage_row_payload_text).unwrap()
+            })
+            .find(|row| kind.is_none_or(|kind| row["unit_cargo_target_kind"] == kind))
+            .unwrap()
+    };
+    let unit = read("crate-dependency-graph-table", Some("lib"));
+    assert_eq!(
+        [
+            &unit["unit_cargo_package_identifier"],
+            &unit["unit_source_root_path"],
+            &unit["unit_package_root_path"],
+            &read("workspace-config-state-records", None)["workspace_source_root_path"],
+        ],
+        [
+            &json!("path+file:///parseltongue-workspace-root#sample@0.1.0"),
+            &json!("/parseltongue-workspace-root/src/lib.rs"),
+            &json!("/parseltongue-workspace-root"),
+            &json!("/parseltongue-workspace-root"),
+        ]
     );
 }

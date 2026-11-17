@@ -9,7 +9,7 @@ use parseltongue_core_row_types::{
     HldExternalNamedKey, HldInputCompletenessKind, HldItemKindValue, HldMaterializationInputRecord,
     HldNodeInputCategory, HldNodeInputRecord, HldOwnerKindValue, HldRelationKindValue,
     HldTargetIdentityValue, HldUnresolvedReasonKind, NameSymbolTargetKey, RunCancelFlagValue,
-    validate_hld_materialization_input,
+    WORKSPACE_FIXED_ROOT_PATH, validate_hld_materialization_input,
 };
 use parseltongue_table_store_traits::{
     FullGraphInputStorePort, HldGraphInputStorePort, StageTableStorePort,
@@ -1455,7 +1455,11 @@ fn test_itoa_top_level_containment() {
     let unit_identity = canonical_unit_identity_from_root_scope(&database, unit);
     let source_root = root.canonicalize().unwrap();
     let source_path = source_root.join("src/lib.rs");
-    let source_path_text = source_path.to_string_lossy().into_owned();
+    // REQ-RUST-072.0 D3: a stored path starts with the fixed root, not with the real one.
+    let source_path_text = Path::new(WORKSPACE_FIXED_ROOT_PATH)
+        .join("src/lib.rs")
+        .to_string_lossy()
+        .into_owned();
     let source_bytes = fs::read(&source_path).unwrap();
     let files = read_published_stage_rows(&database, "file-source-text-table");
     let file = files
@@ -1905,7 +1909,8 @@ fn test_source_fixture_scope_rules() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let root_path = root.canonicalize().unwrap();
+    // REQ-RUST-072.0 D3: stored paths start with the fixed root.
+    let root_path = PathBuf::from(WORKSPACE_FIXED_ROOT_PATH);
     let source_rows = read_published_stage_rows(&database, "file-source-text-table");
     [
         "src/lib.rs",
@@ -6481,15 +6486,12 @@ fn test_module_file_area_rows() {
     );
 }
 
-/// Maps the copy of pinned itoa under `parent` and returns its root with the exported
-/// node and edge rows, as the export command prints them.
-fn export_copied_itoa_graph(parent: &Path) -> (PathBuf, String, String) {
-    std::fs::create_dir_all(parent).unwrap();
-    let root = prepare_pinned_itoa_workspace(parent);
-    let database = parent.join("directory-independent-rows.db");
+/// Maps the workspace at `root` and returns the exported node and edge rows, as the
+/// export command prints them.
+fn export_mapped_itoa_graph(root: &Path, database: &Path) -> (String, String) {
     let output = run_itoa_mapping_command(
-        &root,
-        &database,
+        root,
+        database,
         &[
             "--sysroot-source-scope-kind",
             "declarations",
@@ -6516,31 +6518,59 @@ fn export_copied_itoa_graph(parent: &Path) -> (PathBuf, String, String) {
         assert!(output.status.success(), "{table}");
         String::from_utf8(output.stdout).unwrap()
     };
-    let (nodes, edges) = (
+    (
         export("item-effective-visibility-records"),
         export("edge-evidence-record-table"),
-    );
-    (root, nodes, edges)
+    )
 }
 
-/// REQ-RUST-072.0 D1, D2: the same source in two directories exports equal node and edge
-/// rows, run id included, and no row holds the text of either directory.
+/// REQ-RUST-072.0 D1, D2, D6: the same source in two directories, the second one given
+/// through a symbolic link, exports equal node and edge rows and the same run id, and no
+/// row holds the text of either directory or of the link.
+#[cfg(unix)]
 #[test]
 fn test_itoa_rows_directory_independent() {
     let directory = tempfile::tempdir().unwrap();
-    let (first_root, first_nodes, first_edges) =
-        export_copied_itoa_graph(&directory.path().join("first"));
-    let (second_root, second_nodes, second_edges) =
-        export_copied_itoa_graph(&directory.path().join("second").join("deeper"));
-    let count_equal_lines = |first: &str, second: &str| {
-        let equal = first
+    let prepare = |name: &str| {
+        let parent = directory.path().join(name);
+        std::fs::create_dir_all(&parent).unwrap();
+        prepare_pinned_itoa_workspace(&parent)
+    };
+    let (first_root, second_root) = (prepare("first"), prepare("second/deeper"));
+    let link_root = directory.path().join("linked");
+    std::os::unix::fs::symlink(&second_root, &link_root).unwrap();
+    let (first_nodes, first_edges) =
+        export_mapped_itoa_graph(&first_root, &directory.path().join("first.db"));
+    let (second_nodes, second_edges) =
+        export_mapped_itoa_graph(&link_root, &directory.path().join("second.db"));
+    // The header's attempt value is a nonce of the run; everything else is compared.
+    let read_export_lines = |export: &str| {
+        export
             .lines()
-            .zip(second.lines())
+            .enumerate()
+            .map(|(index, line)| match index {
+                0 => {
+                    let mut header: Value = serde_json::from_str(line).unwrap();
+                    let attempt =
+                        header["export_scope_identity_record"]["stage_attempt_sequence_value"]
+                            .take();
+                    assert!(attempt.is_string(), "{line}");
+                    header.to_string()
+                }
+                _ => line.to_owned(),
+            })
+            .collect::<Vec<_>>()
+    };
+    let count_equal_lines = |first: &str, second: &str| {
+        let (first, second) = (read_export_lines(first), read_export_lines(second));
+        let equal = first
+            .iter()
+            .zip(&second)
             .filter(|(first, second)| first == second)
             .count();
-        (equal, first.lines().count(), second.lines().count())
+        (equal, first.len(), second.len())
     };
-    // 172 node rows and 686 edge rows, each with one header line.
+    // 172 node rows and 686 edge rows, each with one header line that holds the run id.
     assert_eq!(
         (
             count_equal_lines(&first_nodes, &second_nodes),
@@ -6548,7 +6578,7 @@ fn test_itoa_rows_directory_independent() {
         ),
         ((173, 173, 173), (687, 687, 687))
     );
-    let held = [&first_root, &second_root]
+    let held = [&first_root, &second_root, &link_root]
         .iter()
         .flat_map(|root| {
             let text = root.to_str().unwrap().to_owned();
@@ -6556,5 +6586,5 @@ fn test_itoa_rows_directory_independent() {
                 .map(|rows| rows.matches(&text).count())
         })
         .collect::<Vec<_>>();
-    assert_eq!(held, vec![0; 8], "rows that hold a real root");
+    assert_eq!(held, vec![0; 12], "rows that hold a real root");
 }

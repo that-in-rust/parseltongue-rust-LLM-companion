@@ -6,7 +6,8 @@
 
 use parseltongue_core_row_types::{
     MAPPED_TARGET_FLAG_FIELD, RunCancelFlagValue, StageRunScopeValue, StageTableRowRecord,
-    StageUnitWriteRequest, StoreBackendFailureError, evaluate_cfg_expression_truth,
+    StageUnitWriteRequest, StoreBackendFailureError, WorkspaceRootRelocationValue,
+    evaluate_cfg_expression_truth,
 };
 use parseltongue_table_store_traits::StageTableStorePort;
 #[path = "sysroot-compilation-context-rows.rs"]
@@ -99,9 +100,44 @@ fn check_proc_macro_package(package: &Value) -> bool {
     })
 }
 
+/// REQ-RUST-072.0 D3: every string of `value` in its stored form. A string that is not a
+/// path under the workspace root is kept as it is.
+fn relocate_metadata_path_values(
+    value: Value,
+    relocation: &WorkspaceRootRelocationValue,
+) -> Result<Value, StoreBackendFailureError> {
+    Ok(match value {
+        Value::String(text) => Value::String(
+            relocation
+                .relocate_workspace_path_text(&text)
+                .map_err(build_graph_stage_failure)?,
+        ),
+        Value::Array(items) => Value::Array(
+            items
+                .into_iter()
+                .map(|item| relocate_metadata_path_values(item, relocation))
+                .collect::<Result<_, _>>()?,
+        ),
+        Value::Object(fields) => Value::Object(
+            fields
+                .into_iter()
+                .map(|(name, field)| {
+                    // A package id is also the key of a map in `cargo metadata`.
+                    let name = relocation
+                        .relocate_workspace_path_text(&name)
+                        .map_err(build_graph_stage_failure)?;
+                    Ok((name, relocate_metadata_path_values(field, relocation)?))
+                })
+                .collect::<Result<_, StoreBackendFailureError>>()?,
+        ),
+        other => other,
+    })
+}
+
 pub fn load_workspace_crate_graph(
     root: &Path,
     commands: &dyn WorkspaceCommandRunPort,
+    relocation: &WorkspaceRootRelocationValue,
 ) -> Result<Vec<StageTableRowRecord>, StoreBackendFailureError> {
     let lock = root.join("Cargo.lock");
     let original = std::fs::read(&lock).map_err(build_graph_stage_failure)?;
@@ -114,7 +150,14 @@ pub fn load_workspace_crate_graph(
     let bytes = metadata?;
     let _: cargo_metadata::Metadata =
         serde_json::from_slice(&bytes).map_err(build_graph_stage_failure)?;
-    let metadata: Value = serde_json::from_slice(&bytes).map_err(build_graph_stage_failure)?;
+    // REQ-RUST-072.0: the real root leaves here; every row below is built from stored forms.
+    let metadata = relocate_metadata_path_values(
+        serde_json::from_slice(&bytes).map_err(build_graph_stage_failure)?,
+        relocation,
+    )?;
+    let stored_root = relocation
+        .relocate_workspace_path_text(&root.to_string_lossy())
+        .map_err(build_graph_stage_failure)?;
     let cfg_bytes = commands.run_workspace_command_output(root, &["rustc", "--print", "cfg"])?;
     let cfg: BTreeSet<String> = String::from_utf8(cfg_bytes)
         .map_err(build_graph_stage_failure)?
@@ -427,7 +470,7 @@ pub fn load_workspace_crate_graph(
     rows.sort_by(|a, b| a.stage_row_record_key.cmp(&b.stage_row_record_key));
     rows.dedup_by(|a, b| a.stage_row_record_key == b.stage_row_record_key);
     rows.push(StageTableRowRecord {stage_owned_table_name:"workspace-config-state-records".into(),stage_row_record_key:"workspace".into(),
-        stage_row_payload_text:json!({"workspace_source_root_path":root,"workspace_lock_digest_full":blake3::hash(&original).to_hex().to_string(),"workspace_sysroot_directory_path":sysroot.trim(),"workspace_target_cfg_values":cfg}).to_string()});
+        stage_row_payload_text:json!({"workspace_source_root_path":stored_root,"workspace_lock_digest_full":blake3::hash(&original).to_hex().to_string(),"workspace_sysroot_directory_path":sysroot.trim(),"workspace_target_cfg_values":cfg}).to_string()});
     Ok(rows)
 }
 
@@ -448,14 +491,20 @@ pub fn ingest_requested_source_file(
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
     path: &Path,
+    relocation: &WorkspaceRootRelocationValue,
 ) -> Result<StageTableRowRecord, StoreBackendFailureError> {
     if cancel.check_stage_work_cancelled() {
         return Err(build_graph_stage_failure("stage cancelled"));
     }
-    let (path, bytes) = read_safe_source_bytes(path)?;
+    // REQ-RUST-072.0 D3, D5: the file is opened under the real root and stored under the
+    // fixed one. `path` may be in either form.
+    let disk = relocation.restore_workspace_disk_path(&path.to_string_lossy());
+    let (path, bytes) = read_safe_source_bytes(Path::new(&disk))?;
     let digest = blake3::hash(&bytes).to_hex().to_string();
     store.write_file_content_bytes(&digest, &bytes)?;
-    let key = path.to_string_lossy().into_owned();
+    let key = relocation
+        .relocate_workspace_path_text(&path.to_string_lossy())
+        .map_err(build_graph_stage_failure)?;
     let row = StageTableRowRecord {stage_owned_table_name:"file-source-text-table".into(),stage_row_record_key:key.clone(),
         stage_row_payload_text:json!({"file_source_absolute_path":key,"file_content_digest_full":digest,"file_source_byte_count":bytes.len()}).to_string()};
     store.write_stage_table_unit(
@@ -475,6 +524,7 @@ pub fn ingest_workspace_source_files(
     scope: &StageRunScopeValue,
     store: &dyn StageTableStorePort,
     cancel: &RunCancelFlagValue,
+    relocation: &WorkspaceRootRelocationValue,
 ) -> Result<usize, StoreBackendFailureError> {
     let configuration = store.read_stage_table_rows(scope, "workspace-config-state-records")?;
     let configuration: Value = serde_json::from_str(
@@ -536,11 +586,13 @@ pub fn ingest_workspace_source_files(
         }
         Ok(())
     }
-    roots
-        .into_iter()
-        .try_for_each(|root| walk_source_directory_tree(&root, &mut files))?;
+    roots.into_iter().try_for_each(|root| {
+        // REQ-RUST-072.0 D5: a stored root is walked at its place on disk.
+        let disk = relocation.restore_workspace_disk_path(&root.to_string_lossy());
+        walk_source_directory_tree(Path::new(&disk), &mut files)
+    })?;
     for path in &files {
-        ingest_requested_source_file(scope, store, cancel, path)?;
+        ingest_requested_source_file(scope, store, cancel, path, relocation)?;
     }
     Ok(files.len())
 }

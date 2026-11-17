@@ -138,10 +138,12 @@ pub fn prepare_macro_expansion_port<'a>(
     scope: &StageRunScopeValue,
     cancel: &'a RunCancelFlagValue,
     lookup: &'a dyn ResolvedMacroLookupPort,
+    relocation: Option<&WorkspaceRootRelocationValue>,
 ) -> Result<impl ItemMacroExpansionPort + 'a, StoreBackendFailureError> {
     let mut projection = CrateSyntaxProjectionState::build_crate_projection_state(
         unit, workspace, store, scope, cancel,
     )?;
+    projection.projection_root_relocation_value = relocation.cloned();
     projection.project_unit_source_root()?;
     Ok(PersistedItemMacroPort {
         projection_source_state_lock: Mutex::new(projection),

@@ -106,9 +106,16 @@ fn ordered_macro_expansion_barriers() {
     let lookup = OrderedMacroFixtureLookup::default();
     lookup.accept_namespace_fixture_rows(&initial);
     drop(projection);
-    let port =
-        crate::prepare_macro_expansion_port(unit(), &workspace, &store, &scope, &cancel, &lookup)
-            .unwrap();
+    let port = crate::prepare_macro_expansion_port(
+        unit(),
+        &workspace,
+        &store,
+        &scope,
+        &cancel,
+        &lookup,
+        None,
+    )
+    .unwrap();
     lookup
         .fail
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -147,6 +154,7 @@ fn ordered_macro_expansion_empty() {
         },
         &cancel,
         &lookup,
+        None,
     )
     .unwrap();
     assert!(port.expand_next_resolved_macro_items().unwrap().is_none());
@@ -169,6 +177,7 @@ fn unresolved_macro_completion_records() {
         },
         &cancel,
         &lookup,
+        None,
     )
     .unwrap();
     assert!(port.expand_next_resolved_macro_items().unwrap().is_none());
@@ -651,7 +660,7 @@ fn mapped_unit_namespace_persistence() {
         metadata["unit_mapped_target_flag"]=json!(mapped);
         metadata["unit_sysroot_context_flag"]=json!(sysroot);
         let fixture=NamespacePersistenceFixture{source:LegacyMacroFixtureStore{source:"pub struct Persisted;".into()},units:vec![metadata],written:Default::default()};
-        let count=crate::persist_namespace_syntax_inputs(&StageRunScopeValue{run_generation_digest_value:"generation".into(),stage_attempt_sequence_value:"attempt".into()},&fixture,&RunCancelFlagValue::default()).unwrap();
+        let count=crate::persist_namespace_syntax_inputs(&StageRunScopeValue{run_generation_digest_value:"generation".into(),stage_attempt_sequence_value:"attempt".into()},&fixture,&RunCancelFlagValue::default(),None).unwrap();
         let written=fixture.written.lock().unwrap();
         assert_eq!(count>0,mapped||sysroot);
         assert_eq!(written.iter().filter(|row|row.stage_owned_table_name=="syntax-namespace-input-items").any(|row|serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap()["binding_resolved_name_text"]=="Persisted"),mapped||sysroot);
@@ -674,7 +683,8 @@ fn mapped_unit_namespace_persistence() {
                 stage_attempt_sequence_value: "attempt".into()
             },
             &fixture,
-            &RunCancelFlagValue::default()
+            &RunCancelFlagValue::default(),
+            None
         )
         .is_err()
     );
