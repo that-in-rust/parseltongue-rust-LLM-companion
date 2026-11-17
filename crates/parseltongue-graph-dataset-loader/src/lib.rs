@@ -15,6 +15,11 @@ mod graph_export_row_checks;
 #[path = "graph-export-row-parser.rs"]
 mod graph_export_row_parser;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+#[path = "graph-dataset-loader-tests.rs"]
+mod graph_dataset_loader_tests;
+
 pub use graph_dataset_file_writer::{
     load_graph_export_files, read_graph_dataset_file, write_graph_dataset_file,
 };
