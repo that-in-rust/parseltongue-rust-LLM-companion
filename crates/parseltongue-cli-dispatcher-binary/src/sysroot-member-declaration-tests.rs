@@ -1,7 +1,69 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-use super::{SYSROOT_MEMBER_TABLE_NAME, collect_sysroot_member_rows};
-use serde_json::Value;
+use super::{
+    SYSROOT_MEMBER_TABLE_NAME, check_sysroot_source_record, collect_sysroot_member_rows,
+    read_sysroot_source_record,
+};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::fs;
+
+fn hash_bytes_sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// REQ-RUST-065.0 D1, D3, D4, D5
+#[test]
+fn test_core_source_listing_record() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("core/src");
+    fs::create_dir_all(source.join("mem")).unwrap();
+    let (last, first) = ("impl Z { fn z(self) {} }", "impl M { fn m(self) {} }");
+    fs::write(source.join("z.rs"), last).unwrap();
+    fs::write(source.join("mem/a.rs"), first).unwrap();
+    fs::write(source.join("notes.txt"), "not read").unwrap();
+    // D1: one `sha256sum` line per file, in byte order of the relative path.
+    let listing = format!(
+        "{}  core/src/mem/a.rs\n{}  core/src/z.rs\n",
+        hash_bytes_sha256_hex(first.as_bytes()),
+        hash_bytes_sha256_hex(last.as_bytes())
+    );
+    let record = read_sysroot_source_record(directory.path()).unwrap();
+    assert_eq!(
+        json!({
+            "sysroot_source_directory_path": "core/src",
+            "sysroot_source_file_count": 2,
+            "sysroot_source_byte_count": first.len() + last.len(),
+            "sysroot_listing_digest_sha256": hash_bytes_sha256_hex(listing.as_bytes()),
+        }),
+        record
+    );
+    // D4: the rows come with the record of the bytes they were parsed from.
+    let (parsed, rows) = collect_sysroot_member_rows(directory.path()).unwrap();
+    assert_eq!((&record, 2), (&parsed, rows.len()));
+    assert!(
+        check_sysroot_source_record(&json!({"workspace_sysroot_source_record": record}), &parsed)
+            .is_ok()
+    );
+    // D3: one byte more gives another digest. D4: the stored record no longer holds.
+    fs::write(source.join("z.rs"), format!("{last} ")).unwrap();
+    let (changed, _) = collect_sysroot_member_rows(directory.path()).unwrap();
+    assert_ne!(
+        record["sysroot_listing_digest_sha256"],
+        changed["sysroot_listing_digest_sha256"]
+    );
+    let stored = json!({"workspace_sysroot_source_record": record});
+    let error = check_sysroot_source_record(&stored, &changed).unwrap_err();
+    assert!(
+        error.error_context_detail_text.contains("core/src"),
+        "{error:?}"
+    );
+    assert!(check_sysroot_source_record(&json!({}), &changed).is_err());
+    // D5: a directory that cannot be read fails; no file is skipped.
+    assert!(read_sysroot_source_record(&directory.path().join("absent")).is_err());
+}
 
 /// REQ-RUST-054.0 D6, D9
 #[test]
@@ -22,7 +84,7 @@ fn test_core_directory_member_rows() {
         "impl A { fn other_crate(self) {} }",
     )
     .unwrap();
-    let rows = collect_sysroot_member_rows(directory.path()).unwrap();
+    let (_, rows) = collect_sysroot_member_rows(directory.path()).unwrap();
     let keys = rows
         .iter()
         .map(|row| row.stage_row_record_key.as_str())
