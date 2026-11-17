@@ -1276,6 +1276,7 @@ fn encode_hld_visibility_kind(
         Kind::Public => "public",
         Kind::RestrictedNonPrivate => "restricted_non_private",
         Kind::PrivateEquivalent => "private_equivalent",
+        Kind::NotApplicable => "not_applicable",
         Kind::Unknown => "unknown",
     }
 }

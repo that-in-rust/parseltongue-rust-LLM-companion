@@ -620,6 +620,7 @@ fn encode_visibility_kind_json(
         parseltongue_core_row_types::HldEffectiveVisibilityKind::PrivateEquivalent => {
             "PrivateEquivalent"
         }
+        parseltongue_core_row_types::HldEffectiveVisibilityKind::NotApplicable => "NotApplicable",
         parseltongue_core_row_types::HldEffectiveVisibilityKind::Unknown => "Unknown",
     }
 }

@@ -220,6 +220,8 @@ pub enum HldEffectiveVisibilityKind {
     Public,
     RestrictedNonPrivate,
     PrivateEquivalent,
+    /// REQ-RUST-069.0 V5: a macro call has no visibility to declare.
+    NotApplicable,
     Unknown,
 }
 

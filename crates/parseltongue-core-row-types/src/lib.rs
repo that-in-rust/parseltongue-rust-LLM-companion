@@ -29,6 +29,10 @@ pub use unit_prelude_configuration_records::*;
 mod hld_materialization_core_records;
 pub use hld_materialization_core_records::*;
 
+#[path = "node-reach-field-rules.rs"]
+mod node_reach_field_rules;
+pub use node_reach_field_rules::*;
+
 #[path = "configuration-expression-truth-values.rs"]
 mod configuration_expression_truth_values;
 pub use configuration_expression_truth_values::evaluate_cfg_expression_truth;

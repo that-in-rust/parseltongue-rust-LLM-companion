@@ -1456,6 +1456,7 @@ fn encode_visibility_value(value: HldEffectiveVisibilityKind) -> &'static str {
         HldEffectiveVisibilityKind::Public => "Public",
         HldEffectiveVisibilityKind::RestrictedNonPrivate => "RestrictedNonPrivate",
         HldEffectiveVisibilityKind::PrivateEquivalent => "PrivateEquivalent",
+        HldEffectiveVisibilityKind::NotApplicable => "NotApplicable",
         HldEffectiveVisibilityKind::Unknown => "Unknown",
     }
 }
@@ -1473,6 +1474,7 @@ fn decode_optional_visibility_value(
         "Public" => Ok(Some(HldEffectiveVisibilityKind::Public)),
         "RestrictedNonPrivate" => Ok(Some(HldEffectiveVisibilityKind::RestrictedNonPrivate)),
         "PrivateEquivalent" => Ok(Some(HldEffectiveVisibilityKind::PrivateEquivalent)),
+        "NotApplicable" => Ok(Some(HldEffectiveVisibilityKind::NotApplicable)),
         "Unknown" => Ok(Some(HldEffectiveVisibilityKind::Unknown)),
         _ => Err("unknown visibility kind".into()),
     }
