@@ -79,6 +79,9 @@ Ownership:
 - DuckDB: name resolution, node projection, relational analysis.
 - Turso: durable storage, frozen snapshots, atomic publication, serving.
 - No third database.
+- A stored path of a workspace file starts with the fixed root
+  `/parseltongue-workspace-root`. Only the loader and the CLI see the real directory
+  (SPEC part 14).
 - A DuckDB file of the finished graph is a copy written after the run by a separate crate
   from the exported JSON (user decision, 2026-11-17; SPEC part 9). It is not a store of
   the run.

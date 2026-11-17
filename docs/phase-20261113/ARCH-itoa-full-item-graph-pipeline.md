@@ -145,6 +145,12 @@ nodes.json, edges.json      --parseltongue-graph-dataset-loader-->  graph.duckdb
 
 Levels 1 and 2 are the full graph, the deliverable. Levels 3–7 are the facts it is built from.
 
+**Paths in every table.** A path under the workspace root is stored with the fixed root
+`/parseltongue-workspace-root` in place of the real one, and the package id likewise.
+The loader replaces it where `cargo metadata` and the file reads first give it; the real
+root is used only to open files. The same source in two directories therefore stores
+equal rows (SPEC part 14).
+
 ```text
 level  table                                  owner stage                        state
 1      edge-evidence-record-table             semantic-edge-evidence-stage       eight kinds
@@ -277,8 +283,9 @@ proven form                                       initializer is a method call n
 an impl with a bound on its type parameter        cast on `*mut T` with `T: PointeeSized`;
                                                   nothing stored proves the bound restricts
                                                   no type
-rows that depend on the source directory          file identity is the absolute path, and
-                                                  the run id hashes those rows
+a run id that depends on the toolchain directory  the run id hashes the sysroot path; rows
+                                                  of workspace files hold the fixed root
+                                                  /parseltongue-workspace-root (part 14)
 the run with the whole sysroot (C3)               stops with a store copy mismatch
 ```
 

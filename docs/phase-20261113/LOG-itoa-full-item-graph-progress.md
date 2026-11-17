@@ -12,13 +12,13 @@ run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method ca
 `core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
 and it is an expected row. The expected graph was written and checked by one author.**
 
-**Since that run the code has changed (SPEC parts 10 to 13, 2026-11-17 and 18): the
+**Since that run the code has changed (SPEC parts 10 to 14, 2026-11-17 and 18): the
 `json` extension is inside the executable; each module contains the file area of its
 file; every item node stores its visibility, whether it is reachable from outside the
-crate, and its signature; and each struct field is a node. The run now stores 172 nodes
-and 686 edge rows. Both expected graphs are re-frozen with those rows and the two
-equality tests pass at `40cf94ccf`, but S1 to S4 are NOT STARTED for this head. They run
-once, after parts 14 and 15.**
+crate, and its signature; each struct field is a node; and stored rows no longer depend
+on the source directory. The run now stores 172 nodes and 686 edge rows. Both expected
+graphs are re-frozen with those rows and the two equality tests pass at `a57f7e7b7`, but
+S1 to S4 are NOT STARTED for this head. They run once, after part 15 (`cast`).**
 
 **A separate crate copies the exported graph into one DuckDB file, and the full run from
 pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
@@ -1705,3 +1705,45 @@ and a run equals both re-frozen expected graphs: 170 nodes, 684 edge rows (scope
   `derive_node_reach_fields`, `find_struct_field_type` and `print_item_signature_text`;
   `index_repository` after each code commit.
 - **Next:** part 14, stored rows that do not depend on the source directory.
+
+## 2026-11-18 Part 14 built: stored rows do not depend on the source directory
+
+- **Result:** two copies of pinned itoa in two directories, the second mapped through a
+  symbolic link, export equal rows: 172 of 172 node rows, 686 of 686 edge rows, and one
+  run id. Measured before the change: 0 of 172 and 0 of 686, and two run ids. No row
+  holds a real directory. `test_itoa_rows_directory_independent` passes. S1 to S4 are
+  NOT STARTED for this head.
+- **How:** the loader stores every path under the workspace root, and the package id,
+  with the fixed root `/parseltongue-workspace-root`. The real root is used only to open
+  files.
+- **Commits:** spec `4f438c599`; failing test `2c4cb9aa0` (14.1); the path rule
+  `2b45fe36f` (14.2); loader, CLI and syntax port `a57f7e7b7` (14.3).
+- **RED (14.1):** `test_itoa_rows_directory_independent`, 1 selected, 0 passed, 1 failed,
+  on `((0, 173, 173), (0, 687, 687))` equal lines of each export.
+- **Gates at `a57f7e7b7`:** `cargo fmt --all -- --check` exit 0; workspace clippy exit 0;
+  core-row-types 29, loader 10 + 3, extractor 181 + 17, DuckDB adapter 189, Turso
+  adapter 46 + 22 + 4 tests pass; real-source suite 62 passed, 2 failed, 1017.85 s; the
+  2 failed tests pass after their path assertions were changed (rerun by name, 2 passed).
+- **Run:** `parseltongue map-workspace-full-run ... --worker-thread-count-value 4
+  --sysroot-source-scope-kind declarations`: exit 0, 26.33 s, 352,876 kB peak, 172 node
+  rows, 686 edge rows, run id `fdbe5e29…600eda`, equal to the run id of the test's runs
+  under `/tmp`.
+- **Test names:** `test_workspace_root_path_relocation`,
+  `test_loaded_rows_hold_fixed_root`, `test_itoa_rows_directory_independent`, and the
+  two equality tests.
+- **A second place needed the real root:** the first run after the change stopped with
+  "module u128_ext" missing. The macro expansion port builds its own projection and
+  asked the disk for the fixed path. It now gets the same value.
+- **Spec corrected while building:** D1 said the export header would be equal. Its
+  attempt value is a nonce of the run and differs between any two runs; D1 now says so.
+- **Deviations:** two tests written with or after their code; the full suite was not
+  run again after the two test-only changes; the workspace test gate was not run.
+  Listed in section 6 of the part file.
+- **Left open:** the run id still hashes the toolchain directory, which is under the
+  home directory (PRD, "Open").
+- **codebase-memory queries:** `trace_path` inbound, depth 1, on
+  `read_safe_source_bytes`, `ingest_requested_source_file`,
+  `read_canonical_source_path` and `load_workspace_crate_graph`; `index_repository`
+  after each code commit.
+- **Next:** part 15, `cast`. Its spec (`7b6c5e5aa`) finds that no trait solver is
+  needed.

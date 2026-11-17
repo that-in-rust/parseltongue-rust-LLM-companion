@@ -2,7 +2,10 @@
 
 Back to the [index](README.md).
 
-Status on 2026-11-18: **specified, not built.** Picked by the user on 2026-11-17 ("two
+Status on 2026-11-18: **built (`a57f7e7b7`).** Two copies of pinned itoa in two
+directories, the second mapped through a symbolic link, export equal node and edge rows
+and one run id; gate results are in section 6. S1 to S4 are NOT STARTED for this head.
+Picked by the user on 2026-11-17 ("two
 machines cannot compare or share a stored run").
 
 **The defect, measured on 2026-11-18 at `40cf94ccf`.** The pinned source was copied to a
@@ -121,7 +124,37 @@ the root, so it does not change (A1).
 
 ## 6. Quality gate results
 
-Not run: nothing is built.
+Measured on 2026-11-18 at `a57f7e7b7`.
+
+```text
+cargo fmt --all -- --check                               exit 0
+cargo clippy --release --workspace --all-targets ...      exit 0
+core-row-types 29, loader 10 + 3, extractor 181 + 17,
+DuckDB adapter 189, Turso adapter 46 + 22 + 4 tests       0 failed
+real-source suite (64 tests, --test-threads=1)            62 passed, 2 failed, 1017.85 s
+the 2 failed tests after their assertions were changed    2 passed
+run of pinned itoa, 4 workers, scope declarations         exit 0, 26.33 s, 352,876 kB peak
+stored                                                    172 nodes, 686 edge rows
+```
+
+- **Two directories:** 172 of 172 node rows and 686 of 686 edge rows equal, and one run
+  id. Before this part: 0 and 0. No row holds either real root or the link.
+- **The same run id from `/tmp` and from the home directory:** the run above and the
+  test's runs both give `fdbe5e29…600eda`.
+- **The two failed tests** (`test_itoa_top_level_containment`,
+  `test_source_fixture_scope_rules`) compared a stored path with the real directory.
+  They now expect the fixed root. The suite was not run a second time in full: the
+  production code did not change after it.
+- **The header's attempt value** is a nonce of the run (process id and time), so it
+  differs between any two runs, also in one directory. D1 leaves it out.
+
+Deviations from the repository rules:
+
+- **Tests after code.** `test_workspace_root_path_relocation` was written with its code
+  and `test_loaded_rows_hold_fixed_root` after it; neither was seen failing.
+- **D7 at the loader** (a path under the real root that starts with the fixed root) is
+  covered by the core unit test only.
+- **The workspace test gate was not run**; it runs once before S1 to S4.
 
 ## 7. Open questions
 

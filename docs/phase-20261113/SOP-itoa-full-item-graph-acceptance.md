@@ -210,6 +210,9 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
 - Run production twice at each of 1, 4 and 16 workers. Export nodes and edges as in S2 and
   compare every line after the first. The first line of an export is its header and carries
   that run's attempt id. Any other difference is FAIL.
+- Run production once on a copy of the pinned source in a second directory. Its node and
+  edge rows equal those of the first run line for line, and the run id in the header is
+  equal (REQ-RUST-072.0). Any difference is FAIL.
 - Record wall time, whole-process-tree peak memory (10 ms samples) and store size.
 
 ### Report

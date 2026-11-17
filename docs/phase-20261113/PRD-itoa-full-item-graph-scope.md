@@ -386,16 +386,14 @@ general behaviour, nothing keyed on itoa names.
   public path from the crate root (SPEC part 11, decided under Rule 6 on 2026-11-17).
   The methods of `private::Sealed` are stored as not reachable, although outside code can
   call them through a bound `I: Integer`. Whether that route should count is open.
-- **Rows depend on the source directory.** Two copies of the pinned source in different
-  directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause:
-  the store's file identity is the absolute path, and the run id hashes those rows. Not
-  fixed.
+- **The run id depends on the toolchain directory.** Stored rows no longer depend on the
+  source directory (SPEC part 14, built 2026-11-18: every stored path of a workspace file
+  starts with `/parseltongue-workspace-root`). The run id still hashes the path of the
+  toolchain, which is under the home directory, so it differs between two machines with
+  different home directories. Node and edge rows hold no such path.
 - **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for
   sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
   are compared (A4).
-
-The expected graph is frozen without variant or field nodes. Deciding that point needs a
-new freeze.
 
 ### Out of scope
 

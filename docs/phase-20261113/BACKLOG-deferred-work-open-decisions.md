@@ -63,8 +63,9 @@ Also open, in code rather than in the graph rules:
 
 - **Two unresolved-reason lists.** `SiteUnresolvedReasonKind` for sites and
   `HldUnresolvedReasonKind` for graph edges both still exist.
-- **Rows depend on the source directory** and **`test_lang_items_in_sysroot` fails**: both
-  are described in the PRD ("Open") and the SOP.
+- **The run id depends on the toolchain directory** and **`test_lang_items_in_sysroot`
+  fails**: both are described in the PRD ("Open") and the SOP. Rows no longer depend on
+  the source directory (SPEC part 14, built 2026-11-18).
 
 Already decided, so not open: one lexical source container per item; impl blocks are records;
 items inside function bodies are evidence; calls are resolved in Rust; nodes are projected in
