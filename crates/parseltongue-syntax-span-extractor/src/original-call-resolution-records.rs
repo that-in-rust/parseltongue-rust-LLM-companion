@@ -7,6 +7,7 @@ use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_source_context,
     read_impl_stage_values,
 };
+use crate::local_binding_receiver_records::find_local_binding_statement;
 use crate::signature_type_edge_records::read_stored_reason_kind;
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
@@ -1626,6 +1627,29 @@ fn extract_method_receiver_syntax(
             .receiver()
             .and_then(|receiver| read_receiver_place_steps(&receiver, call, input, removed)),
     });
+    // REQ-RUST-064.0 L1: a receiver that is a local variable keeps the evidence of the
+    // one `let` that binds it to a method call. Any other receiver stores no such field.
+    let local = receiver
+        .as_deref()
+        .zip(function.as_ref())
+        .filter(|_| parameter.is_none())
+        .and_then(|(name, function)| find_local_binding_statement(function, call, name));
+    let evidence = match local {
+        Some(found) => {
+            let range = found.binding_let_statement.syntax().text_range();
+            let mut evidence = evidence;
+            evidence["receiver_local_binding_evidence"] = json!({
+                "binding_statement_start_offset":restore_source_byte_offset(range.start(), removed),
+                "binding_statement_end_offset":restore_source_byte_offset(range.end(), removed),
+                "binding_name_token_count":found.binding_name_token_count,
+                "binding_mutable_flag":found.binding_mutable_flag,
+                "binding_initializer_call_evidence":extract_method_receiver_syntax(
+                    &found.binding_initializer_call, input, removed),
+            });
+            evidence
+        }
+        None => evidence,
+    };
     // REQ-RUST-062.0 C1: a receiver that is a method call, through parentheses only,
     // keeps the evidence of that call. Any other receiver stores no such field.
     let inner = std::iter::successors(call.receiver(), |found| match found {

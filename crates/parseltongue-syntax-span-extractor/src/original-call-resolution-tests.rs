@@ -685,6 +685,50 @@ fn test_flag_rebound_receiver_names() {
     assert_eq!(later["receiver_rebinding_flag"], false);
 }
 
+/// REQ-RUST-064.0 L1: a receiver that is a local variable keeps the evidence of the one
+/// `let` that binds it to a method call, and of nothing else.
+#[test]
+fn test_local_binding_receiver_evidence() {
+    let read = |body: &str| {
+        let source = format!("fn run<I: T>(i: I) {{ {body} }}\n");
+        read_method_receiver_evidence(&source, "s.len()")["receiver_local_binding_evidence"].clone()
+    };
+    let plain = read("let s = (i.name(1)); s.len()");
+    let start = "fn run<I: T>(i: I) { ".len();
+    assert_eq!(plain["binding_statement_start_offset"], start);
+    assert_eq!(
+        plain["binding_statement_end_offset"],
+        start + "let s = (i.name(1));".len()
+    );
+    assert_eq!(plain["binding_name_token_count"], 2);
+    assert_eq!(plain["binding_mutable_flag"], false);
+    let call = &plain["binding_initializer_call_evidence"];
+    assert_eq!(call["receiver_shape_kind"], "parameter_identifier");
+    assert_eq!(call["method_declared_name_value"], "name");
+    assert_eq!(call["receiver_generic_owner_kind"], "function");
+    let mutable = read("let mut s = i.name(); if true { s.len() } else { 0 }");
+    assert_eq!(mutable["binding_mutable_flag"], true);
+    assert_eq!(mutable["binding_name_token_count"], 2);
+    for body in [
+        "let s: &str = i.name(); s.len()",
+        "let ref s = i.name(); s.len()",
+        "let s @ _ = i.name(); s.len()",
+        "let (s, _) = (i.name(), 0); s.len()",
+        "let Some(s) = i.name() else { return }; s.len()",
+        "let s = i.name(); let s = s; s.len()",
+        "let s = i.name(); show!(s); s.len()",
+        "let s = i.name(); s.len(); show!(s)",
+        "{ let s = i.name(); } s.len()",
+        "s.len(); let s = i.name();",
+        "let s = i.name(); fn inner() { s.len() }",
+        "let s = i.name(); x.s; s.len()",
+        "let s = name(i); s.len()",
+        "let s = i.name()?; s.len()",
+    ] {
+        assert_eq!(read(body), Value::Null, "{body}");
+    }
+}
+
 /// REQ-RUST-042.0
 #[test]
 fn test_locate_enclosing_generic_owner() {

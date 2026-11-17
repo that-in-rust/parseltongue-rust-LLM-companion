@@ -31,6 +31,8 @@ pub use syntax_namespace_input_persistence::persist_namespace_syntax_inputs;
 mod body_value_read_records;
 #[path = "expanded-site-origin-records.rs"]
 mod expanded_site_origin_records;
+#[path = "local-binding-receiver-records.rs"]
+mod local_binding_receiver_records;
 #[path = "macro-body-item-records.rs"]
 mod macro_body_item_records;
 #[path = "receiver-type-probe-records.rs"]
