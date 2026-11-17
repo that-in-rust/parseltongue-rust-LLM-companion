@@ -2,7 +2,10 @@
 
 Back to the [index](README.md).
 
-Status on 2026-11-18: **specified, not built.** Picked by the user on 2026-11-17, last
+Status on 2026-11-18: **built (`4cb0cbade`).** A run of pinned itoa names `cast`; all
+133 method calls into `core` have a target and the stored graph equals the re-frozen
+expected graph (173 nodes, 686 edge rows). Gate results are in section 6. S1 to S4 are
+NOT STARTED for this head. Picked by the user on 2026-11-17, last
 in the order, with the question whether it needs a trait solver.
 
 **It does not need a trait solver.** The run already finds the one declaration of
@@ -117,11 +120,41 @@ A1  WHEN the mapper runs on pinned itoa with scope declarations THEN the call `c
 
 ## 6. Quality gate results
 
-Not run: nothing is built.
+Measured on 2026-11-18 at `4cb0cbade`.
+
+```text
+cargo fmt --all -- --check                               exit 0
+cargo clippy --release --workspace --all-targets ...      exit 0
+core-row-types 29, loader 10 + 3, extractor 184 + 17,
+DuckDB adapter 189, Turso adapter 46 + 22 + 4 tests       0 failed
+real-source suite (64 tests, --test-threads=1)            64 passed, 0 failed, 1036.68 s
+expected-data tests (Python)                              25 passed
+run of pinned itoa, 4 workers, scope declarations         exit 0, 22.23 s, 352,248 kB peak
+stored                                                    173 nodes, 686 edge rows,
+                                                          686 with a target
+```
+
+- **RED seen:** `test_itoa_declarations_graph_equality` failed on the one row (expected
+  `Buffer::format --calls--> *mut T::cast`, stored `unresolved .cast`). The three unit
+  tests each failed first.
+- **The bound alone was not enough.** After P3 to P6 the real-source test still failed.
+  A probe of the stored rows showed the bound discharged and the receiver read as a
+  pointer to a type of unknown size. P7 was added to this spec and built.
+- **No other row changed:** both equality tests pass, so P7 names no target the expected
+  graph does not list.
+
+Deviations from the repository rules:
+
+- **The spec changed after the first code** (P7, and P1 reworded to store a body-local
+  trait with a flag, as type names are stored).
+- **The workspace test gate was not run**; it runs once before S1 to S4.
 
 ## 7. Open questions
 
 - **Other bounds.** Every other bound on an impl of `core` still needs a trait solver.
   None is met on pinned itoa after this part.
-- **The graph's `incomplete` mark.** With no call left without a target, whether the run
-  marks the graph complete is read from the code in step 2 and recorded here.
+- **The graph's `incomplete` mark is a constant.** The run writes
+  `workspace_full_map_completeness_kind = incomplete` and `IncompleteTypedInput` for
+  every full-graph run; neither is computed from the rows. With every edge row holding a
+  target the mark has no row behind it any more. What "complete" should mean, and
+  whether the run should compute it, is open (PRD, "Open").

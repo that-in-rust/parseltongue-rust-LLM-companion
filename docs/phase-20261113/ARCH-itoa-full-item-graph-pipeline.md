@@ -280,9 +280,9 @@ proven form                                       initializer is a method call n
                                                   written type, a pattern, any other
                                                   initializer, a name used elsewhere in the
                                                   unit
-an impl with a bound on its type parameter        cast on `*mut T` with `T: PointeeSized`;
-                                                  nothing stored proves the bound restricts
-                                                  no type
+an impl with a bound on its type parameter        any bound other than `?Sized` or the lang
+                                                  item `pointee_sized` (part 15) keeps the
+                                                  member unproven; none is met on itoa
 a run id that depends on the toolchain directory  the run id hashes the sysroot path; rows
                                                   of workspace files hold the fixed root
                                                   /parseltongue-workspace-root (part 14)

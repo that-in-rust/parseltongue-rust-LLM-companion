@@ -374,12 +374,11 @@ general behaviour, nothing keyed on itoa names.
 
 ### Open
 
-- **One method call into `core` without a target: `cast`.** Its impl has the bound
-  `T: PointeeSized`, which the run cannot prove harmless (immediate backlog, entry 7). The
-  other 132 are named in the accepted run of 2026-11-17 at `753665eb9`, scope
-  `declarations` ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)),
-  each equal to its frozen expected row. The graph stays marked incomplete while `cast`
-  has no target.
+- **The `incomplete` mark.** Every method call into `core` is named since SPEC part 15
+  (built 2026-11-18; `cast` by the rule that a bound on the lang item `pointee_sized`
+  restricts no type), and every edge row of a `declarations` run has a target. The run
+  still marks the graph `incomplete`: the mark is a constant in the code, not computed
+  from the rows. What "complete" should mean, and whether the run computes it, is open.
 - **Reading the whole sysroot.** A run with scope `included` did not finish name
   resolution in 2,400 s on 2026-11-13 (the run report is deleted). No itoa run uses it.
 - **Reachability through a private supertrait.** "Reachable" means: can be named by a

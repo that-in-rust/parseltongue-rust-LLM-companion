@@ -12,13 +12,14 @@ run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method ca
 `core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
 and it is an expected row. The expected graph was written and checked by one author.**
 
-**Since that run the code has changed (SPEC parts 10 to 14, 2026-11-17 and 18): the
+**Since that run the code has changed (SPEC parts 10 to 15, 2026-11-17 and 18): the
 `json` extension is inside the executable; each module contains the file area of its
 file; every item node stores its visibility, whether it is reachable from outside the
-crate, and its signature; each struct field is a node; and stored rows no longer depend
-on the source directory. The run now stores 172 nodes and 686 edge rows. Both expected
-graphs are re-frozen with those rows and the two equality tests pass at `a57f7e7b7`, but
-S1 to S4 are NOT STARTED for this head. They run once, after part 15 (`cast`).**
+crate, and its signature; each struct field is a node; stored rows no longer depend on
+the source directory; and `cast` is named. The run now stores 173 nodes and 686 edge
+rows, each edge row with a target. Both expected graphs are re-frozen and the two
+equality tests pass at `4cb0cbade`, but S1 to S4 are NOT STARTED for this head. They run
+next, once.**
 
 **A separate crate copies the exported graph into one DuckDB file, and the full run from
 pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
@@ -1747,3 +1748,45 @@ and a run equals both re-frozen expected graphs: 170 nodes, 684 edge rows (scope
   after each code commit.
 - **Next:** part 15, `cast`. Its spec (`7b6c5e5aa`) finds that no trait solver is
   needed.
+
+## 2026-11-18 Part 15 built: `cast` is named, without a trait solver
+
+- **Result:** `self.bytes.as_mut_ptr().cast::<I::Buffer>()` in `Buffer::format` has the
+  target `*mut T::cast`. All 133 method calls into `core` are named, and every one of
+  the 686 edge rows of a `declarations` run has a target. The stored graph equals the
+  re-frozen expected graph (173 nodes, 686 edge rows). S1 to S4 are NOT STARTED for this
+  head.
+- **How:** two rules. A bound on the one trait that carries `#[lang = "pointee_sized"]`
+  restricts no type, so `impl<T: PointeeSized> *mut T` applies to every pointer. And a
+  sized generic parameter behind a returned raw pointer or reference is a sized type, so
+  the result `*mut T` of `[T]::as_mut_ptr` reaches that impl.
+- **Commits:** spec `7b6c5e5aa`; expected rows `4ee1fd5e4` (15.1); rows, both rules and
+  the spec's P7 `4cb0cbade` (15.3, 15.4).
+- **RED (15.2):** `test_itoa_declarations_graph_equality`, 1 selected, 0 passed, 1
+  failed, on "nodes expected 173 stored 172" and the one `cast` row.
+- **Gates at `4cb0cbade`:** `cargo fmt --all -- --check` exit 0; workspace clippy exit 0;
+  core-row-types 29, loader 10 + 3, extractor 184 + 17, DuckDB adapter 189, Turso
+  adapter 46 + 22 + 4 tests pass; real-source suite 64 passed, 0 failed, 1036.68 s; 25
+  expected-data tests.
+- **Run:** `parseltongue map-workspace-full-run ... --worker-thread-count-value 4
+  --sysroot-source-scope-kind declarations`: exit 0, 22.23 s, 352,248 kB peak, 173 node
+  rows, 686 edge rows, 686 with a target.
+- **Test names:** `test_trait_and_bound_rows`, `test_pointee_sized_bound_rules`,
+  `test_pointer_return_sized_pointee`, `test_itoa_core_member_targets`, and the two
+  equality tests.
+- **Found while building:** the first rule alone left the call unresolved. A probe of
+  the stored declaration rows showed the bound discharged and the receiver read as a
+  pointer to a type of unknown size; that gave the second rule (P7).
+- **Found in the code:** the graph's `incomplete` mark is a constant, not computed from
+  the rows. Earlier documents said it was there because of `cast`; that was wrong. The
+  mark stays. What "complete" means is open (PRD, "Open").
+- **The limit of the first rule:** that every type meets `PointeeSized` is a rule of the
+  compiler. The `core` source shows the attribute, not an impl for every type.
+- **Deviations:** the spec gained P7 after the first code; the workspace test gate was
+  not run. Listed in section 6 of the part file.
+- **codebase-memory queries:** `search_graph` for `check_impl_bound_restriction` and
+  `build_inherent_member_candidate`; `trace_path` inbound on
+  `probe_core_member_declaration` and `parse_return_type_shape`; `index_repository`
+  after the code commit.
+- **Next:** the workspace gates, then S1 to S4 on one frozen executable, then the full
+  run into the DuckDB file.

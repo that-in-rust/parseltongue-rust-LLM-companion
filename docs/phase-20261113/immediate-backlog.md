@@ -156,23 +156,11 @@ digest in S1.
 
 ## 7. Name the one call into `core` that is left: `cast`
 
-Added 2026-11-17.
-
-**Seen in the data.** `self.bytes.as_mut_ptr().cast::<u8>()` in `Buffer::format` is the
-only one of the 133 method calls into `core` that a `declarations` run stores without a
-target. The frozen targets file gives its target as `*mut T::cast`, and the compile check
-of 2026-11-16 agrees.
-
-- The run finds the one declaration, in `impl<T: PointeeSized> *mut T` of
-  `ptr/mut_ptr.rs`. It stops because the impl has a bound, and no stored row proves that
-  `PointeeSized` restricts no type (REQ-RUST-062.0 C7).
-- The expected graph of a `declarations` run lists this site without a target, with the
-  known label beside it (REQ-RUST-066.0 M4).
-
-**Open before any code:** which source facts prove that every type meets
-`PointeeSized` (its `#[lang = "pointee_sized"]` declaration in `marker.rs` is one
-candidate), written as a requirement first. When built, the label moves out of the
-builder's list of unmerged labels and the graph is frozen again.
+Done 2026-11-18 (SPEC part 15, `4cb0cbade`). `self.bytes.as_mut_ptr().cast::<I::Buffer>()`
+in `Buffer::format` has the target `*mut T::cast`. Two rules did it, neither a trait
+solver: a bound on the lang item `pointee_sized` restricts no type, and a sized generic
+parameter behind a returned raw pointer is a sized type. All 133 method calls into
+`core` are named.
 
 ## Navigation-data additions from the research
 

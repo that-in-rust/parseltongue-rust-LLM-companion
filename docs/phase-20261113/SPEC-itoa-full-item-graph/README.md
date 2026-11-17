@@ -36,7 +36,7 @@ part  file                                       requirements                   
 12    part-12-module-contains-file-area.md       070.0                          BUILT 2026-11-17: a module contains the file area of its file; a run equals both re-frozen graphs (170 nodes, 684 edge rows); 63 real-source tests pass
 13    part-13-variant-and-field-nodes.md         071.0                          built (`40cf94ccf`): enum variants and struct fields as nodes; on itoa 2 nodes, 2 `contains` rows, 4 rows change source
 14    part-14-directory-independent-rows.md      072.0                          built (`a57f7e7b7`): stored rows and run id equal for the same source in two directories (172 of 172 node rows, 686 of 686 edge rows; before: 0 and 0)
-15    part-15-cast-pointee-sized-bound.md        073.0                          specified, not built: `cast` named without a trait solver; a bound on the lang item `pointee_sized` restricts no type
+15    part-15-cast-pointee-sized-bound.md        073.0                          built (`4cb0cbade`): `cast` named without a trait solver; a bound on the lang item `pointee_sized` restricts no type; 133 of 133 calls into `core` named
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of
