@@ -227,3 +227,50 @@ fn test_parent_cycle_reach_ends() {
     assert_eq!((Public, None), fields["second"]);
     assert_eq!((Unknown, None), fields["looped"]);
 }
+
+/// REQ-RUST-071.0 F1, F2: a variant and a field of a variant take the visibility and the
+/// reachability of the enum; a field of a struct keeps the visibility it declares and is
+/// reachable only when its struct is.
+#[test]
+fn test_variant_member_reach_rules() {
+    use NodeReachOwnerValue::VariantMember;
+    let rows = vec![
+        ("area", PrivateEquivalent, FileArea { module: CrateRoot }),
+        ("Open", Public, Container(Node("area"))),
+        ("Open::A", PrivateEquivalent, VariantMember(Node("Open"))),
+        (
+            "Open::A::0",
+            PrivateEquivalent,
+            VariantMember(Node("Open::A")),
+        ),
+        ("Shut", PrivateEquivalent, Container(Node("area"))),
+        ("Shut::A", PrivateEquivalent, VariantMember(Node("Shut"))),
+        (
+            "Shut::A::x",
+            PrivateEquivalent,
+            VariantMember(Node("Shut::A")),
+        ),
+        ("Lost::A", PrivateEquivalent, VariantMember(Unresolved)),
+        ("Open::shown", Public, Container(Node("Open"))),
+        ("Open::kept", RestrictedNonPrivate, Container(Node("Open"))),
+        ("Open::hidden", PrivateEquivalent, Container(Node("Open"))),
+        ("Shut::shown", Public, Container(Node("Shut"))),
+    ];
+    let expected = [
+        ("Lost::A", Unknown, None),
+        ("Open", Public, Some(true)),
+        ("Open::A", Public, Some(true)),
+        ("Open::A::0", Public, Some(true)),
+        ("Open::hidden", PrivateEquivalent, Some(false)),
+        ("Open::kept", RestrictedNonPrivate, Some(false)),
+        ("Open::shown", Public, Some(true)),
+        ("Shut", PrivateEquivalent, Some(false)),
+        ("Shut::A", PrivateEquivalent, Some(false)),
+        ("Shut::A::x", PrivateEquivalent, Some(false)),
+        ("Shut::shown", Public, Some(false)),
+    ]
+    .into_iter()
+    .map(|(key, visibility, reach)| (key, (visibility, reach)))
+    .collect::<BTreeMap<_, _>>();
+    assert_eq!(derive_fixture_reach_fields(&rows, false), expected);
+}

@@ -1429,6 +1429,10 @@ fn encode_owner_kind_value(value: HldOwnerKindValue) -> &'static str {
         HldOwnerKindValue::Impl => "Impl",
         HldOwnerKindValue::FunctionBody => "FunctionBody",
         HldOwnerKindValue::Other => "Other",
+        HldOwnerKindValue::Struct => "Struct",
+        HldOwnerKindValue::Enum => "Enum",
+        HldOwnerKindValue::Union => "Union",
+        HldOwnerKindValue::EnumVariant => "EnumVariant",
     }
 }
 
@@ -1447,6 +1451,10 @@ fn decode_optional_owner_kind_value(value: &Value) -> Result<Option<HldOwnerKind
         "Impl" => Ok(Some(HldOwnerKindValue::Impl)),
         "FunctionBody" => Ok(Some(HldOwnerKindValue::FunctionBody)),
         "Other" => Ok(Some(HldOwnerKindValue::Other)),
+        "Struct" => Ok(Some(HldOwnerKindValue::Struct)),
+        "Enum" => Ok(Some(HldOwnerKindValue::Enum)),
+        "Union" => Ok(Some(HldOwnerKindValue::Union)),
+        "EnumVariant" => Ok(Some(HldOwnerKindValue::EnumVariant)),
         _ => Err("unknown owner kind".into()),
     }
 }

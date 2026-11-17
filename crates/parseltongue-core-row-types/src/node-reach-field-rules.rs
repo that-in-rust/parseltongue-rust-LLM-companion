@@ -32,6 +32,9 @@ pub enum NodeReachOwnerValue<K> {
     /// An item in a module: the parent is its file area or its inline module.
     Container(NodeReachParentValue<K>),
     TraitMember(NodeReachParentValue<K>),
+    /// REQ-RUST-071.0 F1, F2: an enum variant, or a field of one. It takes the visibility
+    /// and the reachability of its enum or variant.
+    VariantMember(NodeReachParentValue<K>),
     InherentMember {
         self_type: NodeReachParentValue<K>,
     },
@@ -93,6 +96,7 @@ fn derive_effective_visibility_kind<K: Ord>(
         NodeReachOwnerValue::FileArea { .. } => Unknown,
         NodeReachOwnerValue::MacroCall => NotApplicable,
         NodeReachOwnerValue::TraitMember(trait_type)
+        | NodeReachOwnerValue::VariantMember(trait_type)
         | NodeReachOwnerValue::TraitImplMember { trait_type, .. } => match trait_type {
             NodeReachParentValue::Node(trait_key) => {
                 derive_effective_visibility_kind(nodes, trait_key, &[path, &[key]].concat())
@@ -116,9 +120,9 @@ fn derive_node_reach_flag<K: Ord>(
     let parents = match &record.node_reach_owner_value {
         NodeReachOwnerValue::FileArea { .. } => return None,
         NodeReachOwnerValue::MacroCall => return Some(false),
-        NodeReachOwnerValue::Container(parent) | NodeReachOwnerValue::TraitMember(parent) => {
-            vec![parent]
-        }
+        NodeReachOwnerValue::Container(parent)
+        | NodeReachOwnerValue::TraitMember(parent)
+        | NodeReachOwnerValue::VariantMember(parent) => vec![parent],
         NodeReachOwnerValue::InherentMember { self_type } => vec![self_type],
         NodeReachOwnerValue::TraitImplMember {
             trait_type,

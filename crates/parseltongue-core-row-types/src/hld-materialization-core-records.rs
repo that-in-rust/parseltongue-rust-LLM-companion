@@ -213,6 +213,13 @@ pub enum HldOwnerKindValue {
     Impl,
     FunctionBody,
     Other,
+    /// REQ-RUST-071.0 N4: the owner of a field.
+    Struct,
+    /// REQ-RUST-071.0 N4: the owner of a variant.
+    Enum,
+    Union,
+    /// REQ-RUST-071.0 N4: the owner of a field of a variant.
+    EnumVariant,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -875,10 +882,23 @@ fn validate_hld_node_input(
             {
                 return Err(HldMaterializationValidationError::InvalidNodeCategory);
             }
-            if matches!(
-                node_record.node_item_kind_value,
-                Some(HldItemKindValue::Field | HldItemKindValue::EnumVariant)
-            ) || node_record.node_owner_kind_value == Some(HldOwnerKindValue::Other)
+            // REQ-RUST-071.0 N4: a field or variant and the type that owns it go together.
+            let member_owner_valid = match node_record.node_owner_kind_value {
+                Some(
+                    HldOwnerKindValue::Struct
+                    | HldOwnerKindValue::Union
+                    | HldOwnerKindValue::EnumVariant,
+                ) => node_record.node_item_kind_value == Some(HldItemKindValue::Field),
+                Some(HldOwnerKindValue::Enum) => {
+                    node_record.node_item_kind_value == Some(HldItemKindValue::EnumVariant)
+                }
+                _ => !matches!(
+                    node_record.node_item_kind_value,
+                    Some(HldItemKindValue::Field | HldItemKindValue::EnumVariant)
+                ),
+            };
+            if !member_owner_valid
+                || node_record.node_owner_kind_value == Some(HldOwnerKindValue::Other)
                 || (node_record.node_owner_kind_value == Some(HldOwnerKindValue::FunctionBody)
                     && !node_record.node_function_body_ancestry_flag)
             {

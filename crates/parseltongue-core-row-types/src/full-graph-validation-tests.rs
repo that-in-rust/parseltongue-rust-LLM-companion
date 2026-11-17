@@ -376,3 +376,52 @@ fn test_external_node_row_validation() {
         Err(HldMaterializationValidationError::InvalidEdgeRecord)
     );
 }
+
+/// REQ-RUST-071.0 N4: a field is owned by a struct, a union or a variant, and a variant by
+/// an enum. No other item has one of these owners, and a field or variant has no other.
+#[test]
+fn test_member_owner_kind_pairs() {
+    use HldItemKindValue::{EnumVariant, Field, Function};
+    use HldOwnerKindValue::{Enum, Impl, Module, Struct, Union};
+    let check = |kind, owner| {
+        let mut input = build_full_graph_fixture();
+        input.input_node_records[0].node_item_kind_value = Some(kind);
+        input.input_node_records[0].node_owner_kind_value = Some(owner);
+        validate_full_graph_input(&input)
+    };
+    let allowed = [
+        (Field, Struct),
+        (Field, Union),
+        (Field, HldOwnerKindValue::EnumVariant),
+        (EnumVariant, Enum),
+    ];
+    let rejected = [
+        (Field, Enum),
+        (Field, Module),
+        (Field, Impl),
+        (EnumVariant, Struct),
+        (EnumVariant, Module),
+        (EnumVariant, HldOwnerKindValue::EnumVariant),
+        (Function, Struct),
+        (Function, Union),
+        (Function, Enum),
+        (Function, HldOwnerKindValue::EnumVariant),
+    ];
+    let outcomes = allowed
+        .iter()
+        .chain(&rejected)
+        .map(|&(kind, owner)| (kind, owner, check(kind, owner)))
+        .collect::<Vec<_>>();
+    let expected = allowed
+        .iter()
+        .map(|&(kind, owner)| (kind, owner, Ok(())))
+        .chain(rejected.iter().map(|&(kind, owner)| {
+            (
+                kind,
+                owner,
+                Err(HldMaterializationValidationError::InvalidNodeCategory),
+            )
+        }))
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes, expected);
+}

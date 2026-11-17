@@ -1265,6 +1265,10 @@ fn encode_hld_owner_kind(kind: parseltongue_core_row_types::HldOwnerKindValue) -
         Kind::FunctionBody => "function_body",
         Kind::Other => "other",
         Kind::ExternBlock => "extern_block",
+        Kind::Struct => "struct",
+        Kind::Enum => "enum",
+        Kind::Union => "union",
+        Kind::EnumVariant => "enum_variant",
     }
 }
 
