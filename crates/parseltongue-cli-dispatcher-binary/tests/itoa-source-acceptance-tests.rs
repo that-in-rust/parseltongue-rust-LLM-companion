@@ -187,6 +187,19 @@ fn run_original_graph_fixture() -> (
     PathBuf,
     HldMaterializationInputRecord,
 ) {
+    run_scoped_graph_fixture("excluded")
+}
+
+/// The full graph of pinned itoa, read back from the published generation of a run with
+/// the given `--sysroot-source-scope-kind`.
+fn run_scoped_graph_fixture(
+    sysroot_scope: &str,
+) -> (
+    tempfile::TempDir,
+    PathBuf,
+    PathBuf,
+    HldMaterializationInputRecord,
+) {
     let directory = tempfile::tempdir().unwrap();
     let root = prepare_pinned_itoa_workspace(directory.path());
     let database = directory.path().join("original-full-graph.db");
@@ -195,7 +208,7 @@ fn run_original_graph_fixture() -> (
         &database,
         &[
             "--sysroot-source-scope-kind",
-            "excluded",
+            sysroot_scope,
             "--mapping-final-stage-kind",
             "full-item-dependency-graph",
         ],
@@ -5467,7 +5480,7 @@ fn derive_expected_graph_label(node: &HldNodeInputRecord) -> String {
 /// One text row per expected node: label, category, item kind, kind of owner, file,
 /// the macro call that generates it, and whether it is declared in a function body
 /// (REQ-RUST-044.1 N1).
-fn collect_expected_node_rows() -> std::collections::BTreeSet<String> {
+fn collect_expected_node_rows(name: &str) -> std::collections::BTreeSet<String> {
     let read_optional_text = |value: &Value| {
         value
             .as_str()
@@ -5475,7 +5488,7 @@ fn collect_expected_node_rows() -> std::collections::BTreeSet<String> {
             .unwrap_or("none")
             .to_string()
     };
-    read_expected_graph_rows("itoa-expected-graph-nodes.json")
+    read_expected_graph_rows(name)
         .iter()
         .map(|node| {
             format!(
@@ -5576,31 +5589,54 @@ fn convert_camel_snake_text(name: &str) -> String {
 
 /// REQ-RUST-044.3 F2: the files compared against are the frozen ones. Panics when a file's
 /// digest differs from the freeze record written beside it.
-fn verify_frozen_expected_files() {
+fn verify_frozen_expected_files(files: &ExpectedGraphFileNames) {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/phase-20261113/itoa-target-dataset");
     let record: Value = serde_json::from_str(
-        &fs::read_to_string(directory.join("itoa-expected-graph-freeze.json")).unwrap(),
+        &fs::read_to_string(directory.join(files.freeze_record_name)).unwrap(),
     )
     .unwrap();
     let frozen = record["frozen_file_sha256"].as_object().unwrap();
     assert!(
-        [
-            "itoa-expected-graph-nodes.json",
-            "itoa-expected-graph-edges.json"
-        ]
-        .iter()
-        .all(|name| frozen.contains_key(*name)),
+        [files.node_file_name, files.edge_file_name]
+            .iter()
+            .all(|name| frozen.contains_key(*name)),
         "the freeze record names the node and edge files"
     );
-    frozen.iter().for_each(|(name, digest)| {
-        assert_eq!(
-            digest.as_str().unwrap(),
-            hash_file_sha256_hex(&directory.join(name)),
-            "{name} differs from the frozen expected graph"
-        )
-    });
+    // REQ-RUST-066.0 M7: a graph merged from other frozen files also names their digests.
+    [&record["frozen_file_sha256"], &record["input_file_sha256"]]
+        .iter()
+        .filter_map(|digests| digests.as_object())
+        .flatten()
+        .for_each(|(name, digest)| {
+            assert_eq!(
+                digest.as_str().unwrap(),
+                hash_file_sha256_hex(&directory.join(name)),
+                "{name} differs from the frozen expected graph"
+            )
+        });
 }
+
+/// The files of one frozen expected graph: its freeze record, its nodes and its edge rows.
+struct ExpectedGraphFileNames {
+    freeze_record_name: &'static str,
+    node_file_name: &'static str,
+    edge_file_name: &'static str,
+}
+
+/// The expected graph of a run that reads no source of `core` (REQ-RUST-044.0).
+const EXCLUDED_GRAPH_FILE_NAMES: ExpectedGraphFileNames = ExpectedGraphFileNames {
+    freeze_record_name: "itoa-expected-graph-freeze.json",
+    node_file_name: "itoa-expected-graph-nodes.json",
+    edge_file_name: "itoa-expected-graph-edges.json",
+};
+
+/// The expected graph of a run that reads the declarations of `core` (REQ-RUST-066.0).
+const DECLARATIONS_GRAPH_FILE_NAMES: ExpectedGraphFileNames = ExpectedGraphFileNames {
+    freeze_record_name: "itoa-expected-declarations-graph-freeze.json",
+    node_file_name: "itoa-expected-declarations-graph-nodes.json",
+    edge_file_name: "itoa-expected-declarations-graph-edges.json",
+};
 
 fn read_expected_graph_rows(name: &str) -> Vec<Value> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -5620,8 +5656,8 @@ fn check_relation_site_compared(relation: &str) -> bool {
 /// the file, the byte where its first token starts, the byte where its last token ends,
 /// and for each whether it is written in the macro definition or in the macro call
 /// (REQ-RUST-044.0 E1 to E7).
-fn collect_expected_graph_rows() -> Vec<String> {
-    let mut rows = read_expected_graph_rows("itoa-expected-graph-edges.json")
+fn collect_expected_graph_rows(name: &str) -> Vec<String> {
+    let mut rows = read_expected_graph_rows(name)
         .iter()
         .flat_map(|edge| {
             let relation = edge["relation"].as_str().unwrap().to_string();
@@ -5860,8 +5896,28 @@ fn test_itoa_crate_root_node() {
 /// production stores for it (N1).
 #[test]
 fn test_itoa_whole_graph_equality() {
-    verify_frozen_expected_files();
     let (_directory, _root, _database, input) = run_original_graph_fixture();
+    verify_stored_graph_equality(&input, &EXCLUDED_GRAPH_FILE_NAMES);
+}
+
+/// REQ-RUST-066.0 M8: a run that reads the declarations of `core` stores the frozen
+/// expected graph of that scope: the same nodes and edge rows, with each method call into
+/// `core` naming its frozen target, and the one listed call (`cast`) without a target.
+#[test]
+fn test_itoa_declarations_graph_equality() {
+    verify_frozen_core_targets(&read_sysroot_library_path());
+    verify_frozen_expected_files(&EXCLUDED_GRAPH_FILE_NAMES);
+    let (_directory, _root, _database, input) = run_scoped_graph_fixture("declarations");
+    verify_stored_graph_equality(&input, &DECLARATIONS_GRAPH_FILE_NAMES);
+}
+
+/// Panics, listing every differing node and edge row, unless what the run stored equals
+/// the frozen expected graph in `files`.
+fn verify_stored_graph_equality(
+    input: &HldMaterializationInputRecord,
+    files: &ExpectedGraphFileNames,
+) {
+    verify_frozen_expected_files(files);
     let labels = input
         .input_node_records
         .iter()
@@ -5880,8 +5936,8 @@ fn test_itoa_whole_graph_equality() {
         input.input_node_records.len(),
         "two production nodes share one expected label"
     );
-    let stored_nodes = collect_production_node_rows(&input, &labels);
-    let expected_nodes = collect_expected_node_rows();
+    let stored_nodes = collect_production_node_rows(input, &labels);
+    let expected_nodes = collect_expected_node_rows(files.node_file_name);
     // Visibility, reachability and signature text are not stored on a node yet (PRD:
     // "unknown visibility and unknown reachability are stored as unknown"). When one is
     // stored, it joins the compared row.
@@ -5892,8 +5948,8 @@ fn test_itoa_whole_graph_equality() {
         ) && node.node_reachable_outside_crate_flag.is_none()
             && node.node_signature_text.is_none()
     }));
-    let expected_rows = collect_expected_graph_rows();
-    let stored_rows = collect_production_graph_rows(&input, &labels);
+    let expected_rows = collect_expected_graph_rows(files.edge_file_name);
+    let stored_rows = collect_production_graph_rows(input, &labels);
     let count_row_copies = |rows: &[String]| {
         rows.iter()
             .fold(std::collections::BTreeMap::new(), |mut counts, row| {
