@@ -2210,6 +2210,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "parseltongue-graph-dataset-loader"
+version = "0.1.0"
+dependencies = [
+ "duckdb",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "parseltongue-port-macro-expander"
 version = "0.1.0"
 dependencies = [

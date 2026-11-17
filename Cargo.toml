@@ -10,6 +10,7 @@ members = [
     "crates/parseltongue-cli-dispatcher-binary",
     "crates/parseltongue-port-macro-expander",
     "crates/parseltongue-macro-span-records",
+    "crates/parseltongue-graph-dataset-loader",
 ]
 resolver = "3"
 
