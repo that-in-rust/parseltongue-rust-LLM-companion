@@ -164,3 +164,87 @@ of 2026-11-16 agrees.
 `PointeeSized` (its `#[lang = "pointee_sized"]` declaration in `marker.rs` is one
 candidate), written as a requirement first. When built, the label moves out of the
 builder's list of unmerged labels and the graph is frozen again.
+
+## Navigation-data additions from the research
+
+Added 2026-11-17, from the source-backed navigation critique and the 80-repository
+[research synthesis](https://app.devin.ai/sessions/ddc1e3dd95934b5a8ea0dcfd9da06478).
+Entries 1–6 remain in force; the additions below do not duplicate their ownership,
+signature or reproducibility work. Row counts and implementation cost are not measured.
+Each addition needs its own source-written expected rows and freeze before producer code.
+
+**These are producer/dataset ideas, not work for the
+[CLI phase](../phase-20261116/ReadMe.md).** That phase consumes the available dataset and
+reports its limitations; none of these additions is a prerequisite for CLI API ideation.
+Nothing here authorizes changing the acceptance run already in progress.
+
+## 8. Role-aware occurrences, including field references
+
+**The navigation need.** A coding agent needs to find each use of a symbol, not just items
+that depend on it. The graph's `reads` relation is for consts/statics, not a general field
+access index. Field representation is already an open decision in the
+[deferred backlog](BACKLOG-deferred-work-open-decisions.md) (OD-4).
+
+**Add beyond that decision:** field identities and source-backed occurrence sites with
+roles such as definition, reference, read, write and import. Start from itoa's named
+`Buffer.bytes` and tuple `DecimalPairs.0` fields. Preserve each source site and its resolved
+target; record an explicit reason when the target or role cannot be proven. Do not infer
+semantic roles from identifier spelling or merge distinct sites into a single edge.
+
+**Before code:** freeze field definitions and their occurrence ranges from pinned source;
+decide their relationship to the existing item graph without silently changing `reads`.
+Extend, rather than replace, entry 5's signatures/visibility/reachability comparison.
+
+## 9. Exact macro template and invocation edit provenance
+
+**The navigation need.** Existing `generates` and `expands` rows identify generated items,
+calls and definitions. An agent also needs the editable source locations and which
+generated items share the template it is about to change.
+
+**Add:** explicit invocation, template-definition and relevant template-fragment anchors
+for generated items/sites, linked to the existing expansion identities and evidence.
+Keep original-source ranges separate from expansion ranges; mark an anchor unavailable
+when exact provenance is not established. Do not present an invocation span as the exact
+definition span of every generated member, or fabricate a one-to-one source range.
+
+**Before code:** write source-backed expectations for representative generated items and
+co-generated groups, then freeze the full addition. Preserve existing provenance records;
+this is an enrichment of their edit routes, not a second macro-expansion engine.
+
+## 10. Source-linked documentation and contracts
+
+**The navigation need.** A signature alone does not tell an agent the documented
+preconditions, safety obligations or usage of an item. Entry 5 remains the signature task;
+this entry concerns documentation associated with that item.
+
+**Add:** rustdoc text and source anchors, preserving sections such as Safety, Panics,
+Errors and Examples where present. Keep documentation written in source separate from
+generated explanations and from semantic guarantees proved by the mapper. A documented
+claim is evidence of what the author wrote, not proof that every caller satisfies it.
+
+**Before code:** freeze documentation ownership, exact source ranges and text/digests from
+pinned itoa. Define how macro-generated items inherit or cite template documentation;
+record an unavailable association rather than guessing. Do not ingest examples or tests
+as graph inputs implicitly just because documentation mentions them.
+
+## 11. Explicit source-scope and availability records
+
+**The navigation need.** An absent caller can mean no recorded caller, excluded source,
+inactive configuration or unsupported analysis. A coding agent must not read all of those
+as "unused". The source scope also determines what absence a query can truthfully claim.
+
+**Add or make explicit from existing input records:** the indexed source manifest, content
+digests, build/cfg assumptions, and per-source indexed/excluded/inactive/unsupported/failed
+states with typed reasons. Distinguish unresolved semantic sites from deliberately
+excluded or inactive sites; identify external declarations separately from bodies read.
+Entry 4 owns the declaration/body flag correction; this entry does not duplicate it.
+
+Benchmarks, tests and examples outside the current graph stay explicitly outside it.
+Widening that scope is a separate source/expected-data decision, not a query fallback.
+Tie any new coverage records to the producer generation and frozen input identities;
+freshness must not silently describe a different working tree as the indexed snapshot.
+
+**Before code:** inventory existing persisted input/availability records so they are reused,
+then freeze the missing coverage expectations, including negative and excluded cases.
+The CLI can expose existing coverage facts now and report unavailable facts without
+building these producer records itself.
