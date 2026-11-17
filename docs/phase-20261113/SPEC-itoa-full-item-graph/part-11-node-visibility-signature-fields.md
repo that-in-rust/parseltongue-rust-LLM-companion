@@ -2,12 +2,13 @@
 
 Back to the [index](README.md).
 
-Status on 2026-11-17: **specified, not built.** Picked by the user on 2026-11-17 ("is it
-public API, and what does it take and return"). Built after part 12, whose edge from a
-module to its file area this part walks.
+Status on 2026-11-17: **built** (code `28f1db595`). A run of pinned itoa equals the
+re-frozen expected graph with the three fields compared on every node, for both scopes.
+Picked by the user on 2026-11-17 ("is it public API, and what does it take and return").
+Built after part 12, whose edge from a module to its file area this part walks.
 
-**The defect.** Every item node stores visibility `Unknown`, no reachability and no
-signature. A reader must open the source for each node to learn whether it is public API
+**The defect it fixed.** Every item node stored visibility `Unknown`, no reachability and no
+signature. A reader had to open the source for each node to learn whether it is public API
 and what it takes and returns.
 
 **The change.** Three fields of the node row are filled from source, and compared with
@@ -187,7 +188,44 @@ A3         test_generated_nodes_read_twice and the S4 runs       real source
 
 ## 6. Quality gate results
 
-Not run: nothing is built.
+Measured on 2026-11-17 at code commit `28f1db595`.
+
+```text
+cargo fmt --all -- --check                                              exit 0
+cargo clippy --release --workspace --all-targets --all-features         exit 0
+tests  parseltongue-core-row-types            26 passed, 0 failed (3 new)
+       parseltongue-syntax-span-extractor     177 + 17 passed, 0 failed (3 new)
+       parseltongue-duckdb-analysis-adapter   188 passed, 0 failed
+       parseltongue-turso-store-adapter       46 + 22 + 4 passed, 0 failed, 3 ignored
+       itoa-source-acceptance-tests           63 passed, 0 failed, 1007.70 s
+expected-data tests (python)                  25 passed
+production run, 4 workers, scope declarations exit 0, 22.46 s, 368,704 kB peak
+  exported node rows   170: 46 Public, 26 PrivateEquivalent, 1 RestrictedNonPrivate,
+                       15 NotApplicable, 82 without; reachable 19 true, 69 false,
+                       82 without; 88 signatures
+```
+
+Not run: the workspace-wide test gate. It runs once, with the final acceptance.
+
+Deviations from the repository rules, each as it happened:
+
+- **Test first.** The two equality tests were seen failing on the three fields (step
+  11.2: 90 nodes differ). The unit tests of the printer, of the visibility text and of the
+  rules each failed first against a stub. The pass `resolve_node_visibility_fields` has no
+  fixture test of its own; the real-source equality tests cover it.
+- **Gates.** The real-source suite was not run at the commits of steps 11.3 and 11.4
+  (the two equality tests were red by design until 11.5). The commit of step 11.5 was
+  pushed, at the user's request, while the suite was still running; it then passed.
+- **Two stale tests the gates found.** A DuckDB adapter fixture test still asserted the
+  old placeholder values, and a Turso adapter gate test still expected DuckDB without the
+  `json` feature (missed in part 10, because the workspace tests were not run after it).
+  Both are fixed.
+- **One correction to the expected graph** (file areas, top of this file).
+
+codebase-memory queries: `trace_path extract_file_syntax_rows` inbound (9 callers);
+`trace_path resolve_node_visibility_fields` both directions (caller
+`publish_full_graph_checkpoint`; callees `read_impl_member_owners`,
+`derive_node_reach_fields`); re-indexed after each code commit.
 
 ## 7. Open questions
 
