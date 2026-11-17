@@ -150,3 +150,91 @@ Return `unsupported`, `missing`, or `unknown`, not an empty success; absence doe
 **Sources:** [S80FIELD: supplements/80-repository-synthesis-draft.md L127–L139 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FVIS L207–L241](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L207-L241); [FOWN L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171); [FMACRO L14–L30](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/declarative-macro-expansion-records.rs#L14-L30); [FBACKLOG L198–L220](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261113/immediate-backlog.md#L198-L220); [EDITORIAL: inputs/editorial-design.md L20–L39 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz)
 
 
+<a id="cli-cnd-008"></a>
+
+### CLI-CND-008 — `query-list-symbol-docs` · P2 · C
+
+**Job:** List exact documentation sections attached to an item when documentation ranges are published.
+
+**Inputs:** Item ID; doc-section limit; source digest policy.
+
+**Outputs:** Stored doc ranges with source provenance or typed unavailable state; no LLM summary/fact.
+
+**Evidence:** Current schema/code is only a candidate source; actual compatible published rows and capability coverage are unverified.
+
+**Bounds/completeness:** Return `unsupported`, `missing`, or `unknown`, not an empty success; absence does not authorize producer/schema work in this phase.
+
+**Dependencies:** Published documentation ranges and item association; actual rows unverified.
+
+**Sources:** [S80FIELD: supplements/80-repository-synthesis-draft.md L127–L139 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FVIS L207–L241](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L207-L241); [FOWN L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171); [FMACRO L14–L30](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/declarative-macro-expansion-records.rs#L14-L30); [FBACKLOG L198–L220](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261113/immediate-backlog.md#L198-L220); [EDITORIAL: inputs/editorial-design.md L20–L39 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz)
+
+
+## Rejected/deferred X concepts — no CLI verbs
+
+These stable IDs exist only to preserve route/reviewer rationale. They are not API records, do not have canonical verbs and are not commands to implement.
+
+
+### CLI-X-001 — Semantic intent / embeddings · Later · X
+
+**Canonical verb:** none; rejected concept, not a command.
+
+**Reason:** No embeddings, semantic model or new retrieval index; exact/lexical navigation remains the bounded fallback.
+
+**Status:** Rejected from this phase; not a CLI command.
+
+**Sources:** [S80LIMITS: supplements/80-repository-synthesis-draft.md L16–L26 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROADMAP: supplements/80-repository-synthesis-draft.md L356–L415 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [PHASE L14–L39](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261116/ReadMe.md#L14-L39)
+
+
+### CLI-X-002 — Runtime behavior / traces · Later · X
+
+**Canonical verb:** none; rejected concept, not a command.
+
+**Reason:** Static published edges are not runtime traces or dynamic behavior.
+
+**Status:** Rejected from this phase; not a CLI command.
+
+**Sources:** [S80LIMITS: supplements/80-repository-synthesis-draft.md L16–L26 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROADMAP: supplements/80-repository-synthesis-draft.md L356–L415 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [PHASE L14–L39](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261116/ReadMe.md#L14-L39)
+
+
+### CLI-X-003 — Change risk / technical-debt prediction · Later · X
+
+**Canonical verb:** none; rejected concept, not a command.
+
+**Reason:** No calibrated defect probability, safe-change claim or debt-hour score is supported by graph metrics.
+
+**Status:** Rejected from this phase; not a CLI command.
+
+**Sources:** [S80LIMITS: supplements/80-repository-synthesis-draft.md L16–L26 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROADMAP: supplements/80-repository-synthesis-draft.md L356–L415 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [PHASE L14–L39](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261116/ReadMe.md#L14-L39)
+
+
+### CLI-X-004 — Affected-test selection / execution coverage · Later · X
+
+**Canonical verb:** none; rejected concept, not a command.
+
+**Reason:** Test-to-code and execution-coverage facts are absent or unverified; structural test candidates are not coverage.
+
+**Status:** Rejected from this phase; not a CLI command.
+
+**Sources:** [S80LIMITS: supplements/80-repository-synthesis-draft.md L16–L26 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROADMAP: supplements/80-repository-synthesis-draft.md L356–L415 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [PHASE L14–L39](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261116/ReadMe.md#L14-L39)
+
+
+### CLI-X-005 — Reindex or republish workspace · Later · X
+
+**Canonical verb:** none; rejected concept, not a command.
+
+**Reason:** Mutation, source editing, extraction and reindexing are outside read-only navigation.
+
+**Status:** Rejected from this phase; no query verb exists.
+
+**Sources:** [S80LIMITS: supplements/80-repository-synthesis-draft.md L16–L26 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROADMAP: supplements/80-repository-synthesis-draft.md L356–L415 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [PHASE L14–L39](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261116/ReadMe.md#L14-L39)
+
+
+### CLI-X-006 — Watcher / HTTP / MCP lifecycle · Later · X
+
+**Canonical verb:** none; rejected concept, not a command.
+
+**Reason:** Background watcher, HTTP/MCP implementation and service lifecycle are not required or authorized here.
+
+**Status:** Rejected from this phase; no query verb exists.
+
+**Sources:** [S80LIMITS: supplements/80-repository-synthesis-draft.md L16–L26 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROADMAP: supplements/80-repository-synthesis-draft.md L356–L415 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [PHASE L14–L39](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/docs/phase-20261116/ReadMe.md#L14-L39)
