@@ -19,9 +19,9 @@ run report is in the [log](LOG-itoa-full-item-graph-progress.md).**
 
 ```text
 itoa run, scope declarations, equal to the frozen expected graph
-nodes  170    88 items of itoa, 66 names outside itoa (19 of them methods declared in core),
-              13 builtin types, 2 file areas, 1 crate root
-edges  684    calls 197 (196 with a target), uses_type 203, reads 98, contains 90,
+nodes  172    88 items and 2 fields of itoa, 66 names outside itoa (19 of them methods
+              declared in core), 13 builtin types, 2 file areas, 1 crate root
+edges  686    calls 197 (196 with a target), uses_type 203, reads 98, contains 92,
               generates 45, expands 15, implements 32, imports 4
 open          the items under "Open" below; the expected graph was checked by its author alone
 ```
@@ -180,8 +180,9 @@ general behaviour, nothing keyed on itoa names.
   identity, self type and trait are metadata, never a second parent.
 - **Variants and fields (OD-4, decided 2026-11-18 by Rule 6, SPEC part 13).** An enum
   variant and a struct or union field are nodes, each contained by its type, and a type or
-  read written in a field is an edge from the field. Cost on itoa: 2 nodes and 2 rows.
-  Specified, not built. An edge for each use of a field is not part of it (backlog).
+  read written in a field is an edge from the field. Cost on itoa: 2 nodes and 2 rows
+  (measured). Built on 2026-11-18. An edge for each use of a field is not part of it
+  (backlog).
 - **Module and file area (OD-7, decided 2026-11-17 by Rule 6, SPEC part 12).** A module
   `contains` the file area of its file: the crate root that of the root file, and a
   `mod name;` module that of the file it names. The relation is `contains` because a file

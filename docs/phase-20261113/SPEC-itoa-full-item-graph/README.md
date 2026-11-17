@@ -34,7 +34,7 @@ part  file                                       requirements                   
 10    part-10-json-extension-built-in.md         068.0                          BUILT 2026-11-17: the mapper runs with an empty HOME and opens no `.duckdb/` path; 62 real-source tests pass
 11    part-11-node-visibility-signature-fields.md  069.0                        built (`28f1db595`): visibility, reachability and signature on every item node, compared by both equality tests
 12    part-12-module-contains-file-area.md       070.0                          BUILT 2026-11-17: a module contains the file area of its file; a run equals both re-frozen graphs (170 nodes, 684 edge rows); 63 real-source tests pass
-13    part-13-variant-and-field-nodes.md         071.0                          specified, not built: enum variants and struct fields as nodes; on itoa 2 nodes, 2 `contains` rows, 4 rows change source
+13    part-13-variant-and-field-nodes.md         071.0                          built (`40cf94ccf`): enum variants and struct fields as nodes; on itoa 2 nodes, 2 `contains` rows, 4 rows change source
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of

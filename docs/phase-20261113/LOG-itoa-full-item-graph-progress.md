@@ -12,11 +12,13 @@ run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method ca
 `core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
 and it is an expected row. The expected graph was written and checked by one author.**
 
-**Since that run the code has changed (2026-11-17, SPEC parts 10 and 12): the `json`
-extension is inside the executable, and each module contains the file area of its file,
-which adds two `contains` rows (684 edge rows). Both expected graphs are re-frozen with
-those rows and the two equality tests pass, but S1 to S4 are NOT STARTED for this head.
-They run once, after parts 11 and 13 to 15.**
+**Since that run the code has changed (SPEC parts 10 to 13, 2026-11-17 and 18): the
+`json` extension is inside the executable; each module contains the file area of its
+file; every item node stores its visibility, whether it is reachable from outside the
+crate, and its signature; and each struct field is a node. The run now stores 172 nodes
+and 686 edge rows. Both expected graphs are re-frozen with those rows and the two
+equality tests pass at `40cf94ccf`, but S1 to S4 are NOT STARTED for this head. They run
+once, after parts 14 and 15.**
 
 **A separate crate copies the exported graph into one DuckDB file, and the full run from
 pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
@@ -49,14 +51,15 @@ real-source tests             58 pass        61 pass
 ### What the pinned itoa run stores (measured, scope `declarations`)
 
 ```text
-nodes  170   88 items of itoa (45 written by macro expansions), 66 names outside itoa
-             (19 of them methods declared in core), 13 builtin types, 2 file areas,
-             1 crate root
-edges  684   relation    rows  with a target
+nodes  172   88 items of itoa (45 written by macro expansions) and 2 fields, 66 names
+             outside itoa (19 of them methods declared in core), 13 builtin types,
+             2 file areas, 1 crate root
+edges  686   relation    rows  with a target
              calls        197   196   (cast has none)
              uses_type    203   203
              reads         98    98
-             contains      90    90   (88 to items, 2 from a module to its file area)
+             contains      92    92   (88 to items, 2 from a module to its file area,
+                                       2 from a struct to its field)
              generates     45    45
              expands       15    15
              implements    32    32
@@ -1657,3 +1660,48 @@ and a run equals both re-frozen expected graphs: 170 nodes, 684 edge rows (scope
   publish_full_graph_checkpoint` outbound; `index_repository` after each code commit.
 - **Next:** part 13, enum variants and struct fields as nodes: spec, expected rows, new
   freeze, then code.
+
+## 2026-11-18 Part 13 built: struct fields and enum variants are nodes
+
+- **Result:** a run of pinned itoa stores `Buffer::bytes` and `DecimalPairs::0` as nodes,
+  each contained by its struct, and equals the re-frozen expected graph for scope
+  `declarations` (172 nodes, 686 edge rows) and `excluded` (153 nodes, 686 edge rows).
+  `test_itoa_declarations_graph_equality` and `test_itoa_whole_graph_equality` pass. S1
+  to S4 are NOT STARTED for this head.
+- **Stored (exported rows of the run below):** both fields have kind `Field`, owner kind
+  `Struct`, `PrivateEquivalent`, not reachable, and their signature. Four rows start at
+  a field: `Buffer::bytes` uses `MaybeUninit` and `u8` and reads
+  `<i128 as Integer>::MAX_STR_LEN`; `DecimalPairs::0` uses `u8`. 92 `contains` rows.
+- **Commits:** expected rows `d18aa3fc6` (13.1); spec `ac799a1bd`; owner kinds, the
+  owner rule and `VariantMember` `9240249ab` (13.3); field span rows, site owner and
+  variant signature `902408ccd` (13.4); projection and visibility pass `ffb60e7c0`
+  (13.5); body-local field fix `40cf94ccf`.
+- **RED (13.2):** the two equality tests, 0 passed and 2 failed, on "nodes expected 172
+  stored 170; edge rows expected 686 stored 684" and "nodes expected 153 stored 151".
+- **Gates at `40cf94ccf`:** `cargo fmt --all -- --check` exit 0; workspace clippy exit 0;
+  core-row-types 28, extractor 181 + 17, DuckDB adapter 189, Turso adapter 46 + 22 + 4
+  tests pass; real-source suite 63 passed, 0 failed, 1012.26 s; 25 expected-data tests.
+- **Run:** `parseltongue map-workspace-full-run ... --worker-thread-count-value 4
+  --sysroot-source-scope-kind declarations`: exit 0, 21.24 s, 346,900 kB peak, 172 node
+  rows, 686 edge rows.
+- **Test names:** `test_member_owner_kind_pairs`, `test_variant_member_reach_rules`,
+  `test_field_span_rows_written`, `test_field_site_owner_rows`,
+  `test_field_signature_text_printed`, `test_body_field_binds_nothing`,
+  `test_member_nodes_are_projected`, and the two equality tests.
+- **First suite run failed 11 of 63:** 13 node, row and label literals that the two new
+  nodes moved (151 to 153 nodes, 90 to 92 `contains` rows, 43 to 45 source-written
+  items, and the source of the `i128::MAX_STR_LEN` read). Each was read and changed;
+  the second full run passed.
+- **A defect of 13.4, fixed before a run showed it:** a field in a function body counted
+  as a name binding in `check_receiver_name_rebound` and `check_call_lexical_shadowing`.
+- **Deviations:** `test_member_nodes_are_projected` was written after the SQL change;
+  no test covers a field written by a macro expansion (G1); the workspace test gate was
+  not run. Listed in section 6 of the part file.
+- **Not built:** an edge for each use of a field (`self.bytes`, `DECIMAL_PAIRS.0`).
+  Backlog, OD-4.
+- **codebase-memory queries:** `trace_path` inbound, depth 1, on
+  `check_syntax_item_node` (6 callers; two of them needed the fix above),
+  `decode_original_item_kinds`, `validate_graph_input_records`,
+  `derive_node_reach_fields`, `find_struct_field_type` and `print_item_signature_text`;
+  `index_repository` after each code commit.
+- **Next:** part 14, stored rows that do not depend on the source directory.

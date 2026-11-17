@@ -58,7 +58,8 @@ Where we are: status is kept in one place, the "Where we are" page at the top of
 
 Graph rules in force:
 
-- Every item outside a function body is a node, private items included.
+- Every item outside a function body is a node, private items included. So is each
+  struct or union field and each enum variant, contained by its type.
 - Each source file has one file-area node. Each `use` is a node.
 - A module contains the file area of its file: the crate root that of the root file, a
   `mod name;` module that of the file it names (SPEC part 12).

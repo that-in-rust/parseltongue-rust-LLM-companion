@@ -242,7 +242,7 @@ Identity:
 Open:
 
 - **G10** Enum variants and struct fields are nodes, each contained by its type (PRD, decided
-  2026-11-18; SPEC part 13, not built).
+  2026-11-18; SPEC part 13, built). A field or variant inside a function body is not.
 - **F12** Does a `pub use` carry both an `imports` and a `reexports` edge?
 - **G4, G5** are rules without a producer: every node stores them empty or unknown.
 
