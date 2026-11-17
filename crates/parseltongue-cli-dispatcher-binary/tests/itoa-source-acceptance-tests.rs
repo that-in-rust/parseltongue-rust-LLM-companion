@@ -6480,3 +6480,81 @@ fn test_module_file_area_rows() {
             .count()
     );
 }
+
+/// Maps the copy of pinned itoa under `parent` and returns its root with the exported
+/// node and edge rows, as the export command prints them.
+fn export_copied_itoa_graph(parent: &Path) -> (PathBuf, String, String) {
+    std::fs::create_dir_all(parent).unwrap();
+    let root = prepare_pinned_itoa_workspace(parent);
+    let database = parent.join("directory-independent-rows.db");
+    let output = run_itoa_mapping_command(
+        &root,
+        &database,
+        &[
+            "--sysroot-source-scope-kind",
+            "declarations",
+            "--mapping-final-stage-kind",
+            "full-item-dependency-graph",
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let export = |table: &str| {
+        let output = Command::new(read_mapper_executable_path())
+            .args([
+                "export-published-stage-rows",
+                "--workspace-store-file-path",
+                database.to_str().unwrap(),
+                "--stage-owned-table-name",
+                table,
+            ])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{table}");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    let (nodes, edges) = (
+        export("item-effective-visibility-records"),
+        export("edge-evidence-record-table"),
+    );
+    (root, nodes, edges)
+}
+
+/// REQ-RUST-072.0 D1, D2: the same source in two directories exports equal node and edge
+/// rows, run id included, and no row holds the text of either directory.
+#[test]
+fn test_itoa_rows_directory_independent() {
+    let directory = tempfile::tempdir().unwrap();
+    let (first_root, first_nodes, first_edges) =
+        export_copied_itoa_graph(&directory.path().join("first"));
+    let (second_root, second_nodes, second_edges) =
+        export_copied_itoa_graph(&directory.path().join("second").join("deeper"));
+    let count_equal_lines = |first: &str, second: &str| {
+        let equal = first
+            .lines()
+            .zip(second.lines())
+            .filter(|(first, second)| first == second)
+            .count();
+        (equal, first.lines().count(), second.lines().count())
+    };
+    // 172 node rows and 686 edge rows, each with one header line.
+    assert_eq!(
+        (
+            count_equal_lines(&first_nodes, &second_nodes),
+            count_equal_lines(&first_edges, &second_edges)
+        ),
+        ((173, 173, 173), (687, 687, 687))
+    );
+    let held = [&first_root, &second_root]
+        .iter()
+        .flat_map(|root| {
+            let text = root.to_str().unwrap().to_owned();
+            [&first_nodes, &first_edges, &second_nodes, &second_edges]
+                .map(|rows| rows.matches(&text).count())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(held, vec![0; 8], "rows that hold a real root");
+}
