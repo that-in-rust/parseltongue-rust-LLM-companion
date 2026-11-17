@@ -225,7 +225,7 @@ No run with `declarations` has been judged. Before one is:
 needed                                                        state on 2026-11-17
 expected target of each of the 133 calls, from source          frozen, one author:
                                                                itoa-expected-core-member-targets.json
-the run names every call the expected rows name                not done: 121 of 133 at the
+the run names every call the expected rows name                not done: 131 of 133 at the
                                                                head, each equal, 0 wrong (log)
 expected graph re-frozen with those targets                    not done
 S1 record of the compiler version and the core digest          the command is in S1; the frozen

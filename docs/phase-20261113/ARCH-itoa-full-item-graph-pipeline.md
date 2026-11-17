@@ -66,17 +66,24 @@ step  function (crate)                                          writes
   passes `declarations` (PRD, decided 2026-11-16).
 - Step 6a runs only with `declarations`. It reads the `.rs` files under
   `<sysroot>/lib/rustlib/src/rust/library/core/src` by syntax
-  (`extract_member_declaration_rows`) and stores five kinds of row: a member of a trait or
+  (`extract_member_declaration_rows`) and stores seven kinds of row: a member of a trait or
   impl (with its return type text, generic names and relaxed bounds), a type name
-  declaration, a `use` leaf of a prelude file, the name tokens of a macro call, and a name
+  declaration, a `use` leaf of a prelude file, the name tokens of a macro call, a name
   a file binds at file level (`file_scope_name_binding`: item, module, extern crate, `use`
-  leaf, glob, or a form whose names are not read). Those files are an input of the run: the
+  leaf, glob, or a form whose names are not read), a macro call written directly in an
+  impl (`impl_macro_call`), and a file-level `macro_rules!` with its arm count
+  (`macro_definition`). A `fn` or `const` in a macro's body is stored with its arm, its
+  nesting depth and its attributes. Those files are an input of the run: the
   SOP freezes them by digest. The run id does not cover them yet (it hashes the compiler
   version).
 - A receiver that is itself a method call into `core` takes the return type that
   declaration writes. A type name in it that `core` declares more than once (`Result`) is
   read only when the file's own scope and the prelude import prove which declaration it is
   (`find_file_scope_type`); the proof is stored on the edge row.
+- A method called on a const of a builtin type (`u8::MAX.ilog10()`) is named when one
+  macro call in `impl u8` is bound, by `#[macro_use]` scope, to one one-arm macro whose
+  body declares both the const and the method (`find_builtin_constant_member`); every row
+  of that chain is stored on the edge row.
 - A method call into `core` is named by the impl's self type as `core` writes it
   (`[T]::len`). When a prelude trait declares the same name and cannot be ruled out, the
   target is stored with that assumption on the row, never without it.
@@ -221,8 +228,11 @@ what                                              why it is hard
 targets for method calls into core (part 8)       needs the receiver's type and core's
                                                   declarations; no lowered types (C2), no
                                                   trait solver. Built for most shapes.
-methods written by a macro in core                ilog10; the syntax scan sees text, not a
-                                                  member
+methods written by a macro in core, beyond the    built only for a one-arm macro called
+proven form                                       once in an impl of a builtin type, found
+                                                  by `#[macro_use]` scope (ilog10). Not built:
+                                                  several arms, impls under `cfg` (usize),
+                                                  a macro called through another macro
 a receiver that is a local variable               string.len(); the type of a `let` binding
                                                   is not read
 an impl with a bound on its type parameter        cast on `*mut T` with `T: PointeeSized`;

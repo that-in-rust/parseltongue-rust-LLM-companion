@@ -369,8 +369,8 @@ general behaviour, nothing keyed on itoa names.
     decided ("Method calls into `core`" above). Done: the expected targets of the 133
     calls are written from source and frozen; the S1 command for the digest of the `core`
     files exists; the code names most of the calls, each equal to its frozen row (counts
-    on the log's "Where we are" page). Not done: `ilog10` (written by a macro in `core`),
-    `len` on a local variable and `cast`; the `core` digest in the run id; the merge of
+    on the log's "Where we are" page). Not done: `len` on a local variable and
+    `cast`; the `core` digest in the run id; the merge of
     the targets into the expected graph and its new freeze; an acceptance run.
 - **Node fields.** Visibility, reachability outside the crate and signature text are not
   filled on any node, and the whole-graph test does not compare them.

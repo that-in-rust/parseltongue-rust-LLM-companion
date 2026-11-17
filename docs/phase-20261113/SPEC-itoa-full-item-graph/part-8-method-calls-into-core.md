@@ -1,7 +1,7 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-17: **121 of the 133 calls are named and equal their frozen rows, 12 have
-no target (sections 10 to 12 and REQ-RUST-062.0 built). The order changed by user decision: the expected target of all 133 calls is written
+Status on 2026-11-17: **131 of the 133 calls are named and equal their frozen rows, 2 have
+no target (sections 10 to 12, REQ-RUST-062.0 and REQ-RUST-063.0 built). The order changed by user decision: the expected target of all 133 calls is written
 from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
 it.** Counts are on the log's "Where we are" page.
 
@@ -959,12 +959,19 @@ M2   Stored rows. For each `macro_rules! NAME` that is a direct child of a core 
      texts and the number of its arms. A file scope row of a module already stores its
      attribute texts (`#[macro_use]`).
 M3   Stored rows. A macro body row SHALL also be stored for `const NAME : TYPE` written as
-     tokens, with the type text. Every macro body row (fn or const) SHALL store:
-       macro_body_brace_depth      braces between the arm's body and the item (0 = directly
-                                   in the arm's body)
-       macro_body_repetition_flag  whether the item is inside `$( .. )`
-       member_attribute_text_values  the `#[..]` written directly before the item
-       macro_arm_ordinal_value     which arm of the macro holds it
+     tokens (not after `<` or `,`: a const generic parameter), with the type text and
+     member_item_kind_value const (fn for the older rows). Every row of a `macro_rules!`
+     body (fn or const) SHALL store:
+       macro_arm_ordinal_value     which arm of the macro holds it (0 = the first)
+       macro_body_nesting_depth    bracket pairs of any kind between the arm's body and the
+                                   item (0 = directly in the arm's body); null when the
+                                   item is in an arm's pattern
+       macro_body_repetition_flag  whether one of those pairs is `$( .. )`
+       member_attribute_text_values  the `#[..]` written directly before the item (a doc
+                                   comment between them is passed over)
+       macro_item_boundary_flag    whether the tokens before the item and its attributes
+                                   end at the opening bracket, a `;` or a `}`; when not
+                                   (`$(#[$m])* fn ..`), the call may add an attribute
 M4   The macro NAME called in file F at offset O stands for the definition D when, going
      back from O over the file scope rows of F, the first row that can define a macro is:
      (a) a macro_definition row named NAME: D is it; or
@@ -978,23 +985,25 @@ M4   The macro NAME called in file F at offset O stands for the definition D whe
      named NAME and no other row that can define a macro is passed over. Anything else
      found first leaves the name unproven.
 M5   The builtin type B has the inherent member NAME of kind K (const | fn) declared at D
-     when all of these hold:
-     - exactly one impl_macro_call row in core has self type text B, no trait, no generic
-       parameter, and a macro whose body holds NAME (below); neither the impl nor the
-       call has an attribute text containing `cfg`;
-     - every impl of core whose self type text is B (written out or impl_macro_call) has
-       no `cfg` attribute, so no impl of B is left unread;
+     when exactly one pair (impl_macro_call row, body row) of core has all of these:
+     - the call's impl has self type text B, no trait and no generic parameter; neither
+       the impl nor the call has an attribute text containing `cfg`;
      - the macro name stands for one definition by M4, and that macro has one arm;
-     - that macro's body rows hold exactly one row named NAME of kind K, with brace depth
-       0, no repetition, no attribute text containing `cfg`, and for a fn a `self`
-       parameter; no body row of that macro takes its name from a macro variable.
-     D is that body row.
+     - the body row is in that macro (it stores the offset of the name of the
+       `macro_rules!` that holds it), is named NAME (not through a macro variable), has
+       kind K, nesting depth 0, no repetition, the boundary flag, no attribute text
+       containing `cfg`, and for a fn a `self` parameter;
+     and no inherent impl of core written out for B declares NAME. D is the body row.
+     Such a declaration is in force in every configuration, so by the rule above no other
+     macro call and no other impl of B can declare NAME: the other macro calls in impls
+     of B need not be read.
 M6   A receiver that is one value path `B::NAME` and nothing else, where the stored type
      lookup of the prefix resolves B to a builtin type, has the type B when M5 proves a
      const NAME on B whose type text is `Self` or B. Then the method is looked up by M5
      with kind fn, the receiver taken by value. The target label is `B::method`, crate
-     core, owner kind inherent_impl, proof kind core_macro_body_member.
-     Withheld, with what was found stored: builtin_macro_member_unproven.
+     core, owner kind inherent_impl; the record's receiver_type_proof_kind is
+     builtin_constant_declared_type. Withheld, with what was found stored:
+     builtin_macro_member_unproven.
 M7   The lookup record SHALL carry: the builtin name; for the const and for the method,
      the file and offsets of the impl_macro_call row, of the macro definition and of the
      body row; the M4 kind (same_file | macro_use_module) with the module row's offsets;
@@ -1023,8 +1032,35 @@ M8   No assumption is stored for these rows: each step is a stored row. The run 
 
 | Req | Test | Level | Case | Expected |
 |---|---|---|---|---|
-| M1 to M3 | sysroot declaration row test | unit | an impl with a macro call; a file-level macro with two arms; `const` and `fn` at depth 0, in inner braces, in a repetition, under `cfg` | the rows |
+| M1 to M3 | sysroot declaration row test | unit | an impl with a macro call; a file-level macro with two arms; `const` and `fn` at depth 0, in inner braces, in a repetition, under `cfg`; a const generic parameter | the rows |
 | M4 | macro impl member test | unit | same file; `#[macro_use]` module; a later second definition; a macro call in between; `cfg` or `#[path]` on the module; a second definition in a module without `#[macro_use]` | D; not proven |
-| M5 | macro impl member test | unit | `impl u8 { m! {} }`; two impls with the macro; an impl under `cfg`; two arms; the name twice; in inner braces | D; not proven |
-| M6, M7 | fixture | unit | `u8::MAX.ilog10()`; a const of another type; a local type named like the prefix | `u8::ilog10` with the record; no target |
+| M5 | macro impl member test | unit | `impl u8 { m! {} }` beside a call of an unread macro; two proven pairs; an impl or a call under `cfg`; two arms; the name written out in an impl; in inner braces; in a repetition | D; not proven |
+| M6, M7 | fixture | unit | `u8::MAX.ilog10()`; a const of another type (`u8::BITS`); a method the call may give an attribute; a type with no macro call (`usize`); a field after the path | `u8::ilog10` with the record; builtin_macro_member_unproven (3); receiver_type_not_determined |
 | M1 to M8 | test_itoa_core_member_targets | real source | the 10 `ilog10` calls equal their frozen rows | wrong 0 |
+
+### Measured after M1 to M8 were built (2026-11-17, working tree after `61030b47d`)
+
+```text
+method calls into core, named and equal   131 of 133   wrong 0
+  1 each  u8 u16 u32 u64 u128 i8 i16 i32 i64 i128 ::ilog10
+without a target                            2
+   1  len      receiver_type_not_determined   (a local `&str`)
+   1  cast     inherent_member_unproven       (C7)
+nodes 169 (ten new external targets), edge rows 682
+```
+
+Each of the 10 rows stores, for `MAX` and for `ilog10`: the macro call in the impl
+(`core/src/num/mod.rs`), the `#[macro_use]` module row, the macro definition and the body
+row (`core/src/num/uint_macros.rs` or `int_macros.rs`), each with its offsets, and the
+rule `inherent_item_declared_once`. Command and resource numbers are in the log entry of
+2026-11-17.
+
+Three things the real `core` source showed that the first draft of this section missed:
+
+- `core/src/num/imp/int_bits.rs` defines a second macro named `uint_impl`. A body row
+  therefore stores the offset of the name of the `macro_rules!` that holds it, and M5
+  joins on that offset, not on the macro's name.
+- A doc comment between an attribute and an item is its own token, not trivia. The
+  attribute read passes over it.
+- A macro call row and a member row can have the same file and offset, so the stored key
+  of an `impl_macro_call` row ends in its kind, like a file scope row.

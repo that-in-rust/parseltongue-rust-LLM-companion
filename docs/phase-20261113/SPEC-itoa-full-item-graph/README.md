@@ -26,7 +26,7 @@ part  file                                       requirements                   
 5     part-5-macro-generated-items.md            046.0 050.0 051.0 052.0        5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
 7     part-7-whole-graph-acceptance.md           043.1, 044.0 to 044.3          acceptance run passed S1 to S4 on 2026-11-16 (log)
-8     part-8-method-calls-into-core.md           054.0 to 063.0                 121 of 133 calls named and equal; 12 open (ilog10, str::len, cast); not accepted
+8     part-8-method-calls-into-core.md           054.0 to 063.0                 131 of 133 calls named and equal; 2 open (str::len, cast); not accepted
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of
