@@ -108,12 +108,15 @@ pub(crate) fn persist_sysroot_member_rows(
 }
 
 /// The key of a declaration row: its file and the offset of its name. A file scope row
-/// (REQ-RUST-062.0 C9) shares that offset with the declaration row of the same name, so
-/// its key also says its kind.
+/// (REQ-RUST-062.0 C9) shares that offset with the declaration row of the same name, and
+/// a macro call in an impl (REQ-RUST-063.0 M1) with the row of the names its file's
+/// calls of that macro write, so the key of either also says its kind.
 fn build_declaration_row_key(relative: &str, row: &serde_json::Value) -> String {
     let offset = &row["member_name_start_offset"];
     match row["declaration_owner_kind_value"].as_str() {
-        Some(kind @ "file_scope_name_binding") => format!("{relative}#{offset}#{kind}"),
+        Some(kind @ ("file_scope_name_binding" | "impl_macro_call")) => {
+            format!("{relative}#{offset}#{kind}")
+        }
         _ => format!("{relative}#{offset}"),
     }
 }

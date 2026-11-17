@@ -1,4 +1,8 @@
 //! REQ-RUST-054.0: the methods a sysroot source file declares, from syntax only.
+use crate::macro_body_item_records::{
+    count_macro_rule_arms, read_const_type_text, read_item_attribute_texts,
+    read_macro_body_position,
+};
 use ra_ap_syntax::{
     AstNode, Direction, Edition, NodeOrToken, SourceFile, SyntaxKind, SyntaxNode, SyntaxToken,
     TextRange,
@@ -24,7 +28,11 @@ pub fn extract_member_declaration_rows(
         .descendants()
         .flat_map(|node| match node.kind() {
             SyntaxKind::IMPL => ast::Impl::cast(node)
-                .map(|owner| list_impl_member_rows(source_relative_path, &owner))
+                .map(|owner| {
+                    let mut rows = list_impl_member_rows(source_relative_path, &owner);
+                    rows.extend(list_impl_macro_rows(source_relative_path, &owner));
+                    rows
+                })
                 .unwrap_or_default(),
             SyntaxKind::TRAIT => ast::Trait::cast(node)
                 .map(|owner| list_trait_member_rows(source_relative_path, &owner))
@@ -171,6 +179,15 @@ fn list_scope_binding_rows(path: &str, node: &SyntaxNode) -> Vec<Value> {
         SyntaxKind::MACRO_CALL | SyntaxKind::EXTERN_BLOCK => {
             vec![row("unread_form", None, None, None)]
         }
+        // REQ-RUST-063.0 M2
+        SyntaxKind::MACRO_RULES => named()
+            .map(|bound| {
+                let mut found = row("macro_definition", None, Some(bound), None);
+                found["macro_arm_count_value"] = json!(count_macro_rule_arms(node));
+                found
+            })
+            .into_iter()
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -291,6 +308,40 @@ fn list_impl_member_rows(path: &str, owner: &ast::Impl) -> Vec<Value> {
         ),
     };
     list_owned_function_rows(path, owner.assoc_item_list(), &value)
+}
+
+/// REQ-RUST-063.0 M1: one row per macro call written as a direct item of an impl that
+/// is a direct child of its source file.
+fn list_impl_macro_rows(path: &str, owner: &ast::Impl) -> Vec<Value> {
+    owner
+        .assoc_item_list()
+        .filter(|_| check_file_scope_parent(owner.syntax()))
+        .into_iter()
+        .flat_map(|list| list.assoc_items())
+        .filter_map(|item| match item {
+            ast::AssocItem::MacroCall(call) => call.path().map(|name| (call, name)),
+            _ => None,
+        })
+        .map(|(call, name)| {
+            let range = name.syntax().text_range();
+            json!({
+                "declaration_source_relative_path":path,
+                "member_name_start_offset":usize::from(range.start()),
+                "member_name_end_offset":usize::from(range.end()),
+                "member_declared_name_value":null,
+                "member_name_parameter_flag":false,
+                "declaration_owner_kind_value":"impl_macro_call",
+                "owner_macro_name_value":read_syntax_node_text(name.syntax()),
+                "impl_self_type_text":owner.self_ty().map(|ty| read_syntax_node_text(ty.syntax())),
+                "owner_trait_path_text":owner.trait_().map(|ty| read_syntax_node_text(ty.syntax())),
+                "impl_generic_parameter_text":owner
+                    .generic_param_list()
+                    .map(|list| read_syntax_node_text(list.syntax())),
+                "owner_attribute_text_values":list_attribute_text_values(owner),
+                "member_attribute_text_values":list_attribute_text_values(&call),
+            })
+        })
+        .collect()
 }
 
 fn list_generic_declaration_nodes(list: Option<ast::GenericParamList>) -> Vec<SyntaxNode> {
@@ -706,8 +757,66 @@ fn build_prelude_leaf_row(path: &str, node: &SyntaxNode) -> Option<Value> {
     }))
 }
 
+/// One item written as tokens: its keyword, the tokens of its name, and what it is.
+struct MacroTokenItemValue<'a> {
+    item_kind: &'static str,
+    declared_name: String,
+    keyword_token: &'a SyntaxToken,
+    name_first_token: &'a SyntaxToken,
+    name_last_token: &'a SyntaxToken,
+    name_parameter_flag: bool,
+    written_type_text: Option<String>,
+}
+
+/// The item whose keyword is the token at `at`: `fn NAME`, `fn $name`, or
+/// `const NAME :` (REQ-RUST-063.0 M3) that is not a const generic parameter.
+fn read_macro_token_item(tokens: &[SyntaxToken], at: usize) -> Option<MacroTokenItemValue<'_>> {
+    let [keyword, first, second] = tokens.get(at..at + 3)? else {
+        return None;
+    };
+    let item = |item_kind, declared_name, last, parameter, written| MacroTokenItemValue {
+        item_kind,
+        declared_name,
+        keyword_token: keyword,
+        name_first_token: first,
+        name_last_token: last,
+        name_parameter_flag: parameter,
+        written_type_text: written,
+    };
+    match (keyword.kind(), first.kind(), second.kind()) {
+        (SyntaxKind::FN_KW, SyntaxKind::IDENT, _) => {
+            Some(item("fn", first.text().to_owned(), first, false, None))
+        }
+        (SyntaxKind::FN_KW, SyntaxKind::DOLLAR, SyntaxKind::IDENT) => Some(item(
+            "fn",
+            format!("${}", second.text()),
+            second,
+            true,
+            None,
+        )),
+        (SyntaxKind::CONST_KW, SyntaxKind::IDENT, SyntaxKind::COLON)
+            if !at
+                .checked_sub(1)
+                .and_then(|before| tokens.get(before))
+                .is_some_and(|before| {
+                    matches!(before.kind(), SyntaxKind::L_ANGLE | SyntaxKind::COMMA)
+                }) =>
+        {
+            Some(item(
+                "const",
+                first.text().to_owned(),
+                first,
+                false,
+                Some(read_const_type_text(second)),
+            ))
+        }
+        _ => None,
+    }
+}
+
 /// REQ-RUST-054.0 D3, D8: `fn NAME` and `fn $name` written as tokens in a macro
-/// definition or in the arguments of a macro call.
+/// definition or in the arguments of a macro call. REQ-RUST-063.0 M3: `const NAME`
+/// too, and for a `macro_rules!` where in its body each item is.
 fn list_macro_token_rows(
     path: &str,
     definition: &SyntaxNode,
@@ -719,42 +828,43 @@ fn list_macro_token_rows(
         .filter_map(|element| element.into_token())
         .filter(|token| !token.kind().is_trivia())
         .collect::<Vec<SyntaxToken>>();
-    tokens
-        .windows(3)
-        .filter(|window| window[0].kind() == SyntaxKind::FN_KW)
-        .filter_map(|window| match (window[1].kind(), window[2].kind()) {
-            (SyntaxKind::IDENT, _) => {
-                Some((window[1].text().to_owned(), &window[1], &window[1], false))
-            }
-            (SyntaxKind::DOLLAR, SyntaxKind::IDENT) => Some((
-                format!("${}", window[2].text()),
-                &window[1],
-                &window[2],
-                true,
-            )),
-            _ => None,
-        })
-        .map(|(name, first, last, parameter)| {
+    let name_offset = definition
+        .children()
+        .find_map(ast::Name::cast)
+        .map(|name| usize::from(name.syntax().text_range().start()));
+    (0..tokens.len())
+        .filter_map(|at| read_macro_token_item(&tokens, at))
+        .map(|item| {
+            let (attributes, boundary) = read_item_attribute_texts(item.keyword_token);
+            let position = read_macro_body_position(item.keyword_token, definition);
             json!({
                 "declaration_source_relative_path":path,
-                "member_name_start_offset":usize::from(first.text_range().start()),
-                "member_name_end_offset":usize::from(last.text_range().end()),
-                "member_declared_name_value":name,
-                "member_name_parameter_flag":parameter,
+                "member_name_start_offset":usize::from(item.name_first_token.text_range().start()),
+                "member_name_end_offset":usize::from(item.name_last_token.text_range().end()),
+                "member_declared_name_value":item.declared_name,
+                "member_name_parameter_flag":item.name_parameter_flag,
                 "declaration_owner_kind_value":owner_kind,
                 "impl_self_type_text":null,
                 "impl_generic_parameter_text":null,
                 "impl_generic_parameter_names":null,
                 "impl_bound_restriction_flag":null,
-                "macro_self_parameter_flag":check_macro_self_parameter(last),
-                "macro_owner_shape_kind":read_macro_owner_shape(first),
+                "macro_self_parameter_flag":item.item_kind == "fn"
+                    && check_macro_self_parameter(item.name_last_token),
+                "macro_owner_shape_kind":read_macro_owner_shape(item.keyword_token),
+                "member_item_kind_value":item.item_kind,
+                "member_written_type_text":item.written_type_text,
+                "macro_arm_ordinal_value":position["macro_arm_ordinal_value"],
+                "macro_body_nesting_depth":position["macro_body_nesting_depth"],
+                "macro_body_repetition_flag":position["macro_body_repetition_flag"],
+                "macro_item_boundary_flag":boundary,
                 "type_declaration_kind_value":null,
                 "owner_trait_path_text":null,
                 "owner_macro_name_value":macro_name,
+                "owner_macro_name_offset":name_offset,
                 "member_self_parameter_kind":null,
                 "member_self_parameter_text":null,
                 "member_return_type_text":null,
-                "member_attribute_text_values":[],
+                "member_attribute_text_values":attributes,
                 "owner_attribute_text_values":[],
                 "owner_function_body_flag":check_function_body_ancestry(definition),
             })
