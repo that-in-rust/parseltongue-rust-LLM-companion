@@ -1,6 +1,7 @@
 //! REQ-RUST-054.0: the methods a sysroot source file declares, from syntax only.
 use ra_ap_syntax::{
     AstNode, Direction, Edition, NodeOrToken, SourceFile, SyntaxKind, SyntaxNode, SyntaxToken,
+    TextRange,
     ast::{self, HasAttrs, HasGenericParams, HasName, HasTypeBounds, HasVisibility},
 };
 use serde_json::{Value, json};
@@ -56,9 +57,136 @@ pub fn extract_member_declaration_rows(
             _ => Vec::new(),
         })
         .chain(list_macro_call_rows(source_relative_path, tree.syntax()))
+        .chain(list_file_scope_rows(source_relative_path, tree.syntax()))
         .collect::<Vec<_>>();
     rows.sort_by_key(|row| row["member_name_start_offset"].as_u64());
     rows
+}
+
+/// The name a `use` leaf binds, with the range that writes it, and the full path the leaf
+/// names. `self` binds the name before it; `as _` binds nothing.
+fn read_use_leaf_binding(tree: &ast::UseTree) -> (Option<(String, TextRange)>, String) {
+    let mut written = tree
+        .syntax()
+        .ancestors()
+        .filter_map(ast::UseTree::cast)
+        .filter_map(|holder| holder.path())
+        .map(|path| read_syntax_node_text(path.syntax()).replace(char::is_whitespace, ""))
+        .collect::<Vec<_>>();
+    written.reverse();
+    let joined = written.join("::");
+    let path = joined.strip_suffix("::self").unwrap_or(&joined).to_owned();
+    let bound = match tree.rename() {
+        Some(rename) => rename
+            .name()
+            .map(|name| (name.text().to_string(), name.syntax().text_range())),
+        None => tree
+            .path()
+            .and_then(|path| path.segment())
+            .and_then(|segment| segment.name_ref())
+            .zip(path.rsplit("::").next().map(str::to_owned))
+            .map(|(written, name)| (name, written.syntax().text_range())),
+    };
+    (bound, path)
+}
+
+/// REQ-RUST-062.0 C9: the rows of one direct child of a source file: what it may bind in
+/// the type namespace of the file's module.
+fn list_scope_binding_rows(path: &str, node: &SyntaxNode) -> Vec<Value> {
+    let attributes = ast::AnyHasAttrs::cast(node.clone())
+        .map(|owner| list_attribute_text_values(&owner))
+        .unwrap_or_default();
+    let row = |form: &str,
+               kind: Option<&str>,
+               bound: Option<(String, TextRange)>,
+               leaf: Option<String>| {
+        let range = bound
+            .as_ref()
+            .map_or_else(|| node.text_range(), |(_, range)| *range);
+        json!({
+            "declaration_owner_kind_value":"file_scope_name_binding",
+            "declaration_source_relative_path":path,
+            "member_name_start_offset":usize::from(range.start()),
+            "member_name_end_offset":usize::from(range.end()),
+            "member_declared_name_value":bound.map(|(name, _)| name).filter(|name| !name.is_empty()),
+            "scope_binding_form_kind":form,
+            "type_declaration_kind_value":kind,
+            "use_leaf_path_text":leaf,
+            "member_attribute_text_values":attributes,
+        })
+    };
+    let named = || {
+        node.children()
+            .find_map(ast::Name::cast)
+            .map(|name| (name.text().to_string(), name.syntax().text_range()))
+    };
+    let item = |kind| named().map(|bound| row("item", Some(kind), Some(bound), None));
+    match node.kind() {
+        SyntaxKind::STRUCT => item("struct").into_iter().collect(),
+        SyntaxKind::ENUM => item("enum").into_iter().collect(),
+        SyntaxKind::UNION => item("union").into_iter().collect(),
+        SyntaxKind::TRAIT => item("trait").into_iter().collect(),
+        SyntaxKind::TYPE_ALIAS => item("type_alias").into_iter().collect(),
+        SyntaxKind::MODULE => {
+            let kind = match ast::Module::cast(node.clone()).and_then(|module| module.item_list()) {
+                Some(_) => "module_inline",
+                None => "module_file",
+            };
+            named()
+                .map(|bound| row("module", Some(kind), Some(bound), None))
+                .into_iter()
+                .collect()
+        }
+        SyntaxKind::EXTERN_CRATE => ast::ExternCrate::cast(node.clone())
+            .and_then(|found| match found.rename() {
+                Some(rename) => rename
+                    .name()
+                    .map(|name| (name.text().to_string(), name.syntax().text_range())),
+                None => found
+                    .name_ref()
+                    .map(|name| (name.text().to_string(), name.syntax().text_range())),
+            })
+            .map(|bound| row("extern_crate", None, Some(bound), None))
+            .into_iter()
+            .collect(),
+        SyntaxKind::USE => node
+            .descendants()
+            .filter_map(ast::UseTree::cast)
+            .filter(|tree| tree.use_tree_list().is_none())
+            .filter_map(|tree| {
+                let (bound, leaf) = read_use_leaf_binding(&tree);
+                match (tree.star_token(), bound) {
+                    // A glob has no name: its row is at its `*`.
+                    (Some(star), _) => Some(row(
+                        "use_glob",
+                        None,
+                        Some((String::new(), star.text_range())),
+                        Some(leaf),
+                    )),
+                    (None, Some(bound)) => Some(row("use_leaf", None, Some(bound), Some(leaf))),
+                    (None, None) => None,
+                }
+            })
+            .collect(),
+        SyntaxKind::MACRO_CALL | SyntaxKind::EXTERN_BLOCK => {
+            vec![row("unread_form", None, None, None)]
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// REQ-RUST-062.0 C9: one row per direct child of a source file that may bind a name in
+/// the type namespace of the file's module.
+fn list_file_scope_rows(path: &str, root: &SyntaxNode) -> Vec<Value> {
+    root.children()
+        .flat_map(|node| list_scope_binding_rows(path, &node))
+        .collect()
+}
+
+/// Whether `node`, a trait or an impl, is a direct child of its source file.
+fn check_file_scope_parent(node: &SyntaxNode) -> bool {
+    node.parent()
+        .is_some_and(|parent| parent.kind() == SyntaxKind::SOURCE_FILE)
 }
 
 /// What a member row says about the item that holds the member.
@@ -71,6 +199,8 @@ struct MemberOwnerSyntaxValue {
     trait_path: Option<String>,
     attributes: Vec<String>,
     function_body: bool,
+    /// REQ-RUST-062.0 C9: the owner is a direct child of its source file.
+    file_scope: bool,
     /// REQ-RUST-062.0 C3, for a trait declaration: the names of its generic parameters,
     /// of the associated types it declares, and those of both `?Sized` is written for.
     trait_generic_names: Option<Vec<String>>,
@@ -90,15 +220,21 @@ fn list_parameter_list_names(list: Option<ast::GenericParamList>) -> Vec<String>
         .collect()
 }
 
-/// REQ-RUST-062.0 C3: the names of `candidates` that `?Sized` is written for: in the
-/// bounds of the name's own declaration, or anywhere in a where clause of the owner, which
-/// then counts for every name.
+/// REQ-RUST-062.0 C3: the names of `candidates` that a bound taking the implicit `Sized`
+/// away is written for: in the bounds of the name's own declaration, or anywhere in a
+/// where clause of the owner, which then counts for every name.
 fn list_unsized_relaxed_names(
     candidates: &[String],
     declarations: &[SyntaxNode],
     where_clause: Option<ast::WhereClause>,
 ) -> Vec<String> {
-    let relaxed = |node: &SyntaxNode| node.text().to_string().contains("?Sized");
+    // Each of these, written as a bound, takes the implicit `Sized` away.
+    let relaxed = |node: &SyntaxNode| {
+        let text = node.text().to_string();
+        ["?Sized", "PointeeSized", "MetaSized"]
+            .iter()
+            .any(|bound| text.contains(bound))
+    };
     if where_clause.is_some_and(|clause| relaxed(clause.syntax())) {
         return candidates.to_vec();
     }
@@ -145,6 +281,7 @@ fn list_impl_member_rows(path: &str, owner: &ast::Impl) -> Vec<Value> {
         trait_path,
         attributes: list_attribute_text_values(owner),
         function_body: check_function_body_ancestry(owner.syntax()),
+        file_scope: check_file_scope_parent(owner.syntax()),
         trait_generic_names: None,
         trait_associated_names: None,
         unsized_relaxed_names: list_unsized_relaxed_names(
@@ -197,6 +334,7 @@ fn list_trait_member_rows(path: &str, owner: &ast::Trait) -> Vec<Value> {
         trait_path: owner.name().map(|name| name.text().to_string()),
         attributes: list_attribute_text_values(owner),
         function_body: check_function_body_ancestry(owner.syntax()),
+        file_scope: check_file_scope_parent(owner.syntax()),
         unsized_relaxed_names: list_unsized_relaxed_names(
             &names,
             &declarations,
@@ -267,6 +405,7 @@ fn build_owned_function_row(
         "member_attribute_text_values":list_attribute_text_values(function),
         "owner_attribute_text_values":owner.attributes,
         "owner_function_body_flag":owner.function_body,
+        "owner_file_scope_flag":owner.file_scope,
         "trait_generic_parameter_names":owner.trait_generic_names,
         "trait_associated_type_names":owner.trait_associated_names,
         "owner_unsized_relaxed_names":owner.unsized_relaxed_names,
@@ -538,7 +677,11 @@ fn build_prelude_leaf_row(path: &str, node: &SyntaxNode) -> Option<Value> {
             (name.syntax().text_range(), name.text().to_string(), None)
         }
     };
+    // REQ-RUST-062.0 C9: the name the leaf binds and the full path it names.
+    let (bound, leaf_path) = read_use_leaf_binding(&tree);
     Some(json!({
+        "use_leaf_bound_name_value":bound.filter(|_| glob_path.is_none()).map(|(name, _)| name),
+        "use_leaf_path_text":leaf_path,
         "declaration_source_relative_path":path,
         "member_name_start_offset":usize::from(range.start()),
         "member_name_end_offset":usize::from(range.end()),

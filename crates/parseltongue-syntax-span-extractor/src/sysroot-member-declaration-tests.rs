@@ -2,6 +2,15 @@
 use super::extract_member_declaration_rows;
 use serde_json::{Value, json};
 
+/// The rows of `source` that are not file scope rows (REQ-RUST-062.0 C9), for the tests
+/// of the older row kinds.
+fn list_member_declaration_rows(path: &str, source: &str) -> Vec<Value> {
+    extract_member_declaration_rows(path, source)
+        .into_iter()
+        .filter(|row| row["declaration_owner_kind_value"] != "file_scope_name_binding")
+        .collect()
+}
+
 fn find_member_row_named<'a>(rows: &'a [Value], owner: &str, name: &str) -> &'a Value {
     rows.iter()
         .find(|row| {
@@ -15,7 +24,7 @@ fn find_member_row_named<'a>(rows: &'a [Value], owner: &str, name: &str) -> &'a 
 #[test]
 fn test_inherent_member_row_fields() {
     let source = "#[lang = \"maybe_uninit\"]\nimpl<T> MaybeUninit<T> {\n    #[stable(feature = \"maybe_uninit_write\", since = \"1.55.0\")]\n    pub const fn write(&mut self, val: T) -> &mut T { loop {} }\n    pub const fn uninit() -> MaybeUninit<T> { loop {} }\n}\nfn free() { impl Local { fn inner(self: Box<Self>) {} } }\n";
-    let rows = extract_member_declaration_rows("mem/maybe_uninit.rs", source);
+    let rows = list_member_declaration_rows("mem/maybe_uninit.rs", source);
     assert_eq!(3, rows.len(), "{rows:#?}");
     let write = find_member_row_named(&rows, "inherent_impl", "write");
     let offset = source.find("write(").unwrap();
@@ -42,6 +51,7 @@ fn test_inherent_member_row_fields() {
             "member_attribute_text_values":["#[stable(feature = \"maybe_uninit_write\", since = \"1.55.0\")]"],
             "owner_attribute_text_values":["#[lang = \"maybe_uninit\"]"],
             "owner_function_body_flag":false,
+            "owner_file_scope_flag":true,
             "trait_generic_parameter_names":null,
             "trait_associated_type_names":null,
             "owner_unsized_relaxed_names":[],
@@ -67,7 +77,7 @@ fn test_inherent_member_row_fields() {
 #[test]
 fn test_trait_member_row_fields() {
     let source = "pub trait TryInto<T>: Sized {\n    type Error;\n    fn try_into(self) -> Result<T, Self::Error>;\n}\nimpl<T, U> TryInto<U> for T where U: TryFrom<T> {\n    fn try_into(self) -> Result<U, U::Error> { loop {} }\n}\nimpl<T> [T] { pub const fn len(&self) -> usize { 0 } }\nimpl<T: PointeeSized> *mut T { pub const fn cast<U>(self) -> *mut U { loop {} } }\n";
-    let rows = extract_member_declaration_rows("convert/mod.rs", source);
+    let rows = list_member_declaration_rows("convert/mod.rs", source);
     assert_eq!(4, rows.len(), "{rows:#?}");
     let declared = find_member_row_named(&rows, "trait_declaration", "try_into");
     assert_eq!(json!("TryInto"), declared["owner_trait_path_text"]);
@@ -103,7 +113,7 @@ fn test_trait_member_row_fields() {
         ])
     );
     assert_eq!(
-        json!([null, null, [], ["U"]]),
+        json!([null, null, ["T"], ["U"]]),
         json!([
             cast["trait_generic_parameter_names"],
             cast["trait_associated_type_names"],
@@ -115,7 +125,8 @@ fn test_trait_member_row_fields() {
         "ops/deref.rs",
         "pub trait Borrow<B: ?Sized, C> { type Target: ?Sized; type Kept; fn get(&self) -> Pair<B, C>; }\n\
          pub trait Late<A> where A: ?Sized { type Out; fn late(&self) -> Pair<A, Self::Out>; }\n\
-         impl<T: ?Sized, U> Cell<T, U> { fn held(&self) -> Pair<T, U> { loop {} } }\n",
+         impl<T: ?Sized, U> Cell<T, U> { fn held(&self) -> Pair<T, U> { loop {} } }\n\
+         impl<T: PointeeSized, U: MetaSized, V> Ptr<T, U, V> { fn at(&self) -> Pair<T, U> { loop {} } }\n",
     );
     let names = |name: &str| {
         relaxed
@@ -127,13 +138,15 @@ fn test_trait_member_row_fields() {
     // A where clause that writes `?Sized` counts for every name of the trait.
     assert_eq!(Some(json!(["A", "Out"])), names("late"));
     assert_eq!(Some(json!(["T"])), names("held"));
+    // `PointeeSized` and `MetaSized` as a bound take the implicit `Sized` away too.
+    assert_eq!(Some(json!(["T", "U"])), names("at"));
 }
 
 /// REQ-RUST-054.0 D3, D5
 #[test]
 fn test_macro_body_member_rows() {
     let source = "macro_rules! uint_impl {\n    (Self = $SelfT:ty, $name:ident) => {\n        impl $SelfT {\n            pub const fn ilog10(self) -> u32 { self.checked_ilog10().unwrap() }\n            pub fn $name(self) {}\n        }\n    };\n}\nuint_impl! { Self = u8, extra }\n";
-    let rows = extract_member_declaration_rows("num/uint_macros.rs", source)
+    let rows = list_member_declaration_rows("num/uint_macros.rs", source)
         .into_iter()
         .filter(|row| row["declaration_owner_kind_value"] != "macro_call_name_tokens")
         .collect::<Vec<_>>();
@@ -155,7 +168,7 @@ fn test_macro_body_member_rows() {
 #[test]
 fn test_member_rows_offset_order() {
     let source = "impl A { fn second_one(&self) {} fn first_one(self) {} }\ntrait B { fn third_one(&mut self); }\nmacro_rules! m { () => { fn fourth_one() {} } }\n";
-    let rows = extract_member_declaration_rows("a.rs", source);
+    let rows = list_member_declaration_rows("a.rs", source);
     let names = rows
         .iter()
         .map(|row| row["member_declared_name_value"].as_str().unwrap())
@@ -332,6 +345,24 @@ fn test_prelude_use_leaf_rows() {
         read("core/src/prelude/v1.rs")
     );
     assert!(read("core/src/iter/mod.rs").is_empty());
+    // REQ-RUST-062.0 C9: the name each leaf binds and the full path it names.
+    let bound = extract_member_declaration_rows(
+        "core/src/prelude/v1.rs",
+        "pub use crate::result::Result::{self, Err, Ok as _};\npub use super::v1::*;\n",
+    )
+    .iter()
+    .filter(|row| row["declaration_owner_kind_value"] == "prelude_use_leaf")
+    .map(|row| json!([row["use_leaf_bound_name_value"], row["use_leaf_path_text"]]))
+    .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            json!(["Result", "crate::result::Result"]),
+            json!(["Err", "crate::result::Result::Err"]),
+            json!([null, "crate::result::Result::Ok"]),
+            json!([null, "super::v1"]),
+        ],
+        bound
+    );
 }
 
 /// REQ-RUST-054.0 D11: a `use .. as NAME` row keeps the last name of the path it
@@ -395,3 +426,4 @@ fn test_macro_call_token_rows() {
         found
     );
 }
+

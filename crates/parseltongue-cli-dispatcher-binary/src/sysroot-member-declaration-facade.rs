@@ -72,7 +72,7 @@ pub(crate) fn collect_sysroot_member_rows(
                 .into_iter()
                 .map(|row| StageTableRowRecord {
                     stage_owned_table_name: SYSROOT_MEMBER_TABLE_NAME.into(),
-                    stage_row_record_key: format!("{relative}#{}", row["member_name_start_offset"]),
+                    stage_row_record_key: build_declaration_row_key(relative, &row),
                     stage_row_payload_text: row.to_string(),
                 })
                 .collect::<Vec<_>>())
@@ -105,4 +105,15 @@ pub(crate) fn persist_sysroot_member_rows(
         cancel,
     )?;
     Ok(rows.len())
+}
+
+/// The key of a declaration row: its file and the offset of its name. A file scope row
+/// (REQ-RUST-062.0 C9) shares that offset with the declaration row of the same name, so
+/// its key also says its kind.
+fn build_declaration_row_key(relative: &str, row: &serde_json::Value) -> String {
+    let offset = &row["member_name_start_offset"];
+    match row["declaration_owner_kind_value"].as_str() {
+        Some(kind @ "file_scope_name_binding") => format!("{relative}#{offset}#{kind}"),
+        _ => format!("{relative}#{offset}"),
+    }
 }
