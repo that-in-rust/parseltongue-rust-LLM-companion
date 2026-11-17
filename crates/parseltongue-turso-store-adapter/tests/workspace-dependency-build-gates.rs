@@ -74,7 +74,8 @@ fn test_no_forbidden_semantic_dependencies() -> Result<(), Box<dyn Error>> {
         .iter()
         .find(|dependency| dependency["name"] == "duckdb")
         .ok_or("missing DuckDB dependency")?;
-    assert_eq!(duckdb["features"], serde_json::json!(["bundled"]));
+    // REQ-RUST-068.0: the `json` extension is compiled in, so a run loads no extension file.
+    assert_eq!(duckdb["features"], serde_json::json!(["bundled", "json"]));
     assert!(
         !workspace_metadata_package_rows
             .iter()
