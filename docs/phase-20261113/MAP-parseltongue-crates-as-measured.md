@@ -1,17 +1,17 @@
 # MAP — the parseltongue crates as measured
 
-Measured at commit `37ea1755d` on 2026-11-16. Re-measure after a structural change; do not
+Measured at commit `eb031e680` on 2026-11-17. Re-measure after a structural change; do not
 edit numbers by hand. This file records structure. It does not say any test passes or any
 graph is complete.
 
 ## The answer
 
-**Ten crates, 138 Rust files, 70,497 lines. The itoa full item graph is produced by one CLI
+**Ten crates, 140 Rust files, 72,925 lines. The itoa full item graph is produced by one CLI
 stage that wires five of them together. Eight of the ten edge kinds have a producer. No code
 exists for lowered signature types, type inference in bodies or a trait solver.**
 
-- Two crates hold 62% of the non-test code: the DuckDB adapter (11,710 lines) and the syntax
-  extractor (11,234), of 36,745.
+- Two crates hold 64% of the non-test code: the syntax extractor (12,562 lines) and the
+  DuckDB adapter (11,710), of 38,084.
 - A large share of the tree is earlier work this phase does not use: the HLD builder and
   stores, and the oracle comparison.
 
@@ -26,7 +26,10 @@ read from `full-graph-checkpoint-facade.rs`:
    edge kinds                           (contains, generates, expands)
 3  resolve five edge kinds      Rust    resolve_original_call_edges, resolve_signature_type_edges,
                                         resolve_impl_header_edges, resolve_body_read_edges,
-                                        resolve_use_import_edges (syntax-span-extractor)
+                                        resolve_use_import_edges (syntax-span-extractor).
+                                        With scope `declarations` a method call into core
+                                        goes through find_core_member_target, which reads
+                                        sysroot-member-declaration-records
 4  add endpoint nodes           Rust    collect_builtin_endpoint_nodes,
                                         collect_external_endpoint_nodes
 5  write the graph              Turso   write_full_graph_input
@@ -66,11 +69,12 @@ table-store-traits          494      1   store and analysis ports
 turso-store-adapter       4,055     75   durable store, frozen snapshots, graph write and read-back
 duckdb-analysis-adapter  11,710    187   name resolution rounds, node and structural edge projection
 crate-graph-loader          644     12   Cargo metadata and sysroot context to crate graph rows
-syntax-span-extractor    11,234    177   parsing, impl headers, namespace input, five edge resolvers
+syntax-span-extractor    12,562    185   parsing, impl headers, namespace input, five edge resolvers,
+                                         the declarations of core and the lookup over them
 port-macro-expander       3,916     22   declarative and built-in macro expansion
 macro-span-records          236      2   span types the expander uses, under the name ra_ap_span
 stage-worker-scheduler       67      4   worker scheduling
-cli-dispatcher-binary     2,267    129   the one binary; wires the stages
+cli-dispatcher-binary     2,278    129   the one binary; wires the stages
 ```
 
 "Tests" counts `#[test]` attributes in the crate, the 60 real-source itoa tests included.
@@ -114,9 +118,10 @@ oracle-edge-differ-run        compare a store with oracle exports               
 ## Real-source tests on pinned itoa
 
 `crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs`, 60 tests
-in 5,980 lines, over the vendored source in `tests/pinned-itoa-source-tree/`.
+in 6,221 lines, over the vendored source in `tests/pinned-itoa-source-tree/`.
 `test_itoa_whole_graph_equality` compares the whole stored graph with the frozen expected
-graph.
+graph. `test_itoa_core_member_targets` compares each method call into `core` that a run
+with scope `declarations` names with its frozen expected target.
 
 ## Code in the tree that this phase does not use
 

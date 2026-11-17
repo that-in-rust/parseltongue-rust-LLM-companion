@@ -1,7 +1,7 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-16: **108 of the 133 calls are named and equal their frozen rows, 25 have
-no target (sections 10 to 12 built). The order changed by user decision: the expected target of all 133 calls is written
+Status on 2026-11-17: **121 of the 133 calls are named and equal their frozen rows, 12 have
+no target (sections 10 to 12 and REQ-RUST-062.0 built). The order changed by user decision: the expected target of all 133 calls is written
 from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
 it.** Counts are on the log's "Where we are" page.
 
@@ -842,6 +842,11 @@ written in a file wins over a glob import. A file module's scope holds its own i
 imports, then the extern crates, then the prelude; it does not hold the names of its
 parent module.
 
+One thing C10 does not check: it reads an attribute text only for `cfg`, `prelude_import`
+and `#[path`, and takes it that no attribute of a `core` item adds a name to its file. A
+derive adds impls, not names. No row of the run proves that no other attribute macro is
+used, so this is a stated limit of the proof, not a stored doubt.
+
 ### Design (L1 / L2 / L3)
 
 ```text
@@ -867,4 +872,26 @@ L2, L3  nothing added
 | C10, C11 | file scope name test | unit | declared in the file; from the prelude; a glob, a macro call, a second binding, a `cfg`, a `#[path]` | D; not proven |
 | C8, C12, C13 | fixture | unit | a second and third `Result` in the fixture `core`; an impl on `Result` in the alias file | `Result<T, E>::expect`; receiver_type_name_unproven |
 | C7 | test_itoa_core_member_targets | real source | `cast` stays without a target | reason stored |
-| C1 to C6 | test_itoa_core_member_targets | real source | 8 expect and 5 unwrap equal their frozen rows | wrong 0 |
+| C1 to C13 | test_itoa_core_member_targets | real source | 8 expect and 5 unwrap equal their frozen rows | wrong 0 |
+
+### Measured after C8 to C13 were built (2026-11-17, working tree after `565c57fb5`)
+
+```text
+method calls into core, named and equal   121 of 133   wrong 0
+  8  Result<T, E>::expect    5  Result<T, E>::unwrap    proof kind prelude_import
+without a target                           12
+  10  ilog10   receiver_type_not_determined
+   1  len      receiver_type_not_determined   (a local `&str`)
+   1  cast     inherent_member_unproven       (C7)
+```
+
+Each of the 13 rows stores the proof of `Result`: written in `core/src/convert/mod.rs`,
+the prelude import in `core/src/lib.rs`, the prelude row in `core/src/prelude/v1.rs`, and
+the enum in `core/src/result.rs`, each with its offsets. Command and resource numbers are
+in the log entry of 2026-11-17.
+
+One defect found by the first run and fixed: a file scope row and the declaration row of
+the same name have the same name offset, so the stored row key (`file#offset`) was not
+unique. The key of a file scope row now ends in its kind, and a `use_glob` row is placed
+at its `*`.
+

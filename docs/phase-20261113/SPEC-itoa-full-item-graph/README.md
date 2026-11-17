@@ -1,14 +1,14 @@
 # SPEC — requirements for the itoa full item graph
 
-Updated 2026-11-16. This folder states only what is in force. Scope: pinned itoa 1.0.18, the
+Updated 2026-11-17. This folder states only what is in force. Scope: pinned itoa 1.0.18, the
 full item dependency graph only.
 
 ## The answer
 
 **Eight parts, in build order. Parts 1 to 7 were closed by the acceptance run at commit
 `822da80cf`: the whole stored graph equalled the frozen expected graph. Part 8 (a target for the
-133 method calls into `core`) is in progress behind the scope value `declarations`; it is
-in no accepted run, and one of its real-source tests fails at the branch head.**
+133 method calls into `core`) is in progress behind the scope value `declarations`: 121 of
+the 133 calls are named and equal their frozen expected rows. It is in no accepted run.**
 
 Counts and the current step are on the [log](../LOG-itoa-full-item-graph-progress.md)'s
 "Where we are" page.
@@ -26,13 +26,12 @@ part  file                                       requirements                   
 5     part-5-macro-generated-items.md            046.0 050.0 051.0 052.0        5a-5c BUILT; 5d steps 1-9, 10a, 10b, 10c, 11 BUILT
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
 7     part-7-whole-graph-acceptance.md           043.1, 044.0 to 044.3          acceptance run passed S1 to S4 on 2026-11-16 (log)
-8     part-8-method-calls-into-core.md           054.0 to 057.0                 steps 8.1 to 8.3b-2a BUILT; 8.3b-2b open; not accepted
+8     part-8-method-calls-into-core.md           054.0 to 062.0                 121 of 133 calls named and equal; 12 open (ilog10, str::len, cast); not accepted
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of
-the 60 tests was at commit `7ed552478` (60 pass, log). At the head,
-`test_itoa_core_member_targets` fails (step 8.3b-2b is open). Neither word means the SOP
-passed: only an acceptance run decides that.
+the 60 tests was at commit `eb031e680` (60 pass, log). Neither word means the SOP passed:
+only an acceptance run decides that.
 
 Out of scope: every other repository, any rust-analyzer export or oracle comparison, and
 every higher-abstraction table (interface level, HLD, file and folder roll-ups).
@@ -86,15 +85,16 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
   --test itoa-source-acceptance-tests -- --test-threads=1          # 60 real-source tests
 ```
 
-Occurrences of each requirement id in the Rust files under `crates/`, counted 2026-11-16
-at commit `37ea1755d` (one occurrence can cover several tests):
+Occurrences of each requirement id in the Rust files under `crates/`, counted 2026-11-17
+at commit `eb031e680` (one occurrence can cover several tests):
 
 ```text
 018.2  15    032.0   7    033.0   2    034.0  11    035.0   4    036.0   8
-038.0   4    038.1   1    042.0  17    043.0  12    043.1   4    044.0   4
+038.0   4    038.1   1    042.0  17    043.0  12    043.1   4    044.0   5
 044.1   3    044.2   1    044.3   2    045.0  38    046.0  21    047.0  13
 048.0  16    049.0  11    050.0   8    051.0   9    052.0  72    053.0  60
-054.0  29    055.0  10    056.0  14    057.0   7
+054.0  29    055.0  11    056.0  14    057.0   7    058.0   5    059.0  15
+060.0   9    061.0   6    062.0  27
 ```
 
 ### Open points across parts
