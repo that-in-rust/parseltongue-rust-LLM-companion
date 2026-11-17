@@ -1064,3 +1064,104 @@ Three things the real `core` source showed that the first draft of this section 
   attribute read passes over it.
 - A macro call row and a member row can have the same file and offset, so the stored key
   of an `impl_macro_call` row ends in its kind, like a file scope row.
+
+## 15. A receiver that is a local variable bound to a method call (spec first, added 2026-11-17)
+
+### Rust work mode
+
+Library code: one new evidence field from the syntax read of the workspace (L2) and pure
+lookups over stored rows (L1). No new stage, no new table.
+
+### Measured before writing (commit `9e0b2799c`, scope `declarations`)
+
+```text
+ the call          src/lib.rs line 109   string.len()      in Buffer::format<I: Integer>
+ the binding       src/lib.rs line 108   let string = i.write(unsafe { &mut *buf_ptr });
+ stored today      receiver_shape_kind other, receiver_rebinding_flag true,
+                   receiver_place_step_rows null; reason receiver_type_not_determined
+ expected row      str::len, core/src/str/mod.rs line 155, inherent impl, no assumption
+ stored already    i.write(..) is named private::Sealed::write by the bound walk (I: Integer,
+                   Integer: Sealed). The table field-signature-detail-table holds a RET_TYPE
+                   row for that method: text "-> &str", one type path "str".
+ not stored        path-resolution-site-records holds no row for the one-segment path
+                   `string`: 0 rows at bytes 3368..3374 (export of the run stepL).
+```
+
+### What is missing today
+
+- The receiver evidence does not say which `let` binds the name.
+- The lookup does not read the return type a workspace function declares.
+- Nothing proves that `let string = ..` binds a new variable. Rust reads the pattern as a
+  constant or a unit struct when one of that name is in scope.
+
+### The Rust rules this follows
+
+- `let NAME = EXPR;` with no type gives `NAME` the type of `EXPR`. A `mut` does not
+  change it; `ref` does.
+- A binding is in scope from the end of its `let` to the end of the block that holds it.
+- A method call has the return type that the named method declares. For a method of a
+  trait this is the same in every impl when that type names no `Self`, no generic
+  parameter and no associated type. An `async fn` returns a future instead.
+
+### Executable requirements: REQ-RUST-064.0
+
+```text
+ L1   WHEN a method call's receiver is one plain identifier NAME that is no parameter of
+      the function the call is in, THEN the receiver evidence SHALL store
+      receiver_local_binding_evidence only if all of these hold in that function:
+        a. every identifier token NAME is the name of an identifier pattern or a path
+           expression of one segment, and exactly one is an identifier pattern;
+        b. that pattern is the whole pattern of a let statement with no ref, no
+           subpattern, no written type and no else;
+        c. the let is a statement of a block that encloses the call, ends before the
+           call starts, and its nearest item is the same function;
+        d. its initializer, through parentheses only, is a method call.
+      It stores the offsets of the let, the count of the tokens NAME in the function,
+      whether the binding is mut, and the receiver evidence of the initializer call. Any
+      other receiver SHALL store no such field.
+ L2   WHEN the field is stored, THEN the lookup SHALL go on only if the scope proof of the
+      run is not withheld, NAME is no name of the core prelude, and the source files of
+      the unit write the identifier NAME exactly as many times as the function does. Else
+      the row SHALL have no target, with the reason local_binding_name_unproven.
+ L3   The initializer call SHALL be named by the bound walk that names such a call as an
+      edge: one workspace function, through a bound of a generic parameter of the
+      function. Else no target, with the reason local_initializer_call_unproven.
+ L4   That function SHALL not be async and SHALL have exactly one stored return type row.
+      Else no target, with the reason local_initializer_return_unproven.
+ L5   Every type path of that row SHALL be a builtin type or a name of core, as the stored
+      lookup of the path says, and none SHALL be Self. Else no target, with the reason
+      receiver_type_name_unproven.
+ L6   The receiver type SHALL be the text of that row after `->`, probed as a written
+      type is (REQ-RUST-054.0). A type the probe does not model gives no target.
+ L7   The record SHALL store receiver_type_proof_kind local_binding_call_result, the type
+      text, the offsets of the let, the bound walk of the initializer, the occurrence key
+      of the function named, and the file and offsets of the return type row.
+ L8   No rule guesses: a rule that does not hold gives no target and its reason.
+```
+
+### Design (L1 / L2 / L3)
+
+- **L2, syntax read:** `extract_method_receiver_syntax` adds the field, as it adds
+  `receiver_inner_call_evidence`.
+- **L1, lookup:** `find_core_member_target` gets one branch before the place rows. The
+  bound walk is taken out of `resolve_bound_method_target` so the lookup can call it.
+  `read_core_member_index` keeps the RET_TYPE rows beside the STATIC and field rows, and
+  the count of each identifier in the unit's source files.
+- Callers found with codebase-memory and checked in source: `find_core_member_target` is
+  called by `build_original_call_edge` and `find_call_result_member`;
+  `resolve_bound_method_target` by `build_original_call_edge` only.
+
+### Verification matrix
+
+| Req | Test | Level | Case | Expected |
+|---|---|---|---|---|
+| L1 | receiver syntax test | unit | a plain let; `mut`; a written type; `ref`; a tuple pattern; let-else; two lets of the name; the name in a macro call; the let in an inner block that ended; an initializer that is not a method call | the field only for the first two |
+| L2 to L7 | fixture | unit | `let s = i.name(); s.len()` with the trait method returning `&str` | `str::len`, with the record |
+| L2 | fixture | unit | a `const` of the same name elsewhere in the file | no target, `local_binding_name_unproven` |
+| L3 | fixture | unit | the initializer is a call the bound walk does not name | no target, `local_initializer_call_unproven` |
+| L4, L5 | fixture | unit | `async fn`; a return type `Self::Out`; a return type that is a workspace struct | no target, with the reason of the rule |
+| L1 to L8 | test_itoa_core_member_targets | real source | `string.len()` equals its frozen row | 132 of 133, wrong 0 |
+
+### Open questions
+
+- None for the user. `cast` stays without a target (C7).
