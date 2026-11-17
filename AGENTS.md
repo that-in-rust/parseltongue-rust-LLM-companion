@@ -3,6 +3,16 @@
 Rules for any agent working in this repository. Read top to bottom: the answer first,
 then the six rules that follow from it, then reference facts.
 
+## Choose the phase
+
+- **Graph producer:** `docs/phase-20261113/` governs the pinned-itoa mapper, its dataset
+  and acceptance. "This phase" and graph-completion claims below refer to that work.
+- **CLI consumer:** start at [phase-20261116/ReadMe.md](docs/phase-20261116/ReadMe.md).
+  This phase uses the published dataset to inform coding agents via the CLI; it does NOT
+  improve the dataset. Missing producer facts remain in the phase-20261113 backlog, not
+  hidden extraction or guessed relationships in the CLI. Shared source-proof, spec-first,
+  test-first and delivery rules still apply; a passing query never accepts the producer.
+
 ## The answer
 
 **Build one thing: the `full-item-dependency-graph` of pinned itoa 1.0.18, produced
@@ -186,7 +196,9 @@ Earlier part files cite reviews made under this rule; those records stay as hist
 
 ### Documents
 
-`docs/phase-20261113/` is the only current documentation.
+`docs/phase-20261113/` is current documentation for the graph producer. The bounded CLI
+consumer phase starts at [its entry document](docs/phase-20261116/ReadMe.md); it does not
+change the producer's scope, frozen expected graph or acceptance SOP.
 
 ```text
 SOP      SOP-itoa-full-item-graph-acceptance.md         steps S1–S4 that decide PASS
