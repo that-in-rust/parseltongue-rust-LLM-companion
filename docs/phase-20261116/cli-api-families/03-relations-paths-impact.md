@@ -188,3 +188,115 @@ Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan compl
 **Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
 
 
+<a id="cli-rel-010"></a>
+
+### CLI-REL-010 — `query-trace-declared-paths` · P1 · D
+
+**Job:** Return a bounded witness path through allowed recorded relations.
+
+**Inputs:** Start ID; relation allowlist; direction/depth/limit.
+
+**Outputs:** Ordered path with per-edge site evidence.
+
+**Evidence:** Preserve each recorded source site, relation kind, resolution state and evidence identity. A targetless unresolved site cannot be attributed to a requested caller target; list it only as a separate scoped unknown, never as that item’s caller.
+
+**Bounds/completeness:** Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan completeness differs from semantic completeness. No caller/path result is not proof of absence. File/range impact seeds without stored anchors are returned as unmapped; never parse or guess.
+
+**Dependencies:** Stable graph rows; bounded traversal.
+
+**Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
+
+
+<a id="cli-rel-011"></a>
+
+### CLI-REL-011 — `query-find-connecting-paths` · P2 · D
+
+**Job:** Find a bounded set of distinct connection paths between two IDs.
+
+**Inputs:** From/to IDs; direction; relation allowlist; max paths/depth.
+
+**Outputs:** Witness paths and explicit search-bound status.
+
+**Evidence:** Preserve each recorded source site, relation kind, resolution state and evidence identity. A targetless unresolved site cannot be attributed to a requested caller target; list it only as a separate scoped unknown, never as that item’s caller.
+
+**Bounds/completeness:** Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan completeness differs from semantic completeness. No caller/path result is not proof of absence. File/range impact seeds without stored anchors are returned as unmapped; never parse or guess.
+
+**Dependencies:** Graph traversal; does not establish runtime connection.
+
+**Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
+
+
+<a id="cli-rel-012"></a>
+
+### CLI-REL-012 — `query-estimate-change-impact` · P1 · D
+
+**Job:** Enumerate static candidate dependents reachable from a declared change scope.
+
+**Inputs:** Changed item IDs; file/range seeds only where stored anchors exist; relation allowlist; depth/node caps.
+
+**Outputs:** Mapped impact candidates with witness paths plus a separate unmapped-seed list; no parsing/name guessing and no “what breaks” claim.
+
+**Evidence:** Preserve each recorded source site, relation kind, resolution state and evidence identity. A targetless unresolved site cannot be attributed to a requested caller target; list it only as a separate scoped unknown, never as that item’s caller.
+
+**Bounds/completeness:** Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan completeness differs from semantic completeness. No caller/path result is not proof of absence. File/range impact seeds without stored anchors are returned as unmapped; never parse or guess.
+
+**Dependencies:** Stored item/site anchors and selected relation rows; unmapped file/range seeds remain visible.
+
+**Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
+
+
+<a id="cli-rel-013"></a>
+
+### CLI-REL-013 — `query-list-ownership-chain` · P2 · C
+
+**Job:** Show separately recorded lexical, type, trait and impl ownership links.
+
+**Inputs:** Item ID; ownership kinds; depth.
+
+**Outputs:** Known ownership chain and unavailable links without name matching.
+
+**Evidence:** Preserve each recorded source site, relation kind, resolution state and evidence identity. A targetless unresolved site cannot be attributed to a requested caller target; list it only as a separate scoped unknown, never as that item’s caller.
+
+**Bounds/completeness:** Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan completeness differs from semantic completeness. No caller/path result is not proof of absence. File/range impact seeds without stored anchors are returned as unmapped; never parse or guess.
+
+**Dependencies:** Owner-kind and impl records; direct owner target is not established.
+
+**Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
+
+
+<a id="cli-rel-014"></a>
+
+### CLI-REL-014 — `query-inspect-macro-provenance` · P1 · E
+
+**Job:** Return available generating-call and token-origin evidence for a generated item/site.
+
+**Inputs:** Generated item or site ID; origin-depth cap.
+
+**Outputs:** Definition/invocation boundary origins and explicit mapping gaps.
+
+**Evidence:** Preserve each recorded source site, relation kind, resolution state and evidence identity. A targetless unresolved site cannot be attributed to a requested caller target; list it only as a separate scoped unknown, never as that item’s caller.
+
+**Bounds/completeness:** Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan completeness differs from semantic completeness. No caller/path result is not proof of absence. File/range impact seeds without stored anchors are returned as unmapped; never parse or guess.
+
+**Dependencies:** Macro expansion/origin tables; not a complete edit map.
+
+**Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
+
+
+<a id="cli-rel-015"></a>
+
+### CLI-REL-015 — `query-export-bounded-subgraph` · P1 · D
+
+**Job:** Export the raw selected node/edge subgraph as bounded data, distinct from a reason-ranked context receipt.
+
+**Inputs:** Root item IDs or stored path anchors; relation allowlist; boundary/induced scope; depth/node/edge/byte caps.
+
+**Outputs:** Raw selected node and edge rows with site evidence, snapshot identity and truncation/completeness; no summary ranking.
+
+**Evidence:** Preserve each recorded source site, relation kind, resolution state and evidence identity. A targetless unresolved site cannot be attributed to a requested caller target; list it only as a separate scoped unknown, never as that item’s caller.
+
+**Bounds/completeness:** Bound depth/nodes/edges/paths/bytes; state boundary vs induced scope; scan completeness differs from semantic completeness. No caller/path result is not proof of absence. File/range impact seeds without stored anchors are returned as unmapped; never parse or guess.
+
+**Dependencies:** Published node/edge rows and stable IDs; caller supplies scope and bounds.
+
+**Sources:** [S80REL: supplements/80-repository-synthesis-draft.md L165–L179 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80CONTRACT: supplements/80-repository-synthesis-draft.md L188–L263 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [FEDGE L261–L301](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-core-row-types/src/hld-materialization-core-records.rs#L261-L301); [FIMPL L129–L171](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/9fc6e7a16e4f8776a1d03ab668d3d219bf943c7b/crates/parseltongue-syntax-span-extractor/src/impl-header-source-records.rs#L129-L171)
