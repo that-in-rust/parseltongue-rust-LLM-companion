@@ -1,7 +1,7 @@
 # Part 8 — method calls into `core`
 
-Status on 2026-11-17: **131 of the 133 calls are named and equal their frozen rows, 2 have
-no target (sections 10 to 12, REQ-RUST-062.0 and REQ-RUST-063.0 built). The order changed by user decision: the expected target of all 133 calls is written
+Status on 2026-11-17: **132 of the 133 calls are named and equal their frozen rows, 1 has
+no target, the `cast` (sections 10 to 12, REQ-RUST-062.0 to REQ-RUST-064.0 built). The order changed by user decision: the expected target of all 133 calls is written
 from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
 it.** Counts are on the log's "Where we are" page.
 
@@ -1065,7 +1065,7 @@ Three things the real `core` source showed that the first draft of this section 
 - A macro call row and a member row can have the same file and offset, so the stored key
   of an `impl_macro_call` row ends in its kind, like a file scope row.
 
-## 15. A receiver that is a local variable bound to a method call (spec first, added 2026-11-17)
+## 15. A receiver that is a local variable bound to a method call (built 2026-11-17)
 
 ### Rust work mode
 
@@ -1080,6 +1080,7 @@ lookups over stored rows (L1). No new stage, no new table.
  stored today      receiver_shape_kind other, receiver_rebinding_flag true,
                    receiver_place_step_rows null; reason receiver_type_not_determined
  expected row      str::len, core/src/str/mod.rs line 155, inherent impl, no assumption
+                   asked for (a stored row may carry more)
  stored already    i.write(..) is named private::Sealed::write by the bound walk (I: Integer,
                    Integer: Sealed). The table field-signature-detail-table holds a RET_TYPE
                    row for that method: text "-> &str", one type path "str".
@@ -1102,6 +1103,11 @@ lookups over stored rows (L1). No new stage, no new table.
 - A method call has the return type that the named method declares. For a method of a
   trait this is the same in every impl when that type names no `Self`, no generic
   parameter and no associated type. An `async fn` returns a future instead.
+- Method lookup tries the receiver by value first. A method that takes `self` by value is
+  found at that step. If a bound trait the run did not read declared the same name by
+  value, the call would not compile; if it declared it by reference, it would lose. So
+  one by-value method found by the walk is the one called, given that the source compiles.
+  For itoa this matters: `Sealed: Copy`, and `Copy` is not read.
 
 ### Executable requirements: REQ-RUST-064.0
 
@@ -1120,12 +1126,16 @@ lookups over stored rows (L1). No new stage, no new table.
       whether the binding is mut, and the receiver evidence of the initializer call. Any
       other receiver SHALL store no such field.
  L2   WHEN the field is stored, THEN the lookup SHALL go on only if the scope proof of the
-      run is not withheld, NAME is no name of the core prelude, and the source files of
-      the unit write the identifier NAME exactly as many times as the function does. Else
-      the row SHALL have no target, with the reason local_binding_name_unproven.
+      run is not withheld, the call is written in a source file and not in a macro
+      expansion, NAME is no name of the core prelude, and the source files of the unit
+      write the identifier NAME exactly as many times as the function does. Else the row
+      SHALL have no target, with the reason local_binding_name_unproven.
  L3   The initializer call SHALL be named by the bound walk that names such a call as an
-      edge: one workspace function, through a bound of a generic parameter of the
-      function. Else no target, with the reason local_initializer_call_unproven.
+      edge: exactly one workspace function, through a bound of a generic parameter of the
+      function. WHEN a bound trait of that walk has no source in the run, THEN the
+      function named SHALL take `self` by value, and the record SHALL store the assumption
+      source_compiles_method_resolves. Else no target, with the reason
+      local_initializer_call_unproven.
  L4   That function SHALL not be async and SHALL have exactly one stored return type row.
       Else no target, with the reason local_initializer_return_unproven.
  L5   Every type path of that row SHALL be a builtin type or a name of core, as the stored
@@ -1159,9 +1169,98 @@ lookups over stored rows (L1). No new stage, no new table.
 | L2 to L7 | fixture | unit | `let s = i.name(); s.len()` with the trait method returning `&str` | `str::len`, with the record |
 | L2 | fixture | unit | a `const` of the same name elsewhere in the file | no target, `local_binding_name_unproven` |
 | L3 | fixture | unit | the initializer is a call the bound walk does not name | no target, `local_initializer_call_unproven` |
+| L3 | fixture | unit | the trait has a supertrait with no source, method by value | `str::len`, with the assumption stored |
+| L3 | fixture | unit | the trait has a supertrait with no source, method by `&self` | no target, `local_initializer_call_unproven` |
 | L4, L5 | fixture | unit | `async fn`; a return type `Self::Out`; a return type that is a workspace struct | no target, with the reason of the rule |
 | L1 to L8 | test_itoa_core_member_targets | real source | `string.len()` equals its frozen row | 132 of 133, wrong 0 |
+
+### Measured after building (scope `declarations`, run stepM)
+
+```text
+method calls into core, named and equal   132 of 133   wrong 0
+  1  str::len   proof kind local_binding_call_result
+without a target                            1
+  1  cast       inherent_member_unproven   (C7)
+```
+
+The row of `string.len()` stores: the `let` at bytes 3309..3356 of `src/lib.rs`, three
+tokens `string` in the function and in the unit, the bound walk `I`, `Integer`,
+`private::Sealed` with `Copy` as a trait without source, the return type row `-> &str` at
+bytes 4068..4075, and the assumptions `core_macro_expansions_import_no_trait` and
+`source_compiles_method_resolves`. Command and resource numbers are in the log.
 
 ### Open questions
 
 - None for the user. `cast` stays without a target (C7).
+
+## 16. The run id covers the `core` files (spec first, added 2026-11-17)
+
+### Rust work mode
+
+CLI adapter code: one read of the file system in the facade that already reads `core`
+(L3), one pure function for the digest (L1). No new stage, no new table.
+
+### Measured before writing (working tree after `fb94f7ff9`, scope `declarations`)
+
+```text
+ run id today       compute_workspace_generation_digest (main.rs) hashes the rows of
+                    workspace-config-state-records, crate-dependency-graph-table and
+                    file-source-text-table. The config row holds the compiler version text
+                    and the scope kind. It holds nothing of the bytes of core.
+ the read of core   collect_sysroot_member_rows reads every .rs file under
+                    <sysroot>/lib/rustlib/src/rust/library/core/src, in path order, after
+                    the run id is made.
+ the frozen value   itoa-expected-core-member-targets.json, core_source: 288 files,
+                    6,419,461 bytes, listing_sha256 39a4d53484c4df57...
+ the S1 command     find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum
+                    run on this VM today: 39a4d53484c4df57... (equal to the frozen value)
+```
+
+### What is missing today
+
+- Two runs over different `core` bytes get the same run id when the compiler version text
+  is the same.
+- A run does not store which `core` bytes it read, so S1 cannot compare a run with the
+  freeze record.
+
+### Executable requirements: REQ-RUST-065.0
+
+```text
+ D1   WHEN the scope is declarations, THEN the workspace configuration row SHALL store
+      workspace_sysroot_source_record with: the directory "core/src", the count of its
+      .rs files, the sum of their byte lengths, and listing_sha256. That value is the
+      SHA-256 of a text of one line per file, files in byte order of their path relative
+      to the library directory: the SHA-256 of the file's bytes in lower-case hex, two
+      spaces, the relative path, a line feed. It SHALL equal the output of the S1 command.
+ D2   WHEN the scope is not declarations, THEN the row SHALL have no such field.
+ D3   The run id SHALL be made after D1, from the stored row. Two runs whose core files
+      differ in one byte SHALL have different run ids.
+ D4   The rows of core SHALL be read from the same list of files. WHEN the record made
+      from the bytes that were parsed differs from the stored record, THEN the run SHALL
+      fail and store no row of core.
+ D5   A file that cannot be read fails the run. No file is skipped.
+```
+
+### Design (L1 / L2 / L3)
+
+- **L3, facade:** `sysroot-member-declaration-facade.rs` reads the files once per use into
+  path and bytes (`read_sysroot_source_files`); `collect_sysroot_member_rows` parses that
+  list, so the digest and the rows cannot come from different lists.
+- **L1, pure:** `build_source_listing_record` makes the record from the list.
+- **Call sites:** `run_workspace_mapping_pipeline` adds the field where it adds
+  `workspace_sysroot_scope_kind`; `persist_sysroot_member_rows` compares before it writes.
+- `compute_workspace_generation_digest` is not changed: it already hashes the row.
+
+### Verification matrix
+
+| Req | Test | Level | Case | Expected |
+|---|---|---|---|---|
+| D1 | facade unit test | unit | a directory of two files | the record equals one computed by hand; path order, not read order |
+| D3 | facade unit test | unit | one byte of one file changed | another listing_sha256 |
+| D4 | facade unit test | unit | a stored record that differs | an error, no rows written |
+| D1, D3 | test_core_member_rows_published | real source | a declarations run | the stored record equals `core_source` of the frozen targets file: 288 files, 6,419,461 bytes, the frozen listing_sha256; the run id differs from the id of the `excluded` run |
+| D2 | test_core_member_rows_published | real source | the `excluded` run | no field |
+
+### Open questions
+
+- None for the user.

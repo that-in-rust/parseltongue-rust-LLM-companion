@@ -4,13 +4,13 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-17, production code of the commit that adds M6 and M7 of REQ-RUST-063.0)
+## Where we are (2026-11-17, production code of commit `317942e17`, REQ-RUST-064.0)
 
 **Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
 1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
 passed SOP steps S1 to S4 on one frozen executable. That graph is marked `incomplete`: 133
 method calls into `core` have no target, and the expected graph was written and checked by
-one author. Not accepted: the branch head, where part 8 names 131 of those 133 calls. Each
+one author. Not accepted: the branch head, where part 8 names 132 of those 133 calls. Each
 named call equals its frozen expected row, checked once against the compiler. No SOP step
 has been run on the head.**
 
@@ -19,29 +19,33 @@ has been run on the head.**
 ```text
                               accepted run   head
                               822da80cf
-nodes                         151            169
+nodes                         151            170
 edge rows                     682            682
-calls with a target            64 of 197     195 of 197
-edge rows with a target       549 of 682     680 of 682
-method calls into core named    0 of 133     131 of 133   equal to the frozen rows: 131, wrong: 0
+calls with a target            64 of 197     196 of 197
+edge rows with a target       549 of 682     681 of 682
+method calls into core named    0 of 133     132 of 133   equal to the frozen rows: 132, wrong: 0
 ```
 
 - **Expected targets:** all 133 are written from source and frozen
   (`itoa-target-dataset/itoa-expected-core-member-targets.json`).
 - **Named at the head:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`, 13
   `TryInto::try_into`, 8 `Result<T, E>::expect`, 5 `Result<T, E>::unwrap`, 5 `[T]::len`,
-  1 `Iterator::rev`, 1 `[T]::as_mut_ptr`, and `ilog10` once on each of `u8`, `u16`, `u32`,
-  `u64`, `u128`, `i8`, `i16`, `i32`, `i64`, `i128`.
-- **Without a target (2):** 1 `str::len` (the receiver is a local variable), 1 `cast` (its
-  impl has a bound the run cannot prove harmless).
-- **Real-source tests:** 60 of 60 pass on the executable built from the head.
-- **Built last:** REQ-RUST-063.0, a method that a `core` macro writes into an impl of a
-  builtin type. For `u8::MAX.ilog10()` the run proves from stored rows that `impl u8`
-  calls `uint_impl!`, that the name stands for the one-arm macro in `num/uint_macros.rs`
-  (through `#[macro_use]`, not through the name being unique: `core` has a second
-  `uint_impl`), and that its body declares `MAX: Self` and `ilog10(self)`.
-- **Next:** `str::len` on a local variable. `cast` stays without a target until a bound
-  such as `T: PointeeSized` can be proven to restrict nothing.
+  1 `Iterator::rev`, 1 `[T]::as_mut_ptr`, 1 `str::len`, and `ilog10` once on each of `u8`,
+  `u16`, `u32`, `u64`, `u128`, `i8`, `i16`, `i32`, `i64`, `i128`.
+- **Without a target (1):** `cast` (its impl has a bound the run cannot prove harmless).
+- **Real-source tests:** 59 of 60 passed in one run of the head's production code; the
+  60th failed on a stale label list in the test, and passed alone after that list was
+  corrected. The 60 were not run again together.
+- **Built last:** REQ-RUST-064.0, a receiver that is a local variable. For
+  `string.len()` the run proves from stored rows that one plain `let` binds `string`, that
+  the name is written nowhere else in the unit, that its initializer `i.write(..)` is
+  named `private::Sealed::write` through the bound `I: Integer`, and that this method
+  declares the return type `&str`. `Sealed: Copy` has no source in the run, so the row
+  stores the assumption `source_compiles_method_resolves`.
+- **Next:** the `core` files in the run id (REQ-RUST-065.0, spec written), then the merge
+  of the targets into the expected graph and its new freeze, then S1 to S4. `cast` stays
+  without a target until a bound such as `T: PointeeSized` can be proven to restrict
+  nothing.
 - **Not done:** the `core` files are not in the run id; the targets are not merged into the
   expected graph; S1 to S4 are NOT STARTED for the head.
 
@@ -1152,4 +1156,76 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  not done    S1 to S4 for this head: NOT STARTED. The core files are not in the run id. The
              targets are not merged into the expected graph. 2 calls into core have no
              target.
+```
+
+### 2026-11-17 — part 8, REQ-RUST-064.0 built: `len` on a local `&str` (132 of 133)
+
+```text
+ what        A method called on a local variable that one plain `let` binds to a method
+             call: let string = i.write(..); string.len().
+             L1        local-binding-receiver-records.rs: find_local_binding_statement,
+                       stored as receiver_local_binding_evidence (commit fb94f7ff9)
+             L3        list_bound_method_candidates, taken out of
+                       resolve_bound_method_target
+             L2 to L7  find_local_binding_type, called from find_core_member_target; the
+                       index keeps the RET_TYPE rows and a count of each identifier of
+                       the unit's source files
+ found       two facts the spec's first draft missed, both now in part 8 section 15:
+             L2 counted names in all stored text and must count the source files of the
+             unit only; private::Sealed has the supertrait Copy, whose source the run does
+             not read, so L3 accepts the walk only for a method that takes self by value
+             and stores the assumption source_compiles_method_resolves.
+ tests       unit (extractor): test_local_binding_receiver_evidence (L1),
+             test_local_binding_receiver_member (L2 to L7, nine cases). Its first failure
+             was a fixture without trait-contains-method edges, not the missing behaviour:
+             RED for the intended reason was not observed.
+             real source: test_itoa_core_member_targets (pins 132, str::len label, 170
+             nodes, 682 edge rows, 197 calls, 1 without a target),
+             test_core_member_rows_published (170 nodes, str::len added).
+ run         parseltongue map-workspace-full-run --workspace-root-path-value
+             ~/phase8-work/run1/itoa --workspace-store-file-path stepM.db
+             --worker-thread-count-value 2 --mapping-final-stage-kind
+             full-item-dependency-graph --sysroot-source-scope-kind declarations
+               exit 0   22.81 s wall   377,608 kB peak resident set (largest process)
+             One run; it was not repeated for equality.
+             against the frozen expected rows (test_itoa_core_member_targets, and the
+             scratch compare_run.py on the export):
+               seen 133   named and equal 132   wrong 0   without a target 1
+               new: str::len (core/src/str/mod.rs), proof kind local_binding_call_result
+               open: 1 cast (inherent_member_unproven)
+             nodes 170, edge rows 682, calls 197, calls without a target 1
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, extractor and cli crates             ok
+             extractor tests                                          174 and 17 passed, 0 failed
+             real-source tests                                        59 passed, 1 failed, 893 s
+               failed: test_core_member_rows_published, its list of added labels lacked
+               str::len. The list was corrected (test only) and the test passed alone
+               (38 s). The 60 were not run again together.
+             not run: the workspace clippy, test and build gates; the cli crate's other
+             test targets
+ commits     fb94f7ff9, 903738163, 317942e17, baee92849, 3f6ebad08 (code and tests).
+             baee92849 is 203 changed lines; the others are under 200. 903738163 and
+             317942e17 were not gated alone.
+ documents   part 8 (status, section 15 L2 and L3, measured section; section 16 is the
+             spec of the next step), SPEC README, part 7 Q4 note, PRD open list, ARCH
+             not-built table, SOP table, this log's "Where we are". MAP not re-measured.
+ queries     codebase-memory trace_path inbound, depth 1, before the change:
+             scan_source_scope_tokens (read_core_member_index), read_core_member_index
+             (resolve_original_call_edges), resolve_bound_method_target
+             (build_original_call_edge), find_core_member_target (build_original_call_edge,
+             find_call_result_member), list_core_fixture_edges (read_core_fixture_rows,
+             test_call_result_receiver_member). index_repository after the commits, then
+             find_local_binding_type (find_core_member_target),
+             list_bound_method_candidates (resolve_bound_method_target,
+             find_local_binding_type), find_local_binding_statement
+             (extract_method_receiver_syntax), check_plain_function_text (it lists 0; the
+             source has one call, in find_local_binding_type). For the next step:
+             collect_sysroot_member_rows (persist_sysroot_member_rows and one test),
+             persist_sysroot_member_rows and compute_workspace_generation_digest
+             (run_workspace_mapping_pipeline each).
+ next        REQ-RUST-065.0, the core files in the run id. Then the merge of the targets
+             into the expected graph, its new freeze, and S1 to S4.
+ not done    S1 to S4 for this head: NOT STARTED. The core files are not in the run id. The
+             targets are not merged into the expected graph. 1 call into core has no
+             target (cast).
 ```

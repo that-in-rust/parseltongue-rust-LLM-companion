@@ -233,8 +233,13 @@ proven form                                       once in an impl of a builtin t
                                                   by `#[macro_use]` scope (ilog10). Not built:
                                                   several arms, impls under `cfg` (usize),
                                                   a macro called through another macro
-a receiver that is a local variable               string.len(); the type of a `let` binding
-                                                  is not read
+a receiver that is a local variable, beyond the   built only for one plain `let` whose
+proven form                                       initializer is a method call named through
+                                                  a bound, with a return type of builtin or
+                                                  `core` names (string.len()). Not built: a
+                                                  written type, a pattern, any other
+                                                  initializer, a name used elsewhere in the
+                                                  unit
 an impl with a bound on its type parameter        cast on `*mut T` with `T: PointeeSized`;
                                                   nothing stored proves the bound restricts
                                                   no type

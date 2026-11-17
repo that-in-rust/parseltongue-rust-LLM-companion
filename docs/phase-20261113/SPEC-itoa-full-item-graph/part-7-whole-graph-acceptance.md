@@ -90,7 +90,9 @@ The dataset is never edited to match production: each change cites the source li
   declared for `&str`, as `clone` and `into` are. A rule that named `str::NAME` would
   name `str::clone` wrongly; telling the two apart needs `core`. `buf.len()` on a
   `&[T]` parameter was already expected without a target for the same reason. Not built:
-  the row does not record the proven receiver type (backlog).
+  the row does not record the proven receiver type (backlog). Under the scope
+  `declarations` the `core` source is read, and part 8 (REQ-RUST-064.0) names this call
+  `str::len`; that run is not accepted yet.
 
 ## 5. REQ-RUST-043.1 — the crate-root node (step 7.3c, added 2026-11-16)
 
