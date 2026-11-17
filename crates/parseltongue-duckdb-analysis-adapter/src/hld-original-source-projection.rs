@@ -100,7 +100,7 @@ impl DuckdbAnalysisStoreAdapter {
                 }
             })?;
         connection
-            .execute_batch("LOAD json; SET enable_external_access = false;")
+            .execute_batch("SET enable_external_access = false;")
             .map_err(|error| StoreBackendFailureError {
                 error_context_detail_text: error.to_string(),
             })?;
