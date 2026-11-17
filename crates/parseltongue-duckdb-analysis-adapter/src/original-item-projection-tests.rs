@@ -101,7 +101,7 @@ impl OriginalGraphFixtureStore {
         }
         .unwrap();
         let end = start + text.len();
-        let span = json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":start, "span_byte_end_offset":end, "span_content_digest_full":blake3::hash(text.as_bytes()).to_hex().to_string(), "span_syntax_kind_value":kind, "span_declared_name_value":name, "span_visibility_source_text":"private", "span_source_code_text":text, "span_configuration_active_flag":active, "span_expansion_provenance_chain":[], "span_semantic_occurrence_key":format!("source-{start}-{end}")});
+        let span = json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":start, "span_byte_end_offset":end, "span_content_digest_full":blake3::hash(text.as_bytes()).to_hex().to_string(), "span_syntax_kind_value":kind, "span_declared_name_value":name, "span_visibility_source_text":"private", "span_signature_source_text":"fixture signature", "span_source_code_text":text, "span_configuration_active_flag":active, "span_expansion_provenance_chain":[], "span_semantic_occurrence_key":format!("source-{start}-{end}")});
         self.insert_source_fixture_row("span-reference-text-table", span.clone());
         span
     }
@@ -395,12 +395,17 @@ fn test_impl_body_members_excluded() {
         .iter()
         .filter(|node| node.node_input_category == HldNodeInputCategory::LocalItem)
     {
+        // REQ-RUST-069.0 V1, S1: the projection copies the declared visibility and the
+        // signature from the span row. Reachability is set after the edges are resolved.
         assert_eq!(
             node.node_effective_visibility_kind,
-            Some(HldEffectiveVisibilityKind::Unknown)
+            Some(HldEffectiveVisibilityKind::PrivateEquivalent)
         );
         assert_eq!(node.node_reachable_outside_crate_flag, None);
-        assert_eq!(node.node_signature_text, None);
+        assert_eq!(
+            node.node_signature_text.as_deref(),
+            Some("fixture signature")
+        );
     }
 }
 

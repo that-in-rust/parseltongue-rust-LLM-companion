@@ -126,3 +126,30 @@ fn test_expanded_signature_text_equal() {
     );
     assert_eq!(signatures, print_source_item_signatures(expanded));
 }
+
+/// REQ-RUST-069.0 V1, V7: the declared visibility text of each item form.
+#[test]
+fn test_item_visibility_text_read() {
+    let source = "pub fn a() {} pub(crate) fn b() {} pub(in crate::m) fn c() {} fn d() {} \
+        #[macro_export] macro_rules! e { () => {}; } macro_rules! f { () => {}; } \
+        #[macro_export(local_inner_macros)] macro_rules! g { () => {}; } #[inline] pub struct H;";
+    let read = SourceFile::parse(source, Edition::Edition2021)
+        .syntax_node()
+        .descendants()
+        .filter(check_syntax_item_node)
+        .map(|item| read_item_visibility_text(&item))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            "pub",
+            "pub(crate)",
+            "pub(in crate::m)",
+            "private",
+            "macro_export",
+            "private",
+            "macro_export",
+            "pub"
+        ],
+        read
+    );
+}

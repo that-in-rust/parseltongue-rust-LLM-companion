@@ -118,6 +118,15 @@ pub(crate) fn publish_full_graph_checkpoint(
     input.input_edge_records.extend(semantic);
     input.input_edge_records.sort();
     input.input_edge_records.dedup();
+    // REQ-RUST-069.0: effective visibility and reachability need the finished `contains` rows.
+    input.input_node_records = parseltongue_syntax_span_extractor::resolve_node_visibility_fields(
+        store,
+        &source_snapshot,
+        &input,
+        cancel,
+    )
+    .map_err(map_full_graph_error)?;
+    input.input_node_records.sort();
     let graph_snapshot = full_graph_input_store
         .write_full_graph_input(&source_snapshot, scope, &input, cancel)
         .map_err(map_full_graph_error)?;

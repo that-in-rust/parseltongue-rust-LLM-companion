@@ -336,11 +336,13 @@ fn test_original_member_graph_roundtrip() {
             node.node_item_kind_value,
             Some(HldItemKindValue::ImplContainer)
         );
-        assert_eq!(
+        // REQ-RUST-069.0 A2: every item of itoa has a known visibility and reachability.
+        assert!(matches!(
             node.node_effective_visibility_kind,
-            Some(HldEffectiveVisibilityKind::Unknown)
-        );
-        assert_eq!(node.node_reachable_outside_crate_flag, None);
+            Some(kind) if kind != HldEffectiveVisibilityKind::Unknown
+        ));
+        assert!(node.node_reachable_outside_crate_flag.is_some());
+        assert!(node.node_signature_text.is_some());
         if node.node_source_relative_path.as_deref() == Some("src/u128_ext.rs")
             && node.node_item_kind_value == Some(HldItemKindValue::Function)
         {
@@ -5961,15 +5963,9 @@ fn verify_stored_graph_equality(
     );
     let stored_nodes = collect_production_node_rows(input, &labels);
     let expected_nodes = collect_expected_node_rows(files.node_file_name);
-    // Visibility, reachability and signature text are not stored on a node yet (PRD:
-    // "unknown visibility and unknown reachability are stored as unknown"). When one is
-    // stored, it joins the compared row.
+    // REQ-RUST-069.0 A2: no node of itoa stores an unknown visibility.
     assert!(input.input_node_records.iter().all(|node| {
-        matches!(
-            node.node_effective_visibility_kind,
-            None | Some(HldEffectiveVisibilityKind::Unknown)
-        ) && node.node_reachable_outside_crate_flag.is_none()
-            && node.node_signature_text.is_none()
+        node.node_effective_visibility_kind != Some(HldEffectiveVisibilityKind::Unknown)
     }));
     let expected_rows = collect_expected_graph_rows(files.edge_file_name);
     let stored_rows = collect_production_graph_rows(input, &labels);

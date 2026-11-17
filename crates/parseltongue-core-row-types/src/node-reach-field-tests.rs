@@ -150,12 +150,11 @@ fn make_reach_fixture_rows() -> Vec<Row> {
     ]
 }
 
-/// REQ-RUST-069.0 V2-V7, R1-R4: one row per rule.
+/// REQ-RUST-069.0 V2-V7, R1-R4: one row per rule. The three file areas get no fields (V6).
 #[test]
 fn test_node_reach_field_rules() {
     let fields = derive_fixture_reach_fields(&make_reach_fixture_rows(), false);
     let expected = [
-        ("area", Public, Some(false)),                      // V5, R1
         ("call", NotApplicable, Some(false)),               // V5, R1
         ("Buffer", Public, Some(true)),                     // V4, R2, R3: the crate root
         ("Buffer::new", Public, Some(true)),                // V4, R2: the self type
@@ -171,11 +170,9 @@ fn test_node_reach_field_rules() {
         ("Unsigned", PrivateEquivalent, Some(false)),
         ("u8::fmt", PrivateEquivalent, Some(false)), // V3: a private trait
         ("ext", PrivateEquivalent, Some(false)),
-        ("ext_area", Public, Some(false)),
         ("mulhi", RestrictedNonPrivate, Some(false)), // V1, R1
         ("ext_open", Public, Some(false)),            // R2: the module of the file
         ("open", Public, Some(true)),
-        ("open_area", Public, Some(false)),
         ("open_item", Public, Some(true)), // R2: through a file area
         ("lost::member", Unknown, None),   // V3: the trait is not resolved
         ("lost::self", Public, None),      // R4

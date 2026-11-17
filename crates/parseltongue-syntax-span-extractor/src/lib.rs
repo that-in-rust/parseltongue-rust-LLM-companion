@@ -70,6 +70,9 @@ pub use impl_header_implements_records::{
 mod external_named_target_records;
 #[path = "item-signature-text-printer.rs"]
 mod item_signature_text_printer;
+#[path = "node-visibility-field-records.rs"]
+mod node_visibility_field_records;
+pub use node_visibility_field_records::{NodeVisibilityFieldError, resolve_node_visibility_fields};
 #[path = "signature-type-edge-records.rs"]
 mod signature_type_edge_records;
 #[path = "use-import-edge-records.rs"]
@@ -520,11 +523,7 @@ fn extract_macro_context_syntax(
             .children()
             .find(|child| format!("{:?}", child.kind()) == "NAME")
             .map(|n| n.text().to_string());
-        let visibility = node
-            .children()
-            .find(|child| format!("{:?}", child.kind()) == "VISIBILITY")
-            .map(|n| n.text().to_string())
-            .unwrap_or_else(|| "private".into());
+        let visibility = item_signature_text_printer::read_item_visibility_text(node);
         let range = node.text_range();
         let start = restore_source_byte_offset(range.start(), &removed);
         let end = restore_source_byte_offset(range.end(), &removed);

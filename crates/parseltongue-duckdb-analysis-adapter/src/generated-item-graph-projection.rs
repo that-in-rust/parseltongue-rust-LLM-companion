@@ -120,11 +120,11 @@ fn build_generated_item_pair(
         node_item_kind_value: Some(item_kind),
         node_owner_kind_value: Some(owner_kind),
         node_function_body_ancestry_flag: false,
-        node_effective_visibility_kind: Some(HldEffectiveVisibilityKind::Unknown),
+        node_effective_visibility_kind: Some(decode_declared_visibility_kind(&span, item_kind)?),
         node_reachable_outside_crate_flag: None,
         node_source_relative_path: Some(area.path),
         node_qualified_path_text: label,
-        node_signature_text: None,
+        node_signature_text: Some(read_span_signature_text(&span)?),
         node_generating_call_reference: Some(call.clone()),
     };
     let generates = HldEdgeInputRecord {

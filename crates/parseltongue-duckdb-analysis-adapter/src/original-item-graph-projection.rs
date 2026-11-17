@@ -151,11 +151,13 @@ impl DuckdbAnalysisStoreAdapter {
                 node_item_kind_value: Some(item_kind),
                 node_owner_kind_value: Some(owner_kind),
                 node_function_body_ancestry_flag: false,
-                node_effective_visibility_kind: Some(HldEffectiveVisibilityKind::Unknown),
+                node_effective_visibility_kind: Some(decode_declared_visibility_kind(
+                    &span, item_kind,
+                )?),
                 node_reachable_outside_crate_flag: None,
                 node_source_relative_path: Some(context.path),
                 node_qualified_path_text: label,
-                node_signature_text: None,
+                node_signature_text: Some(read_span_signature_text(&span)?),
                 node_generating_call_reference: None,
             });
             edges.insert(HldEdgeInputRecord {
@@ -410,6 +412,49 @@ fn validate_original_impl_bridge(
         ));
     }
     Ok(())
+}
+
+/// REQ-RUST-069.0 V1, V5, V7: the visibility an item declares, from the text of its span.
+/// The effective visibility and the reachability are set after the edges are resolved.
+fn decode_declared_visibility_kind(
+    span: &Value,
+    item_kind: HldItemKindValue,
+) -> Result<HldEffectiveVisibilityKind, OriginalSourceProjectionError> {
+    if item_kind == HldItemKindValue::MacroInvocation {
+        return Ok(HldEffectiveVisibilityKind::NotApplicable);
+    }
+    // Expanded text puts a space between tokens: `pub (crate )`.
+    let written = required_string(
+        span,
+        "span_visibility_source_text",
+        "span-reference-text-table",
+    )?
+    .split_whitespace()
+    .collect::<String>();
+    match written.as_str() {
+        "pub" => Ok(HldEffectiveVisibilityKind::Public),
+        "private" | "pub(self)" | "pub(inself)" => {
+            Ok(HldEffectiveVisibilityKind::PrivateEquivalent)
+        }
+        "macro_export" => Ok(HldEffectiveVisibilityKind::Unknown),
+        restricted if restricted.starts_with("pub(") => {
+            Ok(HldEffectiveVisibilityKind::RestrictedNonPrivate)
+        }
+        other => Err(invalid_source_row(
+            "span-reference-text-table",
+            format!("unsupported visibility text {other}"),
+        )),
+    }
+}
+
+/// REQ-RUST-069.0 S1: the signature the syntax stage printed for the item.
+fn read_span_signature_text(span: &Value) -> Result<String, OriginalSourceProjectionError> {
+    required_string(
+        span,
+        "span_signature_source_text",
+        "span-reference-text-table",
+    )
+    .map(str::to_owned)
 }
 
 fn decode_original_item_kinds(

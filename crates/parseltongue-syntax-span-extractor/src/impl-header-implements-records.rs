@@ -196,7 +196,7 @@ fn read_header_external_name(
 
 /// What a header's self type or trait names when that is a node of the
 /// graph: a builtin, or an item among `endpoints`.
-fn read_header_node_target(
+pub(crate) fn read_header_node_target(
     resolution: &Value,
     endpoints: &BTreeSet<&HldTargetIdentityValue>,
 ) -> Result<Option<HldTargetIdentityValue>, ImplHeaderEdgeError> {

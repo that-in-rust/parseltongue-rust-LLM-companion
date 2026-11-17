@@ -23,7 +23,8 @@ pub enum NodeReachParentValue<K> {
 /// How a node is owned, which decides the parents of R2 and the visibility of V2 to V5.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeReachOwnerValue<K> {
-    /// A file area, with the module that contains it.
+    /// A file area, with the module that contains it. It has no fields of its own; an item
+    /// in it is reachable when that module is.
     FileArea {
         module: NodeReachParentValue<K>,
     },
@@ -55,13 +56,19 @@ pub struct NodeReachFieldRecord {
     pub node_reachable_outside_crate_flag: Option<bool>,
 }
 
-/// The two fields of every node of `nodes`.
+/// The two fields of every node of `nodes` but its file areas, which store neither (V6).
 pub fn derive_node_reach_fields<K: Ord + Clone>(
     nodes: &BTreeMap<K, NodeReachInputRecord<K>>,
 ) -> BTreeMap<K, NodeReachFieldRecord> {
     nodes
-        .keys()
-        .map(|key| {
+        .iter()
+        .filter(|(_, record)| {
+            !matches!(
+                record.node_reach_owner_value,
+                NodeReachOwnerValue::FileArea { .. }
+            )
+        })
+        .map(|(key, _)| {
             let fields = NodeReachFieldRecord {
                 node_effective_visibility_kind: derive_effective_visibility_kind(nodes, key, &[]),
                 node_reachable_outside_crate_flag: derive_node_reach_flag(nodes, key, &[]),
@@ -82,7 +89,8 @@ fn derive_effective_visibility_kind<K: Ord>(
         return Unknown;
     };
     match &record.node_reach_owner_value {
-        NodeReachOwnerValue::FileArea { .. } => Public,
+        // V6: a file area declares nothing.
+        NodeReachOwnerValue::FileArea { .. } => Unknown,
         NodeReachOwnerValue::MacroCall => NotApplicable,
         NodeReachOwnerValue::TraitMember(trait_type)
         | NodeReachOwnerValue::TraitImplMember { trait_type, .. } => match trait_type {
@@ -106,9 +114,8 @@ fn derive_node_reach_flag<K: Ord>(
 ) -> Option<bool> {
     let record = nodes.get(key).filter(|_| !path.contains(&key))?;
     let parents = match &record.node_reach_owner_value {
-        NodeReachOwnerValue::FileArea { .. } | NodeReachOwnerValue::MacroCall => {
-            return Some(false);
-        }
+        NodeReachOwnerValue::FileArea { .. } => return None,
+        NodeReachOwnerValue::MacroCall => return Some(false),
         NodeReachOwnerValue::Container(parent) | NodeReachOwnerValue::TraitMember(parent) => {
             vec![parent]
         }

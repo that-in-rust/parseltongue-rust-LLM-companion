@@ -1,4 +1,5 @@
-//! REQ-RUST-069.0 S1, S2: the signature of an item, printed from its own tokens.
+//! REQ-RUST-069.0 S1, S2: the signature of an item, printed from its own tokens, and
+//! V1, V7: the visibility text the item declares.
 
 use ra_ap_syntax::{NodeOrToken, SyntaxKind, SyntaxKind::*, SyntaxNode, SyntaxToken};
 
@@ -98,4 +99,27 @@ fn check_token_pair_spaced(previous: &SyntaxToken, next: &SyntaxToken) -> bool {
         _ => false,
     };
     !(joined_after || joined_before)
+}
+
+/// V1, V7: the visibility an item writes: its `pub` form, `private` when it writes none,
+/// and `macro_export` for a `macro_rules!` definition that carries that attribute.
+pub(crate) fn read_item_visibility_text(item: &SyntaxNode) -> String {
+    let exported = item.kind() == MACRO_RULES
+        && item
+            .children()
+            .filter(|child| child.kind() == ATTR)
+            .map(|attribute| {
+                attribute
+                    .text()
+                    .to_string()
+                    .split_whitespace()
+                    .collect::<String>()
+            })
+            .any(|text| text == "#[macro_export]" || text.starts_with("#[macro_export("));
+    if exported {
+        return "macro_export".into();
+    }
+    item.children()
+        .find(|child| child.kind() == VISIBILITY)
+        .map_or_else(|| "private".into(), |written| written.text().to_string())
 }

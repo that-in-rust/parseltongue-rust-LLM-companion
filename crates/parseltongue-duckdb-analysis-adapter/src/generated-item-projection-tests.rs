@@ -41,7 +41,7 @@ impl OriginalGraphFixtureStore {
             .map(|(item, kind, name, active)| {
                 let start = text.find(item).unwrap();
                 let end = start + item.len();
-                let span = json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":path, "span_byte_start_offset":start, "span_byte_end_offset":end, "span_content_digest_full":build_fixture_digest_text(item), "span_syntax_kind_value":kind, "span_declared_name_value":name, "span_visibility_source_text":"private", "span_source_code_text":item, "span_configuration_active_flag":active, "span_expansion_provenance_chain":chain, "span_semantic_occurrence_key":format!("expanded-{start}-{end}")});
+                let span = json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":path, "span_byte_start_offset":start, "span_byte_end_offset":end, "span_content_digest_full":build_fixture_digest_text(item), "span_syntax_kind_value":kind, "span_declared_name_value":name, "span_visibility_source_text":"private", "span_signature_source_text":"fixture signature", "span_source_code_text":item, "span_configuration_active_flag":active, "span_expansion_provenance_chain":chain, "span_semantic_occurrence_key":format!("expanded-{start}-{end}")});
                 self.insert_source_fixture_row("span-reference-text-table", span.clone());
                 ((*item).to_owned(), span)
             })
