@@ -4,13 +4,13 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-17, production code of the commit that adds C1, C3, C4 and C5 of REQ-RUST-062.0)
+## Where we are (2026-11-17, production code of the commit that adds C8 to C13 of REQ-RUST-062.0)
 
 **Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
 1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
 passed SOP steps S1 to S4 on one frozen executable. That graph is marked `incomplete`: 133
 method calls into `core` have no target, and the expected graph was written and checked by
-one author. Not accepted: the branch head, where part 8 names 108 of those 133 calls. Each
+one author. Not accepted: the branch head, where part 8 names 121 of those 133 calls. Each
 named call equals its frozen expected row, checked once against the compiler. No SOP step
 has been run on the head.**
 
@@ -19,23 +19,27 @@ has been run on the head.**
 ```text
                               accepted run   head
                               822da80cf
-nodes                         151            157
+nodes                         151            159
 edge rows                     682            682
-calls with a target            64 of 197     172 of 197
-edge rows with a target       549 of 682     657 of 682
-method calls into core named    0 of 133     108 of 133   equal to the frozen rows: 108, wrong: 0
+calls with a target            64 of 197     185 of 197
+edge rows with a target       549 of 682     670 of 682
+method calls into core named    0 of 133     121 of 133   equal to the frozen rows: 121, wrong: 0
 ```
 
 - **Expected targets:** all 133 are written from source and frozen
   (`itoa-target-dataset/itoa-expected-core-member-targets.json`).
 - **Named at the head:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`, 13
-  `TryInto::try_into`, 5 `[T]::len`, 1 `Iterator::rev`, 1 `[T]::as_mut_ptr`.
-- **Without a target (25):** 8 `expect`, 5 `unwrap`, 10 `ilog10`, 1 each of `str::len` and
-  `cast`.
+  `TryInto::try_into`, 8 `Result<T, E>::expect`, 5 `Result<T, E>::unwrap`, 5 `[T]::len`,
+  1 `Iterator::rev`, 1 `[T]::as_mut_ptr`.
+- **Without a target (12):** 10 `ilog10` (written by a macro in `core`), 1 `str::len` (the
+  receiver is a local variable), 1 `cast` (its impl has a bound the run cannot prove
+  harmless).
 - **Real-source tests:** 60 of 60 pass on the executable built from the head.
-- **In progress:** REQ-RUST-062.0, a receiver that is itself a method call (8 `expect`, 5
-  `unwrap`). Built: the stored inputs (C1, C3) and the type reading (C4, C5). Not built:
-  the lookup that uses them (C2, C6), so the counts above did not change.
+- **Built last:** REQ-RUST-062.0, a receiver that is itself a method call. The run reads
+  the return type `core` declares (`Result<T, Self::Error>`) and proves which `Result` it
+  is from the file's own scope and the prelude import, with every step stored on the row.
+- **Next:** the 10 `ilog10` calls, then `str::len`. `cast` stays without a target until a
+  bound such as `T: PointeeSized` can be proven to restrict nothing.
 - **Not done:** the `core` files are not in the run id; the targets are not merged into the
   expected graph; S1 to S4 are NOT STARTED for the head.
 
@@ -999,4 +1003,82 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  next        C2 and C6 with a fixture of `999.try_into().expect("x")`, RED then GREEN, then
              the real-source comparison (predicted, not measured: 121 named, 12 without)
  not done    S1 to S4 for this head: NOT STARTED. 25 calls into core have no target.
+```
+
+## 2026-11-17 09:15 IST Part 8: REQ-RUST-062.0 C8 to C13, the 13 `expect` and `unwrap` calls are named; documents brought to this state
+
+```text
+ spec        SPEC part 8 section 13, C8 to C13 (565c57fb5), pushed before this code
+ why         C2 and C6 as first written named none of the 13 calls on real source: try_into
+             returns Result<T, Self::Error>, and core declares the name Result three times
+             (the enum in result.rs, type aliases in fmt/mod.rs and io/error.rs). The fixture
+             had one Result. The lookup refuses a type name declared more than once.
+ built       C9   extract_member_declaration_rows stores one file_scope_name_binding row per
+                  direct child of a core file that may bind a type name (item, module,
+                  extern_crate, use_leaf, use_glob, unread_form), with its attribute texts
+             C10  find_file_scope_type: the name is an item of the file that writes it, or
+             C11  it comes from the prelude import of core/src/lib.rs, followed to the one
+                  declaration; an alias, a glob, a macro call, a second binding, a cfg or a
+                  #[path] leaves the name unproven
+             C8   find_call_result_member reads a duplicated type name only with that proof
+             C12  and only when every impl with the probed method name writes the same
+                  declaration; otherwise receiver_type_name_unproven
+             C13  the proof (files and offsets of each step) is stored on the edge row in
+                  receiver_type_name_proofs
+ defect      the first real-source run failed: UNIQUE constraint on the declaration rows.
+             A file scope row and the declaration row of the same name had one stored key
+             (file and name offset). build_declaration_row_key adds the kind to the key of a
+             file scope row; a glob row sits at its `*`. Not caught by a fixture: the key is
+             built in the cli crate, and only the real core source has such a pair.
+ fixtures    test_file_scope_binding_rows, test_file_scope_type_proven,
+             test_file_scope_type_unproven (new); the chained-call fixture now has three
+             Result declarations and a call through the alias impl that stays unproven
+ real source command: parseltongue map-workspace-full-run --workspace-root-path-value
+             ~/phase8-work/run1/itoa --workspace-store-file-path <store.db>
+             --worker-thread-count-value 2 --mapping-final-stage-kind
+             full-item-dependency-graph --sysroot-source-scope-kind declarations
+               run 1   exit 0   22.30 s wall   385,768 kB peak resident set
+               run 2   exit 0   23.25 s wall   380,704 kB peak resident set
+             (peak of the largest process, not the whole tree). The 682 exported edge rows
+             of the two runs are equal after sorting. Executable sha256 058ee3ebe9801ab2...,
+             read before and after run 2.
+             against the frozen expected rows (test_itoa_core_member_targets):
+               seen 133   named and equal 121   wrong 0   without a target 12
+               new: 8 Result<T, E>::expect, 5 Result<T, E>::unwrap, proof kind prelude_import
+               open: 10 ilog10 (receiver_type_not_determined), 1 len on a local &str
+               (receiver_type_not_determined), 1 cast (inherent_member_unproven)
+             nodes 159, edge rows 682, calls with a target 185 of 197, edge rows with a
+             target 670 of 682
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, extractor and cli crates             ok
+             extractor tests                                          168 and 17 passed, 0 failed
+             real-source tests                                        60 passed, 0 failed, 923 s
+             cli crate, all targets: 1 failed, test_lang_items_in_sysroot (the known open
+             defect); every other test passed
+             not run: the workspace clippy, test and build gates
+ commits     e367248ff, 740db3a26, 8144218d0, 86350f3a5, eb031e680 (code and tests, pushed).
+             8144218d0 is 309 lines (a new module and its test in one commit) and
+             eb031e680 is 195; the others are under 200.
+ documents   every file of docs/phase-20261113 was read against the code and this run.
+             Changed: this log's "Where we are" page, SPEC README and part 8, PRD (two new
+             decisions, the DuckDB json line, the open list), ARCH (step 6a row kinds, C2,
+             the not-built table), SOP (the table of what the next run needs), BACKLOG, MAP
+             (re-measured at eb031e680), immediate backlog entry 6. AGENTS.md: no change
+             needed; it holds no numbers.
+ queries     codebase-memory index_repository twice (27,262 nodes, 64,103 edges; last at
+             03:40Z, after the code commits). trace_path inbound, depth 1:
+             probe_core_member_declaration (4 callers), name_probed_core_member (it
+             lists 1, find_core_member_target; the source has a second call, in
+             find_call_result_member), extract_member_declaration_rows (the sysroot facade
+             and test helpers), find_file_scope_type (4: two tests, check_impl_name_differs,
+             prove_return_type_names), prove_return_type_names (1, find_call_result_member),
+             list_file_scope_rows (1, extract_member_declaration_rows),
+             build_declaration_row_key (1, collect_sysroot_member_rows). trace_path
+             outbound: extract_member_declaration_rows, find_core_member_target. The
+             callers were checked against the source with grep.
+ next        the 10 ilog10 calls (spec first: a method written by a macro in core), then
+             len on a local &str. cast stays without a target.
+ not done    S1 to S4 for this head: NOT STARTED. The core files are not in the run id. The
+             targets are not merged into the expected graph. 12 calls into core have no
+             target.
 ```
