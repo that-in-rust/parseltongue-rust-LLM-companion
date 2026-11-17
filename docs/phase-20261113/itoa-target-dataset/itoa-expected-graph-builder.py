@@ -103,8 +103,9 @@ def unres(src, method, f, line, anchor, gen=None, n=1, flags=(), start=None, why
 # ---------------- hand-written nodes ----------------
 AL, AX = "area:src/lib.rs", "area:src/u128_ext.rs"
 node("itoa", "module", "public", L, 1, 466, "//!", "crate_root", reach=True, flags=["crate_root"])
-node(AL, "file_public_area", "public", L, 1, 466, "//!", "crate_root")
-node(AX, "file_public_area", "public", X, 1, 22, "#[cfg", "crate_root")
+# REQ-RUST-069.0 V6: a file area declares nothing, so it has no visibility and no reachability.
+node(AL, "file_public_area", None, L, 1, 466, "//!", "crate_root", reach=None)
+node(AX, "file_public_area", None, X, 1, 22, "#[cfg", "crate_root", reach=None)
 node("u128_ext", "module", "private", L, 54, 54, "mod u128_ext;", AL)
 node(USE_HINT, "use_statement", "private", L, 56, 56, "use core::hint;", AL)
 node(USE_MEM, "use_statement", "private", L, 57, 57, "use core::mem::{self, MaybeUninit};", AL)

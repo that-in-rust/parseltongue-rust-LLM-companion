@@ -15,14 +15,19 @@ the expected graph:
 
 ```text
 field                               itoa, 170 nodes
-node_effective_visibility_kind      48 Public, 26 PrivateEquivalent, 1 RestrictedNonPrivate,
-                                    15 NotApplicable (macro calls), 80 without a value
-node_reachable_outside_crate_flag   19 true, 71 false, 80 without a value
+node_effective_visibility_kind      46 Public, 26 PrivateEquivalent, 1 RestrictedNonPrivate,
+                                    15 NotApplicable (macro calls), 82 without a value
+node_reachable_outside_crate_flag   19 true, 69 false, 82 without a value
 node_signature_text                 88 with a text (the items of itoa), 82 without
 ```
 
-The 80 nodes without a value are the crate root, the 66 names outside itoa and the 13
-builtin types: the run reads no declaration of them.
+The 82 nodes without a value are the crate root, the 2 file areas, the 66 names outside
+itoa and the 13 builtin types: none of them has a declaration the run reads.
+
+**One correction to the expected graph (2026-11-17).** It listed the 2 file areas as
+public and not reachable. Nothing in the source declares that: a file area is not an
+item. They now have no value, which is also what the node rules in
+`parseltongue-core-row-types` already require of a file-area node.
 
 **One limit, stated so the flag is not over-read.** "Reachable" means: can be named by a
 public path from the crate root. The methods of `private::Sealed` are stored as not
@@ -65,9 +70,9 @@ V3  WHEN an item is a member of a trait impl THEN it SHALL store the trait's vis
     the impl is not resolved
 V4  WHEN an item is a member of an inherent impl, or any other item THEN it SHALL store
     its declared visibility
-V5  WHEN a node is a macro call THEN it SHALL store NotApplicable; a file area Public
-V6  WHEN a node is the crate root, a name outside the read source or a builtin type
-    THEN it SHALL store no visibility, no reachability and no signature
+V5  WHEN a node is a macro call THEN it SHALL store NotApplicable
+V6  WHEN a node is the crate root, a file area, a name outside the read source or a
+    builtin type THEN it SHALL store no visibility, no reachability and no signature
 V7  WHEN a `macro_rules!` definition carries `#[macro_export]` THEN it SHALL store Unknown
     and no reachability (the export rule is not built); otherwise PrivateEquivalent
 ```
@@ -75,8 +80,8 @@ V7  WHEN a `macro_rules!` definition carries `#[macro_export]` THEN it SHALL sto
 Reachability (can be named by a public path from the crate root):
 
 ```text
-R1  WHEN a node's visibility is not Public THEN the flag SHALL be false; a file area and a
-    macro call SHALL store false
+R1  WHEN a node's visibility is not Public or Unknown THEN the flag SHALL be false, a
+    macro call included; with Unknown it SHALL have no value
 R2  WHEN a node is Public THEN the flag SHALL be true exactly when its parent is reachable.
     The parent is: the trait, for a trait member; the self type, for a member of an
     inherent impl; the trait and the self type both, for a member of a trait impl; for any
@@ -85,7 +90,7 @@ R2  WHEN a node is Public THEN the flag SHALL be true exactly when its parent is
 R3  WHEN the parent is the crate root, a name outside the read source or a builtin type
     THEN it SHALL count as reachable
 R4  WHEN a parent of R2 is not resolved to a node THEN the flag SHALL have no value
-R5  WHEN the unit has a `use` item whose visibility is not PrivateEquivalent THEN a Public
+R5  WHEN the graph has a `use` item whose visibility is not PrivateEquivalent THEN a Public
     node whose parent is not reachable SHALL have no value instead of false (a re-export
     may name it; re-exports are not followed in this part). itoa has no such `use`
 ```
@@ -110,7 +115,6 @@ S2  WHEN the tokens are printed THEN one space SHALL separate two tokens, except
     A trailing comma is kept: no token is dropped or added
 S3  WHEN the same item is written in source and in a macro expansion with the same tokens
     THEN both SHALL store the same signature
-S4  WHEN a node is a file area THEN it SHALL store no signature
 ```
 
 Acceptance:

@@ -1295,7 +1295,7 @@
       "start_line": 0
     },
     {
-      "effective_visibility": "public",
+      "effective_visibility": null,
       "end_line": 466,
       "file": "src/lib.rs",
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
@@ -1309,7 +1309,7 @@
       "node_exact_range": null,
       "owner": "crate_root",
       "owner_kind": null,
-      "reachable_outside_crate": false,
+      "reachable_outside_crate": null,
       "signature": null,
       "source_anchor": "//!",
       "source_evidence": {
@@ -4448,7 +4448,7 @@
       "start_line": 450
     },
     {
-      "effective_visibility": "public",
+      "effective_visibility": null,
       "end_line": 22,
       "file": "src/u128_ext.rs",
       "file_assignment_status": "SOURCE_FILE_CANDIDATE",
@@ -4462,7 +4462,7 @@
       "node_exact_range": null,
       "owner": "crate_root",
       "owner_kind": null,
-      "reachable_outside_crate": false,
+      "reachable_outside_crate": null,
       "signature": null,
       "source_anchor": "#[cfg",
       "source_evidence": {
