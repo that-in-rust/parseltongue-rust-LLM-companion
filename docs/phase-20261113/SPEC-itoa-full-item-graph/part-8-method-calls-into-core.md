@@ -895,3 +895,136 @@ the same name have the same name offset, so the stored row key (`file#offset`) w
 unique. The key of a file scope row now ends in its kind, and a `use_glob` row is placed
 at its `*`.
 
+
+## 14. A method that a `core` macro writes into an impl of a builtin type (spec first, added 2026-11-17)
+
+### Rust work mode
+
+Library code, pure lookups over stored rows (L1), plus new rows from the syntax read of
+`core` (L2). No new stage, no new table.
+
+### Measured before writing (commit `eb031e680`, scope `declarations`)
+
+```text
+10 calls   $Unsigned::MAX.ilog10() and $Signed::MAX.ilog10(), expanded to `u8 ::MAX .ilog10 ()`
+           for u8 u16 u32 u64 u128 i8 i16 i32 i64 i128
+stored     receiver_place_step_rows: one value_path step `u8 ::MAX`; receiver_shape_kind other
+reason     receiver_type_not_determined
+the read   the `reads` edge of the same path already proves the prefix: its stored type
+           lookup of `u8` is resolved to the builtin type (type_relative_member_evidence)
+```
+
+Read from the `core` source of rustc 1.99.1 by hand (the run does not read these yet):
+
+```text
+core/src/lib.rs:256          #[macro_use] pub mod num;
+core/src/num/mod.rs:40..43   #[macro_use] mod int_macros;   #[macro_use] mod uint_macros;
+core/src/num/mod.rs:378      impl i8 { int_impl! { .. } }        (i16 403, i32 428, i64 453, i128 478)
+core/src/num/mod.rs:585      impl u8 { uint_impl! { .. } .. }    (u16 1233, u32 1289, u64 1321, u128 1353)
+core/src/num/mod.rs          isize and usize: three impls each, each under #[cfg(target_pointer_width)]
+core/src/num/uint_macros.rs  one macro_rules! uint_impl with one arm; in its body, in no inner
+                             braces: `pub const MAX: Self = !0;` (51), `pub const fn ilog10(self) -> u32 {` (1833)
+core/src/num/int_macros.rs   one macro_rules! int_impl with one arm; MAX (47), ilog10 (3520)
+core/src/num/imp/int_bits.rs:65   a second `macro_rules! uint_impl`, in a module with no #[macro_use]
+```
+
+### What is missing today
+
+- A macro body row is stored for `fn NAME` only, with no attribute, no depth and no arm
+  count. A `const` written in a macro body has no row.
+- No row says that a macro is called directly in an impl of `u8`.
+- No row says where a `macro_rules!` is written at file level. `uint_impl` is declared
+  twice in `core`, so the name alone does not say which macro `impl u8` calls.
+- The lookup has no receiver shape for `TYPE::CONST`.
+
+### The Rust rules this follows
+
+- `u8::MAX` and `x.ilog10()` on a `u8` look at the inherent impls of `u8` first. One type
+  has one inherent item of a name: a second is an error (E0592). So one inherent
+  declaration, proven active, is the target, and no trait is asked.
+- A `macro_rules!` name is looked up in textual order: the last definition written before
+  the call. A module's macros reach the code after it only through `#[macro_use]`.
+- The macros a module can see from outside are written before it in textual order, so a
+  definition found in the call's own file is later than any of those.
+
+### Executable requirements: REQ-RUST-063.0
+
+```text
+M1   Stored rows. For a macro call that is a direct item of an impl that is a direct child
+     of a core file, the run SHALL store one row (impl_macro_call): the macro name as
+     written, the impl's self type text, trait path text, generic parameter text and
+     attribute texts, the call's attribute texts, and the offsets of the macro name.
+M2   Stored rows. For each `macro_rules! NAME` that is a direct child of a core file, the
+     run SHALL store one file scope row of form macro_definition with NAME, its attribute
+     texts and the number of its arms. A file scope row of a module already stores its
+     attribute texts (`#[macro_use]`).
+M3   Stored rows. A macro body row SHALL also be stored for `const NAME : TYPE` written as
+     tokens, with the type text. Every macro body row (fn or const) SHALL store:
+       macro_body_brace_depth      braces between the arm's body and the item (0 = directly
+                                   in the arm's body)
+       macro_body_repetition_flag  whether the item is inside `$( .. )`
+       member_attribute_text_values  the `#[..]` written directly before the item
+       macro_arm_ordinal_value     which arm of the macro holds it
+M4   The macro NAME called in file F at offset O stands for the definition D when, going
+     back from O over the file scope rows of F, the first row that can define a macro is:
+     (a) a macro_definition row named NAME: D is it; or
+     (b) a file module row with an attribute text `#[macro_use]`, no `cfg` and no `#[path`,
+         whose file (F's directory, `m.rs` or `m/mod.rs`, exactly one with rows) has
+         exactly one macro_definition row named NAME and, after it, no row that can
+         define a macro: D is that row.
+     Rows that can define a macro: macro_definition named NAME, a module or extern crate
+     with `macro_use` in an attribute text, and an unread_form row (a macro call may
+     write a macro). A module row with `#[macro_use]` whose file has no macro_definition
+     named NAME and no other row that can define a macro is passed over. Anything else
+     found first leaves the name unproven.
+M5   The builtin type B has the inherent member NAME of kind K (const | fn) declared at D
+     when all of these hold:
+     - exactly one impl_macro_call row in core has self type text B, no trait, no generic
+       parameter, and a macro whose body holds NAME (below); neither the impl nor the
+       call has an attribute text containing `cfg`;
+     - every impl of core whose self type text is B (written out or impl_macro_call) has
+       no `cfg` attribute, so no impl of B is left unread;
+     - the macro name stands for one definition by M4, and that macro has one arm;
+     - that macro's body rows hold exactly one row named NAME of kind K, with brace depth
+       0, no repetition, no attribute text containing `cfg`, and for a fn a `self`
+       parameter; no body row of that macro takes its name from a macro variable.
+     D is that body row.
+M6   A receiver that is one value path `B::NAME` and nothing else, where the stored type
+     lookup of the prefix resolves B to a builtin type, has the type B when M5 proves a
+     const NAME on B whose type text is `Self` or B. Then the method is looked up by M5
+     with kind fn, the receiver taken by value. The target label is `B::method`, crate
+     core, owner kind inherent_impl, proof kind core_macro_body_member.
+     Withheld, with what was found stored: builtin_macro_member_unproven.
+M7   The lookup record SHALL carry: the builtin name; for the const and for the method,
+     the file and offsets of the impl_macro_call row, of the macro definition and of the
+     body row; the M4 kind (same_file | macro_use_module) with the module row's offsets;
+     and the rule used (`inherent_item_declared_once`).
+M8   No assumption is stored for these rows: each step is a stored row. The run does not
+     read `alloc` or `std`; method_probe_unread_source says so as on every core lookup.
+```
+
+### Design (L1 / L2 / L3)
+
+- **L2, rows:** `extract_member_declaration_rows` (`sysroot-member-declaration-records.rs`)
+  gains M1 to M3 beside `list_macro_token_rows` and `list_scope_binding_rows`. The stored
+  key of the new rows is the file and offset, with the kind for a file scope row
+  (`build_declaration_row_key`).
+- **L1, lookup:** a new module `core-macro-impl-member-records.rs` with pure functions
+  over `&[Value]`: `find_macro_scope_definition` (M4) and `find_macro_impl_member` (M5),
+  each returning the proof or nothing.
+- **L1, wiring:** in `find_core_member_target`, a `value_path` first step with no field
+  or index step that `find_static_place_type` does not answer goes to a new
+  `find_builtin_constant_member` (M6, M7). The prefix proof is the stored type lookup the
+  `reads` resolver uses (`context.resolve_type`).
+- Not built: `usize` and `isize` (their impls are under `cfg`), a const whose type is not
+  `Self`, a macro with more than one arm, a macro called through another macro.
+
+### Verification matrix
+
+| Req | Test | Level | Case | Expected |
+|---|---|---|---|---|
+| M1 to M3 | sysroot declaration row test | unit | an impl with a macro call; a file-level macro with two arms; `const` and `fn` at depth 0, in inner braces, in a repetition, under `cfg` | the rows |
+| M4 | macro impl member test | unit | same file; `#[macro_use]` module; a later second definition; a macro call in between; `cfg` or `#[path]` on the module; a second definition in a module without `#[macro_use]` | D; not proven |
+| M5 | macro impl member test | unit | `impl u8 { m! {} }`; two impls with the macro; an impl under `cfg`; two arms; the name twice; in inner braces | D; not proven |
+| M6, M7 | fixture | unit | `u8::MAX.ilog10()`; a const of another type; a local type named like the prefix | `u8::ilog10` with the record; no target |
+| M1 to M8 | test_itoa_core_member_targets | real source | the 10 `ilog10` calls equal their frozen rows | wrong 0 |
