@@ -145,6 +145,26 @@ IO Error: Extension "/home/ubuntu/.duckdb/extensions/v2.0.0/linux_amd64/json.duc
 **Open before any code:** build the extension into the executable, or freeze the file by
 digest in S1.
 
+## 7. Name the one call into `core` that is left: `cast`
+
+Added 2026-11-17.
+
+**Seen in the data.** `self.bytes.as_mut_ptr().cast::<u8>()` in `Buffer::format` is the
+only one of the 133 method calls into `core` that a `declarations` run stores without a
+target. The frozen targets file gives its target as `*mut T::cast`, and the compile check
+of 2026-11-16 agrees.
+
+- The run finds the one declaration, in `impl<T: PointeeSized> *mut T` of
+  `ptr/mut_ptr.rs`. It stops because the impl has a bound, and no stored row proves that
+  `PointeeSized` restricts no type (REQ-RUST-062.0 C7).
+- The expected graph of a `declarations` run lists this site without a target, with the
+  known label beside it (REQ-RUST-066.0 M4).
+
+**Open before any code:** which source facts prove that every type meets
+`PointeeSized` (its `#[lang = "pointee_sized"]` declaration in `marker.rs` is one
+candidate), written as a requirement first. When built, the label moves out of the
+builder's list of unmerged labels and the graph is frozen again.
+
 ## Navigation-data additions from the research
 
 Added 2026-11-17, from the source-backed navigation critique and the 80-repository
@@ -158,7 +178,7 @@ Each addition needs its own source-written expected rows and freeze before produ
 reports its limitations; none of these additions is a prerequisite for CLI API ideation.
 Nothing here authorizes changing the acceptance run already in progress.
 
-## 7. Role-aware occurrences, including field references
+## 8. Role-aware occurrences, including field references
 
 **The navigation need.** A coding agent needs to find each use of a symbol, not just items
 that depend on it. The graph's `reads` relation is for consts/statics, not a general field
@@ -175,7 +195,7 @@ semantic roles from identifier spelling or merge distinct sites into a single ed
 decide their relationship to the existing item graph without silently changing `reads`.
 Extend, rather than replace, entry 5's signatures/visibility/reachability comparison.
 
-## 8. Exact macro template and invocation edit provenance
+## 9. Exact macro template and invocation edit provenance
 
 **The navigation need.** Existing `generates` and `expands` rows identify generated items,
 calls and definitions. An agent also needs the editable source locations and which
@@ -191,7 +211,7 @@ definition span of every generated member, or fabricate a one-to-one source rang
 co-generated groups, then freeze the full addition. Preserve existing provenance records;
 this is an enrichment of their edit routes, not a second macro-expansion engine.
 
-## 9. Source-linked documentation and contracts
+## 10. Source-linked documentation and contracts
 
 **The navigation need.** A signature alone does not tell an agent the documented
 preconditions, safety obligations or usage of an item. Entry 5 remains the signature task;
@@ -207,7 +227,7 @@ pinned itoa. Define how macro-generated items inherit or cite template documenta
 record an unavailable association rather than guessing. Do not ingest examples or tests
 as graph inputs implicitly just because documentation mentions them.
 
-## 10. Explicit source-scope and availability records
+## 11. Explicit source-scope and availability records
 
 **The navigation need.** An absent caller can mean no recorded caller, excluded source,
 inactive configuration or unsupported analysis. A coding agent must not read all of those

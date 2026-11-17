@@ -187,6 +187,9 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
   2026-11-16).
 - `test_itoa_whole_graph_equality` compares the whole graph: every node, every edge site by
   byte range and record, and `contains` and `implements` by source, relation and target.
+- `test_itoa_declarations_graph_equality` does the same for a run with `declarations`,
+  against the expected graph of that scope. It also checks that the `core` source on the
+  machine has the frozen digest.
 - The expected graph names items by symbolic label; the test derives the same label from
   each stored identity.
 
@@ -225,13 +228,19 @@ No run with `declarations` has been judged. Before one is:
 needed                                                        state on 2026-11-17
 expected target of each of the 133 calls, from source          frozen, one author:
                                                                itoa-expected-core-member-targets.json
-the run names every call the expected rows name                not done: 132 of 133 at the
-                                                               head, each equal, 0 wrong (log)
-expected graph re-frozen with those targets                    not done
+the run names every call the expected rows name                132 of 133 at the head, each
+                                                               equal, 0 wrong (log); `cast` is
+                                                               listed without a target
+expected graph frozen with those targets                       frozen, one author
+                                                               (REQ-RUST-066.0):
+                                                               itoa-expected-declarations-graph-*.json,
+                                                               170 nodes, 682 edge rows; compared
+                                                               by test_itoa_declarations_graph_equality
 S1 record of the compiler version and the core digest          the command is in S1; the frozen
                                                                targets file records both values
-the run id covers the core files                               not built: it hashes the
-                                                               compiler version only
+the run id covers the core files                               built (REQ-RUST-065.0): the run
+                                                               stores the S1 digest of the
+                                                               files it read; not judged
 S2 audit accepts reads under the core source directory only    not checked on a run
 S2 audit of the DuckDB `json` extension file                   open: the run loads it from
                                                                ~/.duckdb/extensions, outside
