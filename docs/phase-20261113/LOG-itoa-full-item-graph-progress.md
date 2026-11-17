@@ -1616,3 +1616,44 @@ and a run equals both re-frozen expected graphs: 170 nodes, 684 edge rows (scope
   `index_repository` after `b32b47200`.
 - **Next:** part 11, node visibility, reachability and signature: spec first.
 
+
+## 2026-11-18 Part 11 built: visibility, reachability and signature on every item node
+
+- **Result:** a run of pinned itoa equals the re-frozen expected graph with three more
+  fields compared on every node, for scope `declarations` (170 nodes) and `excluded`
+  (151). `test_itoa_declarations_graph_equality` and `test_itoa_whole_graph_equality`
+  pass. The "Where we are" page above still describes the accepted run of `753665eb9`;
+  S1 to S4 are NOT STARTED for this head and run once, after the last open point.
+- **Stored (exported node rows of the run below):** 46 Public, 26 PrivateEquivalent,
+  1 RestrictedNonPrivate, 15 NotApplicable, 82 without a value; reachable 19 true,
+  69 false, 82 without; 88 signatures.
+- **Commits:** spec `054a8fdba`; expected signatures `c94154305` (11.1); failing test
+  `e51f014ab` (11.2); signature printer `2edeb931c` (11.3); rules and `NotApplicable`
+  `ca12fad6b` (11.4); expected-graph correction `860c62c45`; projection, pass and
+  checkpoint call `28f1db595` (11.5); documents `1c140290b`, `ce870fb9c`, `9a1f6d26f`.
+- **Gates at `28f1db595`:** `cargo fmt --all -- --check` exit 0; workspace clippy exit 0;
+  core-row-types 26, extractor 177 + 17, DuckDB adapter 188, Turso adapter 46 + 22 + 4
+  tests pass; real-source suite 63 passed, 0 failed, 1007.70 s; 25 expected-data tests.
+- **Run:** `parseltongue map-workspace-full-run ... --worker-thread-count-value 4
+  --sysroot-source-scope-kind declarations`: exit 0, 22.46 s, 368,704 kB peak, 170 nodes,
+  90 `contains` rows.
+- **Test names:** `test_item_signature_text_printed`, `test_expanded_signature_text_equal`,
+  `test_item_visibility_text_read`, `test_node_reach_field_rules`,
+  `test_reexport_reach_flag_unknown`, `test_parent_cycle_reach_ends`, and the two equality
+  tests.
+- **Expected graph corrected:** the 2 file areas were listed as public and not reachable.
+  No source text declares that and the node rules forbid it; they now have no value.
+- **A miss from part 10, found here:** `test_no_forbidden_semantic_dependencies` still
+  expected DuckDB features `[bundled]` and had failed since part 10, because the
+  workspace tests were not run after it. Fixed in `f43382e34`.
+- **Deviations:** listed in section 6 of the part file (real-source suite not run at the
+  11.3 and 11.4 commits; 11.5 pushed while the suite ran, at the user's request; no fixture
+  test for the pass itself; one stale adapter fixture assertion). The workspace test gate
+  was not run.
+- **Open question left:** whether a member of a private supertrait of a reachable trait
+  counts as reachable (PRD, "Open").
+- **codebase-memory queries:** `trace_path extract_file_syntax_rows` inbound;
+  `trace_path resolve_node_visibility_fields` both; `trace_path
+  publish_full_graph_checkpoint` outbound; `index_repository` after each code commit.
+- **Next:** part 13, enum variants and struct fields as nodes: spec, expected rows, new
+  freeze, then code.
