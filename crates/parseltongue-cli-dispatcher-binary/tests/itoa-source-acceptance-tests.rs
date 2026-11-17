@@ -2242,6 +2242,24 @@ fn test_core_member_rows_published() {
     let (database, input) = run("declarations.db", "declarations");
     let config = read_published_stage_rows(&database, "workspace-config-state-records");
     assert_eq!(config[0]["workspace_sysroot_scope_kind"], "declarations");
+    // REQ-RUST-065.0 D1: the run stores which bytes of `core` it read, and they are the
+    // ones the frozen expected targets were written from.
+    let frozen: Value = serde_json::from_str(
+        &fs::read_to_string(
+            Path::new(EXPECTED_DATASET_DIRECTORY_PATH).join(CORE_TARGET_DATASET_NAME),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        json!({
+            "sysroot_source_directory_path": "core/src",
+            "sysroot_source_file_count": frozen["core_source"]["file_count"],
+            "sysroot_source_byte_count": frozen["core_source"]["byte_count"],
+            "sysroot_listing_digest_sha256": frozen["core_source"]["listing_sha256"],
+        }),
+        config[0]["workspace_sysroot_source_record"]
+    );
     let units = read_published_stage_rows(&database, "crate-dependency-graph-table");
     assert!(
         units
@@ -2279,6 +2297,24 @@ fn test_core_member_rows_published() {
     }));
 
     let (excluded_database, excluded) = run("excluded.db", "excluded");
+    // REQ-RUST-065.0 D2, D3: a run that reads no `core` stores no record, and its run id
+    // is another one.
+    let excluded_config =
+        read_published_stage_rows(&excluded_database, "workspace-config-state-records");
+    assert!(
+        excluded_config[0]
+            .get("workspace_sysroot_source_record")
+            .is_none()
+    );
+    let generation = |database: &Path| {
+        TursoWorkspaceStoreAdapter::open_turso_workspace_store(database.to_str().unwrap())
+            .unwrap()
+            .read_workspace_publication_scope()
+            .unwrap()
+            .unwrap()
+            .run_generation_digest_value
+    };
+    assert_ne!(generation(&database), generation(&excluded_database));
     assert!(
         read_published_stage_rows(&excluded_database, "sysroot-member-declaration-records")
             .is_empty()

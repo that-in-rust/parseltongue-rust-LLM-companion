@@ -756,6 +756,15 @@ fn run_workspace_mapping_pipeline(
                     SysrootSourceScopeKind::Excluded => "excluded",
                     SysrootSourceScopeKind::Declarations => "declarations",
                 });
+                // REQ-RUST-065.0 D1 to D3: the run id below hashes this row, so it covers
+                // the bytes of `core` a `declarations` run reads.
+                if sysroot_scope == SysrootSourceScopeKind::Declarations {
+                    let library = sysroot_member_declaration_facade::build_sysroot_library_path(
+                        read_required_json_string(&value, "workspace_sysroot_directory_path")?,
+                    );
+                    value[sysroot_member_declaration_facade::SYSROOT_SOURCE_RECORD_NAME] =
+                        sysroot_member_declaration_facade::read_sysroot_source_record(&library)?;
+                }
                 value["workspace_required_stage_names"] =
                     if matches!(final_stage, MappingFinalStageKind::NameResolution) {
                         json!([
