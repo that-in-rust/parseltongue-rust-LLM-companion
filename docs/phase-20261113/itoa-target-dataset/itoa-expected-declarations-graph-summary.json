@@ -1,0 +1,77 @@
+{
+  "artifact_status": "FROZEN_EXPECTED_GRAPH",
+  "core_source": {
+    "byte_count": 6419461,
+    "compiler_version_lines": [
+      "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "binary: rustc",
+      "commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "commit-date: 2026-10-13",
+      "host: x86_64-unknown-linux-gnu",
+      "release: 1.99.1",
+      "LLVM version: 23.1.1"
+    ],
+    "directory": "<sysroot>/lib/rustlib/src/rust/library/core/src",
+    "file_count": 288,
+    "listing_command": "cd <sysroot>/lib/rustlib/src/rust/library && find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum",
+    "listing_sha256": "39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780"
+  },
+  "counts": {
+    "edge_rows_grouped": 473,
+    "edge_sites": 682,
+    "edge_sites_known_not_merged": 1,
+    "edge_sites_merged": 132,
+    "edge_sites_without_target": 1,
+    "nodes": 170,
+    "nodes_added": 19
+  },
+  "identity_status": "SYMBOLIC_LABELS",
+  "merged_from": [
+    "itoa-expected-graph-nodes.json",
+    "itoa-expected-graph-edges.json",
+    "itoa-expected-core-member-targets.json"
+  ],
+  "production_input": false,
+  "provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NONE",
+    "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
+  },
+  "relation_kind_counts": {
+    "calls": 103,
+    "contains": 88,
+    "derives": 0,
+    "expands": 15,
+    "generates": 45,
+    "implements": 32,
+    "imports": 4,
+    "reads": 62,
+    "reexports": 0,
+    "uses_type": 124
+  },
+  "requirement": "REQ-RUST-066.0",
+  "source_commit": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+  "source_coverage": {
+    "known_uncovered_constructs": [
+      "operators",
+      "literals"
+    ],
+    "whole_source_coverage_claimed": false
+  },
+  "source_pin_file": "phase-one-benchmark-pin.json",
+  "sysroot_source_scope_kind": "declarations",
+  "target_kind_counts": {
+    "builtin": 77,
+    "external": 118,
+    "node": 277,
+    "unresolved": 1
+  },
+  "unmerged_labels": {
+    "*mut T::cast": {
+      "record": "undetermined/inherent_member_unproven",
+      "requirement": "REQ-RUST-062.0 C7",
+      "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"
+    }
+  }
+}

@@ -1,0 +1,4863 @@
+{
+  "artifact_status": "FROZEN_EXPECTED_GRAPH",
+  "core_source": {
+    "byte_count": 6419461,
+    "compiler_version_lines": [
+      "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "binary: rustc",
+      "commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "commit-date: 2026-10-13",
+      "host: x86_64-unknown-linux-gnu",
+      "release: 1.99.1",
+      "LLVM version: 23.1.1"
+    ],
+    "directory": "<sysroot>/lib/rustlib/src/rust/library/core/src",
+    "file_count": 288,
+    "listing_command": "cd <sysroot>/lib/rustlib/src/rust/library && find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum",
+    "listing_sha256": "39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780"
+  },
+  "identity_status": "SYMBOLIC_LABELS",
+  "merged_from": [
+    "itoa-expected-graph-nodes.json",
+    "itoa-expected-graph-edges.json",
+    "itoa-expected-core-member-targets.json"
+  ],
+  "production_input": false,
+  "provenance": {
+    "author": "Devin",
+    "basis": "PINNED_SOURCE_READING",
+    "independent_compiler_oracle_verification": "NONE",
+    "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
+  },
+  "requirement": "REQ-RUST-066.0",
+  "row_count": 170,
+  "rows": [
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "prelude_name",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "Clone",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "prelude_name",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "Copy",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "prelude_name",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "Default",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "Iterator::rev",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "MaybeUninit<T>::write",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "Result<T, E>::expect",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "Result<T, E>::unwrap",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "TryInto::try_into",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "[T]::as_mut_ptr",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "[T]::get_unchecked",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "[T]::len",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::hint",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::hint::unreachable_unchecked",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::mem",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::mem::MaybeUninit",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::mem::MaybeUninit::uninit",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::mem::size_of",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::str",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "crate_rooted_path",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "core::str::from_utf8_unchecked",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i128",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i128::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i128::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i128::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i128::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i128::unsigned_abs",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i16",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i16::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i16::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i16::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i16::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i16::unsigned_abs",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i32",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i32::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i32::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i32::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i32::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i32::unsigned_abs",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i64",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i64::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i64::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i64::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i64::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i64::unsigned_abs",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i8",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i8::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i8::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i8::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i8::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "i8::unsigned_abs",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "isize",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_ROOT_MODULE_NOT_DECLARED",
+      "flags": [
+        "crate_root"
+      ],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "itoa",
+      "node_category": "crate_root",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": true,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "str",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "str::len",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u128",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u128::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u128::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u128::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u128::from",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u128::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u16",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u16::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u16::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u16::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u16::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u32",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u32::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u32::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u32::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u32::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u64",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u64::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u64::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u64::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u64::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u8",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u8::BITS",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u8::MAX",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "builtin_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u8::MIN",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "u8::ilog10",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": null,
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "usize",
+      "node_category": "builtin_type",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 466,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "file_public_area",
+      "label": "area:src/lib.rs",
+      "node_category": "file_public_area",
+      "node_exact_range": null,
+      "owner": "crate_root",
+      "owner_kind": null,
+      "reachable_outside_crate": false,
+      "source_anchor": "//!",
+      "source_evidence": {
+        "anchor_text": "//!",
+        "byte_range": [
+          0,
+          3
+        ],
+        "line": 1,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 1
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 54,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "module",
+      "label": "u128_ext",
+      "node_category": "local_item",
+      "node_exact_range": [
+        1980,
+        1993
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "mod u128_ext;",
+      "source_evidence": {
+        "anchor_text": "mod u128_ext;",
+        "byte_range": [
+          1980,
+          1993
+        ],
+        "line": 54,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 54
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 56,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "use_statement",
+      "label": "use core::hint",
+      "node_category": "local_item",
+      "node_exact_range": [
+        1995,
+        2010
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "use core::hint;",
+      "source_evidence": {
+        "anchor_text": "use core::hint;",
+        "byte_range": [
+          1995,
+          2010
+        ],
+        "line": 56,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 56
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 57,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "use_statement",
+      "label": "use core::mem::{self, MaybeUninit}",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2011,
+        2046
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "use core::mem::{self, MaybeUninit};",
+      "source_evidence": {
+        "anchor_text": "use core::mem::{self, MaybeUninit};",
+        "byte_range": [
+          2011,
+          2046
+        ],
+        "line": 57,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 57
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 58,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "use_statement",
+      "label": "use core::str",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2047,
+        2061
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "use core::str;",
+      "source_evidence": {
+        "anchor_text": "use core::str;",
+        "byte_range": [
+          2047,
+          2061
+        ],
+        "line": 58,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 58
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 74,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "struct",
+      "label": "Buffer",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2116,
+        2427
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": true,
+      "source_anchor": "pub struct Buffer",
+      "source_evidence": {
+        "anchor_text": "pub struct Buffer",
+        "byte_range": [
+          2357,
+          2374
+        ],
+        "line": 72,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 72
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 80,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<Buffer as Default>::default",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2459,
+        2525
+      ],
+      "owner": "impl@76",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "fn default()",
+      "source_evidence": {
+        "anchor_text": "fn default()",
+        "byte_range": [
+          2473,
+          2485
+        ],
+        "line": 78,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 78
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 90,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<Buffer as Clone>::clone",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2625,
+        2692
+      ],
+      "owner": "impl@86",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "fn clone(&self)",
+      "source_evidence": {
+        "anchor_text": "fn clone(&self)",
+        "byte_range": [
+          2639,
+          2654
+        ],
+        "line": 88,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 88
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 101,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "Buffer::new",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2714,
+        3006
+      ],
+      "owner": "impl@93",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "pub fn new()",
+      "source_evidence": {
+        "anchor_text": "pub fn new()",
+        "byte_range": [
+          2881,
+          2893
+        ],
+        "line": 98,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 98
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 113,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "Buffer::format",
+      "node_category": "local_item",
+      "node_exact_range": [
+        3012,
+        3484
+      ],
+      "owner": "impl@93",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "pub fn format<I: Integer>",
+      "source_evidence": {
+        "anchor_text": "pub fn format<I: Integer>",
+        "byte_range": [
+          3181,
+          3206
+        ],
+        "line": 106,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 106
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 123,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "trait",
+      "label": "Integer",
+      "node_category": "local_item",
+      "node_exact_range": [
+        3488,
+        3836
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": true,
+      "source_anchor": "pub trait Integer: private::Sealed",
+      "source_evidence": {
+        "anchor_text": "pub trait Integer: private::Sealed",
+        "byte_range": [
+          3639,
+          3673
+        ],
+        "line": 119,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 119
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 122,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "Integer::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": [
+        3680,
+        3834
+      ],
+      "owner": "Integer",
+      "owner_kind": "trait",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize;",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize;",
+        "byte_range": [
+          3809,
+          3834
+        ],
+        "line": 122,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 122
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 133,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "module",
+      "label": "private",
+      "node_category": "local_item",
+      "node_exact_range": [
+        3838,
+        4084
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "mod private {",
+      "source_evidence": {
+        "anchor_text": "mod private {",
+        "byte_range": [
+          3906,
+          3919
+        ],
+        "line": 126,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 126
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 132,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "trait",
+      "label": "private::Sealed",
+      "node_category": "local_item",
+      "node_exact_range": [
+        3924,
+        4082
+      ],
+      "owner": "private",
+      "owner_kind": "module",
+      "reachable_outside_crate": false,
+      "source_anchor": "pub trait Sealed: Copy",
+      "source_evidence": {
+        "anchor_text": "pub trait Sealed: Copy",
+        "byte_range": [
+          3943,
+          3965
+        ],
+        "line": 128,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 128
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 130,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "private::Sealed::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": [
+        3976,
+        4020
+      ],
+      "owner": "private::Sealed",
+      "owner_kind": "trait",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer: 'static;",
+      "source_evidence": {
+        "anchor_text": "type Buffer: 'static;",
+        "byte_range": [
+          3999,
+          4020
+        ],
+        "line": 130,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 130
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 131,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "private::Sealed::write",
+      "node_category": "local_item",
+      "node_exact_range": [
+        4029,
+        4076
+      ],
+      "owner": "private::Sealed",
+      "owner_kind": "trait",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str;",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str;",
+        "byte_range": [
+          4029,
+          4076
+        ],
+        "line": 131,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 131
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 183,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Integer",
+      "node_category": "local_item",
+      "node_exact_range": [
+        4086,
+        5905
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Integer {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Integer {",
+        "byte_range": [
+          4086,
+          4113
+        ],
+        "line": 135,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 135
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 141,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "unnamed_const"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "constant",
+      "label": "const _ #impl_Integer(i128,u128)",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "const _: () = {",
+      "source_evidence": {
+        "anchor_text": "const _: () = {",
+        "byte_range": [
+          4164,
+          4179
+        ],
+        "line": 137,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 137
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 141,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "unnamed_const"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "constant",
+      "label": "const _ #impl_Integer(i16,u16)",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "const _: () = {",
+      "source_evidence": {
+        "anchor_text": "const _: () = {",
+        "byte_range": [
+          4164,
+          4179
+        ],
+        "line": 137,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 137
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 141,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "unnamed_const"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "constant",
+      "label": "const _ #impl_Integer(i32,u32)",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "const _: () = {",
+      "source_evidence": {
+        "anchor_text": "const _: () = {",
+        "byte_range": [
+          4164,
+          4179
+        ],
+        "line": 137,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 137
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 141,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "unnamed_const"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "constant",
+      "label": "const _ #impl_Integer(i64,u64)",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "const _: () = {",
+      "source_evidence": {
+        "anchor_text": "const _: () = {",
+        "byte_range": [
+          4164,
+          4179
+        ],
+        "line": 137,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 137
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 141,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "unnamed_const"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "constant",
+      "label": "const _ #impl_Integer(i8,u8)",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "const _: () = {",
+      "source_evidence": {
+        "anchor_text": "const _: () = {",
+        "byte_range": [
+          4164,
+          4179
+        ],
+        "line": 137,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 137
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 144,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<u128 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@143",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          4430,
+          4456
+        ],
+        "line": 144,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 144
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 144,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<u16 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@143",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          4430,
+          4456
+        ],
+        "line": 144,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 144
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 144,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<u32 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@143",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          4430,
+          4456
+        ],
+        "line": 144,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 144
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 144,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<u64 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@143",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          4430,
+          4456
+        ],
+        "line": 144,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 144
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 144,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<u8 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@143",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          4430,
+          4456
+        ],
+        "line": 144,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 144
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 148,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<u128 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          4563,
+          4614
+        ],
+        "line": 148,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 148
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 148,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<u16 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          4563,
+          4614
+        ],
+        "line": 148,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 148
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 148,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<u32 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          4563,
+          4614
+        ],
+        "line": 148,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 148
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 148,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<u64 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          4563,
+          4614
+        ],
+        "line": 148,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 148
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 148,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<u8 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          4563,
+          4614
+        ],
+        "line": 148,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 148
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 156,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u128 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          4706,
+          4754
+        ],
+        "line": 152,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 152
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 156,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u16 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          4706,
+          4754
+        ],
+        "line": 152,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 152
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 156,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u32 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          4706,
+          4754
+        ],
+        "line": 152,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 152
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 156,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u64 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          4706,
+          4754
+        ],
+        "line": 152,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 152
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 156,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u8 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@147",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          4706,
+          4754
+        ],
+        "line": 152,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 152
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 160,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<i128 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@159",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          5034,
+          5060
+        ],
+        "line": 160,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 160
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 160,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<i16 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@159",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          5034,
+          5060
+        ],
+        "line": 160,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 160
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 160,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<i32 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@159",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          5034,
+          5060
+        ],
+        "line": 160,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 160
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 160,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<i64 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@159",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          5034,
+          5060
+        ],
+        "line": 160,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 160
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 160,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<i8 as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@159",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize =",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize =",
+        "byte_range": [
+          5034,
+          5060
+        ],
+        "line": 160,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 160
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 164,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<i128 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          5163,
+          5214
+        ],
+        "line": 164,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 164
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 164,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<i16 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          5163,
+          5214
+        ],
+        "line": 164,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 164
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 164,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<i32 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          5163,
+          5214
+        ],
+        "line": 164,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 164
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 164,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<i64 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          5163,
+          5214
+        ],
+        "line": 164,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 164
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 164,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<i8 as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+      "source_evidence": {
+        "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
+        "byte_range": [
+          5163,
+          5214
+        ],
+        "line": 164,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 164
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 180,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 189,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i128, u128)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<i128 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          5306,
+          5354
+        ],
+        "line": 168,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 168
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 180,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 186,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i16, u16)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<i16 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          5306,
+          5354
+        ],
+        "line": 168,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 168
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 180,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 187,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i32, u32)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<i32 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          5306,
+          5354
+        ],
+        "line": 168,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 168
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 180,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 188,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i64, u64)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<i64 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          5306,
+          5354
+        ],
+        "line": 168,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 168
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 180,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 185,
+        "macro": "impl_Integer"
+      },
+      "generated_by_label": "impl_Integer!(i8, u8)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<i8 as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@163",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          5306,
+          5354
+        ],
+        "line": 168,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 168
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 185,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i8, u8)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        5907,
+        5929
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i8, u8);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i8, u8);",
+        "byte_range": [
+          5907,
+          5929
+        ],
+        "line": 185,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 185
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 186,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i16, u16)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        5930,
+        5954
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i16, u16);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i16, u16);",
+        "byte_range": [
+          5930,
+          5954
+        ],
+        "line": 186,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 186
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 187,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i32, u32)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        5955,
+        5979
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i32, u32);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i32, u32);",
+        "byte_range": [
+          5955,
+          5979
+        ],
+        "line": 187,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 187
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 188,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i64, u64)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        5980,
+        6004
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i64, u64);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i64, u64);",
+        "byte_range": [
+          5980,
+          6004
+        ],
+        "line": 188,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 188
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 189,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer!(i128, u128)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6005,
+        6031
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer!(i128, u128);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer!(i128, u128);",
+        "byte_range": [
+          6005,
+          6031
+        ],
+        "line": 189,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 189
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 209,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Integer_size",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6033,
+        6684
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Integer_size {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Integer_size {",
+        "byte_range": [
+          6033,
+          6065
+        ],
+        "line": 191,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 191
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 195,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 215,
+        "macro": "impl_Integer_size"
+      },
+      "generated_by_label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<isize as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@194",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
+        "byte_range": [
+          6237,
+          6301
+        ],
+        "line": 195,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 195
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 195,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 216,
+        "macro": "impl_Integer_size"
+      },
+      "generated_by_label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
+      "item_kind": "associated_constant",
+      "label": "<usize as Integer>::MAX_STR_LEN",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@194",
+      "owner_kind": "impl",
+      "reachable_outside_crate": true,
+      "source_anchor": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
+      "source_evidence": {
+        "anchor_text": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
+        "byte_range": [
+          6237,
+          6301
+        ],
+        "line": 195,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 195
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 200,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 215,
+        "macro": "impl_Integer_size"
+      },
+      "generated_by_label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<isize as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@199",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = <$primitive as private::Sealed>::Buffer;",
+      "source_evidence": {
+        "anchor_text": "type Buffer = <$primitive as private::Sealed>::Buffer;",
+        "byte_range": [
+          6409,
+          6463
+        ],
+        "line": 200,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 200
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 200,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 216,
+        "macro": "impl_Integer_size"
+      },
+      "generated_by_label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
+      "item_kind": "associated_type",
+      "label": "<usize as private::Sealed>::Buffer",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@199",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "type Buffer = <$primitive as private::Sealed>::Buffer;",
+      "source_evidence": {
+        "anchor_text": "type Buffer = <$primitive as private::Sealed>::Buffer;",
+        "byte_range": [
+          6409,
+          6463
+        ],
+        "line": 200,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 200
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 206,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 215,
+        "macro": "impl_Integer_size"
+      },
+      "generated_by_label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<isize as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@199",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          6555,
+          6603
+        ],
+        "line": 204,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 204
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 206,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)",
+        "reachability_needs_review"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 216,
+        "macro": "impl_Integer_size"
+      },
+      "generated_by_label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<usize as private::Sealed>::write",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@199",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+      "source_evidence": {
+        "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
+        "byte_range": [
+          6555,
+          6603
+        ],
+        "line": 204,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 204
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 211,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6686,
+        6755
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
+        "byte_range": [
+          6686,
+          6755
+        ],
+        "line": 211,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 211
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 212,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6756,
+        6825
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
+        "byte_range": [
+          6756,
+          6825
+        ],
+        "line": 212,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 212
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 213,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6826,
+        6895
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
+        "byte_range": [
+          6826,
+          6895
+        ],
+        "line": 213,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 213
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 214,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6896,
+        6965
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
+        "byte_range": [
+          6896,
+          6965
+        ],
+        "line": 214,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 214
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 215,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
+      "node_category": "local_item",
+      "node_exact_range": [
+        6966,
+        7035
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
+        "byte_range": [
+          6966,
+          7035
+        ],
+        "line": 215,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 215
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 216,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
+      "node_category": "local_item",
+      "node_exact_range": [
+        7036,
+        7105
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
+      "source_evidence": {
+        "anchor_text": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
+        "byte_range": [
+          7036,
+          7105
+        ],
+        "line": 216,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 216
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 219,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "struct",
+      "label": "DecimalPairs",
+      "node_category": "local_item",
+      "node_exact_range": [
+        7107,
+        7159
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "struct DecimalPairs([u8; 200]);",
+      "source_evidence": {
+        "anchor_text": "struct DecimalPairs([u8; 200]);",
+        "byte_range": [
+          7128,
+          7159
+        ],
+        "line": 219,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 219
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 228,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "static",
+      "label": "DECIMAL_PAIRS",
+      "node_category": "local_item",
+      "node_exact_range": [
+        7161,
+        7542
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "static DECIMAL_PAIRS: DecimalPairs",
+      "source_evidence": {
+        "anchor_text": "static DECIMAL_PAIRS: DecimalPairs",
+        "byte_range": [
+          7243,
+          7277
+        ],
+        "line": 222,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 222
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 237,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "function",
+      "label": "divmod100",
+      "node_category": "local_item",
+      "node_exact_range": [
+        7544,
+        7895
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn divmod100(value: u32)",
+      "source_evidence": {
+        "anchor_text": "fn divmod100(value: u32)",
+        "byte_range": [
+          7620,
+          7644
+        ],
+        "line": 231,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 231
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 253,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "function",
+      "label": "slice_buffer_to_str",
+      "node_category": "local_item",
+      "node_exact_range": [
+        7897,
+        8631
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "unsafe fn slice_buffer_to_str",
+      "source_evidence": {
+        "anchor_text": "unsafe fn slice_buffer_to_str",
+        "byte_range": [
+          8160,
+          8189
+        ],
+        "line": 247,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 247
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 257,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "trait",
+      "label": "Unsigned",
+      "node_category": "local_item",
+      "node_exact_range": [
+        8633,
+        8711
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "trait Unsigned: Integer",
+      "source_evidence": {
+        "anchor_text": "trait Unsigned: Integer",
+        "byte_range": [
+          8633,
+          8656
+        ],
+        "line": 255,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 255
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 256,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "Unsigned::fmt",
+      "node_category": "local_item",
+      "node_exact_range": [
+        8663,
+        8709
+      ],
+      "owner": "Unsigned",
+      "owner_kind": "trait",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize;",
+      "source_evidence": {
+        "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize;",
+        "byte_range": [
+          8663,
+          8709
+        ],
+        "line": 256,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 256
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 327,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_definition",
+      "label": "macro_rules! impl_Unsigned",
+      "node_category": "local_item",
+      "node_exact_range": [
+        8713,
+        11604
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "macro_rules! impl_Unsigned {",
+      "source_evidence": {
+        "anchor_text": "macro_rules! impl_Unsigned {",
+        "byte_range": [
+          8713,
+          8741
+        ],
+        "line": 259,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 259
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 324,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 330,
+        "macro": "impl_Unsigned"
+      },
+      "generated_by_label": "impl_Unsigned!(u16)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u16 as Unsigned>::fmt",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@261",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+      "source_evidence": {
+        "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+        "byte_range": [
+          8875,
+          8922
+        ],
+        "line": 263,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 263
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 324,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 331,
+        "macro": "impl_Unsigned"
+      },
+      "generated_by_label": "impl_Unsigned!(u32)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u32 as Unsigned>::fmt",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@261",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+      "source_evidence": {
+        "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+        "byte_range": [
+          8875,
+          8922
+        ],
+        "line": 263,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 263
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 324,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 332,
+        "macro": "impl_Unsigned"
+      },
+      "generated_by_label": "impl_Unsigned!(u64)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u64 as Unsigned>::fmt",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@261",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+      "source_evidence": {
+        "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+        "byte_range": [
+          8875,
+          8922
+        ],
+        "line": 263,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 263
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 324,
+      "file": "src/lib.rs",
+      "file_assignment_status": "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP",
+      "flags": [
+        "macro_generated_file_assignment_open(I4)"
+      ],
+      "generated_by": {
+        "invocation_file": "src/lib.rs",
+        "invocation_line": 329,
+        "macro": "impl_Unsigned"
+      },
+      "generated_by_label": "impl_Unsigned!(u8)",
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u8 as Unsigned>::fmt",
+      "node_category": "local_item",
+      "node_exact_range": null,
+      "owner": "impl@261",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+      "source_evidence": {
+        "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+        "byte_range": [
+          8875,
+          8922
+        ],
+        "line": 263,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 263
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 329,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u8)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        11606,
+        11625
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u8);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u8);",
+        "byte_range": [
+          11606,
+          11625
+        ],
+        "line": 329,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 329
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 330,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u16)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        11626,
+        11646
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u16);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u16);",
+        "byte_range": [
+          11626,
+          11646
+        ],
+        "line": 330,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 330
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 331,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u32)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        11647,
+        11667
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u32);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u32);",
+        "byte_range": [
+          11647,
+          11667
+        ],
+        "line": 331,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 331
+    },
+    {
+      "effective_visibility": "not_applicable",
+      "end_line": 332,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "macro_call",
+      "label": "impl_Unsigned!(u64)",
+      "node_category": "local_item",
+      "node_exact_range": [
+        11668,
+        11688
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "impl_Unsigned!(u64);",
+      "source_evidence": {
+        "anchor_text": "impl_Unsigned!(u64);",
+        "byte_range": [
+          11668,
+          11688
+        ],
+        "line": 332,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 332
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 403,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "associated_function",
+      "label": "<u128 as Unsigned>::fmt",
+      "node_category": "local_item",
+      "node_exact_range": [
+        11719,
+        14378
+      ],
+      "owner": "impl@334",
+      "owner_kind": "impl",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+      "source_evidence": {
+        "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
+        "byte_range": [
+          11767,
+          11814
+        ],
+        "line": 336,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 336
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 438,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "function",
+      "label": "enc_16lsd",
+      "node_category": "local_item",
+      "node_exact_range": [
+        14382,
+        15883
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn enc_16lsd<const OFFSET: usize>",
+      "source_evidence": {
+        "anchor_text": "fn enc_16lsd<const OFFSET: usize>",
+        "byte_range": [
+          14509,
+          14542
+        ],
+        "line": 408,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 408
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 466,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "function",
+      "label": "div_rem_1e16",
+      "node_category": "local_item",
+      "node_exact_range": [
+        15885,
+        16903
+      ],
+      "owner": "area:src/lib.rs",
+      "owner_kind": "crate_root",
+      "reachable_outside_crate": false,
+      "source_anchor": "fn div_rem_1e16(n: u128)",
+      "source_evidence": {
+        "anchor_text": "fn div_rem_1e16(n: u128)",
+        "byte_range": [
+          16313,
+          16337
+        ],
+        "line": 450,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 450
+    },
+    {
+      "effective_visibility": "public",
+      "end_line": 22,
+      "file": "src/u128_ext.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "file_public_area",
+      "label": "area:src/u128_ext.rs",
+      "node_category": "file_public_area",
+      "node_exact_range": null,
+      "owner": "crate_root",
+      "owner_kind": null,
+      "reachable_outside_crate": false,
+      "source_anchor": "#[cfg",
+      "source_evidence": {
+        "anchor_text": "#[cfg",
+        "byte_range": [
+          0,
+          5
+        ],
+        "line": 1,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/u128_ext.rs",
+        "source_sha256": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+      },
+      "start_line": 1
+    },
+    {
+      "effective_visibility": "restricted_non_private",
+      "end_line": 22,
+      "file": "src/u128_ext.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "function",
+      "label": "u128_ext::mulhi",
+      "node_category": "local_item",
+      "node_exact_range": [
+        54,
+        694
+      ],
+      "owner": "area:src/u128_ext.rs",
+      "owner_kind": "module",
+      "reachable_outside_crate": false,
+      "source_anchor": "pub(crate) fn mulhi",
+      "source_evidence": {
+        "anchor_text": "pub(crate) fn mulhi",
+        "byte_range": [
+          184,
+          203
+        ],
+        "line": 7,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/u128_ext.rs",
+        "source_sha256": "498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c"
+      },
+      "start_line": 7
+    }
+  ],
+  "source_commit": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+  "source_coverage": {
+    "known_uncovered_constructs": [
+      "operators",
+      "literals"
+    ],
+    "whole_source_coverage_claimed": false
+  },
+  "source_pin_file": "phase-one-benchmark-pin.json",
+  "sysroot_source_scope_kind": "declarations",
+  "unmerged_labels": {
+    "*mut T::cast": {
+      "record": "undetermined/inherent_member_unproven",
+      "requirement": "REQ-RUST-062.0 C7",
+      "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"
+    }
+  }
+}
