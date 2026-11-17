@@ -14,9 +14,9 @@ production run against.**
 - 133 of the 686 sites are method calls expected to have no target: the receiver's type is
   declared in `core`, which a run with scope `excluded` does not read.
 - **A second expected graph, for a run with scope `declarations`** (REQ-RUST-066.0): the
-  graph above with the frozen target of 132 of those 133 calls written in. 172 nodes (19
-  more, one per target label), 686 sites, 1 site without a target (`cast`, listed in the
-  file with the label it is known to have and the requirement that keeps it open).
+  graph above with the frozen target of each of those 133 calls written in. 173 nodes (20
+  more, one per target label), 686 sites, none without a target (`cast` is merged since
+  REQ-RUST-073.0, 2026-11-18).
   `test_itoa_declarations_graph_equality` compares a `declarations` run against it.
 - Not covered: operators and literals. They are not sites of the graph.
 
@@ -37,9 +37,9 @@ itoa-expected-core-target-freeze.json its freeze record: sha256 of the file, of 
 itoa-expected-core-target-builder.py  writes that file from the pinned source and the core
                                       source of the installed compiler; checks every citation
 test_itoa_expected_core_targets.py    11 tests
-itoa-expected-declarations-graph-nodes.json    172 nodes: the 153 above and 19 targets in core
-itoa-expected-declarations-graph-edges.json    477 rows, 686 sites: 132 calls into core with
-                                      their frozen target, 1 (`cast`) without
+itoa-expected-declarations-graph-nodes.json    173 nodes: the 153 above and 20 targets in core
+itoa-expected-declarations-graph-edges.json    477 rows, 686 sites: 133 calls into core with
+                                      their frozen target
 itoa-expected-declarations-graph-summary.json  counts
 itoa-expected-declarations-graph-freeze.json   its freeze record: sha256 of the three files
                                       above, of the three files they are merged from, and

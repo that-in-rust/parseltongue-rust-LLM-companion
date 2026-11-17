@@ -17780,6 +17780,67 @@
       "via_use_node": null
     },
     {
+      "callee_name": "cast",
+      "core_target": {
+        "assumptions": [],
+        "crate": "core",
+        "declaration": {
+          "file": "core/src/ptr/mut_ptr.rs",
+          "line": 31,
+          "text": "pub const fn cast<U>(self) -> *mut U {"
+        },
+        "owner_kind": "inherent_impl"
+      },
+      "evidence_key": "src/lib.rs:107:[3279, 3287]",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "calls",
+      "site_exact_ranges": [
+        {
+          "first_token_kind": "definition",
+          "first_token_start": 3256,
+          "last_token_end": 3299,
+          "last_token_kind": "definition",
+          "text": "self.bytes.as_mut_ptr().cast::<I::Buffer>()"
+        }
+      ],
+      "sites": [
+        {
+          "anchor": ".cast::<",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 107
+          },
+          "line": 107,
+          "occurrence": 0,
+          "record": "core_inherent_member",
+          "site_text": null,
+          "site_text_offset": 0
+        }
+      ],
+      "source": "Buffer::format",
+      "source_evidence_sites": [
+        {
+          "anchor_text": ".cast::<",
+          "byte_range": [
+            3279,
+            3287
+          ],
+          "line": 107,
+          "range_status": "EXACT_ANCHOR",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "EXACT",
+      "target": "*mut T::cast",
+      "target_kind": "external",
+      "via_use_node": null
+    },
+    {
       "callee_name": "as_mut_ptr",
       "core_target": {
         "assumptions": [],
@@ -18003,62 +18064,6 @@
       "source_site_evidence_status": "EXACT",
       "target": "str::len",
       "target_kind": "external",
-      "via_use_node": null
-    },
-    {
-      "callee_name": "cast",
-      "evidence_key": "src/lib.rs:107:[3279, 3287]",
-      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
-      "flags": [],
-      "generated_by": null,
-      "known_target_label": "*mut T::cast",
-      "relation": "calls",
-      "resolution_status": "unresolved",
-      "site_exact_ranges": [
-        {
-          "first_token_kind": "definition",
-          "first_token_start": 3256,
-          "last_token_end": 3299,
-          "last_token_kind": "definition",
-          "text": "self.bytes.as_mut_ptr().cast::<I::Buffer>()"
-        }
-      ],
-      "sites": [
-        {
-          "anchor": ".cast::<",
-          "file": "src/lib.rs",
-          "first_token": {
-            "kind": "definition",
-            "line": 107
-          },
-          "line": 107,
-          "occurrence": 0,
-          "record": "undetermined/inherent_member_unproven",
-          "site_text": null,
-          "site_text_offset": 0
-        }
-      ],
-      "source": "Buffer::format",
-      "source_evidence_sites": [
-        {
-          "anchor_text": ".cast::<",
-          "byte_range": [
-            3279,
-            3287
-          ],
-          "line": 107,
-          "range_status": "EXACT_ANCHOR",
-          "source_path": "src/lib.rs",
-          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
-        }
-      ],
-      "source_kind": "node",
-      "source_site_evidence_status": "EXACT",
-      "target": "unresolved .cast",
-      "target_kind": "unresolved",
-      "unmerged_requirement": "REQ-RUST-062.0 C7",
-      "unresolved_reason": "trait_solver_needed",
-      "unresolved_why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type",
       "via_use_node": null
     },
     {
@@ -31401,11 +31406,5 @@
   },
   "source_pin_file": "phase-one-benchmark-pin.json",
   "sysroot_source_scope_kind": "declarations",
-  "unmerged_labels": {
-    "*mut T::cast": {
-      "record": "undetermined/inherent_member_unproven",
-      "requirement": "REQ-RUST-062.0 C7",
-      "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"
-    }
-  }
+  "unmerged_labels": {}
 }

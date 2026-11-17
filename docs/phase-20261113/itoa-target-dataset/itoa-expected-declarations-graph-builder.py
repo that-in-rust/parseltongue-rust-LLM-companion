@@ -26,10 +26,8 @@ OUTPUT_PREFIX = "itoa-expected-declarations-graph-"
 RECORD_BY_OWNER_KIND = {"inherent_impl": "core_inherent_member",
                         "trait_declaration_impl_not_named": "core_trait_declared_member"}
 # M4: labels that are known and not merged, each with the requirement that keeps it so.
-UNMERGED_LABELS = {"*mut T::cast": {
-    "requirement": "REQ-RUST-062.0 C7",
-    "record": "undetermined/inherent_member_unproven",
-    "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"}}
+# None since REQ-RUST-073.0 (2026-11-18): `*mut T::cast` is merged like the other 132.
+UNMERGED_LABELS = {}
 
 
 def digest(data):

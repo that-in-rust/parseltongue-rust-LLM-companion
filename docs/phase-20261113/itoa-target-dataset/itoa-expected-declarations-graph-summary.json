@@ -19,11 +19,11 @@
   "counts": {
     "edge_rows_grouped": 477,
     "edge_sites": 686,
-    "edge_sites_known_not_merged": 1,
-    "edge_sites_merged": 132,
-    "edge_sites_without_target": 1,
-    "nodes": 172,
-    "nodes_added": 19
+    "edge_sites_known_not_merged": 0,
+    "edge_sites_merged": 133,
+    "edge_sites_without_target": 0,
+    "nodes": 173,
+    "nodes_added": 20
   },
   "identity_status": "SYMBOLIC_LABELS",
   "merged_from": [
@@ -63,15 +63,8 @@
   "sysroot_source_scope_kind": "declarations",
   "target_kind_counts": {
     "builtin": 77,
-    "external": 118,
-    "node": 281,
-    "unresolved": 1
+    "external": 119,
+    "node": 281
   },
-  "unmerged_labels": {
-    "*mut T::cast": {
-      "record": "undetermined/inherent_member_unproven",
-      "requirement": "REQ-RUST-062.0 C7",
-      "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"
-    }
-  }
+  "unmerged_labels": {}
 }

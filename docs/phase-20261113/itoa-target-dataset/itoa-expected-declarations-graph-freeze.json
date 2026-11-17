@@ -1,32 +1,26 @@
 {
   "builder_file_sha256": {
-    "itoa-expected-declarations-graph-builder.py": "ce4e2f77fe112a9f5c7ed70a891853c43e1ef57d92248979bf55538ba4a329a0",
+    "itoa-expected-declarations-graph-builder.py": "e5a96e7433489a1fca16d98026a3ead07be7117f1f607c61af820fe3d34d4cf8",
     "itoa-expected-graph-rules.py": "2d9dfb6bb80be27291a8fa06e50bb0622937b7b75b1e157f299512b2e22637d4"
   },
   "counts": {
     "edge_rows_grouped": 477,
     "edge_sites": 686,
-    "edge_sites_known_not_merged": 1,
-    "edge_sites_merged": 132,
-    "edge_sites_without_target": 1,
-    "nodes": 172,
-    "nodes_added": 19
+    "edge_sites_known_not_merged": 0,
+    "edge_sites_merged": 133,
+    "edge_sites_without_target": 0,
+    "nodes": 173,
+    "nodes_added": 20
   },
   "frozen_file_sha256": {
-    "itoa-expected-declarations-graph-edges.json": "ef78fea5c4209636717407907f149f66d879d558ec2ec8b700deb35faf1373a7",
-    "itoa-expected-declarations-graph-nodes.json": "cdac01148f3fd6508d2e0eefffe080a9965d04733e5ebcdf353018260ce3cb62",
-    "itoa-expected-declarations-graph-summary.json": "46527854b64e7d982c77261ff4a9e8ea127dd3eb3e6ba50725a4216d40c17522"
+    "itoa-expected-declarations-graph-edges.json": "26fcfab422e6e6d95780a25ccb27db735cba8fe7fa3a5ff578fe6e06a3d8359d",
+    "itoa-expected-declarations-graph-nodes.json": "283a0881ec0bc90cb51cd9ac97806a337f83e0bc86d1ad8418f899c84f2dde9e",
+    "itoa-expected-declarations-graph-summary.json": "ef6c896bc50db7e7f98d30df087f28aa029cf087c12879181ebf478295b430be"
   },
   "input_file_sha256": {
     "itoa-expected-core-member-targets.json": "acf9a04a47c60a0f0dcfdd9e22e7ae9bd7999819dd5d8ed5466ae3e1dbda7b9c",
     "itoa-expected-graph-edges.json": "ac8259662d4d49f1e8de4ff3089cbe0a6a704225e2aeaab5e85453e417451a45",
     "itoa-expected-graph-nodes.json": "d1aee44fbb5c70d607757daf9fb621ab494d161022ec17927755838c4d59ea54"
   },
-  "unmerged_labels": {
-    "*mut T::cast": {
-      "record": "undetermined/inherent_member_unproven",
-      "requirement": "REQ-RUST-062.0 C7",
-      "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"
-    }
-  }
+  "unmerged_labels": {}
 }

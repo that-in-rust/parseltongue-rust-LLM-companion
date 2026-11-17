@@ -30,8 +30,29 @@
     "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
   },
   "requirement": "REQ-RUST-066.0",
-  "row_count": 172,
+  "row_count": 173,
   "rows": [
+    {
+      "effective_visibility": null,
+      "end_line": 0,
+      "external_name_kind": "core_declared_member",
+      "file": "",
+      "file_assignment_status": "NO_SOURCE_FILE_NOT_READ",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": null,
+      "label": "*mut T::cast",
+      "node_category": "external_name",
+      "owner": null,
+      "owner_kind": null,
+      "reachable_outside_crate": null,
+      "source_anchor": null,
+      "source_evidence": null,
+      "source_read": false,
+      "start_line": 0
+    },
     {
       "effective_visibility": null,
       "end_line": 0,
@@ -5012,11 +5033,5 @@
   },
   "source_pin_file": "phase-one-benchmark-pin.json",
   "sysroot_source_scope_kind": "declarations",
-  "unmerged_labels": {
-    "*mut T::cast": {
-      "record": "undetermined/inherent_member_unproven",
-      "requirement": "REQ-RUST-062.0 C7",
-      "why": "the impl has the bound `T: PointeeSized`, and no stored row proves that the bound restricts no type"
-    }
-  }
+  "unmerged_labels": {}
 }
