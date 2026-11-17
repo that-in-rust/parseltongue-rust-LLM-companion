@@ -4,60 +4,46 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-17, production code of commit `317942e17`, REQ-RUST-064.0)
+## Where we are (2026-11-17, acceptance run of commit `753665eb9`, scope `declarations`)
 
-**Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
-1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
-passed SOP steps S1 to S4 on one frozen executable. That graph is marked `incomplete`: 133
-method calls into `core` have no target, and the expected graph was written and checked by
-one author. Not accepted: the branch head, where part 8 names 132 of those 133 calls. Each
-named call equals its frozen expected row, checked once against the compiler. No SOP step
-has been run on the head.**
+**Accepted: the mapper stores a graph of pinned itoa 1.0.18 equal to the frozen expected
+graph of a `declarations` run, row for row (170 nodes, 682 edge rows), and the acceptance
+run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method calls into
+`core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
+and it is an expected row. The expected graph was written and checked by one author.**
 
-### The branch head (part 8, scope `declarations`; no SOP run)
+### The two accepted runs
 
 ```text
-                              accepted run   head
-                              822da80cf
+                              822da80cf      753665eb9
+scope                         excluded       declarations
 nodes                         151            170
 edge rows                     682            682
 calls with a target            64 of 197     196 of 197
 edge rows with a target       549 of 682     681 of 682
 method calls into core named    0 of 133     132 of 133   equal to the frozen rows: 132, wrong: 0
+real-source tests             58 pass        61 pass
 ```
 
-- **Expected targets:** all 133 are written from source and frozen
-  (`itoa-target-dataset/itoa-expected-core-member-targets.json`).
-- **Named at the head:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`, 13
-  `TryInto::try_into`, 8 `Result<T, E>::expect`, 5 `Result<T, E>::unwrap`, 5 `[T]::len`,
-  1 `Iterator::rev`, 1 `[T]::as_mut_ptr`, 1 `str::len`, and `ilog10` once on each of `u8`,
-  `u16`, `u32`, `u64`, `u128`, `i8`, `i16`, `i32`, `i64`, `i128`.
-- **Without a target (1):** `cast` (its impl has a bound the run cannot prove harmless).
-- **Real-source tests:** 59 of 60 passed in one run of the head's production code; the
-  60th failed on a stale label list in the test, and passed alone after that list was
-  corrected. The 60 were not run again together.
-- **Built last:** REQ-RUST-064.0, a receiver that is a local variable. For
-  `string.len()` the run proves from stored rows that one plain `let` binds `string`, that
-  the name is written nowhere else in the unit, that its initializer `i.write(..)` is
-  named `private::Sealed::write` through the bound `I: Integer`, and that this method
-  declares the return type `&str`. `Sealed: Copy` has no source in the run, so the row
-  stores the assumption `source_compiles_method_resolves`.
-- **Next:** the `core` files in the run id (REQ-RUST-065.0, spec written), then the merge
-  of the targets into the expected graph and its new freeze, then S1 to S4. `cast` stays
-  without a target until a bound such as `T: PointeeSized` can be proven to restrict
-  nothing.
-- **Not done:** the `core` files are not in the run id; the targets are not merged into the
-  expected graph; S1 to S4 are NOT STARTED for the head.
+- **Named:** 49 `MaybeUninit<T>::write`, 39 `[T]::get_unchecked`, 13 `TryInto::try_into`,
+  8 `Result<T, E>::expect`, 5 `Result<T, E>::unwrap`, 5 `[T]::len`, 1 `Iterator::rev`,
+  1 `[T]::as_mut_ptr`, 1 `str::len`, and `ilog10` once on each of `u8`, `u16`, `u32`,
+  `u64`, `u128`, `i8`, `i16`, `i32`, `i64`, `i128`.
+- **Without a target (1):** `cast` in `Buffer::format`. Its impl has the bound
+  `T: PointeeSized`, which the run cannot prove harmless (immediate backlog, entry 7).
+- **The `core` files are frozen and in the run id:** 288 `.rs` files, 6,419,461 bytes,
+  listing sha256 `39a4d534…ea40780` (REQ-RUST-065.0).
+- **Both expected graphs stay frozen.** `test_itoa_whole_graph_equality` compares a run
+  with `excluded`, `test_itoa_declarations_graph_equality` a run with `declarations`.
 
-Everything from here to "What is left" describes the accepted run at `822da80cf`.
-
-### What the pinned itoa run stores (measured)
+### What the pinned itoa run stores (measured, scope `declarations`)
 
 ```text
-nodes  151   88 items of itoa (45 written by macro expansions), 47 names outside itoa,
-             13 builtin types, 2 file areas, 1 crate root
+nodes  170   88 items of itoa (45 written by macro expansions), 66 names outside itoa
+             (19 of them methods declared in core), 13 builtin types, 2 file areas,
+             1 crate root
 edges  682   relation    rows  with a target
-             calls        197    64   (133 method calls into core have none)
+             calls        197   196   (cast has none)
              uses_type    203   203
              reads         98    98
              contains      88    88
@@ -65,48 +51,54 @@ edges  682   relation    rows  with a target
              expands       15    15
              implements    32    32
              imports        4     4
-run          15.3 to 19.3 s wall, 370 to 414 MB peak (whole process tree), 21.0 MB store
+run          22.5 to 26.6 s wall, 363 to 404 MB peak (whole process tree), 36.8 MB store
 workers      1, 4 and 16, twice each, store byte-identical node and edge rows
 ```
 
-### What the whole-graph test compares (`test_itoa_whole_graph_equality`)
+### What the two whole-graph tests compare
 
-- **Nodes, all 151:** label, category, item kind, owner kind, file, generating macro call,
-  declared in a function body or not, byte range in the file (the 43 nodes written directly
-  in source), and the kind of a name outside itoa.
+- **Nodes, all of them:** label, category, item kind, owner kind, file, generating macro
+  call, declared in a function body or not, byte range in the file (the 43 nodes written
+  directly in source), and the kind of a name outside itoa.
 - **Sites of calls, type uses, reads, imports and macro rows, all 562:** source, relation,
   target, exact byte range, and the record (how a call's target was chosen; signature or
   expression; body or macro argument).
 - **`contains` and `implements`, 120 rows:** source, relation and target only.
-- **Not compared:** the lookup evidence kept on a row, and the range of a node written by
-  a macro expansion.
+- **The 133 calls into `core`** (`test_itoa_core_member_targets`): also the crate, the
+  owner kind, the declaration's file and line, and the assumptions the expected row asks
+  for.
+- **Not compared:** the rest of the lookup evidence kept on a row, and the range of a node
+  written by a macro expansion.
 
 ### Checks at the last full run
 
 ```text
-real-source itoa tests   58 pass, 0 fail (872 s, one thread, frozen executable)  at 822da80cf
-workspace tests          602 pass, 0 fail, 4 ignored                   at 822da80cf
+real-source itoa tests   61 pass, 0 fail (928 s, one thread, frozen executable)  at 753665eb9
+workspace tests          first run: 639 pass, 2 fail, 4 ignored, stopped after 20 test
+                         binaries. Both failures are `cargo metadata --offline` missing a
+                         crate in this machine's crate cache; `cargo fetch --locked` fixed
+                         that. Rerun of all binaries: in progress, not yet recorded.
                          test_lang_items_in_sysroot skipped; it fails when run
-format, lint, release    pass                                          at 822da80cf
-expected-data tests      9 pass (7 tests of the removed "blocked rows" layer deleted)
+format, lint, release    pass                                          at 753665eb9
+expected-data tests      25 pass
 ```
 
-The workspace gate is not a full PASS while that test is skipped. It reads the native
-sysroot, which itoa runs exclude.
+The workspace gate is not a full PASS while that test is skipped. It reads the whole
+native sysroot, which no itoa run does.
 
 ### SOP status
 
 ```text
-S1  freeze inputs and expected graph   PASS   digests equal the pin and the freeze record
+S1  freeze inputs and expected graph   PASS   source, compiler and core digests equal the freeze record
 S2  gates and production run           PASS   audit clean; one workspace test skipped (accepted by the user)
-S3  exact comparison                   PASS   58 tests on the frozen executable
-S4  determinism, time, memory          PASS   six runs identical; 11 ms samples
+S3  exact comparison                   PASS   61 tests on the frozen executable
+S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers store identical rows
 ```
 
 Run report: the last entry below. Executable sha256
-`43d999e173241c4b9a8011aade1871916a5c92cc9c86157dd8e92f6d1e0d1b88`.
+`af84bb460f6d73cf0fb465117cfad671f94fab339497c72a0efc6872771cf354`.
 
-### The code, from the codebase-memory index of `822da80cf`
+### The code, from the codebase-memory index of `822da80cf` (not re-measured here)
 
 Counts at the head are in the [MAP](MAP-parseltongue-crates-as-measured.md).
 
@@ -130,17 +122,18 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 ### What does not work or is not built
 
-- **133 method calls have no target** (`buf[i].write(..)`, `x.try_into()`, `MAX.ilog10()`,
-  `string.len()`). The receiver's type is declared in `core`, which the accepted run does
-  not read. Part 8 reads it with scope `declarations` (table above).
+- **One method call has no target:** `cast` (above).
+- **The run reads one file outside the frozen inputs:** DuckDB's `json` extension, from
+  `~/.duckdb/extensions` (immediate backlog, entry 6). Its digest is in the run report;
+  S1 does not freeze it.
 - **Nodes store no visibility, reachability or signature.** The PRD allows "unknown".
 - **No edge from a module to the contents of its file** (OD-7). `itoa` and `u128_ext` do
   not lead to their items by an edge.
+- **No edge from a trait member to the impl members that implement it**, and none from a
+  type to its methods (immediate backlog, entries 1 to 3).
 - **Struct fields and enum variants are not nodes** (open in the PRD).
 - **Reading the whole sysroot** did not finish in 2,400 s on 2026-11-13, and stops with a
-  store copy mismatch since; accepted itoa runs exclude it.
-- **The `core` files part 8 reads are not frozen.** The run id hashes the compiler version,
-  not those files, and SOP S1 does not list them.
+  store copy mismatch since. No itoa run does it.
 - **Rows depend on the source directory.** Two copies of the pinned source in different
   directories store different run ids and macro-expansion ids. Cause: the store's file
   identity is the absolute path, and the run id hashes those rows. Not fixed.
@@ -149,22 +142,16 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 ### What is left
 
-The SOP run at `822da80cf` is done. Part 8 is under way:
+Part 8 is done as far as it was decided: the acceptance run of `753665eb9` passed. Nothing
+is in progress. Open, each needing a decision from the user:
 
-0. First, by the decision of 2026-11-16 20:48: write the expected target of each of the 133
-   calls from source and re-freeze, before more lookup code (spec in part 8, section 9).
-1. Close step 8.3b-2b: find why 37 of the 46 calls typed `&mut Self::Buffer` do not reach
-   the new rule, check the 8 new targets against the source, then GREEN.
-2. Steps 8.3b-3, 8.4 and 8.5 (not started).
-3. Step 8.6: change the SOP for the `core` read, re-freeze the expected graph, repeat the
-   acceptance run.
-
-Open, each needing a decision from the user:
-
-1. Why rows depend on the source directory.
-2. `test_lang_items_in_sysroot`.
-3. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
+1. `cast`: which source facts prove that every type meets `PointeeSized`.
+2. The DuckDB `json` extension: build it into the executable, or freeze it by digest in S1.
+3. Why rows depend on the source directory.
+4. `test_lang_items_in_sysroot`.
+5. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
    to its file's contents; visibility, reachability and signature on nodes.
+6. The navigation links of the immediate backlog (entries 1 to 3).
 
 ## Entries — add new ones at the bottom
 
@@ -1229,3 +1216,201 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
              targets are not merged into the expected graph. 1 call into core has no
              target (cast).
 ```
+
+### 2026-11-17 — part 8, REQ-RUST-065.0 built: the `core` files are in the run id
+
+```text
+ what        A run with scope declarations stores which core files it read, and that
+             record is part of the run id.
+             D1, D4, D5  sysroot-member-declaration-facade.rs: read_sysroot_source_files
+                         reads every .rs file under core/src once, in byte order of the
+                         relative path; build_source_listing_record hashes those bytes
+                         (the S1 listing); collect_sysroot_member_rows parses the same
+                         bytes and returns the record with the rows;
+                         persist_sysroot_member_rows fails before any row is written when
+                         the record differs from the one in the workspace row
+                         (check_sysroot_source_record). Commit 6755ab0a9.
+             D1 to D3    main.rs: with scope declarations the workspace row gets
+                         workspace_sysroot_source_record before the run id is computed.
+                         A run with excluded has no such field. Commit 8787f0223.
+ tests       unit (cli): test_core_source_listing_record. RED: the stub record was Null
+             and the check returned Ok. GREEN: recursion, .rs only, order, byte count, the
+             digest computed by hand, changed bytes, a record that differs, a missing
+             directory.
+             real source: test_core_member_rows_published also asserts that the stored
+             record equals core_source of the frozen targets file, that a run with
+             excluded stores none, and that the two run ids differ.
+ measured    stored record of a declarations run on pinned itoa:
+               core/src   288 files   6,419,461 bytes
+               listing sha256 39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780
+             equal to the S1 command's digest and to the frozen targets file.
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, cli crate                            ok
+             cli tests (bins and three contract test targets)         ok
+             real-source tests   60 passed, 0 failed, 893.82 s; wall 14:54.01,
+                                 390,288 kB largest process
+             not run: the workspace gates.
+ commits     6755ab0a9 (152 added, 24 removed), 8787f0223 (45 added). Documents e3a0101b1.
+ queries     codebase-memory trace_path inbound, depth 1: collect_sysroot_member_rows
+             (test_core_directory_member_rows, persist_sysroot_member_rows),
+             persist_sysroot_member_rows (run_workspace_mapping_pipeline),
+             compute_workspace_generation_digest (run_workspace_mapping_pipeline).
+             index_repository after the commits: 27,629 nodes, 64,952 edges.
+ next        REQ-RUST-066.0: merge the frozen targets into an expected graph of a
+             declarations run.
+```
+
+### 2026-11-17 — part 8, REQ-RUST-066.0: the expected graph of a `declarations` run, frozen
+
+```text
+ what        A third builder reads the frozen expected graph and the frozen targets file
+             and writes the expected graph of a declarations run. The two inputs are not
+             changed, so the expected graph of the accepted run (scope excluded) stays as
+             frozen on 2026-11-16.
+             M1 to M7  itoa-target-dataset/itoa-expected-declarations-graph-builder.py and
+                       itoa-expected-declarations-graph-{nodes,edges,summary,freeze}.json.
+                       Commit 5f43747e4 (36,527 added lines, nearly all generated JSON;
+                       over the 200-line rule for that reason).
+             M8        test_itoa_declarations_graph_equality; the comparison of
+                       test_itoa_whole_graph_equality moved into
+                       verify_stored_graph_equality, which takes the names of the expected
+                       files. Test file only. Commit 753665eb9.
+ decided     cast stays without a target in this graph (REQ-RUST-062.0 C7). The row keeps
+             the record undetermined/inherent_member_unproven and names the known label
+             *mut T::cast beside it. It is the one accepted row without a target
+             (immediate backlog, entry 7). Mine, not asked of the user: it is what the
+             user was told on 2026-11-17 ("cast stays without a target by decision").
+ measured    builder output:
+               nodes 170 (151 + 19 names declared in core)   grouped edge rows 473
+               edge sites 682   merged from the targets file 132   without a target 1
+               records: 118 core_inherent_member, 14 core_trait_declared_member
+             digests: nodes f597b26379ba575119c885134ffe32fe50d770c33317be10dbaa856ab616b5df
+                      edges c40f8b0c581a9f84a13d1d883ae37b9ed196921e70a3687e17c853d26e001bb3
+ tests       dataset: python3 -m unittest discover -s docs/phase-20261113/itoa-target-dataset
+             -p 'test_*.py': Ran 25 tests, OK (5 new: the rebuild is byte-equal; input
+             digests; a missing, an unused and a doubled targets row each fail; record
+             counts; added nodes).
+             real source: cargo test --release -p parseltongue-cli-dispatcher-binary --test
+             itoa-source-acceptance-tests -- --test-threads=1 graph_equality:
+               test_itoa_declarations_graph_equality ... ok
+               test_itoa_whole_graph_equality ... ok
+               2 passed; 0 failed; 59 filtered out; 39.88 s
+             No RED run for M8: the expected files and the production code both existed
+             before the test. In its place, one deliberate break: the new test pointed at
+             the excluded-scope files fails with "nodes expected 151 stored 170", 19
+             differing nodes, 266 differing edge rows. Reverted.
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, cli crate                            ok
+             cli tests (bins and three contract test targets)         ok
+               test_lang_items_in_sysroot skipped: in the first try it ran for more than
+               60 s and I stopped it (the known open defect)
+             real-source tests   61 passed, 0 failed, 930.40 s; wall 15:38.45,
+                                 456,048 kB largest process
+ commits     e3a0101b1 (spec), 5f43747e4 (builder, files, dataset tests), 753665eb9
+             (Rust test), efb5bbfb0 (PRD, SOP, immediate backlog).
+ queries     codebase-memory trace_path inbound on verify_frozen_expected_files and
+             collect_expected_graph_rows listed 0 callers; the source has them
+             (test_itoa_whole_graph_equality, verify_stored_graph_equality), found with
+             grep. index_repository after 753665eb9, then search_graph for
+             run_scoped_graph_fixture, verify_stored_graph_equality and
+             test_itoa_declarations_graph_equality: all three found.
+ limit       The expected graph of a declarations run has one author, like the two files
+             it is built from. The targets file was checked once against compiler output
+             by label and count, not site by site.
+ next        The workspace gates, then S1 to S4 on one frozen executable.
+```
+
+### Acceptance run report — pinned itoa, scope `declarations`, frozen executable (2026-11-17)
+
+```text
+source      itoa af77385d0daf4d0e949e81f2588be2e44f69f086, clean
+            src/lib.rs       e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f
+            src/u128_ext.rs  498cc94f13805e551248fd82f47cc318f51d953a5002a9f8698858cd12fbae3c
+            Cargo.toml 44ca1ae5…dec0483, Cargo.lock 965fa758…a8d019d, benches/bench.rs 29a0bdb9…498b154
+compiler    rustc 1.99.1 (58cf8f9c3 2026-10-13), host x86_64-unknown-linux-gnu
+core        core/src: 288 .rs files, 6,419,461 bytes
+            listing sha256 39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780
+executable  af84bb460f6d73cf0fb465117cfad671f94fab339497c72a0efc6872771cf354 (104,047,000 bytes),
+            built by cargo build --release --workspace --all-targets --all-features;
+            same digest after S3
+expected    declarations graph
+              nodes f597b26379ba575119c885134ffe32fe50d770c33317be10dbaa856ab616b5df
+              edges c40f8b0c581a9f84a13d1d883ae37b9ed196921e70a3687e17c853d26e001bb3
+            built from  graph nodes 29aed6ef…f7954e7, graph edges a51f7d6e…d06b156,
+                        core targets acf9a04a47c60a0f0dcfdd9e22e7ae9bd7999819dd5d8ed5466ae3e1dbda7b9c
+commits     production code of 8787f0223, the last commit that changes it. 753665eb9
+            changes the test file only; efb5bbfb0 changes three documents only.
+            Format and lint ran with 753665eb9 checked out. efb5bbfb0 was committed one
+            second after lint ended, so the build and the four steps ran with it checked
+            out. The crates are equal in both.
+```
+
+```text
+S1  PASS  source commit and digests equal the pin; rustc -vV and the core digest equal the
+          frozen targets file; the three builders reproduce the frozen files byte for byte
+          (0 of 12 JSON files differ); 25 expected-data tests pass
+S2  PASS  run publishes; completeness = incomplete (recorded, Rule 3); the stored
+          workspace_sysroot_source_record equals the S1 core record
+          untraced, 4 workers: 23.93 s, 398.1 MB peak, 2,054 samples
+          strace audit: auditor pass, no violation rows; 0 connect calls; the only file
+          opened under a target/ directory is .rustc_info.json; of the sysroot source,
+          the 288 .rs files under core/src and its 55 directories are opened, nothing else
+S3  PASS  61 passed, 0 failed, one thread, 928.22 s (wall 15:28.42), on the frozen
+          executable. 170 nodes and 682 edge rows equal the frozen expected graph of a
+          declarations run (test_itoa_declarations_graph_equality); 132 of 133 calls into
+          core named and equal (test_itoa_core_member_targets); 1 call without a target
+          (cast), an expected row. The excluded-scope graph still equals its own frozen
+          graph (test_itoa_whole_graph_equality).
+S4  PASS  six runs, node and edge rows byte-identical after the header line, and
+          identical to the S2 store
+          nodes body aadbd84f2d2a79a0e36dc576be4146e943e730976f55204c4c7e015055307c08
+          edges body 3e637bdd01a9d635207c475f04a6a78d881f3ee9017a4a959add379d7c27c1af
+```
+
+```text
+workers  wall s  peak MB  store bytes  nodes  edges
+1        22.66   389.0    36,831,232   170    682
+1 again  23.35   363.1    36,831,232   170    682
+4        22.47   391.9    36,831,232   170    682
+4 again  23.75   387.0    36,831,232   170    682
+16       26.45   403.6    36,831,232   170    682
+16 again 26.62   397.6    36,831,232   170    682
+```
+
+- **Workspace gates at `753665eb9`:** format, lint (all targets, all features) and release
+  build pass. Tests, with `test_lang_items_in_sysroot` skipped (the known open defect):
+  the first run ended with exit 101 after 20 test binaries, 639 passed, 2 failed,
+  4 ignored. The two are `test_no_forbidden_semantic_dependencies` and
+  `test_parser_source_pin_aligned` (`workspace-dependency-build-gates.rs`). Both run
+  `cargo metadata --offline --locked`, which failed with "failed to download
+  `android_system_properties v0.1.6`": the crate cache of this machine held only the
+  crates of this platform. After `cargo fetch --locked` the same command exits 0. No file
+  of the repository changed. A rerun of all test binaries (`--no-fail-fast`) is in
+  progress and is not recorded here yet. The release build after the tests passed, and
+  `target/release/parseltongue` still has the digest of the frozen executable.
+- **Open, found by the audit:** the run opens
+  `~/.duckdb/extensions/v2.0.0/linux_amd64/json.duckdb_extension` (sha256
+  `dd65944f1b176ec293fc212eb108218947712df14edd0a436dacb2f9c6bf57d1`). It is not one of
+  the frozen inputs of SOP Rule 2 and S1 does not record it. The auditor does not check
+  it and passes. I downloaded this file on this machine on 2026-11-16; without it the run
+  fails.
+  Immediate backlog, entry 6.
+- **Deviations from the SOP text:**
+  - The run maps a copy of the pinned source (`~/phase8-work/run1/itoa`, byte-equal to the
+    pinned checkout for the four source files) with the pinned `Cargo.lock` added, as in
+    the run of 2026-11-16.
+  - S3's tests map their own copy of the pinned source in a temporary directory, not the
+    S2 store. Rows depend on the source directory, so the S2 export is not byte-compared
+    with the test's rows; both are compared by label.
+  - The SOP says the freeze record of the expected graph names the compiler version and
+    the `core` digest. The freeze record names the targets file by digest, and that file
+    holds both values.
+  - Order: S1, S2, S4, then S3, then the workspace tests.
+- **Limits:** the graph is marked incomplete (1 call, `cast`); the two expected graphs and
+  the targets file have one author; the targets were checked once against compiler output
+  by label and count, not site by site; only itoa was run. The lookup evidence kept on a
+  row is compared only as far as the assumptions the expected row asks for.
+- **Commands:** `~/phase8-work/accept/run-all.sh`, which calls `run-s1.sh`, `run-s2.sh`
+  and `run-s4.sh` (not in the repository). They run the SOP commands with
+  `--sysroot-source-scope-kind declarations`.
+- **codebase-memory:** index_repository after `753665eb9`; no query was needed for the run.
