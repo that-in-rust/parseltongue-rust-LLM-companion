@@ -273,6 +273,7 @@ fn render_written_type_shape(shape: &WrittenTypeShapeValue) -> String {
         ),
         WrittenTypeShapeValue::Wildcard => "_".to_owned(),
         WrittenTypeShapeValue::Opaque => "?".to_owned(),
+        WrittenTypeShapeValue::SizedUnknown => "_".to_owned(),
     }
 }
 
@@ -1155,7 +1156,7 @@ pub(crate) fn find_core_member_target(
         Some("self_value") => find_self_place_type(span, fields, context, members, index)?,
         _ => None,
     };
-    let Some((written, mut evidence)) = place else {
+    let Some((written, evidence)) = place else {
         return Ok(None);
     };
     let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
@@ -1186,6 +1187,20 @@ pub(crate) fn find_core_member_target(
         };
         shapes = next.into_iter().flatten().collect();
     }
+    name_probed_core_member(&shapes, method, evidence, members, index)
+}
+
+/// REQ-RUST-056.0 P2 to P5: the declaration the probe finds for `method` on a receiver
+/// whose type is one of `shapes`, written into the lookup record `evidence`.
+fn name_probed_core_member(
+    shapes: &[WrittenTypeShapeValue],
+    method: &str,
+    mut evidence: Value,
+    members: &ImplMemberLookupIndex,
+    index: &CoreMemberLookupIndex,
+) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
+    let declarations = index.core_declaration_value_rows.as_slice();
+    let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
     let scope_traits = match index.list_scope_trait_methods(method, members) {
         Ok(found) => found,
         Err(reason) => return withheld(reason, evidence),

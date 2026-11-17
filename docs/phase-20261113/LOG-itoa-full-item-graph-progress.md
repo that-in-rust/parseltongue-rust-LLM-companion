@@ -4,7 +4,7 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-16, production code of the commit that adds REQ-RUST-060.0 and 061.0)
+## Where we are (2026-11-17, production code of the commit that adds C1, C3, C4 and C5 of REQ-RUST-062.0)
 
 **Two states. Accepted: at commit `822da80cf` the mapper stored a graph of pinned itoa
 1.0.18 equal to the frozen expected graph (151 nodes, 682 edge rows), and the acceptance run
@@ -33,6 +33,9 @@ method calls into core named    0 of 133     108 of 133   equal to the frozen ro
 - **Without a target (25):** 8 `expect`, 5 `unwrap`, 10 `ilog10`, 1 each of `str::len` and
   `cast`.
 - **Real-source tests:** 60 of 60 pass on the executable built from the head.
+- **In progress:** REQ-RUST-062.0, a receiver that is itself a method call (8 `expect`, 5
+  `unwrap`). Built: the stored inputs (C1, C3) and the type reading (C4, C5). Not built:
+  the lookup that uses them (C2, C6), so the counts above did not change.
 - **Not done:** the `core` files are not in the run id; the targets are not merged into the
   expected graph; S1 to S4 are NOT STARTED for the head.
 
@@ -959,3 +962,41 @@ Work stopped in the middle of GREEN of step 8.3b-2b. Nothing after this entry wa
  not done    S1 to S4 for this head: NOT STARTED. 25 calls into core have no target.
 ```
 
+## 2026-11-17 08:27 IST Part 8: the inputs of REQ-RUST-062.0 (C1, C3, C4, C5); no new call named
+
+```text
+ spec        SPEC part 8 section 13 (REQ-RUST-062.0), pushed before this code (a7f952424)
+ built       C3  a row of a core declaration now stores trait_generic_parameter_names,
+                 trait_associated_type_names, owner_unsized_relaxed_names and
+                 member_generic_parameter_names
+             C4  parse_return_type_shape reads a return type such as Result<T, Self::Error>;
+             C5  a generic parameter or associated type without ?Sized, standing as a
+                 generic argument, is "a type not named, proven Sized" (SizedUnknown), which
+                 fits a generic parameter of an impl and nothing else
+             C1  the stored evidence of a method call whose receiver is a method call holds
+                 receiver_inner_call_evidence (the inner call's name and receiver evidence)
+             refactor: the probe tail of find_core_member_target is name_probed_core_member
+ not built   C2 and C6: nothing reads the inner call's return type yet, and no fixture of a
+             chained call exists. parse_return_type_shape is called by its unit test only.
+ fixtures    test_return_type_sized_arguments (new), test_trait_member_row_fields and
+             test_inherent_member_row_fields (extended)
+ real source test_itoa_core_member_targets, against the frozen expected rows: unchanged
+               stored 108   equal 108   wrong 0   without a target 25
+             nodes 157, edge rows 682, calls 197; edge rows with a target 657 of 682
+ gates       cargo fmt --check                                        ok
+             clippy -D warnings, extractor and cli crates             ok
+             extractor tests                                          181 passed, 0 failed
+             real-source tests                                        60 passed, 0 failed, 910 s
+             (whole test process: 15 m 22 s wall, 673 MB peak resident set of the largest
+             process, not the whole tree)
+             executable sha256 14c359199898271f..., read after the run
+             not run: the workspace clippy, test and build gates
+ queries     codebase-memory trace_path inbound, depth 1: build_owned_function_row (1 caller,
+             list_owned_function_rows), extract_method_receiver_syntax (1,
+             extract_original_call_syntax), find_core_member_target (1,
+             build_original_call_edge). The index is older than these functions:
+             parse_return_type_shape was not found. Re-indexed after the commit.
+ next        C2 and C6 with a fixture of `999.try_into().expect("x")`, RED then GREEN, then
+             the real-source comparison (predicted, not measured: 121 named, 12 without)
+ not done    S1 to S4 for this head: NOT STARTED. 25 calls into core have no target.
+```

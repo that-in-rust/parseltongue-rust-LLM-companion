@@ -1603,7 +1603,7 @@ fn extract_method_receiver_syntax(
         .as_deref()
         .zip(function.as_ref())
         .is_some_and(|(name, function)| check_receiver_name_rebound(function, call, name));
-    json!({
+    let evidence = json!({
         "receiver_shape_kind":if parameter.is_some() {
             "parameter_identifier"
         } else if call.receiver().is_some_and(|expr| check_own_self_argument(&expr)) {
@@ -1625,7 +1625,27 @@ fn extract_method_receiver_syntax(
         "receiver_place_step_rows":call
             .receiver()
             .and_then(|receiver| read_receiver_place_steps(&receiver, call, input, removed)),
+    });
+    // REQ-RUST-062.0 C1: a receiver that is a method call, through parentheses only,
+    // keeps the evidence of that call. Any other receiver stores no such field.
+    let inner = std::iter::successors(call.receiver(), |found| match found {
+        ast::Expr::ParenExpr(wrapped) => wrapped.expr(),
+        _ => None,
     })
+    .last()
+    .and_then(|found| match found {
+        ast::Expr::MethodCallExpr(inner) => Some(inner),
+        _ => None,
+    });
+    match inner {
+        Some(inner) => {
+            let mut evidence = evidence;
+            evidence["receiver_inner_call_evidence"] =
+                extract_method_receiver_syntax(&inner, input, removed);
+            evidence
+        }
+        None => evidence,
+    }
 }
 
 /// REQ-RUST-055.0 R2: the receiver as a place, base first: a parameter, `self` or a value

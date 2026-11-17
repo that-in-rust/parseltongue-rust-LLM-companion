@@ -39,6 +39,9 @@ pub(crate) enum WrittenTypeShapeValue {
     Wildcard,
     /// A type this model does not read: it is never proven to fit or to differ.
     Opaque,
+    /// REQ-RUST-062.0 C4, C5: a type that is not named and is proven `Sized`: it fits a
+    /// generic parameter of an impl and nothing else.
+    SizedUnknown,
 }
 
 /// A trait in scope at the call that declares the method name (P4, P5).
@@ -94,6 +97,71 @@ pub(crate) fn parse_written_type_shape(text: &str, parameters: &[String]) -> Wri
         .map_or(WrittenTypeShapeValue::Opaque, |ty| {
             build_written_type_shape(&ty, parameters, &mut BTreeSet::new())
         })
+}
+
+/// REQ-RUST-062.0 C4: the shape of the return type `text` of a member of `core`.
+/// `generics` are the generic parameter names of the member and of its trait or impl:
+/// none of them names a type. A direct generic argument of the returned type that is one
+/// of `sized`, or `Self::NAME` with `NAME` one of them, is a type proven `Sized`.
+pub(crate) fn parse_return_type_shape(
+    text: &str,
+    sized: &[String],
+    generics: &[String],
+) -> WrittenTypeShapeValue {
+    let parse = SourceFile::parse(&format!("type X = {text};"), Edition::Edition2021);
+    let returned = parse
+        .errors()
+        .is_empty()
+        .then(|| parse.tree())
+        .and_then(|tree| tree.syntax().descendants().find_map(ast::TypeAlias::cast))
+        .and_then(|alias| alias.ty());
+    let Some(returned) = returned else {
+        return WrittenTypeShapeValue::Opaque;
+    };
+    let written = match &returned {
+        ast::Type::PathType(found) => found
+            .path()
+            .and_then(|path| path.segment())
+            .and_then(|segment| segment.generic_arg_list())
+            .into_iter()
+            .flat_map(|list| list.generic_args())
+            .filter(|argument| !matches!(argument, ast::GenericArg::LifetimeArg(_)))
+            .collect::<Vec<_>>(),
+        _ => Vec::new(),
+    };
+    let proven = |argument: &ast::GenericArg| {
+        let ast::GenericArg::TypeArg(found) = argument else {
+            return false;
+        };
+        let text = found
+            .syntax()
+            .text()
+            .to_string()
+            .split_whitespace()
+            .collect::<String>();
+        sized
+            .iter()
+            .any(|name| text == *name || text == format!("Self::{name}"))
+    };
+    match build_written_type_shape(&returned, generics, &mut BTreeSet::new()) {
+        WrittenTypeShapeValue::Named { name, arguments } if arguments.len() == written.len() => {
+            WrittenTypeShapeValue::Named {
+                name,
+                arguments: written
+                    .iter()
+                    .zip(arguments)
+                    .map(|(argument, shape)| {
+                        if proven(argument) {
+                            WrittenTypeShapeValue::SizedUnknown
+                        } else {
+                            shape
+                        }
+                    })
+                    .collect(),
+            }
+        }
+        shape => shape,
+    }
 }
 
 fn build_inner_type_shape(
@@ -213,12 +281,14 @@ fn unify_written_type_shapes(
     declared: &WrittenTypeShapeValue,
     probed: &WrittenTypeShapeValue,
 ) -> ShapeFitKind {
-    use WrittenTypeShapeValue::{Array, Named, Opaque, Pointer, Reference, Slice, Wildcard};
+    use WrittenTypeShapeValue::{
+        Array, Named, Opaque, Pointer, Reference, SizedUnknown, Slice, Wildcard,
+    };
     match (declared, probed) {
         (Wildcard, Opaque | Slice(_) | Wildcard) => ShapeFitKind::Unknown,
         (Wildcard, Named { name, .. }) if name == "str" => ShapeFitKind::Unknown,
         (Wildcard, _) => ShapeFitKind::Fits,
-        (Opaque, _) | (_, Opaque | Wildcard) => ShapeFitKind::Unknown,
+        (Opaque | SizedUnknown, _) | (_, Opaque | Wildcard | SizedUnknown) => ShapeFitKind::Unknown,
         (
             Reference {
                 mutable: left,
@@ -301,7 +371,9 @@ fn list_shape_type_names(shape: &WrittenTypeShapeValue) -> Vec<&str> {
         WrittenTypeShapeValue::Named { name, arguments } => std::iter::once(name.as_str())
             .chain(arguments.iter().flat_map(list_shape_type_names))
             .collect(),
-        WrittenTypeShapeValue::Wildcard | WrittenTypeShapeValue::Opaque => Vec::new(),
+        WrittenTypeShapeValue::Wildcard
+        | WrittenTypeShapeValue::Opaque
+        | WrittenTypeShapeValue::SizedUnknown => Vec::new(),
     }
 }
 

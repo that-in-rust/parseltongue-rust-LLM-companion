@@ -352,3 +352,49 @@ fn test_macro_name_parameter_calls() {
         outcome("impl Iter { member! { fold } } use member as other;")
     );
 }
+
+/// REQ-RUST-062.0 C4, C5: in a return type, a generic argument that the declaration
+/// proves `Sized` fits a generic parameter of an impl; one it does not prove fits nothing.
+#[test]
+fn test_return_type_sized_arguments() {
+    let rows = extract_member_declaration_rows(
+        "core/src/result.rs",
+        "pub enum Result<T, E> { Ok(T), Err(E) }\npub enum Option<T> { None, Some(T) }\n\
+         impl<T, E> Result<T, E> { pub fn expect(self, msg: &str) -> T { loop {} } }\n\
+         impl<T> Option<T> { pub fn expect(self, msg: &str) -> T { loop {} } }\n",
+    );
+    let names = |values: &[&str]| {
+        values
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let outcome = |sized: &[&str]| {
+        let shape =
+            parse_return_type_shape("Result<T, Self::Error>", &names(sized), &names(&["T"]));
+        match probe_core_member_declaration(&shape, "expect", &rows, &[]) {
+            CoreMemberProbeOutcome::Named {
+                declaration_row_index,
+                probe_step_text,
+                ..
+            } => format!(
+                "{}::expect at {probe_step_text}",
+                rows[declaration_row_index]["impl_self_type_text"]
+                    .as_str()
+                    .unwrap()
+            ),
+            CoreMemberProbeOutcome::Withheld(detail) => format!("withheld {detail}"),
+        }
+    };
+    assert_eq!(
+        "Result<T, E>::expect at step 0 by value",
+        outcome(&["T", "Error"])
+    );
+    // `?Sized` written for one of them: it may be a type an impl's parameter cannot be.
+    assert_eq!("withheld inherent_member_unproven", outcome(&["Error"]));
+    assert_eq!("withheld inherent_member_unproven", outcome(&["T"]));
+    assert_eq!(
+        WrittenTypeShapeValue::Opaque,
+        parse_return_type_shape("Self", &[], &[])
+    );
+}
