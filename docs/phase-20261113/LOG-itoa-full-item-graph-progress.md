@@ -77,7 +77,8 @@ real-source itoa tests   61 pass, 0 fail (928 s, one thread, frozen executable) 
 workspace tests          first run: 639 pass, 2 fail, 4 ignored, stopped after 20 test
                          binaries. Both failures are `cargo metadata --offline` missing a
                          crate in this machine's crate cache; `cargo fetch --locked` fixed
-                         that. Rerun of all binaries: in progress, not yet recorded.
+                         that. Rerun of all 21 test binaries: 643 pass, 0 fail,
+                         4 ignored, exit 0 (1,024 s).
                          test_lang_items_in_sysroot skipped; it fails when run
 format, lint, release    pass                                          at 753665eb9
 expected-data tests      25 pass
@@ -142,8 +143,16 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 ### What is left
 
-Part 8 is done as far as it was decided: the acceptance run of `753665eb9` passed. Nothing
-is in progress. Open, each needing a decision from the user:
+Part 8 is done as far as it was decided: the acceptance run of `753665eb9` passed.
+
+**In progress: part 9, the exported graph as a DuckDB file** (user decision, 2026-11-17).
+A separate crate reads the two JSON files a run exports, checks them and writes one DuckDB
+file. The user's bar for done: one full run in which pinned itoa goes through
+`parseltongue` and the DuckDB file equals the exported rows. Specified
+([part 9](SPEC-itoa-full-item-graph/part-9-graph-export-into-duckdb.md)); no code is
+committed yet.
+
+Open, each needing a decision from the user:
 
 1. `cast`: which source facts prove that every type meets `PointeeSized`.
 2. The DuckDB `json` extension: build it into the executable, or freeze it by digest in S1.
@@ -1385,8 +1394,10 @@ workers  wall s  peak MB  store bytes  nodes  edges
   `cargo metadata --offline --locked`, which failed with "failed to download
   `android_system_properties v0.1.6`": the crate cache of this machine held only the
   crates of this platform. After `cargo fetch --locked` the same command exits 0. No file
-  of the repository changed. A rerun of all test binaries (`--no-fail-fast`) is in
-  progress and is not recorded here yet. The release build after the tests passed, and
+  of the repository changed. The rerun of all 21 test binaries (`--no-fail-fast`,
+  `~/phase8-work/accept/ws-test2.log`) ended with exit 0: 643 passed, 0 failed, 4 ignored,
+  wall 17:04, maximum resident set 388,832 kB. It ran at `efb5bbfb0`, a documents-only
+  commit after `753665eb9`, with no change under `crates/`. After it,
   `target/release/parseltongue` still has the digest of the frozen executable.
 - **Open, found by the audit:** the run opens
   `~/.duckdb/extensions/v2.0.0/linux_amd64/json.duckdb_extension` (sha256

@@ -33,7 +33,7 @@ S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers st
   known open defect.
 - The first workspace test run stopped at two tests that call `cargo metadata --offline`:
   the machine's crate cache lacked a crate. After `cargo fetch --locked` a rerun of all
-  test binaries is in progress; its result is in the log's run report.
+  21 test binaries passed: 643 pass, 0 fail, 4 ignored (log, run report).
 - Both expected graphs were written and checked by one author (Rule 1).
 - The earlier run, with `excluded`, passed on 2026-11-16 at commit `822da80cf` (151 nodes,
   682 edge rows, 133 calls without a target). Its expected graph stays frozen and
