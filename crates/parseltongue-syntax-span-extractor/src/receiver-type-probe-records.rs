@@ -362,7 +362,7 @@ fn unify_member_receiver_shape(
     }
 }
 
-fn list_shape_type_names(shape: &WrittenTypeShapeValue) -> Vec<&str> {
+pub(crate) fn list_shape_type_names(shape: &WrittenTypeShapeValue) -> Vec<&str> {
     match shape {
         WrittenTypeShapeValue::Reference { inner, .. }
         | WrittenTypeShapeValue::Pointer { inner, .. }
@@ -393,6 +393,23 @@ fn check_type_name_declared(name: &str, declarations: &[Value]) -> bool {
                 .as_slice(),
             [Some("struct" | "enum" | "union")]
         )
+}
+
+/// REQ-RUST-062.0 C8: the type names of `shape` that the name alone does not prove to be
+/// one type, each once, in the order written.
+pub(crate) fn list_unproven_type_names(
+    shape: &WrittenTypeShapeValue,
+    declarations: &[Value],
+) -> Vec<String> {
+    list_shape_type_names(shape)
+        .into_iter()
+        .filter(|name| !check_type_name_declared(name, declarations))
+        .fold(Vec::new(), |mut names, name| {
+            if !names.iter().any(|found| found == name) {
+                names.push(name.to_owned());
+            }
+            names
+        })
 }
 
 /// REQ-RUST-054.0 D12: whether a macro that takes its member's name from its caller may
@@ -579,18 +596,22 @@ fn decide_probe_form_outcome(
 }
 
 /// P2 to P5: Rust's method probe for `receiver.method_name(..)` over `declarations`.
+/// `proven_type_names` are the type names of `receiver` that the caller proved.
 pub(crate) fn probe_core_member_declaration(
     receiver: &WrittenTypeShapeValue,
     method_name: &str,
     declarations: &[Value],
     scope_traits: &[ScopeTraitMethodValue],
+    proven_type_names: &[String],
 ) -> CoreMemberProbeOutcome {
     if *receiver == WrittenTypeShapeValue::Opaque {
         return CoreMemberProbeOutcome::Withheld("receiver_type_not_modelled");
     }
-    if !list_shape_type_names(receiver)
+    // REQ-RUST-062.0 C8: a name is one type by its sole declaration, or by a proof the
+    // caller made from the scope of the file that writes it.
+    if !list_unproven_type_names(receiver, declarations)
         .iter()
-        .all(|name| check_type_name_declared(name, declarations))
+        .all(|name| proven_type_names.contains(name))
     {
         return CoreMemberProbeOutcome::Withheld("receiver_type_name_unproven");
     }

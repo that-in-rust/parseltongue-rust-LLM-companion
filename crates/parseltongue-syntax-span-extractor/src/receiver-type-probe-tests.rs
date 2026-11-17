@@ -39,7 +39,7 @@ fn shape(text: &str) -> WrittenTypeShapeValue {
 /// The probe's outcome as text: `<impl self type>::<name> at <step>`, or the withheld detail.
 fn probe(receiver: &str, name: &str, traits: &[ScopeTraitMethodValue]) -> String {
     let rows = read_fixture_declaration_rows();
-    match probe_core_member_declaration(&shape(receiver), name, &rows, traits) {
+    match probe_core_member_declaration(&shape(receiver), name, &rows, traits, &[]) {
         CoreMemberProbeOutcome::Named {
             declaration_row_index,
             probe_step_text,
@@ -326,7 +326,7 @@ fn test_macro_name_parameter_calls() {
              macro_rules! member {{ ($name:ident) => {{ fn $name(self) {{}} }} }}\n{extra}"
         );
         let rows = extract_member_declaration_rows("core/src/fixture.rs", &source);
-        match probe_core_member_declaration(&shape("&[u8]"), "len", &rows, &[]) {
+        match probe_core_member_declaration(&shape("&[u8]"), "len", &rows, &[], &[]) {
             CoreMemberProbeOutcome::Named { .. } => "named",
             CoreMemberProbeOutcome::Withheld(detail) => detail,
         }
@@ -372,7 +372,7 @@ fn test_return_type_sized_arguments() {
     let outcome = |sized: &[&str]| {
         let shape =
             parse_return_type_shape("Result<T, Self::Error>", &names(sized), &names(&["T"]));
-        match probe_core_member_declaration(&shape, "expect", &rows, &[]) {
+        match probe_core_member_declaration(&shape, "expect", &rows, &[], &[]) {
             CoreMemberProbeOutcome::Named {
                 declaration_row_index,
                 probe_step_text,

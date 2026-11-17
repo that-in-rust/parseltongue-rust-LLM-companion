@@ -3,6 +3,7 @@
 //! evidence, every name in it is proven against the stored path lookups, and the probe of
 //! `receiver-type-probe-records.rs` picks the declaration. Anything not proven withholds
 //! the name: a missed target is preferable to a wrong one.
+use crate::core_file_scope_name_records::find_file_scope_type;
 use crate::external_named_target_records::{ExternalNameProofRecord, build_external_proof_value};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_stage_values,
@@ -12,7 +13,8 @@ use crate::original_call_resolution_records::{
 };
 use crate::receiver_type_probe_records::{
     CoreMemberProbeOutcome, ScopeTraitMethodValue, WrittenTypeShapeValue,
-    check_macro_member_candidate, parse_written_type_shape, probe_core_member_declaration,
+    check_macro_member_candidate, list_shape_type_names, list_unproven_type_names,
+    parse_return_type_shape, parse_written_type_shape, probe_core_member_declaration,
 };
 use crate::syntax_namespace_record_codec::{
     decode_occurrence_identity_value, decode_symbol_target_value,
@@ -1129,6 +1131,11 @@ pub(crate) fn find_core_member_target(
     if let Some(found) = index.find_sole_trait_member(method) {
         return Ok(Some(found));
     }
+    // REQ-RUST-062.0 C2: a receiver that is a method call.
+    let inner = &receiver["receiver_inner_call_evidence"];
+    if !inner.is_null() {
+        return find_call_result_member(span, inner, method, context, members, index, bounds);
+    }
     let Some([first, places @ ..]) = receiver["receiver_place_step_rows"]
         .as_array()
         .map(Vec::as_slice)
@@ -1187,17 +1194,163 @@ pub(crate) fn find_core_member_target(
         };
         shapes = next.into_iter().flatten().collect();
     }
-    name_probed_core_member(&shapes, method, evidence, members, index)
+    name_probed_core_member(&shapes, method, evidence, members, index, &[])
+}
+
+/// The strings of the array `row[key]`; none when the row stores no such array.
+fn list_row_name_values(row: &Value, key: &str) -> Vec<String> {
+    row[key]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect()
+}
+
+/// REQ-RUST-062.0 C2 to C6: the member `method` names on a receiver that is the method
+/// call `inner`. The receiver's type is the return type that the declaration naming
+/// `inner` writes. `None` when `inner` has no lookup, or its declaration stores no return
+/// type; the withheld reason of `inner` is kept.
+fn find_call_result_member(
+    span: &Value,
+    inner: &Value,
+    method: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+    index: &CoreMemberLookupIndex,
+    bounds: &BoundMethodLookupIndex,
+) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
+    let Some((outcome, lookup)) =
+        find_core_member_target(span, inner, context, members, index, bounds)?
+    else {
+        return Ok(None);
+    };
+    let cited = [
+        "declaration_source_relative_path",
+        "member_name_start_offset",
+        "member_name_end_offset",
+    ];
+    let declared = index
+        .core_declaration_value_rows
+        .iter()
+        .find(|row| cited.iter().all(|key| row[*key] == lookup[*key]))
+        .and_then(|row| Some((row, row["member_return_type_text"].as_str()?)));
+    let assumed = lookup["lookup_assumption_values"].clone();
+    let mut evidence = json!({
+        "receiver_type_proof_kind":"call_result_declared_type",
+        "receiver_inner_call_lookup":lookup,
+        "method_probe_unread_source":["alloc", "std"],
+        "lookup_assumption_values":assumed
+    });
+    let label = match outcome {
+        Ok(ExternalNameProofRecord {
+            external_target_identity_value: HldTargetIdentityValue::ExternalNamed(key),
+            ..
+        }) => key.external_item_path_text,
+        Ok(_) => return Ok(None),
+        Err(reason) => return Ok(Some((Err(reason), evidence))),
+    };
+    let Some((row, returned)) = declared else {
+        return Ok(None);
+    };
+    evidence["receiver_inner_call_target_label"] = json!(label);
+    evidence["receiver_return_type_text"] = json!(returned);
+    // C4: the names the declaration's owner declares, less those not proven `Sized`.
+    let relaxed = list_row_name_values(row, "owner_unsized_relaxed_names");
+    let owner_generics = [
+        "trait_generic_parameter_names",
+        "impl_generic_parameter_names",
+    ]
+    .iter()
+    .flat_map(|key| list_row_name_values(row, key))
+    .collect::<Vec<_>>();
+    let sized = owner_generics
+        .iter()
+        .cloned()
+        .chain(list_row_name_values(row, "trait_associated_type_names"))
+        .filter(|name| !relaxed.contains(name))
+        .collect::<Vec<_>>();
+    let generics = owner_generics
+        .into_iter()
+        .chain(list_row_name_values(row, "member_generic_parameter_names"))
+        .collect::<Vec<_>>();
+    let shape = parse_return_type_shape(returned, &sized, &generics);
+    // C8, C13: a name `core` declares more than once is proven by its file's scope.
+    let declarations = index.core_declaration_value_rows.as_slice();
+    let Some(proofs) = prove_return_type_names(&shape, row, method, declarations) else {
+        evidence["receiver_type_text"] = json!(render_written_type_shape(&shape));
+        return Ok(Some((Err("receiver_type_name_unproven"), evidence)));
+    };
+    let proven = proofs
+        .iter()
+        .filter_map(|proof| proof["type_name_value"].as_str().map(str::to_owned))
+        .collect::<Vec<_>>();
+    if !proofs.is_empty() {
+        evidence["receiver_type_name_proofs"] = json!(proofs);
+    }
+    name_probed_core_member(&[shape], method, evidence, members, index, &proven)
+}
+
+/// REQ-RUST-062.0 C12: whether the impl that holds the member `row` writes the type name
+/// of `proof` in its self type, and its own file does not prove it the same declaration.
+fn check_impl_name_differs(row: &Value, proof: &Value, declarations: &[Value]) -> bool {
+    let name = proof["type_name_value"].as_str().unwrap_or("");
+    let generics = list_row_name_values(row, "impl_generic_parameter_names");
+    let written =
+        parse_written_type_shape(row["impl_self_type_text"].as_str().unwrap_or(""), &generics);
+    list_shape_type_names(&written).contains(&name)
+        && !(row["owner_file_scope_flag"] == true
+            && row["declaration_source_relative_path"]
+                .as_str()
+                .and_then(|file| find_file_scope_type(declarations, file, name))
+                .is_some_and(|found| {
+                    found["type_declaration_site_value"] == proof["type_declaration_site_value"]
+                }))
+}
+
+/// REQ-RUST-062.0 C8, C10, C12: one proof per type name of `shape` that the name alone
+/// does not prove, where `shape` is the return type the member `row` writes. `None` when
+/// a name is not proven, or an impl that declares `method` may mean another type by it.
+fn prove_return_type_names(
+    shape: &WrittenTypeShapeValue,
+    row: &Value,
+    method: &str,
+    declarations: &[Value],
+) -> Option<Vec<Value>> {
+    let names = list_unproven_type_names(shape, declarations);
+    let file = row["declaration_source_relative_path"]
+        .as_str()
+        .filter(|_| names.is_empty() || row["owner_file_scope_flag"] == true)?;
+    names
+        .iter()
+        .map(|name| {
+            find_file_scope_type(declarations, file, name).filter(|proof| {
+                !declarations
+                    .iter()
+                    .filter(|found| {
+                        found["member_declared_name_value"] == method
+                            && matches!(
+                                found["declaration_owner_kind_value"].as_str(),
+                                Some("inherent_impl" | "trait_impl")
+                            )
+                    })
+                    .any(|found| check_impl_name_differs(found, proof, declarations))
+            })
+        })
+        .collect()
 }
 
 /// REQ-RUST-056.0 P2 to P5: the declaration the probe finds for `method` on a receiver
 /// whose type is one of `shapes`, written into the lookup record `evidence`.
+/// `proven_type_names` are the type names REQ-RUST-062.0 C10 proved for the shapes.
 fn name_probed_core_member(
     shapes: &[WrittenTypeShapeValue],
     method: &str,
     mut evidence: Value,
     members: &ImplMemberLookupIndex,
     index: &CoreMemberLookupIndex,
+    proven_type_names: &[String],
 ) -> Result<Option<(BuiltinMemberNameOutcome, Value)>, OriginalCallResolutionError> {
     let declarations = index.core_declaration_value_rows.as_slice();
     let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
@@ -1210,7 +1363,13 @@ fn name_probed_core_member(
         .map(|shape| {
             (
                 shape,
-                probe_core_member_declaration(shape, method, declarations, &scope_traits),
+                probe_core_member_declaration(
+                    shape,
+                    method,
+                    declarations,
+                    &scope_traits,
+                    proven_type_names,
+                ),
             )
         })
         .collect::<Vec<_>>();
