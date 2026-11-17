@@ -95,7 +95,7 @@ Scope:
   extra worktrees or clones.
 - **One branch.** `research/tiny-rust-code-mapper`. `git pull --rebase` before pushing (the user
   also commits from a Mac).
-- **Small commits.** One focused change per commit, at most about 200 changed lines, with a
+- **Focused commits.** One focused change per commit, at most about 1,000 changed lines, with a
   message that says what changed and why. Push after each. Do not hold work back for a full
   rewrite. Only a delete-only commit may be larger.
 - **Spec first.** Before code for a new target, write its part file in the SPEC folder with
@@ -209,7 +209,7 @@ SPEC     SPEC-itoa-full-item-graph/                     README.md is the index; 
   in the log.
 - Every document is written answer first (pyramid): the conclusion and current state on top,
   then the few points that support it, then reference detail. Short, specific, no repetition.
-- One document at a time, in commits of at most about 200 changed lines, each pushed to
+- One document at a time, in commits of at most about 1,000 changed lines, each pushed to
   `research/tiny-rust-code-mapper` before the next starts.
 - A change to architecture or to a pin updates ARCH, SOP and this file in the same commit.
 - Everything else under `docs/` is history. Exception: code and tools still read these files in

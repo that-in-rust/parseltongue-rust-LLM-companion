@@ -1532,3 +1532,16 @@ inputs    itoa 1.0.18, a copy of the four pinned source files (byte-equal to com
   `test_failed_check_writes_nothing` of `load_graph_export_files` and the real-source test
   of `read_graph_dataset_file`.
 - **Next:** nothing is in progress. The open decisions are listed under "What is left".
+
+## 2026-11-17 16:15 IST Rule change: a commit may be up to about 1,000 changed lines
+
+**The limit on one commit is raised from about 200 to about 1,000 changed lines (user
+decision, 2026-11-17).** `AGENTS.md` Rule 3 and its rule for document commits now say so.
+
+- **Why:** a new file with its tests rarely fits in 200 lines. Four of the six loader
+  commits were over it (287 to 509 lines), and so were commits of part 8.
+- **Unchanged:** one focused change per commit, pushed after each; a delete-only commit
+  may be larger.
+- **Not edited:** the plans of parts 3, 4, 4b, 4c and 4d name the old limit. They record
+  how those closed parts were built.
+- No code changed, so no gate was run and no codebase-memory query was needed.
