@@ -2373,8 +2373,8 @@ fn test_core_member_rows_published() {
         added
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
-    assert_eq!((151, 682), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((170, 682), (nodes.len(), edges));
+    assert_eq!((151, 684), (excluded_nodes.len(), excluded_edges));
+    assert_eq!((170, 684), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -3071,7 +3071,8 @@ fn test_generated_item_node_counts() {
             .iter()
             .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Contains)
             .count(),
-        88
+        // 88 rows to items and two from a module to its file area (REQ-RUST-070.0).
+        90
     );
 }
 
@@ -3197,7 +3198,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 682);
+    assert_eq!(input.input_edge_records.len(), 684);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3313,7 +3314,8 @@ fn test_generated_nodes_read_twice() {
     assert_eq!(input.input_node_records, again.input_node_records);
     assert_eq!(input.input_edge_records, again.input_edge_records);
     check_relation_rows_twice(HldRelationKindValue::Generates, 45);
-    check_relation_rows_twice(HldRelationKindValue::Contains, 88);
+    // 88 rows to items and two from a module to its file area (REQ-RUST-070.0).
+    check_relation_rows_twice(HldRelationKindValue::Contains, 90);
 }
 
 /// REQ-RUST-050.0 L1, L3, L4: every node label is distinct on itoa, none carries the
@@ -5851,7 +5853,8 @@ fn test_self_receiver_shadow_cases() {
 }
 
 /// REQ-RUST-043.1 C1, C2: pinned itoa has one crate-root node, `itoa`, read back from the
-/// published generation with no file, kind or owner, and no edge names it.
+/// published generation with no file, kind or owner. REQ-RUST-070.0 A1: the one edge that
+/// names it is its `contains` row to the file area of `src/lib.rs`.
 #[test]
 fn test_itoa_crate_root_node() {
     let (_directory, _root, _database, input) = run_original_graph_fixture();
@@ -5886,8 +5889,14 @@ fn test_itoa_crate_root_node() {
                         target: root.node_target_reference.clone(),
                     }
         })
-        .count();
-    assert_eq!(touching, 0);
+        .map(|edge| {
+            (
+                edge.edge_source_reference == root.node_target_reference,
+                edge.edge_relation_kind_value,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(touching, [(true, HldRelationKindValue::Contains)]);
 }
 
 /// REQ-RUST-044.0: every node and every edge row production stores for pinned itoa is
@@ -6322,7 +6331,7 @@ fn test_itoa_core_member_targets() {
         )
     );
     assert_eq!(
-        (170, 682, 197, 1),
+        (170, 684, 197, 1),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),
@@ -6373,7 +6382,7 @@ fn test_empty_home_graph_published() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(
-        (170, 682),
+        (170, 684),
         (
             read_published_stage_rows(&database, "item-effective-visibility-records").len(),
             read_published_stage_rows(&database, "edge-evidence-record-table").len()

@@ -363,7 +363,8 @@ fn test_impl_body_members_excluded() {
     let before = source.rows.clone();
     let input = derive_fixture_graph_input(&source).unwrap();
     assert_eq!(input.input_node_records.len(), 18);
-    assert_eq!(input.input_edge_records.len(), 16);
+    // 16 rows to items, and the crate root's row to its file area (REQ-RUST-070.0 A1).
+    assert_eq!(input.input_edge_records.len(), 17);
     for name in [
         "hidden",
         "hidden_too",
@@ -492,7 +493,86 @@ fn test_crate_root_node_stored() {
                     }
         })
         .count();
-    assert_eq!(touching, 0);
+    // REQ-RUST-070.0 A1: its one row is `contains` to the file area of the root file.
+    assert_eq!(touching, 1);
+}
+
+/// REQ-RUST-070.0 A2, A3: a `mod child;` declaration whose file was read gives one
+/// `contains` row from the module to that file's area, sited at the declaration; the
+/// inline module `nested` gives none; a second read candidate is refused, not chosen.
+#[test]
+fn test_module_declaration_area_edge() {
+    let mut source = build_original_fixture_store();
+    source.bytes.extend_from_slice(b"mod child;\r\n");
+    let digest = blake3::hash(&source.bytes).to_hex().to_string();
+    source.rows.remove("file-source-text-table");
+    for path in ["/fixture/src/lib.rs", "/fixture/src/child.rs"] {
+        source.insert_source_fixture_row(
+            "file-source-text-table",
+            json!({"file_source_absolute_path":path, "file_content_digest_full":digest}),
+        );
+    }
+    source.insert_source_fixture_row("syntax-file-work-requests", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/child.rs", "file_parse_context_kind":"items", "file_expansion_provenance_chain":[]}));
+    let span = source.insert_fixture_span_record("mod child;", "MODULE", "child", true);
+    source.insert_source_fixture_row("span-byte-ownership-ranges", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":span["span_byte_start_offset"], "span_byte_end_offset":span["span_byte_end_offset"], "span_gap_classification_kind":"item", "span_expansion_provenance_chain":[]}));
+    let request = |candidates: &[&str]| json!({"source_request_path_candidates":candidates, "source_request_context_kind":"items", "source_request_origin_digest":span["span_semantic_occurrence_key"], "source_request_origin_kind":"module_declaration", "unit_compilation_identity_key":"raw-unit", "file_expansion_provenance_chain":[]});
+    source.insert_source_fixture_row(
+        MODULE_FILE_LINK_TABLE,
+        request(&["/fixture/src/child.rs", "/fixture/src/child/mod.rs"]),
+    );
+    let input = derive_fixture_graph_input(&source).unwrap();
+    let area_rows = input
+        .input_edge_records
+        .iter()
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted {
+                target: HldTargetIdentityValue::FilePublicArea(area),
+            } => Some((edge, area)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let child = find_fixture_named_node(&input, "child");
+    let nested = find_fixture_named_node(&input, "nested");
+    assert_eq!(
+        area_rows.len(),
+        2,
+        "the crate root's row and the declaration's"
+    );
+    assert!(
+        area_rows
+            .iter()
+            .all(|(edge, _)| edge.edge_source_reference != nested.node_target_reference)
+    );
+    let (edge, _) = area_rows
+        .iter()
+        .find(|(edge, _)| edge.edge_source_reference == child.node_target_reference)
+        .unwrap();
+    assert_eq!(
+        edge.edge_relation_kind_value,
+        HldRelationKindValue::Contains
+    );
+    let site = edge
+        .edge_evidence_row_key
+        .evidence_site_occurrence_key
+        .read_semantic_occurrence_parts();
+    assert_eq!(site.span_source_file_path, "src/lib.rs");
+    assert_eq!(
+        site.span_byte_range_value.read_source_range_pair(),
+        (
+            span["span_byte_start_offset"].as_u64().unwrap(),
+            span["span_byte_end_offset"].as_u64().unwrap()
+        )
+    );
+    assert_eq!(
+        site.span_content_digest_full.read_full_digest_bytes(),
+        blake3::hash(b"mod child;").as_bytes()
+    );
+
+    source.insert_source_fixture_row(MODULE_FILE_LINK_TABLE, request(&["/fixture/src/lib.rs"]));
+    assert!(matches!(
+        derive_fixture_graph_input(&source),
+        Err(OriginalSourceProjectionError::InvalidSourceRow { .. })
+    ));
 }
 
 /// REQ-RUST-043.1 C3: a unit whose root file is not read has no crate-root node.

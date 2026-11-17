@@ -11,6 +11,10 @@ mod macro_call_expands_projection;
 
 #[path = "item-node-label-text.rs"]
 mod item_node_label_text;
+#[path = "module-file-area-projection.rs"]
+mod module_file_area_projection;
+
+const MODULE_FILE_LINK_TABLE: &str = "module-source-closure-requests";
 
 impl DuckdbAnalysisStoreAdapter {
     pub fn derive_original_graph_input(
@@ -37,6 +41,7 @@ impl DuckdbAnalysisStoreAdapter {
                 "impl-header-index-table",
                 "macro-expanded-item-table",
                 "legacy-macro-scope-records",
+                MODULE_FILE_LINK_TABLE,
             ])
             .collect::<Vec<_>>();
         self.copy_published_stage_rows(source, source_scope, &tables, cancel)?;
@@ -69,6 +74,9 @@ impl DuckdbAnalysisStoreAdapter {
             });
             if context.file_is_crate_root {
                 nodes.insert(build_crate_root_node(&context, generation));
+                edges.insert(module_file_area_projection::build_root_area_edge(
+                    &context, generation,
+                )?);
             }
             nodes.insert(HldNodeInputRecord {
                 run_generation_digest_value: generation,
@@ -178,6 +186,14 @@ impl DuckdbAnalysisStoreAdapter {
         nodes.extend(generated_nodes);
         edges.extend(generated_edges);
         edges.extend(macro_call_expands_projection::build_macro_expands_records(
+            &connection,
+            source,
+            source_scope,
+            workspace_root,
+            generation,
+            cancel,
+        )?);
+        edges.extend(module_file_area_projection::build_module_area_records(
             &connection,
             source,
             source_scope,
