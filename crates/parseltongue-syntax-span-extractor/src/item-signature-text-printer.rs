@@ -23,7 +23,8 @@ pub(crate) fn print_item_signature_text(item: &SyntaxNode) -> String {
 
 /// S1: the tokens the signature keeps, in source order.
 fn collect_item_signature_tokens(item: &SyntaxNode) -> Vec<SyntaxToken> {
-    let value_cut = matches!(item.kind(), CONST | STATIC);
+    // REQ-RUST-071.0 F3: the discriminant of a variant is a value too.
+    let value_cut = matches!(item.kind(), CONST | STATIC | VARIANT);
     let tokens = item
         .children_with_tokens()
         .take_while(|child| !(value_cut && child.kind() == EQ))

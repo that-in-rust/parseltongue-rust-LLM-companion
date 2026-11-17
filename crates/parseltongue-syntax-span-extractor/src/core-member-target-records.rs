@@ -227,9 +227,11 @@ pub(crate) fn read_core_member_index(
         .into_iter()
         .filter(|row| check_declared_type_row(row) || row["site_syntax_kind_value"] == "RET_TYPE")
         .filter_map(|row| {
-            let owner =
-                read_span_graph_identity(row["site_owner_occurrence_key"].as_str()?, context)?;
-            Some((owner, row))
+            // REQ-RUST-071.0 E1: a field row is owned by the field; its struct is beside it.
+            let owner_key = row["site_field_owner_occurrence_key"]
+                .as_str()
+                .or(row["site_owner_occurrence_key"].as_str())?;
+            Some((read_span_graph_identity(owner_key, context)?, row))
         })
         .partition(|(_, row)| row["site_syntax_kind_value"] == "RET_TYPE");
     Ok(CoreMemberLookupIndex {

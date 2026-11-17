@@ -68,6 +68,9 @@ pub use impl_header_implements_records::{
 };
 #[path = "external-named-target-records.rs"]
 mod external_named_target_records;
+#[cfg(test)]
+#[path = "field-span-row-tests.rs"]
+mod field_span_row_tests;
 #[path = "item-signature-text-printer.rs"]
 mod item_signature_text_printer;
 #[path = "node-visibility-field-records.rs"]
@@ -422,8 +425,12 @@ fn build_syntax_occurrence_key(
         canonical,
     )
 }
+fn check_syntax_field_node(node: &SyntaxNode) -> bool {
+    ast::RecordField::can_cast(node.kind()) || ast::TupleField::can_cast(node.kind())
+}
 fn check_syntax_item_node(node: &SyntaxNode) -> bool {
-    if ast::Variant::can_cast(node.kind()) {
+    // REQ-RUST-071.0 N1: a variant and a field are nodes of the graph like an item.
+    if ast::Variant::can_cast(node.kind()) || check_syntax_field_node(node) {
         return true;
     }
     if !ast::Item::can_cast(node.kind()) {
@@ -519,10 +526,22 @@ fn extract_macro_context_syntax(
     for node in &items {
         let (key, canonical) = build_syntax_occurrence_key(input, node, &removed);
         let active = active_flags.get(node).copied().unwrap_or(true);
-        let name = node
-            .children()
-            .find(|child| format!("{:?}", child.kind()) == "NAME")
-            .map(|n| n.text().to_string());
+        let name = if ast::TupleField::can_cast(node.kind()) {
+            // REQ-RUST-071.0 N2: `.0` counts the tuple fields the configuration keeps.
+            let kept = |field: &SyntaxNode| {
+                field.kind() == node.kind() && active_flags.get(field).copied().unwrap_or(true)
+            };
+            active.then(|| {
+                std::iter::successors(node.prev_sibling(), SyntaxNode::prev_sibling)
+                    .filter(kept)
+                    .count()
+                    .to_string()
+            })
+        } else {
+            node.children()
+                .find(|child| format!("{:?}", child.kind()) == "NAME")
+                .map(|n| n.text().to_string())
+        };
         let visibility = item_signature_text_printer::read_item_visibility_text(node);
         let range = node.text_range();
         let start = restore_source_byte_offset(range.start(), &removed);
@@ -667,9 +686,10 @@ fn extract_macro_context_syntax(
             continue;
         }
         let (key, _) = build_syntax_occurrence_key(input, &node, &removed);
+        // REQ-RUST-071.0 E1: a field owns the row of its own type.
         let owner = node
             .ancestors()
-            .skip(1)
+            .skip(usize::from(!check_syntax_field_node(&node)))
             .find(check_syntax_item_node)
             .map(|n| build_syntax_occurrence_key(input, &n, &removed).0)
             .or_else(|| owner_fallback.map(str::to_owned));
@@ -682,6 +702,16 @@ fn extract_macro_context_syntax(
             "site_syntax_kind_value":kind,"site_syntax_source_text":&source[start..end],
             "site_owner_occurrence_key":owner,"site_resolution_status_kind":"pending",
             "site_unresolved_reason_kind":Value::Null,"span_expansion_provenance_chain":input.file_expansion_provenance_chain});
+        if check_syntax_field_node(&node) {
+            // The struct, union or variant the field is written in: a field place is
+            // looked up by it (REQ-RUST-059.0 S3).
+            payload["site_field_owner_occurrence_key"] = json!(
+                node.ancestors()
+                    .skip(1)
+                    .find(check_syntax_item_node)
+                    .map(|n| build_syntax_occurrence_key(input, &n, &removed).0)
+            );
+        }
         if let Some(item) = ast::Impl::cast(node.clone()) {
             payload["impl_header_syntax_record"] =
                 impl_header_source_records::extract_impl_header_syntax(

@@ -42,12 +42,15 @@ fn test_item_signature_text_printed() {
             vec!["pub(crate) fn mulhi(x: u128, y: u128) -> u128"],
         ),
         (
-            "pub struct Buffer {\n    bytes: [MaybeUninit<u8>; 40],\n}",
-            vec!["pub struct Buffer"],
+            "pub struct Buffer {\n    bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN],\n}",
+            vec![
+                "pub struct Buffer",
+                "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN]",
+            ],
         ),
         (
             "struct DecimalPairs([u8; 200]);",
-            vec!["struct DecimalPairs"],
+            vec!["struct DecimalPairs", "[u8; 200]"],
         ),
         (
             "static DECIMAL_PAIRS: DecimalPairs = DecimalPairs(*b\"00\");",
@@ -152,4 +155,27 @@ fn test_item_visibility_text_read() {
         ],
         read
     );
+}
+
+/// REQ-RUST-071.0 F3: a field is its tokens without attributes; a variant is its name,
+/// without its fields and without `=` and a discriminant.
+#[test]
+fn test_field_signature_text_printed() {
+    let cases = [
+        (
+            "pub struct P { /// doc\n pub x: T, #[serde(skip)] pub(crate) y: &'static str }",
+            vec!["pub struct P", "pub x: T", "pub(crate) y: &'static str"],
+        ),
+        (
+            "enum E { A, B(u8), C { x: u8 } = 3, #[default] D }",
+            vec!["enum E", "A", "B", "u8", "C", "x: u8", "D"],
+        ),
+        (
+            "union U { a: u8, b: i8 }",
+            vec!["union U", "a: u8", "b: i8"],
+        ),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(expected, print_source_item_signatures(source), "{source}");
+    }
 }
