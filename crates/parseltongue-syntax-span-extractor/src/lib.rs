@@ -40,6 +40,8 @@ mod sysroot_member_declaration_records;
 pub use sysroot_member_declaration_records::extract_member_declaration_rows;
 #[path = "core-file-scope-name-records.rs"]
 mod core_file_scope_name_records;
+#[path = "core-macro-impl-member-records.rs"]
+mod core_macro_impl_member_records;
 #[path = "core-member-target-records.rs"]
 mod core_member_target_records;
 #[path = "type-relative-member-records.rs"]

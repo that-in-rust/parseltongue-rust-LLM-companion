@@ -10,7 +10,7 @@ mod core_file_scope_name_tests;
 
 const CORE_CRATE_ROOT_PATH: &str = "core/src/lib.rs";
 
-fn check_scope_binding_row(row: &Value) -> bool {
+pub(crate) fn check_scope_binding_row(row: &Value) -> bool {
     row["declaration_owner_kind_value"] == "file_scope_name_binding"
 }
 
@@ -25,7 +25,7 @@ fn list_named_scope_rows<'a>(rows: &'a [Value], file: &str, name: &str) -> Vec<&
         .collect()
 }
 
-fn list_row_attribute_texts(row: &Value) -> impl Iterator<Item = &str> {
+pub(crate) fn list_row_attribute_texts(row: &Value) -> impl Iterator<Item = &str> {
     row["member_attribute_text_values"]
         .as_array()
         .into_iter()
@@ -34,7 +34,7 @@ fn list_row_attribute_texts(row: &Value) -> impl Iterator<Item = &str> {
 }
 
 /// C10: a row used as a proof step has no attribute text that contains `cfg`.
-fn check_row_always_active(row: &Value) -> bool {
+pub(crate) fn check_row_always_active(row: &Value) -> bool {
     row["member_attribute_text_values"].is_array()
         && list_row_attribute_texts(row).all(|text| !text.contains("cfg"))
 }
@@ -71,7 +71,7 @@ fn find_root_file_module<'a>(rows: &'a [Value], name: &str) -> Option<&'a Value>
     }
 }
 
-fn build_row_site_value(row: &Value) -> Value {
+pub(crate) fn build_row_site_value(row: &Value) -> Value {
     json!({
         "declaration_source_relative_path":row["declaration_source_relative_path"],
         "member_name_start_offset":row["member_name_start_offset"],
