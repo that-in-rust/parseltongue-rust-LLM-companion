@@ -2365,6 +2365,8 @@ fn test_core_member_rows_published() {
     .map(|name| format!("{name}::ilog10"));
     assert_eq!(
         [
+            // REQ-RUST-073.0: `cast` on the result of `as_mut_ptr`.
+            "*mut T::cast",
             "Iterator::rev",
             "MaybeUninit<T>::write",
             "Result<T, E>::expect",
@@ -2382,7 +2384,7 @@ fn test_core_member_rows_published() {
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
     assert_eq!((153, 686), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((172, 686), (nodes.len(), edges));
+    assert_eq!((173, 686), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -6334,9 +6336,9 @@ fn test_itoa_core_member_targets() {
             .each_ref()
             .map(|label| count_stored_label(label))
     );
-    // Equal to their expected rows: 132 of 133. Without a stored target: 1, the `cast`.
+    // Equal to their expected rows: 133 of 133, `cast` included (REQ-RUST-073.0 A1).
     assert_eq!(
-        (132, [49, 39, 5, 13, 1, 1, 8, 5, 1]),
+        (133, [49, 39, 5, 13, 1, 1, 8, 5, 1, 1]),
         (
             stored.len(),
             [
@@ -6348,13 +6350,14 @@ fn test_itoa_core_member_targets() {
                 "[T]::as_mut_ptr",
                 "Result<T, E>::expect",
                 "Result<T, E>::unwrap",
-                "str::len"
+                "str::len",
+                "*mut T::cast"
             ]
             .map(count_stored_label)
         )
     );
     assert_eq!(
-        (172, 686, 197, 1),
+        (173, 686, 197, 0),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),
@@ -6405,7 +6408,7 @@ fn test_empty_home_graph_published() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(
-        (172, 686),
+        (173, 686),
         (
             read_published_stage_rows(&database, "item-effective-visibility-records").len(),
             read_published_stage_rows(&database, "edge-evidence-record-table").len()
@@ -6570,13 +6573,13 @@ fn test_itoa_rows_directory_independent() {
             .count();
         (equal, first.len(), second.len())
     };
-    // 172 node rows and 686 edge rows, each with one header line that holds the run id.
+    // 173 node rows and 686 edge rows, each with one header line that holds the run id.
     assert_eq!(
         (
             count_equal_lines(&first_nodes, &second_nodes),
             count_equal_lines(&first_edges, &second_edges)
         ),
-        ((173, 173, 173), (687, 687, 687))
+        ((174, 174, 174), (687, 687, 687))
     );
     let held = [&first_root, &second_root, &link_root]
         .iter()

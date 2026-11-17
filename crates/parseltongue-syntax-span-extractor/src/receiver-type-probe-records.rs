@@ -102,7 +102,8 @@ pub(crate) fn parse_written_type_shape(text: &str, parameters: &[String]) -> Wri
 /// REQ-RUST-062.0 C4: the shape of the return type `text` of a member of `core`.
 /// `generics` are the generic parameter names of the member and of its trait or impl:
 /// none of them names a type. A direct generic argument of the returned type that is one
-/// of `sized`, or `Self::NAME` with `NAME` one of them, is a type proven `Sized`.
+/// of `sized`, or `Self::NAME` with `NAME` one of them, is a type proven `Sized`; so is
+/// the pointee of a returned raw pointer or reference (REQ-RUST-073.0 P7).
 pub(crate) fn parse_return_type_shape(
     text: &str,
     sized: &[String],
@@ -129,20 +130,25 @@ pub(crate) fn parse_return_type_shape(
             .collect::<Vec<_>>(),
         _ => Vec::new(),
     };
-    let proven = |argument: &ast::GenericArg| {
-        let ast::GenericArg::TypeArg(found) = argument else {
-            return false;
-        };
-        let text = found
-            .syntax()
-            .text()
-            .to_string()
-            .split_whitespace()
-            .collect::<String>();
+    // A type written as one of `sized`, or as `Self::NAME` with `NAME` one of them.
+    let proven_text = |text: String| {
+        let text = text.split_whitespace().collect::<String>();
         sized
             .iter()
             .any(|name| text == *name || text == format!("Self::{name}"))
     };
+    let proven = |argument: &ast::GenericArg| {
+        matches!(argument, ast::GenericArg::TypeArg(found)
+            if proven_text(found.syntax().text().to_string()))
+    };
+    // REQ-RUST-073.0 P7: the pointee of a returned raw pointer or reference.
+    let pointee_proven = match &returned {
+        ast::Type::PtrType(found) => found.ty(),
+        ast::Type::RefType(found) => found.ty(),
+        _ => None,
+    }
+    .is_some_and(|pointee| proven_text(pointee.syntax().text().to_string()));
+    let sized_pointee = || Box::new(WrittenTypeShapeValue::SizedUnknown);
     match build_written_type_shape(&returned, generics, &mut BTreeSet::new()) {
         WrittenTypeShapeValue::Named { name, arguments } if arguments.len() == written.len() => {
             WrittenTypeShapeValue::Named {
@@ -158,6 +164,18 @@ pub(crate) fn parse_return_type_shape(
                         }
                     })
                     .collect(),
+            }
+        }
+        WrittenTypeShapeValue::Pointer { mutable, .. } if pointee_proven => {
+            WrittenTypeShapeValue::Pointer {
+                mutable,
+                inner: sized_pointee(),
+            }
+        }
+        WrittenTypeShapeValue::Reference { mutable, .. } if pointee_proven => {
+            WrittenTypeShapeValue::Reference {
+                mutable,
+                inner: sized_pointee(),
             }
         }
         shape => shape,
@@ -487,10 +505,61 @@ struct InherentMemberCandidateValue<'a> {
     member_presence_unproven_flag: bool,
 }
 
-fn build_inherent_member_candidate(
+/// REQ-RUST-073.0 P3, P6: `name` is the one trait the read source declares under that
+/// name, outside a function body, and it is the lang item `pointee_sized`, which every
+/// type meets. A second trait or any type of the name leaves it undecided.
+fn check_universal_lang_trait(name: &str, declarations: &[Value]) -> bool {
+    let named = declarations
+        .iter()
+        .filter(|row| {
+            matches!(
+                row["declaration_owner_kind_value"].as_str(),
+                Some("trait_name_declaration" | "type_name_declaration")
+            ) && row["member_declared_name_value"] == name
+        })
+        .collect::<Vec<_>>();
+    let [only] = named.as_slice() else {
+        return false;
+    };
+    only["declaration_owner_kind_value"] == "trait_name_declaration"
+        && only["owner_function_body_flag"] == false
+        && only["owner_attribute_text_values"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(|text| text.split_whitespace().collect::<String>())
+            .any(|text| text == "#[lang=\"pointee_sized\"]")
+}
+
+/// REQ-RUST-073.0 P4, P5: the impl of `row` has no where clause, and each bound on its
+/// type parameters is `?Sized` or restricts no type by P3.
+fn check_impl_bounds_discharged(row: &Value, declarations: &[Value]) -> bool {
+    let parameter = |name: &str| {
+        row["impl_generic_parameter_names"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|found| found == name)
+    };
+    row["impl_where_clause_flag"] == false
+        && row["impl_bound_text_values"]
+            .as_array()
+            .is_some_and(|bounds| {
+                bounds.iter().all(|bound| {
+                    bound.as_str().is_some_and(|text| {
+                        text == "?Sized"
+                            || (!parameter(text) && check_universal_lang_trait(text, declarations))
+                    })
+                })
+            })
+}
+
+fn build_inherent_member_candidate<'row>(
     index: usize,
-    row: &Value,
-) -> Option<InherentMemberCandidateValue<'_>> {
+    row: &'row Value,
+    declarations: &[Value],
+) -> Option<InherentMemberCandidateValue<'row>> {
     let kind = row["member_self_parameter_kind"]
         .as_str()
         .filter(|kind| *kind != "none")?;
@@ -514,7 +583,9 @@ fn build_inherent_member_candidate(
             row["impl_self_type_text"].as_str().unwrap_or(""),
             &parameters,
         ),
-        member_presence_unproven_flag: conditional || row["impl_bound_restriction_flag"] != false,
+        member_presence_unproven_flag: conditional
+            || (row["impl_bound_restriction_flag"] != false
+                && !check_impl_bounds_discharged(row, declarations)),
     })
 }
 
@@ -628,7 +699,7 @@ pub(crate) fn probe_core_member_declaration(
             row["declaration_owner_kind_value"] == "inherent_impl"
                 && row["member_declared_name_value"] == method_name
         })
-        .filter_map(|(index, row)| build_inherent_member_candidate(index, row))
+        .filter_map(|(index, row)| build_inherent_member_candidate(index, row, declarations))
         .collect::<Vec<_>>();
     let walked = list_receiver_probe_steps(receiver)
         .iter()

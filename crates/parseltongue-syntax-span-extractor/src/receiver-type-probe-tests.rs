@@ -398,3 +398,188 @@ fn test_return_type_sized_arguments() {
         parse_return_type_shape("Self", &[], &[])
     );
 }
+
+/// The probe of `m` on `W<u8>` in a file that declares `traits`, the struct `W` and one
+/// impl with the header `header`: the impl's self type when named, else the detail.
+fn probe_bound_fixture(traits: &str, header: &str) -> String {
+    let source = format!("{traits}\npub struct W<T>(T);\n{header} {{ pub fn m(&self) {{}} }}\n");
+    let rows = extract_member_declaration_rows("core/src/fixture.rs", &source);
+    match probe_core_member_declaration(&shape("W<u8>"), "m", &rows, &[], &[]) {
+        CoreMemberProbeOutcome::Named {
+            declaration_row_index,
+            ..
+        } => format!(
+            "named {}",
+            rows[declaration_row_index]["impl_self_type_text"]
+                .as_str()
+                .unwrap()
+        ),
+        CoreMemberProbeOutcome::Withheld(detail) => format!("withheld {detail}"),
+    }
+}
+
+/// REQ-RUST-073.0 P3 to P6: a bound on the one trait that is the lang item
+/// `pointee_sized` restricts no type; every other bound keeps the member unproven.
+#[test]
+fn test_pointee_sized_bound_rules() {
+    const LANG: &str = "#[lang = \"pointee_sized\"]\npub trait PointeeSized {}";
+    let lang_and = |more: &str| format!("{LANG}\n{more}");
+    let cases = [
+        // P3, P4: discharged.
+        (LANG.to_owned(), "impl<T: PointeeSized> W<T>", true),
+        (LANG.to_owned(), "impl<T: PointeeSized + ?Sized> W<T>", true),
+        (
+            LANG.to_owned(),
+            "impl<T: ?Sized, U: PointeeSized> W<T>",
+            true,
+        ),
+        // P5: another bound, alone or beside the lang bound; a where clause; a path.
+        (lang_and("pub trait Plain {}"), "impl<T: Plain> W<T>", false),
+        (
+            lang_and("pub trait Plain {}"),
+            "impl<T: PointeeSized + Plain> W<T>",
+            false,
+        ),
+        (
+            LANG.to_owned(),
+            "impl<T: PointeeSized> W<T> where T: PointeeSized",
+            false,
+        ),
+        (
+            LANG.to_owned(),
+            "impl<T: crate::marker::PointeeSized> W<T>",
+            false,
+        ),
+        (
+            LANG.to_owned(),
+            "impl<'a, T: PointeeSized + 'a> W<T>",
+            false,
+        ),
+        (
+            "#[lang = \"meta_sized\"]\npub trait MetaSized {}".to_owned(),
+            "impl<T: MetaSized> W<T>",
+            false,
+        ),
+        // P6: the name is declared twice, or is also a type.
+        (
+            lang_and("mod other { pub trait PointeeSized {} }"),
+            "impl<T: PointeeSized> W<T>",
+            false,
+        ),
+        (
+            lang_and("pub struct PointeeSized;"),
+            "impl<T: PointeeSized> W<T>",
+            false,
+        ),
+        (
+            lang_and("use other::Thing as PointeeSized;"),
+            "impl<T: PointeeSized> W<T>",
+            false,
+        ),
+        // P3: the name is a generic parameter of the impl; the attribute is absent.
+        (
+            LANG.to_owned(),
+            "impl<PointeeSized, T: PointeeSized> W<T>",
+            false,
+        ),
+        (
+            "pub trait PointeeSized {}".to_owned(),
+            "impl<T: PointeeSized> W<T>",
+            false,
+        ),
+    ];
+    let outcomes = cases
+        .iter()
+        .map(|(traits, header, _)| (*header, probe_bound_fixture(traits, header)))
+        .collect::<Vec<_>>();
+    let expected = cases
+        .iter()
+        .map(|(_, header, named)| {
+            let outcome = if *named {
+                "named W<T>"
+            } else {
+                "withheld inherent_member_unproven"
+            };
+            (*header, outcome.to_owned())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes, expected);
+}
+
+/// REQ-RUST-073.0 P7: a generic parameter proven `Sized` is a sized type behind a raw
+/// pointer or a reference of a return type too, so `cast` on the result of
+/// `[T]::as_mut_ptr` reaches the impl of `*mut T`.
+#[test]
+fn test_pointer_return_sized_pointee() {
+    use WrittenTypeShapeValue::{Pointer, Reference, SizedUnknown, Slice, Wildcard};
+    let names = |names: &[&str]| {
+        names
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let parse = |text: &str, sized: &[&str]| {
+        parse_return_type_shape(text, &names(sized), &names(&["T", "U", "Item"]))
+    };
+    let pointer = |mutable, inner| Pointer {
+        mutable,
+        inner: Box::new(inner),
+    };
+    let reference = |mutable, inner| Reference {
+        mutable,
+        inner: Box::new(inner),
+    };
+    assert_eq!(
+        [
+            parse("*mut T", &["T"]),
+            parse("*const T", &["T"]),
+            parse("&T", &["T"]),
+            parse("&mut Self::Item", &["Item"]),
+            // Not proven `Sized`, or not the pointee itself: unchanged.
+            parse("*mut U", &["T"]),
+            parse("*mut T", &[]),
+            parse("*const [T]", &["T"]),
+        ],
+        [
+            pointer(true, SizedUnknown),
+            pointer(false, SizedUnknown),
+            reference(false, SizedUnknown),
+            reference(true, SizedUnknown),
+            pointer(true, Wildcard),
+            pointer(true, Wildcard),
+            pointer(false, Slice(Box::new(Wildcard))),
+        ]
+    );
+    const SOURCE: &str = "#[lang = \"pointee_sized\"]\npub trait PointeeSized {}\n\
+        impl<T: PointeeSized> *const T { pub const fn cast<U>(self) -> *const U { loop {} } }\n\
+        impl<T: PointeeSized> *mut T { pub const fn cast<U>(self) -> *mut U { loop {} } }\n";
+    let rows = extract_member_declaration_rows("core/src/fixture.rs", SOURCE);
+    let probe = |receiver: &WrittenTypeShapeValue| match probe_core_member_declaration(
+        receiver,
+        "cast",
+        &rows,
+        &[],
+        &[],
+    ) {
+        CoreMemberProbeOutcome::Named {
+            declaration_row_index,
+            ..
+        } => rows[declaration_row_index]["impl_self_type_text"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+        CoreMemberProbeOutcome::Withheld(detail) => format!("withheld {detail}"),
+    };
+    assert_eq!(
+        [
+            probe(&parse("*mut T", &["T"])),
+            probe(&parse("*const T", &["T"])),
+            probe(&parse("*mut T", &[])),
+        ],
+        [
+            "*mut T".to_owned(),
+            "*const T".to_owned(),
+            "withheld inherent_member_unproven".to_owned(),
+        ]
+    );
+}

@@ -34,9 +34,15 @@ pub fn extract_member_declaration_rows(
                     rows
                 })
                 .unwrap_or_default(),
-            SyntaxKind::TRAIT => ast::Trait::cast(node)
-                .map(|owner| list_trait_member_rows(source_relative_path, &owner))
-                .unwrap_or_default(),
+            // REQ-RUST-073.0 P1: the trait's own row, then the rows of its members.
+            SyntaxKind::TRAIT => build_type_name_row(source_relative_path, &node)
+                .into_iter()
+                .chain(
+                    ast::Trait::cast(node)
+                        .map(|owner| list_trait_member_rows(source_relative_path, &owner))
+                        .unwrap_or_default(),
+                )
+                .collect(),
             SyntaxKind::MACRO_RULES | SyntaxKind::MACRO_DEF => {
                 let name = node
                     .children()
@@ -213,6 +219,10 @@ struct MemberOwnerSyntaxValue {
     generic_parameters: Option<String>,
     generic_names: Option<Vec<String>>,
     bound_restriction: Option<bool>,
+    /// REQ-RUST-073.0 P2, for an impl: each bound written on its type parameters, and
+    /// whether it has a where clause.
+    bound_texts: Option<Vec<String>>,
+    where_clause: Option<bool>,
     trait_path: Option<String>,
     attributes: Vec<String>,
     function_body: bool,
@@ -295,6 +305,8 @@ fn list_impl_member_rows(path: &str, owner: &ast::Impl) -> Vec<Value> {
             .map(|list| read_syntax_node_text(list.syntax())),
         generic_names: Some(list_generic_parameter_names(owner)),
         bound_restriction: Some(check_impl_bound_restriction(owner)),
+        bound_texts: Some(list_impl_bound_texts(owner)),
+        where_clause: Some(owner.where_clause().is_some()),
         trait_path,
         attributes: list_attribute_text_values(owner),
         function_body: check_function_body_ancestry(owner.syntax()),
@@ -382,6 +394,8 @@ fn list_trait_member_rows(path: &str, owner: &ast::Trait) -> Vec<Value> {
         generic_parameters: None,
         generic_names: None,
         bound_restriction: None,
+        bound_texts: None,
+        where_clause: None,
         trait_path: owner.name().map(|name| name.text().to_string()),
         attributes: list_attribute_text_values(owner),
         function_body: check_function_body_ancestry(owner.syntax()),
@@ -445,6 +459,8 @@ fn build_owned_function_row(
         "impl_generic_parameter_text":owner.generic_parameters,
         "impl_generic_parameter_names":owner.generic_names,
         "impl_bound_restriction_flag":owner.bound_restriction,
+        "impl_bound_text_values":owner.bound_texts,
+        "impl_where_clause_flag":owner.where_clause,
         "macro_self_parameter_flag":null,
         "macro_owner_shape_kind":null,
         "type_declaration_kind_value":null,
@@ -478,20 +494,29 @@ fn list_generic_parameter_names(owner: &ast::Impl) -> Vec<String> {
         .collect()
 }
 
+/// REQ-RUST-073.0 P2: the text of each bound written on a type parameter of the impl,
+/// in source order.
+fn list_impl_bound_texts(owner: &ast::Impl) -> Vec<String> {
+    owner
+        .generic_param_list()
+        .into_iter()
+        .flat_map(|list| list.type_or_const_params())
+        .filter_map(|parameter| match parameter {
+            ast::TypeOrConstParam::Type(found) => found.type_bound_list(),
+            ast::TypeOrConstParam::Const(_) => None,
+        })
+        .flat_map(|list| list.bounds())
+        .map(|bound| read_syntax_node_text(bound.syntax()).trim().to_owned())
+        .collect()
+}
+
 /// REQ-RUST-054.0 D6: whether the impl may not apply to every type its self type
 /// matches: a where clause, or a bound on a type parameter other than `?Sized`.
 fn check_impl_bound_restriction(owner: &ast::Impl) -> bool {
     owner.where_clause().is_some()
-        || owner
-            .generic_param_list()
-            .into_iter()
-            .flat_map(|list| list.type_or_const_params())
-            .filter_map(|parameter| match parameter {
-                ast::TypeOrConstParam::Type(found) => found.type_bound_list(),
-                ast::TypeOrConstParam::Const(_) => None,
-            })
-            .flat_map(|list| list.bounds())
-            .any(|bound| read_syntax_node_text(bound.syntax()).trim() != "?Sized")
+        || list_impl_bound_texts(owner)
+            .iter()
+            .any(|bound| bound != "?Sized")
 }
 
 fn check_token_tree_opener(node: &SyntaxNode, opener: SyntaxKind) -> bool {
@@ -647,6 +672,7 @@ fn list_macro_call_rows(path: &str, root: &SyntaxNode) -> Vec<Value> {
 /// either gives a second name to a type.
 fn build_type_name_row(path: &str, node: &SyntaxNode) -> Option<Value> {
     let kind = match node.kind() {
+        SyntaxKind::TRAIT => "trait",
         SyntaxKind::STRUCT => "struct",
         SyntaxKind::ENUM => "enum",
         SyntaxKind::UNION => "union",
@@ -680,7 +706,12 @@ fn build_type_name_row(path: &str, node: &SyntaxNode) -> Option<Value> {
         "member_name_end_offset":usize::from(range.end()),
         "member_declared_name_value":name.text().to_string(),
         "member_name_parameter_flag":false,
-        "declaration_owner_kind_value":"type_name_declaration",
+        // REQ-RUST-073.0 P1: a trait is not a type name; it has its own row kind.
+        "declaration_owner_kind_value":if kind == "trait" {
+            "trait_name_declaration"
+        } else {
+            "type_name_declaration"
+        },
         "impl_self_type_text":null,
         "impl_generic_parameter_text":null,
         "impl_generic_parameter_names":null,
@@ -694,7 +725,9 @@ fn build_type_name_row(path: &str, node: &SyntaxNode) -> Option<Value> {
         "member_self_parameter_text":null,
         "member_return_type_text":null,
         "member_attribute_text_values":[],
-        "owner_attribute_text_values":[],
+        "owner_attribute_text_values":ast::Trait::cast(node.clone())
+            .map(|owner| list_attribute_text_values(&owner))
+            .unwrap_or_default(),
         "owner_function_body_flag":check_function_body_ancestry(node),
     }))
 }

@@ -40,6 +40,8 @@ fn test_inherent_member_row_fields() {
             "impl_generic_parameter_text":"<T>",
             "impl_generic_parameter_names":["T"],
             "impl_bound_restriction_flag":false,
+            "impl_bound_text_values":[],
+            "impl_where_clause_flag":false,
             "macro_self_parameter_flag":null,
             "macro_owner_shape_kind":null,
             "type_declaration_kind_value":null,
@@ -78,7 +80,8 @@ fn test_inherent_member_row_fields() {
 fn test_trait_member_row_fields() {
     let source = "pub trait TryInto<T>: Sized {\n    type Error;\n    fn try_into(self) -> Result<T, Self::Error>;\n}\nimpl<T, U> TryInto<U> for T where U: TryFrom<T> {\n    fn try_into(self) -> Result<U, U::Error> { loop {} }\n}\nimpl<T> [T] { pub const fn len(&self) -> usize { 0 } }\nimpl<T: PointeeSized> *mut T { pub const fn cast<U>(self) -> *mut U { loop {} } }\n";
     let rows = list_member_declaration_rows("convert/mod.rs", source);
-    assert_eq!(4, rows.len(), "{rows:#?}");
+    // Four member rows and the row of the trait itself (REQ-RUST-073.0 P1).
+    assert_eq!(5, rows.len(), "{rows:#?}");
     let declared = find_member_row_named(&rows, "trait_declaration", "try_into");
     assert_eq!(json!("TryInto"), declared["owner_trait_path_text"]);
     assert_eq!(Value::Null, declared["impl_self_type_text"]);
@@ -173,8 +176,9 @@ fn test_member_rows_offset_order() {
         .iter()
         .map(|row| row["member_declared_name_value"].as_str().unwrap())
         .collect::<Vec<_>>();
+    // `B` is the row of the trait itself (REQ-RUST-073.0 P1).
     assert_eq!(
-        vec!["second_one", "first_one", "third_one", "fourth_one"],
+        vec!["second_one", "first_one", "B", "third_one", "fourth_one"],
         names
     );
     let offsets = rows
@@ -623,5 +627,71 @@ fn test_macro_impl_scope_rows() {
         ],
         body,
         "M3"
+    );
+}
+
+/// REQ-RUST-073.0 P1, P2: a trait has a row with its attributes, and a member row of an
+/// impl stores each bound on the impl's type parameters and whether it has a where clause.
+#[test]
+fn test_trait_and_bound_rows() {
+    let source = "#[lang = \"pointee_sized\"]\n#[rustc_deny_explicit_impl]\n\
+        pub trait PointeeSized {}\npub trait Plain { fn p(&self); }\n\
+        fn body() { trait Local {} }\n\
+        impl<T: PointeeSized> A<T> { fn a(&self) {} }\n\
+        impl<'x, T: ?Sized + Copy, U: Plain + 'x, const N: usize> B<T, U> { fn b(&self) {} }\n\
+        impl<T> C<T> where T: Copy { fn c(&self) {} }\n";
+    let rows = extract_member_declaration_rows("x.rs", source);
+    let traits = rows
+        .iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "trait_name_declaration")
+        .map(|row| {
+            let start = row["member_name_start_offset"].as_u64().unwrap() as usize;
+            let end = row["member_name_end_offset"].as_u64().unwrap() as usize;
+            assert_eq!(
+                json!(&source[start..end]),
+                row["member_declared_name_value"]
+            );
+            json!([
+                &source[start..end],
+                row["type_declaration_kind_value"],
+                row["owner_attribute_text_values"],
+                row["owner_function_body_flag"]
+            ])
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            json!([
+                "PointeeSized",
+                "trait",
+                ["#[lang = \"pointee_sized\"]", "#[rustc_deny_explicit_impl]"],
+                false
+            ]),
+            json!(["Plain", "trait", [], false]),
+            json!(["Local", "trait", [], true]),
+        ],
+        traits
+    );
+    let read = |owner: &str, name: &str| {
+        let row = find_member_row_named(&rows, owner, name);
+        json!([
+            row["impl_bound_text_values"],
+            row["impl_where_clause_flag"],
+            row["impl_bound_restriction_flag"]
+        ])
+    };
+    assert_eq!(
+        [
+            read("inherent_impl", "a"),
+            read("inherent_impl", "b"),
+            read("inherent_impl", "c"),
+            read("trait_declaration", "p"),
+        ],
+        [
+            json!([["PointeeSized"], false, true]),
+            json!([["?Sized", "Copy", "Plain", "'x"], false, true]),
+            json!([[], true, true]),
+            json!([null, null, null]),
+        ]
     );
 }
