@@ -13,8 +13,7 @@ higher-abstraction table.
 Built: source to resolved names, then one graph step that writes item nodes and eight edge
 kinds (`contains`, `calls`, `uses_type`, `reads`, `implements`, `imports`, `generates`,
 `expands`) and reads them back from a frozen generation. Not built: lowered signature types,
-type inference in bodies, a trait solver, and node visibility, reachability and signature
-text. A method call whose receiver type is declared in `core` is named from a syntax-only
+type inference in bodies and a trait solver. A method call whose receiver type is declared in `core` is named from a syntax-only
 read of `core` (scope `declarations`, part 8): 132 of 133 in the accepted run of
 2026-11-17; `cast` has no target. With `excluded` none of the 133 has one.
 
@@ -149,7 +148,7 @@ Levels 1 and 2 are the full graph, the deliverable. Levels 3–7 are the facts i
 ```text
 level  table                                  owner stage                        state
 1      edge-evidence-record-table             semantic-edge-evidence-stage       eight kinds
-2      item-effective-visibility-records      item-effective-visibility-stage    three fields empty
+2      item-effective-visibility-records      item-effective-visibility-stage    three fields filled
 3      impl-header-index-table                signature-type-lowering-stage      produced
        lowered-signature-type-table                                              no producer
        sysroot-member-declaration-records     sysroot-member-declaration-stage   part 8 only
@@ -164,8 +163,10 @@ level  table                                  owner stage                       
 7      span-reference-text-table              syntax-spans                       produced
 ```
 
-The three empty node fields are effective visibility, reachable outside crate, and signature
-text. `sysroot-member-declaration-records` is written only with scope `declarations`.
+The three node fields are effective visibility, reachable outside crate, and signature
+text. The syntax stage prints the signature and the declared visibility onto each span row;
+`resolve_node_visibility_fields` sets the effective visibility and the reachability in
+the checkpoint, after all edges are resolved (SPEC part 11). `sysroot-member-declaration-records` is written only with scope `declarations`.
 
 Supporting tables:
 
@@ -195,8 +196,10 @@ Nodes:
   that generated it.
 - **G2** Nothing inside a function body is a node. Body contents are evidence.
 - **G3** The crate root is a node.
-- **G4** Each node stores effective visibility: public, restricted, or private. Trait members and
-  trait-impl members take the trait's visibility; inherent members keep their own.
+- **G4** Each item node stores effective visibility: public, restricted, or private; a macro
+  call stores not applicable. Trait members and trait-impl members take the trait's
+  visibility; inherent members keep their own. The crate root, a file area, a name outside
+  the read source and a builtin type store none.
 - **G5** Reachable from outside the crate is a separate column.
 - **G6** Unknown visibility never silently means private.
 - **G7** One file-area node per source file, separate from the file's module node.
@@ -273,8 +276,6 @@ proven form                                       initializer is a method call n
 an impl with a bound on its type parameter        cast on `*mut T` with `T: PointeeSized`;
                                                   nothing stored proves the bound restricts
                                                   no type
-node visibility, reachability, signature (G4,     no producer; a trait-impl member's
-G5, E9)                                           visibility comes from its trait (E8)
 rows that depend on the source directory          file identity is the absolute path, and
                                                   the run id hashes those rows
 the run with the whole sysroot (C3)               stops with a store copy mismatch
