@@ -31,7 +31,7 @@
   },
   "relation_kind_counts": {
     "calls": 103,
-    "contains": 90,
+    "contains": 92,
     "derives": 0,
     "expands": 15,
     "generates": 45,
@@ -42,7 +42,7 @@
     "uses_type": 124
   },
   "requirement": "REQ-RUST-066.0",
-  "row_count": 475,
+  "row_count": 477,
   "rows": [
     {
       "evidence_key": "src/lib.rs:89:[2673, 2686]",
@@ -17455,6 +17455,45 @@
       "via_use_node": null
     },
     {
+      "evidence_key": "src/lib.rs:73:None",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "contains",
+      "site_exact_ranges": null,
+      "sites": [
+        {
+          "anchor": "",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 73
+          },
+          "line": 73,
+          "occurrence": 0,
+          "record": null,
+          "site_text": null,
+          "site_text_offset": 0
+        }
+      ],
+      "source": "Buffer",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "",
+          "byte_range": null,
+          "line": 73,
+          "range_status": "AMBIGUOUS_OR_EMPTY",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "AMBIGUOUS_OR_EMPTY",
+      "target": "Buffer::bytes",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
       "evidence_key": "src/lib.rs:86:[2597, 2618]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [
@@ -17618,7 +17657,7 @@
           "site_text_offset": 0
         }
       ],
-      "source": "Buffer",
+      "source": "Buffer::bytes",
       "source_evidence_sites": [
         {
           "anchor_text": "i128::MAX_STR_LEN",
@@ -17670,7 +17709,7 @@
           "site_text_offset": 0
         }
       ],
-      "source": "Buffer",
+      "source": "Buffer::bytes",
       "source_evidence_sites": [
         {
           "anchor_text": "MaybeUninit<u8>",
@@ -17720,7 +17759,7 @@
           "site_text_offset": 1
         }
       ],
-      "source": "Buffer",
+      "source": "Buffer::bytes",
       "source_evidence_sites": [
         {
           "anchor_text": "<u8>",
@@ -18535,6 +18574,45 @@
       "via_use_node": null
     },
     {
+      "evidence_key": "src/lib.rs:219:None",
+      "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
+      "flags": [],
+      "generated_by": null,
+      "relation": "contains",
+      "site_exact_ranges": null,
+      "sites": [
+        {
+          "anchor": "",
+          "file": "src/lib.rs",
+          "first_token": {
+            "kind": "definition",
+            "line": 219
+          },
+          "line": 219,
+          "occurrence": 0,
+          "record": null,
+          "site_text": null,
+          "site_text_offset": 0
+        }
+      ],
+      "source": "DecimalPairs",
+      "source_evidence_sites": [
+        {
+          "anchor_text": "",
+          "byte_range": null,
+          "line": 219,
+          "range_status": "AMBIGUOUS_OR_EMPTY",
+          "source_path": "src/lib.rs",
+          "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+        }
+      ],
+      "source_kind": "node",
+      "source_site_evidence_status": "AMBIGUOUS_OR_EMPTY",
+      "target": "DecimalPairs::0",
+      "target_kind": "node",
+      "via_use_node": null
+    },
+    {
       "evidence_key": "src/lib.rs:219:[7148, 7157]",
       "evidence_ref_kind": "SYMBOLIC_SOURCE_SITE_REF_NOT_CANONICAL",
       "flags": [],
@@ -18564,7 +18642,7 @@
           "site_text_offset": 1
         }
       ],
-      "source": "DecimalPairs",
+      "source": "DecimalPairs::0",
       "source_evidence_sites": [
         {
           "anchor_text": "[u8; 200]",

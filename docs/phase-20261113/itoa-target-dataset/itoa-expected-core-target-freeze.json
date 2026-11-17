@@ -19,7 +19,7 @@
     "listing_command": "cd <sysroot>/lib/rustlib/src/rust/library && find core/src -name '*.rs' | LC_ALL=C sort | xargs sha256sum | sha256sum",
     "listing_sha256": "39a4d53484c4df57cff47403663a190d610682430406f82458395e1b1ea40780"
   },
-  "expected_graph_edges_sha256": "16957e055311199cadff6107f84a55163fa3f52e37fbb17428f8238abe90464a",
+  "expected_graph_edges_sha256": "ac8259662d4d49f1e8de4ff3089cbe0a6a704225e2aeaab5e85453e417451a45",
   "frozen_file_sha256": {
     "itoa-expected-core-member-targets.json": "acf9a04a47c60a0f0dcfdd9e22e7ae9bd7999819dd5d8ed5466ae3e1dbda7b9c"
   },

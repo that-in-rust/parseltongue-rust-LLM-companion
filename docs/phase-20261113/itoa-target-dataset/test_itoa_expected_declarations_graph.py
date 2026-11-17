@@ -56,9 +56,9 @@ class ExpectedDeclarationsGraphTests(unittest.TestCase):
             BUILDER.merge_edge_rows(edges, targets + targets[:1])
 
     def test_merged_site_record_counts(self):
-        """M3, M4, M6: 684 sites; 132 merged by the owner kind of their row; the cast is not."""
+        """M3, M4, M6: 686 sites; 132 merged by the owner kind of their row; the cast is not."""
         sites = [(row, site) for row in self.edges for site in row["sites"]]
-        self.assertEqual(684, len(sites))
+        self.assertEqual(686, len(sites))
         records = collections.Counter(site["record"] for row, site in sites if "core_target" in row)
         self.assertEqual({"core_inherent_member": 118, "core_trait_declared_member": 14}, dict(records))
         open_rows = [row for row in self.edges if row["target_kind"] == "unresolved"]
@@ -70,9 +70,9 @@ class ExpectedDeclarationsGraphTests(unittest.TestCase):
                             for row in self.edges if row["site_exact_ranges"] is not None))
 
     def test_merged_label_node_rows(self):
-        """M5: 151 nodes of the expected graph and one core_declared_member node per merged label."""
+        """M5: 153 nodes of the expected graph and one core_declared_member node per merged label."""
         added = [node for node in self.nodes if node.get("external_name_kind") == "core_declared_member"]
-        self.assertEqual((170, 19), (len(self.nodes), len(added)))
+        self.assertEqual((172, 19), (len(self.nodes), len(added)))
         self.assertEqual({row["target"] for row in self.edges if "core_target" in row}, {node["label"] for node in added})
         self.assertNotIn("*mut T::cast", {node["label"] for node in self.nodes})
         self.assertTrue(all((node["node_category"], node["file"], node["item_kind"], node["owner_kind"])

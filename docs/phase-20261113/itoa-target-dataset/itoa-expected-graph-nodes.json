@@ -8,7 +8,7 @@
     "independent_compiler_oracle_verification": "NONE",
     "review": "AUTHOR_ONLY_NO_SECOND_REVIEWER"
   },
-  "row_count": 151,
+  "row_count": 153,
   "rows": [
     {
       "effective_visibility": null,
@@ -1494,6 +1494,40 @@
         "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
       },
       "start_line": 72
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 73,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "field",
+      "label": "Buffer::bytes",
+      "node_category": "local_item",
+      "node_exact_range": [
+        2381,
+        2424
+      ],
+      "owner": "Buffer",
+      "owner_kind": "struct",
+      "reachable_outside_crate": false,
+      "signature": "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN]",
+      "source_anchor": "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN]",
+      "source_evidence": {
+        "anchor_text": "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN]",
+        "byte_range": [
+          2381,
+          2424
+        ],
+        "line": 73,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 73
     },
     {
       "effective_visibility": "public",
@@ -3849,6 +3883,40 @@
         "byte_range": [
           7128,
           7159
+        ],
+        "line": 219,
+        "range_status": "EXACT_ANCHOR",
+        "source_path": "src/lib.rs",
+        "source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f"
+      },
+      "start_line": 219
+    },
+    {
+      "effective_visibility": "private",
+      "end_line": 219,
+      "file": "src/lib.rs",
+      "file_assignment_status": "SOURCE_FILE_CANDIDATE",
+      "flags": [],
+      "generated_by": null,
+      "generated_by_label": null,
+      "in_function_body": false,
+      "item_kind": "field",
+      "label": "DecimalPairs::0",
+      "node_category": "local_item",
+      "node_exact_range": [
+        7148,
+        7157
+      ],
+      "owner": "DecimalPairs",
+      "owner_kind": "struct",
+      "reachable_outside_crate": false,
+      "signature": "[u8; 200]",
+      "source_anchor": "[u8; 200]",
+      "source_evidence": {
+        "anchor_text": "[u8; 200]",
+        "byte_range": [
+          7148,
+          7157
         ],
         "line": 219,
         "range_status": "EXACT_ANCHOR",

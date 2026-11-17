@@ -123,6 +123,11 @@ node("private::Sealed::Buffer", "associated_type", "public", L, 130, 130, "type 
 node("private::Sealed::write", "associated_function", "public", L, 131, 131, "fn write(self, buf: &mut Self::Buffer) -> &str;", "private::Sealed")
 node("DecimalPairs", "struct", "private", L, 219, 219, "struct DecimalPairs([u8; 200]);", AL)
 node("DECIMAL_PAIRS", "static", "private", L, 222, 228, "static DECIMAL_PAIRS: DecimalPairs", AL)
+# REQ-RUST-071.0 N1, N2: a field is a node owned by its struct; a tuple field is named by its position. Its anchor
+# is the whole field, so its range is the anchor's.
+BYTES_FIELD, PAIRS_FIELD = "Buffer::bytes", "DecimalPairs::0"
+node(BYTES_FIELD, "field", "private", L, 73, 73, "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN]", "Buffer")
+node(PAIRS_FIELD, "field", "private", L, 219, 219, "[u8; 200]", "DecimalPairs")
 node("divmod100", "function", "private", L, 231, 237, "fn divmod100(value: u32)", AL)
 node("slice_buffer_to_str", "function", "private", L, 247, 253, "unsafe fn slice_buffer_to_str", AL)
 node("Unsigned", "trait", "private", L, 255, 257, "trait Unsigned: Integer", AL)
@@ -222,8 +227,9 @@ for i in impls:
         edge(i["self_type"], "implements", i["trait"], L, i["start_line"], "impl ", skind=BI, gen=i["generated_by"], flags=["builtin_source_never_seeds_interface_edge"])
 
 # ---------------- uses_type: signatures, fields, bounds, supertraits ----------------
-edge("Buffer", "uses_type", MU, L, 73, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT]); prim("Buffer", "u8", L, 73, "<⟦u8⟧>")
-edge("Buffer", "reads", mx("i128"), L, 73, "i128::MAX_STR_LEN", flags=[OD8])
+# REQ-RUST-071.0 E1: what a field writes is an edge from the field, not from its struct.
+edge(BYTES_FIELD, "uses_type", MU, L, 73, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT]); prim(BYTES_FIELD, "u8", L, 73, "<⟦u8⟧>")
+edge(BYTES_FIELD, "reads", mx("i128"), L, 73, "i128::MAX_STR_LEN", flags=[OD8])
 edge("<Buffer as Default>::default", "uses_type", "Buffer", L, 78, "-> ⟦Buffer⟧")
 edge("<Buffer as Clone>::clone", "uses_type", "Buffer", L, 88, "-> ⟦Self⟧", flags=["Self_resolved_to_impl_self_type"])
 edge("Buffer::new", "uses_type", "Buffer", L, 98, "-> ⟦Buffer⟧")
@@ -232,7 +238,7 @@ edge("Buffer::format", "uses_type", "private::Sealed::Buffer", L, 107, "cast::<�
 edge("Integer", "uses_type", "private::Sealed", L, 119, ": ⟦private::Sealed⟧"); prim("Integer::MAX_STR_LEN", "usize", L, 122, ": ⟦usize⟧")
 ext("private::Sealed", "uses_type", "Copy", L, 128, ": ⟦Copy⟧", flags=["via_prelude"])
 edge("private::Sealed::write", "uses_type", "private::Sealed::Buffer", L, 131, "Self::Buffer"); prim("private::Sealed::write", "str", L, 131, "-> &⟦str⟧")
-prim("DecimalPairs", "u8", L, 219, "[⟦u8⟧; 200]"); edge("DECIMAL_PAIRS", "uses_type", "DecimalPairs", L, 222, ": ⟦DecimalPairs⟧", flags=[OD8])
+prim(PAIRS_FIELD, "u8", L, 219, "[⟦u8⟧; 200]"); edge("DECIMAL_PAIRS", "uses_type", "DecimalPairs", L, 222, ": ⟦DecimalPairs⟧", flags=[OD8])
 edge("DECIMAL_PAIRS", "calls", "DecimalPairs", L, 222, "= DecimalPairs(", flags=["tuple_struct_constructor"], how="tuple_struct_constructor")
 prim("divmod100", "u32", L, 231, "u32", n=3)
 edge("slice_buffer_to_str", "uses_type", MU, L, 247, "MaybeUninit<u8>", dkind="external", via=USE_MEM, flags=[EXT])
@@ -526,6 +532,15 @@ def node_exact_range(f, a, b):
     offset = lambda line: sum(len(value) + 1 for value in raw[:line - 1])
     return [offset(a) + len(raw[a - 1]) - len(raw[a - 1].lstrip()), offset(b) + len(raw[b - 1].rstrip())]
 
+def field_exact_range(row):
+    """REQ-RUST-071.0 N1: a field written on one line with nothing above it is its anchor, which is the whole field."""
+    raw = RAW[row["file"]].split(b"\n")
+    line, anchor = raw[row["start_line"] - 1], row["source_anchor"].encode()
+    if row["start_line"] != row["end_line"] or line.count(anchor) != 1 or raw[row["start_line"] - 2].strip().startswith((b"//", b"#[")):
+        errors.append(f"{row['label']}: a field's range needs one anchor on one line with no comment or attribute above")
+    start = sum(len(value) + 1 for value in raw[:row["start_line"] - 1]) + line.index(anchor)
+    return [start, start + len(anchor)]
+
 # ---------------- signatures (REQ-RUST-069.0 S1, S2): the item's own tokens without attributes, comments, body,
 # field list, const or static value and final `;`, printed with the spacing of S2 ----------------
 WRITE_SIG, FMT_SIG = "fn write(self, buf: &mut Self::Buffer) -> &str", "fn fmt(self, buf: &mut Self::Buffer) -> usize"
@@ -544,6 +559,7 @@ SIGNATURES = {
     "private::Sealed::Buffer": "type Buffer: 'static",
     "private::Sealed::write": WRITE_SIG,
     "DecimalPairs": "struct DecimalPairs",
+    BYTES_FIELD: "bytes: [MaybeUninit<u8>; i128::MAX_STR_LEN]", PAIRS_FIELD: "[u8; 200]",
     "DECIMAL_PAIRS": "static DECIMAL_PAIRS: DecimalPairs",
     "divmod100": "fn divmod100(value: u32) -> (u32, u32)",
     "slice_buffer_to_str": "unsafe fn slice_buffer_to_str(buf: &[MaybeUninit<u8>], offset: usize) -> &str",
@@ -606,6 +622,7 @@ for row in nodes.values():
     candidate["source_evidence"] = source_evidence(row["file"], row["start_line"], row["source_anchor"])
     # A node written by a macro expansion has no range of its own in the file; it is placed by its generating call.
     candidate["node_exact_range"] = None if row["generated_by"] or candidate["node_category"] != "local_item" \
+        else field_exact_range(row) if row["item_kind"] == "field" \
         else node_exact_range(row["file"], row["start_line"], row["end_line"])
     candidate["file_assignment_status"] = "PROPOSED_UNVERIFIED_MACRO_OWNERSHIP" if row.get("generated_by") else "SOURCE_FILE_CANDIDATE"
     node_rows.append(candidate)
