@@ -68,6 +68,8 @@ pub use impl_header_implements_records::{
 };
 #[path = "external-named-target-records.rs"]
 mod external_named_target_records;
+#[path = "item-signature-text-printer.rs"]
+mod item_signature_text_printer;
 #[path = "signature-type-edge-records.rs"]
 mod signature_type_edge_records;
 #[path = "use-import-edge-records.rs"]
@@ -532,6 +534,7 @@ fn extract_macro_context_syntax(
             "span_byte_start_offset":start,"span_byte_end_offset":end,
             "span_content_digest_full":blake3::hash(&input.file_source_content_bytes[start..end]).to_hex().to_string(),
             "span_syntax_kind_value":format!("{:?}",node.kind()),"span_declared_name_value":name,"span_visibility_source_text":visibility,
+            "span_signature_source_text":item_signature_text_printer::print_item_signature_text(node),
             "span_source_code_text":&source[start..end],"span_configuration_active_flag":active,
             "site_unresolved_reason_kind":if active{Value::Null}else{json!("cfg_inactive")},
             "span_expansion_provenance_chain":input.file_expansion_provenance_chain
