@@ -11,7 +11,7 @@ use crate::syntax_namespace_record_codec::encode_symbol_target_value;
 use parseltongue_core_row_types::*;
 use serde_json::{Value, json};
 
-const CORE_FIXTURE_FILES: [(&str, &str); 4] = [
+const CORE_FIXTURE_FILES: [(&str, &str); 7] = [
     (
         "core/src/mem/maybe_uninit.rs",
         "pub union MaybeUninit<T> { value: T }\n\
@@ -29,13 +29,34 @@ const CORE_FIXTURE_FILES: [(&str, &str); 4] = [
     ),
     (
         "core/src/prelude/v1.rs",
-        "pub use crate::iter::ExactSizeIterator;\npub use crate::convert::TryInto;\n",
+        "pub use crate::iter::ExactSizeIterator;\npub use crate::convert::TryInto;\n\
+         pub use crate::result::Result::{self, Err, Ok};\n",
     ),
     (
         "core/src/convert/mod.rs",
         "pub trait TryInto<T>: Sized { type Error; fn try_into(self) -> Result<T, Self::Error>; }\n\
          impl<T, U> TryInto<U> for T { type Error = (); fn try_into(self) -> Result<U, ()> { loop {} } }\n\
-         pub trait Lone { fn lone_call(self); }\n",
+         pub trait Lone { fn lone_call(self); }\n\
+         pub trait Loose<T: ?Sized> { fn loose_call(self) -> Result<T, ()>; }\n",
+    ),
+    (
+        "core/src/result.rs",
+        "pub enum Result<T, E> { Ok(T), Err(E) }\n\
+         impl<T, E> Result<T, E> { pub fn expect(self, msg: &str) -> T { loop {} }\n\
+         pub fn unwrap(self) -> T { loop {} }\n\
+         pub fn shadowed(self) {} }\n",
+    ),
+    // REQ-RUST-062.0 C8: `core` gives the name `Result` to an alias as well.
+    (
+        "core/src/fmt/mod.rs",
+        "pub struct Error;\n\
+         pub type Result = crate::result::Result<(), Error>;\n\
+         impl Result { pub fn shadowed(self) {} }\n",
+    ),
+    (
+        "core/src/lib.rs",
+        "#[prelude_import]\nuse prelude::rust_2024::*;\n\
+         pub mod prelude; pub mod result; pub mod fmt; pub mod convert;\n",
     ),
 ];
 
@@ -62,6 +83,22 @@ fn read_core_fixture_rows(
     stray: &str,
     impls: bool,
 ) -> (HldEdgeInputRecord, Value) {
+    let edges = list_core_fixture_edges(source, no_std, core_name, stray, impls);
+    let [edge] = edges.as_slice() else {
+        panic!("one call expected, found {}", edges.len());
+    };
+    edge.clone()
+}
+
+/// `read_core_fixture_rows` for a source with any number of calls: every call edge with
+/// its dispatch metadata, in stored order.
+fn list_core_fixture_edges(
+    source: &str,
+    no_std: bool,
+    core_name: bool,
+    stray: &str,
+    impls: bool,
+) -> Vec<(HldEdgeInputRecord, Value)> {
     let (store, input) = make_call_fixture_graph(source);
     let unit = encode_compilation_unit_value(&make_call_fixture_unit());
     let path_row = |text: &str, start: usize, outcome: Value| {
@@ -263,12 +300,14 @@ fn read_core_fixture_rows(
         &RunCancelFlagValue::default(),
     )
     .unwrap();
-    let [edge] = edges.as_slice() else {
-        panic!("one call expected, found {}", edges.len());
-    };
-    let metadata: Value =
-        serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
-    (edge.clone(), metadata)
+    edges
+        .into_iter()
+        .map(|edge| {
+            let metadata: Value =
+                serde_json::from_str(edge.edge_dispatch_metadata_text.as_deref().unwrap()).unwrap();
+            (edge, metadata)
+        })
+        .collect()
 }
 
 fn read_fixture_table_values(store: &OriginalCallFixtureStore, table: &str) -> Vec<Value> {
@@ -760,5 +799,143 @@ fn test_self_field_receiver_member() {
     unnamed(
         "struct Buffer { bytes: [MaybeUninit<u8>; 4] } \
          trait Reader { fn f(&self, i: usize) { self.bytes.get_unchecked(i); } }",
+    );
+}
+
+/// REQ-RUST-062.0 C1, C2, C6: a receiver that is a method call named by a declaration of
+/// `core` has the type that declaration returns; the lookup record cites the inner call.
+#[test]
+fn test_call_result_receiver_member() {
+    // The edge of the call of `method` in `source`, which may hold other calls.
+    let find = |source: &str, method: &str| {
+        list_core_fixture_edges(source, true, true, "", false)
+            .into_iter()
+            .find(|(_, metadata)| metadata["callee_source_text"] == method)
+            .unwrap()
+    };
+    let (edge, metadata) = find(
+        "struct Buffer; fn f(i: usize) { 999.try_into().expect(\"x\"); }",
+        "expect",
+    );
+    assert_eq!(
+        make_core_member_target("Result<T, E>::expect"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+    assert_eq!("core_inherent_member", metadata["dispatch_kind"]);
+    let lookup = &metadata["core_member_lookup_evidence"];
+    let inner = &lookup["receiver_inner_call_lookup"];
+    assert_eq!(
+        json!([
+            "call_result_declared_type",
+            "TryInto::try_into",
+            "Result<T, Self::Error>",
+            "Result<_, _>",
+            "step 0 by value",
+            "core/src/result.rs",
+            ["source_compiles_method_resolves"]
+        ]),
+        json!([
+            lookup["receiver_type_proof_kind"],
+            lookup["receiver_inner_call_target_label"],
+            lookup["receiver_return_type_text"],
+            lookup["receiver_type_text"],
+            lookup["method_probe_step_text"],
+            lookup["declaration_source_relative_path"],
+            lookup["lookup_assumption_values"]
+        ])
+    );
+    // The inner call's own lookup record: where `try_into` is declared.
+    let declared = CORE_FIXTURE_FILES[3].1;
+    assert_eq!(
+        json!(["core/src/convert/mod.rs", declared.find("try_into")]),
+        json!([
+            inner["declaration_source_relative_path"],
+            inner["member_name_start_offset"]
+        ])
+    );
+    let (start, end) = (
+        lookup["member_name_start_offset"].as_u64().unwrap() as usize,
+        lookup["member_name_end_offset"].as_u64().unwrap() as usize,
+    );
+    assert_eq!("expect", &CORE_FIXTURE_FILES[4].1[start..end]);
+    // C13: which `Result` the return type of `try_into` names, and what proves it.
+    let leaf = CORE_FIXTURE_FILES[2].1.find("self").unwrap();
+    assert_eq!(
+        json!([{
+            "type_name_value":"Result",
+            "name_written_source_path":"core/src/convert/mod.rs",
+            "type_name_proof_kind":"prelude_import",
+            "type_declaration_site_value":{
+                "declaration_source_relative_path":"core/src/result.rs",
+                "member_name_start_offset":9,
+                "member_name_end_offset":15
+            },
+            "prelude_import_site_value":{
+                "declaration_source_relative_path":"core/src/lib.rs",
+                "member_name_start_offset":42,
+                "member_name_end_offset":43
+            },
+            "prelude_leaf_site_value":{
+                "declaration_source_relative_path":"core/src/prelude/v1.rs",
+                "member_name_start_offset":leaf,
+                "member_name_end_offset":leaf + 4
+            },
+            "prelude_leaf_path_text":"crate::result::Result"
+        }]),
+        lookup["receiver_type_name_proofs"]
+    );
+
+    // Through parentheses.
+    let (edge, metadata) = find(
+        "struct Buffer; fn f(i: usize) { (999.try_into()).unwrap(); }",
+        "unwrap",
+    );
+    assert_eq!(
+        make_core_member_target("Result<T, E>::unwrap"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+
+    let unnamed = |source: &str, method: &str, detail: &str| {
+        let (edge, metadata) = find(source, method);
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+        assert_eq!(detail, metadata["unresolved_detail_kind"], "{metadata}");
+    };
+    // The inner call is not named: its trait is not in scope.
+    unnamed(
+        "struct Buffer; fn f(i: usize) { 999.lone_call().expect(\"x\"); }",
+        "expect",
+        "receiver_type_not_determined",
+    );
+    // The inner call is named, and its declaration writes no return type.
+    unnamed(
+        "struct Buffer; use core::convert::Lone; fn f(i: usize) { 999.lone_call().expect(\"x\"); }",
+        "expect",
+        "receiver_type_not_determined",
+    );
+    // `?Sized` is written for the trait's parameter: it is not proven `Sized`.
+    unnamed(
+        "struct Buffer; use core::convert::Loose; fn f(i: usize) { 999.loose_call().expect(\"x\"); }",
+        "expect",
+        "inherent_member_unproven",
+    );
+    // C12: an impl in the file of the alias declares `shadowed` on its own `Result`.
+    unnamed(
+        "struct Buffer; fn f(i: usize) { 999.try_into().shadowed(); }",
+        "shadowed",
+        "receiver_type_name_unproven",
+    );
+    // `expect` returns a bare `T`: a type the model does not read.
+    unnamed(
+        "struct Buffer; fn f(i: usize) { 999.try_into().expect(\"x\").first(); }",
+        "first",
+        "inherent_member_unproven",
     );
 }

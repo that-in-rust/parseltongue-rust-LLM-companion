@@ -2306,6 +2306,8 @@ fn test_core_member_rows_published() {
         std::collections::BTreeSet::from([
             "Iterator::rev",
             "MaybeUninit<T>::write",
+            "Result<T, E>::expect",
+            "Result<T, E>::unwrap",
             "TryInto::try_into",
             "[T]::as_mut_ptr",
             "[T]::get_unchecked",
@@ -2315,7 +2317,7 @@ fn test_core_member_rows_published() {
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
     assert_eq!((151, 682), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((157, 682), (nodes.len(), edges));
+    assert_eq!((159, 682), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -6189,9 +6191,9 @@ fn test_itoa_core_member_targets() {
         .collect::<CoreTargetAssumptionSet>(),
         proof_assumptions
     );
-    // Equal to their expected rows: 108 of 133. Without a stored target: 25.
+    // Equal to their expected rows: 121 of 133. Without a stored target: 12.
     assert_eq!(
-        (108, [49, 39, 5, 13, 1, 1]),
+        (121, [49, 39, 5, 13, 1, 1, 8, 5]),
         (
             stored.len(),
             [
@@ -6200,13 +6202,15 @@ fn test_itoa_core_member_targets() {
                 "[T]::len",
                 "TryInto::try_into",
                 "Iterator::rev",
-                "[T]::as_mut_ptr"
+                "[T]::as_mut_ptr",
+                "Result<T, E>::expect",
+                "Result<T, E>::unwrap"
             ]
             .map(count_stored_label)
         )
     );
     assert_eq!(
-        (157, 682, 197, 25),
+        (159, 682, 197, 12),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),
