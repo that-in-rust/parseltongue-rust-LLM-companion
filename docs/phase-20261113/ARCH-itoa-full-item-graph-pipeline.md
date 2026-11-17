@@ -14,8 +14,9 @@ Built: source to resolved names, then one graph step that writes item nodes and 
 kinds (`contains`, `calls`, `uses_type`, `reads`, `implements`, `imports`, `generates`,
 `expands`) and reads them back from a frozen generation. Not built: lowered signature types,
 type inference in bodies, a trait solver, and node visibility, reachability and signature
-text. A method call whose receiver type is declared in `core` has no target; part 8 is
-adding one from a syntax-only read of `core` and is in no accepted run.
+text. A method call whose receiver type is declared in `core` has no target in the accepted
+run. Part 8 names most of them from a syntax-only read of `core` (scope `declarations`); the
+count is on the log's "Where we are" page, and no run with that scope is accepted.
 
 ```text
 source files
@@ -64,9 +65,18 @@ step  function (crate)                                          writes
   `declarations` add no sysroot crate. The accepted run passed `excluded`; the next one
   passes `declarations` (PRD, decided 2026-11-16).
 - Step 6a runs only with `declarations`. It reads the `.rs` files under
-  `<sysroot>/lib/rustlib/src/rust/library/core/src` and stores one row per method `core`
-  declares. Those files are an input of the run: the SOP freezes them by digest. The run id
-  does not cover them yet (it hashes the compiler version).
+  `<sysroot>/lib/rustlib/src/rust/library/core/src` by syntax
+  (`extract_member_declaration_rows`) and stores five kinds of row: a member of a trait or
+  impl (with its return type text, generic names and relaxed bounds), a type name
+  declaration, a `use` leaf of a prelude file, the name tokens of a macro call, and a name
+  a file binds at file level (`file_scope_name_binding`: item, module, extern crate, `use`
+  leaf, glob, or a form whose names are not read). Those files are an input of the run: the
+  SOP freezes them by digest. The run id does not cover them yet (it hashes the compiler
+  version).
+- A receiver that is itself a method call into `core` takes the return type that
+  declaration writes. A type name in it that `core` declares more than once (`Result`) is
+  read only when the file's own scope and the prelude import prove which declaration it is
+  (`find_file_scope_type`); the proof is stored on the edge row.
 - A method call into `core` is named by the impl's self type as `core` writes it
   (`[T]::len`). When a prelude trait declares the same name and cannot be ruled out, the
   target is stored with that assumption on the row, never without it.
@@ -91,8 +101,9 @@ Three facts in the code that shape the remaining work:
   paths are stored as text in `body-site-reference-table`; only step 7 reads them.
 - **C2** Header paths are resolved. Full signature types (parameters, returns, bounds) are not
   lowered into rows: `lowered-signature-type-table` has no writer. Resolvers work from
-  resolved path lookups; part 8 adds the written type text of a parameter. So a receiver is
-  typed only in the shapes a resolver handles.
+  resolved path lookups; part 8 adds the written type text of a parameter, of `self`, of a
+  static, of a field, and of the return type of a `core` method. So a receiver is typed only
+  in the shapes a resolver handles.
 - **C3** itoa with the sysroot did not finish step 5 in 2,400 s (2026-11-13); on 2026-11-16
   the same run stopped after 171 s with a store copy mismatch. Acceptance runs exclude it.
 
@@ -209,10 +220,14 @@ The build order of the PRD is done up to the whole-graph comparison, which passe
 what                                              why it is hard
 targets for method calls into core (part 8)       needs the receiver's type and core's
                                                   declarations; no lowered types (C2), no
-                                                  trait solver
-return type of a core method (part 8 step 8.4)    try_into, expect, unwrap chain on a result
-methods written by a macro in core (step 8.5)     ilog10; the syntax scan sees text, not a
+                                                  trait solver. Built for most shapes.
+methods written by a macro in core                ilog10; the syntax scan sees text, not a
                                                   member
+a receiver that is a local variable               string.len(); the type of a `let` binding
+                                                  is not read
+an impl with a bound on its type parameter        cast on `*mut T` with `T: PointeeSized`;
+                                                  nothing stored proves the bound restricts
+                                                  no type
 node visibility, reachability, signature (G4,     no producer; a trait-impl member's
 G5, E9)                                           visibility comes from its trait (E8)
 rows that depend on the source directory          file identity is the absolute path, and

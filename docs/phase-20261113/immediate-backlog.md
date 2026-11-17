@@ -134,12 +134,13 @@ IO Error: Extension "/home/ubuntu/.duckdb/extensions/v2.0.0/linux_amd64/json.duc
 
 - The run passed after the file was downloaded from `extensions.duckdb.org` into that
   directory (51,158,462 bytes, sha256 `dd65944f...6bf57d1`).
-- The PRD says the graph projection "loads the bundled `json` extension". On this build it
-  is not bundled: the code runs `LOAD json`, and DuckDB looks in the home directory.
+- The PRD said the graph projection "loads the bundled `json` extension". On this build it
+  is not bundled: the code runs `LOAD json`, and DuckDB looks in the home directory. The
+  PRD line now says so (corrected 2026-11-17); the defect itself is open.
 - So production reads a file that is neither the pinned source nor the `core` source, and
   SOP S1 does not freeze it.
 - Not checked: how the file came to be on the machine of the accepted run, and whether the
   S2 audit of that run listed the read.
 
 **Open before any code:** build the extension into the executable, or freeze the file by
-digest in S1. Either way the PRD line is corrected.
+digest in S1.

@@ -222,14 +222,20 @@ expected row.
 No run with `declarations` has been judged. Before one is:
 
 ```text
-needed                                                        state on 2026-11-16
+needed                                                        state on 2026-11-17
 expected target of each of the 133 calls, from source          frozen, one author:
                                                                itoa-expected-core-member-targets.json
+the run names every call the expected rows name                not done: 121 of 133 at the
+                                                               head, each equal, 0 wrong (log)
 expected graph re-frozen with those targets                    not done
-S1 record of the compiler version and the core digest          no command writes it yet
+S1 record of the compiler version and the core digest          the command is in S1; the frozen
+                                                               targets file records both values
 the run id covers the core files                               not built: it hashes the
                                                                compiler version only
 S2 audit accepts reads under the core source directory only    not checked on a run
+S2 audit of the DuckDB `json` extension file                   open: the run loads it from
+                                                               ~/.duckdb/extensions, outside
+                                                               the frozen inputs
 ```
 
 A row is in the expected graph before the code that produces it is written (Rule 1). A

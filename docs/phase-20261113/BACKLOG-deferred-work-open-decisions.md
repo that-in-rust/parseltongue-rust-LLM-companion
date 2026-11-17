@@ -1,6 +1,6 @@
 # BACKLOG — deferred work and open decisions
 
-Updated 2026-11-16.
+Updated 2026-11-17.
 
 ## The answer
 
@@ -45,8 +45,12 @@ that reads the graph":
 
 - **Method calls into `core` (decided 2026-11-16):** the run reads the declarations of
   `core` as a frozen input; the label is the type as `core` writes it (`[T]::len`); a call
-  a prelude trait could also answer is named with that assumption stored on the row. The
-  frozen graph still has those 133 calls without a target; the re-freeze is part 8.
+  a prelude trait could also answer is named with that assumption stored on the row. A
+  trait method is named by its trait (`TryInto::try_into`). A receiver that is a method
+  call takes the return type `core` declares, and a type name in it is read only when the
+  file's scope proves which declaration it is (2026-11-17). The frozen graph still has
+  those 133 calls without a target; their expected targets are frozen in a separate file,
+  and the re-freeze of the graph is part 8.
 - **OD-8 (decided 2026-11-16, built in part 5d steps 10a and 10c):** `reads` and
   `uses_type` start at any item a path is written in, not only a function.
 - **Disagreement with the expected graph:** show the source lines, the user rules, and the

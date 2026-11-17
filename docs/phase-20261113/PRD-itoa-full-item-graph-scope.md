@@ -12,7 +12,7 @@ Out of scope for this phase: every other repository, any rust-analyzer export or
 comparison, and every higher-abstraction table (interface level, HLD, file and folder
 roll-ups). Those are later queries over this graph, not part of it.
 
-Status on 2026-11-16: **the acceptance run passed all four SOP steps on one frozen
+Status on 2026-11-17: **the acceptance run passed all four SOP steps on one frozen
 executable (commit `822da80cf`). The graph is marked incomplete: 133 method calls into
 `core` have no target. Part 8 has changed production since, so that PASS does not cover the
 branch head; the head's state is on the [log](LOG-itoa-full-item-graph-progress.md)'s
@@ -138,7 +138,8 @@ done  Buffer::format --calls--> core::hint::unreachable_unchecked   the use node
 done  use nodes of lib.rs --imports--> core::hint, core::mem, core::mem::MaybeUninit, core::str
 done  file-area nodes --contains--> their top-level nodes
 done  whole library equal to the frozen expected graph (A1–A6), at `822da80cf`
-next  part 8: a target for the 133 method calls into `core`; needs a new freeze and a new run
+next  part 8: a target for the 133 method calls into `core` (most are named at the head, see
+      the log); needs a new freeze and a new run
 ```
 
 Method: expected rows live only in the test; fix the earliest missing producer; add only
@@ -152,8 +153,11 @@ general behaviour, nothing keyed on itoa names.
 - Turso `=0.9.0-pre.5`, concurrent writes. A busy publication is tried up to 6 times, waiting
   10, 20, 40, 80, then 160 ms.
 - DuckDB `=1.20000.1`, bundled, run-local temp directory. No extension is installed or
-  auto-loaded. The graph projection loads the bundled `json` extension and then turns
-  external access off; name resolution opens with external access off.
+  auto-loaded. The graph projection runs `LOAD json` and then turns external access off;
+  name resolution opens with external access off. Measured 2026-11-16 on a fresh VM: the
+  `json` extension is not inside the build. DuckDB reads it from
+  `~/.duckdb/extensions/v2.0.0/linux_amd64/`, and the run fails when that file is absent.
+  It is a file outside the frozen inputs (immediate backlog, entry 6).
 
 ### Decisions in force
 
@@ -205,6 +209,15 @@ general behaviour, nothing keyed on itoa names.
     expected graph. Without it the target is not stored.
   - **The expected target of every such call is written from source first**, then frozen,
     then the code is built to equal it.
+  - **A trait method is named by the trait** (2026-11-16): `TryInto::try_into`,
+    `Iterator::rev`. The row says `trait_declaration_impl_not_named`: it names the
+    declaration, not the impl that runs.
+  - **A receiver that is a method call takes the return type `core` declares**
+    (2026-11-17, REQ-RUST-062.0). `999.try_into().expect(..)` is named
+    `Result<T, E>::expect` from `Result<T, Self::Error>`. A type name `core` declares more
+    than once is read only when the scope of the file that writes it proves which
+    declaration it is: an item of that file, or the prelude import. The proof (files and
+    offsets of each step) is stored on the row. Without it the call keeps no target.
   - **A call by a written path (2026-11-16).** The row says `external_written_path` as how
     its target was chosen, so an agent can tell it from a call to a node of read source.
     `MaybeUninit::<u8>::uninit` targets `core::mem::MaybeUninit::uninit`: the written path
@@ -353,9 +366,12 @@ general behaviour, nothing keyed on itoa names.
     `core` source and names a method call when the receiver's written type and the
     declaration are both proven
     ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)). The rules are
-    decided ("Method calls into `core`" above). Not done: the expected targets of the 133
-    calls, the digest of the `core` files in S1 and in the run id, and the code for most
-    of the calls.
+    decided ("Method calls into `core`" above). Done: the expected targets of the 133
+    calls are written from source and frozen; the S1 command for the digest of the `core`
+    files exists; the code names most of the calls, each equal to its frozen row (counts
+    on the log's "Where we are" page). Not done: `ilog10` (written by a macro in `core`),
+    `len` on a local variable and `cast`; the `core` digest in the run id; the merge of
+    the targets into the expected graph and its new freeze; an acceptance run.
 - **Node fields.** Visibility, reachability outside the crate and signature text are not
   filled on any node, and the whole-graph test does not compare them.
 - **Rows depend on the source directory.** Two copies of the pinned source in different
