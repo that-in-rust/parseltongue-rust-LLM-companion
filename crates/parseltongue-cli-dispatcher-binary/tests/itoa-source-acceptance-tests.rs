@@ -6385,3 +6385,71 @@ fn test_empty_home_graph_published() {
         "the run wrote into HOME"
     );
 }
+
+/// REQ-RUST-070.0 A1 to A4: the crate root contains the file area of the root file, with
+/// the whole file as its site; `u128_ext` contains the file area of `src/u128_ext.rs`,
+/// with `mod u128_ext;` as its site; the inline module `private` has no such row; and
+/// each file area is the target of exactly one `contains` row.
+#[test]
+fn test_module_file_area_rows() {
+    let (_directory, root, _database, input) = run_original_graph_fixture();
+    let node = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .unwrap()
+    };
+    let source = fs::read(root.join("src/lib.rs")).unwrap();
+    let rows = input
+        .input_edge_records
+        .iter()
+        .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Contains)
+        .filter_map(|edge| match &edge.edge_resolution_value {
+            HldEdgeResolutionValue::Extracted { target }
+                if node(target).node_input_category == HldNodeInputCategory::FilePublicArea =>
+            {
+                let site = edge
+                    .edge_evidence_row_key
+                    .evidence_site_occurrence_key
+                    .read_semantic_occurrence_parts();
+                let (start, end) = site.span_byte_range_value.read_source_range_pair();
+                assert_eq!(
+                    blake3::hash(&source[start as usize..end as usize]).as_bytes(),
+                    site.span_content_digest_full.read_full_digest_bytes()
+                );
+                Some((
+                    derive_expected_graph_label(node(&edge.edge_source_reference)),
+                    derive_expected_graph_label(node(target)),
+                    site.span_source_file_path.to_string(),
+                    String::from_utf8_lossy(&source[start as usize..end as usize]).into_owned(),
+                ))
+            }
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    let whole = String::from_utf8(source.clone()).unwrap();
+    let expected = [
+        ("itoa", "area:src/lib.rs", whole.as_str()),
+        ("u128_ext", "area:src/u128_ext.rs", "mod u128_ext;"),
+    ]
+    .into_iter()
+    .map(|(module, area, text)| {
+        (
+            module.to_string(),
+            area.to_string(),
+            "src/lib.rs".to_string(),
+            text.to_string(),
+        )
+    })
+    .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(expected, rows);
+    assert_eq!(
+        2,
+        input
+            .input_node_records
+            .iter()
+            .filter(|node| node.node_input_category == HldNodeInputCategory::FilePublicArea)
+            .count()
+    );
+}
