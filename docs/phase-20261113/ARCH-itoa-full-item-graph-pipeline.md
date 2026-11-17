@@ -14,16 +14,16 @@ Built: source to resolved names, then one graph step that writes item nodes and 
 kinds (`contains`, `calls`, `uses_type`, `reads`, `implements`, `imports`, `generates`,
 `expands`) and reads them back from a frozen generation. Not built: lowered signature types,
 type inference in bodies, a trait solver, and node visibility, reachability and signature
-text. A method call whose receiver type is declared in `core` has no target in the accepted
-run. Part 8 names most of them from a syntax-only read of `core` (scope `declarations`); the
-count is on the log's "Where we are" page, and no run with that scope is accepted.
+text. A method call whose receiver type is declared in `core` is named from a syntax-only
+read of `core` (scope `declarations`, part 8): 132 of 133 in the accepted run of
+2026-11-17; `cast` has no target. With `excluded` none of the 133 has one.
 
 ```text
 source files
   -> Rust    crate graph, ingest, one parse per file                  built
   -> DuckDB  name resolution rounds  <->  Rust item-macro expander    built
   -> Rust    impl headers                                             built
-  -> Rust    method declarations of core (scope `declarations`)       built; no accepted run
+  -> Rust    method declarations of core (scope `declarations`)       built
   -> DuckDB  item nodes, contains, generates, expands                 built
   -> Rust    calls, uses_type, implements, reads, imports             built
   -> Turso   frozen full graph, read back and compared                built: marked incomplete
@@ -62,8 +62,8 @@ step  function (crate)                                          writes
 
 - Step 4 runs when a file mentions `std`, `core`, `alloc`, `Clone` and similar, and
   `--sysroot-source-scope-kind` is `included` (the default). itoa triggers it. `excluded` and
-  `declarations` add no sysroot crate. The accepted run passed `excluded`; the next one
-  passes `declarations` (PRD, decided 2026-11-16).
+  `declarations` add no sysroot crate. The accepted run of 2026-11-17 passes
+  `declarations` (PRD, decided 2026-11-16); the one of 2026-11-16 passed `excluded`.
 - Step 6a runs only with `declarations`. It reads the `.rs` files under
   `<sysroot>/lib/rustlib/src/rust/library/core/src` by syntax
   (`extract_member_declaration_rows`) and stores seven kinds of row: a member of a trait or
@@ -223,7 +223,7 @@ Decided since (PRD, "Decisions in force"):
 ## 4 — What remains
 
 The build order of the PRD is done up to the whole-graph comparison, which passed at
-`822da80cf`. What the pipeline still lacks:
+`822da80cf` (scope `excluded`) and at `753665eb9` (scope `declarations`). What the pipeline still lacks:
 
 ```text
 what                                              why it is hard

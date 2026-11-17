@@ -12,26 +12,32 @@ every run.**
   comparison, and every higher-abstraction table (interface level, file and folder roll-ups).
 - Passing unit tests, a bounded checkpoint or a planned command are not a PASS.
 
-Status on 2026-11-16: **all four steps passed on one frozen executable, built from commit
-`822da80cf`** (run report in [the log](LOG-itoa-full-item-graph-progress.md)). Production
-has changed since (SPEC part 8), so these results do not cover the branch head. No step has
-been run on it.
+Status on 2026-11-17: **all four steps passed on one frozen executable, built from commit
+`753665eb9`, with the scope value `declarations`** (run report in
+[the log](LOG-itoa-full-item-graph-progress.md)). A production change after that commit
+needs a new run.
 
 ```text
-S1  freeze inputs and expected graph   PASS   digests equal the pin and the freeze record
+S1  freeze inputs and expected graph   PASS   source, compiler and core digests equal the freeze record
 S2  gates and production run           PASS   process audit clean; one workspace test skipped (below)
-S3  exact comparison                   PASS   58 tests; 151 nodes and 682 edge rows equal the frozen graph
+S3  exact comparison                   PASS   61 tests; 170 nodes and 682 edge rows equal the frozen graph
 S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers store identical rows
 ```
 
-- The graph is marked `incomplete`: 133 method calls into `core` have no target. Each is
-  an expected row (Rule 3).
+- The graph is marked `incomplete`: one method call into `core`, `cast`, has no target. It
+  is an expected row (Rule 3). The other 132 are named and equal their expected rows.
+- The run loads DuckDB's `json` extension from `~/.duckdb/extensions`. That file is not
+  one of the frozen inputs of Rule 2; the run report records its digest. Open.
 - The workspace gate skips `test_lang_items_in_sysroot`, which fails when run. It reads the
-  native sysroot, which itoa runs exclude. Accepted by the user on 2026-11-16 as a known
-  open defect.
-- The expected graph was written and checked by one author (Rule 1).
-- The next acceptance run uses the scope value `declarations` (decided 2026-11-16). What
-  must exist before it is judged is in the last section.
+  whole native sysroot, which no itoa run does. Accepted by the user on 2026-11-16 as a
+  known open defect.
+- The first workspace test run stopped at two tests that call `cargo metadata --offline`:
+  the machine's crate cache lacked a crate. After `cargo fetch --locked` a rerun of all
+  test binaries is in progress; its result is in the log's run report.
+- Both expected graphs were written and checked by one author (Rule 1).
+- The earlier run, with `excluded`, passed on 2026-11-16 at commit `822da80cf` (151 nodes,
+  682 edge rows, 133 calls without a target). Its expected graph stays frozen and
+  `test_itoa_whole_graph_equality` still compares a run with it.
 
 Scope and decisions are in the [PRD](PRD-itoa-full-item-graph-scope.md); graph rules
 and tables are in the [ARCH](ARCH-itoa-full-item-graph-pipeline.md); requirement ids and their
@@ -45,6 +51,9 @@ tests are in the [SPEC](SPEC-itoa-full-item-graph/README.md).
 - It is written by reading the pinned source. No tool output is its authority.
 - It is frozen (2026-11-16). The digests of its files are in
   `itoa-expected-graph-freeze.json`; the comparison test fails when a file differs from them.
+- The expected graph of a run with `declarations` is that graph with the frozen targets of
+  the calls into `core` merged in (2026-11-17): `itoa-expected-declarations-graph-*.json`,
+  with its own freeze record.
 - It was written and checked against the source by one author, with no second reviewer
   (user decision, 2026-11-16). An error made the same way in the expected graph and in the
   code is not caught.
@@ -74,8 +83,9 @@ tests are in the [SPEC](SPEC-itoa-full-item-graph/README.md).
 - **BLOCKED:** a precondition is missing, for example the expected graph is not frozen.
 - **NOT STARTED:** the producer or the check does not exist yet.
 - A run the code marks `incomplete` can pass only when every row without a target is an
-  expected row of the frozen graph. On pinned itoa these are the 133 method calls whose
-  receiver type is declared in `core`. The report states the mark and the count.
+  expected row of the frozen graph. On pinned itoa, with `excluded` these are the 133
+  method calls whose receiver type is declared in `core`; with `declarations` it is the one
+  call `cast`. The report states the mark and the count.
 - A PASS belongs to one executable digest. Any production change needs a new run.
 - Memory and time are measured and reported on every run. This phase sets no memory cap.
 - Declare the expected wall time before each command; kill it at twice that.
@@ -154,9 +164,9 @@ Pass:
   other file of the sysroot source is.
 - Time and memory come only from the untraced run.
 
-Add `--sysroot-source-scope-kind` to both runs. The accepted run of 2026-11-16 passed
+Add `--sysroot-source-scope-kind declarations` to both runs. The run of 2026-11-16 passed
 `excluded`: a target in `core` is a named external target, or a row without a target and
-with a reason (below). From the next freeze on, the value is `declarations`.
+with a reason (below).
 
 ### S3 — Exact comparison
 
@@ -215,33 +225,30 @@ as the expected row: the name as far as itoa's source proves it, the crate, and 
 the target's source was not read. A site whose target name source cannot prove matches an
 expected unresolved row with the same reason.
 
-### The scope value `declarations` (decided 2026-11-16): what the next run needs
+### The scope value `declarations` (decided 2026-11-16, judged 2026-11-17)
 
 Decided in the [PRD](PRD-itoa-full-item-graph-scope.md) ("Method calls into `core`"): the run
 reads the `core` source for its method declarations, and a method call into `core` is
 matched like every other row: same target label, same proof record, same assumptions as the
 expected row.
 
-No run with `declarations` has been judged. Before one is:
-
 ```text
 needed                                                        state on 2026-11-17
 expected target of each of the 133 calls, from source          frozen, one author:
                                                                itoa-expected-core-member-targets.json
-the run names every call the expected rows name                132 of 133 at the head, each
-                                                               equal, 0 wrong (log); `cast` is
-                                                               listed without a target
+the run names every call the expected rows name                132 of 133, each equal, 0 wrong;
+                                                               `cast` is listed without a target
 expected graph frozen with those targets                       frozen, one author
                                                                (REQ-RUST-066.0):
                                                                itoa-expected-declarations-graph-*.json,
-                                                               170 nodes, 682 edge rows; compared
-                                                               by test_itoa_declarations_graph_equality
-S1 record of the compiler version and the core digest          the command is in S1; the frozen
-                                                               targets file records both values
-the run id covers the core files                               built (REQ-RUST-065.0): the run
+                                                               170 nodes, 682 edge rows
+S1 record of the compiler version and the core digest          PASS: both equal the frozen
+                                                               targets file
+the run id covers the core files                               PASS (REQ-RUST-065.0): the run
                                                                stores the S1 digest of the
-                                                               files it read; not judged
-S2 audit accepts reads under the core source directory only    not checked on a run
+                                                               files it read
+S2 audit accepts reads under the core source directory only    PASS: 288 .rs files read, no
+                                                               other file of the sysroot source
 S2 audit of the DuckDB `json` extension file                   open: the run loads it from
                                                                ~/.duckdb/extensions, outside
                                                                the frozen inputs
