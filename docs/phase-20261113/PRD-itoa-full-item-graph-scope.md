@@ -160,11 +160,10 @@ general behaviour, nothing keyed on itoa names.
 - Turso `=0.9.0-pre.5`, concurrent writes. A busy publication is tried up to 6 times, waiting
   10, 20, 40, 80, then 160 ms.
 - DuckDB `=1.20000.1`, bundled, run-local temp directory. No extension is installed or
-  auto-loaded. The graph projection runs `LOAD json` and then turns external access off;
-  name resolution opens with external access off. Measured 2026-11-16 on a fresh VM: the
-  `json` extension is not inside the build. DuckDB reads it from
-  `~/.duckdb/extensions/v2.0.0/linux_amd64/`, and the run fails when that file is absent.
-  It is a file outside the frozen inputs (immediate backlog, entry 6).
+  auto-loaded. The `json` extension is compiled into the executable (feature `json` of the
+  `duckdb` crate, SPEC part 10, 2026-11-17), so the run loads nothing and reads no file
+  under `~/.duckdb`. The graph projection turns external access off; name resolution opens
+  with external access off.
 
 ### Decisions in force
 
@@ -370,8 +369,6 @@ general behaviour, nothing keyed on itoa names.
   `declarations` ([part 8](SPEC-itoa-full-item-graph/part-8-method-calls-into-core.md)),
   each equal to its frozen expected row. The graph stays marked incomplete while `cast`
   has no target.
-- **DuckDB's `json` extension is outside the frozen inputs.** The run loads it from
-  `~/.duckdb/extensions` (immediate backlog, entry 6).
 - **Reading the whole sysroot.** A run with scope `included` did not finish name
   resolution in 2,400 s on 2026-11-13 (the run report is deleted). No itoa run uses it.
 - **Node fields.** Visibility, reachability outside the crate and signature text are not

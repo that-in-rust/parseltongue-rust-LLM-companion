@@ -26,8 +26,10 @@ S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers st
 
 - The graph is marked `incomplete`: one method call into `core`, `cast`, has no target. It
   is an expected row (Rule 3). The other 132 are named and equal their expected rows.
-- The run loads DuckDB's `json` extension from `~/.duckdb/extensions`. That file is not
-  one of the frozen inputs of Rule 2; the run report records its digest. Open.
+- The accepted run of 2026-11-17 loaded DuckDB's `json` extension from
+  `~/.duckdb/extensions`, a file outside the frozen inputs of Rule 2. Since SPEC part 10
+  (2026-11-17) the extension is inside the executable and no run reads that file. The
+  change is to production code, so the next acceptance run is on a new executable.
 - The workspace gate skips `test_lang_items_in_sysroot`, which fails when run. It reads the
   whole native sysroot, which no itoa run does. Accepted by the user on 2026-11-16 as a
   known open defect.
@@ -249,9 +251,10 @@ the run id covers the core files                               PASS (REQ-RUST-06
                                                                files it read
 S2 audit accepts reads under the core source directory only    PASS: 288 .rs files read, no
                                                                other file of the sysroot source
-S2 audit of the DuckDB `json` extension file                   open: the run loads it from
-                                                               ~/.duckdb/extensions, outside
-                                                               the frozen inputs
+S2 audit of the DuckDB `json` extension file                   closed by SPEC part 10: the
+                                                               extension is in the executable;
+                                                               a traced run opens no path
+                                                               with `.duckdb/`
 ```
 
 A row is in the expected graph before the code that produces it is written (Rule 1). A

@@ -124,7 +124,10 @@ from source and frozen first.
 
 ## 6. DuckDB's `json` extension is read from the home directory
 
-Added 2026-11-16, at the user's request.
+Added 2026-11-16, at the user's request. **Closed 2026-11-17 by SPEC part 10:** the
+extension is compiled into the executable and `LOAD json` is removed. A run with an empty
+`HOME` publishes the graph, and a traced run opens no path with `.duckdb/`. The text below
+is the record of the defect.
 
 **Seen on this VM.** A run of the release executable stopped at the graph stage:
 

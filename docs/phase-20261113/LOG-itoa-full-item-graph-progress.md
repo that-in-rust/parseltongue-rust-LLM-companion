@@ -125,9 +125,9 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 ### What does not work or is not built
 
 - **One method call has no target:** `cast` (above).
-- **The run reads one file outside the frozen inputs:** DuckDB's `json` extension, from
-  `~/.duckdb/extensions` (immediate backlog, entry 6). Its digest is in the run report;
-  S1 does not freeze it.
+- **The accepted run is not of the current executable.** Part 10 changed production code
+  (the `json` extension is now inside the executable), and parts 11 to 15 will change the
+  graph. S1 to S4 are NOT STARTED for the new head; they run once, after part 15.
 - **Nodes store no visibility, reachability or signature.** The PRD allows "unknown".
 - **No edge from a module to the contents of its file** (OD-7). `itoa` and `u128_ext` do
   not lead to their items by an edge.
@@ -170,7 +170,7 @@ exported rows.
 Open, each needing a decision from the user:
 
 1. `cast`: which source facts prove that every type meets `PointeeSized`.
-2. The DuckDB `json` extension: build it into the executable, or freeze it by digest in S1.
+2. The DuckDB `json` extension: closed by part 10 (built into the executable).
 3. Why rows depend on the source directory.
 4. `test_lang_items_in_sysroot`.
 5. The PRD's open points: struct fields and enum variants as nodes; the edge from a module
@@ -1545,3 +1545,34 @@ decision, 2026-11-17).** `AGENTS.md` Rule 3 and its rule for document commits no
 - **Not edited:** the plans of parts 3, 4, 4b, 4c and 4d name the old limit. They record
   how those closed parts were built.
 - No code changed, so no gate was run and no codebase-memory query was needed.
+
+## 2026-11-17 Part 10 built: the mapper needs no DuckDB extension file
+
+**A run of pinned itoa with an empty `HOME` publishes the graph, and a traced run opens no
+path with `.duckdb/`.** REQ-RUST-068.0 A1 to A4 pass. S1 to S4: NOT STARTED for this head.
+
+- **Change:** the adapter's `duckdb` dependency gains the feature `json`; `LOAD json` is
+  removed from `open_source_projection_store` (commit `dd213b8f9`). Test: commit
+  `6cf6ea851`.
+- **RED:** `test_empty_home_graph_published`, 0 passed, 1 failed, with DuckDB's
+  "Extension .../empty-home/.duckdb/extensions/v2.0.0/linux_amd64/json.duckdb_extension
+  not found".
+- **GREEN:** the same test, 1 passed, 22.0 s.
+- **A3:** `strace -f -e trace=openat,open,connect,execve` of
+  `parseltongue map-workspace-full-run ... --worker-thread-count-value 4
+  --sysroot-source-scope-kind declarations` with `~/.duckdb` moved away: exit 0, 0 opens
+  with `.duckdb/`, 0 network connects, children `cargo` and `rustc` only, 31.4 s under
+  strace, 381 MB. Exported rows (170 nodes, 682 edge rows) equal the accepted run's export.
+- **Gates:** formatting exit 0; clippy on the two crates exit 0; adapter tests 187 passed;
+  real-source tests 62 passed, 0 failed, 931 s. Workspace gates not run (after part 15).
+- **Cost:** DuckDB is compiled once more, 18 min 30 s at two jobs.
+- **Order of the open points changed:** part 12 (module to file area) is built before
+  part 11 (node fields), because reachability of an item in `src/u128_ext.rs` needs the
+  link from the module to its file. Part 12 is specified (commit `a170cb130`).
+- **codebase-memory:** `index_repository`; `trace_path open_source_projection_store`
+  (inbound: `publish_full_graph_checkpoint`, `publish_original_source_hld`, projection
+  tests); `trace_path run_itoa_mapping_command`; `search_graph` for the test helpers;
+  `trace_path derive_original_graph_input` (both, depth 2) for part 12.
+- **Next:** part 12: the two rows added to the expected graph, then a failing real-source
+  test, then the projection.
+

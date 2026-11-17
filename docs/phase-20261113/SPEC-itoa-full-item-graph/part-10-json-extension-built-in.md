@@ -2,8 +2,9 @@
 
 Back to the [index](README.md).
 
-Status on 2026-11-17: **specified, not built.** Decided by the user on 2026-11-17: the
-mapper must run on a machine that has no `~/.duckdb` directory.
+Status on 2026-11-17: **built.** A run with an empty `HOME` publishes the graph, and a
+traced run with `~/.duckdb` moved away opens no extension file (section 6). Decided by the
+user on 2026-11-17: the mapper must run on a machine that has no `~/.duckdb` directory.
 
 **The defect.** The graph stage runs `LOAD json`. The executable does not contain the
 `json` extension, so DuckDB reads
@@ -78,7 +79,29 @@ The test passes `CARGO_HOME` and `RUSTUP_HOME` of the real home, because the run
 
 ## 6. Quality gate results
 
-Not run: nothing is built.
+Measured 2026-11-17 on commit `dd213b8f9`, release build, `CARGO_BUILD_JOBS=2`.
+
+```text
+10.1 RED    test_empty_home_graph_published   0 passed, 1 failed: "Extension
+            .../empty-home/.duckdb/extensions/v2.0.0/linux_amd64/json.duckdb_extension not found"
+10.2 GREEN  the same test                     1 passed, 22.0 s (the build of DuckDB with the
+            feature took 18 min 30 s)
+10.3 A3     strace -f of one run of pinned itoa, scope declarations, 4 workers, with
+            ~/.duckdb moved away: exit 0; 0 opens with `.duckdb/` in the path; 0 network
+            connects; child commands cargo and rustc only; 31.4 s under strace, 381 MB
+            maximum resident set. The exported node and edge rows (170, 682) equal the
+            export of the accepted run, identities and payloads.
+gates       cargo fmt --all -- --check                                              exit 0
+            cargo clippy --release -p parseltongue-duckdb-analysis-adapter
+              -p parseltongue-cli-dispatcher-binary --all-targets --all-features    exit 0
+            cargo test --release -p parseltongue-duckdb-analysis-adapter            187 passed, 0 failed
+            cargo test --release -p parseltongue-cli-dispatcher-binary
+              --test itoa-source-acceptance-tests -- --test-threads=1               62 passed, 0 failed, 931 s
+```
+
+- The executable is 105,126,296 bytes, sha256 `0285ac70…adc4`. Its size before the feature
+  was not recorded, so the growth is not measured.
+- Not run: the workspace-wide gates (they run once, after part 15) and S1 to S4.
 
 ## 7. Open questions
 
