@@ -11,6 +11,8 @@ lock, installer, release CI or acceptance procedure. No platform or API/schema c
 has been qualified, no combined package has been tested, and no release has been published
 by this phase. A source-declared upstream asset is not proof that our combined product works.
 
+Release proposal: [pinned backend release plan](NOTE-pinned-backend-release-plan.md).
+
 ## Scope and boundary
 
 - Plan target-to-asset selection, source/version/checksum and license pins, native Rust
