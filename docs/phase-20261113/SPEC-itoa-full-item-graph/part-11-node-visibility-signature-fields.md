@@ -95,13 +95,19 @@ Signature:
 ```text
 S1  WHEN an item is a node THEN its signature SHALL be the item's own tokens, without
     attributes, comments and white space, and without: the body of a function, the item
-    list of a module, trait or impl, the field or variant list of a struct, union or enum,
+    list of a module, trait or impl, the field or variant list of a struct, union or enum (record and tuple alike),
     the body of a `macro_rules!` definition, the `=` and value of a const or static, and a
     final `;`
-S2  WHEN the tokens are printed THEN one space SHALL separate two tokens, except that no
-    space is written after `(` `[` `<` `&` `*` `::` `!` `#` `.` `?`, none before
-    `)` `]` `>` `,` `;` `:` `::` `.` `?`, none before `(` `[` `<` `!` that follows a name
-    or a closing bracket, and `<` `>` `&` `*` inside a binary expression keep both spaces
+S2  WHEN the tokens are printed THEN one space SHALL separate two tokens, except:
+    no space after   ( [ { < & * :: # . ? .. ..=   and after a prefix operator
+    no space before  ) ] } > , ; : :: . .. ..=
+    no space before  !  that follows a name
+    no space before  <  that follows a name, `Self`, `impl` or `for`
+    no space before  (  that follows a name, `self`, `Self`, `super`, `crate`, `pub`,
+                        `fn`, `)`, `]`, `>` or `!`
+    no space before  [  that follows a name, `)`, `]`, `#` or `!`
+    `<` `>` `&` `*` written in a binary expression keep a space on both sides
+    A trailing comma is kept: no token is dropped or added
 S3  WHEN the same item is written in source and in a macro expansion with the same tokens
     THEN both SHALL store the same signature
 S4  WHEN a node is a file area THEN it SHALL store no signature

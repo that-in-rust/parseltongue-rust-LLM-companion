@@ -14,13 +14,13 @@
   },
   "frozen_file_sha256": {
     "itoa-expected-declarations-graph-edges.json": "f4eefe209090094f80924bc9aae4ae5d2a504d49783e1033c7bbd0a4c4955101",
-    "itoa-expected-declarations-graph-nodes.json": "f597b26379ba575119c885134ffe32fe50d770c33317be10dbaa856ab616b5df",
+    "itoa-expected-declarations-graph-nodes.json": "3cb4bdb97e2e4afbe6961c83b1a9483159d5bd696f74ea5f53f0b3eaa7ebccb2",
     "itoa-expected-declarations-graph-summary.json": "b1aca2956f73bd77ccdab82c365c634b41eb9bb2762d32e3935691481585ad88"
   },
   "input_file_sha256": {
     "itoa-expected-core-member-targets.json": "acf9a04a47c60a0f0dcfdd9e22e7ae9bd7999819dd5d8ed5466ae3e1dbda7b9c",
     "itoa-expected-graph-edges.json": "16957e055311199cadff6107f84a55163fa3f52e37fbb17428f8238abe90464a",
-    "itoa-expected-graph-nodes.json": "29aed6efdaef15ad4564b787ee381d6fec16ac23cdc726bc9460db824f7954e7"
+    "itoa-expected-graph-nodes.json": "06db0a40b7610c4df3b44c88dc05c890cbafe9c3d2a69f552d760125e4d809e1"
   },
   "unmerged_labels": {
     "*mut T::cast": {

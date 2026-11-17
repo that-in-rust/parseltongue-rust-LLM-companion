@@ -1100,6 +1100,7 @@
       "owner": null,
       "owner_kind": null,
       "reachable_outside_crate": null,
+      "signature": null,
       "source_anchor": null,
       "source_evidence": null,
       "source_read": true,
@@ -1730,6 +1731,7 @@
       "owner": "crate_root",
       "owner_kind": null,
       "reachable_outside_crate": false,
+      "signature": null,
       "source_anchor": "//!",
       "source_evidence": {
         "anchor_text": "//!",
@@ -1763,6 +1765,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "mod u128_ext",
       "source_anchor": "mod u128_ext;",
       "source_evidence": {
         "anchor_text": "mod u128_ext;",
@@ -1796,6 +1799,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "use core::hint",
       "source_anchor": "use core::hint;",
       "source_evidence": {
         "anchor_text": "use core::hint;",
@@ -1829,6 +1833,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "use core::mem::{self, MaybeUninit}",
       "source_anchor": "use core::mem::{self, MaybeUninit};",
       "source_evidence": {
         "anchor_text": "use core::mem::{self, MaybeUninit};",
@@ -1862,6 +1867,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "use core::str",
       "source_anchor": "use core::str;",
       "source_evidence": {
         "anchor_text": "use core::str;",
@@ -1895,6 +1901,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": true,
+      "signature": "pub struct Buffer",
       "source_anchor": "pub struct Buffer",
       "source_evidence": {
         "anchor_text": "pub struct Buffer",
@@ -1928,6 +1935,7 @@
       "owner": "impl@76",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "fn default() -> Buffer",
       "source_anchor": "fn default()",
       "source_evidence": {
         "anchor_text": "fn default()",
@@ -1961,6 +1969,7 @@
       "owner": "impl@86",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "fn clone(&self) -> Self",
       "source_anchor": "fn clone(&self)",
       "source_evidence": {
         "anchor_text": "fn clone(&self)",
@@ -1994,6 +2003,7 @@
       "owner": "impl@93",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "pub fn new() -> Buffer",
       "source_anchor": "pub fn new()",
       "source_evidence": {
         "anchor_text": "pub fn new()",
@@ -2027,6 +2037,7 @@
       "owner": "impl@93",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "pub fn format<I: Integer>(&mut self, i: I) -> &str",
       "source_anchor": "pub fn format<I: Integer>",
       "source_evidence": {
         "anchor_text": "pub fn format<I: Integer>",
@@ -2060,6 +2071,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": true,
+      "signature": "pub trait Integer: private::Sealed",
       "source_anchor": "pub trait Integer: private::Sealed",
       "source_evidence": {
         "anchor_text": "pub trait Integer: private::Sealed",
@@ -2093,6 +2105,7 @@
       "owner": "Integer",
       "owner_kind": "trait",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize;",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize;",
@@ -2126,6 +2139,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "mod private",
       "source_anchor": "mod private {",
       "source_evidence": {
         "anchor_text": "mod private {",
@@ -2159,6 +2173,7 @@
       "owner": "private",
       "owner_kind": "module",
       "reachable_outside_crate": false,
+      "signature": "pub trait Sealed: Copy",
       "source_anchor": "pub trait Sealed: Copy",
       "source_evidence": {
         "anchor_text": "pub trait Sealed: Copy",
@@ -2192,6 +2207,7 @@
       "owner": "private::Sealed",
       "owner_kind": "trait",
       "reachable_outside_crate": false,
+      "signature": "type Buffer: 'static",
       "source_anchor": "type Buffer: 'static;",
       "source_evidence": {
         "anchor_text": "type Buffer: 'static;",
@@ -2225,6 +2241,7 @@
       "owner": "private::Sealed",
       "owner_kind": "trait",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str;",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str;",
@@ -2258,6 +2275,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "macro_rules! impl_Integer",
       "source_anchor": "macro_rules! impl_Integer {",
       "source_evidence": {
         "anchor_text": "macro_rules! impl_Integer {",
@@ -2295,6 +2313,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "const _: ()",
       "source_anchor": "const _: () = {",
       "source_evidence": {
         "anchor_text": "const _: () = {",
@@ -2332,6 +2351,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "const _: ()",
       "source_anchor": "const _: () = {",
       "source_evidence": {
         "anchor_text": "const _: () = {",
@@ -2369,6 +2389,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "const _: ()",
       "source_anchor": "const _: () = {",
       "source_evidence": {
         "anchor_text": "const _: () = {",
@@ -2406,6 +2427,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "const _: ()",
       "source_anchor": "const _: () = {",
       "source_evidence": {
         "anchor_text": "const _: () = {",
@@ -2443,6 +2465,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "const _: ()",
       "source_anchor": "const _: () = {",
       "source_evidence": {
         "anchor_text": "const _: () = {",
@@ -2479,6 +2502,7 @@
       "owner": "impl@143",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -2515,6 +2539,7 @@
       "owner": "impl@143",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -2551,6 +2576,7 @@
       "owner": "impl@143",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -2587,6 +2613,7 @@
       "owner": "impl@143",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -2623,6 +2650,7 @@
       "owner": "impl@143",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -2660,6 +2688,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -2697,6 +2726,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -2734,6 +2764,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -2771,6 +2802,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -2808,6 +2840,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -2845,6 +2878,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -2882,6 +2916,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -2919,6 +2954,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -2956,6 +2992,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -2993,6 +3030,7 @@
       "owner": "impl@147",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3029,6 +3067,7 @@
       "owner": "impl@159",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -3065,6 +3104,7 @@
       "owner": "impl@159",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -3101,6 +3141,7 @@
       "owner": "impl@159",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -3137,6 +3178,7 @@
       "owner": "impl@159",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -3173,6 +3215,7 @@
       "owner": "impl@159",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize =",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize =",
@@ -3210,6 +3253,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -3247,6 +3291,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -3284,6 +3329,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -3321,6 +3367,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -3358,6 +3405,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]",
       "source_anchor": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
       "source_evidence": {
         "anchor_text": "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN];",
@@ -3395,6 +3443,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3432,6 +3481,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3469,6 +3519,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3506,6 +3557,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3543,6 +3595,7 @@
       "owner": "impl@163",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3576,6 +3629,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer!(i8, u8)",
       "source_anchor": "impl_Integer!(i8, u8);",
       "source_evidence": {
         "anchor_text": "impl_Integer!(i8, u8);",
@@ -3609,6 +3663,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer!(i16, u16)",
       "source_anchor": "impl_Integer!(i16, u16);",
       "source_evidence": {
         "anchor_text": "impl_Integer!(i16, u16);",
@@ -3642,6 +3697,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer!(i32, u32)",
       "source_anchor": "impl_Integer!(i32, u32);",
       "source_evidence": {
         "anchor_text": "impl_Integer!(i32, u32);",
@@ -3675,6 +3731,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer!(i64, u64)",
       "source_anchor": "impl_Integer!(i64, u64);",
       "source_evidence": {
         "anchor_text": "impl_Integer!(i64, u64);",
@@ -3708,6 +3765,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer!(i128, u128)",
       "source_anchor": "impl_Integer!(i128, u128);",
       "source_evidence": {
         "anchor_text": "impl_Integer!(i128, u128);",
@@ -3741,6 +3799,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "macro_rules! impl_Integer_size",
       "source_anchor": "macro_rules! impl_Integer_size {",
       "source_evidence": {
         "anchor_text": "macro_rules! impl_Integer_size {",
@@ -3777,6 +3836,7 @@
       "owner": "impl@194",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
@@ -3813,6 +3873,7 @@
       "owner": "impl@194",
       "owner_kind": "impl",
       "reachable_outside_crate": true,
+      "signature": "const MAX_STR_LEN: usize",
       "source_anchor": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
       "source_evidence": {
         "anchor_text": "const MAX_STR_LEN: usize = <$primitive as Integer>::MAX_STR_LEN;",
@@ -3850,6 +3911,7 @@
       "owner": "impl@199",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = <i64 as private::Sealed>::Buffer",
       "source_anchor": "type Buffer = <$primitive as private::Sealed>::Buffer;",
       "source_evidence": {
         "anchor_text": "type Buffer = <$primitive as private::Sealed>::Buffer;",
@@ -3887,6 +3949,7 @@
       "owner": "impl@199",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "type Buffer = <u64 as private::Sealed>::Buffer",
       "source_anchor": "type Buffer = <$primitive as private::Sealed>::Buffer;",
       "source_evidence": {
         "anchor_text": "type Buffer = <$primitive as private::Sealed>::Buffer;",
@@ -3924,6 +3987,7 @@
       "owner": "impl@199",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3961,6 +4025,7 @@
       "owner": "impl@199",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn write(self, buf: &mut Self::Buffer) -> &str",
       "source_anchor": "fn write(self, buf: &mut Self::Buffer) -> &str {",
       "source_evidence": {
         "anchor_text": "fn write(self, buf: &mut Self::Buffer) -> &str {",
@@ -3994,6 +4059,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")])",
       "source_anchor": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(isize as i16 #[cfg(target_pointer_width = \"16\")]);",
@@ -4027,6 +4093,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")])",
       "source_anchor": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(usize as u16 #[cfg(target_pointer_width = \"16\")]);",
@@ -4060,6 +4127,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")])",
       "source_anchor": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(isize as i32 #[cfg(target_pointer_width = \"32\")]);",
@@ -4093,6 +4161,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")])",
       "source_anchor": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(usize as u32 #[cfg(target_pointer_width = \"32\")]);",
@@ -4126,6 +4195,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")])",
       "source_anchor": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(isize as i64 #[cfg(target_pointer_width = \"64\")]);",
@@ -4159,6 +4229,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")])",
       "source_anchor": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
       "source_evidence": {
         "anchor_text": "impl_Integer_size!(usize as u64 #[cfg(target_pointer_width = \"64\")]);",
@@ -4192,6 +4263,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "struct DecimalPairs",
       "source_anchor": "struct DecimalPairs([u8; 200]);",
       "source_evidence": {
         "anchor_text": "struct DecimalPairs([u8; 200]);",
@@ -4225,6 +4297,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "static DECIMAL_PAIRS: DecimalPairs",
       "source_anchor": "static DECIMAL_PAIRS: DecimalPairs",
       "source_evidence": {
         "anchor_text": "static DECIMAL_PAIRS: DecimalPairs",
@@ -4258,6 +4331,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "fn divmod100(value: u32) -> (u32, u32)",
       "source_anchor": "fn divmod100(value: u32)",
       "source_evidence": {
         "anchor_text": "fn divmod100(value: u32)",
@@ -4291,6 +4365,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "unsafe fn slice_buffer_to_str(buf: &[MaybeUninit<u8>], offset: usize) -> &str",
       "source_anchor": "unsafe fn slice_buffer_to_str",
       "source_evidence": {
         "anchor_text": "unsafe fn slice_buffer_to_str",
@@ -4324,6 +4399,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "trait Unsigned: Integer",
       "source_anchor": "trait Unsigned: Integer",
       "source_evidence": {
         "anchor_text": "trait Unsigned: Integer",
@@ -4357,6 +4433,7 @@
       "owner": "Unsigned",
       "owner_kind": "trait",
       "reachable_outside_crate": false,
+      "signature": "fn fmt(self, buf: &mut Self::Buffer) -> usize",
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize;",
       "source_evidence": {
         "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize;",
@@ -4390,6 +4467,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "macro_rules! impl_Unsigned",
       "source_anchor": "macro_rules! impl_Unsigned {",
       "source_evidence": {
         "anchor_text": "macro_rules! impl_Unsigned {",
@@ -4426,6 +4504,7 @@
       "owner": "impl@261",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn fmt(self, buf: &mut Self::Buffer) -> usize",
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
         "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
@@ -4462,6 +4541,7 @@
       "owner": "impl@261",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn fmt(self, buf: &mut Self::Buffer) -> usize",
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
         "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
@@ -4498,6 +4578,7 @@
       "owner": "impl@261",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn fmt(self, buf: &mut Self::Buffer) -> usize",
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
         "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
@@ -4534,6 +4615,7 @@
       "owner": "impl@261",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn fmt(self, buf: &mut Self::Buffer) -> usize",
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
         "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
@@ -4567,6 +4649,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Unsigned!(u8)",
       "source_anchor": "impl_Unsigned!(u8);",
       "source_evidence": {
         "anchor_text": "impl_Unsigned!(u8);",
@@ -4600,6 +4683,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Unsigned!(u16)",
       "source_anchor": "impl_Unsigned!(u16);",
       "source_evidence": {
         "anchor_text": "impl_Unsigned!(u16);",
@@ -4633,6 +4717,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Unsigned!(u32)",
       "source_anchor": "impl_Unsigned!(u32);",
       "source_evidence": {
         "anchor_text": "impl_Unsigned!(u32);",
@@ -4666,6 +4751,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "impl_Unsigned!(u64)",
       "source_anchor": "impl_Unsigned!(u64);",
       "source_evidence": {
         "anchor_text": "impl_Unsigned!(u64);",
@@ -4699,6 +4785,7 @@
       "owner": "impl@334",
       "owner_kind": "impl",
       "reachable_outside_crate": false,
+      "signature": "fn fmt(self, buf: &mut Self::Buffer) -> usize",
       "source_anchor": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
       "source_evidence": {
         "anchor_text": "fn fmt(self, buf: &mut Self::Buffer) -> usize {",
@@ -4732,6 +4819,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "fn enc_16lsd<const OFFSET: usize>(buf: &mut [MaybeUninit<u8>], n: u64)",
       "source_anchor": "fn enc_16lsd<const OFFSET: usize>",
       "source_evidence": {
         "anchor_text": "fn enc_16lsd<const OFFSET: usize>",
@@ -4765,6 +4853,7 @@
       "owner": "area:src/lib.rs",
       "owner_kind": "crate_root",
       "reachable_outside_crate": false,
+      "signature": "fn div_rem_1e16(n: u128) -> (u128, u64)",
       "source_anchor": "fn div_rem_1e16(n: u128)",
       "source_evidence": {
         "anchor_text": "fn div_rem_1e16(n: u128)",
@@ -4795,6 +4884,7 @@
       "owner": "crate_root",
       "owner_kind": null,
       "reachable_outside_crate": false,
+      "signature": null,
       "source_anchor": "#[cfg",
       "source_evidence": {
         "anchor_text": "#[cfg",
@@ -4828,6 +4918,7 @@
       "owner": "area:src/u128_ext.rs",
       "owner_kind": "module",
       "reachable_outside_crate": false,
+      "signature": "pub(crate) fn mulhi(x: u128, y: u128) -> u128",
       "source_anchor": "pub(crate) fn mulhi",
       "source_evidence": {
         "anchor_text": "pub(crate) fn mulhi",

@@ -525,13 +525,74 @@ def node_exact_range(f, a, b):
     offset = lambda line: sum(len(value) + 1 for value in raw[:line - 1])
     return [offset(a) + len(raw[a - 1]) - len(raw[a - 1].lstrip()), offset(b) + len(raw[b - 1].rstrip())]
 
+# ---------------- signatures (REQ-RUST-069.0 S1, S2): the item's own tokens without attributes, comments, body,
+# field list, const or static value and final `;`, printed with the spacing of S2 ----------------
+WRITE_SIG, FMT_SIG = "fn write(self, buf: &mut Self::Buffer) -> &str", "fn fmt(self, buf: &mut Self::Buffer) -> usize"
+ARRAY_BUFFER_SIG = "type Buffer = [MaybeUninit<u8>; Self::MAX_STR_LEN]"
+SIGNATURES = {
+    "u128_ext": "mod u128_ext", USE_HINT: USE_HINT, USE_MEM: USE_MEM, USE_STR: USE_STR,
+    "Buffer": "pub struct Buffer",
+    "<Buffer as Default>::default": "fn default() -> Buffer",
+    "<Buffer as Clone>::clone": "fn clone(&self) -> Self",
+    "Buffer::new": "pub fn new() -> Buffer",
+    "Buffer::format": "pub fn format<I: Integer>(&mut self, i: I) -> &str",
+    "Integer": "pub trait Integer: private::Sealed",
+    "Integer::MAX_STR_LEN": "const MAX_STR_LEN: usize",
+    "private": "mod private",
+    "private::Sealed": "pub trait Sealed: Copy",
+    "private::Sealed::Buffer": "type Buffer: 'static",
+    "private::Sealed::write": WRITE_SIG,
+    "DecimalPairs": "struct DecimalPairs",
+    "DECIMAL_PAIRS": "static DECIMAL_PAIRS: DecimalPairs",
+    "divmod100": "fn divmod100(value: u32) -> (u32, u32)",
+    "slice_buffer_to_str": "unsafe fn slice_buffer_to_str(buf: &[MaybeUninit<u8>], offset: usize) -> &str",
+    "Unsigned": "trait Unsigned: Integer",
+    "Unsigned::fmt": FMT_SIG,
+    "<u128 as Unsigned>::fmt": FMT_SIG,
+    "enc_16lsd": "fn enc_16lsd<const OFFSET: usize>(buf: &mut [MaybeUninit<u8>], n: u64)",
+    "div_rem_1e16": "fn div_rem_1e16(n: u128) -> (u128, u64)",
+    "u128_ext::mulhi": "pub(crate) fn mulhi(x: u128, y: u128) -> u128",
+}
+# What the expansion writes where the macro body writes a parameter.
+SIGNATURE_ARGUMENTS = {}
+for s, u, inv in PAIRS:
+    SIGNATURES[f"const _ #impl_Integer({s},{u})"] = "const _: ()"
+    for t in (s, u):
+        SIGNATURES.update({mx(t): "const MAX_STR_LEN: usize", sb(t): ARRAY_BUFFER_SIG, sw(t): WRITE_SIG})
+for t, p, inv in SIZES:
+    SIGNATURES.update({mx(t): "const MAX_STR_LEN: usize", sb(t): f"type Buffer = <{p} as private::Sealed>::Buffer", sw(t): WRITE_SIG})
+    SIGNATURE_ARGUMENTS[sb(t)] = ("$primitive", p)
+for u, inv in UNS:
+    SIGNATURES[uf(u)] = FMT_SIG
+for name, a, b in MACRO_DEFS:
+    SIGNATURES[f"macro_rules! {name}"] = f"macro_rules! {name}"
+for macro, call, inv in MACRO_CALLS:
+    SIGNATURES[call] = call
+def squeeze(text): return "".join(text.split())
+for row in nodes.values():
+    label = row["label"]
+    if row["item_kind"] == "file_public_area" or "crate_root" in row["flags"]:
+        row["signature"] = None
+        continue
+    if label not in SIGNATURES:
+        errors.append(f"{label} has no signature"); continue
+    row["signature"] = SIGNATURES[label]
+    # The signature's tokens are in the item's source lines, in order and unbroken.
+    written = "".join(TEXT[row["file"]][row["start_line"] - 1:row["end_line"]])
+    if label in SIGNATURE_ARGUMENTS:
+        written = written.replace(*SIGNATURE_ARGUMENTS[label])
+    if squeeze(row["signature"]) not in squeeze(written):
+        errors.append(f"{label}: signature {row['signature']!r} is not in {row['file']}:{row['start_line']}-{row['end_line']}")
+unused = sorted(set(SIGNATURES) - set(nodes))
+if unused: errors.append(f"signatures of no node: {unused}")
+
 MACRO_CALL_AT = {row["start_line"]: row["label"] for row in nodes.values() if row["item_kind"] == "macro_call"}
 node_rows = []
 for row in nodes.values():
     if "crate_root" in row["flags"]:
         # REQ-RUST-043.1 C1: the root module has no declaration of its own, so no file, kind, owner or visibility.
         node_rows.append(dict(label=row["label"], item_kind=None, node_category="crate_root", external_name_kind=None,
-            source_read=True, effective_visibility=None, reachable_outside_crate=None, file="", start_line=0, end_line=0,
+            source_read=True, effective_visibility=None, reachable_outside_crate=None, signature=None, file="", start_line=0, end_line=0,
             owner=None, owner_kind=None, in_function_body=False, generated_by=None, generated_by_label=None,
             source_anchor=None, flags=row["flags"], source_evidence=None,
             file_assignment_status="NO_SOURCE_FILE_ROOT_MODULE_NOT_DECLARED"))
