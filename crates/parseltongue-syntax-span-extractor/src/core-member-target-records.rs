@@ -10,7 +10,7 @@ use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_stage_values,
 };
 use crate::original_call_resolution_records::{
-    BoundMethodLookupIndex, OriginalCallResolutionError,
+    BoundMethodLookupIndex, OriginalCallResolutionError, list_bound_method_candidates,
 };
 use crate::receiver_type_probe_records::{
     CoreMemberProbeOutcome, ScopeTraitMethodValue, WrittenTypeShapeValue,
@@ -44,8 +44,9 @@ pub(crate) struct CoreMemberLookupIndex {
     core_rename_name_pairs: Vec<(Option<String>, String)>,
     /// The names the prelude files of `core` re-export.
     scope_prelude_leaf_names: BTreeSet<String>,
-    /// Every identifier written in the workspace's read source.
-    workspace_token_name_values: BTreeSet<String>,
+    /// Every identifier written in the source files of the mapped units, with the
+    /// number of times it is written.
+    workspace_token_name_counts: BTreeMap<String, usize>,
     /// `(trait name, member name)` for each member a workspace trait declares.
     workspace_trait_member_names: BTreeSet<(String, String)>,
     /// REQ-RUST-059.0 S7: the text of the `self` parameter of each function, by the
@@ -57,6 +58,8 @@ pub(crate) struct CoreMemberLookupIndex {
     /// each stored field; the owner is the graph identity of the `static`, or of the item
     /// that declares the field.
     owner_declared_type_rows: Vec<(HldTargetIdentityValue, Value)>,
+    /// REQ-RUST-064.0 L4: `(owner, row)` for the stored return type of each function.
+    owner_return_type_rows: Vec<(HldTargetIdentityValue, Value)>,
 }
 
 /// The graph identity of the active stored span `key`; `None` when it has none.
@@ -83,7 +86,7 @@ fn check_declared_type_row(row: &Value) -> bool {
 /// The identifiers written in `text`, and whether a `use` in it may import by glob: a
 /// `*` between `::`, `{` or `,` and `;`, `}` or `,`. Tokens inside macro definitions count.
 /// Last, whether it holds an `extern crate` item.
-fn scan_source_scope_tokens(text: &str) -> (BTreeSet<String>, bool, bool) {
+fn scan_source_scope_tokens(text: &str) -> (BTreeMap<String, usize>, bool, bool) {
     let tree = SourceFile::parse(text, Edition::Edition2021).tree();
     let outside = tree
         .syntax()
@@ -99,7 +102,10 @@ fn scan_source_scope_tokens(text: &str) -> (BTreeSet<String>, bool, bool) {
         .iter()
         .filter(|token| token.kind() == SyntaxKind::IDENT)
         .map(|token| token.text().trim_start_matches("r#").to_owned())
-        .collect();
+        .fold(BTreeMap::new(), |mut counts, name| {
+            *counts.entry(name).or_insert(0usize) += 1;
+            counts
+        });
     let glob = tokens.windows(3).any(|window| {
         matches!(
             window[0].kind(),
@@ -153,9 +159,11 @@ pub(crate) fn read_core_member_index(
         .flatten()
         .any(|(member, (.., outside))| !member && *outside);
     let (tokens, glob) = texts.iter().flatten().filter(|(member, _)| *member).fold(
-        (BTreeSet::new(), false),
+        (BTreeMap::new(), false),
         |(mut names, glob), (_, (found, star, _))| {
-            names.extend(found.iter().cloned());
+            for (name, count) in found {
+                *names.entry(name.clone()).or_insert(0usize) += count;
+            }
             (names, glob || *star)
         },
     );
@@ -182,7 +190,7 @@ pub(crate) fn read_core_member_index(
             .is_none_or(|rows| !rows.is_empty())
     }) {
         Some("dependency_crates_not_read")
-    } else if tokens.contains("alloc") || tokens.contains("std") {
+    } else if tokens.contains_key("alloc") || tokens.contains_key("std") {
         Some("alloc_or_std_named")
     } else if glob {
         Some("scope_glob_import_unread")
@@ -215,23 +223,24 @@ pub(crate) fn read_core_member_index(
             ))
         })
         .collect();
-    let owned = signatures
+    let (returned, owned) = signatures
         .into_iter()
-        .filter(check_declared_type_row)
+        .filter(|row| check_declared_type_row(row) || row["site_syntax_kind_value"] == "RET_TYPE")
         .filter_map(|row| {
             let owner =
                 read_span_graph_identity(row["site_owner_occurrence_key"].as_str()?, context)?;
             Some((owner, row))
         })
-        .collect();
+        .partition(|(_, row)| row["site_syntax_kind_value"] == "RET_TYPE");
     Ok(CoreMemberLookupIndex {
         self_parameter_source_texts: receivers,
         owner_declared_type_rows: owned,
+        owner_return_type_rows: returned,
         core_rename_name_pairs: renames,
         core_declaration_value_rows: declarations,
         scope_proof_withheld_reason: reason,
         scope_prelude_leaf_names: prelude,
-        workspace_token_name_values: tokens,
+        workspace_token_name_counts: tokens,
         workspace_item_leaf_names: nodes
             .iter()
             .filter_map(|node| node.node_qualified_path_text.rsplit("::").next())
@@ -335,7 +344,7 @@ impl CoreMemberLookupIndex {
     fn check_core_trait_scope(&self, name: &str) -> bool {
         self.list_core_trait_names(name).into_iter().any(|name| {
             self.scope_prelude_leaf_names.contains(name)
-                || self.workspace_token_name_values.contains(name)
+                || self.workspace_token_name_counts.contains_key(name)
         })
     }
 
@@ -349,7 +358,7 @@ impl CoreMemberLookupIndex {
             .any(|name| self.scope_prelude_leaf_names.contains(*name))
             && !names
                 .iter()
-                .any(|name| self.workspace_token_name_values.contains(*name))
+                .any(|name| self.workspace_token_name_counts.contains_key(*name))
     }
 
     /// `name` and every name that `core` renames it to, directly or through another.
@@ -764,6 +773,142 @@ fn find_parameter_place_type(
     }
 }
 
+/// Whether `text` is a function that returns its written return type: not `async`.
+fn check_plain_function_text(text: &str) -> bool {
+    SourceFile::parse(text, Edition::Edition2021)
+        .tree()
+        .syntax()
+        .descendants()
+        .find_map(ast::Fn::cast)
+        .is_some_and(|function| function.async_token().is_none())
+}
+
+/// REQ-RUST-064.0 L2 to L7: the type of a receiver that is a local variable which one
+/// plain `let` binds to a method call: the return type that the one workspace function
+/// named by that call declares. `None` when the receiver stores no such `let`.
+fn find_local_binding_type(
+    span: &Value,
+    receiver: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    index: &CoreMemberLookupIndex,
+    bounds: &BoundMethodLookupIndex,
+) -> Result<Option<ReceiverPlaceTypeOutcome>, OriginalCallResolutionError> {
+    let local = &receiver["receiver_local_binding_evidence"];
+    let Some(name) = receiver["receiver_declared_name_value"]
+        .as_str()
+        .filter(|_| !local.is_null())
+    else {
+        return Ok(None);
+    };
+    let mut evidence = json!({
+        "receiver_type_proof_kind":"local_binding_call_result",
+        "receiver_binding_name_value":name,
+        "binding_statement_start_offset":local["binding_statement_start_offset"],
+        "binding_statement_end_offset":local["binding_statement_end_offset"],
+        "binding_name_token_count":local["binding_name_token_count"],
+        "method_probe_unread_source":["alloc", "std"],
+        "lookup_assumption_values":["core_macro_expansions_import_no_trait"]
+    });
+    let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
+    if let Some(reason) = index.scope_proof_withheld_reason {
+        return withheld(reason, evidence);
+    }
+    // L2: the function is written in a source file, and no other token of the unit
+    // writes the name, so no item of that name exists for the pattern to match.
+    let original = span["span_expansion_provenance_chain"]
+        .as_array()
+        .is_some_and(Vec::is_empty);
+    let written = index
+        .workspace_token_name_counts
+        .get(name)
+        .and_then(|count| u64::try_from(*count).ok());
+    if !original
+        || index.scope_prelude_leaf_names.contains(name)
+        || written.is_none()
+        || written != local["binding_name_token_count"].as_u64()
+    {
+        return withheld("local_binding_name_unproven", evidence);
+    }
+    // L3: the initializer names one workspace function through a bound.
+    let Some(owner) = span["site_owner_occurrence_key"].as_str() else {
+        return withheld("local_initializer_call_unproven", evidence);
+    };
+    let call = &local["binding_initializer_call_evidence"];
+    let walked = list_bound_method_candidates(owner, context.span(owner)?, call, context, bounds)?;
+    let Some((target, walk)) = walked.and_then(|(found, walk)| {
+        let mut found = found.into_iter();
+        found
+            .next()
+            .filter(|_| found.next().is_none())
+            .zip(Some(walk))
+    }) else {
+        return withheld("local_initializer_call_unproven", evidence);
+    };
+    evidence["binding_initializer_bound_walk"] = walk.build_walk_evidence_value();
+    // L4: that function declares one return type, and returns it.
+    let rows = index
+        .owner_return_type_rows
+        .iter()
+        .filter(|(owner, _)| *owner == target)
+        .map(|(_, row)| row)
+        .collect::<Vec<_>>();
+    let ([row], Some(key)) = (
+        rows.as_slice(),
+        rows.first()
+            .and_then(|row| row["site_owner_occurrence_key"].as_str()),
+    ) else {
+        return withheld("local_initializer_return_unproven", evidence);
+    };
+    let declared = context.span(key)?;
+    evidence["binding_initializer_target_occurrence"] = context.occurrence(declared)?;
+    // L3: a bound trait with no source may declare the name too. A method that takes
+    // `self` by value is found at the first step, where a second one is an error.
+    if !walk.missing_source_traits.is_empty() {
+        let by_value = index
+            .self_parameter_source_texts
+            .get(key)
+            .is_some_and(|text| matches!(text.trim(), "self" | "mut self"));
+        if !by_value {
+            return withheld("local_initializer_call_unproven", evidence);
+        }
+        if let Some(assumed) = evidence["lookup_assumption_values"].as_array_mut() {
+            assumed.push(json!("source_compiles_method_resolves"));
+        }
+    }
+    let text = row["site_syntax_source_text"]
+        .as_str()
+        .and_then(|text| text.strip_prefix("->"))
+        .map(str::trim);
+    let (Some(text), true) = (
+        text,
+        declared["span_syntax_kind_value"] == "FN"
+            && declared["span_source_code_text"]
+                .as_str()
+                .is_some_and(check_plain_function_text),
+    ) else {
+        return withheld("local_initializer_return_unproven", evidence);
+    };
+    evidence["receiver_written_type_text"] = json!(text);
+    evidence["binding_return_type_file_path"] = row["file_source_absolute_path"].clone();
+    evidence["binding_return_type_start_offset"] = row["span_byte_start_offset"].clone();
+    evidence["binding_return_type_end_offset"] = row["span_byte_end_offset"].clone();
+    // L5: every name of the type is a builtin type or a name of `core`.
+    let Some(paths) = row["type_path_source_rows"].as_array() else {
+        return withheld("receiver_type_name_unproven", evidence);
+    };
+    for path in paths {
+        let proven = path["type_path_self_flag"] != true
+            && match build_row_path_evidence(row, path) {
+                Some(site) => check_written_path_proven(&site, path, context)?,
+                None => false,
+            };
+        if !proven {
+            return withheld("receiver_type_name_unproven", evidence);
+        }
+    }
+    Ok(Some((Ok(text.to_owned()), evidence)))
+}
+
 /// The stored lookup evidence of one type path that the stored row `row` writes.
 fn build_row_path_evidence(row: &Value, path: &Value) -> Option<Value> {
     let text = path["type_source_text"].as_str()?;
@@ -1136,6 +1281,22 @@ pub(crate) fn find_core_member_target(
     let inner = &receiver["receiver_inner_call_evidence"];
     if !inner.is_null() {
         return find_call_result_member(span, inner, method, context, members, index, bounds);
+    }
+    // REQ-RUST-064.0: a receiver that is a local variable bound to a method call.
+    if let Some((written, evidence)) =
+        find_local_binding_type(span, receiver, context, index, bounds)?
+    {
+        return match written {
+            Ok(text) => name_probed_core_member(
+                &[parse_written_type_shape(&text, &[])],
+                method,
+                evidence,
+                members,
+                index,
+                &[],
+            ),
+            Err(reason) => Ok(Some((Err(reason), evidence))),
+        };
     }
     let Some([first, places @ ..]) = receiver["receiver_place_step_rows"]
         .as_array()
