@@ -4,6 +4,7 @@
 //! `receiver-type-probe-records.rs` picks the declaration. Anything not proven withholds
 //! the name: a missed target is preferable to a wrong one.
 use crate::core_file_scope_name_records::find_file_scope_type;
+use crate::core_macro_impl_member_records::find_builtin_constant_member;
 use crate::external_named_target_records::{ExternalNameProofRecord, build_external_proof_value};
 use crate::impl_header_source_records::{
     ImplHeaderSourceContext, ImplHeaderSourceError, read_impl_stage_values,
@@ -1163,10 +1164,23 @@ pub(crate) fn find_core_member_target(
         Some("self_value") => find_self_place_type(span, fields, context, members, index)?,
         _ => None,
     };
-    let Some((written, evidence)) = place else {
-        return Ok(None);
-    };
     let withheld = |reason: &'static str, evidence: Value| Ok(Some((Err(reason), evidence)));
+    let Some((written, evidence)) = place else {
+        // REQ-RUST-063.0 M6: a const of a builtin type, and nothing after it.
+        let constant = (first["place_step_kind"] == "value_path" && places.is_empty())
+            .then(|| {
+                find_builtin_constant_member(span, first, method, context, members, declarations)
+            })
+            .transpose()?
+            .flatten();
+        return Ok(constant.map(|(outcome, record)| {
+            let outcome = match index.scope_proof_withheld_reason {
+                Some(reason) => Err(reason),
+                None => outcome.map(build_core_member_proof),
+            };
+            (outcome, record)
+        }));
+    };
     let shape_text = match written {
         Ok(text) => text,
         Err(reason) => return withheld(reason, evidence),

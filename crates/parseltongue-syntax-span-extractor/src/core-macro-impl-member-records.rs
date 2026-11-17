@@ -5,6 +5,9 @@ use crate::core_file_scope_name_records::{
     build_row_site_value, check_row_always_active, check_scope_binding_row,
     list_row_attribute_texts,
 };
+use crate::impl_header_source_records::{ImplHeaderSourceContext, ImplHeaderSourceError};
+use crate::type_relative_member_records::{ImplMemberLookupIndex, read_type_relative_parts};
+use parseltongue_core_row_types::is_hld_builtin_type;
 use serde_json::{Value, json};
 
 #[cfg(test)]
@@ -209,4 +212,73 @@ pub(crate) fn find_macro_impl_member(
             }))
         });
     pairs.next().filter(|_| !written && pairs.next().is_none())
+}
+
+/// The label of the target, or the reason it is withheld, with the record of the lookup.
+pub(crate) type BuiltinConstantMemberOutcome = (Result<String, &'static str>, Value);
+
+/// REQ-RUST-063.0 M6, M7: the method `method` of `core` called on a receiver that is the
+/// one value path `first`, a const of a builtin type: `u8::MAX`. `None` when the path
+/// is not `B::NAME` with `B` resolved to a builtin type; else the target, or the reason
+/// it is withheld, with the record of the lookup.
+pub(crate) fn find_builtin_constant_member(
+    span: &Value,
+    first: &Value,
+    method: &str,
+    context: &ImplHeaderSourceContext<'_>,
+    members: &ImplMemberLookupIndex,
+    declarations: &[Value],
+) -> Result<Option<BuiltinConstantMemberOutcome>, ImplHeaderSourceError> {
+    let Some(((prefix, name), start)) = first["path_source_text"]
+        .as_str()
+        .and_then(read_type_relative_parts)
+        .filter(|(prefix, _)| *prefix != "Self")
+        .zip(first["span_byte_start_offset"].as_u64())
+    else {
+        return Ok(None);
+    };
+    let source = json!({
+        "span_byte_start_offset":start,
+        "span_byte_end_offset":start + prefix.len() as u64,
+        "type_simple_path_flag":true
+    });
+    let looked_up = context.resolve_type(span, &source, false)?;
+    let Some((prefix_evidence, builtin)) = members
+        .find_type_member_target(prefix, &looked_up, name, "CONST")
+        .map(|found| found.member_lookup_evidence)
+        .and_then(|evidence| {
+            let builtin = evidence["self_type_builtin_name"].as_str()?.to_owned();
+            is_hld_builtin_type(&builtin).then_some((evidence, builtin))
+        })
+    else {
+        return Ok(None);
+    };
+    // The workspace gives the type no member of this name: the proof the `reads`
+    // resolver stores for the same path.
+    let workspace = members.find_builtin_member_name(&prefix_evidence, name);
+    let constant = find_macro_impl_member(declarations, &builtin, name, "const").filter(|found| {
+        matches!(found["member_written_type_text"].as_str(), Some(text) if text == "Self" || text == builtin)
+    });
+    let member = find_macro_impl_member(declarations, &builtin, method, "fn");
+    let site = &member.as_ref().unwrap_or(&Value::Null)["macro_body_item_site_value"];
+    let record = json!({
+        "receiver_type_proof_kind":"builtin_constant_declared_type",
+        "receiver_constant_path_text":first["path_source_text"],
+        "receiver_prefix_member_evidence":prefix_evidence,
+        "receiver_type_text":builtin,
+        "receiver_constant_member_proof":constant,
+        "method_macro_member_proof":member,
+        "method_probe_step_text":"receiver type, by value",
+        "declaration_source_relative_path":site["declaration_source_relative_path"],
+        "member_name_start_offset":site["member_name_start_offset"],
+        "member_name_end_offset":site["member_name_end_offset"],
+        "method_probe_unread_source":["alloc", "std"],
+        "lookup_assumption_values":[]
+    });
+    let outcome = match (workspace, &constant, &member) {
+        (Some(Err(reason)), _, _) => Err(reason),
+        (Some(Ok(_)), Some(_), Some(_)) => Ok(format!("{builtin}::{method}")),
+        _ => Err("builtin_macro_member_unproven"),
+    };
+    Ok(Some((outcome, record)))
 }
