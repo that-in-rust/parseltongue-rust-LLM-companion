@@ -313,7 +313,8 @@ fn test_original_member_graph_roundtrip() {
             )
         })
         .collect::<Vec<_>>();
-    assert_eq!(local.len(), 43, "original items, impl members included");
+    // 43 items and the two fields `Buffer::bytes` and `DecimalPairs::0` (REQ-RUST-071.0).
+    assert_eq!(local.len(), 45, "original items, impl members included");
     assert!(
         local
             .iter()
@@ -2375,8 +2376,8 @@ fn test_core_member_rows_published() {
         added
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
-    assert_eq!((151, 684), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((170, 684), (nodes.len(), edges));
+    assert_eq!((153, 686), (excluded_nodes.len(), excluded_edges));
+    assert_eq!((172, 686), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -2706,9 +2707,9 @@ fn test_itoa_reads_row_counts() {
             );
         }
     }
-    // G7: `i128::MAX_STR_LEN` is read by `Buffer::new` and, as the array length of its field,
-    // by the struct `Buffer`.
-    let buffer = locate_original_kind_node(&input, &spans, "Buffer", "STRUCT");
+    // G7: `i128::MAX_STR_LEN` is read by `Buffer::new` and, as its array length, by the
+    // field `Buffer::bytes` (REQ-RUST-071.0 E1).
+    let buffer = locate_original_kind_node(&input, &spans, "bytes", "RECORD_FIELD");
     let mut sources = rows
         .iter()
         .filter(|(_, site)| *site == "i128::MAX_STR_LEN")
@@ -2829,7 +2830,7 @@ fn test_itoa_imports_row_counts() {
             "core::str"
         ]
     );
-    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(input.input_node_records.len(), 153);
 }
 
 /// Reads the stored graph a second time and checks the rows of one relation: the expected
@@ -3039,7 +3040,7 @@ fn test_generated_item_node_counts() {
         [5, 12, 12, 12, 4]
     );
     assert_eq!(generated.len(), 45);
-    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(input.input_node_records.len(), 153);
     let area = input
         .input_node_records
         .iter()
@@ -3073,8 +3074,9 @@ fn test_generated_item_node_counts() {
             .iter()
             .filter(|edge| edge.edge_relation_kind_value == HldRelationKindValue::Contains)
             .count(),
-        // 88 rows to items and two from a module to its file area (REQ-RUST-070.0).
-        90
+        // 88 rows to items, two from a module to its file area (REQ-RUST-070.0) and two
+        // from a struct to its field (REQ-RUST-071.0 C1).
+        92
     );
 }
 
@@ -3200,7 +3202,7 @@ fn test_generates_edge_row_counts() {
     let mut counts = rows_per_call.values().copied().collect::<Vec<_>>();
     counts.sort_unstable();
     assert_eq!(counts, [1, 1, 1, 1, 3, 3, 7, 7, 7, 7, 7]);
-    assert_eq!(input.input_edge_records.len(), 684);
+    assert_eq!(input.input_edge_records.len(), 686);
 }
 
 /// REQ-RUST-051.0 E1-E5, E8: each of itoa's 15 macro call nodes has exactly one `expands`
@@ -3316,8 +3318,9 @@ fn test_generated_nodes_read_twice() {
     assert_eq!(input.input_node_records, again.input_node_records);
     assert_eq!(input.input_edge_records, again.input_edge_records);
     check_relation_rows_twice(HldRelationKindValue::Generates, 45);
-    // 88 rows to items and two from a module to its file area (REQ-RUST-070.0).
-    check_relation_rows_twice(HldRelationKindValue::Contains, 90);
+    // 88 rows to items, two from a module to its file area (REQ-RUST-070.0) and two from
+    // a struct to its field (REQ-RUST-071.0 C1).
+    check_relation_rows_twice(HldRelationKindValue::Contains, 92);
 }
 
 /// REQ-RUST-050.0 L1, L3, L4: every node label is distinct on itoa, none carries the
@@ -3331,8 +3334,8 @@ fn test_node_labels_all_distinct() {
         .iter()
         .map(|node| node.node_qualified_path_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(input.input_node_records.len(), 151);
-    assert_eq!(labels.len(), 151, "every label is distinct");
+    assert_eq!(input.input_node_records.len(), 153);
+    assert_eq!(labels.len(), 153, "every label is distinct");
     assert!(
         labels.iter().all(|label| !label.contains("file:///")),
         "no label carries the checkout path"
@@ -4155,7 +4158,11 @@ fn test_item_initializer_read_rows() {
                 },
             )
         })
-        .filter(|(source, ..)| source.ends_with("MAX_STR_LEN") || source.ends_with("Buffer"))
+        .filter(|(source, ..)| {
+            ["MAX_STR_LEN", "Buffer", "Buffer::bytes"]
+                .iter()
+                .any(|end| source.ends_with(end))
+        })
         .collect::<Vec<_>>();
     rows.sort();
     let row = |source: String, text: String, target: String| (source, text, target);
@@ -4190,8 +4197,9 @@ fn test_item_initializer_read_rows() {
                 )
             }),
     )
+    // REQ-RUST-071.0 E1: the array length is read by the field, not by its struct.
     .chain([row(
-        "Buffer".to_owned(),
+        "Buffer::bytes".to_owned(),
         "i128::MAX_STR_LEN".to_owned(),
         "<i128 as Integer>::MAX_STR_LEN".to_owned(),
     )])
@@ -4857,7 +4865,7 @@ fn test_itoa_external_path_calls() {
             "core::str::from_utf8_unchecked",
         ]
     );
-    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(input.input_node_records.len(), 153);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: each of the 13 `MaybeUninit<u8>` type uses targets the node
@@ -4952,7 +4960,7 @@ fn test_itoa_external_type_uses() {
         })
         .collect::<Vec<_>>();
     assert_eq!(open, Vec::<String>::new());
-    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(input.input_node_records.len(), 153);
 }
 
 /// REQ-RUST-053.0 N1, N3, N4: the three traits `Buffer` implements and the supertrait bound
@@ -5041,7 +5049,7 @@ fn test_itoa_prelude_name_targets() {
     assert_eq!(open(Some(HldRelationKindValue::Implements)), 0);
     assert_eq!(open(Some(HldRelationKindValue::UsesType)), 0);
     assert_eq!(open(None), 133);
-    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(input.input_node_records.len(), 153);
 }
 
 /// REQ-RUST-053.0 N3, N4, N6: a member reached through a builtin type that no impl in itoa
@@ -5170,7 +5178,7 @@ fn test_itoa_builtin_member_targets() {
         assert_eq!(metadata["call_shape_kind"], "method_call");
         assert!(metadata["external_target_proof_record"].is_null());
     }
-    assert_eq!(input.input_node_records.len(), 151);
+    assert_eq!(input.input_node_records.len(), 153);
 }
 
 /// The stored edge rows of the full item graph of a one-file crate `source`, which must
@@ -6341,7 +6349,7 @@ fn test_itoa_core_member_targets() {
         )
     );
     assert_eq!(
-        (170, 684, 197, 1),
+        (172, 686, 197, 1),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),
@@ -6392,7 +6400,7 @@ fn test_empty_home_graph_published() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(
-        (170, 684),
+        (172, 686),
         (
             read_published_stage_rows(&database, "item-effective-visibility-records").len(),
             read_published_stage_rows(&database, "edge-evidence-record-table").len()

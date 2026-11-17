@@ -35,7 +35,6 @@ SELECT span.*, CASE
             AND a.payload = span.payload AND a.parent_kind IN ('FN', 'CONST', 'STATIC', 'TYPE_ALIAS')
     ) THEN 'body-evidence'
     WHEN syntax_kind = 'IMPL' THEN 'impl-record'
-    WHEN syntax_kind IN ('VARIANT', 'RECORD_FIELD', 'TUPLE_FIELD') THEN 'deferred-member'
     ELSE 'included' END AS projection_state
 FROM "generated-item-source-spans" span;
 
@@ -57,7 +56,7 @@ SELECT area.*, span.payload AS span_payload,
     coalesce((SELECT to_json(list(json_extract_string(a.parent_payload, '$.span_declared_name_value') ORDER BY a.parent_start))
         FROM "generated-item-source-ancestors" a
         WHERE a.generation_key = span.generation_key AND a.attempt_key = span.attempt_key
-            AND a.payload = span.payload AND a.parent_kind IN ('MODULE', 'TRAIT')), '[]') AS lexical_names,
+            AND a.payload = span.payload AND a.parent_kind IN ('MODULE', 'TRAIT', 'STRUCT', 'UNION', 'ENUM', 'VARIANT')), '[]') AS lexical_names,
     coalesce((SELECT to_json(list(json_object('header', header.payload::JSON, 'member', member.value)))
         FROM "frozen-generation-source-records" header, json_each(header.payload, '$.impl_member_occurrence_rows') member
         WHERE header.generation_key = span.generation_key AND header.attempt_key = span.attempt_key
@@ -101,7 +100,7 @@ LEFT JOIN LATERAL (
 LEFT JOIN LATERAL (
     SELECT a.parent_payload FROM "generated-item-source-ancestors" a
     WHERE a.generation_key = span.generation_key AND a.attempt_key = span.attempt_key
-        AND a.payload = span.payload AND a.parent_kind IN ('MODULE', 'TRAIT')
+        AND a.payload = span.payload AND a.parent_kind IN ('MODULE', 'TRAIT', 'STRUCT', 'UNION', 'ENUM', 'VARIANT')
     ORDER BY a.parent_end - a.parent_start LIMIT 1
 ) container ON true
 LEFT JOIN LATERAL (

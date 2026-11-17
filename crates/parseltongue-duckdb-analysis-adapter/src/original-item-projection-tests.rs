@@ -106,13 +106,28 @@ impl OriginalGraphFixtureStore {
         span
     }
 
+    /// One ownership range for each span that no other span of `spans` encloses.
+    fn insert_fixture_ownership_ranges<'a>(&mut self, spans: impl Iterator<Item = &'a Value>) {
+        let spans = spans.collect::<Vec<_>>();
+        for span in &spans {
+            let start = span["span_byte_start_offset"].as_u64().unwrap();
+            let end = span["span_byte_end_offset"].as_u64().unwrap();
+            if !spans.iter().any(|other| {
+                other["span_byte_start_offset"].as_u64().unwrap() < start
+                    && other["span_byte_end_offset"].as_u64().unwrap() > end
+            }) {
+                self.insert_source_fixture_row("span-byte-ownership-ranges", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":start, "span_byte_end_offset":end, "span_gap_classification_kind":"item", "span_expansion_provenance_chain":[]}));
+            }
+        }
+    }
+
     fn insert_fixture_impl_header(&mut self, implementation: &Value, member: &Value, body: bool) {
         self.insert_source_fixture_row("impl-header-index-table", json!({"impl_source_occurrence_key":implementation["span_semantic_occurrence_key"], "impl_semantic_occurrence_key":encode_fixture_occurrence_value(implementation), "impl_member_occurrence_rows":[{"member_source_occurrence_key":member["span_semantic_occurrence_key"], "member_semantic_occurrence_key":encode_fixture_occurrence_value(member)}], "impl_function_body_ancestry_flag":body, "impl_source_container":{"container_kind_value":"file_area"}}));
     }
 }
 
-fn build_original_fixture_store() -> OriginalGraphFixtureStore {
-    let text = "use crate::Record;\r\nstruct Record;\r\ntrait Trait { fn required(); const VALUE: u8; type Output; }\r\nimpl Record { fn same() {} }\r\nimpl Trait for Record { fn same() { } }\r\nmod nested { mod inner { impl Record { fn deep() {} } use super::Record; } }\r\nfn outer() { impl Record { fn hidden() {} } mod local { fn hidden_too() {} } }\r\nconst VALUE: u8 = { fn const_hidden() {} 1 };\r\n#[cfg(any())] mod disabled { fn off() {} }\r\nfn café() {}\r\nenum Choice { A }\r\n";
+/// A store that holds the unit, root scope, file request and file text of `text`.
+fn build_fixture_store_header(text: &str) -> OriginalGraphFixtureStore {
     let mut source = OriginalGraphFixtureStore {
         rows: BTreeMap::new(),
         bytes: text.as_bytes().to_vec(),
@@ -122,6 +137,40 @@ fn build_original_fixture_store() -> OriginalGraphFixtureStore {
     source.insert_source_fixture_row("syntax-namespace-input-scopes", json!({"scope_cargo_unit_key":"raw-unit", "scope_module_identity_key":{"scope_compilation_unit_key":build_original_fixture_unit(), "scope_semantic_path_parts":[]}}));
     source.insert_source_fixture_row("syntax-file-work-requests", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "file_parse_context_kind":"items", "file_expansion_provenance_chain":[]}));
     source.insert_source_fixture_row("file-source-text-table", json!({"file_source_absolute_path":"/fixture/src/lib.rs", "file_content_digest_full":blake3::hash(text.as_bytes()).to_hex().to_string()}));
+    source
+}
+
+/// REQ-RUST-071.0: a struct, a tuple struct, a union and an enum, with their members.
+fn build_member_fixture_store() -> OriginalGraphFixtureStore {
+    let text = "pub struct Pair { pub left: u8 }\nstruct Tuple(u16);\nunion Either { bits: u32 }\n\
+        pub enum Shape { Dot, Line(i8), Box { side: i16 } }\n";
+    let mut source = build_fixture_store_header(text);
+    let spans = [
+        ("pub struct Pair { pub left: u8 }", "STRUCT", "Pair"),
+        ("pub left: u8", "RECORD_FIELD", "left"),
+        ("struct Tuple(u16);", "STRUCT", "Tuple"),
+        ("u16", "TUPLE_FIELD", "0"),
+        ("union Either { bits: u32 }", "UNION", "Either"),
+        ("bits: u32", "RECORD_FIELD", "bits"),
+        (
+            "pub enum Shape { Dot, Line(i8), Box { side: i16 } }",
+            "ENUM",
+            "Shape",
+        ),
+        ("Dot", "VARIANT", "Dot"),
+        ("Line(i8)", "VARIANT", "Line"),
+        ("i8", "TUPLE_FIELD", "0"),
+        ("Box { side: i16 }", "VARIANT", "Box"),
+        ("side: i16", "RECORD_FIELD", "side"),
+    ]
+    .map(|(text, kind, name)| source.insert_fixture_span_record(text, kind, name, true));
+    source.insert_fixture_ownership_ranges(spans.iter());
+    source
+}
+
+fn build_original_fixture_store() -> OriginalGraphFixtureStore {
+    let text = "use crate::Record;\r\nstruct Record;\r\ntrait Trait { fn required(); const VALUE: u8; type Output; }\r\nimpl Record { fn same() {} }\r\nimpl Trait for Record { fn same() { } }\r\nmod nested { mod inner { impl Record { fn deep() {} } use super::Record; } }\r\nfn outer() { impl Record { fn hidden() {} } mod local { fn hidden_too() {} } }\r\nconst VALUE: u8 = { fn const_hidden() {} 1 };\r\n#[cfg(any())] mod disabled { fn off() {} }\r\nfn café() {}\r\nenum Choice { A }\r\n";
+    let mut source = build_fixture_store_header(text);
     let mut spans = BTreeMap::new();
     for (text, kind, name, active) in [
         ("use crate::Record;", "USE", "", true),
@@ -199,16 +248,7 @@ fn build_original_fixture_store() -> OriginalGraphFixtureStore {
     ] {
         source.insert_fixture_impl_header(&spans[implementation], &spans[member], body);
     }
-    for span in spans.values() {
-        let start = span["span_byte_start_offset"].as_u64().unwrap();
-        let end = span["span_byte_end_offset"].as_u64().unwrap();
-        if !spans.values().any(|other| {
-            other["span_byte_start_offset"].as_u64().unwrap() < start
-                && other["span_byte_end_offset"].as_u64().unwrap() > end
-        }) {
-            source.insert_source_fixture_row("span-byte-ownership-ranges", json!({"unit_compilation_identity_key":"raw-unit", "file_source_absolute_path":"/fixture/src/lib.rs", "span_byte_start_offset":start, "span_byte_end_offset":end, "span_gap_classification_kind":"item", "span_expansion_provenance_chain":[]}));
-        }
-    }
+    source.insert_fixture_ownership_ranges(spans.values());
     source
 }
 
@@ -362,9 +402,10 @@ fn test_impl_body_members_excluded() {
     let source = build_original_fixture_store();
     let before = source.rows.clone();
     let input = derive_fixture_graph_input(&source).unwrap();
-    assert_eq!(input.input_node_records.len(), 18);
-    // 16 rows to items, and the crate root's row to its file area (REQ-RUST-070.0 A1).
-    assert_eq!(input.input_edge_records.len(), 17);
+    // The variant `Choice::A` is a node (REQ-RUST-071.0 N1).
+    assert_eq!(input.input_node_records.len(), 19);
+    // 17 rows to items, and the crate root's row to its file area (REQ-RUST-070.0 A1).
+    assert_eq!(input.input_edge_records.len(), 18);
     for name in [
         "hidden",
         "hidden_too",
@@ -372,7 +413,6 @@ fn test_impl_body_members_excluded() {
         "local",
         "off",
         "disabled",
-        "A",
     ] {
         assert!(
             !input.input_node_records.iter().any(|node| node
@@ -877,4 +917,89 @@ fn test_reject_corrupt_file_digest() {
         derive_fixture_graph_input(&source),
         Err(OriginalSourceProjectionError::InvalidEvidence(_))
     ));
+}
+
+/// REQ-RUST-071.0 N1, N2, N4, C1: each field and variant of a struct, union and enum is a
+/// node with the kind and owner kind of N4, labelled under its owner, and contained by
+/// that owner alone.
+#[test]
+fn test_member_nodes_are_projected() {
+    let input = derive_fixture_graph_input(&build_member_fixture_store()).unwrap();
+    let label = |reference: &HldTargetIdentityValue| {
+        input
+            .input_node_records
+            .iter()
+            .find(|node| &node.node_target_reference == reference)
+            .map(|node| {
+                node.node_qualified_path_text
+                    .rsplit_once("lib.rs::")
+                    .map_or(node.node_qualified_path_text.as_str(), |(_, name)| name)
+            })
+            .unwrap()
+    };
+    let mut members = input
+        .input_node_records
+        .iter()
+        .filter(|node| {
+            matches!(
+                node.node_item_kind_value,
+                Some(HldItemKindValue::Field | HldItemKindValue::EnumVariant)
+            )
+        })
+        .map(|node| {
+            let containers = input
+                .input_edge_records
+                .iter()
+                .filter(|edge| {
+                    edge.edge_relation_kind_value == HldRelationKindValue::Contains
+                        && edge.edge_resolution_value
+                            == HldEdgeResolutionValue::Extracted {
+                                target: node.node_target_reference.clone(),
+                            }
+                })
+                .map(|edge| label(&edge.edge_source_reference))
+                .collect::<Vec<_>>();
+            (
+                label(&node.node_target_reference),
+                node.node_item_kind_value.unwrap(),
+                node.node_owner_kind_value.unwrap(),
+                containers,
+            )
+        })
+        .collect::<Vec<_>>();
+    members.sort_by_key(|member| member.0);
+    use HldItemKindValue::{EnumVariant, Field};
+    use HldOwnerKindValue as Owner;
+    assert_eq!(
+        members,
+        vec![
+            ("Either::bits", Field, Owner::Union, vec!["Either"]),
+            ("Pair::left", Field, Owner::Struct, vec!["Pair"]),
+            ("Shape::Box", EnumVariant, Owner::Enum, vec!["Shape"]),
+            (
+                "Shape::Box::side",
+                Field,
+                Owner::EnumVariant,
+                vec!["Shape::Box"]
+            ),
+            ("Shape::Dot", EnumVariant, Owner::Enum, vec!["Shape"]),
+            ("Shape::Line", EnumVariant, Owner::Enum, vec!["Shape"]),
+            (
+                "Shape::Line::0",
+                Field,
+                Owner::EnumVariant,
+                vec!["Shape::Line"]
+            ),
+            ("Tuple::0", Field, Owner::Struct, vec!["Tuple"]),
+        ]
+    );
+    // Nodes: four types, eight members, the file area and the crate root. Rows: one to
+    // each type and member, and the crate root's to the file area.
+    assert_eq!(
+        (
+            input.input_node_records.len(),
+            input.input_edge_records.len()
+        ),
+        (14, 13)
+    );
 }

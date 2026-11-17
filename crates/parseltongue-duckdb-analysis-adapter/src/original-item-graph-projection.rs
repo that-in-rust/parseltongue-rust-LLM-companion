@@ -474,6 +474,11 @@ fn decode_original_item_kinds(
             "TRAIT" => HldOwnerKindValue::Trait,
             "IMPL" => HldOwnerKindValue::Impl,
             "EXTERN_BLOCK" => HldOwnerKindValue::ExternBlock,
+            // REQ-RUST-071.0 N4: the owner of a field or of a variant.
+            "STRUCT" => HldOwnerKindValue::Struct,
+            "UNION" => HldOwnerKindValue::Union,
+            "ENUM" => HldOwnerKindValue::Enum,
+            "VARIANT" => HldOwnerKindValue::EnumVariant,
             other => {
                 return Err(OriginalSourceProjectionError::UnsupportedActiveSyntax {
                     syntax_kind: other.into(),
@@ -485,7 +490,20 @@ fn decode_original_item_kinds(
         owner_kind,
         HldOwnerKindValue::Trait | HldOwnerKindValue::Impl
     );
+    let field_owner = matches!(
+        owner_kind,
+        HldOwnerKindValue::Struct | HldOwnerKindValue::Union | HldOwnerKindValue::EnumVariant
+    );
+    let variant_owner = owner_kind == HldOwnerKindValue::Enum;
     let kind = match required_string(span, "span_syntax_kind_value", "span-reference-text-table")? {
+        "RECORD_FIELD" | "TUPLE_FIELD" if field_owner => HldItemKindValue::Field,
+        "VARIANT" if variant_owner => HldItemKindValue::EnumVariant,
+        // Nothing else is written directly in a struct, union, enum or variant.
+        other if field_owner || variant_owner => {
+            return Err(OriginalSourceProjectionError::UnsupportedActiveSyntax {
+                syntax_kind: other.into(),
+            });
+        }
         "FN" if associated => HldItemKindValue::AssociatedFunction,
         "FN" => HldItemKindValue::Function,
         "CONST" if associated => HldItemKindValue::AssociatedConstant,

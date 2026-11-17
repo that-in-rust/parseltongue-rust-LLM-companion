@@ -119,6 +119,12 @@ pub fn resolve_node_visibility_fields(
                 (HldNodeInputCategory::LocalItem, _, Some(HldOwnerKindValue::Trait)) => {
                     NodeReachOwner::TraitMember(container())
                 }
+                // REQ-RUST-071.0 F1: a variant, and a field of one, take the enum's fields.
+                (
+                    HldNodeInputCategory::LocalItem,
+                    _,
+                    Some(HldOwnerKindValue::Enum | HldOwnerKindValue::EnumVariant),
+                ) => NodeReachOwner::VariantMember(container()),
                 (HldNodeInputCategory::LocalItem, ..) => NodeReachOwner::Container(container()),
                 _ => return None,
             };
