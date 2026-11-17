@@ -1,9 +1,9 @@
 # Markdown review coverage
 
 **The review inventory accounts for all 393 repository Markdown paths and 34 supplemental
-research paths frozen for this CLI ideation pass.** The inventory and curated API backlog
-are being published in separate, small documentation commits; this page records the
-completed coverage reconciliation, not CLI implementation or producer acceptance.
+research paths frozen for this CLI ideation pass.** The [complete inventory](markdown-source-inventory.md)
+and [curated CLI backlog](CLI-query-backlog.md) are published in separate, small documentation
+commits. This page records coverage reconciliation, not CLI implementation or producer acceptance.
 
 ## Frozen inputs and reading treatment
 
