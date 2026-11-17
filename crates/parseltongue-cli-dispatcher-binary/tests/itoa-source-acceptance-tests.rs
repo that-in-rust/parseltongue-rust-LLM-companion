@@ -5482,6 +5482,8 @@ fn derive_expected_graph_label(node: &HldNodeInputRecord) -> String {
 /// One text row per expected node: label, category, item kind, kind of owner, file,
 /// the macro call that generates it, and whether it is declared in a function body
 /// (REQ-RUST-044.1 N1).
+/// REQ-RUST-069.0 A1: and its effective visibility, whether it is reachable from outside
+/// the crate, and its signature.
 fn collect_expected_node_rows(name: &str) -> std::collections::BTreeSet<String> {
     let read_optional_text = |value: &Value| {
         value
@@ -5494,7 +5496,7 @@ fn collect_expected_node_rows(name: &str) -> std::collections::BTreeSet<String> 
         .iter()
         .map(|node| {
             format!(
-                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={} | at={} | external={}",
+                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={} | at={} | external={} | visibility={} | reachable={} | signature={}",
                 node["label"].as_str().unwrap(),
                 node["node_category"].as_str().unwrap(),
                 read_optional_text(&node["item_kind"]),
@@ -5506,7 +5508,12 @@ fn collect_expected_node_rows(name: &str) -> std::collections::BTreeSet<String> 
                     .as_array()
                     .map(|range| format!("{}..{}", range[0], range[1]))
                     .unwrap_or_else(|| "none".to_string()),
-                read_optional_text(&node["external_name_kind"])
+                read_optional_text(&node["external_name_kind"]),
+                read_optional_text(&node["effective_visibility"]),
+                node["reachable_outside_crate"]
+                    .as_bool()
+                    .map_or("none".to_string(), |flag| flag.to_string()),
+                read_optional_text(&node["signature"])
             )
         })
         .collect()
@@ -5548,6 +5555,7 @@ fn collect_production_node_rows(
         "external_definition" => "external_name".to_string(),
         "builtin" => "builtin_type".to_string(),
         "macro_invocation" => "macro_call".to_string(),
+        "private_equivalent" => "private".to_string(),
         other => other.to_string(),
     };
     input
@@ -5555,7 +5563,7 @@ fn collect_production_node_rows(
         .iter()
         .map(|node| {
             format!(
-                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={} | at={} | external={}",
+                "{} | {} | kind={} | owner={} | file={} | generated_by={} | in_function_body={} | at={} | external={} | visibility={} | reachable={} | signature={}",
                 derive_expected_graph_label(node),
                 name_debug_value(format!("{:?}", node.node_input_category)),
                 node.node_item_kind_value
@@ -5571,7 +5579,13 @@ fn collect_production_node_rows(
                     .unwrap_or("none"),
                 node.node_function_body_ancestry_flag,
                 derive_stored_node_position(&node.node_target_reference),
-                derive_stored_external_kind(&node.node_target_reference)
+                derive_stored_external_kind(&node.node_target_reference),
+                node.node_effective_visibility_kind
+                    .map(|kind| name_debug_value(format!("{kind:?}")))
+                    .unwrap_or_else(|| "none".to_string()),
+                node.node_reachable_outside_crate_flag
+                    .map_or("none".to_string(), |flag| flag.to_string()),
+                node.node_signature_text.as_deref().unwrap_or("none")
             )
         })
         .collect()
