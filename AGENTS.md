@@ -60,6 +60,8 @@ Graph rules in force:
 
 - Every item outside a function body is a node, private items included.
 - Each source file has one file-area node. Each `use` is a node.
+- A module contains the file area of its file: the crate root that of the root file, a
+  `mod name;` module that of the file it names (SPEC part 12).
 - Edges are stored uncollapsed. Relation kinds: `contains`, `calls`, `imports`, `uses_type`,
   `reads`, `implements`, `reexports`, `derives`, and for macros `generates` and `expands`.
 - One edge row per source site. Two sites with the same source, relation and target are two

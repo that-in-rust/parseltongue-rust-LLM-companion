@@ -215,7 +215,9 @@ Edges:
   metadata. It never fans out to implementations.
 - **F5** `pub use` gives one `reexports` edge per resolved binding. itoa has none.
 - **F6** Every extracted edge is stored, private to private included. Nothing is collapsed.
-- **F7** A file-area node `contains` each top-level node of its file.
+- **F7** A file-area node `contains` each top-level node of its file. The crate root
+  `contains` the file area of the root file, and a `mod name;` module that of the file it
+  names; an inline module has no file area.
 - **F8** A `use` node `imports` each item it binds.
 - **F9** A function `reads` each const or static it reads.
 - **F10** A function has edges only to what it uses, never to every import in scope.

@@ -21,7 +21,7 @@ run report is in the [log](LOG-itoa-full-item-graph-progress.md).**
 itoa run, scope declarations, equal to the frozen expected graph
 nodes  170    88 items of itoa, 66 names outside itoa (19 of them methods declared in core),
               13 builtin types, 2 file areas, 1 crate root
-edges  682    calls 197 (196 with a target), uses_type 203, reads 98, contains 88,
+edges  684    calls 197 (196 with a target), uses_type 203, reads 98, contains 90,
               generates 45, expands 15, implements 32, imports 4
 open          the items under "Open" below; the expected graph was checked by its author alone
 ```
@@ -42,7 +42,7 @@ Graph rules:
 1. Nodes: every module, function, struct, enum, trait, type alias, const, static and associated
    item, private items included. Nothing inside a function body. Impl blocks are not nodes.
 2. One file-area node per source file, separate from its module node. It contains the file's
-   top-level nodes.
+   top-level nodes, and the module whose file it is contains it.
 3. Each `use` outside a function body is a node, with one `imports` edge per resolved binding.
 4. An inline module is an ordinary module node with its own scope.
 5. Every extracted edge is stored uncollapsed, private to private included. The edge type has
@@ -143,6 +143,7 @@ done  Buffer::new --reads--> <i128 as Integer>::MAX_STR_LEN
 done  Buffer::format --calls--> core::hint::unreachable_unchecked   the use node is evidence
 done  use nodes of lib.rs --imports--> core::hint, core::mem, core::mem::MaybeUninit, core::str
 done  file-area nodes --contains--> their top-level nodes
+done  crate root and each `mod name;` module --contains--> the file area of its file (part 12)
 done  whole library equal to the frozen expected graph (A1–A6), at `822da80cf`
 done  part 8: a target for 132 of the 133 method calls into `core`; a `declarations` run
       equal to its frozen expected graph, at `753665eb9`
@@ -176,6 +177,10 @@ general behaviour, nothing keyed on itoa names.
 - **Containment:** each item has one lexical source container. File-level items and impl
   members belong to the file area; nested items belong to their inline module or trait. Impl
   identity, self type and trait are metadata, never a second parent.
+- **Module and file area (OD-7, decided 2026-11-17 by Rule 6, SPEC part 12).** A module
+  `contains` the file area of its file: the crate root that of the root file, and a
+  `mod name;` module that of the file it names. The relation is `contains` because a file
+  area had no container, so no node gains a second parent. Cost on itoa: 2 edge rows.
 - **Missing source (2026-11-14).** Codebases are expected to be partial or broken, so an edge
   is one of three things: *proven* (every candidate was visible in source); *proven, gap* (one
   target found, and the edge names the source that was missing, so it is correct if the code
@@ -378,13 +383,12 @@ general behaviour, nothing keyed on itoa names.
   the store's file identity is the absolute path, and the run id hashes those rows. Not
   fixed.
 - **Enum variants and struct fields:** nodes, or evidence only.
-- **File module and file area:** how a file's module node relates to its file-area node.
 - **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for
   sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
   are compared (A4).
 
-The expected graph was frozen without variant or field nodes and without an edge from a
-file's module to its file area. Deciding either point needs a new freeze.
+The expected graph is frozen without variant or field nodes. Deciding that point needs a
+new freeze.
 
 ### Out of scope
 

@@ -12,6 +12,12 @@ run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method ca
 `core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
 and it is an expected row. The expected graph was written and checked by one author.**
 
+**Since that run the code has changed (2026-11-17, SPEC parts 10 and 12): the `json`
+extension is inside the executable, and each module contains the file area of its file,
+which adds two `contains` rows (684 edge rows). Both expected graphs are re-frozen with
+those rows and the two equality tests pass, but S1 to S4 are NOT STARTED for this head.
+They run once, after parts 11 and 13 to 15.**
+
 **A separate crate copies the exported graph into one DuckDB file, and the full run from
 pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
 170 of 170 and 682 of 682 (under "What is left").**
@@ -46,11 +52,11 @@ real-source tests             58 pass        61 pass
 nodes  170   88 items of itoa (45 written by macro expansions), 66 names outside itoa
              (19 of them methods declared in core), 13 builtin types, 2 file areas,
              1 crate root
-edges  682   relation    rows  with a target
+edges  684   relation    rows  with a target
              calls        197   196   (cast has none)
              uses_type    203   203
              reads         98    98
-             contains      88    88
+             contains      90    90   (88 to items, 2 from a module to its file area)
              generates     45    45
              expands       15    15
              implements    32    32
@@ -1575,4 +1581,38 @@ path with `.duckdb/`.** REQ-RUST-068.0 A1 to A4 pass. S1 to S4: NOT STARTED for 
   `trace_path derive_original_graph_input` (both, depth 2) for part 12.
 - **Next:** part 12: the two rows added to the expected graph, then a failing real-source
   test, then the projection.
+
+## 2026-11-17 Part 12 built: a module contains the file area of its file
+
+**The crate root and `u128_ext` each have a `contains` row to the file area of their file,
+and a run equals both re-frozen expected graphs: 170 nodes, 684 edge rows (scope
+`declarations`).** REQ-RUST-070.0 A1 to A6 pass. S1 to S4: NOT STARTED for this head.
+
+- **Rows:** `itoa` to `area:src/lib.rs`, sited at the whole file; `u128_ext` to
+  `area:src/u128_ext.rs`, sited at `mod u128_ext;` (`src/lib.rs`, bytes 1980 to 1993).
+  The inline module `private` has no such row.
+- **Order:** expected rows and re-freeze `d52a528a2`; failing test `aafaeb186`; code
+  `b32b47200`.
+- **RED:** `test_module_file_area_rows`, 0 passed, 1 failed (expected two rows, stored
+  none). **GREEN:** 1 passed, 16.5 s.
+- **How:** the stored `module-source-closure-requests` row of a `mod name;` declaration
+  is joined in DuckDB to the declaration's span and to the file the run read
+  (`module-file-area-projection.sql`, `build_module_area_records`). The crate-root row is
+  built from the unit's root path (`build_root_area_edge`). A declaration naming two read
+  files is an error, not a choice.
+- **Gates:** formatting exit 0; clippy on the two crates exit 0; adapter tests 188
+  passed; real-source tests 63 passed, 0 failed, 933 s (command in `AGENTS.md`).
+- **Run:** `parseltongue map-workspace-full-run ... --worker-thread-count-value 4
+  --sysroot-source-scope-kind declarations`: exit 0, 22.4 s, 377 MB maximum resident set,
+  170 nodes, 684 edge rows.
+- **Tests changed:** seven real-source tests and two fixture tests stated 682 rows, 88
+  `contains`, or "no edge names the crate root".
+- **Deviation:** the fixture test `test_module_declaration_area_edge` was written after
+  the code. Checked afterwards by turning the new call off: it fails with 1 row, not 2.
+- **Decision recorded:** OD-7 closed in the PRD and the backlog (Rule 6; 2 rows).
+- **codebase-memory:** `trace_path derive_original_graph_input` inbound
+  (`publish_full_graph_checkpoint`, `derive_fixture_graph_input`) and outbound;
+  `trace_path publish_full_graph_checkpoint` outbound (17 callees);
+  `index_repository` after `b32b47200`.
+- **Next:** part 11, node visibility, reachability and signature: spec first.
 

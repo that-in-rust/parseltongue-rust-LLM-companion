@@ -20,7 +20,6 @@ Open:
 
 ```text
 id      decision                                                    state in the frozen graph
-OD-7    How a file's module node relates to its file-area node.     no edge between them
 OD-4    Enum variants and struct fields: nodes, or evidence only.   not nodes; itoa has private
                                                                     fields only
 fields  Visibility, reachability and signature text on nodes.       not filled, not compared
@@ -37,6 +36,9 @@ that reads the graph":
   node (itoa: 3 and 15). A macro-generated item records the call that generated it. A call
   points to the definition it expands by an `expands` row (decided and built 2026-11-16,
   part 5c; itoa: 15 rows).
+
+- **Module and file area (OD-7, decided 2026-11-17 by Rule 6):** a module `contains` the
+  file area of its file. Built in SPEC part 12 (REQ-RUST-070.0); itoa gains 2 rows.
 
 - **Macro-generated items (OD-2, decided 2026-11-15):** identity is the macro call plus the
   item's place in its expansion. The file area or module where the call is written contains

@@ -2,7 +2,8 @@
 
 Back to the [index](README.md).
 
-Status on 2026-11-17: **specified, not built.** Picked by the user on 2026-11-17 ("a walk
+Status on 2026-11-17: **built.** A run of pinned itoa stores the two rows and equals both
+re-frozen expected graphs (section 6). S1 to S4 are not started for this head. Picked by the user on 2026-11-17 ("a walk
 from the crate root finds nothing"). The form is decided by Rule 6: an edge, because it
 tells a reader more than no edge. This closes OD-7 of the backlog.
 
@@ -102,7 +103,30 @@ A6       test_itoa_whole_graph_equality         real source   equal to the re-fr
 
 ## 6. Quality gate results
 
-Not run: nothing is built.
+Measured 2026-11-17 on commit `b32b47200`, release build, `CARGO_BUILD_JOBS=2`.
+
+```text
+12.1        both expected graphs re-frozen with the two rows: 684 sites, 475 rows; the 25
+            expected-data tests pass (commit d52a528a2)
+12.2 RED    test_module_file_area_rows   0 passed, 1 failed: expected the two rows, stored none
+12.3 GREEN  the same test                1 passed, 16.5 s
+            test_module_declaration_area_edge (fixture; written after the code, then checked
+            by turning the new call off: 0 passed, 1 failed, "1 row, not 2")   1 passed
+gates       cargo fmt --all -- --check                                              exit 0
+            cargo clippy --release -p parseltongue-duckdb-analysis-adapter
+              -p parseltongue-cli-dispatcher-binary --all-targets --all-features    exit 0
+            cargo test --release -p parseltongue-duckdb-analysis-adapter            188 passed, 0 failed
+            cargo test --release -p parseltongue-cli-dispatcher-binary
+              --test itoa-source-acceptance-tests -- --test-threads=1               63 passed, 0 failed, 933 s
+run         pinned itoa, scope declarations, 4 workers: exit 0, 22.4 s, 377 MB maximum
+            resident set; 170 nodes, 684 edge rows, 90 `contains`
+```
+
+- A5 and A6 pass: `test_itoa_declarations_graph_equality` and
+  `test_itoa_whole_graph_equality` compare a run with the re-frozen graphs.
+- Seven older real-source tests and two fixture tests stated the old counts (682 rows, 88
+  `contains`) or that the crate root has no edge. They now state the new rows.
+- Not run: the workspace-wide gates (once, after part 15) and S1 to S4.
 
 ## 7. Open questions
 

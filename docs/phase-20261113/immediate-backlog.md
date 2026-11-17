@@ -54,7 +54,9 @@ this self type." It does not say the impl member is called. `Buffer::format` kee
 
 ## 2. Link the crate and each module to their source files
 
-Added 2026-11-16, at the user's request.
+Added 2026-11-16, at the user's request. **Closed 2026-11-17 by SPEC part 12:** the crate
+root and `u128_ext` each have a `contains` row to the file area of their file. The text
+below is the record of the gap.
 
 **The gap.** A walk that starts at the crate finds no source file.
 

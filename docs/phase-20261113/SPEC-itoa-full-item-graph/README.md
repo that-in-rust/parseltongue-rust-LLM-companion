@@ -32,7 +32,7 @@ part  file                                       requirements                   
 8     part-8-method-calls-into-core.md           054.0 to 066.0                 132 of 133 calls named; a `declarations` run equals its frozen expected graph in a test; 1 listed without a target (cast); S1 to S4 passed at `753665eb9`
 9     part-9-graph-export-into-duckdb.md         067.0                          built in a separate crate; the full run of 2026-11-17 gave a DuckDB file equal to the export row for row (log); the mapper is not changed
 10    part-10-json-extension-built-in.md         068.0                          BUILT 2026-11-17: the mapper runs with an empty HOME and opens no `.duckdb/` path; 62 real-source tests pass
-12    part-12-module-contains-file-area.md       070.0                          specified, not built: a module contains the file area of its file (Rule 6; built before part 11)
+12    part-12-module-contains-file-area.md       070.0                          BUILT 2026-11-17: a module contains the file area of its file; a run equals both re-frozen graphs (170 nodes, 684 edge rows); 63 real-source tests pass
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of
