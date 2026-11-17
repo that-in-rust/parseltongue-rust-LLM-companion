@@ -11,7 +11,7 @@ use crate::syntax_namespace_record_codec::encode_symbol_target_value;
 use parseltongue_core_row_types::*;
 use serde_json::{Value, json};
 
-const CORE_FIXTURE_FILES: [(&str, &str); 9] = [
+const CORE_FIXTURE_FILES: [(&str, &str); 10] = [
     (
         "core/src/mem/maybe_uninit.rs",
         "pub union MaybeUninit<T> { value: T }\n\
@@ -70,6 +70,11 @@ const CORE_FIXTURE_FILES: [(&str, &str); 9] = [
          pub const fn ilog10(self) -> u32 { 0 }\n\
          $(#[$m])* pub const fn gated(self) -> u32 { 0 }\n}; }\n",
     ),
+    // REQ-RUST-064.0: `str` has a `len` of its own.
+    (
+        "core/src/str/mod.rs",
+        "impl str { pub const fn len(&self) -> usize { 0 } }\n",
+    ),
 ];
 
 /// The one call edge of `source`, resolved over a store that holds the fixture's `core`
@@ -111,7 +116,49 @@ fn list_core_fixture_edges(
     stray: &str,
     impls: bool,
 ) -> Vec<(HldEdgeInputRecord, Value)> {
-    let (store, input) = make_call_fixture_graph(source);
+    let (store, mut input) = make_call_fixture_graph(source);
+    // REQ-RUST-064.0: a trait contains its methods, as the stored graph says.
+    let spans = read_fixture_table_values(&store, "span-reference-text-table");
+    let place = |span: &Value| {
+        let (start, end) = (
+            span["span_byte_start_offset"].as_u64().unwrap(),
+            span["span_byte_end_offset"].as_u64().unwrap(),
+        );
+        let text = span["span_source_code_text"].as_str().unwrap();
+        (start, end, make_call_fixture_occurrence(start, end, text))
+    };
+    input.input_edge_records = spans
+        .iter()
+        .filter(|owner| owner["span_syntax_kind_value"] == "TRAIT")
+        .flat_map(|owner| {
+            let (start, end, source) = place(owner);
+            spans
+                .iter()
+                .filter(|item| item["span_syntax_kind_value"] == "FN")
+                .map(place)
+                .filter(move |(inner, last, _)| start < *inner && *last <= end)
+                .map(move |(_, _, site)| HldEdgeInputRecord {
+                    run_generation_digest_value: RunGenerationDigestValue([1; 32]),
+                    edge_source_reference: NameSymbolTargetKey::Definition(source.clone()).into(),
+                    edge_relation_kind_value: HldRelationKindValue::Contains,
+                    edge_resolution_value: HldEdgeResolutionValue::Extracted {
+                        target: NameSymbolTargetKey::Definition(site.clone()).into(),
+                    },
+                    edge_evidence_row_key: HldEvidenceRowKey {
+                        evidence_site_occurrence_key: site.clone(),
+                        evidence_source_occurrence_key: NameSymbolTargetKey::Definition(
+                            source.clone(),
+                        )
+                        .into(),
+                        evidence_relation_kind_value: HldRelationKindValue::Contains,
+                        evidence_target_reference_value: Some(
+                            NameSymbolTargetKey::Definition(site).into(),
+                        ),
+                    },
+                    edge_dispatch_metadata_text: None,
+                })
+        })
+        .collect();
     let unit = encode_compilation_unit_value(&make_call_fixture_unit());
     let path_row = |text: &str, start: usize, outcome: Value| {
         let mut row = json!({
@@ -152,6 +199,19 @@ fn list_core_fixture_edges(
     }
     for (start, _) in source.match_indices("usize") {
         extra.push(path_row("usize", start, builtin("usize")));
+    }
+    // A bound on a trait whose source the run did not read.
+    for (start, _) in source.match_indices(": Copy") {
+        extra.push(path_row(
+            "Copy",
+            start + 2,
+            json!({"path_resolution_state_kind":"unresolved",
+                "path_unresolved_reason_kind":"external_source_missing",
+                "path_target_symbol_rows":[]}),
+        ));
+    }
+    for (start, _) in source.match_indices("&str") {
+        extra.push(path_row("str", start + 1, builtin("str")));
     }
     extra.push(make_call_fixture_row(
         "file-source-text-table",
@@ -1029,4 +1089,143 @@ fn test_builtin_constant_receiver_member() {
             withheld("fn f() -> u32 { u8::MAX.0.ilog10() }")
         ])
     );
+}
+
+/// REQ-RUST-064.0 L2 to L8: a method called on a local variable that one plain `let`
+/// binds to a method call has the receiver type the method named declares.
+#[test]
+fn test_local_binding_receiver_member() {
+    let find = |source: &str| {
+        list_core_fixture_edges(source, true, true, "", true)
+            .into_iter()
+            .find(|(_, metadata)| metadata["callee_source_text"] == "len")
+            .unwrap()
+    };
+    let source = "struct Buffer; trait Named { fn name(self, b: &u8) -> &str; } \
+        fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }";
+    let (edge, metadata) = find(source);
+    assert_eq!(
+        make_core_member_target("str::len"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+    assert_eq!("core_inherent_member", metadata["dispatch_kind"]);
+    let lookup = &metadata["core_member_lookup_evidence"];
+    let (statement, returned) = (
+        source.find("let s").unwrap(),
+        source.find("-> &str").unwrap(),
+    );
+    assert_eq!(
+        json!([
+            "local_binding_call_result",
+            "&str",
+            statement,
+            statement + "let s = i.name(b);".len(),
+            ["I", "Named"],
+            "/fixture/src/lib.rs",
+            returned,
+            returned + "-> &str".len(),
+            "core/src/str/mod.rs",
+        ]),
+        json!([
+            lookup["receiver_type_proof_kind"],
+            lookup["receiver_written_type_text"],
+            lookup["binding_statement_start_offset"],
+            lookup["binding_statement_end_offset"],
+            lookup["binding_initializer_bound_walk"]["bound_chain"],
+            lookup["binding_return_type_file_path"],
+            lookup["binding_return_type_start_offset"],
+            lookup["binding_return_type_end_offset"],
+            lookup["declaration_source_relative_path"],
+        ]),
+        "{lookup}"
+    );
+    assert!(lookup["binding_initializer_target_occurrence"].is_object());
+    // L3: a bound trait with no source may declare `name` too. A method that takes `self`
+    // by value is still the one called, if the source compiles.
+    let (edge, metadata) = find(&source.replace("trait Named {", "trait Named: Copy {"));
+    assert_eq!(
+        make_core_member_target("str::len"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+    let lookup = &metadata["core_member_lookup_evidence"];
+    assert_eq!(
+        json!([
+            ["Copy"],
+            [
+                "core_macro_expansions_import_no_trait",
+                "source_compiles_method_resolves"
+            ]
+        ]),
+        json!([
+            lookup["binding_initializer_bound_walk"]["missing_source_traits"],
+            lookup["lookup_assumption_values"]
+        ]),
+        "{lookup}"
+    );
+    let withheld = |source: &str| {
+        let (edge, metadata) = find(source);
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+        metadata["unresolved_detail_kind"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let cases = [
+        // L2: the name is written elsewhere in the unit, so the `let` may match a const.
+        (
+            "local_binding_name_unproven",
+            "trait Named { fn name(self, b: &u8) -> &str; } const s: u8 = 0; \
+             fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+        // L3: no bound names the method of the initializer.
+        (
+            "local_initializer_call_unproven",
+            "trait Named { fn name(self, b: &u8) -> &str; } \
+             fn f<I>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+        // L3: with a bound trait that has no source, a method by reference may lose to
+        // a method of that trait.
+        (
+            "local_initializer_call_unproven",
+            "trait Named: Copy { fn name(&self, b: &u8) -> &str; } \
+             fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+        // L4: an `async fn` returns a future; a function with no return type returns `()`.
+        (
+            "local_initializer_return_unproven",
+            "trait Named { async fn name(self, b: &u8) -> &str; } \
+             fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+        (
+            "local_initializer_return_unproven",
+            "trait Named { fn name(self, b: &u8); } \
+             fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+        // L5: a type each impl may write, and a type of the workspace.
+        (
+            "receiver_type_name_unproven",
+            "trait Named { type Out; fn name(self, b: &u8) -> Self::Out; } \
+             fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+        (
+            "receiver_type_name_unproven",
+            "trait Named { fn name(self, b: &u8) -> &Buffer; } \
+             fn f<I: Named>(i: I, b: &u8) -> usize { let s = i.name(b); s.len() }",
+        ),
+    ];
+    for (reason, source) in cases {
+        assert_eq!(
+            reason,
+            withheld(&format!("struct Buffer; {source}")),
+            "{source}"
+        );
+    }
 }
