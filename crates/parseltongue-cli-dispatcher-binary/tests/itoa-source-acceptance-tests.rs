@@ -2315,7 +2315,8 @@ fn test_core_member_rows_published() {
             "TryInto::try_into",
             "[T]::as_mut_ptr",
             "[T]::get_unchecked",
-            "[T]::len"
+            "[T]::len",
+            "str::len"
         ]
         .into_iter()
         .chain(integer_labels.iter().map(String::as_str))
@@ -2324,7 +2325,7 @@ fn test_core_member_rows_published() {
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
     assert_eq!((151, 682), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((169, 682), (nodes.len(), edges));
+    assert_eq!((170, 682), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -6209,9 +6210,9 @@ fn test_itoa_core_member_targets() {
             .each_ref()
             .map(|label| count_stored_label(label))
     );
-    // Equal to their expected rows: 131 of 133. Without a stored target: 2.
+    // Equal to their expected rows: 132 of 133. Without a stored target: 1, the `cast`.
     assert_eq!(
-        (131, [49, 39, 5, 13, 1, 1, 8, 5]),
+        (132, [49, 39, 5, 13, 1, 1, 8, 5, 1]),
         (
             stored.len(),
             [
@@ -6222,13 +6223,14 @@ fn test_itoa_core_member_targets() {
                 "Iterator::rev",
                 "[T]::as_mut_ptr",
                 "Result<T, E>::expect",
-                "Result<T, E>::unwrap"
+                "Result<T, E>::unwrap",
+                "str::len"
             ]
             .map(count_stored_label)
         )
     );
     assert_eq!(
-        (169, 682, 197, 2),
+        (170, 682, 197, 1),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),
