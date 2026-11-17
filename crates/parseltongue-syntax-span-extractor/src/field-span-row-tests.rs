@@ -101,3 +101,31 @@ fn test_field_site_owner_rows() {
         owners
     );
 }
+
+/// REQ-RUST-071.0 N3: a field inside a function body is no node and binds no name
+/// there, so it neither shadows a called path nor rebinds a receiver of its name.
+#[test]
+fn test_body_field_binds_nothing() {
+    let source = "fn run(buf: Buffer) -> usize {\n    struct Local { buf: u8, Buffer: u8 }\n    \
+        let _ = Buffer::new();\n    buf.len()\n}\n";
+    let sites = extract_file_syntax_rows(&make_call_syntax_input(source))
+        .unwrap()
+        .stage_unit_output_rows
+        .iter()
+        .filter(|row| row.stage_owned_table_name == "body-site-reference-table")
+        .map(|row| serde_json::from_str::<Value>(&row.stage_row_payload_text).unwrap())
+        .collect::<Vec<_>>();
+    let find = |kind: &str| {
+        sites
+            .iter()
+            .find(|site| site["site_syntax_kind_value"] == kind)
+            .unwrap()
+    };
+    assert_eq!(
+        (
+            &find("CALL_EXPR")["call_syntax_evidence"]["call_lexical_shadowing_flag"],
+            &find("METHOD_CALL_EXPR")["call_syntax_evidence"]["method_receiver_evidence"]["receiver_rebinding_flag"]
+        ),
+        (&json!(false), &json!(false))
+    );
+}

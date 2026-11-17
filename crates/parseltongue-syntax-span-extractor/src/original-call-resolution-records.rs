@@ -1950,6 +1950,12 @@ fn find_type_parameter_owner(function: &ast::Fn, name: &str) -> Option<&'static 
     declares(outer).then_some("enclosing_item")
 }
 
+/// An item that can bind its name in the block it is written in. A field has a span row
+/// (REQ-RUST-071.0 N1) and binds nothing.
+fn check_name_binding_item(node: &SyntaxNode) -> bool {
+    crate::check_syntax_item_node(node) && !crate::check_syntax_field_node(node)
+}
+
 /// Conservative: any binding or local item of that name anywhere in the body,
 /// or an earlier macro call that is handed the name, may rebind the receiver.
 fn check_receiver_name_rebound(function: &ast::Fn, call: &ast::MethodCallExpr, name: &str) -> bool {
@@ -1965,7 +1971,7 @@ fn check_receiver_name_rebound(function: &ast::Fn, call: &ast::MethodCallExpr, n
                     .filter_map(|element| element.into_token())
                     .any(|token| token.kind() == SyntaxKind::IDENT && token.text() == name);
         }
-        (node.kind() == SyntaxKind::IDENT_PAT || crate::check_syntax_item_node(&node))
+        (node.kind() == SyntaxKind::IDENT_PAT || check_name_binding_item(&node))
             && node
                 .children()
                 .filter_map(ast::Name::cast)
@@ -2028,7 +2034,7 @@ fn check_call_lexical_shadowing(prefix: &ast::Path, call: &SyntaxNode) -> bool {
                 .any(|node| {
                     // Local items/imports are hoisted; value patterns are conservatively
                     // retained even when their precise activation point is unsupported.
-                    (crate::check_syntax_item_node(&node) || node.kind() == SyntaxKind::IDENT_PAT)
+                    (check_name_binding_item(&node) || node.kind() == SyntaxKind::IDENT_PAT)
                         && node
                             .children()
                             .filter_map(ast::Name::cast)
