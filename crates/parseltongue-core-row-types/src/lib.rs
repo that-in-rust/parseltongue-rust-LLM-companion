@@ -33,6 +33,10 @@ pub use hld_materialization_core_records::*;
 mod node_reach_field_rules;
 pub use node_reach_field_rules::*;
 
+#[path = "workspace-root-path-relocation.rs"]
+mod workspace_root_path_relocation;
+pub use workspace_root_path_relocation::*;
+
 #[path = "configuration-expression-truth-values.rs"]
 mod configuration_expression_truth_values;
 pub use configuration_expression_truth_values::evaluate_cfg_expression_truth;
