@@ -13,6 +13,8 @@ The producer/dataset boundary is unchanged: no new extraction, graph/schema/data
 - Every API ID has one unique four-word `query-...` verb. Exact/prefix/fuzzy are modes of one search verb; snapshot sections are modes of one compare verb. Pagination/truncation are envelope fields/options, not extra verbs. X concept IDs have no verb and are not commands. No `--ndjson` or pagination-only command is added.
 - Shared family evidence/bounds rules are factored into each family page; every entry still states job, operands, outputs, evidence profile, completeness/bounds, dependencies and clickable source citations.
 
+Priority follows agent utility: reach an exact source location first, expose evidence and missing facts before acting, then reduce repeated navigation steps. Advanced graph analytics follow that useful path; repository stars and unmeasured speed/token claims do not determine priority.
+
 ### Curated families
 - [Orientation and capabilities](cli-api-families/01-orientation-capabilities.md)
 - [Symbol and source lookup](cli-api-families/02-symbol-source-lookup.md)
@@ -32,6 +34,7 @@ The producer/dataset boundary is unchanged: no new extraction, graph/schema/data
 5. Distinguish scan/page completeness, semantic resolution, source/build scope and capability availability. Unknown is not zero. Bound rows, bytes, nodes, edges, paths, depth and time. Cursors bind generation/query/filters/order/algorithm version. A budget too small for one evidence-complete record returns typed `too_small`, not malformed JSON or stripped evidence. [response contract (review bundle: supplements/80-repository-synthesis-draft.md L188–L263)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz).
 6. Current source is editable only after digest/range verification; historical source can remain valid historical evidence. No semantic extraction is run while reading source. Token counts require a named tokenizer/version or a labelled estimate; no throughput, latency or token-savings claim without measurement.
 7. External LLM reasoning stays with the caller. Caller-supplied focus IDs, rules, weights or seen receipts affect selection/evaluation only; they never become stored facts or persistent learned memory.
+8. Each operation's future schema must name its total ordering and tie-breaks. Default candidate order is source-relative path, byte start/end, item kind and stable ID (missing values last); heuristic ranks prepend descending score. Site/path results add relation kind and site ID. Algorithm outputs declare their own stable order. Cursors preserve that exact order.
 
 ## Proposed response envelope and exit statuses
 
@@ -44,7 +47,7 @@ JSON is canonical; text is a rendering of the same typed result. The shape below
   "snapshot": {"generation_digest": "<digest>", "attempt_sequence": "<sequence>"},
   "scope": {"mode": "boundary", "paths": ["src/**"]},
   "result_state": "partial",
-  "items": [],
+  "items": [{"item_id": "<published-item-id>", "evidence_ids": ["<published-evidence-id>"]}],
   "completeness": {"scan": "complete", "page": "truncated", "semantic_resolution": "partial", "total": null},
   "continuation": {"receipt": "<self-contained caller-held JSON>"},
   "warnings": []
@@ -117,7 +120,7 @@ Proposed cases (not tests claimed run):
 - a folder rollup reconciles to enumerated leaf contributors and discloses unknown coverage;
 - analytics output is repeatable for identical parameters and reports algorithm/version/seed/direction/relations;
 - caller-supplied rules yield `unknown` where facts are absent, with witnesses for evaluations;
-- snapshot comparison refuses mixed attempt/configuration identity and reports ambiguous item matches;
+- snapshot comparison refuses mixed generation/attempt identity within either input, reports cross-input configuration differences, and preserves ambiguous item matches;
 - choose `none`, `next`, and `quit` are valid protocol transitions without implicit selection.
 
 ## Analytics: keep the formula, reject the story
