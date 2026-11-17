@@ -1074,6 +1074,9 @@ pub(super) struct BoundTraitWalkValue {
     pub(super) bound_trait_targets: Vec<HldTargetIdentityValue>,
 }
 
+/// The methods a bound walk found for one method name, with the walk.
+pub(super) type BoundMethodCandidateValue = (BTreeSet<HldTargetIdentityValue>, BoundTraitWalkValue);
+
 impl BoundTraitWalkValue {
     /// The record an edge carries to say which bounds chose its target.
     pub(super) fn build_walk_evidence_value(&self) -> Value {
@@ -1241,36 +1244,32 @@ pub(super) fn walk_parameter_bound_traits(
 }
 
 /// `parameter.method(..)` where the parameter's declared type is a type
-/// parameter of the enclosing function: the candidates are the methods of the
-/// parameter's bound traits and their supertraits. Exactly one gives an edge to
-/// that trait method; a trait whose source is absent is recorded, not guessed.
-fn resolve_bound_method_target(
+/// parameter of the enclosing function: the methods of that name that the
+/// parameter's bound traits and their supertraits declare, with the walk that
+/// found them. `None` when the receiver is no such parameter, or a bound has a
+/// form the walk cannot prove.
+pub(super) fn list_bound_method_candidates(
     owner_key: &str,
     owner_span: &Value,
     receiver: &Value,
     context: &ImplHeaderSourceContext<'_>,
     index: &BoundMethodLookupIndex,
-    endpoints: &BTreeSet<&HldTargetIdentityValue>,
-) -> Result<(HldEdgeResolutionValue, Value), OriginalCallResolutionError> {
-    let unproven = (
-        unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded),
-        Value::Null,
-    );
+) -> Result<Option<BoundMethodCandidateValue>, OriginalCallResolutionError> {
     let (Some(parameter), Some(method)) = (
         receiver["receiver_parameter_type_text"].as_str(),
         receiver["method_declared_name_value"].as_str(),
     ) else {
-        return Ok(unproven);
+        return Ok(None);
     };
     if receiver["receiver_shape_kind"] != "parameter_identifier"
         || receiver["receiver_generic_owner_kind"] != "function"
         || receiver["receiver_rebinding_flag"] != false
         || owner_span["span_syntax_kind_value"] != "FN"
     {
-        return Ok(unproven);
+        return Ok(None);
     }
     let Some(walk) = walk_parameter_bound_traits(owner_key, parameter, context, index)? else {
-        return Ok(unproven);
+        return Ok(None);
     };
     let candidates = walk
         .bound_trait_targets
@@ -1288,6 +1287,27 @@ fn resolve_bound_method_target(
                 .map(|(_, target)| target.clone())
         })
         .collect::<BTreeSet<_>>();
+    Ok(Some((candidates, walk)))
+}
+
+/// Exactly one candidate of `list_bound_method_candidates` gives an edge to that
+/// trait method; a trait whose source is absent is recorded, not guessed.
+fn resolve_bound_method_target(
+    owner_key: &str,
+    owner_span: &Value,
+    receiver: &Value,
+    context: &ImplHeaderSourceContext<'_>,
+    index: &BoundMethodLookupIndex,
+    endpoints: &BTreeSet<&HldTargetIdentityValue>,
+) -> Result<(HldEdgeResolutionValue, Value), OriginalCallResolutionError> {
+    let Some((candidates, walk)) =
+        list_bound_method_candidates(owner_key, owner_span, receiver, context, index)?
+    else {
+        return Ok((
+            unresolved_call_target_value(HldUnresolvedReasonKind::TraitSolverNeeded),
+            Value::Null,
+        ));
+    };
     let missing = &walk.missing_source_traits;
     let evidence = walk.build_walk_evidence_value();
     let mut found = candidates.into_iter();
