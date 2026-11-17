@@ -12,6 +12,10 @@ run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method ca
 `core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
 and it is an expected row. The expected graph was written and checked by one author.**
 
+**A separate crate copies the exported graph into one DuckDB file, and the full run from
+pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
+170 of 170 and 682 of 682 (under "What is left").**
+
 ### The two accepted runs
 
 ```text
