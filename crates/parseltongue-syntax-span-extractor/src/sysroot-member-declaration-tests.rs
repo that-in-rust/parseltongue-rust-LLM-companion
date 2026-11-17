@@ -42,6 +42,10 @@ fn test_inherent_member_row_fields() {
             "member_attribute_text_values":["#[stable(feature = \"maybe_uninit_write\", since = \"1.55.0\")]"],
             "owner_attribute_text_values":["#[lang = \"maybe_uninit\"]"],
             "owner_function_body_flag":false,
+            "trait_generic_parameter_names":null,
+            "trait_associated_type_names":null,
+            "owner_unsized_relaxed_names":[],
+            "member_generic_parameter_names":[],
         }),
         *write
     );
@@ -88,6 +92,41 @@ fn test_trait_member_row_fields() {
         cast["impl_generic_parameter_text"]
     );
     assert_eq!(json!("value"), cast["member_self_parameter_kind"]);
+    // REQ-RUST-062.0 C3: the names a return type may write, and those `?Sized` relaxes.
+    assert_eq!(
+        json!([["T"], ["Error"], [], []]),
+        json!([
+            declared["trait_generic_parameter_names"],
+            declared["trait_associated_type_names"],
+            declared["owner_unsized_relaxed_names"],
+            declared["member_generic_parameter_names"]
+        ])
+    );
+    assert_eq!(
+        json!([null, null, [], ["U"]]),
+        json!([
+            cast["trait_generic_parameter_names"],
+            cast["trait_associated_type_names"],
+            cast["owner_unsized_relaxed_names"],
+            cast["member_generic_parameter_names"]
+        ])
+    );
+    let relaxed = extract_member_declaration_rows(
+        "ops/deref.rs",
+        "pub trait Borrow<B: ?Sized, C> { type Target: ?Sized; type Kept; fn get(&self) -> Pair<B, C>; }\n\
+         pub trait Late<A> where A: ?Sized { type Out; fn late(&self) -> Pair<A, Self::Out>; }\n\
+         impl<T: ?Sized, U> Cell<T, U> { fn held(&self) -> Pair<T, U> { loop {} } }\n",
+    );
+    let names = |name: &str| {
+        relaxed
+            .iter()
+            .find(|row| row["member_declared_name_value"] == name)
+            .map(|row| row["owner_unsized_relaxed_names"].clone())
+    };
+    assert_eq!(Some(json!(["B", "Target"])), names("get"));
+    // A where clause that writes `?Sized` counts for every name of the trait.
+    assert_eq!(Some(json!(["A", "Out"])), names("late"));
+    assert_eq!(Some(json!(["T"])), names("held"));
 }
 
 /// REQ-RUST-054.0 D3, D5

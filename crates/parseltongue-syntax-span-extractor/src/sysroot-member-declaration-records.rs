@@ -71,6 +71,44 @@ struct MemberOwnerSyntaxValue {
     trait_path: Option<String>,
     attributes: Vec<String>,
     function_body: bool,
+    /// REQ-RUST-062.0 C3, for a trait declaration: the names of its generic parameters,
+    /// of the associated types it declares, and those of both `?Sized` is written for.
+    trait_generic_names: Option<Vec<String>>,
+    trait_associated_names: Option<Vec<String>>,
+    unsized_relaxed_names: Vec<String>,
+}
+
+/// The names of the type and const parameters of a generic parameter list.
+fn list_parameter_list_names(list: Option<ast::GenericParamList>) -> Vec<String> {
+    list.into_iter()
+        .flat_map(|list| list.type_or_const_params())
+        .filter_map(|parameter| match parameter {
+            ast::TypeOrConstParam::Type(found) => found.name(),
+            ast::TypeOrConstParam::Const(found) => found.name(),
+        })
+        .map(|name| name.text().to_string())
+        .collect()
+}
+
+/// REQ-RUST-062.0 C3: the names of `candidates` that `?Sized` is written for: in the
+/// bounds of the name's own declaration, or anywhere in a where clause of the owner, which
+/// then counts for every name.
+fn list_unsized_relaxed_names(
+    candidates: &[String],
+    declarations: &[SyntaxNode],
+    where_clause: Option<ast::WhereClause>,
+) -> Vec<String> {
+    let relaxed = |node: &SyntaxNode| node.text().to_string().contains("?Sized");
+    if where_clause.is_some_and(|clause| relaxed(clause.syntax())) {
+        return candidates.to_vec();
+    }
+    declarations
+        .iter()
+        .filter(|node| relaxed(node))
+        .filter_map(|node| node.children().find_map(ast::Name::cast))
+        .map(|name| name.text().to_string())
+        .filter(|name| candidates.contains(name))
+        .collect()
 }
 
 fn read_syntax_node_text(node: &SyntaxNode) -> String {
@@ -107,11 +145,49 @@ fn list_impl_member_rows(path: &str, owner: &ast::Impl) -> Vec<Value> {
         trait_path,
         attributes: list_attribute_text_values(owner),
         function_body: check_function_body_ancestry(owner.syntax()),
+        trait_generic_names: None,
+        trait_associated_names: None,
+        unsized_relaxed_names: list_unsized_relaxed_names(
+            &list_generic_parameter_names(owner),
+            &list_generic_declaration_nodes(owner.generic_param_list()),
+            owner.where_clause(),
+        ),
     };
     list_owned_function_rows(path, owner.assoc_item_list(), &value)
 }
 
+fn list_generic_declaration_nodes(list: Option<ast::GenericParamList>) -> Vec<SyntaxNode> {
+    list.into_iter()
+        .flat_map(|list| list.generic_params())
+        .map(|parameter| parameter.syntax().clone())
+        .collect()
+}
+
 fn list_trait_member_rows(path: &str, owner: &ast::Trait) -> Vec<Value> {
+    let generics = list_parameter_list_names(owner.generic_param_list());
+    let associated = owner
+        .assoc_item_list()
+        .into_iter()
+        .flat_map(|list| list.assoc_items())
+        .filter_map(|item| match item {
+            ast::AssocItem::TypeAlias(found) => Some(found),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let associated_names = associated
+        .iter()
+        .filter_map(|found| found.name())
+        .map(|name| name.text().to_string())
+        .collect::<Vec<_>>();
+    let names = generics
+        .iter()
+        .chain(&associated_names)
+        .cloned()
+        .collect::<Vec<_>>();
+    let declarations = list_generic_declaration_nodes(owner.generic_param_list())
+        .into_iter()
+        .chain(associated.iter().map(|found| found.syntax().clone()))
+        .collect::<Vec<_>>();
     let value = MemberOwnerSyntaxValue {
         owner_kind: "trait_declaration",
         self_type: None,
@@ -121,6 +197,13 @@ fn list_trait_member_rows(path: &str, owner: &ast::Trait) -> Vec<Value> {
         trait_path: owner.name().map(|name| name.text().to_string()),
         attributes: list_attribute_text_values(owner),
         function_body: check_function_body_ancestry(owner.syntax()),
+        unsized_relaxed_names: list_unsized_relaxed_names(
+            &names,
+            &declarations,
+            owner.where_clause(),
+        ),
+        trait_generic_names: Some(generics),
+        trait_associated_names: Some(associated_names),
     };
     list_owned_function_rows(path, owner.assoc_item_list(), &value)
 }
@@ -184,6 +267,10 @@ fn build_owned_function_row(
         "member_attribute_text_values":list_attribute_text_values(function),
         "owner_attribute_text_values":owner.attributes,
         "owner_function_body_flag":owner.function_body,
+        "trait_generic_parameter_names":owner.trait_generic_names,
+        "trait_associated_type_names":owner.trait_associated_names,
+        "owner_unsized_relaxed_names":owner.unsized_relaxed_names,
+        "member_generic_parameter_names":list_parameter_list_names(function.generic_param_list()),
     }))
 }
 
