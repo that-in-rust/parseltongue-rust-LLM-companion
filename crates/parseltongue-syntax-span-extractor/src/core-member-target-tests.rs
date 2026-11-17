@@ -11,7 +11,7 @@ use crate::syntax_namespace_record_codec::encode_symbol_target_value;
 use parseltongue_core_row_types::*;
 use serde_json::{Value, json};
 
-const CORE_FIXTURE_FILES: [(&str, &str); 7] = [
+const CORE_FIXTURE_FILES: [(&str, &str); 9] = [
     (
         "core/src/mem/maybe_uninit.rs",
         "pub union MaybeUninit<T> { value: T }\n\
@@ -57,6 +57,18 @@ const CORE_FIXTURE_FILES: [(&str, &str); 7] = [
         "core/src/lib.rs",
         "#[prelude_import]\nuse prelude::rust_2024::*;\n\
          pub mod prelude; pub mod result; pub mod fmt; pub mod convert;\n",
+    ),
+    // REQ-RUST-063.0: a macro of a `#[macro_use]` module writes the members of `u8`.
+    (
+        "core/src/num/mod.rs",
+        "#[macro_use]\nmod uint_macros;\nimpl u8 { uint_impl! {} }\n",
+    ),
+    (
+        "core/src/num/uint_macros.rs",
+        "macro_rules! uint_impl { () => {\n pub const MAX: Self = !0;\n\
+         pub const BITS: u32 = 8;\n\
+         pub const fn ilog10(self) -> u32 { 0 }\n\
+         $(#[$m])* pub const fn gated(self) -> u32 { 0 }\n}; }\n",
     ),
 ];
 
@@ -937,5 +949,84 @@ fn test_call_result_receiver_member() {
         "struct Buffer; fn f(i: usize) { 999.try_into().expect(\"x\").first(); }",
         "first",
         "inherent_member_unproven",
+    );
+}
+
+/// REQ-RUST-063.0 M6, M7: a method called on a const of a builtin type, both written
+/// into the type's impl by a macro of `core`.
+#[test]
+fn test_builtin_constant_receiver_member() {
+    let read = |source: &str| {
+        read_core_fixture_rows(&format!("struct Buffer; {source}"), true, true, "", true)
+    };
+    let (edge, metadata) = read("fn f() -> u32 { u8::MAX.ilog10() }");
+    assert_eq!(
+        make_core_member_target("u8::ilog10"),
+        edge.edge_resolution_value,
+        "{metadata}"
+    );
+    assert_eq!("core_inherent_member", metadata["dispatch_kind"]);
+    let lookup = &metadata["core_member_lookup_evidence"];
+    let macros = CORE_FIXTURE_FILES[8].1;
+    let call = CORE_FIXTURE_FILES[7].1.find("uint_impl").unwrap();
+    assert_eq!(
+        json!([
+            "builtin_constant_declared_type",
+            "u8",
+            "u8",
+            [],
+            "core/src/num/uint_macros.rs",
+            macros.find("ilog10").unwrap(),
+            "Self",
+            macros.find("MAX").unwrap(),
+            ["core/src/num/mod.rs", call, "macro_use_module", 13],
+            "inherent_item_declared_once"
+        ]),
+        json!([
+            lookup["receiver_type_proof_kind"],
+            lookup["receiver_type_text"],
+            lookup["receiver_prefix_member_evidence"]["self_type_builtin_name"],
+            lookup["lookup_assumption_values"],
+            lookup["declaration_source_relative_path"],
+            lookup["member_name_start_offset"],
+            lookup["receiver_constant_member_proof"]["member_written_type_text"],
+            lookup["receiver_constant_member_proof"]["macro_body_item_site_value"]["member_name_start_offset"],
+            [
+                lookup["method_macro_member_proof"]["impl_macro_call_site_value"]["declaration_source_relative_path"],
+                lookup["method_macro_member_proof"]["impl_macro_call_site_value"]["member_name_start_offset"],
+                lookup["method_macro_member_proof"]["macro_scope_proof_value"]["macro_scope_proof_kind"],
+                lookup["method_macro_member_proof"]["macro_scope_proof_value"]["macro_definition_site_value"]
+                    ["member_name_start_offset"]
+            ],
+            lookup["method_macro_member_proof"]["inherent_lookup_rule_kind"]
+        ]),
+        "{metadata}"
+    );
+    // Withheld: a const whose type is not the type itself; a method the call may give
+    // an attribute; a type with no macro call; a path with a field after it.
+    let withheld = |source: &str| {
+        let (edge, metadata) = read(source);
+        assert!(
+            matches!(
+                edge.edge_resolution_value,
+                HldEdgeResolutionValue::Unresolved { .. }
+            ),
+            "{metadata}"
+        );
+        metadata["unresolved_detail_kind"].clone()
+    };
+    assert_eq!(
+        json!([
+            "builtin_macro_member_unproven",
+            "builtin_macro_member_unproven",
+            "builtin_macro_member_unproven",
+            "receiver_type_not_determined"
+        ]),
+        json!([
+            withheld("fn f() -> u32 { u8::BITS.ilog10() }"),
+            withheld("fn f() -> u32 { u8::MAX.gated() }"),
+            withheld("fn f() -> u32 { usize::MAX.ilog10() }"),
+            withheld("fn f() -> u32 { u8::MAX.0.ilog10() }")
+        ])
     );
 }

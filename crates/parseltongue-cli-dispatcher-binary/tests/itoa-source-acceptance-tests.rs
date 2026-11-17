@@ -2302,8 +2302,12 @@ fn test_core_member_rows_published() {
         .filter(|node| !excluded_nodes.contains(node))
         .map(String::as_str)
         .collect::<std::collections::BTreeSet<_>>();
+    let integer_labels = [
+        "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128",
+    ]
+    .map(|name| format!("{name}::ilog10"));
     assert_eq!(
-        std::collections::BTreeSet::from([
+        [
             "Iterator::rev",
             "MaybeUninit<T>::write",
             "Result<T, E>::expect",
@@ -2312,12 +2316,15 @@ fn test_core_member_rows_published() {
             "[T]::as_mut_ptr",
             "[T]::get_unchecked",
             "[T]::len"
-        ]),
+        ]
+        .into_iter()
+        .chain(integer_labels.iter().map(String::as_str))
+        .collect::<std::collections::BTreeSet<_>>(),
         added
     );
     assert!(excluded_nodes.iter().all(|node| nodes.contains(node)));
     assert_eq!((151, 682), (excluded_nodes.len(), excluded_edges));
-    assert_eq!((159, 682), (nodes.len(), edges));
+    assert_eq!((169, 682), (nodes.len(), edges));
 }
 
 /// REQ-RUST-038.1, REQ-RUST-045.0
@@ -6191,9 +6198,20 @@ fn test_itoa_core_member_targets() {
         .collect::<CoreTargetAssumptionSet>(),
         proof_assumptions
     );
-    // Equal to their expected rows: 121 of 133. Without a stored target: 12.
+    // REQ-RUST-063.0: `ilog10` is named once on each of the ten integer types.
+    let integer_labels = [
+        "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128",
+    ]
+    .map(|name| format!("{name}::ilog10"));
     assert_eq!(
-        (121, [49, 39, 5, 13, 1, 1, 8, 5]),
+        [1; 10],
+        integer_labels
+            .each_ref()
+            .map(|label| count_stored_label(label))
+    );
+    // Equal to their expected rows: 131 of 133. Without a stored target: 2.
+    assert_eq!(
+        (131, [49, 39, 5, 13, 1, 1, 8, 5]),
         (
             stored.len(),
             [
@@ -6210,7 +6228,7 @@ fn test_itoa_core_member_targets() {
         )
     );
     assert_eq!(
-        (159, 682, 197, 12),
+        (169, 682, 197, 2),
         (
             input.input_node_records.len(),
             input.input_edge_records.len(),
