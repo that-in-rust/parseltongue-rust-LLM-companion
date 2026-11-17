@@ -178,6 +178,10 @@ general behaviour, nothing keyed on itoa names.
 - **Containment:** each item has one lexical source container. File-level items and impl
   members belong to the file area; nested items belong to their inline module or trait. Impl
   identity, self type and trait are metadata, never a second parent.
+- **Variants and fields (OD-4, decided 2026-11-18 by Rule 6, SPEC part 13).** An enum
+  variant and a struct or union field are nodes, each contained by its type, and a type or
+  read written in a field is an edge from the field. Cost on itoa: 2 nodes and 2 rows.
+  Specified, not built. An edge for each use of a field is not part of it (backlog).
 - **Module and file area (OD-7, decided 2026-11-17 by Rule 6, SPEC part 12).** A module
   `contains` the file area of its file: the crate root that of the root file, and a
   `mod name;` module that of the file it names. The relation is `contains` because a file
@@ -385,7 +389,6 @@ general behaviour, nothing keyed on itoa names.
   directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause:
   the store's file identity is the absolute path, and the run id hashes those rows. Not
   fixed.
-- **Enum variants and struct fields:** nodes, or evidence only.
 - **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for
   sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
   are compared (A4).

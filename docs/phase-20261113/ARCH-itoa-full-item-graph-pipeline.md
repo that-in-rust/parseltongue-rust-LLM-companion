@@ -241,7 +241,8 @@ Identity:
 
 Open:
 
-- **G10** Enum variants and struct fields: nodes or evidence (PRD, open).
+- **G10** Enum variants and struct fields are nodes, each contained by its type (PRD, decided
+  2026-11-18; SPEC part 13, not built).
 - **F12** Does a `pub use` carry both an `imports` and a `reexports` edge?
 - **G4, G5** are rules without a producer: every node stores them empty or unknown.
 

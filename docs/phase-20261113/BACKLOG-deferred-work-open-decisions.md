@@ -20,8 +20,9 @@ Open:
 
 ```text
 id      decision                                                    state in the frozen graph
-OD-4    Enum variants and struct fields: nodes, or evidence only.   not nodes; itoa has private
-                                                                    fields only
+OD-4    Enum variants and struct fields: nodes, or evidence only.   decided 2026-11-18 by Rule 6: nodes
+                                                                    (SPEC part 13, not built). Uses of
+                                                                    a field as edges: not decided, not built
 fields  Visibility, reachability and signature text on nodes.       built 2026-11-17 (SPEC part 11), compared
 ```
 
