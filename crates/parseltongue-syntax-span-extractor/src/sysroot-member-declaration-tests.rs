@@ -507,3 +507,121 @@ fn test_file_scope_binding_rows() {
         ])
     );
 }
+
+/// REQ-RUST-063.0 M1 to M3: a macro call in a file-level impl, a file-level
+/// `macro_rules!`, and the `const` and `fn` items of a macro body with where they are.
+#[test]
+fn test_macro_impl_scope_rows() {
+    let source = "macro_rules! two { () => {}; ($x:ident) => { fn second(self) {} }; }\n\
+        #[macro_use] mod uint_macros;\n\
+        macro_rules! uint_impl { (Self = $SelfT:ty) => {\n\
+        #[doc = \"d\"]\n/// text\n#[stable] pub const MAX: Self = !0;\n\
+        #[cfg(a)] #[inline] pub(crate) const fn gated(self) {}\n\
+        pub const fn ilog10(self) -> u32 { const INNER: u8 = 0; 0 }\n\
+        $(#[$m])* fn spliced(self) {}\n\
+        $( fn repeated(self) {} )*\n\
+        impl<const N: usize> Other<N> {}\n\
+        }; }\n\
+        #[lang = \"u8\"] impl u8 { #[doc = \"x\"] uint_impl! { Self = u8 } fn written(self) {} }\n\
+        impl<T> Shown for Wrapper<T> { other!(); }\n\
+        fn free() { impl u8 { local!(); } }\n";
+    let rows = extract_member_declaration_rows("core/src/num/mod.rs", source);
+    let scope = rows
+        .iter()
+        .filter(|row| row["scope_binding_form_kind"] == "macro_definition")
+        .map(|row| {
+            json!([
+                row["member_declared_name_value"],
+                row["macro_arm_count_value"]
+            ])
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![json!(["two", 2]), json!(["uint_impl", 1])],
+        scope,
+        "M2"
+    );
+    let calls = rows
+        .iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "impl_macro_call")
+        .map(|row| {
+            let start = row["member_name_start_offset"].as_u64().unwrap() as usize;
+            let end = row["member_name_end_offset"].as_u64().unwrap() as usize;
+            json!([
+                &source[start..end],
+                row["owner_macro_name_value"],
+                row["impl_self_type_text"],
+                row["owner_trait_path_text"],
+                row["impl_generic_parameter_text"],
+                row["owner_attribute_text_values"],
+                row["member_attribute_text_values"]
+            ])
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            json!([
+                "uint_impl",
+                "uint_impl",
+                "u8",
+                null,
+                null,
+                ["#[lang = \"u8\"]"],
+                ["#[doc = \"x\"]"]
+            ]),
+            json!(["other", "other", "Wrapper<T>", "Shown", "<T>", [], []]),
+        ],
+        calls,
+        "M1"
+    );
+    let body = rows
+        .iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "macro_definition_body")
+        .map(|row| {
+            json!([
+                row["member_declared_name_value"],
+                row["member_item_kind_value"],
+                row["member_written_type_text"],
+                row["macro_arm_ordinal_value"],
+                row["macro_body_nesting_depth"],
+                row["macro_body_repetition_flag"],
+                row["member_attribute_text_values"],
+                row["macro_self_parameter_flag"],
+                row["macro_item_boundary_flag"]
+            ])
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            json!(["second", "fn", null, 1, 0, false, [], true, true]),
+            json!([
+                "MAX",
+                "const",
+                "Self",
+                0,
+                0,
+                false,
+                ["#[doc = \"d\"]", "#[stable]"],
+                false,
+                true
+            ]),
+            json!([
+                "gated",
+                "fn",
+                null,
+                0,
+                0,
+                false,
+                ["#[cfg(a)]", "#[inline]"],
+                true,
+                true
+            ]),
+            json!(["ilog10", "fn", null, 0, 0, false, [], true, true]),
+            json!(["INNER", "const", "u8", 0, 1, false, [], false, true]),
+            json!(["spliced", "fn", null, 0, 0, false, [], true, false]),
+            json!(["repeated", "fn", null, 0, 1, true, [], true, true]),
+        ],
+        body,
+        "M3"
+    );
+}
