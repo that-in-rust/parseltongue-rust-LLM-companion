@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Rules for any agent working in this repository. Read top to bottom: the answer first,
-then the six rules that follow from it, then reference facts.
+Rules for any agent working in this repository. Read top to bottom: choose the phase,
+then its answer and rules, then reference facts.
 
 ## Choose the phase
 
@@ -219,7 +219,7 @@ SPEC     SPEC-itoa-full-item-graph/                     README.md is the index; 
 - One document at a time, in commits of at most about 200 changed lines, each pushed to
   `research/tiny-rust-code-mapper` before the next starts.
 - A change to architecture or to a pin updates ARCH, SOP and this file in the same commit.
-- Everything else under `docs/` is history. Exception: code and tools still read these files in
+- Outside these two phase directories, `docs/` is history. Exception: code and tools still read these files in
   `docs/phase-20261111/`, so do not move or delete them without updating the readers:
   `phase-one-benchmark-pin.json` (the itoa pin) and `parser-source-pin-manifest.json`. Three
   more are read only by the older five-repository tools under `tools/`:
