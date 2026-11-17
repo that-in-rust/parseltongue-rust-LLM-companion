@@ -7,6 +7,10 @@ use crate::core_file_scope_name_records::{
 };
 use serde_json::{Value, json};
 
+#[cfg(test)]
+#[path = "core-macro-impl-member-tests.rs"]
+mod core_macro_impl_member_tests;
+
 fn check_row_source_file(row: &Value, file: &str) -> bool {
     row["declaration_source_relative_path"] == file
 }
