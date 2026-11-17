@@ -4,14 +4,17 @@ Status on 2026-11-17: **specified, not built.** Decided by the user on 2026-11-1
 separate crate reads the JSON a run exports, checks it, and writes it into one DuckDB file.
 The mapper, the Turso store and the exported JSON are not changed.
 
-## Requirement
+**Done for this part** (user, 2026-11-17): one full run in which pinned itoa goes through
+`parseltongue`, the two tables are exported, and the loader writes a DuckDB file whose
+rows equal the exported rows.
 
-REQ-RUST-067.0. Given the two files `export-published-stage-rows` writes for a published
-run (nodes: `item-effective-visibility-records`; edges: `edge-evidence-record-table`), the
-loader writes one DuckDB file whose rows equal the JSON rows, one for one, or it writes
-nothing and returns a typed error.
+## 1. Rust work mode
 
-## 1. Measurement (2026-11-17, the S2 export of the acceptance run, executable `af84bb46…`)
+Spec Mode and Delivery Mode. The component is a library with a small binary. The main risk
+is a file that differs from the JSON without anyone noticing, so the loader reads its own
+file back before it publishes it.
+
+### Measured before writing (the S2 export of the acceptance run, executable `af84bb46…`)
 
 ```text
 file                    lines  first line  rows  bytes
@@ -23,29 +26,69 @@ full-graph-edges.json   683    header      682   5,381,169
   `export_scope_identity_record` with `run_generation_digest_value`.
 - **Row:** `export_record_kind_value` = `row`, `export_row_identity_value` (text) and
   `export_row_payload_value` (object).
-- **Node identity:** the identity text of a node row equals the compact JSON, keys sorted,
-  of its `node_target_identity`: 170 of 170.
-- **Edge ends:** the same form of `edge_source_target_identity` is a node identity in 682
-  of 682 rows, and of `edge_resolution.target` in 681 of 681. One row has no target
-  (`kind` = `Unresolved`, a `reason`): the `cast`.
+- **Node identity:** the identity text of a node row is JSON equal to the row's
+  `node_target_identity`: 170 of 170.
+- **Edge ends:** `edge_source_target_identity` is the identity of a node in 682 of 682
+  rows, and `edge_resolution.target` in 681 of 681. One row has no target (`kind` =
+  `Unresolved`, with a `reason`): the `cast`.
 - **Identities are distinct:** 170 node identities, 682 edge identities.
 - **DuckDB's `json` extension is not in the executable** (immediate backlog, entry 6), so
   the loader must not need it.
 
-## 2. Design
+## 2. Executable requirements: REQ-RUST-067.0
 
-- **A new crate, `parseltongue-graph-dataset-loader`:** a library and a binary of the same
-  name. It depends on `duckdb` (the pinned version, bundled), `serde_json`, `sha2` and
-  `thiserror`, and on no other crate of this workspace. The `parseltongue` executable does
-  not depend on it, so its bytes do not change.
-- **Pure core, effects at the edge.** `parse_graph_export_text` and
-  `check_graph_export_rows` take text and return values; only `write_graph_dataset_file`
-  touches DuckDB and the file system.
-- **No JSON type in DuckDB.** A nested value is stored as compact JSON text, keys sorted.
-  Each row also keeps its whole payload as text, so no field of the JSON is lost; the
-  other columns are copies of payload fields for SQL.
-- **All or nothing.** The file is written under a temporary name in the output directory
-  and renamed after the last check. An output path that exists is an error.
+The input is the two files `export-published-stage-rows` writes for one published run:
+nodes (`item-effective-visibility-records`) and edges (`edge-evidence-record-table`).
+
+```text
+A1  WHEN the loader reads the export of a declarations run of pinned itoa
+    THEN it SHALL write one file holding 170 node rows and 682 edge rows
+A2  WHEN the three tables are read back
+    THEN each payload text SHALL parse to a value equal to the JSON row's payload, and
+    each other column SHALL equal the payload field it copies, for every row
+A3  WHEN the same export is loaded twice
+    THEN the rows read back from both files, ordered by key, SHALL be equal
+A4  WHEN an input breaks one of the checks C1 to C7
+    THEN the loader SHALL return that check's error and no file SHALL exist at the output path
+A5  WHEN the output path exists
+    THEN the loader SHALL return an error and leave that file as it was
+A6  WHEN the loader runs THEN it SHALL open no file under `~/.duckdb`
+A7  WHEN the loader has run THEN the two input files SHALL have the bytes they had before
+```
+
+Checks, all made before any file is created:
+
+```text
+C1  each file's first line is a header naming the expected table; every other line is a row
+C2  both headers name the same run generation, and every row's run_generation_digest_full equals it
+C3  a node's identity text is JSON equal to its node_target_identity
+C4  no two nodes and no two edges share an identity
+C5  every edge's source is a node
+C6  an edge has a target that is a node, or no target and a reason
+C7  each file has at least one row
+```
+
+## 3. Design (L1 / L2 / L3)
+
+- **A new crate, `parseltongue-graph-dataset-loader`:** a library and a binary of that
+  name. It depends on `duckdb` (the workspace's pinned version, bundled), `serde_json`,
+  `sha2`, `thiserror` and `tempfile`, and on no crate of this workspace. `parseltongue`
+  does not depend on it, so the frozen executable's bytes do not change.
+- **L1, pure:** `parse_graph_export_text` (C1, C2, C7) and `check_graph_export_rows`
+  (C2 to C6) take text and return `GraphDatasetRowTables`, the rows of the three tables.
+- **L3, effects:** `write_graph_dataset_file` and `read_graph_dataset_file` are the only
+  code that touches DuckDB or the file system. `load_graph_export_files` joins the two.
+- **Errors:** one enum, `GraphDatasetLoadError`, one variant per check, carrying the file,
+  the line number and the identity where they apply.
+- **No JSON type in DuckDB.** A nested value is stored as compact JSON text with keys
+  sorted. Each row keeps its whole payload as such text, so no field is lost; the other
+  columns are copies of payload fields for SQL.
+- **A node's key** is the compact sorted JSON of its `node_target_identity`. An edge's
+  source and target columns hold the same form, so they join to the node table.
+- **All or nothing.** The file is written in a temporary directory beside the output,
+  closed, opened again read-only and read back. Only when the rows read back equal the
+  rows checked is it linked to the output path, with a call that fails when the path
+  exists.
 
 ```text
 table                     one row per   columns
@@ -70,59 +113,47 @@ full_graph_edge_rows      edge site     edge_identity_key_text (primary key),
                                         edge_payload_json_text
 ```
 
-## 3. Checks before anything is written
+## 4. Verification matrix
 
 ```text
-C1  each file's first line is a header naming the expected table; every other line is a row
-C2  both headers name the same run generation, and every row's run_generation_digest_full equals it
-C3  a node's identity text equals the compact sorted JSON of its node_target_identity
-C4  no two nodes and no two edges share an identity
-C5  every edge's source is a node
-C6  an edge has a target that is a node, or no target and a reason
-C7  each file has at least one row
+req_id   test                                  type         assertion
+C1       test_export_header_line_required      unit         no header, or another table's header: error
+C2       test_run_generation_rows_agree        unit         a row or the second header of another run: error
+C3       test_node_identity_text_checked       unit         identity text unlike node_target_identity: error
+C4       test_duplicate_row_identity_rejected  unit         two nodes, or two edges, with one identity: error
+C5       test_edge_source_node_required        unit         source not in the node file: error
+C6       test_edge_target_node_required        unit         target not a node; no target and no reason: error
+C7       test_export_file_rows_required        unit         header only: error
+A2 A3    test_small_export_dataset_roundtrip   unit, DuckDB rows read back equal the rows checked; two loads equal
+A4       test_failed_check_writes_nothing      unit, files  output path absent after a failed check
+A5 A7    test_existing_output_path_kept        unit, files  output and inputs keep their bytes
+A1 A2    test_itoa_export_dataset_roundtrip    real source  170 and 682 rows; every row equals its JSON row
+A6       strace of the binary, once            manual       no path under ~/.duckdb opened
 ```
 
-Each failed check is one variant of `GraphDatasetLoadError`, carrying the file, the line
-number and the identity where they apply.
+The real-source test runs the `parseltongue` executable on a copy of pinned itoa with scope
+`declarations`, exports the two tables with the same executable, runs the loader binary,
+and compares the DuckDB rows with rows it parses from the JSON itself, not through the
+loader's parser. The executable is `PARSELTONGUE_FROZEN_EXECUTABLE_PATH` when set,
+otherwise `target/release/parseltongue`; when neither exists the test fails and says so.
 
-## 4. Acceptance criteria
-
-```text
-A1  WHEN the loader reads the export of a declarations run of pinned itoa
-    THEN it writes one file holding 170 node rows and 682 edge rows
-A2  WHEN the three tables are read back
-    THEN each payload text parses to a value equal to the JSON row's payload, and each
-    other column equals the payload field it copies, for every row
-A3  WHEN the same export is loaded twice
-    THEN `SELECT *` ordered by the key returns equal rows from both files
-A4  WHEN an input breaks one of C1 to C7
-    THEN the loader returns that check's error and no file exists at the output path
-A5  WHEN the output path exists THEN the loader returns an error and leaves the file as it was
-A6  WHEN the loader runs THEN it opens no file under `~/.duckdb` (strace, once)
-```
-
-## 5. Tests
-
-- **Unit, one per check C1 to C7** (A4), on rows written in the test, each seen failing
-  first.
-- **Real source** (A1 to A3, A5): `test_itoa_export_dataset_roundtrip` in the loader
-  crate. It runs the `parseltongue` executable on a copy of pinned itoa with scope
-  `declarations`, exports the two tables, loads them, and reads the file back. The
-  executable is `PARSELTONGUE_FROZEN_EXECUTABLE_PATH` when set, otherwise
-  `target/release/parseltongue`; when neither exists the test fails and says so.
-
-## 6. Steps
+## 5. Implementation plan
 
 ```text
-9.1  crate, row types, parse and C1, C2, C7           unit tests
-9.2  C3 to C6                                         unit tests
-9.3  write and read back, all or nothing (A3 to A5)   unit tests on a small export
+9.1  crate, error enum, parser with C1, C2, C7           unit tests first
+9.2  checks C3 to C6 and the table rows                  unit tests first
+9.3  write, read back, all or nothing (A2 to A5, A7)     unit tests first
 9.4  binary and the real-source test (A1, A2)
-9.5  A6 once by strace; gates; log entry
+9.5  A6 by strace; workspace gates; the full run recorded in the log
 ```
 
-## 7. Not in this part
+## 6. Quality gate results
 
-- Columns for single fields of the lookup evidence. They stay inside the payload text.
-- A CLI verb in `parseltongue`, and any change to the export format.
-- Loading the frozen expected graph. The input is a run's export only.
+Not run: nothing is built.
+
+## 7. Open questions
+
+- **Columns for single fields of the lookup evidence** are not made. They stay in the
+  payload text until a query needs one.
+- **A CLI verb in `parseltongue`** is not added: it would change the frozen executable.
+- **The frozen expected graph** is not an input. The input is a run's export only.
