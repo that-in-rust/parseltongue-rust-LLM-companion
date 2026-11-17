@@ -7,5 +7,10 @@
 //! touch DuckDB and the file system.
 #[path = "graph-dataset-load-error.rs"]
 mod graph_dataset_load_error;
+#[path = "graph-export-row-parser.rs"]
+mod graph_export_row_parser;
 
 pub use graph_dataset_load_error::{GraphDatasetLoadError, GraphExportFileKind};
+pub use graph_export_row_parser::{
+    GraphExportFileRows, GraphExportRowRecord, parse_graph_export_text, write_canonical_json_text,
+};
