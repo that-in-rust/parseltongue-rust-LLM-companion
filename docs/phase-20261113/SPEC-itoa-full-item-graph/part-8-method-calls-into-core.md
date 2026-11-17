@@ -754,8 +754,9 @@ C2  WHEN the inner call is named by a declaration of core (REQ-RUST-056.0 to 061
     lookup does not apply, or keeps the inner call's withheld reason.
 C3  The row of a trait declaration's member SHALL store the names of the trait's generic
     parameters, the names of the associated types the trait declares, and for each
-    whether `?Sized` is written for it. The row of any member SHALL store the names of
-    the member's own generic parameters.
+    whether a bound that takes the implicit `Sized` away is written for it (`?Sized`,
+    `PointeeSized`, `MetaSized`; the text of C4 says `?Sized` for all three). The row of
+    any member SHALL store the names of the member's own generic parameters.
 C4  In the return type, a name that is a generic parameter of the declaring trait or
     impl, and a path `Self::NAME` where NAME is an associated type the trait declares,
     SHALL be read as "a type not named, proven Sized" when no `?Sized` is written for it
@@ -771,6 +772,76 @@ C7  `cast` on `*mut T` stays without a target in this step: the impl has a bound
     (`T: PointeeSized`) and nothing stored proves that the bound restricts no type.
 ```
 
+### Measured after C1 to C6 were built (2026-11-17, working tree after `3d43abb7c`)
+
+The fixture names `Result<T, E>::expect`. The run on pinned itoa names none of the 13:
+
+```text
+ 13  expect, unwrap   receiver_type_name_unproven
+ stored declarations of core named `Result`:
+   enum         core/src/result.rs
+   type_alias   core/src/fmt/mod.rs
+   type_alias   core/src/io/error.rs
+```
+
+The probe reads a type name as one type only when `core` declares it once. `Result` is
+declared three times, so the name alone does not say which type `try_into` returns. Rust
+decides it by the scope of the file that writes the name. Read by hand in `core` of rustc
+1.99.1: `convert/mod.rs` binds no `Result` at file level, has no glob import and no macro
+call there; `lib.rs` line 198 to 200 is `#[prelude_import] use prelude::rust_2024::*;`;
+the only `Result` of the prelude files is `crate::result::Result` (`prelude/v1.rs` line
+50); `lib.rs` line 314 is `pub mod result;`; `result.rs` line 558 declares the enum.
+
+### Executable requirements: REQ-RUST-062.0, continued (added 2026-11-17, spec first)
+
+```text
+C8   A type name in the return type that core gives to exactly one struct, enum or union
+     and to no alias or rename is read as before. Any other type name that is not a
+     builtin type SHALL be read as one type only when C10 and C11 prove which declaration
+     it is. Otherwise the lookup is withheld: receiver_type_name_unproven.
+C9   Stored rows (file_scope_name_binding). For every direct child of a core source file
+     that may bind a name in the type namespace, the run SHALL store one row with its
+     form and the attribute texts of its item:
+       item          struct, enum, union, trait, trait alias, type alias (its kind stored)
+       module        inline or file
+       extern_crate  the name it binds
+       use_leaf      the name it binds and the full path it names (`self` binds the name
+                     before it; `as _` binds nothing and gives no row)
+       use_glob      the path it globs, no name
+       unread_form   a macro call or an extern block: its names are not read, no name
+     A member row SHALL store whether its trait or impl is a direct child of its file.
+     A prelude row (REQ-RUST-054.0 D10) SHALL store the name it binds and its full path.
+C10  The name N written in the return type or impl header of a member in file F stands
+     for the declaration D when the member's trait or impl is a direct child of F, N is
+     not a generic parameter of that owner or of the member, and one of:
+     (a) F has exactly one row named N, an item of kind struct, enum or union: D is it;
+     (b) F has no row named N, no use_glob and no unread_form row; no extern crate of
+         core binds N; and the prelude gives N the declaration D (C11).
+     A row used as a proof step SHALL have no attribute text that contains `cfg`.
+C11  The prelude gives N the declaration D when all of these hold:
+     - exactly one use row of core has an attribute text containing `prelude_import`; it
+       is a use_glob in core/src/lib.rs and its path starts with `prelude::`;
+     - lib.rs has exactly one row named `prelude`: a file module with no `#[path`;
+     - every prelude row that binds N names the same path, and it is `crate::M::N`;
+     - lib.rs has exactly one row named M: a file module with no `#[path`;
+     - exactly one of core/src/M.rs and core/src/M/mod.rs has stored rows, and in that
+       file N stands for D by C10 (a).
+C12  Every inherent impl and trait impl row of a member with the probed method name,
+     whose self type text writes N as a name, SHALL have N proven by C10 to stand for the
+     same D in its own file. When one does not, the lookup is withheld:
+     receiver_type_name_unproven.
+C13  The lookup record SHALL carry, for each name read by C10: the name, the file that
+     writes it, the proof kind (file_scope_declaration | prelude_import), the file and
+     offsets of D, and for prelude_import the files and offsets of the prelude import and
+     of the prelude row.
+```
+
+What C10 and C11 rest on: `core` is the compiled crate of the pinned toolchain, so a name
+it writes resolves, and two items of one name in one module would not compile. An item
+written in a file wins over a glob import. A file module's scope holds its own items and
+imports, then the extern crates, then the prelude; it does not hold the names of its
+parent module.
+
 ### Design (L1 / L2 / L3)
 
 ```text
@@ -778,6 +849,10 @@ L1  sysroot-member-declaration-records.rs   C3: three new fields on member rows
     original-call-resolution-records.rs     C1: extract_method_receiver_syntax
     receiver-type-probe-records.rs          C4, C5: a new shape variant and its unification
     core-member-target-records.rs           C2, C6: a third kind of receiver base
+    sysroot-member-declaration-records.rs   C9: file_scope_name_binding rows, one flag
+    core-file-scope-name-records.rs (new)   C10, C11: pure lookups over the stored rows
+    core-member-target-records.rs           C8, C12, C13: names proven before the probe
+    receiver-type-probe-records.rs          C8: the probe accepts a name proven by C10
 L2, L3  nothing added
 ```
 
@@ -788,5 +863,8 @@ L2, L3  nothing added
 | C3 | sysroot declaration row test | unit | a trait with a generic, an associated type and `?Sized` | the three fields |
 | C4, C5 | probe test | unit | `Result<T, Self::Error>` with T and Error proven Sized; with `?Sized` | `Result<T, E>::expect`; inherent_member_unproven |
 | C1, C2, C6 | fixture | unit | `999.try_into().expect("x")`; inner call not named | `Result<T, E>::expect`; no target |
+| C9 | sysroot declaration row test | unit | one file with each form; `self` leaf; `as _` | the rows |
+| C10, C11 | file scope name test | unit | declared in the file; from the prelude; a glob, a macro call, a second binding, a `cfg`, a `#[path]` | D; not proven |
+| C8, C12, C13 | fixture | unit | a second and third `Result` in the fixture `core`; an impl on `Result` in the alias file | `Result<T, E>::expect`; receiver_type_name_unproven |
 | C7 | test_itoa_core_member_targets | real source | `cast` stays without a target | reason stored |
 | C1 to C6 | test_itoa_core_member_targets | real source | 8 expect and 5 unwrap equal their frozen rows | wrong 0 |
