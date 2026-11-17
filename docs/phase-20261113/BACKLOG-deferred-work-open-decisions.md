@@ -22,7 +22,7 @@ Open:
 id      decision                                                    state in the frozen graph
 OD-4    Enum variants and struct fields: nodes, or evidence only.   not nodes; itoa has private
                                                                     fields only
-fields  Visibility, reachability and signature text on nodes.       not filled, not compared
+fields  Visibility, reachability and signature text on nodes.       built 2026-11-17 (SPEC part 11), compared
 ```
 
 Decided by the user (2026-11-15), on the rule "choose what is most explicit for a coding agent

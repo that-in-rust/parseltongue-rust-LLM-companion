@@ -117,8 +117,12 @@ whether it becomes two fields.
 Added 2026-11-16, at the user's request. Already listed as open in the
 [PRD](PRD-itoa-full-item-graph-scope.md) ("Node fields").
 
-- Signature text, visibility and reachable-outside-the-crate are not filled on any node.
-- `test_itoa_whole_graph_equality` asserts that they are empty, and does not compare them.
+**Done on 2026-11-17 (SPEC part 11, code `28f1db595`).** Each item node stores its
+visibility, reachability and signature, and both equality tests compare them. What it
+was:
+
+- Signature text, visibility and reachable-outside-the-crate were not filled on any node.
+- `test_itoa_whole_graph_equality` asserted that they were empty, and did not compare them.
 - An agent cannot tell what a function takes or returns without opening the source.
 
 **Open before any code:** the expected value of each field for the 151 nodes, written

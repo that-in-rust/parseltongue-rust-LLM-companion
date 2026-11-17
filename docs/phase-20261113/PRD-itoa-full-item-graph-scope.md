@@ -94,7 +94,8 @@ stage                                writes                                    s
 - Stage 6 is `persist_impl_header_rows`. `lowered-signature-type-table` is registered under
   it and nothing writes it.
 - Stage 7 and the node stage are one function, `publish_full_graph_checkpoint`.
-- Nodes carry no visibility, reachability or signature text yet.
+- Each item node carries its effective visibility, whether it is reachable from outside
+  the crate, and its signature text (SPEC part 11, built 2026-11-17).
 - The sysroot stage runs only with `--sysroot-source-scope-kind declarations`.
 
 The run for this phase is
@@ -376,8 +377,10 @@ general behaviour, nothing keyed on itoa names.
   has no target.
 - **Reading the whole sysroot.** A run with scope `included` did not finish name
   resolution in 2,400 s on 2026-11-13 (the run report is deleted). No itoa run uses it.
-- **Node fields.** Visibility, reachability outside the crate and signature text are not
-  filled on any node, and the whole-graph test does not compare them.
+- **Reachability through a private supertrait.** "Reachable" means: can be named by a
+  public path from the crate root (SPEC part 11, decided under Rule 6 on 2026-11-17).
+  The methods of `private::Sealed` are stored as not reachable, although outside code can
+  call them through a bound `I: Integer`. Whether that route should count is open.
 - **Rows depend on the source directory.** Two copies of the pinned source in different
   directories store different run ids and macro-expansion ids (measured 2026-11-16). Cause:
   the store's file identity is the absolute path, and the run id hashes those rows. Not
