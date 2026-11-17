@@ -74,8 +74,10 @@ step  function (crate)                                          writes
   impl (`impl_macro_call`), and a file-level `macro_rules!` with its arm count
   (`macro_definition`). A `fn` or `const` in a macro's body is stored with its arm, its
   nesting depth and its attributes. Those files are an input of the run: the
-  SOP freezes them by digest. The run id does not cover them yet (it hashes the compiler
-  version).
+  SOP freezes them by digest. The run id covers them: the workspace row stores
+  `workspace_sysroot_source_record` (file count, byte count, the S1 digest of the files),
+  the run id hashes that row, and the run fails if the bytes it parsed differ from the
+  record (REQ-RUST-065.0).
 - A receiver that is itself a method call into `core` takes the return type that
   declaration writes. A type name in it that `core` declares more than once (`Result`) is
   read only when the file's own scope and the prelude import prove which declaration it is

@@ -1,7 +1,7 @@
 # Part 8 — method calls into `core`
 
 Status on 2026-11-17: **132 of the 133 calls are named and equal their frozen rows, 1 has
-no target, the `cast` (sections 10 to 12, REQ-RUST-062.0 to REQ-RUST-064.0 built). The order changed by user decision: the expected target of all 133 calls is written
+no target, the `cast` (sections 10 to 12, REQ-RUST-062.0 to REQ-RUST-065.0 built). The order changed by user decision: the expected target of all 133 calls is written
 from source and frozen first (section 9, REQ-RUST-058.0), then the lookup is built to equal
 it.** Counts are on the log's "Where we are" page.
 
@@ -1193,7 +1193,7 @@ bytes 4068..4075, and the assumptions `core_macro_expansions_import_no_trait` an
 
 - None for the user. `cast` stays without a target (C7).
 
-## 16. The run id covers the `core` files (spec first, added 2026-11-17)
+## 16. The run id covers the `core` files (built 2026-11-17)
 
 ### Rust work mode
 
@@ -1227,8 +1227,9 @@ CLI adapter code: one read of the file system in the facade that already reads `
 
 ```text
  D1   WHEN the scope is declarations, THEN the workspace configuration row SHALL store
-      workspace_sysroot_source_record with: the directory "core/src", the count of its
-      .rs files, the sum of their byte lengths, and listing_sha256. That value is the
+      workspace_sysroot_source_record with: sysroot_source_directory_path "core/src",
+      sysroot_source_file_count (its .rs files), sysroot_source_byte_count (the sum of
+      their lengths) and sysroot_listing_digest_sha256. That value is the
       SHA-256 of a text of one line per file, files in byte order of their path relative
       to the library directory: the SHA-256 of the file's bytes in lower-case hex, two
       spaces, the relative path, a line feed. It SHALL equal the output of the S1 command.
@@ -1246,7 +1247,8 @@ CLI adapter code: one read of the file system in the facade that already reads `
 - **L3, facade:** `sysroot-member-declaration-facade.rs` reads the files once per use into
   path and bytes (`read_sysroot_source_files`); `collect_sysroot_member_rows` parses that
   list, so the digest and the rows cannot come from different lists.
-- **L1, pure:** `build_source_listing_record` makes the record from the list.
+- **L1, pure:** `build_source_listing_record` makes the record from the list;
+  `check_sysroot_source_record` compares it with the stored one.
 - **Call sites:** `run_workspace_mapping_pipeline` adds the field where it adds
   `workspace_sysroot_scope_kind`; `persist_sysroot_member_rows` compares before it writes.
 - `compute_workspace_generation_digest` is not changed: it already hashes the row.
@@ -1256,11 +1258,103 @@ CLI adapter code: one read of the file system in the facade that already reads `
 | Req | Test | Level | Case | Expected |
 |---|---|---|---|---|
 | D1 | facade unit test | unit | a directory of two files | the record equals one computed by hand; path order, not read order |
-| D3 | facade unit test | unit | one byte of one file changed | another listing_sha256 |
+| D3 | facade unit test | unit | one byte of one file changed | another digest |
 | D4 | facade unit test | unit | a stored record that differs | an error, no rows written |
 | D1, D3 | test_core_member_rows_published | real source | a declarations run | the stored record equals `core_source` of the frozen targets file: 288 files, 6,419,461 bytes, the frozen listing_sha256; the run id differs from the id of the `excluded` run |
 | D2 | test_core_member_rows_published | real source | the `excluded` run | no field |
 
+### Measured after building (scope `declarations`, test_core_member_rows_published)
+
+```text
+ stored record   sysroot_source_directory_path core/src, 288 files, 6,419,461 bytes,
+                 sysroot_listing_digest_sha256 39a4d53484c4df57...: equal to core_source
+                 of the frozen targets file
+ excluded run    no record; its run id differs from the id of the declarations run
+```
+
+Not measured: two `declarations` runs over different `core` bytes. D3 for that case rests
+on the unit test of the record and on the run id hashing the row.
+
 ### Open questions
 
 - None for the user.
+
+## 17. The expected graph of a `declarations` run (spec first, added 2026-11-17)
+
+**The frozen expected graph (151 nodes) lists the 133 calls into `core` without a target, and
+the frozen targets are in a second file. This section merges the two into the expected graph
+of a `declarations` run, freezes it, and compares a run with it row by row.**
+
+### Rust work mode
+
+- **Mode:** a Python builder beside the two existing ones, and one Rust real-source test.
+  No production code.
+- **Risk:** medium. This file decides PASS for the richer graph.
+
+### Measured before writing (run stepN, working tree after REQ-RUST-065.0)
+
+```text
+ stored            170 nodes = 151 of the expected graph + 19 with external_name_kind
+                   core_declared_member; 682 edge rows
+ calls into core   118 dispatch_kind core_inherent_member, 14 core_trait_declared_member,
+                   1 undetermined/inherent_member_unproven (the cast)
+ frozen targets    133 rows, 20 labels; 119 owner kind inherent_impl, 14 trait declaration
+```
+
+### What is missing today
+
+- No file lists the 170 nodes and the 682 rows a `declarations` run is expected to store.
+- `test_itoa_core_member_targets` compares the 132 named calls only. No test compares the
+  whole `declarations` graph.
+- The targets builder reads the untargeted sites of the expected graph, so writing the
+  targets back into that file would make each file an input of the other.
+
+### Executable requirements: REQ-RUST-066.0
+
+```text
+ M1   A third builder SHALL read the frozen expected graph (nodes, edges) and the frozen
+      targets file, check each against its freeze record, and write
+      itoa-expected-declarations-graph-nodes.json, -edges.json, -summary.json and
+      -freeze.json. The two inputs are not changed: they stay the expected graph of a run
+      with scope excluded.
+ M2   Each of the 133 sites SHALL be found in the targets file by its source label and
+      its site span. A site that is not found, or a targets row that no site uses, fails
+      the build.
+ M3   A merged site SHALL have the target label of its targets row, target kind external,
+      and the record core_inherent_member (owner kind inherent_impl) or
+      core_trait_declared_member (a trait declaration). Its range is unchanged.
+ M4   The builder SHALL hold the list of labels that are not merged, each with its
+      requirement id. The list is `*mut T::cast` (C7). Such a site stays without a
+      target, with the record undetermined/inherent_member_unproven, and its row SHALL
+      name the known label.
+ M5   One node SHALL be added per merged label: category external_name, external name
+      kind core_declared_member, no file, no kind, no owner.
+ M6   Rows SHALL be grouped again by source, relation and target. The number of sites
+      SHALL stay 682; the number of nodes SHALL be 151 plus the number of merged labels.
+ M7   The freeze record SHALL hold the SHA-256 of the two input files, of the builder and
+      of each file written.
+ M8   test_itoa_declarations_graph_equality SHALL run pinned itoa with scope declarations
+      and compare every node and every edge row with these files, by the same row text
+      as test_itoa_whole_graph_equality. Any difference fails.
+```
+
+### Design
+
+- **Python, pure functions:** `index_target_rows`, `merge_edge_rows`, `list_merged_nodes`,
+  `build_freeze_record`; `main` reads and writes.
+- **Rust test:** the readers of the expected files take the file names; the comparison of
+  the two tests is one shared function.
+
+### Verification matrix
+
+| Req | Test | Level | Case | Expected |
+|---|---|---|---|---|
+| M1, M7 | test_itoa_expected_declarations_graph.py | Python | a rebuild into a temporary directory | byte-equal to the frozen files |
+| M2 | same | Python | a targets row removed | the build fails |
+| M3 to M6 | same | Python | the frozen files | 170 nodes, 682 sites, 1 without a target, 132 merged, 19 new nodes |
+| M8 | test_itoa_declarations_graph_equality | real source | a declarations run | 0 differing nodes, 0 differing rows |
+
+### Open questions
+
+- None for the user. `cast` stays the one listed site without a target (C7); naming it
+  is in the immediate backlog.
