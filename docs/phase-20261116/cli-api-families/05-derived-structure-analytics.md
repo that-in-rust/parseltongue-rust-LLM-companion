@@ -188,3 +188,77 @@ Recompute only within an explicit compatible scope; deterministic tie-breaks; un
 **Sources:** [S80METRICS: supplements/80-repository-synthesis-draft.md L182–L186 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROLL L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RAGG L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [R7TRUTH L100–L108](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793879701-parseltongue-as-grep-replacement-cpu-only-seven-event-retrieval-protocol-over-the-rust-graph.md#L100-L108)
 
 
+<a id="cli-ana-010"></a>
+
+### CLI-ANA-010 — `query-measure-kcore-decomposition` · P2 · D
+
+**Job:** Compute k-core numbers for a declared graph projection.
+
+**Inputs:** Direction/undirected projection; relation set; scope.
+
+**Outputs:** Per-item core number and formula/version.
+
+**Evidence:** Emit formula, algorithm/version, direction, relation allowlist, parameters and seed; metrics are descriptive derived views, not architecture truth, debt, safety or defect probability.
+
+**Bounds/completeness:** Recompute only within an explicit compatible scope; deterministic tie-breaks; unknown inputs are not zero; return formula metadata and bounded rows with leaf drilldown.
+
+**Dependencies:** Descriptive graph layering only; not architecture tiers.
+
+**Sources:** [S80METRICS: supplements/80-repository-synthesis-draft.md L182–L186 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROLL L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RAGG L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [R7TRUTH L100–L108](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793879701-parseltongue-as-grep-replacement-cpu-only-seven-event-retrieval-protocol-over-the-rust-graph.md#L100-L108)
+
+
+<a id="cli-ana-011"></a>
+
+### CLI-ANA-011 — `query-measure-graph-entropy` · P2 · D
+
+**Job:** Compute a named entropy formula over an explicit graph distribution.
+
+**Inputs:** Distribution (e.g. degree); binning/formula version; scope.
+
+**Outputs:** Input counts, formula, units and result; no complexity label.
+
+**Evidence:** Emit formula, algorithm/version, direction, relation allowlist, parameters and seed; metrics are descriptive derived views, not architecture truth, debt, safety or defect probability.
+
+**Bounds/completeness:** Recompute only within an explicit compatible scope; deterministic tie-breaks; unknown inputs are not zero; return formula metadata and bounded rows with leaf drilldown.
+
+**Dependencies:** Derived statistic; no inference about code complexity or quality.
+
+**Sources:** [S80METRICS: supplements/80-repository-synthesis-draft.md L182–L186 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROLL L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RAGG L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [R7TRUTH L100–L108](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793879701-parseltongue-as-grep-replacement-cpu-only-seven-event-retrieval-protocol-over-the-rust-graph.md#L100-L108)
+
+
+<a id="cli-ana-012"></a>
+
+### CLI-ANA-012 — `query-measure-subgraph-coupling` · P2 · D
+
+**Job:** Count internal/cross-boundary relation sites for a declared partition.
+
+**Inputs:** Partition/path boundary; relation allowlist; denominator policy.
+
+**Outputs:** Numerators/denominators and witness sites; no borrowed CK metric names.
+
+**Evidence:** Emit formula, algorithm/version, direction, relation allowlist, parameters and seed; metrics are descriptive derived views, not architecture truth, debt, safety or defect probability.
+
+**Bounds/completeness:** Recompute only within an explicit compatible scope; deterministic tie-breaks; unknown inputs are not zero; return formula metadata and bounded rows with leaf drilldown.
+
+**Dependencies:** Derived counts; caller-supplied partition or path prefixes.
+
+**Sources:** [S80METRICS: supplements/80-repository-synthesis-draft.md L182–L186 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROLL L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RAGG L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [R7TRUTH L100–L108](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793879701-parseltongue-as-grep-replacement-cpu-only-seven-event-retrieval-protocol-over-the-rust-graph.md#L100-L108)
+
+
+<a id="cli-ana-013"></a>
+
+### CLI-ANA-013 — `query-evaluate-supplied-rules` · P2 · D
+
+**Job:** Evaluate caller-supplied predicates against available graph facts and return witnesses.
+
+**Inputs:** Versioned rule JSON; subject IDs; rule limits.
+
+**Outputs:** Satisfied, contradicted or unknown per rule with source evidence.
+
+**Evidence:** Emit formula, algorithm/version, direction, relation allowlist, parameters and seed; metrics are descriptive derived views, not architecture truth, debt, safety or defect probability.
+
+**Bounds/completeness:** Recompute only within an explicit compatible scope; deterministic tie-breaks; unknown inputs are not zero; return formula metadata and bounded rows with leaf drilldown.
+
+**Dependencies:** No persisted rule database; missing facts yield unknown; no unsupported architecture assertion.
+
+**Sources:** [S80METRICS: supplements/80-repository-synthesis-draft.md L182–L186 (supplied bundle)](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz); [S80ROLL L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RAGG L7–L68](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793853341-rust-interface-graph-for-10-million-loc-systems-programming-and-aggregation-level.md#L7-L68); [RREADME L228–L305](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/README.md#L228-L305); [R7TRUTH L100–L108](https://github.com/that-in-rust/parseltongue-rust-LLM-companion/blob/fac71702f179c88990914ccd098e0bd52e7e7131/docs/devin-research/1793879701-parseltongue-as-grep-replacement-cpu-only-seven-event-retrieval-protocol-over-the-rust-graph.md#L100-L108)
