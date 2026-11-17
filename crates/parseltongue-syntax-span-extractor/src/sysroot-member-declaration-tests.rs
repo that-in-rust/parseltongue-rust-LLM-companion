@@ -427,3 +427,83 @@ fn test_macro_call_token_rows() {
     );
 }
 
+/// REQ-RUST-062.0 C9: one row per direct child of a file that may bind a type name.
+#[test]
+fn test_file_scope_binding_rows() {
+    let source = "#[stable] pub enum Result<T, E> { Ok(T), Err(E) }\n\
+        struct Unit; union Bits { a: u8 } trait Shown {} type Alias = Unit;\n\
+        #[path = \"x.rs\"] mod moved; pub mod inline { struct Inner; }\n\
+        extern crate self as core; extern crate alloc;\n\
+        #[prelude_import] use prelude::rust_2024::*;\n\
+        pub use crate::result::Result::{self, Err as Bad, Ok as _};\n\
+        include!(\"docs.rs\"); extern \"C\" { type Foreign; }\n\
+        fn free() { struct Local; } const VALUE: u8 = 0; impl Unit {}\n";
+    let rows = extract_member_declaration_rows("core/src/lib.rs", source);
+    let read = rows
+        .iter()
+        .filter(|row| row["declaration_owner_kind_value"] == "file_scope_name_binding")
+        .map(|row| {
+            json!([
+                row["scope_binding_form_kind"],
+                row["type_declaration_kind_value"],
+                row["member_declared_name_value"],
+                row["use_leaf_path_text"]
+            ])
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec![
+            json!(["item", "enum", "Result", null]),
+            json!(["item", "struct", "Unit", null]),
+            json!(["item", "union", "Bits", null]),
+            json!(["item", "trait", "Shown", null]),
+            json!(["item", "type_alias", "Alias", null]),
+            json!(["module", "module_file", "moved", null]),
+            json!(["module", "module_inline", "inline", null]),
+            json!(["extern_crate", null, "core", null]),
+            json!(["extern_crate", null, "alloc", null]),
+            json!(["use_glob", null, null, "prelude::rust_2024"]),
+            json!(["use_leaf", null, "Result", "crate::result::Result"]),
+            json!(["use_leaf", null, "Bad", "crate::result::Result::Err"]),
+            json!(["unread_form", null, null, null]),
+            json!(["unread_form", null, null, null]),
+        ],
+        read
+    );
+    let bound = |name: &str| {
+        rows.iter()
+            .find(|row| {
+                row["declaration_owner_kind_value"] == "file_scope_name_binding"
+                    && row["member_declared_name_value"] == name
+            })
+            .unwrap()
+    };
+    assert_eq!(
+        json!(["#[stable]"]),
+        bound("Result")["member_attribute_text_values"]
+    );
+    assert_eq!(
+        json!(["#[path = \"x.rs\"]"]),
+        bound("moved")["member_attribute_text_values"]
+    );
+    let glob = rows
+        .iter()
+        .find(|row| row["scope_binding_form_kind"] == "use_glob")
+        .unwrap();
+    assert_eq!(
+        json!(["#[prelude_import]"]),
+        glob["member_attribute_text_values"]
+    );
+    // A member row says whether its trait or impl is a direct child of the file.
+    let rows = extract_member_declaration_rows(
+        "core/src/a.rs",
+        "impl A { fn top(&self) {} } mod m { impl A { fn deep(&self) {} } }",
+    );
+    assert_eq!(
+        json!([true, false]),
+        json!([
+            find_member_row_named(&rows, "inherent_impl", "top")["owner_file_scope_flag"],
+            find_member_row_named(&rows, "inherent_impl", "deep")["owner_file_scope_flag"]
+        ])
+    );
+}
