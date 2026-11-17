@@ -236,6 +236,10 @@ parseltongue export-published-stage-rows --workspace-store-file-path <store.db> 
 parseltongue export-published-stage-rows --workspace-store-file-path <store.db> \
   --stage-owned-table-name edge-evidence-record-table            # edges
 
+# copy the two exported files into one DuckDB file (a separate binary; SPEC part 9)
+parseltongue-graph-dataset-loader --node-export-file-path <nodes.json> \
+  --edge-export-file-path <edges.json> --dataset-output-file-path <graph.duckdb>
+
 # the real-source tests that decide progress
 cargo test --release -p parseltongue-cli-dispatcher-binary \
   --test itoa-source-acceptance-tests -- --test-threads=1
@@ -246,7 +250,7 @@ cargo test --release -p parseltongue-cli-dispatcher-binary \
 
 ### Code
 
-- Ten crates under `crates/`, all named `parseltongue-*`. The crate map lists each one.
+- Eleven crates under `crates/`, all named `parseltongue-*`. The crate map lists each one.
 - `parseltongue-core-row-types` has no dependencies and stays that way.
 - Side effects (files, databases, processes) live only in adapter crates, behind traits from
   `parseltongue-table-store-traits`.

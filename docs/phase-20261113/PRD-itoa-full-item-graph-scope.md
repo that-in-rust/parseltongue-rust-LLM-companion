@@ -73,7 +73,8 @@ Ownership:
   separate crate from the JSON a run exports, after the run and outside it. It is a copy
   for SQL queries. Turso stays the store the run publishes to, and the comparison with the
   expected graph reads Turso
-  ([part 9](SPEC-itoa-full-item-graph/part-9-graph-export-into-duckdb.md), not built).
+  ([part 9](SPEC-itoa-full-item-graph/part-9-graph-export-into-duckdb.md); built, and
+  one full run of pinned itoa on 2026-11-17 gave a file equal to the export row for row).
 
 Stages:
 

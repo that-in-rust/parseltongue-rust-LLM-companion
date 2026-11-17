@@ -10,7 +10,8 @@ full item dependency graph only.
 133 method calls into `core`) was closed by the acceptance run at commit `753665eb9`, with
 the scope value `declarations`: 132 of the 133 calls are named and equal their frozen
 expected rows, and `cast` is listed without a target. Part 9 (the exported graph as a
-DuckDB file, in a separate crate) is specified and not built.**
+DuckDB file, in a separate crate) is built: one full run of pinned itoa on 2026-11-17 gave
+a DuckDB file equal to the exported rows, 170 node rows and 682 edge rows.**
 
 Counts and the current step are on the [log](../LOG-itoa-full-item-graph-progress.md)'s
 "Where we are" page.
@@ -29,7 +30,7 @@ part  file                                       requirements                   
 6     part-6-targets-in-core.md                  053.0                          6.1-6.5 BUILT (145 nodes; workspace gate not a full PASS: one skipped test)
 7     part-7-whole-graph-acceptance.md           043.1, 044.0 to 044.3          acceptance run passed S1 to S4 on 2026-11-16 (log)
 8     part-8-method-calls-into-core.md           054.0 to 066.0                 132 of 133 calls named; a `declarations` run equals its frozen expected graph in a test; 1 listed without a target (cast); S1 to S4 passed at `753665eb9`
-9     part-9-graph-export-into-duckdb.md         067.0                          specified, not built (a separate crate; the mapper is not changed)
+9     part-9-graph-export-into-duckdb.md         067.0                          built in a separate crate; the full run of 2026-11-17 gave a DuckDB file equal to the export row for row (log); the mapper is not changed
 ```
 
 MET and BUILT mean the part's real-source tests pass on pinned itoa. The last full run of

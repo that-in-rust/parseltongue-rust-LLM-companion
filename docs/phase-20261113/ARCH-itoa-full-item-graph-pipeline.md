@@ -116,6 +116,32 @@ Three facts in the code that shape the remaining work:
 - **C3** itoa with the sysroot did not finish step 5 in 2,400 s (2026-11-13); on 2026-11-16
   the same run stopped after 171 s with a store copy mismatch. Acceptance runs exclude it.
 
+### After the run: a DuckDB copy of the graph
+
+Not a pipeline step. A second binary, `parseltongue-graph-dataset-loader`, reads the two
+files `export-published-stage-rows` writes for the node and edge tables, checks them, and
+writes one DuckDB file (user decision, 2026-11-17;
+[part 9](SPEC-itoa-full-item-graph/part-9-graph-export-into-duckdb.md)).
+
+```text
+workspace-store.db (Turso)  --export-published-stage-rows-->  nodes.json, edges.json
+nodes.json, edges.json      --parseltongue-graph-dataset-loader-->  graph.duckdb
+```
+
+- **Not a store of the run.** Turso stays the store, and the comparison with the expected
+  graph reads Turso. The mapper does not depend on the loader crate, and the loader depends
+  on no crate of this workspace.
+- **Three tables:** `full_graph_dataset_info` (one row: run generation, row counts, the
+  digests of the two input files), `full_graph_node_rows` and `full_graph_edge_rows`.
+- **Nothing is lost.** Each row keeps its whole exported payload as JSON text with sorted
+  keys. The other columns copy payload fields for SQL; an edge's source and target columns
+  hold a node's key, so they join to the node table.
+- **Checked before written:** one run generation in both files, no duplicate identity,
+  every edge source a node, every edge target a node or absent with a reason.
+- **All or nothing:** the file is built beside the output, read back and compared, then
+  linked to the output path; an output path that exists is an error.
+- **No DuckDB extension** is installed or loaded, unlike the run itself.
+
 ## 2 — The tables, top to bottom
 
 Levels 1 and 2 are the full graph, the deliverable. Levels 3–7 are the facts it is built from.

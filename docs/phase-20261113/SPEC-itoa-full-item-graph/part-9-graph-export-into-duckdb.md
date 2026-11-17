@@ -1,8 +1,13 @@
 # Part 9 — the exported graph as a DuckDB file
 
-Status on 2026-11-17: **specified, not built.** Decided by the user on 2026-11-17: a
-separate crate reads the JSON a run exports, checks it, and writes it into one DuckDB file.
-The mapper, the Turso store and the exported JSON are not changed.
+Status on 2026-11-17: **built, and the full run passed.** Pinned itoa 1.0.18 went through
+the frozen `parseltongue` executable, the two tables were exported, and the crate
+`parseltongue-graph-dataset-loader` wrote a DuckDB file whose rows equal the exported rows:
+170 node rows and 682 edge rows, every column, 0 differences (section 6).
+
+Decided by the user on 2026-11-17: a separate crate reads the JSON a run exports, checks
+it, and writes it into one DuckDB file. The mapper, the Turso store and the exported JSON
+are not changed.
 
 **Done for this part** (user, 2026-11-17): one full run in which pinned itoa goes through
 `parseltongue`, the two tables are exported, and the loader writes a DuckDB file whose
@@ -127,7 +132,10 @@ C7       test_export_file_rows_required        unit         header only: error
 A2 A3    test_small_export_dataset_roundtrip   unit, DuckDB rows read back equal the rows checked; two loads equal
 A4       test_failed_check_writes_nothing      unit, files  output path absent after a failed check
 A5 A7    test_existing_output_path_kept        unit, files  output and inputs keep their bytes
-A1 A2    test_itoa_export_dataset_roundtrip    real source  170 and 682 rows; every row equals its JSON row
+A1 A2 A7 test_itoa_export_dataset_roundtrip    real source  170 and 682 rows; every row equals its JSON row;
+                                                            the export files keep their bytes
+A4       test_wrong_flag_usage_exit            binary       wrong flags: exit 2, usage text, no file
+A4       test_missing_export_file_exit         binary       unreadable export: exit 1, no file
 A6       strace of the binary, once            manual       no path under ~/.duckdb opened
 ```
 
@@ -147,9 +155,52 @@ otherwise `target/release/parseltongue`; when neither exists the test fails and 
 9.5  A6 by strace; workspace gates; the full run recorded in the log
 ```
 
+All five steps are done. Steps 9.1 to 9.3 were test first: the eleven unit tests ran
+against stubs and 10 failed (the eleventh tests only the JSON text form). The real-source
+test and the two binary tests of 9.4 were written after the code and were never seen to
+fail.
+
 ## 6. Quality gate results
 
-Not run: nothing is built.
+Run on 2026-11-17 at commit `c21eacd2b`. Commands and digests are in the log entry of
+that day.
+
+```text
+format            cargo fmt --all -- --check                                  exit 0
+lint, crate       clippy -p parseltongue-graph-dataset-loader, -D warnings    exit 0
+lint, workspace   clippy --workspace --all-targets --all-features             exit 0
+tests, crate      14 pass, 0 fail: 11 unit, 2 binary, 1 real source
+tests, workspace  25 test binaries, 657 pass, 0 fail, 4 ignored (1,131 s);
+                  test_lang_items_in_sysroot skipped, so not a full PASS
+build             cargo build --release --workspace --all-targets             exit 0
+```
+
+The full run, by acceptance criterion:
+
+```text
+A1  170 node rows and 682 edge rows stored; the info row holds both counts,       PASS
+    the run generation and the sha256 of each input file
+A2  every stored row equals its JSON row in all 11 columns; each payload text    PASS
+    parses back to the exported payload; 681 edges join to a target node, 1 has
+    no target and the reason TraitSolverNeeded
+A3  two loads of the same export to two paths store equal rows in all three      PASS
+    tables
+A4  an input that breaks a check gives that check's error (7 unit tests) and     PASS
+    leaves no file (test_failed_check_writes_nothing); in the binary, wrong
+    flags exit 2 and an unreadable input exits 1, no file either way
+A5  a second load onto the same path exits 1 and the file keeps its digest       PASS
+A6  strace of one load: 0 opens under ~/.duckdb, 0 connect calls, 0 child        PASS
+    processes
+A7  both export files keep their sha256; neither is opened for writing           PASS
+```
+
+- **Measured:** mapper 22.0 s and 354.8 MB peak; loader 0.87 s and 87.9 MB; the DuckDB
+  file is 7,876,608 bytes.
+- **Who checked A1 and A2:** the test `test_itoa_export_dataset_roundtrip`, and a Python
+  script outside the repository that reads the file with the PyPI `duckdb` package and
+  shares no code with the loader. Both report 0 differences.
+- **Not shown:** any repository other than itoa, any scope other than `declarations`, and
+  an export larger than 682 edge rows.
 
 ## 7. Open questions
 

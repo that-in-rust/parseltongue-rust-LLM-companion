@@ -73,15 +73,12 @@ workers      1, 4 and 16, twice each, store byte-identical node and edge rows
 ### Checks at the last full run
 
 ```text
-real-source itoa tests   61 pass, 0 fail (928 s, one thread, frozen executable)  at 753665eb9
-workspace tests          first run: 639 pass, 2 fail, 4 ignored, stopped after 20 test
-                         binaries. Both failures are `cargo metadata --offline` missing a
-                         crate in this machine's crate cache; `cargo fetch --locked` fixed
-                         that. Rerun of all 21 test binaries: 643 pass, 0 fail,
-                         4 ignored, exit 0 (1,024 s).
+real-source itoa tests   61 pass, 0 fail (966 s, one thread)                   at c21eacd2b
+workspace tests          25 test binaries: 657 pass, 0 fail, 4 ignored, exit 0     at c21eacd2b
+                         (1,131 s, max RSS 674 MB). The loader crate adds 14 tests.
                          test_lang_items_in_sysroot skipped; it fails when run
-format, lint, release    pass                                          at 753665eb9
-expected-data tests      25 pass
+format, lint, release    pass (workspace clippy, -D warnings, and build)        at c21eacd2b
+expected-data tests      25 pass                                                at 753665eb9
 ```
 
 The workspace gate is not a full PASS while that test is skipped. It reads the whole
@@ -145,12 +142,26 @@ parseltongue-stage-worker-scheduler            67         4  stage scheduling
 
 Part 8 is done as far as it was decided: the acceptance run of `753665eb9` passed.
 
-**In progress: part 9, the exported graph as a DuckDB file** (user decision, 2026-11-17).
-A separate crate reads the two JSON files a run exports, checks them and writes one DuckDB
-file. The user's bar for done: one full run in which pinned itoa goes through
-`parseltongue` and the DuckDB file equals the exported rows. Specified
-([part 9](SPEC-itoa-full-item-graph/part-9-graph-export-into-duckdb.md)); no code is
-committed yet.
+**Part 9, the exported graph as a DuckDB file, is built and its full run passed**
+(2026-11-17, commit `c21eacd2b`; user decision of the same day). The user's bar: one full
+run in which pinned itoa goes through `parseltongue` and the DuckDB file equals the
+exported rows.
+
+```text
+1 mapper   pinned itoa, scope declarations, frozen executable   22.0 s, 354.8 MB   170 nodes, 682 edge rows
+2 export   the node and edge tables as JSON lines; rows equal the S2 and S4 exports
+3 loader   parseltongue-graph-dataset-loader                      0.87 s, 87.9 MB    one DuckDB file, 7,876,608 bytes
+4 check    a Python script outside the repository reads the file  170 of 170 node rows and 682 of 682 edge rows
+                                                                  equal the JSON in all 11 columns
+```
+
+- 681 edge rows join to a target node; 1 (`cast`) has no target and the reason
+  `TraitSolverNeeded`.
+- The two export files keep their digests; the loader opens no file under `~/.duckdb`,
+  makes no network call and starts no process.
+- In the repository the same is tested by `test_itoa_export_dataset_roundtrip`.
+- The DuckDB file is a copy for SQL. It is not a store of the run and no acceptance step
+  reads it.
 
 Open, each needing a decision from the user:
 
@@ -1425,3 +1436,95 @@ workers  wall s  peak MB  store bytes  nodes  edges
   and `run-s4.sh` (not in the repository). They run the SOP commands with
   `--sysroot-source-scope-kind declarations`.
 - **codebase-memory:** index_repository after `753665eb9`; no query was needed for the run.
+
+## 2026-11-17 13:25 IST Part 9: the exported graph as a DuckDB file, built, and the full run
+
+**The full run the user set as the bar for this part passed. Pinned itoa 1.0.18 went
+through the frozen `parseltongue` executable, the node and edge tables were exported, and
+`parseltongue-graph-dataset-loader` wrote a DuckDB file whose rows equal the exported rows:
+170 of 170 node rows and 682 of 682 edge rows, every column, 0 differences.**
+
+- **Commits:** `0aa9b2de8` (crate, error enum), `1bd385e0a` (parser), `317f9bb82`
+  (checks), `df44a54b7` (DuckDB write and read-back), `4125982e9` (unit tests),
+  `c21eacd2b` (binary, real-source test, two binary tests). No file of another crate
+  changed; `Cargo.toml` gained one member and `Cargo.lock` one package.
+- **The full run** (`~/phase8-work/e2e/run-e2e.sh`, output `e2e.txt`, at `c21eacd2b`; no
+  file under `crates/` differs from the commit). It ran twice. The numbers below are the
+  second run, made with the two executables the workspace build left. The first run used
+  a loader built with `-p` alone (sha256 `62f96d7f…`: without the `unbounded_depth` feature
+  of `serde_json` that another crate of the workspace turns on) and gave the same result:
+  mapper 22.88 s and 353.3 MB, loader 1.00 s, 0 failed checks.
+
+```text
+inputs    itoa 1.0.18, a copy of the four pinned source files (byte-equal to commit af77385d0)
+          with the pinned Cargo.lock; rustc 1.99.1 (58cf8f9c3 2026-10-13)
+          mapper sha256 af84bb460f6d73cf0fb465117cfad671f94fab339497c72a0efc6872771cf354 (the frozen executable)
+          loader sha256 67743f0c79752b517ec25d0dc300c2979fd980f43f254b316f34f536e2e758fc
+1 mapper  map-workspace-full-run, 4 workers, full-item-dependency-graph, scope declarations
+          exit 0, 22.00 s, peak 354.8 MB (process tree)
+2 export  export-published-stage-rows for both tables, exit 0: 170 node rows, 682 edge rows
+          nodes sha256 f3c56289bb8f6b20a26fde9a99ffdfd5e110bc4cc0409843add9a52a4cbbd863
+          edges sha256 409820741e7e58fe629a117d504647770e6f71a5a57651a957dd589662e0d41d
+          row lines equal those of the accepted run (S2 and S4): node rows aadbd84f…, edge
+          rows 3e637bdd…; only the header's stage attempt value differs
+3 loader  exit 0, 0.87 s, max RSS 87,852 kB; full-graph-dataset.duckdb, 7,876,608 bytes
+4 again   the same output path: exit 1 "the output path exists", file digest unchanged
+5 traced  a load to a second path under strace: exit 0, 0 connect calls, 1 execve (itself),
+          0 child processes, 0 opens with `.duckdb/` in the path, 0 opens under the home
+          directory outside the run directory, the two inputs never opened for writing
+6 inputs  both export files have the same sha256 after the three loads
+7 check   check-dataset-rows.py (Python duckdb 2.0.0, not the loader's code), both files:
+          three tables; info row = generation, 170, 682, the two input digests;
+          170 node rows and 682 edge rows equal the JSON in all 11 columns;
+          each payload text parses back to the exported payload;
+          682 edges join to a source node, 681 to a target node,
+          1 without a target (Unresolved, TraitSolverNeeded);
+          the two loads store equal rows; failed checks 0
+          rows by relation: Calls 197, UsesType 203, Reads 98, Contains 88, Generates 45,
+          Implements 32, Expands 15, Imports 4
+```
+
+- **Tests of the crate** (`cargo test --release -p parseltongue-graph-dataset-loader
+  --all-targets --all-features`): 14 pass, 0 fail. Unit: `test_canonical_json_text_sorted`,
+  `test_export_header_line_required`, `test_run_generation_rows_agree`,
+  `test_node_identity_text_checked`, `test_duplicate_row_identity_rejected`,
+  `test_edge_source_node_required`, `test_edge_target_node_required`,
+  `test_export_file_rows_required`, `test_small_export_dataset_roundtrip`,
+  `test_failed_check_writes_nothing`, `test_existing_output_path_kept`. Binary:
+  `test_wrong_flag_usage_exit`, `test_missing_export_file_exit`. Real source:
+  `test_itoa_export_dataset_roundtrip` (23.8 s; it runs the mapper, both exports and the
+  loader, and compares every stored row with rows it parses from the JSON itself).
+- **RED, then GREEN:** with `parse_graph_export_text` and `write_graph_dataset_file`
+  stubbed, the 11 unit tests gave 1 pass, 10 fail, each on the stub's error; with the
+  bodies in, 11 pass. **Not test first:** the real-source test and the two binary tests
+  were written after the code and passed on their first run, so they were never seen to
+  fail.
+- **Gates:**
+  - Crate gates at `c21eacd2b`: `cargo fmt --all -- --check` exit 0; `cargo clippy
+    --release -p parseltongue-graph-dataset-loader --all-targets --all-features -- -D
+    warnings` exit 0; the crate's tests as above.
+  - Workspace gates at `c21eacd2b` (`~/phase8-work/e2e/gates.sh`): format exit 0; clippy
+    `--workspace --all-targets --all-features -- -D warnings` exit 0; tests exit 0, 25
+    test binaries, 657 pass, 0 fail, 4 ignored, 1,131 s, max RSS 674,252 kB; build exit 0.
+    The 61 real-source itoa tests are among them: 61 pass (966 s).
+  - `test_lang_items_in_sysroot` is skipped, so the workspace gate is not a full PASS.
+  - The mapper built by the workspace build has the sha256 of the frozen executable, so
+    the acceptance run of `753665eb9` stands.
+- **Deviations:**
+  - Four of the six commits are over the 200-line rule (310, 287, 509 and 415 lines); each
+    is one file or one test file with its wiring.
+  - The row check of step 7 uses the PyPI package `duckdb` 2.0.0 in a throwaway virtual
+    environment (`~/phase8-work/e2e-venv`). It is not a repository tool and not a gate.
+  - The mapper run of step 1 still loads DuckDB's `json` extension from
+    `~/.duckdb/extensions` (immediate backlog, entry 6). The loader does not.
+- **Limits:** only itoa, only scope `declarations`. The DuckDB file is a copy of what the
+  run exported: it adds no fact, and it inherits `incomplete` and the one row without a
+  target. No acceptance step of the SOP reads it.
+- **codebase-memory** (run after `c21eacd2b`, not before each commit as Rule 4 asks):
+  `index_repository`; `trace_path` inbound, depth 1, on `load_graph_export_files`,
+  `check_graph_export_rows`, `write_graph_dataset_file`, `read_graph_dataset_file` and
+  `parse_graph_export_text`. Every caller it names is in the new crate, and no function of
+  another crate was changed. Checked against source: it misses two callers, the test
+  `test_failed_check_writes_nothing` of `load_graph_export_files` and the real-source test
+  of `read_graph_dataset_file`.
+- **Next:** nothing is in progress. The open decisions are listed under "What is left".

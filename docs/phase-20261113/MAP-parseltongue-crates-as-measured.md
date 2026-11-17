@@ -1,17 +1,18 @@
 # MAP — the parseltongue crates as measured
 
-Measured at commit `79326d155` on 2026-11-17. Re-measure after a structural change; do not
+Measured at commit `c21eacd2b` on 2026-11-17. Re-measure after a structural change; do not
 edit numbers by hand. This file records structure. It does not say any test passes or any
 graph is complete.
 
 ## The answer
 
-**Ten crates, 143 Rust files, 73,906 lines. The itoa full item graph is produced by one CLI
-stage that wires five of them together. Eight of the ten edge kinds have a producer. No code
+**Eleven crates, 153 Rust files, 76,536 lines. The itoa full item graph is produced by one CLI
+stage that wires five of them together. An eleventh crate, outside that stage, copies the
+exported graph into a DuckDB file. Eight of the ten edge kinds have a producer. No code
 exists for lowered signature types, type inference in bodies or a trait solver.**
 
-- Two crates hold 64% of the non-test code: the syntax extractor (13,126 lines) and the
-  DuckDB adapter (11,710), of 38,651.
+- Two crates hold 63% of the non-test code: the syntax extractor (13,440 lines) and the
+  DuckDB adapter (11,710), of 40,015.
 - A large share of the tree is earlier work this phase does not use: the HLD builder and
   stores, and the oracle comparison.
 
@@ -69,15 +70,17 @@ table-store-traits          494      1   store and analysis ports
 turso-store-adapter       4,055     75   durable store, frozen snapshots, graph write and read-back
 duckdb-analysis-adapter  11,710    187   name resolution rounds, node and structural edge projection
 crate-graph-loader          644     12   Cargo metadata and sysroot context to crate graph rows
-syntax-span-extractor    13,126    189   parsing, impl headers, namespace input, five edge resolvers,
+syntax-span-extractor    13,440    191   parsing, impl headers, namespace input, five edge resolvers,
                                          the declarations of core and the lookup over them
 port-macro-expander       3,916     22   declarative and built-in macro expansion
 macro-span-records          236      2   span types the expander uses, under the name ra_ap_span
 stage-worker-scheduler       67      4   worker scheduling
-cli-dispatcher-binary     2,281    129   the one binary; wires the stages
+cli-dispatcher-binary     2,356    131   the mapper binary; wires the stages
+graph-dataset-loader        975     14   a second binary: reads the two JSON files a run exports,
+                                         checks them, writes one DuckDB file (SPEC part 9)
 ```
 
-"Tests" counts `#[test]` attributes in the crate, the 60 real-source itoa tests included.
+"Tests" counts `#[test]` attributes in the crate, the 61 real-source itoa tests included.
 
 Dependencies, arrows read "depends on":
 
@@ -92,6 +95,7 @@ port-macro-expander      -> core-row-types, macro-span-records
 crate-graph-loader       -> core-row-types, table-store-traits
 table-store-traits       -> core-row-types
 stage-worker-scheduler   -> core-row-types
+graph-dataset-loader     -> no crate of this workspace; no crate depends on it
 ```
 
 The one edge between the two adapters, DuckDB to Turso, comes from
@@ -117,8 +121,8 @@ oracle-edge-differ-run        compare a store with oracle exports               
 
 ## Real-source tests on pinned itoa
 
-`crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs`, 60 tests
-in 6,221 lines, over the vendored source in `tests/pinned-itoa-source-tree/`.
+`crates/parseltongue-cli-dispatcher-binary/tests/itoa-source-acceptance-tests.rs`, 61 tests
+in 6,333 lines, over the vendored source in `tests/pinned-itoa-source-tree/`.
 `test_itoa_whole_graph_equality` compares the whole stored graph with the frozen expected
 graph. `test_itoa_core_member_targets` compares each method call into `core` that a run
 with scope `declarations` names with its frozen expected target.
