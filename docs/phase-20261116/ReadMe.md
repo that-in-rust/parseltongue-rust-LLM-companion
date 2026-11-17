@@ -11,9 +11,15 @@ find relevant code, inspect evidence and follow relationships without loading th
 dataset into its context. Production never reads the frozen expected dataset as its input;
 that dataset is the acceptance oracle for the producer.
 
-**State:** phase entry document only. No new query command, query schema, executable part or
-CLI acceptance run is delivered by this document. The initial target remains pinned itoa
-1.0.18, not general multi-repository coverage.
+**State:** the phase now has a canonical coverage/method summary and historical route map; the API backlog and full inventory are planning drafts under review. No new query command, query schema, executable part or CLI acceptance run is delivered by these documents. The initial target remains pinned itoa 1.0.18, not general multi-repository coverage.
+
+## CLI research documents
+
+- [Canonical Markdown review coverage/method summary](markdown-review-coverage.md)
+- [Historical root README route map](legacy-route-map.md)
+- [Draft CLI query backlog](CLI-query-backlog.md)
+- [Draft one-by-one Markdown inventory](markdown-source-inventory.md)
+- [Portable supplemental source bundle](https://app.devin.ai/attachments/93cae10f-5664-448d-aecd-b1febfcba3fb/review-bundle.tar.gz)
 
 ## Scope and boundary
 
@@ -58,8 +64,7 @@ Do not reuse its S1–S4 labels as evidence that a CLI query has passed.
 
 ## Replicate the structure of thinking
 
-Only this entry document exists in the new phase. Create the following documents as their
-work is picked; these are planned responsibilities, not links to existing files:
+The entry document and linked coverage/method summary and historical route map are current phase reading aids; the backlog and inventory are planning documents under review. Create the following implementation documents as their work is picked; these are responsibilities, not claims that an implementation exists:
 
 | Document | Owns |
 | --- | --- |
