@@ -6331,3 +6331,57 @@ fn test_itoa_core_member_targets() {
         )
     );
 }
+
+/// REQ-RUST-068.0 A1, A2: with `HOME` set to an empty directory the run publishes the full
+/// graph and leaves that directory empty, so no DuckDB extension file is read from it.
+/// `CARGO_HOME` and `RUSTUP_HOME` name the real toolchain, which the run starts.
+#[test]
+fn test_empty_home_graph_published() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = prepare_pinned_itoa_workspace(directory.path());
+    let database = directory.path().join("empty-home-graph.db");
+    let home = directory.path().join("empty-home");
+    fs::create_dir(&home).unwrap();
+    let real_home = PathBuf::from(std::env::var_os("HOME").unwrap());
+    let toolchain_home = |name: &str, folder: &str| {
+        std::env::var_os(name)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| real_home.join(folder))
+    };
+    let output = Command::new(read_mapper_executable_path())
+        .args([
+            "map-workspace-full-run",
+            "--workspace-root-path-value",
+            root.to_str().unwrap(),
+            "--workspace-store-file-path",
+            database.to_str().unwrap(),
+            "--worker-thread-count-value",
+            "2",
+            "--sysroot-source-scope-kind",
+            "declarations",
+            "--mapping-final-stage-kind",
+            "full-item-dependency-graph",
+        ])
+        .env("HOME", &home)
+        .env("CARGO_HOME", toolchain_home("CARGO_HOME", ".cargo"))
+        .env("RUSTUP_HOME", toolchain_home("RUSTUP_HOME", ".rustup"))
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        (170, 682),
+        (
+            read_published_stage_rows(&database, "item-effective-visibility-records").len(),
+            read_published_stage_rows(&database, "edge-evidence-record-table").len()
+        )
+    );
+    assert_eq!(
+        0,
+        fs::read_dir(&home).unwrap().count(),
+        "the run wrote into HOME"
+    );
+}
