@@ -12,6 +12,10 @@ then its answer and rules, then reference facts.
   improve the dataset. Missing producer facts remain in the phase-20261113 backlog, not
   hidden extraction or guessed relationships in the CLI. Shared source-proof, spec-first,
   test-first and delivery rules still apply; a passing query never accepts the producer.
+- **Backend release proposal:** start at [phase-20261117/ReadMe.md](docs/phase-20261117/ReadMe.md).
+  This is a Linux/macOS packaging/release plan for the pinned `codebase-memory-mcp`
+  non-Rust backend. Nothing is implemented or validated; it does not change phase-20261113
+  data or the phase-20261116 consumer CLI.
 
 ## The answer
 
@@ -206,6 +210,10 @@ Earlier part files cite reviews made under this rule; those records stay as hist
 `docs/phase-20261113/` is current documentation for the graph producer. The bounded CLI
 consumer phase starts at [its entry document](docs/phase-20261116/ReadMe.md); it does not
 change the producer's scope, frozen expected graph or acceptance SOP.
+The proposal-only Linux/macOS packaging/release plan for the pinned `codebase-memory-mcp`
+non-Rust backend starts at [phase-20261117/ReadMe.md](docs/phase-20261117/ReadMe.md).
+Nothing is implemented or validated; phase-20261113 data and the phase-20261116 consumer
+CLI remain unchanged.
 
 ```text
 SOP      SOP-itoa-full-item-graph-acceptance.md         steps S1–S4 that decide PASS
@@ -226,7 +234,7 @@ SPEC     SPEC-itoa-full-item-graph/                     README.md is the index; 
 - One document at a time, in commits of at most about 1,000 changed lines, each pushed to
   `research/tiny-rust-code-mapper` before the next starts.
 - A change to architecture or to a pin updates ARCH, SOP and this file in the same commit.
-- Outside these two phase directories, `docs/` is history. Exception: code and tools still read these files in
+- Outside these phase directories, `docs/` is history. Exception: code and tools still read these files in
   `docs/phase-20261111/`, so do not move or delete them without updating the readers:
   `phase-one-benchmark-pin.json` (the itoa pin) and `parser-source-pin-manifest.json`. Three
   more are read only by the older five-repository tools under `tools/`:
