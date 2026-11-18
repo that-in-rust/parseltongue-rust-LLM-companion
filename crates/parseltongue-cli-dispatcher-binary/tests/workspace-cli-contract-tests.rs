@@ -452,7 +452,7 @@ fn expected_syntax_item_owner(
     let (unit_compilation_identity_key, _) = fixture_compilation_unit_identity(database);
     let start = source.find(item_source).unwrap();
     let end = start + item_source.len();
-    let path = root.join("src/lib.rs").canonicalize().unwrap();
+    let path = make_stored_fixture_root(root).join("src/lib.rs");
     let canonical = json!([
         unit_compilation_identity_key,
         path.to_string_lossy(),
@@ -541,6 +541,12 @@ fn expected_nested_macro_identity(
         "span_content_digest_full":blake3::hash(invocation.as_bytes()).to_hex().to_string(),
         "span_expansion_provenance_chain":provenance,
     })
+}
+
+/// REQ-RUST-072.0 D3: the root every stored path of the fixture workspace starts with.
+/// The workspace's own directory is used only to open files.
+fn make_stored_fixture_root(_workspace: &Path) -> std::path::PathBuf {
+    std::path::PathBuf::from(parseltongue_core_row_types::WORKSPACE_FIXED_ROOT_PATH)
 }
 
 fn expected_macro_virtual_path(root: &Path, invocation_identity: &Value) -> std::path::PathBuf {
@@ -989,16 +995,15 @@ fn test_flags_without_sysroot_support() {
     let unit = units
         .iter()
         .find(|unit| {
-            unit["unit_package_root_path"] == root.to_str().unwrap()
+            unit["unit_package_root_path"] == make_stored_fixture_root(&root).to_str().unwrap()
                 && unit["unit_cargo_target_kind"] == "lib"
                 && unit["unit_compilation_role_kind"] == "target"
         })
         .unwrap();
-    assert!(units.iter().any(
-        |unit| unit["unit_package_root_path"] == root.to_str().unwrap()
-            && unit["unit_cargo_target_kind"] == "custom-build"
-            && unit["unit_mapped_target_flag"] == false
-    ));
+    assert!(units.iter().any(|unit| unit["unit_package_root_path"]
+        == make_stored_fixture_root(&root).to_str().unwrap()
+        && unit["unit_cargo_target_kind"] == "custom-build"
+        && unit["unit_mapped_target_flag"] == false));
     assert_eq!(unit["unit_no_std_flag"], true);
     assert_eq!(unit["unit_implicit_prelude_flag"], false);
     let paths = read_published_table_fixture(&database, "path-resolution-site-records");
@@ -1193,7 +1198,11 @@ fn test_generated_import_refresh_trace() {
     let dependency = units
         .iter()
         .find(|unit| {
-            unit["unit_package_root_path"] == root.join("defs").to_str().unwrap()
+            unit["unit_package_root_path"]
+                == make_stored_fixture_root(&root)
+                    .join("defs")
+                    .to_str()
+                    .unwrap()
                 && unit["unit_cargo_target_kind"] == "lib"
                 && unit["unit_compilation_role_kind"] == "target"
         })
@@ -1202,7 +1211,7 @@ fn test_generated_import_refresh_trace() {
         refreshes[1]["trigger_unit_compilation_identity_key"],
         dependency["unit_compilation_identity_key"]
     );
-    let fixture_dependency_package_root = root.join("defs");
+    let fixture_dependency_package_root = make_stored_fixture_root(&root).join("defs");
     let fixture_source_absolute_path = fixture_dependency_package_root.join("src/lib.rs");
     assert_eq!(
         dependency["unit_package_root_path"],
@@ -1367,7 +1376,7 @@ fn test_generated_import_refresh_trace() {
     let consumer = units
         .iter()
         .find(|unit| {
-            unit["unit_package_root_path"] == root.to_str().unwrap()
+            unit["unit_package_root_path"] == make_stored_fixture_root(&root).to_str().unwrap()
                 && unit["unit_cargo_target_kind"] == "lib"
                 && unit["unit_compilation_role_kind"] == "target"
         })
@@ -1913,7 +1922,7 @@ pub fn run() { emit_body!(); }
         "FN",
         json!([]),
     );
-    let source_path = root.join("src/lib.rs").canonicalize().unwrap();
+    let source_path = make_stored_fixture_root(&root).join("src/lib.rs");
     let item_start = source.find("pub struct MadeItem;").unwrap();
     let item_origins = vec![
         expected_definition_token_origin(&source_path, 0, 3, item_start, item_start + 3),
@@ -2030,7 +2039,7 @@ pub fn run() { body_root!(); }
     );
     assert_macro_sysroot_disabled(&database);
 
-    let package_root = root.canonicalize().unwrap();
+    let package_root = make_stored_fixture_root(&root);
     let source_path = package_root.join("src/lib.rs");
     let body_owner = expected_syntax_item_owner(
         &database,
@@ -2390,7 +2399,7 @@ macro_rules! generate { () => { fn generated() { inner!(); } }; }
 generate!();
 "#;
     let (_directory, root, database) = build_body_macro_fixture(source);
-    let package_root = root.canonicalize().unwrap();
+    let package_root = make_stored_fixture_root(&root);
     let output = run_workspace_mapping_fixture(&root, &database, "2");
     assert!(
         output.status.success(),
@@ -2482,7 +2491,7 @@ macro_rules! local { () => { use crate::Marker as LocalMarker; fn local_function
 pub fn inside() { local!(); }
 "#;
     let (_directory, root, database) = build_body_macro_fixture(source);
-    let source_path = root.join("src/lib.rs").canonicalize().unwrap();
+    let source_path = make_stored_fixture_root(&root).join("src/lib.rs");
     let output = run_workspace_mapping_fixture(&root, &database, "2");
     assert!(
         output.status.success(),
@@ -2586,8 +2595,8 @@ pub fn run() { let argument = 1; outer!(); }
     );
     assert_macro_sysroot_disabled(&database);
 
-    let package_root = root.canonicalize().unwrap();
-    let source_path = root.join("defs/src/lib.rs").canonicalize().unwrap();
+    let package_root = make_stored_fixture_root(&root);
+    let source_path = make_stored_fixture_root(&root).join("defs/src/lib.rs");
     let expansions = read_published_table_fixture(&database, "macro-expanded-item-table");
     assert_eq!(expansions.len(), 2);
     let outer_invocation = expected_macro_invocation_identity(&database, source, "outer!()");
@@ -3022,7 +3031,13 @@ fn test_fixture_projects_remain_unmapped() {
     let scope = store.read_workspace_publication_scope().unwrap().unwrap();
     let expected: BTreeSet<_> = ["src/lib.rs", "src/child.rs", "src/empty.rs"]
         .into_iter()
-        .map(|path| root.join(path).to_str().unwrap().to_owned())
+        .map(|path| {
+            make_stored_fixture_root(&root)
+                .join(path)
+                .to_str()
+                .unwrap()
+                .to_owned()
+        })
         .collect();
     let requests = store
         .read_stage_table_rows(&scope, "syntax-file-work-requests")

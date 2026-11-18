@@ -96,7 +96,7 @@ fn read_optional_text_value(value: &Value) -> Option<String> {
 }
 
 /// REQ-RUST-067.0 A1 and A2: a `declarations` run of pinned itoa, exported and loaded, gives
-/// one DuckDB file with 170 node rows and 682 edge rows, and every row equals its JSON row.
+/// one DuckDB file with 173 node rows and 686 edge rows, and every row equals its JSON row.
 #[test]
 fn test_itoa_export_dataset_roundtrip() {
     let mapper = read_mapper_executable_path();
@@ -147,8 +147,8 @@ fn test_itoa_export_dataset_roundtrip() {
             .unwrap(),
     );
     let summary: Value = serde_json::from_slice(&loaded.stdout).unwrap();
-    assert_eq!(summary["node_row_count_value"], 170);
-    assert_eq!(summary["edge_row_count_value"], 682);
+    assert_eq!(summary["node_row_count_value"], 173);
+    assert_eq!(summary["edge_row_count_value"], 686);
     assert_eq!(
         [
             std::fs::read(&nodes).unwrap(),
@@ -163,8 +163,8 @@ fn test_itoa_export_dataset_roundtrip() {
         read_export_payload_values(&nodes),
         read_export_payload_values(&edges),
     );
-    assert_eq!(stored.dataset_node_record_values.len(), 170);
-    assert_eq!(stored.dataset_edge_record_values.len(), 682);
+    assert_eq!(stored.dataset_node_record_values.len(), 173);
+    assert_eq!(stored.dataset_edge_record_values.len(), 686);
     let parse = |text: &String| serde_json::from_str::<Value>(text).unwrap();
     assert_eq!(
         sort_payload_value_texts(
@@ -228,7 +228,7 @@ fn test_itoa_export_dataset_roundtrip() {
         .iter()
         .map(|row| row.node_identity_key_text.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(node_keys.len(), 170);
+    assert_eq!(node_keys.len(), 173);
     stored.dataset_edge_record_values.iter().for_each(|row| {
         let payload = parse(&row.edge_payload_json_text);
         let resolution = &payload["edge_resolution"];
@@ -270,17 +270,11 @@ fn test_itoa_export_dataset_roundtrip() {
             read_optional_text_value(&payload["edge_dispatch_metadata_text"])
         );
     });
+    // Every edge row has a target since `cast` is named (REQ-RUST-073.0 A1).
     let without_target = stored
         .dataset_edge_record_values
         .iter()
         .filter(|row| row.target_node_identity_key.is_none())
-        .collect::<Vec<_>>();
-    assert_eq!(without_target.len(), 1, "only `cast` has no target");
-    assert!(
-        without_target[0]
-            .edge_dispatch_metadata_text
-            .as_deref()
-            .is_some_and(|text| text.contains("cast")),
-        "the row without a target is the `cast` call"
-    );
+        .count();
+    assert_eq!(without_target, 0);
 }

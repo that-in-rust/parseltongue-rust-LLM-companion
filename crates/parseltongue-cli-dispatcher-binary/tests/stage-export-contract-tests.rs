@@ -145,7 +145,7 @@ fn test_empty_exports_preserve_scope() {
 
 #[test]
 fn test_exact_manifest_selected_closure() {
-    let (directory, database) = create_export_workspace_fixture();
+    let (_directory, database) = create_export_workspace_fixture();
     let output = run_export_fixture_command(&database, "export-mapped-unit-manifest", &[]);
     assert!(
         output.status.success(),
@@ -205,9 +205,10 @@ fn test_exact_manifest_selected_closure() {
             .iter()
             .all(|path| !path.ends_with("unused.rs") && !path.ends_with("absent.rs"))
     );
+    // REQ-RUST-072.0 D3: the stored workspace root is the fixed root, not the directory.
     assert_eq!(
         manifest["manifest_configuration_state_record"]["workspace_source_root_path"],
-        directory.path().join("workspace").to_str().unwrap()
+        parseltongue_core_row_types::WORKSPACE_FIXED_ROOT_PATH
     );
     let exported = decode_export_fixture_rows(&run_export_fixture_command(
         &database,
