@@ -12,16 +12,17 @@ Out of scope for this phase: every other repository, any rust-analyzer export or
 comparison, and every higher-abstraction table (interface level, HLD, file and folder
 roll-ups). Those are later queries over this graph, not part of it.
 
-Status on 2026-11-17: **the acceptance run passed all four SOP steps on one frozen
-executable (commit `753665eb9`, scope `declarations`). 132 of the 133 method calls into
-`core` are named. The graph is marked incomplete: one call, `cast`, has no target. The
-run report is in the [log](LOG-itoa-full-item-graph-progress.md).**
+Status on 2026-11-18: **the acceptance run passed all four SOP steps on one frozen
+executable (commit `9b31b6b30`, scope `declarations`). All 133 method calls into `core`
+are named and every edge row has a target. The points picked on 2026-11-17 (SPEC parts
+10 to 15) are built. The run report is in the
+[log](LOG-itoa-full-item-graph-progress.md).**
 
 ```text
 itoa run, scope declarations, equal to the frozen expected graph
-nodes  172    88 items and 2 fields of itoa, 66 names outside itoa (19 of them methods
+nodes  173    88 items and 2 fields of itoa, 67 names outside itoa (20 of them methods
               declared in core), 13 builtin types, 2 file areas, 1 crate root
-edges  686    calls 197 (196 with a target), uses_type 203, reads 98, contains 92,
+edges  686    calls 197 (all with a target), uses_type 203, reads 98, contains 92,
               generates 45, expands 15, implements 32, imports 4
 open          the items under "Open" below; the expected graph was checked by its author alone
 ```

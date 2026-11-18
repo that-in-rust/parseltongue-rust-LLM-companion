@@ -5,7 +5,7 @@ full item dependency graph only.
 
 ## The answer
 
-**Parts in build order; 1 to 9 are closed, 10 to 15 are the open points of the PRD the user picked on 2026-11-17 (10 is specified; 11 to 15 are not written yet). Parts 1 to 7 were closed by the acceptance run at commit
+**Parts in build order; all 15 are closed. Parts 10 to 15 are the points of the PRD the user picked on 2026-11-17; the acceptance run of 2026-11-18 at `9b31b6b30` passed S1 to S4 with all of them built (173 nodes, 686 edge rows, every edge row with a target). The sentences below give the history of parts 1 to 9.
 `822da80cf`: the whole stored graph equalled the frozen expected graph. Part 8 (a target for the
 133 method calls into `core`) was closed by the acceptance run at commit `753665eb9`, with
 the scope value `declarations`: 132 of the 133 calls are named and equal their frozen

@@ -101,7 +101,7 @@ Scope:
 - A method call into `core` is named from the `core` source (PRD, decided 2026-11-16): the
   run passes `--sysroot-source-scope-kind declarations` and reads the declarations of
   `core`, which the SOP freezes by digest like the pinned source. The accepted run of
-  2026-11-17 passed `declarations`; the earlier one, of 2026-11-16, passed `excluded`.
+  2026-11-18 passed `declarations`; the first one, of 2026-11-16, passed `excluded`.
 - The expected target of a call is written from source and frozen before the code that
   names it. A target the run names and the expected graph does not list is a FAIL.
 

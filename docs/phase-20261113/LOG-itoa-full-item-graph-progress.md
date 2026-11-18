@@ -4,22 +4,18 @@
 the bottom, never edited. The full log up to step 7.8 (2,788 lines) is in git:
 `git show cb40f3d2f:docs/phase-20261113/LOG-itoa-full-item-graph-progress.md`.
 
-## Where we are (2026-11-17, acceptance run of commit `753665eb9`, scope `declarations`)
+## Where we are (2026-11-18, acceptance run of commit `9b31b6b30`, scope `declarations`)
 
 **Accepted: the mapper stores a graph of pinned itoa 1.0.18 equal to the frozen expected
-graph of a `declarations` run, row for row (170 nodes, 682 edge rows), and the acceptance
-run passed SOP steps S1 to S4 on one frozen executable. 132 of the 133 method calls into
-`core` are named. The graph is still marked `incomplete`: one call, `cast`, has no target,
-and it is an expected row. The expected graph was written and checked by one author.**
+graph of a `declarations` run, row for row (173 nodes, 686 edge rows), and the acceptance
+run passed SOP steps S1 to S4 on one frozen executable. All 133 method calls into `core`
+are named and every edge row has a target. The six points picked on 2026-11-17 (SPEC
+parts 10 to 15) are built. The expected graph was written and checked by one author.**
 
-**Since that run the code has changed (SPEC parts 10 to 15, 2026-11-17 and 18): the
-`json` extension is inside the executable; each module contains the file area of its
-file; every item node stores its visibility, whether it is reachable from outside the
-crate, and its signature; each struct field is a node; stored rows no longer depend on
-the source directory; and `cast` is named. The run now stores 173 nodes and 686 edge
-rows, each edge row with a target. Both expected graphs are re-frozen and the two
-equality tests pass at `4cb0cbade`, but S1 to S4 are NOT STARTED for this head. They run
-next, once.**
+**The full run from pinned itoa to a DuckDB file passed on the same executable: 173 of
+173 node rows and 686 of 686 edge rows of the file equal the exported rows. The report is
+the last entry of this log. The tables below this paragraph that give 170 nodes describe
+the run of 2026-11-17 and are kept as its record.**
 
 **A separate crate copies the exported graph into one DuckDB file, and the full run from
 pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
@@ -1790,3 +1786,45 @@ and a run equals both re-frozen expected graphs: 170 nodes, 684 edge rows (scope
   after the code commit.
 - **Next:** the workspace gates, then S1 to S4 on one frozen executable, then the full
   run into the DuckDB file.
+
+## 2026-11-18 Acceptance run report: pinned itoa, scope `declarations`, commit `9b31b6b30`
+
+Frozen executable sha256 `26fb05f5…aac1bf1` (105,339,904 bytes), the workspace build of
+`9b31b6b30`; loader `336366a4…9736ee`. No production file changed during the run.
+
+```text
+S1  PASS  itoa af77385d, clean; the four source digests equal the pin; rustc 1.99.1; core
+          digest 39a4d534…ea40780 equals the freeze; the three builders rebuild 12 of 12
+          frozen files byte for byte; 25 expected-data tests pass
+S2  PASS  run publishes; 23.70 s, 368.0 MB peak; audit clean: 0 violations, 0 connect
+          calls, only .rustc_info.json under target/, 288 core .rs files read and no other
+          sysroot source, no open under ~/.duckdb; 173 nodes, 686 edge rows, 37.6 MB store
+S3  PASS  64 real-source tests on the frozen executable, 0 failed, 980.91 s
+S4  PASS  six runs at 1, 4 and 16 workers (22.3 to 24.5 s, 356 to 385 MB) and one run
+          from a second directory store identical node and edge rows; one run id in both
+          directories; 0 rows hold a real directory
+```
+
+- **Workspace gates at `9b31b6b30`:** `cargo fmt --all -- --check` exit 0; workspace
+  clippy exit 0; workspace tests 679 passed, 0 failed, 4 ignored in 25 binaries, with
+  `test_lang_items_in_sysroot` skipped (so by the written rule not a full PASS);
+  workspace build exit 0.
+- **The full run into a DuckDB file, same executables:** mapper 22.55 s, 375.2 MB; export
+  rows equal the S2 export; loader 0.82 s, 88.7 MB, file 7,876,608 bytes; a second load
+  onto the same path fails and keeps the file; the traced load makes 0 network calls,
+  starts no process and opens no input for writing; a separate Python check finds 173 of
+  173 node rows and 686 of 686 edge rows equal in all 11 columns, and 686 edges whose
+  target is a node.
+- **Completeness value stored:** `incomplete`. It is a constant in the code (PRD, "Open").
+- **A miss, found by the workspace gate:** 10 tests in three test binaries outside the
+  per-part gates were stale since parts 13 to 15: 9 compared a stored path with the real
+  fixture directory, 1 counted 170 nodes and 682 edge rows. Fixed in `9b31b6b30`, test
+  code only. The first two workspace runs of this report failed on them (1 and 9
+  failures); the third passed. The per-part gates should have included the workspace
+  tests.
+- **Limits:** the expected graph has one author; only itoa is proven; the run id includes
+  the toolchain directory; a field or variant written by a macro expansion has no test.
+- **Artifacts (session VM):** `~/phase8-work/accept2/` (`s1.txt`, `s2.txt`, `s4.txt`,
+  `s3.log`, `e2e.txt`, `status.txt`) and `~/phase8-work/final-ws.log`.
+- **codebase-memory queries:** none in this step; no code was written.
+- **Next:** nothing is in progress. Open decisions are in the PRD ("Open").

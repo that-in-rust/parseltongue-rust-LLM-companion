@@ -12,30 +12,26 @@ every run.**
   comparison, and every higher-abstraction table (interface level, file and folder roll-ups).
 - Passing unit tests, a bounded checkpoint or a planned command are not a PASS.
 
-Status on 2026-11-17: **all four steps passed on one frozen executable, built from commit
-`753665eb9`, with the scope value `declarations`** (run report in
+Status on 2026-11-18: **all four steps passed on one frozen executable, built from commit
+`9b31b6b30`, with the scope value `declarations`** (run report in
 [the log](LOG-itoa-full-item-graph-progress.md)). A production change after that commit
 needs a new run.
 
 ```text
 S1  freeze inputs and expected graph   PASS   source, compiler and core digests equal the freeze record
 S2  gates and production run           PASS   process audit clean; one workspace test skipped (below)
-S3  exact comparison                   PASS   61 tests; 170 nodes and 682 edge rows equal the frozen graph
-S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers store identical rows
+S3  exact comparison                   PASS   64 tests; 173 nodes and 686 edge rows equal the frozen graph
+S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers and one run from a second
+                                              directory store identical rows
 ```
 
-- The graph is marked `incomplete`: one method call into `core`, `cast`, has no target. It
-  is an expected row (Rule 3). The other 132 are named and equal their expected rows.
-- The accepted run of 2026-11-17 loaded DuckDB's `json` extension from
-  `~/.duckdb/extensions`, a file outside the frozen inputs of Rule 2. Since SPEC part 10
-  (2026-11-17) the extension is inside the executable and no run reads that file. The
-  change is to production code, so the next acceptance run is on a new executable.
+- Every edge row has a target: all 133 method calls into `core` are named. The run still
+  writes `incomplete` as the graph's completeness: that value is a constant in the code,
+  not computed from the rows (PRD, "Open").
+- No run reads a DuckDB extension file: the audit of S2 shows no open under `~/.duckdb`.
 - The workspace gate skips `test_lang_items_in_sysroot`, which fails when run. It reads the
   whole native sysroot, which no itoa run does. Accepted by the user on 2026-11-16 as a
-  known open defect.
-- The first workspace test run stopped at two tests that call `cargo metadata --offline`:
-  the machine's crate cache lacked a crate. After `cargo fetch --locked` a rerun of all
-  21 test binaries passed: 643 pass, 0 fail, 4 ignored (log, run report).
+  known open defect. The other 679 tests of 25 binaries pass, 4 ignored.
 - Both expected graphs were written and checked by one author (Rule 1).
 - The earlier run, with `excluded`, passed on 2026-11-16 at commit `822da80cf` (151 nodes,
   682 edge rows, 133 calls without a target). Its expected graph stays frozen and
