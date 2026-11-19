@@ -105,7 +105,7 @@ The run for this phase is
 Process boundary: production may start only `cargo metadata --offline`, `rustc --print cfg`
 and `rustc --print sysroot`. It never compiles, never runs build scripts or proc macros, never
 reads `target/`, and never uses the network. With scope `declarations` it also reads the
-`core` source files of the sysroot (decided 2026-11-16, below; accepted run of 2026-11-17).
+`core` source files of the sysroot (decided 2026-11-16, below; accepted runs of 2026-11-17 and 2026-11-18).
 
 ## 3 — How it is proven
 
@@ -149,7 +149,8 @@ done  crate root and each `mod name;` module --contains--> the file area of its 
 done  whole library equal to the frozen expected graph (A1–A6), at `822da80cf`
 done  part 8: a target for 132 of the 133 method calls into `core`; a `declarations` run
       equal to its frozen expected graph, at `753665eb9`
-open  `cast`, the one call without a target
+done  parts 10 to 15, `cast` included: all 133 method calls into `core` named; a
+      `declarations` run equal to its frozen expected graph, at `9b31b6b30`
 ```
 
 Method: expected rows live only in the test; fix the earliest missing producer; add only
