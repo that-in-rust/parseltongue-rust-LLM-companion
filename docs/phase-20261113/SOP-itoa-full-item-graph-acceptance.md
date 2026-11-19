@@ -27,7 +27,7 @@ S4  determinism, time, memory          PASS   six runs at 1, 4 and 16 workers an
 
 - Every edge row has a target: all 133 method calls into `core` are named. The run still
   writes `incomplete` as the graph's completeness: that value is a constant in the code,
-  not computed from the rows (PRD, "Open").
+  not computed from the rows (backlog, BC-01).
 - No run reads a DuckDB extension file: the audit of S2 shows no open under `~/.duckdb`.
 - The workspace gate skips `test_lang_items_in_sysroot`, which fails when run. It reads the
   whole native sysroot, which no itoa run does. Accepted by the user on 2026-11-16 as a

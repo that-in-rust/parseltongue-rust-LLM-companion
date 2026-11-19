@@ -14,8 +14,12 @@ parts 10 to 15) are built. The expected graph was written and checked by one aut
 
 **The full run from pinned itoa to a DuckDB file passed on the same executable: 173 of
 173 node rows and 686 of 686 edge rows of the file equal the exported rows. The report is
-the last entry of this log. The tables below this paragraph that give 170 nodes describe
+entry of 2026-11-18. The tables below this paragraph that give 170 nodes describe
 the run of 2026-11-17 and are kept as its record.**
+
+**Nothing is in progress and nothing is open in the PRD. What the accepted run left open
+is 12 items in the [backlog](BACKLOG-deferred-work-open-decisions.md), list C (BC-01 to
+BC-12), moved there on 2026-11-19.**
 
 **A separate crate copies the exported graph into one DuckDB file, and the full run from
 pinned itoa to that file passed at `c21eacd2b`: the file's rows equal the exported rows,
@@ -1828,3 +1832,24 @@ S4  PASS  six runs at 1, 4 and 16 workers (22.3 to 24.5 s, 356 to 385 MB) and on
   `s3.log`, `e2e.txt`, `status.txt`) and `~/phase8-work/final-ws.log`.
 - **codebase-memory queries:** none in this step; no code was written.
 - **Next:** nothing is in progress. Open decisions are in the PRD ("Open").
+
+## 2026-11-19 The PRD's open list moved to the backlog (documents only)
+
+The user asked what is left of the original PRD (the version of 2026-11-14, `758bcf6d4`)
+and then decided: "Whatever you think needs to be added, just put it in the backlog."
+
+- **Original PRD against the accepted run:** the finish line, graph rules 1 to 7, the 10
+  build-order rows and A1 to A5 are met by the run of 2026-11-18. A6 is met for 1, 4 and
+  16 workers (S4); its failure-safety half is tested on fixtures in the Turso adapter
+  (`test_full_cancelled_checkpoint_rejected`, `test_full_previous_serving_unchanged`),
+  not by cancelling a real itoa run. The original text "reviewed row by row" is not met:
+  one author, since Rule 5 was retired.
+- **Backlog, new list C, BC-01 to BC-12:** the five points of the PRD's "Open" list, the
+  two limits of SPEC part 13, three limits of the run report, and two new items (one
+  command from source to the DuckDB file; a registered table nothing writes).
+- **PRD:** "Open" now says nothing is open and points to list C. The build-order table no
+  longer lists `cast` as open (`bc8005867`).
+- **No code changed.** The accepted run of 2026-11-18 stands.
+- **codebase-memory queries:** none; no code was read beyond grep for test names.
+- **Next:** nothing is in progress. The next phase is the user's choice; the suggestion in
+  the backlog is BF-01, a second crate.

@@ -24,7 +24,8 @@ nodes  173    88 items and 2 fields of itoa, 67 names outside itoa (20 of them m
               declared in core), 13 builtin types, 2 file areas, 1 crate root
 edges  686    calls 197 (all with a target), uses_type 203, reads 98, contains 92,
               generates 45, expands 15, implements 32, imports 4
-open          the items under "Open" below; the expected graph was checked by its author alone
+open          nothing in this PRD; 12 items in the backlog, list C. The expected graph was
+              checked by its author alone
 ```
 
 Proof procedure: [SOP](SOP-itoa-full-item-graph-acceptance.md). Requirements:
@@ -376,25 +377,13 @@ general behaviour, nothing keyed on itoa names.
 
 ### Open
 
-- **The `incomplete` mark.** Every method call into `core` is named since SPEC part 15
-  (built 2026-11-18; `cast` by the rule that a bound on the lang item `pointee_sized`
-  restricts no type), and every edge row of a `declarations` run has a target. The run
-  still marks the graph `incomplete`: the mark is a constant in the code, not computed
-  from the rows. What "complete" should mean, and whether the run computes it, is open.
-- **Reading the whole sysroot.** A run with scope `included` did not finish name
-  resolution in 2,400 s on 2026-11-13 (the run report is deleted). No itoa run uses it.
-- **Reachability through a private supertrait.** "Reachable" means: can be named by a
-  public path from the crate root (SPEC part 11, decided under Rule 6 on 2026-11-17).
-  The methods of `private::Sealed` are stored as not reachable, although outside code can
-  call them through a bound `I: Integer`. Whether that route should count is open.
-- **The run id depends on the toolchain directory.** Stored rows no longer depend on the
-  source directory (SPEC part 14, built 2026-11-18: every stored path of a workspace file
-  starts with `/parseltongue-workspace-root`). The run id still hashes the path of the
-  toolchain, which is under the home directory, so it differs between two machines with
-  different home directories. Node and edge rows hold no such path.
-- **Edge reasons.** The code has two unresolved-reason lists: `SiteUnresolvedReasonKind` for
-  sites and `HldUnresolvedReasonKind` for graph edges. One must win before unresolved edges
-  are compared (A4).
+Nothing is open in this PRD. The five points that were listed here (the `incomplete`
+mark, reading the whole sysroot, reachability through a private supertrait, the run id
+and the toolchain directory, the two unresolved-reason lists) were moved to the
+[backlog](BACKLOG-deferred-work-open-decisions.md), list C, as BC-01 to BC-05 on
+2026-11-19 (user decision). None blocked the pass. The limits of the proof are there too:
+BC-08 (a skipped test), BC-09 (one author of the expected graph), BC-10 (failure safety
+tested on fixtures).
 
 ### Out of scope
 

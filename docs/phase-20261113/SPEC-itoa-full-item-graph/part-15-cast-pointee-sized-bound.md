@@ -157,4 +157,4 @@ Deviations from the repository rules:
   `workspace_full_map_completeness_kind = incomplete` and `IncompleteTypedInput` for
   every full-graph run; neither is computed from the rows. With every edge row holding a
   target the mark has no row behind it any more. What "complete" should mean, and
-  whether the run should compute it, is open (PRD, "Open").
+  whether the run should compute it, is open (backlog, BC-01).
